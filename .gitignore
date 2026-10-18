@@ -1,0 +1,43 @@
+ds-config.json
+design-system-engine-map.mjs
+structure-contract.mjs
+design-system-engine-history.json
+design-system-engine-check-result.json
+component-prop-result.json
+.design-system-engine-refs/
+node_modules
+.DS_Store
+
+# private parity plans/roadmap (local-only, never published)
+plans/
+
+# The demo design system is a whole project, kept in full (test/demo-ds.test.mjs).
+!test/fixtures/demo-ds/ds-config.json
+!test/fixtures/demo-ds/structure-contract.mjs
+!test/fixtures/demo-ds/.design-system-engine-refs/
+# Harbor and Lagoon, the other fictional design systems (test/harbor-ds.test.mjs, test/lagoon-tw.test.mjs).
+!test/fixtures/harbor-ds/ds-config.json
+!test/fixtures/harbor-ds/structure-contract.mjs
+# Tidepool, the Figma-only design system of the build evaluation (test/build-mode.test.mjs).
+!test/fixtures/tidepool-figma/ds-config.json
+!test/fixtures/lagoon-tw/ds-config.json
+
+# Local choice of guide and its extracted copy (--guide classic).
+.guide-choice
+.classic-guide.md
+
+# Skill evaluation transcripts (large; the result rows are kept).
+test/skill-evals/results/transcripts/
+test/skill-evals/results/build/transcripts/
+test/skill-evals/results/build/smoke/
+# Result rows while a measurement runs; added with git add -f once it is recorded in RESULTS.md.
+test/skill-evals/results/*.jsonl
+test/skill-evals/results/old/
+test/skill-evals/results/build/*.jsonl
+test/skill-evals/results/prototype/*.jsonl
+test/skill-evals/results/prototype/transcripts/
+# The Vue build tools the Vue harness tests use (npm install --prefix test/.vue-tools, test/.vue-cli-tools and
+# test/.nuxt-tools, as CI does)
+test/.vue-tools
+test/.vue-cli-tools
+test/.nuxt-tools

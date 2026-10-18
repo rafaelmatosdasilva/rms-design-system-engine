@@ -1,0 +1,473 @@
+// code-capture.mjs + css-source.mjs — the code side captured once, like Figma. Known-answer
+// fixtures: every fact below is known in advance, so the capture must reproduce it exactly.
+// Browser cases run when a Chrome/Chromium is available (CHROME_PATH or a Playwright install).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { makeFixture } from './helpers.mjs';
+import { captureCode, modeSwitch } from '../code-capture.mjs';
+import { loadCssSources, rootTokens, walkCss, resolveVars, canonValue, blankComments } from '../css-source.mjs';
+import { findChrome } from '../cdp.mjs';
+
+const HAS_CHROME = !!findChrome({ playwright: true }) && typeof WebSocket !== 'undefined';
+const browserTest = (name, fn) => test(name, { skip: HAS_CHROME ? false : 'no Chrome available' }, fn);
+const LIGHT_DARK = [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }, { name: 'Dark', snapshotKey: 'dark', cssSelector: 'dark-media' }];
+const fact = (snap, name, mode) => snap.tokens[name]?.modes?.[mode];
+
+// ── Static reading (no browser) ────────────────────────────────────────────────
+test('static: follows @import, keeps file and line, reads every :root block (not just the first)', () => {
+  const dir = makeFixture({
+    'css/base.css': '@import "palette.css";\n:root {\n  --surface: var(--grey-100);\n}\n:root { --gap-s: 8px; }\n',
+    'css/palette.css': '/* palette */\n:root { --grey-100: #F5F5F5; }\n',
+  });
+  const { files } = loadCssSources(dir, ['css/base.css']);
+  assert.deepEqual(files.map((f) => f.file), ['css/palette.css', 'css/base.css']);   // import applied first
+  const vars = rootTokens(files, LIGHT_DARK[0]);
+  assert.equal(vars.get('--gap-s').value, '8px');                                     // the second :root block
+  assert.equal(`${vars.get('--surface').file}:${vars.get('--surface').line}`, 'css/base.css:3');
+  assert.deepEqual(resolveVars('var(--surface)', vars), { value: '#F5F5F5', chain: ['--surface', '--grey-100'], unresolved: [] });
+});
+
+test('static: modes follow the real cascade, including the trap where a later :root beats an earlier dark block', () => {
+  const css = blankComments(`
+    @media (prefers-color-scheme: dark) { :root { --text: #fff; --bg: #000; } }
+    :root { --text: #111; }
+    :root { --bg: #fafafa; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0a0a0a; } }
+    :root.hc, [data-contrast="more"] { --text: #000; }
+    @layer base { :root { --ring: 2px !important; } }
+    :root { --ring: 1px; }`);
+  const src = [{ file: 't.css', text: css }];
+  const dark = rootTokens(src, LIGHT_DARK[1]);
+  assert.equal(dark.get('--text').value, '#111');     // the later :root wins in dark too (same specificity)
+  assert.equal(dark.get('--bg').value, '#0a0a0a');    // the later dark block wins
+  assert.equal(rootTokens(src, { cssSelector: 'class:hc' }).get('--text').value, '#000');
+  assert.equal(rootTokens(src, { cssSelector: 'data:contrast=more' }).get('--text').value, '#000');
+  assert.equal(rootTokens(src, LIGHT_DARK[0]).get('--ring').value, '2px');   // !important beats order
+});
+
+test('static: the parser handles nesting, strings and ";" inside url()', () => {
+  const rules = walkCss(blankComments('.card { color: red; &:hover { color: blue; } --icon: url(data:image/png;base64,AA); .title { gap: 4px } }'), 'c.css');
+  assert.deepEqual(rules.map((r) => r.selectors[0]), ['.card', '.card:hover', '.card .title']);
+  assert.deepEqual(rules[0].decls.map((d) => `${d.prop}=${d.value}`), ['color=red', '--icon=url(data:image/png;base64,AA)']);
+});
+
+test('canonValue: a minifier\'s spelling equals the source\'s', () => {
+  assert.equal(canonValue('rgba(0,0,0,.1)'), canonValue('rgba(0, 0, 0, 0.1)'));
+  assert.equal(canonValue('.28s'), canonValue('0.28s'));
+  assert.equal(canonValue('#FFFFFF'), '#ffffff');
+  assert.notEqual(canonValue('#000000'), canonValue('#000'));   // hex digits are never reinterpreted
+});
+
+test('modeSwitch: every mode kind maps to a browser switch, and an unknown condition is refused honestly', () => {
+  assert.equal(modeSwitch({ cssSelector: 'dark-media' }).media[0].value, 'dark');
+  assert.match(modeSwitch({ cssSelector: 'class:dark' }).apply, /classList\.add\("dark"\)/);
+  assert.match(modeSwitch({ cssSelector: 'data:theme=dim' }).apply, /setAttribute\("data-theme", "dim"\)/);
+  assert.equal(modeSwitch({ cssSelector: 'media:(min-width: 768px)' }).viewport, 768);
+  assert.ok(modeSwitch({ cssSelector: 'media:(orientation: portrait)' }).unsupported);
+});
+
+test('modeSwitch on the generated styleguide: its pinned data-color follows the mode, then is restored', () => {
+  const attrs = new Map([['data-color', 'light']]);
+  const document = { documentElement: { hasAttribute: (a) => attrs.has(a), getAttribute: (a) => attrs.get(a), setAttribute: (a, v) => attrs.set(a, v), removeAttribute: (a) => attrs.delete(a) } };
+  const run = (code) => new Function('document', code)(document);
+  const dark = modeSwitch({ cssSelector: 'dark-media' }, { styleguide: true });
+  run(dark.apply);
+  assert.equal(attrs.get('data-color'), 'dark');
+  run(dark.undo);
+  assert.deepEqual([...attrs], [['data-color', 'light']]);
+  assert.equal(modeSwitch({ cssSelector: 'dark-media' }).apply, undefined);   // an app page is left alone
+});
+
+test('capture without a browser: every token is single-source and says why', async () => {
+  const dir = makeFixture({
+    'ds-config.json': { paths: { themeCSS: 'theme.css' }, figma: { modes: LIGHT_DARK }, codeReading: { browser: 'off' } },
+    'theme.css': ':root { --a: 1px; } @media (prefers-color-scheme: dark) { :root { --a: 2px; } }',
+  });
+  const cfg = JSON.parse((await import('node:fs')).readFileSync(`${dir}/ds-config.json`, 'utf8'));
+  const { snapshot } = await captureCode(dir, cfg);
+  assert.deepEqual(fact(snapshot, '--a', 'dark'), { value: '2px', confidence: 'single-source', readBy: 'static', why: 'browser reading switched off' });
+  assert.deepEqual(snapshot._coverage.byConfidence, { verified: 0, 'single-source': 2, uncertain: 0 });
+});
+
+test('capture is cached by content, and recaptures when a file changes', async () => {
+  const { writeFileSync } = await import('node:fs');
+  const dir = makeFixture({ 'theme.css': ':root { --a: 1px; }' });
+  const cfg = { paths: { themeCSS: 'theme.css' }, figma: { modes: [LIGHT_DARK[0]] }, codeReading: { browser: 'off' } };
+  assert.equal((await captureCode(dir, cfg)).cached, false);
+  assert.equal((await captureCode(dir, cfg)).cached, true);
+  writeFileSync(`${dir}/theme.css`, ':root { --a: 2px; }');
+  const again = await captureCode(dir, cfg);
+  assert.equal(again.cached, false);
+  assert.equal(fact(again.snapshot, '--a', 'light').value, '2px');
+});
+
+// ── Browser reading ──────────────────────────────────────────────────────────────
+browserTest('browser + static agree on a plain theme: verified, with alias chain and declaration line', async () => {
+  const dir = makeFixture({
+    'theme.css': '@import "palette.css";\n:root { --text: var(--ink); }\n@media (prefers-color-scheme: dark) { :root { --text: var(--paper); } }\n',
+    'palette.css': ':root { --ink: #111111; --paper: #fafafa; }\n',
+  });
+  const { snapshot } = await captureCode(dir, { paths: { themeCSS: 'theme.css' }, figma: { modes: LIGHT_DARK } }, { force: true });
+  assert.deepEqual(fact(snapshot, '--text', 'light'), { value: '#111111', confidence: 'verified', alias: ['--ink'] });
+  assert.equal(fact(snapshot, '--text', 'dark').value, '#fafafa');
+  assert.equal(snapshot.tokens['--text'].declaredAt, 'theme.css:2');
+});
+
+browserTest('browser reading switches class, data-attribute and media modes, three modes at once', async () => {
+  const modes = [
+    { name: 'Light', snapshotKey: 'light', cssSelector: 'root' },
+    { name: 'Dim', snapshotKey: 'dim', cssSelector: 'data:theme=dim' },
+    { name: 'Compact', snapshotKey: 'compact', cssSelector: 'class:compact' },
+  ];
+  const dir = makeFixture({ 'theme.css': ':root { --bg: #fff; --pad: 8px; } [data-theme="dim"] { --bg: #333; } :root.compact { --pad: 4px; }' });
+  const { snapshot } = await captureCode(dir, { paths: { themeCSS: 'theme.css' }, figma: { modes } }, { force: true });
+  assert.equal(fact(snapshot, '--bg', 'dim').value, '#333');
+  assert.equal(fact(snapshot, '--pad', 'compact').value, '4px');
+  assert.equal(fact(snapshot, '--pad', 'dim').value, '8px');
+  assert.equal(snapshot._coverage.byConfidence.uncertain, 0);
+});
+
+browserTest('a reading the two sides disagree on is uncertain, never a design finding', async () => {
+  // Static reading treats @supports as always true; the browser knows this condition is false.
+  const dir = makeFixture({ 'theme.css': ':root { --w: 1px; } @supports (display: no-such-value) { :root { --w: 9px; } }' });
+  const { snapshot } = await captureCode(dir, { paths: { themeCSS: 'theme.css' }, figma: { modes: [LIGHT_DARK[0]] } }, { force: true });
+  assert.deepEqual(fact(snapshot, '--w', 'light'), { value: '1px', confidence: 'uncertain', readings: { browser: '1px', static: '9px' } });
+});
+
+browserTest('tokens injected at runtime by a page script are seen, and an app changing a DS token is recorded', async () => {
+  const dir = makeFixture({
+    'theme.css': ':root { --accent: #0066ff; }',
+    'app/ui.html': '<!doctype html><html><head><style>:root{--accent:#ff0066}</style></head><body><script>const s=document.createElement("style");s.textContent=":root{--runtime-token:3px}";document.head.appendChild(s);</script></body></html>',
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'] }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  assert.deepEqual(snapshot.appTokens['--runtime-token'], { app: { light: '3px' } });
+  assert.deepEqual(snapshot.tokens['--accent'].overriddenBy, { app: { light: '#ff0066' } });
+});
+
+// ── Components (browser) ─────────────────────────────────────────────────────────
+import { partFor, winningDecl, stateRecipe } from '../component-capture.mjs';
+
+test('partFor: the right slot of a shorthand for each side', () => {
+  assert.equal(partFor('padding', 'var(--a) var(--b)', 'paddingRight'), 'var(--b)');
+  assert.equal(partFor('padding', '1px 2px 3px', 'paddingLeft'), '2px');
+  assert.equal(partFor('gap', '4px 8px', 'columnGap'), '8px');
+  assert.equal(partFor('border', '1.5px solid var(--line)', 'borderTopWidth'), '1.5px');
+  assert.equal(partFor('border', '1.5px solid var(--line)', 'borderTopColor'), 'var(--line)');
+  assert.equal(partFor('border', 'none', 'borderTopWidth'), '0px');
+  assert.equal(partFor('background', 'none', 'backgroundColor'), 'transparent');
+});
+
+test('winningDecl: !important beats order, inline beats rules, implicit longhands are ignored', () => {
+  const rule = (sel, props) => ({ rule: { selectorList: { text: sel }, style: { cssProperties: props } } });
+  const m = [rule('.a', [{ name: 'color', value: 'red', important: true }]), rule('.b', [{ name: 'color', value: 'blue' }, { name: 'padding-top', value: '', implicit: true }])];
+  assert.equal(winningDecl(m, null, 'color').value, 'red');
+  assert.equal(winningDecl([rule('.b', [{ name: 'color', value: 'blue' }])], { cssProperties: [{ name: 'color', value: 'green' }] }, 'color').value, 'green');
+  assert.equal(winningDecl(m, null, 'paddingTop'), null);
+});
+
+test('stateRecipe: pseudo-classes are forced, classes and attributes applied, other elements refused', () => {
+  assert.deepEqual(stateRecipe('.btn', '.btn:hover').force, ['hover']);
+  assert.deepEqual(stateRecipe('.btn', '.btn.selected').classes, ['selected']);
+  assert.deepEqual(stateRecipe('.field', '.field--disabled').classes, ['field--disabled']);   // BEM modifier
+  assert.equal(stateRecipe('.btn', '.btn:disabled').disabled, true);
+  assert.deepEqual(stateRecipe('.tab', '.tab[aria-selected="true"]').attrs, [['aria-selected', 'true']]);
+  assert.ok(stateRecipe('.row', '.row .label').error);
+  assert.ok(stateRecipe('.radio', '.choice.done').error);
+});
+
+function componentProject() {
+  const theme = [
+    ':root { --pad-s: 8px; --pad-m: 12px; --ink: #111111; --line: #cccccc; --accent: #0055ff; --h: 32px; }',
+    '.chip { padding: var(--pad-s) var(--pad-m); color: var(--ink); border: 1.5px solid var(--line); height: var(--h); }',
+    '.chip:hover { color: var(--accent); }',
+    '.chip.selected { color: var(--accent); }',
+    '.field { padding: 4px; }',
+    '.field--disabled { padding: 2px; }',
+    '.toolbar .chip { padding-left: 2px; }',
+    '.tag { min-height: 40px; height: 20px; }',
+    '.pop { display: none; padding: 6px; }',
+    '.row { gap: 8px; display: flex; }',
+    '.row-item { padding: 3px; }',
+    '.choice.done { color: var(--accent); }',
+  ].join('\n');
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"><style>body{color:#222222;font-size:13px}</style></head><body>
+    <div class="chip">Plain</div>
+    <div class="toolbar"><div class="chip special" id="c2">Special</div></div>
+    <div class="tag">Tag</div>
+    <div class="pop">Hidden</div>
+    <div class="field">Field</div>
+    <div class="choice done">Done</div>
+  </body></html>`;
+  const contract = `export const CONTRACT = {
+    chip: { propertyMap: { State: { Default: '.chip', Hover: '.chip:hover', Selected: '.chip.selected' } } },
+    field: { propertyMap: { Disabled: { true: '.field--disabled' } } },
+    choice: { propertyMap: { State: { Done: '.choice.done' } } },
+    row: { children: [{ name: 'Item', cssSelector: '.row-item' }] },
+  };
+  export const COMPONENT_CSS_SELECTORS = { choice: { main: '.choice-box' } };`;
+  const dir = makeFixture({
+    'theme.css': theme, 'app/ui.html': page, 'structure-contract.mjs': contract,
+    'struct.json': { components: { chip: {}, tag: {}, pop: {}, field: {}, row: {}, choice: {} } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] }, componentSelectors: { tagAlias: '.tag' } };
+  return { dir, cfg };
+}
+
+browserTest('components: measured where they render, traced to token and source line, and checked against the CSS', async () => {
+  const { dir, cfg } = componentProject();
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const chip = snapshot.components.chip;
+  assert.equal(chip.instance.how, 'found');                                   // the plain instance, not the toolbar usage
+  assert.deepEqual(
+    { v: chip.props.paddingRight.value, var: chip.props.paddingRight.var, at: chip.props.paddingRight.at, c: chip.props.paddingRight.confidence },
+    { v: '12px', var: '--pad-m', at: 'theme.css:2', c: 'verified' });
+  // A 1.5px border is the code's fact; browsers draw it 1px.
+  assert.deepEqual([chip.props.borderTopWidth.value, chip.props.borderTopWidth.drawn], ['1.5px', '1px']);
+  assert.equal(chip.props.color.value, 'rgb(17, 17, 17)');
+  // States: forced :hover and an applied class, each traced to its own rule.
+  assert.equal(chip.states['State=Hover'].produced, 'forced :hover');
+  assert.equal(chip.states['State=Hover'].changed.color.var, '--accent');
+  assert.equal(chip.states['State=Selected'].produced, 'class .selected');
+  // BEM modifier state.
+  assert.equal(snapshot.components.field.states['Disabled=true'].changed.paddingTop.value, '2px');
+});
+
+browserTest('components: min-height beats height, display:none is not measured, two names can share an element', async () => {
+  const { dir, cfg } = componentProject();
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const tag = snapshot.components.tag.props.height;
+  assert.equal(tag.value, '40px');
+  assert.equal(tag.note, 'min-height wins over the declared height');
+  assert.equal(tag.confidence, 'verified');
+  assert.equal(snapshot.components.pop.props.paddingTop.confidence, 'not-read');
+  assert.equal(snapshot.components.tagAlias.props.height.value, '40px');         // same element, second name
+});
+
+browserTest('components: a usage with extra classes is copied without them; a bare element gets its contract children and no invented height', async () => {
+  const { dir, cfg } = componentProject();
+  const page = (await import('node:fs')).readFileSync(`${dir}/app/ui.html`, 'utf8').replace('<div class="chip">Plain</div>', '');
+  (await import('node:fs')).writeFileSync(`${dir}/app/ui.html`, page);
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const chip = snapshot.components.chip;
+  assert.equal(chip.instance.how, 'isolated-copy');
+  assert.deepEqual(chip.instance.usageExtrasRemoved, ['.special', '#c2']);
+  assert.equal(chip.props.paddingLeft.value, '12px');                            // not the toolbar's 2px
+  const row = snapshot.components.row;
+  assert.equal(row.instance.how, 'bare');
+  assert.equal(row.props.columnGap.value, '8px');
+  assert.equal(row.props.height.confidence, 'not-read');
+});
+
+browserTest('components: a state the instance cannot be put in is measured on an element already in it', async () => {
+  const { dir, cfg } = componentProject();
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const done = snapshot.components.choice.states['State=Done'];
+  assert.match(done.produced, /found an element already in this state/);
+  assert.equal(done.colors.light.color, 'rgb(0, 85, 255)');
+});
+
+test('components without a browser: the base rule is read statically, single-source', async () => {
+  const { dir, cfg } = componentProject();
+  const { snapshot } = await captureCode(dir, { ...cfg, codeReading: { browser: 'off' } }, { force: true });
+  assert.deepEqual(snapshot.components.chip.props.paddingRight, { value: '12px', var: '--pad-m', at: 'theme.css:2', confidence: 'single-source', readBy: 'static', why: 'browser reading switched off' });
+});
+
+browserTest('components: when the built page and the source disagree, the value is uncertain, never a design fact', async () => {
+  const { dir, cfg } = componentProject();
+  // A stale build: the page carries its own copy of the rule with a different value.
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(`${dir}/app/ui.html`, 'utf8').replace('<style>', '<style>.chip{padding-left:20px}');
+  fs.writeFileSync(`${dir}/app/ui.html`, page);
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const f = snapshot.components.chip.props.paddingLeft;
+  assert.equal(f.value, '20px');
+  assert.equal(f.confidence, 'uncertain');
+  assert.deepEqual([f.readings.browser, f.readings.static], ['20px', '12px']);
+  // Values the two readings agree on stay verified.
+  assert.equal(snapshot.components.chip.props.paddingTop.confidence, 'verified');
+});
+
+browserTest('breakpoints: each component is measured at every Figma breakpoint width', async () => {
+  const dir = makeFixture({
+    'theme.css': ':root { --pad: 8px; }\n.card { padding: var(--pad); display: block; }\n@media (min-width: 1024px) { .card { padding: 16px; } }\n',
+    'app/ui.html': '<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><div class="card">Card</div></body></html>',
+    'structure-contract.mjs': 'export const CONTRACT = { card: {} };',
+    'struct.json': { components: { card: {} } },
+    'vars.json': { breakpoints: { Phone: { 'viewport/min-width': '0' }, Desktop: { 'viewport/min-width': '1024' } } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: [], snapshotStructure: 'struct.json', snapshotVars: 'vars.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const bp = snapshot.components.card.breakpoints;
+  assert.deepEqual([bp.Phone.width, bp.Phone.paddingLeft, bp.Desktop.width, bp.Desktop.paddingLeft], [375, '8px', 1024, '16px'], JSON.stringify(bp));
+});
+
+browserTest('variant combinations: two axes put on at once, measured with their visible parts', async () => {
+  const dir = makeFixture({
+    'theme.css': '.chip { display: inline-flex; height: 32px; padding: 0 8px; }\n.chip .chip-icon { display: none; width: 12px; height: 12px; }\n.chip--l { height: 40px; padding: 0 12px; }\n.chip.has-icon .chip-icon { display: inline-block; }\n',
+    'app/ui.html': '<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><div class="chip"><span class="chip-icon"></span><span class="chip-label">Tag</span></div></body></html>',
+    'structure-contract.mjs': "export const CONTRACT = { chip: { propertyMap: { Size: { M: '.chip', L: '.chip.chip--l' }, Icon: { False: '.chip', True: '.chip.has-icon' } }, children: [{ name: 'Icon', cssSelector: '.chip .chip-icon' }, { name: 'Label', cssSelector: '.chip .chip-label' }] } };",
+    'struct.json': { components: { chip: { defaultVariant: 'Size=M, Icon=False', variants: { 'Size=M, Icon=False': {}, 'Size=L, Icon=True': {} } } } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: [], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const chip = snapshot.components.chip;
+  assert.deepEqual(chip.layers, { Icon: false, Label: true });
+  const combo = chip.combos?.['Size=L, Icon=True'];
+  assert.ok(combo, JSON.stringify(Object.keys(chip)));
+  assert.deepEqual([combo.size.height, combo.layers, combo.changed.paddingLeft?.value], [40, { Icon: true, Label: true }, '12px']);
+  assert.equal(chip.states['Size=L'].size.height, 40);
+});
+
+browserTest('disabled wins: hover and press must not change a disabled component', async () => {
+  const dir = makeFixture({
+    'theme.css': '.btn { background: rgb(0, 0, 255); color: rgb(255, 255, 255); }\n.btn.btn--off { background: rgb(200, 200, 200); }\n.btn:hover { background: rgb(0, 0, 128); }\n.ok { background: rgb(0, 0, 255); }\n.ok:hover:not(.ok--off) { background: rgb(0, 0, 128); }\n.ok.ok--off { background: rgb(200, 200, 200); }\n',
+    'apps/app/ui.html': '<!doctype html><html><head><link rel="stylesheet" href="../../theme.css"></head><body><button class="btn">Go</button><button class="ok">Ok</button></body></html>',
+    'structure-contract.mjs': "export const CONTRACT = { btn: { propertyMap: { isDisabled: { True: '.btn.btn--off' } } }, ok: { propertyMap: { isDisabled: { True: '.ok.ok--off' } } } };",
+    'struct.json': { components: { btn: {}, ok: {} } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: [], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const hover = (c) => snapshot.components[c].disabledGuard.find((g) => g.force === 'hover');
+  assert.deepEqual(Object.keys(hover('btn').changed), ['backgroundColor']);
+  assert.equal(hover('btn').changed.backgroundColor.to, 'rgb(0, 0, 128)');
+  assert.deepEqual(hover('ok').changed, {});
+  const { compareComponents } = await import('../capture-compare.mjs');
+  const r = compareComponents(snapshot, { btn: {}, ok: {} }, {}, {}, { EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {} });
+  assert.deepEqual(r.differ.filter((d) => /while disabled/.test(d.field)).map((d) => `${d.component} ${d.field}: ${d.code}`), ['btn hover while disabled (isDisabled=True): changes background']);
+});
+
+browserTest('disabled wins: every border side, the shadow and the outline, and no border that only follows the text colour', async () => {
+  const dir = makeFixture({
+    // .tab draws its bottom border only; its hover changes that side, a shadow and an outline. .link has no border, so
+    // its border colour follows the text colour its hover changes: only the text colour is a change.
+    'theme.css': '.tab { color: rgb(0, 0, 0); border: 0 solid; border-bottom: 2px solid rgb(0, 0, 0); }\n.tab.tab--off { color: rgb(150, 150, 150); }\n.tab:hover { border-bottom-color: rgb(0, 0, 255); box-shadow: 0 1px 2px rgb(0, 0, 0); outline: 2px solid rgb(0, 0, 255); }\n.link { color: rgb(0, 0, 0); }\n.link.link--off { color: rgb(150, 150, 150); }\n.link:hover { color: rgb(0, 0, 255); }\n',
+    'apps/app/ui.html': '<!doctype html><html><head><link rel="stylesheet" href="../../theme.css"></head><body><div class="tab">Tab</div><a class="link">Link</a></body></html>',
+    'structure-contract.mjs': "export const CONTRACT = { tab: { propertyMap: { isDisabled: { True: '.tab.tab--off' } } }, link: { propertyMap: { isDisabled: { True: '.link.link--off' } } } };",
+    'struct.json': { components: { tab: {}, link: {} } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: [], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const hover = (c) => snapshot.components[c].disabledGuard.find((g) => g.force === 'hover');
+  assert.deepEqual(Object.keys(hover('tab').changed), ['borderBottomColor', 'boxShadow', 'outlineColor', 'outlineWidth', 'outlineStyle']);
+  assert.equal(hover('tab').changed.outlineStyle.rule, '.tab:hover');
+  assert.deepEqual(Object.keys(hover('link').changed), ['color']);
+  const { compareComponents } = await import('../capture-compare.mjs');
+  const r = compareComponents(snapshot, { tab: {}, link: {} }, {}, {}, { EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {} });
+  assert.deepEqual(r.differ.filter((d) => /hover while disabled/.test(d.field)).map((d) => `${d.component}: ${d.code}`), ['tab: changes bottom border colour, shadow, outline colour, outline width, outline', 'link: changes text colour']);
+});
+
+browserTest('disabled wins: a state the user cannot reach is not a leak', async () => {
+  const dir = makeFixture({
+    'theme.css': '.btn { background: rgb(0, 0, 255); }\n.btn:disabled { background: rgb(200, 200, 200); pointer-events: none; }\n.btn:hover, .btn:active { background: rgb(0, 0, 128); }\n',
+    'apps/app/ui.html': '<!doctype html><html><head><link rel="stylesheet" href="../../theme.css"></head><body><button class="btn">Go</button></body></html>',
+    'structure-contract.mjs': "export const CONTRACT = { btn: { propertyMap: { State: { Disabled: '.btn:disabled' } } } };",
+    'struct.json': { components: { btn: {} } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: [], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  assert.deepEqual(snapshot.components.btn.disabledGuard.map((g) => [g.force, g.unreachable]), [['hover', 'pointer-events: none'], ['active', 'pointer-events: none']]);
+});
+
+test("the project's own style guide page is opened with ?all, so its shrunken card thumbnails are never measured", async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../code-capture.mjs', import.meta.url), 'utf8');
+  assert.equal((src.match(/label === 'styleguide' \? '\?all' : ''/g) ?? []).length, 2);
+});
+
+// every side's border colour, a width the page gives as written, and only text that is drawn.
+browserTest('components: a bottom border\'s own colour, a relative width as written, and the first text drawn', async () => {
+  const theme = `.rule { display: block; width: 100%; border: 0; border-bottom: 1px solid #c80000; color: #111111; }
+.sw { display: inline-flex; gap: 4px; }
+.sw .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); font-size: 30px; }
+.sw .label { font-size: 12px; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body>
+    <div class="rule"></div>
+    <label class="sw"><span class="sr">Hidden name</span><span class="label">On</span></label>
+  </body></html>`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'struct.json': { components: { rule: {}, sw: {} } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const rule = snapshot.components.rule;
+  assert.equal(rule.props.borderBottomColor.value, 'rgb(200, 0, 0)');
+  assert.equal(rule.props.width.declared, '100%');
+  assert.equal(snapshot.components.sw.parts.text.props.fontSize.value, '12px');   // the drawn label, not the clipped name
+});
+
+// Figma's default variant adds a class (Disabled=True is .fld--off); the option the bare component draws
+// (Disabled=False) is measured with that class taken off, not skipped as the instance itself.
+browserTest('components: an option the bare component draws is measured with the default variant\'s class taken off', async () => {
+  const theme = `.fld { display: block; padding: 4px; }
+.fld.fld--off { padding: 2px; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><div class="fld">Field</div></body></html>`;
+  const contract = `export const CONTRACT = { fld: { propertyMap: { Disabled: { True: '.fld.fld--off', False: '.fld' } } } };`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'structure-contract.mjs': contract, 'struct.json': { components: { fld: {} } },
+    'props.json': { fld: { properties: { Disabled: { type: 'VARIANT', defaultValue: 'True', variantOptions: ['True', 'False'] } } } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json', compPropsSnapshot: 'props.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const fld = snapshot.components.fld;
+  assert.equal(fld.props.paddingTop.value, '2px');                                  // Figma's default, Disabled=True
+  const off = fld.states['Disabled=False'];
+  assert.equal(off.produced, 'class .fld--off taken off');
+  assert.equal(off.changed.paddingTop.value, '4px');
+});
+
+// A switch drawn by its own checkbox: each Enable option is that checkbox ticked or not, set on the instance (never a
+// class of a part put on the root), and the text's own colour is read in each.
+browserTest('components: an option drawn by the component\'s own checkbox ticks it or not, and its text is read there', async () => {
+  const theme = `.sw { display: inline-flex; gap: 4px; color: #444444; }
+.sw-input { position: absolute; opacity: 0; }
+.sw-track { width: 20px; height: 10px; background: #888888; }
+.sw-input:checked + .sw-track { background: #000000; }
+.sw-desc { color: #444444; }
+.sw-input:checked ~ .sw-desc { color: #111111; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><label class="sw"><input type="checkbox" class="sw-input" checked><span class="sw-track"></span><span class="sw-desc">On</span></label></body></html>`;
+  const contract = `export const CONTRACT = { sw: { propertyMap: { Enable: { True: '.sw-input:checked + .sw-track', False: '.sw-track' } } } };`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'structure-contract.mjs': contract, 'struct.json': { components: { sw: {} } },
+    'props.json': { sw: { properties: { Enable: { type: 'VARIANT', defaultValue: 'True', variantOptions: ['True', 'False'] } } } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json', compPropsSnapshot: 'props.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const { states } = snapshot.components.sw;
+  assert.equal(states['Enable=False'].produced, '.sw-input not ticked');
+  assert.equal(states['Enable=False'].colors.light.textColor, 'rgb(68, 68, 68)');
+  assert.equal(states['Enable=True'].colors.light.textColor, 'rgb(17, 17, 17)');
+  assert.equal(states['Enable=False'].changed.width, undefined);                       // the root is not drawn as its track
+});
+
+// Figma reads a field's first TEXT layer: its label when one comes before the value. A field with no label before it
+// is its own text.
+browserTest('components: a label drawn before a text field is the first text; a field alone is its text', async () => {
+  const theme = `.fld { display: inline-flex; gap: 4px; }
+.fld .lbl { color: #333333; }
+.fld input { color: #999999; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body>
+    <label class="fld"><span class="lbl">Label</span><input value="Value"></label>
+    <div class="bare"><input class="bare-in" value="Value" style="color:#999999"><span>after</span></div>
+  </body></html>`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'struct.json': { components: { fld: {}, bare: {} } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  assert.equal(snapshot.components.fld.parts.text.props.color.value, 'rgb(51, 51, 51)');    // the label, not the value
+  assert.equal(snapshot.components.bare.parts.text.props.color.value, 'rgb(153, 153, 153)'); // the field comes first
+});
+
+// the capture reads the box's min and max width, alignment and wrap, every side's border style, and the first
+// text's decoration, italic and alignment, each traced to its rule.
+browserTest('components: min and max width, alignment, wrap, border style, and the text\'s decoration, italic and alignment', async () => {
+  const theme = `.row { display: flex; min-width: 80px; max-width: 320px; justify-content: space-between; align-items: center; flex-wrap: wrap; border: 1px dashed #333; }
+.row .t { text-decoration: underline; font-style: italic; text-align: center; }`;
+  const page = `<!doctype html><html><head><link rel="stylesheet" href="../theme.css"></head><body><div class="row"><span class="t">Read more</span></div></body></html>`;
+  const dir = makeFixture({ 'theme.css': theme, 'app/ui.html': page, 'struct.json': { components: { row: {} } } });
+  const cfg = { paths: { themeCSS: 'theme.css', plugins: ['app'], pluginCSS: ['app/ui.src.html'], snapshotStructure: 'struct.json' }, figma: { modes: [LIGHT_DARK[0]] } };
+  const { snapshot } = await captureCode(dir, cfg, { force: true });
+  const row = snapshot.components.row;
+  assert.equal(row.props.minWidth.value, '80px');
+  assert.equal(row.props.maxWidth.value, '320px');
+  assert.equal(row.props.justifyContent.value, 'space-between');
+  assert.equal(row.props.alignItems.value, 'center');
+  assert.equal(row.props.flexWrap.value, 'wrap');
+  assert.equal(row.layout.borderStyles.Bottom, 'dashed');
+  const t = row.parts.text.props;
+  assert.equal(t.textDecorationLine.value, 'underline');
+  assert.equal(t.fontStyle.value, 'italic');
+  assert.equal(t.textAlign.value, 'center');
+});

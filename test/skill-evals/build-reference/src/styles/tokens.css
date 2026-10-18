@@ -1,0 +1,32 @@
+/* Tidepool tokens (reference for the build evaluation). Dark mode: data-theme="dark" on the html element. */
+:root {
+  --surface-page: #ffffff;
+  --text-primary: #1b2433;
+  --button-background: #1f5fd6;
+  --button-background-hover: #1849a8;
+  --button-text: #ffffff;
+  --chip-background: #e8eef9;
+  --chip-text: #1b2433;
+  --field-border: #7d8799;
+  --field-border-error: #c4231b;
+  --gap-s: 4px;
+  --padding-xs: 4px;
+  --padding-s: 8px;
+  --padding-m: 12px;
+  --radii-button: 8px;
+  --radii-chip: 16px;
+  --radii-field: 6px;
+  --stroke-default: 1px;
+}
+
+:root[data-theme="dark"] {
+  --surface-page: #10151f;
+  --text-primary: #eef2f8;
+  --button-background: #5b8def;
+  --button-background-hover: #7aa3f2;
+  --button-text: #0b1020;
+  --chip-background: #243049;
+  --chip-text: #eef2f8;
+  --field-border: #8f99ab;
+  --field-border-error: #ff7a70;
+}

@@ -1,0 +1,398 @@
+// What the team wrote about its system, and its product's page decisions, put in front of a prototype.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, mkdtempSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf, neverOf, ruledOut } from '../prototype-context.mjs';
+import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from '../product-conventions.mjs';
+import { checkPrototype } from '../prototype-pieces.mjs';
+
+const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+const catalog = { components: {
+  button: { description: 'The main action on a screen.', props: { Label: { type: 'text' } } },
+  field: { description: 'A one-line text input.', props: {}, whenNotToUse: 'an on/off choice', useInstead: ['chip'] },
+  badge: { description: 'Old status label.', props: {}, status: 'deprecated', useInstead: ['tag'] },
+} };
+const intent = {
+  components: {
+    button: { design: { description: 'x', annotations: [{ label: 'Role: button' }, 'Keep the label to one verb'] }, code: { note: null, cssComment: 'Primary only' }, guidelines: 'One per screen.' },
+    field: { design: { annotations: [] }, code: {}, guidelines: 'Only for typing text.' },
+  },
+  guidelines: { general: 'Every page opens with one heading.', _sources: ['guidelines.md'] },
+  templates: { authored: 'Settings pages: heading, sections, actions at the end.' },
+  pages: { authored: '' },
+};
+
+test('the context gathers each component\'s purpose, role, notes, when not to use it and its guidelines, and the team\'s rules', () => {
+  const ctx = contextFrom(catalog, intent);
+  assert.equal(ctx.components.button.purpose, 'The main action on a screen.', 'the catalog\'s description first');
+  assert.equal(ctx.components.button.role, 'button');
+  assert.deepEqual(ctx.components.button.notes, ['Keep the label to one verb', 'Primary only']);
+  assert.equal(ctx.components.button.guidelines, 'One per screen.');
+  assert.equal(ctx.components.field.notFor, 'an on/off choice');
+  assert.deepEqual(ctx.components.field.useInstead, ['chip']);
+  assert.equal(ctx.components.badge.status, 'deprecated');
+  assert.deepEqual(ctx.rules.map((r) => r.title), ['guidelines', 'templates (design intent)'], 'an empty layer says nothing');
+  const lines = purposeLines(ctx, ['button', 'field', 'badge']).join('\n');
+  assert.match(lines, /button {2}The main action on a screen\. Role button\./);
+  assert.match(lines, /not for an on\/off choice; use chip/);
+  assert.match(lines, /guidelines Only for typing text\./);
+  assert.match(lines, /badge {3}Old status label\. \[deprecated: use tag\]/);
+  assert.match(ruleLines(ctx).join('\n'), /templates \(design intent\): Settings pages: heading, sections, actions at the end\./);
+});
+
+test('after drawing, each component used is shown beside what the prototype uses it for', () => {
+  const ctx = contextFrom(catalog, intent);
+  const uses = usesAgainstPurpose(ctx, [
+    { component: 'button', props: { Label: 'Save' } }, { component: 'button', props: { Label: 'Cancel' } },
+    { component: 'field', props: { standInFor: 'an on/off switch' } }, { component: 'Row', props: {} },
+  ]);
+  assert.deepEqual(uses.map((u) => u.component), ['button', 'field']);
+  assert.deepEqual(uses[0].uses, ['Save', 'Cancel']);
+  assert.match(uses[0].rule, /Guidelines: One per screen\./, 'two buttons beside "one per screen"');
+  assert.match(uses[1].rule, /Not for an on\/off choice/);
+});
+
+test('a retired component is never put in a new prototype: its replacement is named', () => {
+  const r = checkPrototype({ component: 'Page', children: [{ component: 'badge' }] }, { catalog, view: { components: [{ name: 'badge', controls: [] }] }, scales: { spacing: [], text: [] } });
+  assert.equal(r.ok, false);
+  assert.ok(r.findings.some((f) => f.level === 'error' && /badge is deprecated: use tag instead/.test(f.message)));
+});
+
+const page = (padding, heading, extra = []) => ({ component: 'Page', props: { padding, gap: 'padding/m' }, children: [{ component: 'Text', props: { text: 'T', style: heading, as: 'h1' } }, ...extra, { component: 'Row', props: { justify: 'end' }, children: [{ component: 'button', props: { Label: 'Save' } }] }] });
+
+test('page facts: the frame, the heading, where the actions sit, and the answer to each missing need', () => {
+  const f = pageFacts(page('padding/m', 'm', [{ component: 'chip', props: { standInFor: 'on/off switch for email' } }, { component: 'Missing', props: { need: 'an illustration' } }]), { actionNames: ['button'] });
+  assert.deepEqual(f.page, { padding: 'padding/m', gap: 'padding/m', width: null, align: null });
+  assert.deepEqual(f.heading, { style: 'm', as: 'h1' });
+  assert.deepEqual(f.actions, { at: 'end', justify: 'end' });
+  assert.deepEqual(f.needs, [{ need: 'on/off switch for email', answer: 'chip as a stand-in' }, { need: 'an illustration', answer: 'a Missing box' }]);
+});
+
+test('conventions: two pages, or one designed screen, set a decision; where none is shared the first page made does; the team\'s file wins', () => {
+  const A = ['button'];
+  const two = { a: pageFacts(page('padding/m', 'm'), { actionNames: A }), b: pageFacts(page('padding/m', 'm'), { actionNames: A }) };
+  assert.equal(deriveConventions(two).page.padding.value, 'padding/m');
+  assert.equal(deriveConventions(two).page.padding.first, undefined);
+  const one = { a: pageFacts(page('padding/m', 'm'), { actionNames: A }) };
+  assert.deepEqual(deriveConventions(one).page.padding, { value: 'padding/m', pages: ['a'], first: true, made: null }, 'one page sets the rule for the next');
+  assert.equal(deriveConventions({ a: { ...one.a, designed: true } }).page.padding.first, undefined, 'a screen a designer made is a convention of its own');
+  const tie = { b: { ...pageFacts(page('padding/s', 'm'), { actionNames: A }), made: 2 }, a: { ...pageFacts(page('padding/m', 'm'), { actionNames: A }), made: 5 } };
+  assert.deepEqual(deriveConventions(tie).page.padding, { value: 'padding/s', pages: ['b'], first: true, made: 2 }, 'a tie: the page made first');
+  assert.deepEqual(consistencyFindings(tie.a, deriveConventions({ b: tie.b })).map((d) => d.what), ['page padding'], 'a page made later is held to it');
+  assert.deepEqual(consistencyFindings({ ...tie.b, made: 2 }, deriveConventions({ a: tie.a })), [], 'never a page made before it');
+  assert.deepEqual(consistencyFindings({ ...tie.a, made: 9, designed: true }, deriveConventions({ b: tie.b })), [], 'nor a screen a designer made');
+  const authored = deriveConventions(two, { page: { padding: 'padding/s' }, needs: { 'on/off switch': 'a Missing box' } });
+  assert.equal(authored.page.padding.value, 'padding/s');
+  assert.equal(authored.page.padding.authored, true);
+  assert.equal(authored.needs[0].answer, 'a Missing box');
+});
+
+test('a page that decides differently from the others is told each difference, with the pages it differs from', () => {
+  const A = ['button'];
+  const others = {
+    settings: { ...pageFacts(page('padding/m', 'm', [{ component: 'Missing', props: { need: 'a toggle switch' } }]), { actionNames: A }), designed: true },
+  };
+  const here = pageFacts(page('padding/s', 's', [{ component: 'chip', props: { standInFor: 'switch to toggle push' } }]), { actionNames: A });
+  const d = consistencyFindings(here, deriveConventions(others));
+  const lines = d.map(consistencyLine);
+  assert.ok(lines.includes('page padding: padding/s here, padding/m on the product\'s other pages (settings): give the Page padding "padding/m"'), lines.join('\n'));
+  assert.ok(lines.includes('page heading style: s here, m on the product\'s other pages (settings): give that Text style "m"'));
+  assert.ok(lines.some((l) => /the answer to "a toggle switch": chip as a stand-in here, a Missing box/.test(l)), 'the same need, answered another way');
+  assert.deepEqual(consistencyFindings(pageFacts(page('padding/m', 'm'), { actionNames: A }), deriveConventions(others)), [], 'a page that matches has nothing to change');
+});
+
+test('beyond the frame: body and section text styles, the words for each kind of action and the component it is', () => {
+  const A = ['button', 'chip'];
+  const mk = (save, comp, body, section) => ({ component: 'Page', props: { padding: 'padding/m' }, children: [
+    { component: 'Text', props: { as: 'h1', text: 'Title', style: 'm' } }, { component: 'Text', props: { as: 'h2', text: 'Part', style: section } },
+    { component: 'Text', props: { as: 'p', text: 'Body', style: body } }, { component: 'Row', children: [{ component: comp, props: { Label: save } }, { component: 'button', props: { Label: 'Cancel' } }] }] });
+  const f = pageFacts(mk('Save', 'button', 's', 'm'), { actionNames: A });
+  assert.deepEqual([f.body, f.section, f.intents], ['s', 'm', [{ intent: 'save', label: 'Save', component: 'button' }, { intent: 'cancel', label: 'Cancel', component: 'button' }]]);
+  const conv = deriveConventions({ account: { ...f, made: 1 } });
+  const here = pageFacts(mk('Submit changes', 'chip', 'm', 's'), { actionNames: A });
+  assert.deepEqual(consistencyFindings(here, conv).map(consistencyLine), [
+    'body text style: m here, s on the product\'s other pages (account, the first page made): give that Text style "s"',
+    'section heading style: s here, m on the product\'s other pages (account, the first page made): give that Text style "m"',
+    'the words for saving: "Submit changes" here, "Save" on the product\'s other pages (account, the first page made): label it "Save"',
+    'the component for saving ("Submit changes"): chip here, button on the product\'s other pages (account, the first page made)',
+  ]);
+  assert.deepEqual(consistencyFindings(pageFacts(mk('save', 'button', 's', 'm'), { actionNames: A }), conv), [], 'the same words in another case are the same words');
+});
+
+test('guidelines: every section is kept with its file; one named after a component goes with it, the rest are the product\'s rules', () => {
+  const sections = sectionsOf('Every page opens with one heading.\n\n## button\nOne button per screen, for its main action.\n\n## Forms\nPut the Save action at the end.').map((x) => ({ ...x, file: 'guidelines/notion-style.md' }));
+  const ctx = contextFrom(catalog, null, sections);
+  assert.equal(ctx.components.button.guidelines, 'One button per screen, for its main action.');
+  assert.deepEqual(ctx.rules.map((r) => [r.title, r.file]), [['guidelines', 'guidelines/notion-style.md'], ['Forms', 'guidelines/notion-style.md']]);
+  assert.deepEqual(ctx.limits.map((l) => [l.component, l.max, l.per]), [['button', 1, 'screen']]);
+});
+
+test('limits are read only from a plain sentence: "one button per screen", "at most two fields on a page"; not "one primary button"', () => {
+  const comps = { button: { guidelines: null }, field: { guidelines: null } };
+  const rules = (t) => [{ title: 'x', text: t }];
+  assert.deepEqual(limitsFrom(comps, rules('Use at most two fields on a page.'), ['button', 'field']).map((l) => [l.component, l.max]), [['field', 2]]);
+  assert.deepEqual(limitsFrom(comps, rules('Show one primary button per screen.'), ['button', 'field']), [], 'a word between the number and the name: not read as a limit');
+  assert.deepEqual(limitsFrom({ button: { guidelines: 'One per screen. Short labels.' } }, [], ['button']).map((l) => l.max), [1], 'in the component\'s own section, "one per screen" is about it');
+});
+
+test('a composition with more of a component than the guidelines allow is not drawn; a width that is no breakpoint is a warning', () => {
+  const ctx = contextFrom(catalog, null, sectionsOf('## button\nOne button per screen.'));
+  const ui = { component: 'Page', props: { width: '500' }, children: [{ component: 'button', props: { Label: 'Delete' } }, { component: 'button', props: { Label: 'Cancel' } }] };
+  const r = checkPrototype(ui, { catalog, view: { components: [{ name: 'button', controls: [{ label: 'Label' }] }] }, scales: { spacing: [], text: [] }, limits: ctx.limits, breakpoints: breakpointsOf({ breakpoints: { mobile: '360px', desktop: 1280 } }) });
+  assert.equal(r.ok, false);
+  assert.ok(r.findings.some((f) => f.level === 'error' && /2 button on this screen, and the guidelines allow 1: "One button per screen\." \(guidelines, button\)/.test(f.message)));
+  assert.ok(r.findings.some((f) => f.level === 'warning' && /Page\.width 500 is none of the system's screen widths: mobile \(360\), desktop \(1280\)/.test(f.message)));
+});
+
+test('the request against everything known: the guidelines\' opening and the sections it touches, the components its words point to, the closest page', () => {
+  const ctx = contextFrom({ components: { ...catalog.components, chip: { description: 'A filter people switch on and off.', props: {} } } }, null,
+    sectionsOf('Every page opens with one heading.\n\n## Forms\nSettings save when Save is pressed, never on change.\n\n## Empty states\nNo illustration yet.'));
+  const f = requestFocus(ctx, 'prototype a notification settings page with a switch for email and a Save button', [
+    { name: 'settings', label: 'Settings (designed in Figma)', text: 'Settings Filter New Save', designed: true, file: null },
+    { name: 'search', label: 'search', text: 'Search', designed: false, file: 'prototypes/search.json' },
+  ]);
+  assert.deepEqual(f.sections.map((x) => x.title), ['guidelines', 'Forms'], 'the opening always, then Forms (settings, save); not Empty states');
+  assert.deepEqual(f.components.map((c) => c.name).sort(), ['button', 'chip']);
+  assert.ok(f.components.find((c) => c.name === 'chip').matched.includes('switch'));
+  assert.equal(f.pages[0].name, 'settings');
+  const lines = focusLines(f).join('\n');
+  assert.match(lines, /FOR THIS REQUEST {2}"prototype a notification settings page/);
+  assert.match(lines, /start from: Settings \(designed in Figma\)/);
+  assert.match(lines, /Forms: Settings save when Save is pressed, never on change\./);
+});
+
+test('a prototype request made with the command is kept for the catalog', async () => {
+  const { routePrompt } = await import('../guard.mjs');
+  const root = mkdtempSync(join(tmpdir(), 'proto-request-'));
+  cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), root, { recursive: true });
+  routePrompt({ prompt: '/rms-design-system-engine prototype a settings page with our components' }, { root, cfg: {} });
+  const r = JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'prototypes', 'request.json'), 'utf8'));
+  assert.equal(r.text, 'prototype a settings page with our components');
+});
+
+test('a "never" in the documentation rules a use out by the words after it, not by the whole sentence', () => {
+  const chip = { never: neverOf('Filters a list. People turn it on and off; it never submits anything.') };
+  assert.deepEqual(ruledOut(chip, 'on/off switch for email', 'chip'), [], 'turning on and off is what a chip is for');
+  assert.equal(ruledOut(chip, 'submit the form', 'chip').length, 1);
+  const tag = { never: neverOf('A status that does not change. Never a message that comes and goes, like a confirmation or an error: Tidepool has no toast yet.', 'a message that disappears') };
+  assert.deepEqual(ruledOut(tag, 'confirmation message', 'tag').map((r) => r.words), [['confirmation', 'message'], ['message']]);
+  assert.deepEqual(ruledOut(tag, 'New', 'tag'), []);
+});
+
+test('the request: a component its documentation rules out is named as ruled out, never as one its words point to; as a stand-in it is an error', () => {
+  const cat = { components: { ...catalog.components, tag: { description: 'A small status label.', props: { Label: { type: 'text' } } } } };
+  const ctx = contextFrom(cat, null, sectionsOf('## tag\nA status that does not change. Never a message that comes and goes, like a confirmation: there is no toast yet.'));
+  const f = requestFocus(ctx, 'an account page with a Save button and a message confirming the save', []);
+  assert.ok(!f.components.some((c) => c.name === 'tag'), 'not pointed to by the sentence that rules it out');
+  assert.deepEqual(f.ruledOut.map((r) => [r.name, r.words]), [['tag', ['message']]]);
+  assert.match(focusLines(f).join('\n'), /ruled out by the documentation for "message": tag, "Never a message that comes and goes, like a confirmation: there is no toast yet\."/);
+  const ui = { component: 'Page', children: [{ component: 'tag', props: { Label: 'Saved', standInFor: 'confirmation message' } }] };
+  const r = checkPrototype(ui, { catalog: cat, view: { components: [{ name: 'tag', controls: [{ label: 'Label' }] }] }, scales: { spacing: [], text: [] }, context: ctx });
+  assert.equal(r.ok, false);
+  assert.ok(r.findings.some((x) => x.level === 'error' && /tag is not for "confirmation message": "Never a message that comes and goes/.test(x.message)));
+});
+
+test('a stand-in made of the engine\'s own Text is still a gap', () => {
+  const r = checkPrototype({ component: 'Page', children: [{ component: 'Text', props: { text: 'Changes saved', style: 's' }, standInFor: 'a confirmation that goes away' }] }, { catalog, view: { components: [] }, scales: { spacing: [], text: [{ name: 's', size: '12px', lh: '16px', weight: '500' }] } });
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+  assert.ok(r.gaps.some((g) => g.need === 'a confirmation that goes away' && g.used === "the engine's Text"));
+});
+
+// ── End to end on a built Tidepool with written guidelines ────────────────────────────────────────────────────────
+test('the catalog shows what each component is for and the product\'s pages; a drawn prototype is held to both', { timeout: 600000 }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tp-context-'));
+  cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
+  cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
+  writeFileSync(join(dir, 'guidelines.md'), 'Every page opens with one heading.\n\n## field\nOnly for typing text. Never as an on/off control.\n');
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { sources: ['guidelines.md'] } }, null, 2));
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  assert.equal(run('--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json').status, 0);
+
+  const cat = run('--prototype', '--catalog');
+  assert.equal(cat.status, 0, cat.stdout);
+  assert.match(cat.stdout, /field +A one-line text input\. Role textbox\.\n +guidelines Only for typing text\. Never as an on\/off control\./);
+  assert.match(cat.stdout, /guidelines \(guidelines\.md\): Every page opens with one heading\./);
+  assert.match(cat.stdout, /Read from:\n(.*\n)*  • Figma: 1 designed screen \(src\/figma\/figma-screen-layout\.snapshot\.json\)\n(.*\n)*  • guidelines: guidelines\.md \(committed\)/);
+  assert.match(cat.stdout, /page padding padding\/m \(settings\)/, 'the designed screen sets the product\'s frame');
+  assert.ok(!existsSync(join(dir, 'src', 'styles', 'design-intent.json')), 'reading the intent writes nothing into the project');
+
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, 'prototypes', 'notify.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/s', gap: 'padding/m', width: '360' }, children: [
+    { component: 'Text', props: { text: 'Notifications', style: 'm', as: 'h1' } },
+    { component: 'field', props: {} },
+    { component: 'button', props: { Label: 'Save' } },
+  ] }));
+  const r = run('--prototype', 'prototypes/notify.json');
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /📓 WHAT THE DOCUMENTATION SAYS ABOUT WHAT THIS PROTOTYPE USES\n.*field: A one-line text input\. Role textbox\. Guidelines: Only for typing text\./);
+  assert.match(r.stdout, /• button \(used for "Save"\): The main action on a screen\./);
+  assert.match(r.stdout, /📐 DIFFERENT FROM THE PRODUCT'S OTHER PAGES {2}1\n {3}• page padding: padding\/s here, padding\/m on the product's other pages \(settings\)/);
+  const last = JSON.parse(readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'last.json'), 'utf8'));
+  assert.ok(last.gaps.some((g) => g.kind === 'consistency' && /page padding/.test(g.line)), 'the reply owes the difference');
+
+  const c = run('--prototype', '--consistency');
+  assert.equal(c.status, 0);
+  assert.match(c.stdout, /⚠️ {2}notify\n {6}• page padding: padding\/s here, padding\/m/);
+  assert.match(c.stdout, /✅ settings: the same as the others/);
+});
+
+test('without importing anything, the designed screens set the product\'s pages and the request picks the closest one', { timeout: 600000 }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tp-focus-'));
+  cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
+  const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+  cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
+  cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--catalog', '--for', 'a notification settings page with a Save button'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  assert.equal(r.status, 0, r.stdout);
+  assert.match(r.stdout, /FOR THIS REQUEST {2}"a notification settings page with a Save button"\n {2}start from: Settings \(designed in Figma; rms-design-system-engine --prototype --from-screens brings it into prototypes\/\)/);
+  assert.match(r.stdout, /components its words point to: button/);
+  assert.match(r.stdout, /page padding padding\/m \(settings\)/);
+  assert.ok(!existsSync(join(dir, 'prototypes')), 'nothing written into the project');
+});
+
+test('the frame: containers a designed page holds at the top (a bar, a panel) are the product\'s; content is not', () => {
+  const ia = { component: 'Page', children: [{ component: 'actionBar', children: [{ component: 'input' }] }, { component: 'Row', children: [{ component: 'panel', children: [{ component: 'listItem' }] }, { component: 'Stack', children: [] }] }, { component: 'button' }] };
+  const f = pageFacts(ia);
+  assert.deepEqual(f.frame, ['actionBar', 'panel'], 'the button and the list item are content');
+  const conv = deriveConventions({ ia: { ...f, designed: true } });
+  assert.deepEqual(conv.frame.map((c) => c.component), ['actionBar', 'panel']);
+  const here = pageFacts({ component: 'Page', children: [{ component: 'Row', children: [{ component: 'panel', children: [{ component: 'listItem' }] }] }] });
+  assert.deepEqual(consistencyFindings(here, conv).map(consistencyLine), ["the page's frame: no actionBar here, actionBar on the product's other pages (ia)"]);
+});
+
+test('an option the code has no prop for is drawn on the part its name points to; the check says so only when there is none', async () => {
+  const { drawnByName } = await import('../prototype-pieces.mjs');
+  const markup = '<div class="listItem"><span class="listItem-title">x</span><span class="listItem-description">y</span></div>';
+  assert.equal(drawnByName('TitleContent', { type: 'text', default: 'Title' }, markup), true);
+  assert.equal(drawnByName('Show Description', { type: 'boolean' }, markup), true);
+  assert.equal(drawnByName('label-content', { type: 'text', default: 'label' }, '<button class="b"><svg></svg></button>'), true, 'a label goes where the component\'s text is');
+  assert.equal(drawnByName('number content', { type: 'text', default: '1' }, '<div class="dividerSection">x</div>'), false);
+});
+
+test('a request word many components\' notes share (the product\'s name) points to none of them', () => {
+  const comps = Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].map((n) => [n, { description: `Part ${n} of Atlas.`, props: {} }]));
+  comps.emptyState = { description: 'Centred icon, title and description when there is nothing to show.', props: {} };
+  const f = requestFocus(contextFrom({ components: comps }, null, []), 'a Saved views screen for Atlas with an empty state', []);
+  assert.deepEqual(f.components.map((c) => c.name), ['emptyState']);
+});
+
+test('the request: a component it names that the prototype leaves out is owed; one the documentation rules out for it is an error unless its purpose says otherwise', async () => {
+  const { requestFindings } = await import('../prototype-context.mjs');
+  const cat = { components: { emptyState: { description: 'Shown when a list has nothing.', props: {} }, listItem: { description: 'A row.', props: {} }, tag: { description: 'A small status label.', props: {} } } };
+  const ctx = contextFrom(cat, null, sectionsOf('## tag\nA status that does not change. Never a message that comes and goes, like a confirmation.'));
+  const asked = requestFindings(ctx, 'a Saved views screen: a list of saved views and an empty state for when there are none', [{ component: 'listItem', props: {} }]);
+  assert.deepEqual(asked.map((f) => [f.level, f.kind]), [['warning', 'request']]);
+  assert.match(asked[0].message, /the request asks for empty state and the system has emptyState, which is not in the prototype/);
+  const out = requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Changes saved' } }]);
+  assert.ok(out.some((f) => f.level === 'error' && /tag is ruled out for "message" in this request/.test(f.message)));
+  // Another purpose is not ruled out; the confirmation the request asks for is still owed, the system having none.
+  assert.deepEqual(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { Label: 'Beta', purpose: 'marks the page as beta' } }]).map((f) => [f.level, f.said]), [['warning', 'kind:confirmation message']]);
+  assert.equal(requestFindings(ctx, 'an account page and a message confirming the save', [{ id: 't', component: 'tag', props: { purpose: 'the confirmation message' } }]).length, 1, 'a purpose the documentation rules out too');
+  const r = checkPrototype({ component: 'Page', children: [{ component: 'tag', props: { purpose: 'marks the page as beta' } }] }, { catalog: cat, view: { components: [{ name: 'tag', controls: [] }] }, scales: { spacing: [], text: [] }, context: ctx, request: 'a message confirming the save' });
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+});
+
+test('build mode: a text colour set on the component\'s text part counts; none at all fails the structure gate', { timeout: 600000 }, () => {
+  const make = (fieldCss) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tp-textpart-'));
+    cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
+    const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
+    cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
+    cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
+    if (fieldCss) writeFileSync(join(dir, 'src', 'components', 'field.css'), fieldCss);
+    return spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_FETCH: '1' }, timeout: 300000 }).stdout;
+  };
+  assert.doesNotMatch(make(null), /"color" not set in "\.field"/, 'the reference sets it on .field__input');
+  const none = readFileSync(join(ENGINE, 'test', 'skill-evals', 'build-reference', 'src', 'components', 'field.css'), 'utf8').replace(/ color: var\(--text-primary\);/, '');
+  assert.match(make(none), /field\/default\/text: "color" not set in "\.field"/);
+});
+
+test('a component\'s usage (when to use, common mistakes, limitations) and its Do and Don\'t are part of what a prototype is held to', async () => {
+  const { requestFindings } = await import('../prototype-context.mjs');
+  const cat = { components: {
+    chip: { description: 'A filter people switch on and off.\nWhen to use: filtering a list by one value\nCommon mistakes: a chip as a link to another page', props: {} },
+    button: { description: 'The main action.', props: {} },
+  } };
+  const intentU = { components: { chip: { design: { annotations: [] }, code: {} }, button: { design: { annotations: [] }, code: {} } } };
+  const authored = { components: { button: { guidance: { limitations: 'Labels longer than three words wrap' } } } };
+  const examples = { chip: [{ kind: 'do', caption: 'Chips above the list they filter' }, { kind: 'dont', caption: 'Chips as tabs between sections' }] };
+  const ctx = contextFrom(cat, intentU, null, { authored, examples });
+  assert.deepEqual(ctx.components.chip.whenToUse, ['filtering a list by one value']);
+  assert.deepEqual(ctx.components.chip.mistakes, ['a chip as a link to another page']);
+  assert.deepEqual(ctx.components.button.limitations, ['Labels longer than three words wrap'], 'contract.authored.json fills what Figma leaves unsaid');
+  assert.deepEqual(ctx.components.chip.dos, ['Chips above the list they filter']);
+  assert.deepEqual(ctx.components.chip.donts, ['Chips as tabs between sections']);
+  assert.ok(ctx.components.chip.never.some((n) => n.sentence === 'Common mistake: a chip as a link to another page'));
+  assert.ok(ctx.components.chip.never.some((n) => n.sentence === 'Don\'t: Chips as tabs between sections'));
+  const lines = purposeLines(ctx, ['chip', 'button']).join('\n');
+  assert.match(lines, /use when filtering a list by one value/);
+  assert.match(lines, /mistake a chip as a link to another page/);
+  assert.match(lines, /do Chips above the list they filter/);
+  assert.match(lines, /don't Chips as tabs between sections/);
+  assert.match(lines, /limit Labels longer than three words wrap/);
+  // A Don't or a mistake takes two of its words: one shared word ("list") rules nothing out.
+  assert.equal(ruledOut(ctx.components.chip, 'a list of saved views', 'chip').length, 0);
+  assert.equal(ruledOut(ctx.components.chip, 'tabs for the account sections', 'chip').length, 1);
+  const out = requestFindings(ctx, 'tabs for the account sections', [{ id: 'c', component: 'chip', props: { Label: 'Profile' } }]).filter((f) => f.level === 'error');
+  assert.equal(out.length, 1, 'beside the warning that the system has no tabs');
+  assert.match(out[0].message, /chip is ruled out for "tab, section".*Don't: Chips as tabs between sections/);
+  const use = usesAgainstPurpose(ctx, [{ component: 'chip', props: { Label: 'Profile' } }]);
+  assert.match(use[0].rule, /Use when filtering a list by one value\..*Common mistakes: a chip as a link to another page\..*Don't: Chips as tabs between sections\./);
+  assert.ok(requestFocus(ctx, 'filter the list by one value').components.some((c) => c.name === 'chip'), 'When to use points a request to the component');
+});
+
+test('the prototype context reads the Do and Don\'t pictures\' captions from the references and contract.authored.json', async () => {
+  const { loadContext } = await import('../prototype-context.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'proto-usage-'));
+  mkdirSync(join(dir, 'refs', 'components', 'chip', 'dont'), { recursive: true });
+  writeFileSync(join(dir, 'refs', 'components', 'chip', 'dont', '01 Chips as tabs between sections.png'), '');
+  writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({ components: { chip: { examples: [{ kind: 'do', caption: 'One row of chips above the list', nodeId: '1:2' }], guidance: { whenToUse: 'filtering a list' } } } }));
+  const ctx = await loadContext(dir, { visualRefs: 'refs' }, { components: { chip: { description: 'A filter.', props: {} } } }, { fetchLinks: false });
+  assert.deepEqual(ctx.components.chip.donts, ['Chips as tabs between sections']);
+  assert.deepEqual(ctx.components.chip.dos, ['One row of chips above the list']);
+  assert.deepEqual(ctx.components.chip.whenToUse, ['filtering a list']);
+  assert.ok(ctx.sources.some((s) => /Do and Don't of 1 component/.test(s.detail)));
+});
+
+test('a need said in a phrase (a message confirming it was saved) is a kind the system lacks, unless it has a toast or a banner', async () => {
+  const { kindsLacking } = await import('../prototype-context.mjs');
+  const ctx = { components: { button: {}, field: {} } };
+  assert.deepEqual(kindsLacking(ctx, 'a Save button, and a message confirming the changes were saved'), ['confirmation message']);
+  assert.deepEqual(kindsLacking({ components: { toast: {} } }, 'a message confirming the changes were saved'), []);
+  assert.deepEqual(kindsLacking(ctx, 'a list of messages'), []);
+});
+
+test('the engine\'s layout pieces a system lacks are one gap line', async () => {
+  const { groupLayout, gapLine } = await import('../prototype-pieces.mjs');
+  const lines = groupLayout([{ kind: 'component', need: 'toast' }, { kind: 'layout', need: 'a Row layout component' }, { kind: 'layout', need: 'a Stack layout component' }]).map(gapLine);
+  assert.deepEqual(lines, ['component: toast', "layout: Row and Stack layout components; the prototype uses the engine's own meanwhile"]);
+});
+
+test('a difference between pages says how to match it in the composition', async () => {
+  const { howToMatch } = await import('../product-conventions.mjs');
+  assert.equal(howToMatch({ what: 'where the actions sit', here: 'middle', product: 'end' }), "make the group of actions the page's last part");
+  assert.equal(howToMatch({ what: 'how the actions line up', here: 'start', product: 'end' }), 'give the Row that holds the actions justify "end"');
+  assert.equal(howToMatch({ what: 'page alignment', here: 'center', product: 'stretch' }), 'give the Page align "stretch"');
+  assert.equal(howToMatch({ what: "the page's frame", here: 'no header', product: 'header' }), null);
+});
+
+test('a request that has a part open another owes an "opens"; a state alone is not it', async () => {
+  const { requestFindings } = await import('../prototype-context.mjs');
+  const ctx = { components: { button: { purpose: 'The main action on a screen.' } }, rules: [] };
+  const req = 'a project page with a Delete project button that opens a confirmation';
+  const without = requestFindings(ctx, req, [{ id: 'b', component: 'button', props: { Label: 'Delete project' } }]);
+  assert.ok(without.some((f) => f.said === 'opens'), JSON.stringify(without));
+  const withOpens = requestFindings(ctx, req, [{ id: 'b', component: 'button', props: { Label: 'Delete project', opens: 'c' } }, { id: 'c', component: 'Stack', props: {} }]);
+  assert.ok(!withOpens.some((f) => f.said === 'opens'));
+  assert.ok(!requestFindings(ctx, 'a settings page with a Save button', []).some((f) => f.said === 'opens'));
+  assert.ok(!requestFindings(ctx, 'a page that opens with a heading', []).some((f) => f.said === 'opens'));
+  assert.ok(requestFindings(ctx, 'a row whose More button opens a small menu', []).some((f) => f.said === 'opens'));
+});

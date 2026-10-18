@@ -1,0 +1,1622 @@
+# Usage: every command, option and output
+
+Part of the rms-design-system-engine reference (`rms-design-system-engine --reference usage`). The rules that always apply are in the main guide.
+
+## Usage
+
+```
+/rms-design-system-engine
+```
+
+**You do NOT have to audit the whole design system.** Scope the run to one or more chosen
+components - the common case when you are working on, or checking, a single component:
+
+```bash
+rms-design-system-engine --component ButtonPrimary                # one component
+rms-design-system-engine --component ButtonPrimary,Toast          # several (comma-separated)
+rms-design-system-engine --component ButtonPrimary --component Toast   # or repeated
+```
+
+In a scoped run the gates report **only** findings that belong to the chosen components;
+everything else is collapsed to a single "… N findings outside scope - not audited" line,
+and a gate that failed only on out-of-scope items passes for that run. This is what keeps a
+single-component check clean instead of drowning in the rest of the DS. Because a component
+**contains** others (a button may hold an icon, a card a badge), the scope **auto-expands**
+to the nested components used inside the chosen ones (found via their source files, so the
+parent is never passed while a child it depends on is broken); the banner lists what was
+pulled in. Only a component's own source counts: the file the shared pairing gives it
+(`component-pairing.mjs`: `componentFiles` always wins; a strong sign such as the file's name,
+the component it declares, its first class or its folder pairs alone, as `HbIconButton.vue` is
+iconButton's and `Chip/index.tsx` chip's; weak signs such as a generic file name, the library's
+prefix, the tokens the file uses or a state-word sibling pair only when two agree, and one alone
+is only a proposal to confirm or pin). A page that shows several components, the theme CSS, a native element (`<button>`,
+`type="button"`) and a name inside a longer one (button inside iconButton) pull in nothing. A
+finding that names a component belongs to that component; one that names none (a token, a
+shared rule) belongs to the scope when its file mentions a component in scope. The burndown
+of a scoped run counts only its components. Set a default in `ds-config.json → scopeComponents: ["ButtonPrimary"]` if a repo
+should always run scoped. Omit the flag to audit the whole DS.
+
+**A name the system does not have.** A component asked for that is in neither the Figma data nor the code (no file
+named for it, no element with its class) is said: "nothing about it was checked", in the report and the summary
+(**Nothing checked**), and the NEXT line asks the person which component they mean, never a pass. The router knows the
+components only the code has (a file whose first element carries a class of its own) as well as Figma's, and before
+any is known (no snapshot yet) it still scopes to a name written as one (`buttonPrimary`, "the card component").
+
+**No Figma data captured yet.** With a Figma file set up and no snapshot readable, nothing was compared with Figma:
+the summary says so (**No Figma data captured yet, so nothing was compared with Figma**, and **Nothing compared with
+Figma yet** in place of In parity when the code's own checks pass), and the NEXT line is the capture
+(`--recipe refresh-figma`), then the same run again.
+
+**Only part of the run.** `--only` runs the part asked for and nothing else; the report and the summary say what ran,
+so a part never reads as the whole system passing:
+```bash
+rms-design-system-engine --only accessibility             # the accessibility check alone (from the code, and in the browser when it can)
+rms-design-system-engine --only parity                    # every gate against Figma, without the accessibility check
+rms-design-system-engine --only 3                         # one gate by number (1 to 25), or by name: --only "token values", --only states,props
+rms-design-system-engine --component chip --only accessibility   # with a scope, as any run
+```
+A word it does not know prints the list of gates. `--baseline` needs the whole run, and the trend and the "since the
+last run" comparison are kept for whole runs only. The router turns "check the accessibility of the button", "without
+accessibility" or "only the token values gate" into the right `--only`.
+
+**Utility flags (no full audit - run the terminal command directly):**
+```bash
+rms-design-system-engine --init                          # first-time setup only: asks where the code is and for the Figma link (optional), scaffolds config files, then exits; a project already set up keeps its ds-config.json (--reconfigure replaces it)
+rms-design-system-engine --init --project=<. | folder | GitHub or GitLab link> --figma-url=<url>   # non-interactive setup (for agents/CI): --project required (or --theme-css=<path>), --figma-url and --figma-source-url=<url> optional; --then='<request>' routes the request that led to setup once it is done
+rms-design-system-engine --init --figma-url=<url>           # a project already set up: read another Figma file or a branch of it (a branch link names the branch); only figmaFileKey changes, then refresh the Figma data
+rms-design-system-engine --version                       # am I on the latest? compares local vs remote (a normal run also nudges once/day)
+rms-design-system-engine --update                        # update to the latest - no re-download
+rms-design-system-engine --link-command                  # (re)point the /rms-design-system-engine command at the install via symlink
+rms-design-system-engine --trend                         # show last 20 audit runs + pass/fail trend
+rms-design-system-engine --exemption-debt                # list every exemption/escape-hatch (debt report + legibility: temporary/permanent/owner; totals show on every run)
+rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
+rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
+rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules for an agent with no hooks (Cursor, Copilot): shown, and asked about; --write puts them in AGENTS.md, CLAUDE.md, .cursorrules, .github/copilot-instructions.md or .cursor/rules (those the project has, else AGENTS.md), between markers, once the person says yes (the hook holds it until then)
+rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
+rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
+rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
+rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
+rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
+rms-design-system-engine --duplication                   # list DS names restated by hand-maintained surfaces (opt-in via ds-config duplication.surfaces; totals show on every run)
+rms-design-system-engine --code-connect                  # list stale/invalid Figma Code Connect mappings vs the contract (auto-detected from committed *.figma.tsx; totals show on every run)
+rms-design-system-engine --guidance-rating [--extract]   # how much an agent can take from the guidance: ready, partial or thin per component; --extract asks a model (your tokens)
+rms-design-system-engine --no-docs                       # skip the design-intent layer this run (emitted by default; local, gitignored)
+rms-design-system-engine --refresh-figma                 # read Figma the best way there is: design.json, figma-cli, else says how
+rms-design-system-engine --from-figma-cli [design.json]  # read figma-cli's design.json into the snapshots
+rms-design-system-engine --capture-script vars <n|sums>  # write the read-only script for chunk n of Figma's variables, text styles and effect styles (sums: the checksums alone), to run unchanged with use_figma; save its answer as it came. Each answer is compact (a short record per variable, colours in hex, numbers in their shortest exact form) and near 19,000 bytes, so about 1,900 variables take about ten
+rms-design-system-engine --capture-script components <sums|sums new|next>  # the same for the components, kept by component id: sums gives each component's checksum, a page at a time (the next page when one is left, 'sums new' starts over), next reads as many of the components no answer holds yet as fit in one answer, compressed (one read at a time; a number reads the same as next); each runs the recipes' Step 1c functions, state walk and raw-value sweep in Figma, and none switches Figma's page
+rms-design-system-engine --capture-import [vars|components]  # check every saved answer against the checksum Figma computed, name the chunks to read again (answers saved in the form before still read, or are named to read again), and once all are there write the vars snapshot, or the structure and props snapshots with component-values.snapshot.json, component-state-tokens.json and component-state-bindings.json (keeping what a chunk did not read, naming the components no longer in Figma)
+rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
+rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
+rms-design-system-engine --styleguide --no-a11y-bake     # the page without its accessibility tried while it is built (a page only measured, as a CI's first build is)
+rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
+rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
+rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
+rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
+rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
+rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
+rms-design-system-engine --keep                          # list the kept differences
+rms-design-system-engine --unkeep --match <words> [--component <name>]   # take kept differences back: open again on the next audit
+rms-design-system-engine --baseline --findings --match radi   # only the lines that name it (the radius, not the rest)
+rms-design-system-engine --no-baseline                   # ignore any design-system-engine-baseline.json this run (enforce every gate)
+rms-design-system-engine --checked badge 1.3.3 --by "QA"  # the person checked a criterion only a person can judge: Done in the style guide, by them and when, until the component changes (commit design-system-engine-checked.json)
+rms-design-system-engine --unchecked badge 1.3.3          # take it back: to check again
+rms-design-system-engine --rename-sweep                  # a token renamed in Figma, renamed everywhere in one change: one patch for the system and one per product, every rule, script and doc, the old name kept in the theme pointing at the new one (nothing applied)
+rms-design-system-engine --rename-sweep --since v2.3.0   # the renames since that git ref, not since the last committed read of Figma; --no-keep-old drops the old names
+rms-design-system-engine --figma-motion                  # write the read-only script that reads, on every page, Figma's prototype transitions between variants, each component's Motion keyframes and animation styles, and the overlays its prototype opens, to run with use_figma
+rms-design-system-engine --figma-motion <answer.json>    # keep its answer as the motion snapshot (paths.snapshotMotion) and say each transition the code makes otherwise (at once, another duration, another curve), and each component's loop, opening and closing that differ (motion-components.mjs)
+rms-design-system-engine --figma-examples                # read the examples the design team placed in Figma (each component's instances on its pages, outside the component itself: its words, its icons, the instances it holds), through figma-cli in parts when it answers, else write the script for the session's Figma tool (--from N for each part); the style guide's Playground opens each component as its best example
+rms-design-system-engine --figma-examples <answers.json…> # keep the saved answers as the examples snapshot (paths.snapshotExamples, figma-examples.snapshot.json beside the variables snapshot)
+rms-design-system-engine --figma-brands                  # read the system's brands: Figma's extended collections (each a skin over the system's own collections, its colours and its sizes) and the variables each overrides in each mode, from the file that holds them (the FigCli plugin open on it), through figma-cli a collection at a time when it answers, else the read-only script for the Figma tool (--collection "<name>" --from N)
+rms-design-system-engine --figma-brands <answers.json…>   # keep the saved answers as the brands snapshot (paths.snapshotBrands, figma-brands.snapshot.json beside the variables snapshot); the style guide's Brand switch puts each brand on every preview and the Showroom, never on the page around them
+rms-design-system-engine --brands-css <a.css b.css | addresses…>  # the same brands snapshot from the brands' own stylesheets (one file a brand, named by the file; /* extends: <brand> */ puts it under another; each block's variables in the mode its selector names, a block with none in the base mode), or the files ds-config.json lists in brands.css: the brands can live in the code's repository instead of Figma
+# the style guide's Showroom: each showroom/<Screen>.vue (a screen from Figma written with the system's own components; what the code lacks a stand-in in showroom/stand-ins/) drawn by the project's build, at Figma's size and breakpoint, in the brand and mode chosen. The Showroom page lists the screens as a grid of cards (each its screen in small); a card opens the screen's own page (#showroom/<Screen>), the screen alone until Differences is pressed: then each note of its <Screen>.json (missing, and differs: fixedHere or not) is numbered, pinned over its part of the screen (the note's at, a selector, else the part named data-figma or data-stand-in) and listed beside it in a line (its say; the whole of it, what, under it), filtered by kind; a pin clicked shows its note on the screen. A screen is liquid: laid out to its breakpoint's width (Auto, the room there is, Desktop from 1440px; Desktop, 1440px; Laptop, Figma's own), and Full browser shows it alone over the whole browser window. The screens are drawn and measured at Laptop, Figma's size. Corrections several screens share can sit in one stylesheet (showroom/shared/), each still listed in every screen's own list
+rms-design-system-engine --showroom-compare [--refresh] [--tolerance=N]  # each Showroom screen measured against the Figma screen it was written from (its link in <Screen>.json): Figma's box for every text and component (showroom/<Screen>.figma-layout.json, read through figma-cli when missing, else the script for the Figma tool), the built page measured in Chrome, every text matched by its words and every part named with data-figma, each one more than N px (2) off listed, furthest first. Every --styleguide build runs it too, says it in its summary and shows it beside each screen
+rms-design-system-engine --figma-effects                 # write the read-only script that reads each component's shadows and blurs, gradient and image fills, Clip content, blend mode and opacity, on it and its layers two levels deep, to run with use_figma
+rms-design-system-engine --figma-effects <answer.json>   # keep its answer as the effects snapshot (paths.snapshotEffects) and say each one the code draws otherwise (effects-parity.mjs)
+rms-design-system-engine --figma-screens                 # write the read-only script that reads the screens ds-config.json names (frames and screens), to run with use_figma
+rms-design-system-engine --figma-screens <answer.json>   # keep its answer as the screen layout snapshot (paths.screenLayout) and compare each product's page with its screens
+rms-design-system-engine --figma-a11y                    # write the read-only script that reads the same screens for accessibility: each text and lone icon with what is drawn behind it, inside instances, and each control under 24 by 24, to run with use_figma
+rms-design-system-engine --figma-a11y <answer.json>      # keep its answer as the screen accessibility snapshot (paths.screenA11y) and say what the screens owe (screen-a11y.mjs); every audit with accessibility says it again
+rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
+rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
+rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
+rms-design-system-engine --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-design-system-engine requests)
+rms-design-system-engine --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
+rms-design-system-engine --reference [name]              # print a reference file from the skill (no name lists them)
+rms-design-system-engine --guide classic|current         # link the command to the guide as one file (as before the split), or back
+node ~/.claude/skills/rms-design-system-engine/parity-check.mjs --fix                   # auto-fix sizing/typography divergences in theme.css
+node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
+```
+
+### Build mode
+
+A project whose code has no design tokens yet starts in **build mode** (`ds-config.json` → `"build": true`): setup
+chooses it when the code's folder has no stylesheet of tokens and a Figma file is given, or when it runs with `--build`. The engine still writes no code; it says what to build and
+checks each piece once it exists.
+
+- **What is left to build, in order.** The report ends with a `🧱 TO BUILD` line: the tokens first, then each component
+  Figma has and the code does not yet, a component after the ones it nests. NEXT names the next item with its commands.
+  Something still to build is never a failure; once it exists it is compared like everything else.
+- **Tokens.** The token check writes every Figma variable the theme does not declare yet, exactly as the theme should
+  declare it (name, value, the block for each mode and breakpoint), to `.design-system-engine-out/handback/tokens-to-build.css`,
+  to copy into the theme file. A declared token with a wrong value still fails.
+- **Components.** `--query <name>` prints a component's build sheet: its class, height, padding, gap, radius and colours
+  with their variables, the text style, the selector of each state and variant (a modifier class such as `.chip--l`,
+  a pseudo-class for a state: `:hover:not(:disabled)`, `:active`, `:focus-visible`, `:disabled`), its role and the
+  components it nests. A variant gets a selector only when it changes a style (one that only shows a layer, such as an
+  icon, is markup). A colour Figma paints with no variable is named with its value, to write as it is and report,
+  never as an invented variable. An experimental component gets its sheet when asked for, though it stays off the
+  build list. Every line is what the structure check compares once the component exists, so a component built from
+  the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins. When a product already
+  uses the component, one line shows how its code writes it, with the file and line, to copy.
+- **Component stylesheets.** A component built into its own stylesheet (`src/components/button.css`) is found by its
+  class and added to `paths.themeCSS` after the token file, said once in the report, so every gate reads it.
+- **A token an edit invents.** In any project, a custom property an edit adds with a value of its own (a colour, a size) that Figma has no variable for is handed back, in the theme too; one that only points at the system's tokens, or that Figma has, is not.
+- **A new component is a decision.** A class rule an edit adds whose declarations are mostly a system component's (most of the larger rule written alike) goes back at once: use that component, with a new option if it needs one, or ask the person whether the new one belongs in the system. Never kept without asking.
+- **A last check before the agent finishes.** The Stop hook runs the edit check once more over every UI file the session changed, against the last commit; a value the system does not have that an edit left in place goes back once, with the file and the line. Lines that were already in the commit do not count.
+- **Never a secret in the chat.** Whatever the request, the Stop hook sends back once a final reply that asks the person for a token, key or password: the person puts it in the project's `.env` themselves. A design token named in a question is not a secret.
+- **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13] (Structure), and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
+- **The role, even with only states.** Figma's role annotation is read in the markup of every component that has one, also when all its props are states (a field whose only prop is `State` still has to be a real `<input>`).
+- **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
+- **While building.** The edit check counts the tokens still to build as the system's own, so a component written
+  before its tokens is still checked against them. Unused tokens are expected and do not fail.
+
+### The design-intent layer (auto OUTPUT, never a gate)
+
+The design-intent layer is an **output**, not a verification — the same category as the
+contracts. It runs as a post-step *after* the gates, reusing the fresh snapshots, and **never
+affects pass/fail**. Because this is an **agnostic** engine, the default **adapts to the
+project** instead of forcing a private file on everyone: it **auto-generates once the project
+has ADOPTED it** — an existing `design-intent.json`, a `docs.out` path, or `docs.auto: true` in
+`ds-config.json` — or when the run passes `--docs`/`--intent`. A **zero-signal project gets no
+surprise file**. Once adopted it stays fresh **every run** (like the contracts), so an AI agent
+(and the styleguide) always read a **current** DS rather than a stale one. Force it off with
+**`--no-docs`** or `ds-config.json → docs.auto: false`. To guarantee it on a fresh clone (the
+file is gitignored, so absent after checkout), set `docs.auto: true`. It is deliberately NOT a
+gate: a gate answers "does the code match Figma?", and generating documentation is neither a
+check nor something that decides the verdict. The heavier **styleguide HTML stays opt-in** — it
+builds with `--styleguide`, an explicit `--docs` (alias `--intent`) or `ds-config.json → styleguide.auto:
+true`, from the engine's template unless the project names its own.
+
+It writes **one** merge-aware file, `<theme-css dir>/design-intent.json` (override with
+`ds-config.json → docs.out`) — a project's **intent layer**, organised as
+`{ system, foundations, components, patterns, templates, pages, flows }`. It is a generated
+**view over the canonical sources — nothing is hand-copied**:
+
+- **Design intent** ← Figma component `description` + `annotations` (from the component-props snapshot).
+- **Code intent** ← each component's `structure-contract.mjs` `_note` **and** the comment that
+  precedes its rule in the token CSS.
+- **Facts** ← the structure snapshot (height, padding/gap tokens, fill, variants, properties).
+- **Usage** ← which plugin sources reference the component's class.
+- **External guidelines** ← your own doc(s) listed in `ds-config.json → guidelines: { sources: [...] }`
+  (Markdown or JSON, committed to the repo). A section whose heading matches a component name attaches
+  to that component (`components[name].guidelines`); the rest becomes a global `guidelines` block. This
+  is how prose from an external source (a Notion export, a house styleguide) reaches agents without
+  being invented or duplicated. The generator hashes the file(s) so a change is detectable, and it only
+  reads the **committed** file, never the live network. A live Notion/URL fetch, when you configure one,
+  is a separate capture step (Phase 1) that writes that file first, then the generator folds it in. It
+  never follows links inside a doc: list every page you want in `sources`. Advisory, never a gate.
+
+**Wiring an external guidelines doc** (e.g. a Notion page). In `ds-config.json`:
+```jsonc
+"guidelines": {
+  "sources": ["guidelines.md"],               // the committed file the generator reads (md or json)
+  "source":  { "notion": "<page url or id>" }  // OPTIONAL: refresh guidelines.md from Notion each run
+}
+```
+`sources` alone is enough: export the doc to Markdown, commit it, done. To make the refresh automatic
+from Notion, the person does three one-time things: (1) create a Notion **internal integration** and
+copy its secret; (2) **share the page** with that integration; (3) put the secret in the project's
+`.env` as `NOTION_TOKEN` (gitignored, so it is per-person and never committed). The page **link** in
+`ds-config.json` is not secret and is committed; the **token** stays in each person's `.env`. No token,
+page not shared, or offline → the audit keeps the committed `guidelines.md` and never fails. A prototype's catalog refreshes a link whose file is missing or older than `guidelines.maxAgeHours` (24) the same way. The fetch
+reads one page and does not follow links inside it.
+
+**How much an agent can take from it** (`--guidance-rating`). Rates each component's guidance (its section in
+these files and Figma's description and annotations) for what an agent needs: a section headed with its exact name,
+what it is, when to use it, when not to, its role, an example, its properties by name, and no name the system does
+not have. Each component is ready, partial or thin; the document gets the same class from how many are ready. It
+prints what to add, writes `.design-system-engine-out/guidance-rating.json`, and the style guide shows the rating in
+each component's Documentation area (For agents). `--extract` also runs the extraction test, which spends the
+person's model tokens: a question for each property with options, answered by a model that sees only the guidance
+through `guidelines.extract.cmd` (the prompt on stdin, the answers on stdout; `claude -p` by default), scored against
+Figma's options. `guidelines` is also a level of `eval-run.mjs --levels`.
+
+**The easy way: paste the link into the chat.** The agent runs `rms-design-system-engine --guidelines <link>`,
+which works for GitLab and Notion alike, one or several links: it adds the link below for you, reads the page
+at once, and reports whether it worked. Notion also takes a list now (`"notion": ["<link>", …]`), each
+page to its own `guidelines/notion-<page>.md`; the original single link keeps writing to `sources[0]`.
+
+**From GitLab** (wiki pages or Markdown files, on gitlab.com or a company's own GitLab), list one or
+several links; each is written to its own committed file and read automatically, so there is no need to
+repeat it in `sources`:
+```jsonc
+"guidelines": {
+  "source": {
+    "gitlab": [
+      "https://gitlab.com/acme/design/-/wikis/Buttons",                                   // → guidelines/gitlab-buttons.md
+      { "url": "https://git.acme.io/ds/docs/-/blob/main/usage.md", "file": "guidelines/usage.md" }
+    ]
+  }
+}
+```
+The kind of link is read from the URL: `/-/wikis/<page>` (project or `groups/…` wiki) or
+`/-/blob/<branch>/<file>.md` / `/-/raw/…` (a branch name containing `/` is resolved automatically). The host
+comes from the link. A public project needs nothing else. For a private one, each person puts a GitLab
+personal access token with `read_api` in the project's `.env` as `GITLAB_TOKEN` (gitignored, never
+committed); for a company server, also `GITLAB_HOST=git.acme.io`. The token is only ever sent to
+`gitlab.com` or `GITLAB_HOST`, so a link to any other host is fetched without it. Like Notion: no access,
+offline, or a wrong link → the committed file is kept and the audit never fails. The written pages reach the
+intent layer the same way as any guidelines file: a section headed with a component's name lands in that
+component's `guidelines` in `design-intent.json`, the rest in the global block, as written.
+
+Because the file is regenerated every run, the generator is **merge-aware**: it reads the existing
+file and **preserves everything you authored** — each layer's `authored` string, and every
+component's `authored` field — refreshing only the derived parts. So you get one file that is
+auto-derived where it can be and hand-authored where it must be (the `system`/`patterns`/… layers),
+and regeneration never destroys your prose. Author higher-layer/system intent directly in the
+`authored` fields (Markdown strings).
+
+**It is project-specific and private.** The engine ships only the generic generator; the *content*
+is 100% derived from **your** Figma + code, on your machine. Keep the output **gitignored** (add
+`design-intent.json` to `.gitignore`) and back it up privately alongside the snapshots — never
+commit it to a public repo, since it carries your Figma's internal annotations and DS rationale.
+Any consumer (an optional styleguide) reads this **one** JSON — single source, no
+re-derivation.
+
+#### The living styleguide (opt-in: `--styleguide`, or `--docs`)
+
+`--styleguide` builds the styleguide HTML on its own; `--docs` builds it right after the design-intent. It is a
+**generated view** of what Figma and the code agree on, never hand-maintained. Every project fills **one
+template, the engine's** (`templates/styleguide.template.html`), so an improvement made there reaches every design
+system on its next run; `ds-config.json → styleguide.template` points a project at a template of its own instead.
+The output goes to `styleguide.out`, else `.design-system-engine-out/styleguide/index.html`. With `--component <name>`
+the page holds that component and the components it nests only (found in its markup's classes and in its own file's
+tags and imports, each nested one followed in turn), is written beside the whole page as `<name>.html`, and says so on
+its overview; a name that is no component of the system is said, and left out.
+
+What the engine's template shows (`styleguide-data.mjs` decides it):
+
+- **Its look is the system's.** The template is the layout only. Every colour, text size and weight, corner radius,
+  space and the icon size on the page is a role the engine fills with one of the system's own tokens: the
+  background and text colour the system's own page uses (its `html`/`body` rule), a shared token before one a
+  component owns, its text styles, radii and spacing scale, its icons' Figma size (`styleguide.chrome` names a role
+  by hand: `{ "accent": "--brand" }`). Every box (the Playground, its tables, the code, each section of the documentation)
+  has the look of the system's own card (`cardLook`: its border colour and width, its radius and shadow), as the
+  overview's cards are that card. The page's text is the system's body rule, which the components inherit as in
+  the product. Its switches are the system's own segmented control and its text inputs its own text field, read from
+  their markup (a row of the same element where one carries the selected class). A control the system lacks (or that
+  is not read yet) gets the template's default, drawn with the system's tokens: a segmented control (options in a
+  track, the chosen one raised), a tooltip (a round trigger and a bubble, on the Status page's cards) and a card (the
+  tables' border, corners and shadow); a text field gets its search field as a stand-in, else a plain input. These
+  are the template's own controls, not the system's work: never a task on the Status page (`ui.gaps` lists them for
+  whoever reads the data). Each text size takes the system's text style nearest to the
+  template's default for it (12, 13, 14 and 15px) when one is within 2px, else the default stays; a colour role the
+  system has no token for is left to the browser's own and listed.
+- **Foundations**: colours, typography, spacing, radii and other sizes, each the CSS variable itself, shown only
+  when the token check (`parity-check.mjs --json` → `passVars`) finds it equal to Figma in every mode; a size that
+  changes with a mode shows the value of the mode its section's size switch picks (the switch, with no visible label
+  and room below it, changes only the samples and their values, never the page around them); icons from the icon sheet. The
+  colours sit six a row, each as wide as the room, so its Figma name and variable read whole (three on a phone).
+  Motion (`motionTokens`, `styleguide-data.mjs`): every custom property whose value is a duration or an easing
+  curve, named as Figma's motion variable of the same value (`figma.motion.explicit`, else the naming convention),
+  each with a dot that crosses its track on Play (a duration at a steady pace, an easing over the longest duration,
+  its curve drawn beside it; at once for a person who asks for less motion); where the system answers
+  `prefers-reduced-motion` and what it ends, or that it does not yet; and the system's motion as its fundamentals, in
+  one table (`motionOverview`, `motion-components.mjs`): each timing its components move with (a duration, a curve and a
+  delay), from the fastest, each with a dot that crosses its track on Play, the variables it is written with and their
+  Figma names, what it is for (Repeats, Opens, Closes, On hover, On press, On focus), the components that move so,
+  each once and linked to its Motion tab, Figma's timing for them, and For the system: a purpose with several timings
+  (choose one for every component), a timing several components share (keep it as one variable), one written as values
+  (make it a variable); a duration or curve variable no component uses is a row too (use it, or remove it). The rows
+  come from each component's own (`motionSpec`): its loop (a spinner turning), its opening and its closing, the code's
+  (its `@keyframes` on it or a part of it, a transition an open or closed state plays, a size it transitions) beside
+  Figma's (its Motion keyframes and animation styles, an overlay its prototype opens, played backwards as it closes,
+  variants that lead to each other after a delay and back); each transition Figma's prototype animates between its
+  variants against each one the code plays then, compared from the code as it is now (`projectMotion`, the last audit's
+  `motion.json` when it cannot be read); and every other transition or animation the code gives it. When the code has durations or easings and Figma has no motion
+  variables at all, the system's tasks say so, for You in Figma: add them to a variable collection named Motion
+  (`motionTodos`). Each that differs is a row of the component's Motion tab and of the Status page's Motion: one Figma
+  animates and the code does not, Claude's; one the code animates and Figma does not, You in Figma.
+- **Components**: each drawn from the project's own markup (the contract's probe, else the first instance in its
+  own pages, else what its source renders: a React component's return, a Vue component as the project's own build
+  (Vite, Nuxt, Vue CLI or webpack) renders it once its packages are installed (its bound classes, and the CSS its
+  `<style>` blocks compile to, SCSS and scoped ones included; `vue-harness.mjs`), else its template read with its props'
+  default words, else the element its Figma role asks for) with its own CSS. A Vue component is rendered in each of its
+  variants, and the Playground draws the one its props pick as it renders, so an option that adds or removes an
+  element (an icon only Large has) shows it, not only its class; a combination never rendered starts from the nearest
+  one. A page for one component (`--component X --styleguide`) renders only it and what it nests. The summary says how
+  many Vue components were drawn as their build renders them, naming it, and why not when none was (no packages
+  installed, no build tool). Once Figma's components are captured,
+  a component only the code has (each file whose first element carries a class of its own, in its `components` folder
+  when it has one, that no Figma component is paired with) keeps its own page and its place in the menu, marked
+  **Only in the code**, with its file and the props its code declares; its Status row says Figma is Missing, with a tip:
+  add it to Figma, or remove it from the code. The run counts them apart (`1 only in the code`).
+  `styleguide.showCodeOnly: false` in `ds-config.json` leaves them off the pages and the menu instead, a task each on
+  the Status page with its file (`1 in the code and not in Figma, on the Status page`), and a page for one of them
+  (`--component X --styleguide`) says so. Before Figma's data is captured, every component is the
+  code's: shown with its file and the props its code declares, marked **Only in the code** and compared with nothing
+  in Figma, and the run says so (`3 only in the code`) instead of counting them agreed. Its controls are the props Gate [15] (Component props match Figma)
+  matched, labelled with Figma's names; an option applies what the contract's `propertyMap` says it adds (a class,
+  an attribute; a live state such as `:hover` is offered but disabled); a switch shows or hides the part it names.
+  When an option's look is drawn on the component but a screen reader hears it on a part (a field's wrapper takes
+  `.field--disabled` while the field itself is disabled), the contract's `heardOn` names the part and its state per
+  option (`heardOn: { Disabled: { True: '.field__input:disabled' } }`): the option sets both, and the state check
+  counts what the part says.
+  An HTML and CSS system has no code props to pair, so a Figma prop is a control when the code realizes it: the
+  contract's `propertyMap` (found by its options when the contract spells the prop another way), `htmlRealizations`,
+  a modifier class the CSS has, or a `:disabled` rule; a prop nothing realizes is counted at the top. The system's
+  modes are switched inside the playground, each named as Figma names its collection (`figma.colorCollection`,
+  Styling; a sizing collection by its own name, Sizing, the name kept for screen readers and not shown): the sizing
+  mode at its top left, the colour mode and any other at its bottom right, never among the component's props. Under it,
+  its specs (see Specs) follow the controls as they change. Below them, the tokens behind what is drawn now (each
+  visible part, read again on every change made there) with its code on their right, the code as tall as what it holds
+  and never taller than the tokens. There is no table of every token it has: that is Parity, where each variable's name
+  opens its value per mode and what uses it. Where two tokens share a value, the tables name the one the component's
+  rules use, then one that names the part. Above it, its documentation, the products it is **used in** (each by
+  its full name, linked when `styleguide.plugins` gives its page), and **what differs from Figma**, from the
+  differences list the last full audit wrote.
+- **A component's page in areas**: Playground (with its specs), Variants, Documentation, Accessibility, Parity and Used in, one at a time on
+  the system's segmented control (every one at once on the measuring page, `?all`). Above them, its import line
+  (`styleguide-data.mjs` `importOf`: the file's package and path, else `@/` and its path under `src/`, or
+  `styleguide.importFrom` with `{path}` and `{name}`) and its file to download. The area switch stays at the top as the
+  page scrolls, the component's name beside it once its heading has scrolled away (a foundation's title stays at the
+  top too), and every table's head under them on every page: the card's head, then the table's own head row
+  (`stickHeight` measures how far the bars reach, `--pg-areas-h`, and a card's head, `--pg-card-head-h`); Parity carries the system's alert icon (an icon named warning or alert) before its label while its table
+  marks something (a row that differs, one only in Figma or only in code, a prop not built), Accessibility while a
+  problem stands (the last browser check's or the audit's), and Documentation while a kind is not written yet (`docOpen`),
+  what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Details in Documentation) is one of the
+  Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
+  component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
+  table as the Status page's Parity (`issueTableHTML`, `ISSUE_COLS`): Task nr (the Status page's number, open rows
+  only), Type, Figma (its name and value), Code (its name and value, and where in the
+  code a difference is), What to do (who acts above it) and Status (a sign and the system's colour, To fix, To check,
+  Done or Not compared, with what it is under any but Done, differs from Figma, only in Figma, only in code, both not
+  compared, New in the last audit when the last audit found it first, and when it last held). Each difference the audit found is merged into
+  the row it is about (`parityIssueRows`); what it found beyond those rows, a prop Figma has that the code does not build
+  and a component only the code has are rows of their own. The Status page holds the open rows of every component,
+  each kind in a table of its own shape, one card per component, one kind shown at a time with a filter (Parity, Motion,
+  Documentation, Migration, Products, System, the page's own items and Accessibility last, each when it has any; no
+  All), numbered in that order, so what the browser still tries is numbered after the rest and no other number moves:
+  Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Task nr, WCAG criterion, Figma
+  states, Found, What to do, Status), Documentation's the Documentation area's (Task nr, Kind, What is written, What to
+  do, Status), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
+  Status. The count at the top is the shown kind's, and every open row is numbered, Documentation's too. Under The system, what the tokens owe (`tokenTodos`, area System): the
+  semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
+  (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
+  hand in two tokens (You decide), each one row with its first names (a token one component uses is the system's own
+  choice, not a row). A token belongs to every component that uses it: in its code, named after it, bound on its
+  Figma component (the structure snapshot), or pointed at by one of those; its missing description shows on each of
+  them, a component with no page included (its Status row's Documentation tab), and one description written in Figma
+  clears them all. A token nothing uses yet (in Figma, in the code however the code spells it, or by a brand that sets
+  its own value or points at it) is no fault in a white-label system: its panel says Not used yet, and it is no task,
+  its description included. Open rows first, a count of each status above it, a filter by type (props, variables, values, other), its head kept in
+  view under the areas as the rows scroll by (on a phone the table scrolls sideways instead); in the Playground's card
+  table. The code is as tall as
+  what it holds, never taller than the tokens table on its left; past that it scrolls inside. In the controls a text comes right after the boolean that shows it
+  (`showFirst`: Show Text and Text Content, or both on the same part). **Built with** is an area of its own when the component is made of others (`nestedComponents`: the
+  classes its markup holds, or the tags and imports of its file), each the overview's card with its own preview.
+- **Playground links**: a control and the preview follow each other (a radio picked in the preview sets State); a
+  label edit writes only its words into its part. An option the contract maps to another element's selector (a
+  product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
+  the component's own `:checked` rule, and an option the code does not build is offered as not built.
+- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#status/documentation`). Its columns are Task nr, Kind, What is written, What to do (who writes it above it, You in Figma, and where) and Status (To fix, or Done with where it was written), one row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+  line of Figma's description or annotations or the code's note that starts with the section's name, else
+  `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
+  string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
+  last audit found the products doing with it (a rule laid over it, a look-alike built by hand, a parent's rule
+  overriding it), said so.
+- **An address for each area**: a component's area is in the address after a slash (`#c-chip/accessibility`, `/documentation`, `/parity`, `/variants`, `/built-with`, `/used-in`, `/changelog`; the Playground has none), kept as the areas are switched and opened directly from a shared link, before the props of the variant (`#c-chip/accessibility?Size=L`).
+- **The page's width**: the content takes the whole width the screen gives beside the menu, with no cap, so a wide screen shows wider tables and stages.
+- **The page's own reading**: every button says what it does in words (Menu and Close menu, on a phone; on a wide
+  screen the menu is always there), and the style guide check fails when the page's text roles fall below 4.5:1 on its
+  backgrounds in any colour mode (`pageContrast`, from the tokens' values; written into the page for the check).
+- **The stage's bars**: above the component, a bar in the tables' head colour with the sizing mode (Desktop, Phone) at
+  its left and Inspect at its right; below it, a bar with the colour mode (Light, Dark) at its right and, while
+  inspecting, what is picked at its left. They keep the stage (the checkerboard) apart from what changes it; the
+  checkerboard itself is square, the bars round the stage's corners.
+- **An instance from a page keeps what names it**: an id the instance itself points to (the label a radio group is named
+  by, through `aria-labelledby` or `for`) stays with the copy (`keepReferencedIds`), and each drawing makes it unique
+  (`uniqueIds`), so no two copies share an id and none points at a missing one. A control a product named by
+  `aria-label` (an icon-only button) that the props now give visible words loses that name, so its words name it
+  (2.5.3).
+- **Inspect**, in the top bar (none on the measuring page): the Playground turns into its anatomy, in the live
+  component's place, so a prop is changed and inspected in one place: an inert copy of the component as the controls set
+  it, redrawn as they change (a text typed too), at the size the Playground draws it (smaller only to fit), each part and each padding and gap outlined, a slot in
+  the accent, never filled with a colour (`annotate`). A click on the component, a part, or a padding or gap band (each
+  space over the parts, each part over the component) says in one line what it is and its value (a part's padding,
+  gap, fill, line, corners, shadow, text style and colour; an icon's size and colour; a space's token and value),
+  outlined in the accent, the rest of the component dimmed around it and the other boxes faded; a second click goes
+  back up a level, and a click on the stage outside the component lets go of it. What sits inside the part picked is drawn as parts too, one level per click, as a double click in
+  Figma reaches a layer in a group, and the line names the path (`Actions › buttonSecondary › text`). The modes
+  switched while inspecting (Light, Dark, Desktop, Phone) redraw it in that mode, what is picked kept, and a Width
+  chosen while inspecting (Phone, Tablet, Desktop) draws it at that width, never beside the width's frame. Done inspecting
+  brings the live component back and leaves nothing of the anatomy beside it. A component
+  shown in an overlay is drawn as its own element.
+- **Width**, in the Playground (none on the measuring page): Fit (the live preview), Phone (375px), Tablet (768px) or
+  Desktop (1280px), a frame of that width written with the page's own stylesheets, its icon sheet, the component as
+  drawn now and the system's own scripts (`systemScripts`), so its media queries apply and it works there (a click
+  moves a selection, as in the live preview), scaled down to fit the room.
+- **Figma beside the code**, in the Playground (a Figma button, only for a component with a Figma image; none on the
+  measuring page): the Figma image of the variant set (its variant props equal to the Playground's; the default image
+  only while every variant prop is at its default) beside a still, inert copy of the component as drawn, or over it,
+  clipped by a slider; a small one drawn up to 4 times larger, both alike. A variant with no image says so. Images
+  (`figmaVariantImages`, `visual-diff.mjs`): `<visualRefs>/components/<name>/<Prop=Value, Prop=Value>.png` and
+  `<visualRefs>/components/<name>.png` for its default, else the Figma REST API with `FIGMA_TOKEN` (every variant of
+  its component set in one images call, cached under `visual/figma-variants/` until `_figmaVersion` changes). They go
+  in the page, up to `styleguide.figmaImagesMB` (8) in all; `styleguide.figmaImages: false` for none. It returns the
+  width to Fit, and a width chosen turns it off.
+- **Do and Don't** (`exampleImages`, `visual-diff.mjs`), in its Documentation card: the pictures in
+  `<visualRefs>/components/<name>/do/` and `dont/` (each file named for its caption; a leading number orders them),
+  then the Figma nodes `contract.authored.json` → `components.<name>.examples` names (`[{ "kind": "do" | "dont",
+  "nodeId", "caption" }]`, fetched with `FIGMA_TOKEN`). Within the page's Figma image budget. A variant image of another
+  scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
+  uses in Figma.
+- **Changelog** (view `#changelog`, when the code has history; an old `#whats-new` link opens it): every component's changes gathered by release, newest
+  first (not released yet on top), one row per commit with the components it changed.
+- **Disabled**: a prop named Disabled, on, disables the native controls inside (`input`, `button`, `select`, `textarea`),
+  as a product sets them; the live accessibility check then says Tab passes it by, as it should, and measures focus
+  with transitions off, so a ring that fades in is read at its end.
+- **A token's panel** (`tokenUses`): every token's name on the page (foundations, a component's tables) opens a panel
+  in place, the page left where it is: its Figma name, its value in each mode, the components whose own rules use it
+  and those that use it through another token whose value names it (in any mode, with the token it came through),
+  each linked to its page, and a button to copy it. Escape or a click outside closes it, the focus back on the name.
+  The full list stays at `#uses?t=--name`. Search also finds each component's props and their options.
+- **A link to each variant**: the address carries the props set away from their defaults and the width
+  (`#c-chip?Size=L&width=phone`), kept with `history.replaceState` while that view shows; a link opened sets them and
+  the controls follow (a value the component does not have is left at its default). The address bar holds it, so no
+  button copies it. A component opened with a width chosen is drawn at that width; a test draw never reaches the address.
+- **Parity** (`parityView`, `parityRows`): one row per Figma prop (paired with the code prop, else only in Figma; a Figma
+  slot the contract gives a part of its own is paired with that part (`.modal-slot`); every slot is marked in the
+  Playground as the area it takes, dashed and named Slot inside, in place of the placeholder its markup holds
+  (`drawSlots`): its own part (`.pg-slot-area`, at least 40 by 96 pixels so an empty one is seen), or, for a slot whose
+  content the markup puts straight inside the component (a card, a status bar), the area that content takes drawn over
+  it inside the component's frame (`.pg-slot-host`), the parts of its other slots left as they are; the placeholder is
+  kept unseen so the component keeps its size, and the HTML shown drops the mark;
+  a slot only Figma has is said under the component's name (`slotsHTML`); in an
+  HTML and CSS system a slot or component swap is the markup's content, with code props a slot is `children`) and
+  per code prop Figma lacks; per CSS variable its rules use (the token check's values in each mode, the same or differs;
+  no Figma variable, only in code) and per Figma variable named after it with no CSS variable; per value the agreed
+  record has seen (the same since both sides agreed, or differs since it last moved). Each open difference is in its row, with who acts and what to do.
+- **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
+  (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
+  component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
+  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
+  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header.
+- **At a glance** (`factsOf`), under its name, on one line: its class (`.modal-card`), Version (the release its last
+  change shipped in), Last changed, its date and time, and how to import it. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
+  overview card, in one line, a fact that needs work marked with ! and in bold, never by colour alone.
+- **Variants**, an area of its own when a variant prop has two options built or an on/off prop is built: each option of
+  each variant prop and both sides of each on/off prop (false, true), one per row with its name, drawn by the Playground itself (the other props as it sets them) and copied still and inert,
+  the Playground left as it was; Try it sets that option there. An option Figma has and the code does not build says
+  so.
+- **Status and coverage** (`statusView`, `coverageOf`): under its name and on its overview card, stable, beta or
+  deprecated from `contract.authored.json` → `components.<name>.status`, a `Status:` (or `Maturity:`) line in Figma's
+  description or annotations, or `@deprecated` / `@beta` / `@status x` in its code; never guessed. Coverage is its own
+  file's line coverage from Istanbul's json-summary (`styleguide.coverage`, else `coverage/coverage-summary.json`).
+  The overview counts each status and says what each group holds (`styleguide.groups: { foundations, components }`).
+- **Changelog**, an area of its own: when Figma was last read for it, then each commit that changed it (its own file,
+  or a line of the shared stylesheet holding its class; the project's own files only), grouped by the release tag
+  (`v*`) that holds it, each linked to its commit and its pull request.
+- **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
+  `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
+  opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many
+  times its class appears in the product's source page. A use is the class put on an element (`class-use.mjs`: a class
+  attribute, `className`, `classList`), never a word in a comment or a CSS rule. A product whose screens use it in Figma
+  (`figma-screen-components.snapshot.json`) while its code never does is listed too, said to build it by hand there.
+  `styleguide.productShots: false` turns the pictures off.
+- **Code**: the code for what the playground shows, with the system's button to copy it. With a framework file
+  (`component-api.mjs` `callName`): the component's tag with the props set, in its syntax (jsx, vue, svelte, a custom
+  element), each value as the code spells it, a default left out, every prop the code requires written (`={…}`).
+  Else the HTML the preview draws, keeping only the classes the system's CSS styles.
+- **API**: from the component's file (`component-api.mjs`): its props, each one the code requires marked `*` (a TS
+  member without `?`, `required: true`, PropTypes `.isRequired`; a default makes it not required; nothing guessed),
+  its events (Vue `defineEmits`/`emits`/`emit()`, Svelte `dispatch()`, a React `on*` prop, docgen and custom
+  elements manifest events) and its slots. Left out when the code states none (an HTML and CSS system).
+- **Motion**, between Documentation and Accessibility: everything that moves in the component in the table every task
+  shares (`motionSpec`, `motionIssueRows`, `ISSUE_COLS.Motion`), a count of each status above it: Task nr, What happens
+  (Repeats, Opens, Closes, On hover, On press, On focus, or When a state it names changes, with what moves and the part
+  under it: turns a full circle, `.modal-card`, `.modal.is-closing .modal-overlay`), Code (its duration, curve and delay,
+  the variables it is written with, the rule's file and line, and whether a prefers-reduced-motion rule that wins stops
+  it), Figma (its duration and curve, and where in Figma: its Motion timeline, an animation style, the overlay its
+  prototype opens or a transition between its variants), What to do (Claude in the code when the code differs from Figma
+  or does not animate what Figma does; You in Figma when the code animates a loop, an opening or a closing Figma does
+  not) and Status (Done when the two match; To fix; Only in the code, nothing to do, for a hover or focus Figma's
+  prototype does not animate; Figma not read yet). Its tab carries the alert icon while a row is to fix (`motionOpen`),
+  and the Status page's Motion lists those rows under the same numbers; with this table, motion is no longer a row of
+  Parity. A component shown in an overlay is read with the overlay it opens in, its backdrop too; one that does not move
+  says so.
+- **Accessibility**, one table by WCAG 2.2 criterion at A and AA (`a11yIssueRows`), the same table as the Status page's Accessibility, in
+  the same card as the Playground's tables: Task nr (open rows only), Area (Accessibility, with the criterion and its
+  level; a click, a key or the pointer resting on it opens what it means in plain words and how it is checked, the token
+  panel's own pop-up, Escape closing it), Figma (what Figma's annotations state for it), Code (what was found, each
+  finding or duty on its own line with its sign, naming the component, its variant or its part, `onWhat`, and what
+  passed and where), What to do (who acts above it; each finding's own fix, what a person checks, "On badge, its Label
+  part, a person checks that…", or what has still to run, else what the criterion asks) and Status (✕ To fix, ! To
+  check, ✓ Done, a sign and the system's colour, with New in the last audit, when it was last tried and where each
+  finding is read from under it: a Figma annotation, `contract.authored.json`, its code, the style guide in the
+  browser, the last audit or the audit's code capture, a person). A criterion only a person can judge (1.3.3, 1.4.5,
+  2.4.6, 3.1.2, 3.3.3, 3.3.7 and the media ones) says how to mark it (Checked it? Tell Claude badge 1.3.3 is checked); once
+  the person has, `--checked` records who and when with the component's signature (its CSS rules, its contract entry, its
+  source file) in `design-system-engine-checked.json`, and the row is Done, Checked by them on that day, until the
+  component changes, then To check again, saying who checked it before. With nothing to fix or to check the summary
+  says Meets WCAG 2.2 at level A and AA. Only what applies to the component is listed: a criterion of the page that uses it (a
+  title, a skip link, orientation, consistent navigation), video and sound it does not play, what it has nothing for
+  (no link for 2.4.4), and what asks of controls or fields on a component with none in any variant (keyboard,
+  focus, labels, errors) are left out. To fix first, then to check, then done; a AAA criterion a check stands for (a
+  comfortable target size, motion from interactions, a focus ring's thickness) comes last as advisory and is not counted. Above it a count of
+  each status, and when the audit last ran (or that it has not), with what is excused (`behaviourExceptions`).
+  Under each criterion: what the audit found on it that is about accessibility rather than Figma (a text's contrast
+  in one variant and mode, `splitFindings`, with who acts and what to do); the last browser check's findings
+  from `.design-system-engine-out/a11y.json`; what its code does (`a11y-static.mjs` findings given to it by
+  `wcagStatics`); its role's duties and Figma's notes (`role-markup.mjs`, `behaviour-contract.mjs`: element, name,
+  keys, part roles), to fix only when the audit found that kind of problem; and what this page finds trying every
+  variant (none on the measuring page): every combination up to 32, else each option beside the defaults, the
+  Playground laid out out of sight and drawn again as set, each result said once with the variants it holds in.
+  The tries are the Tab stops in order, a name and a visible focus on each stop, a stop drawn as disabled that Tab
+  still reaches, each behaviour tried with the page's own events (a key only a native element answers is said to be
+  given by the browser), the text contrast in every variant and colour mode, the WCAG 2.2 checks of `wcag-page.js`,
+  and what it does when used (hover, focus, input, press) on six variants that can be used. A criterion is done when
+  its check ran and found nothing (the page's run, `ran` in the last audit's `a11y.json` for zoom, spacing, reflow,
+  a keyboard trap, a focus hidden under other content and target size, the code read for the rest) and to check when only a person can judge it, with what to look
+  at.
+- **What no check reads** (`a11yView().sources`, built in `styleguide-gen.mjs`, `unreadRows`), rows of the same table,
+  each with its status (To check when it states accessibility in a way a check could read, else Not needed, read by
+  the agents): each Figma annotation on it and on its layers that no check reads (`annotationUses` in
+  `a11y-check.mjs` gives it no use: a sizing note, a usage note), with how to write it so one does (its own wording when
+  the engine can tell what it means, `annotationWording`, which `--figma-edits` also lists in Figma), and the team's
+  guidelines (`guidelines.sources`, the Notion and GitLab pages fetched into files), the section named after the
+  component, read by the agents as design intent and by no check. Where each row is read from is under its status.
+- **In use**: the approved pictures of `frames[]` (Gate [2] (Figma frame unchanged)'s references in `visualRefs`), six at most.
+- **Modes**: an axis per mode collection (colour from `figma.modes`, size from the sizing collection), for the page
+  and, where the CSS nests, for one component. A mode the code has no CSS for is offered but disabled ("in Figma,
+  not in the code yet"): the page never draws Figma's values as if the code had them.
+- **Not agreed yet**: a prop on one side only, another default, a token that differs, a component not built yet:
+  left out and counted in one line at the top, for the person to decide.
+
+A project's own template is filled through markers:
+
+- `{{AGREED}}` ← the agreed view above, as JSON.
+- `{{ICON_SHEET}}` ← the DS icon `<symbol>` set, lifted from a built plugin `ui.html` (`styleguide.iconSource`), or built from a folder of SVG files, one icon each (`styleguide.iconSource` naming a folder, else the folder named `icon` or `icons` the code keeps five or more in, the one under `src/` first: `icon-folder.mjs`). Each icon is named by its path in the folder (`m/alert-m.svg` → `m-alert-m`), and the ids inside each file are kept apart from the other files'. An icon of that sheet that paints itself white is listed by the style guide check, never a failure of the page.
+- `{{USAGE}}` ← which plugins reference each component's class (scanned from plugin source).
+- `{{DOCS}}` / `{{DOCS_CODE}}` ← Figma descriptions and code notes, from the design-intent JSON (hardcoded pixel dimensions are stripped — docs describe with tokens).
+- `{{THEME_CSS}}` ← the token CSS inlined verbatim, with its `@media (prefers-color-scheme: dark)` guarded to `:root:not([data-color])` so the manual light/dark toggle wins; `{{COMPONENT_CSS}}` ← the component stylesheets outside the theme.
+
+**Its accessibility is tried while it is built.** After writing the page, `--styleguide` opens it in Chrome
+(`styleguide-bake.mjs`, four pages at once, each trying a share of the components, `#status?bake=1/4`) and has it try
+every variant of every component as its Accessibility area does, then keeps what each found in the page
+(`<script id="sg-a11y-baked">`, with when it ran and each component's signature). Whoever opens the page reads those
+results at once on the Status page and in every Accessibility area, the final ones, with nothing running in their
+browser; a component's area never tries again on its own. A component the build could not try (no Chrome there, its
+signature changed) is tried in the viewer's browser and kept there (`localStorage`). Until every component is tried,
+only Accessibility waits: every other kind is listed at once with its final numbers (Accessibility is numbered last,
+so no other number moves), the Accessibility card shows only how far the try has got and the table
+says Not checked for what is not tried yet, and the menu shows no count; then Accessibility's list is drawn once, final. `--no-a11y-bake` (or `styleguide.bakeA11y: false`) builds the page
+without it; without Chrome it is skipped and said, and a script error the page throws while trying is printed
+under the count.
+
+**The page is checked against the system it shows.** After building it, `--styleguide` checks the page's own CSS
+(every `<style>` but the system's, which the template marks `data-system`): a colour, font, text size, weight, line
+height, corner radius or space that is not one of the system's tokens fails it, and so does what the static
+accessibility check finds in its markup; the run exits 1. `--styleguide-check [page]` runs the same check on a page
+already built, after a project added its own links to it.
+
+**Published for the team.** A local `--styleguide` is a preview. `--publish-styleguide` writes the CI job that makes
+it one link everyone opens, rebuilt from what is merged on every push to the default branch: for GitHub Pages
+(`.github/workflows/style-guide.yml`) or GitLab Pages (a `pages` job, in `.gitlab-ci.yml` or, beside a pipeline the
+project has, `.gitlab/style-guide.gitlab-ci.yml` to include), as the git remote says. The job checks out the engine and
+the products in `products.json` beside the system, builds the page, runs the audit (a failing audit still publishes:
+the page shows the differences), builds the page again, checks it (a page that fails is not published) and publishes
+`public/`. A job already there is never overwritten, and nothing is committed. A GitHub Pages site is public even from
+a private repository (only GitHub Enterprise Cloud keeps it private); GitLab Pages can be kept to project members.
+
+Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome? }`. `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
+DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20
+(docs-truth) checks on the output.
+
+#### The standard contract layer (emitted automatically each run)
+
+**Every run** (after the gates, whenever a vars snapshot exists) **also emits a machine-readable
+contract** in a standard, interoperable format (a per-component JSON contract + W3C DTCG tokens). On
+by default so it never goes stale; opt out per-run with `--no-contracts` or per-project
+with `ds-config.json → contracts.auto: false`. It splits captured from authored by file:
+
+- **`contract.authored.json`** (project root, **committed**) — the AUTHORED hub: per component,
+  `bindings` (Figma prop → `{ attribute: "codeName" }` for a rename, `{ slot: "slotName" }` for a slot),
+  plus optional `semantics`, `notes`, `version`, `description`, `propDescriptions`, and optional
+  **agent guidance** — `whenNotToUse` (string), `useInstead` (a name or a list) and `neverCombineWith`
+  (a list) — so an AI knows when not to reach for a component and what pairings are invalid — and an
+  optional **decision status**: `status` (`current` | `deprecated` | `experimental`), `supersededBy`
+  (the component that won), `since`, and `rationale` (the *why*), so an agent never finds two right
+  answers with no note saying which one won. Decisions
+  only, no captured values, so it is safe to commit and applies in CI. Scaffolded once (empty bindings),
+  then hand-owned; the generator never rewrites it.
+- **`contracts/`** (**local, gitignored**) — the generated CAPTURED views, refreshed every run:
+  `tokens.json` (W3C DTCG: `$type`/`$value`, per-mode under `$extensions`, referenced by
+  `{family.token}`), one **standard** `<name>.contract.json` each (`id`, `version`, `props[]` with
+  `bindings.figma`/`bindings.code`, `anatomy`, `states`, `variants`, `semantics`, plus optional `whenNotToUse`/`useInstead` and
+  `relationships` — `composesWith` derived from the composition snapshot, `neverCombineWith` authored,
+  and a `status` block when the DS says something about the decision: authored fields win, and a Figma
+  component description that already uses a tag convention fills the gaps — `@deprecated [why]`,
+  `@experimental`, `@status <state>`, `@use-instead <Name>` (also `@superseded-by`/`@replaced-by`),
+  `@since <x>`, `@why <text>`; the convention is read, never imposed, and no tags + nothing authored = no
+  field. A deprecated **token** whose Figma description names its replacement or reason gets that
+  explanation as its DTCG `$deprecated` string (`"Use radii/button instead. too sharp"`) instead of a bare `true`),
+  `contract.schema.json`, and an `llms.txt` AI index (which opens by telling an agent to use these components,
+  build nothing by hand that one covers and ask `--query` before guessing a name, then gives the order of authority with
+  this system's own source at each level, `authority.mjs`; it also lists each component's guidance and
+  composition, tags a non-current component `[deprecated]`/`[experimental]`, and gives it a
+  `status: deprecated · use X instead · since 2.0 · why: …` line). They carry the DS's real values, so a single
+  `.gitignore` keeps them local. When these are present, a token divergence also **cites its source**:
+  the token's verified value from `tokens.json` and the file that declares it, so a fix (by a person or
+  an agent) is applied against the real fact, not a guess. Absent contracts, the citation degrades to
+  naming the token and its convention var.
+
+The generator reads `contract.authored.json` + the snapshots and merges them into the local views (the
+authored decisions win). Nothing generates a surface from any of it. **Gate 14** reads the authored
+`bindings` to resolve a prop rename or slot instead of guessing (a wrong binding never masks a real gap
+— it still fails); no other gate reads the contract. A malformed `bindings` entry (a typo'd key) is
+flagged in the run output, never silently ignored. Each run also reports **advisory** signals (never
+pass/fail): breaking vs additive contract changes since the last run, newly-deprecated tokens and
+components; **decision status** (how many components are deprecated / experimental, and every decision
+an agent would misread — guidance (`useInstead`) or composition that still sends it to a deprecated
+component, a `supersededBy` that names no DS component or a component that is itself deprecated (the chain
+is followed to the one that won), and a deprecation with neither a replacement nor a reason; first 12 each
+run, all with `--status`); token
+references that resolve to nothing (a silent-failure risk), and tokens used where a different `$type`
+is expected; **contract completeness** (how many emitted contracts carry a description, semantics and
+whenNotToUse/useInstead guidance, naming those with no description so agent-readiness gaps are visible;
+full list with `--contract-completeness`); **exemption debt** (every escape-hatch surfaced for periodic review, tagged by legibility:
+temporary vs permanent, owner, and review-by, so temporary bypasses get cleared and permanent ones stay
+accountable; totals each run, full list with `--exemption-debt`); **code→design drift** (props that
+exist in code but not in Figma, surfaced as a "sync back to the design" advisory so code-ahead-of-design
+is visible; the engine only surfaces it, the designer decides; totals each run, full list with
+`--code-drift`); and **token layering** (a structure-agnostic check: it imposes no
+tier model, only measures the DS's own aliasing rate and, when references are the DS's norm, surfaces
+the few tokens that hold a raw value instead); **token contrast** (computes WCAG contrast from the token
+values, per mode, and flags pairs below AA; a no-browser complement to the render a11y gate. Pairs are
+**derived** from the token-name convention — a component's `text`/`label`/`icon` token paired with the
+background sharing its state/variant qualifier, on by default, opt out with `a11y.derivePairs: false` —
+and/or **declared** in `ds-config.json → a11y.tokenPairs: [{text, bg, large?}]`; icon/stroke roles use the
+3:1 non-text bar); **declared token tiers** (opt-in — only when
+`ds-config.json → tiers: [{ name, match, mayReference?, layer?, holds? }]` is set: classifies each token by the
+project's own regexes and flags a token that aliases a tier its `mayReference` disallows; with `layer`
+numbering the tiers from the base up, each layer points at the one before it, so a token that skips a
+layer (a component token straight to a primitive) or points back at a later one is listed too; only the
+token it aliases counts, not the rest of the chain; `holds` names the kinds of token a tier keeps
+(`color`, `sizing`, `typography`, `string`, `boolean`), so a colour in a sizes-only layer is listed;
+never imposes a tier model, zero config = does not run); and an **AI-readiness scorecard** (a running R/Y/G
+measure across gate health, coverage, documentation and guidance, aggregated from the signals above,
+never a grade and never blocking); and **prune candidates** (a leaner library is cheaper for an agent
+to read and mis-picks less: surfaces deprecated tokens still present, variant axes that do not vary
+(a "variant" prop with one option), components used in exactly one place, and the token budget: the same
+colour written by hand in two tokens, with no alias (two primitives for one colour, a token that repeats a primitive
+instead of pointing at it; tokens that point at the same one share its value by design and are never listed) and
+tokens only one component uses (a candidate to keep inside it) — each a QUESTION, never
+a verdict; totals each run, full list with `--prune`). One more **opt-in, project-declared** advisory:
+**list duplication** (`ds-config.json → duplication: { surfaces: ["AGENTS.md", ".cursorrules", …], minCluster? }`) —
+a DS list copied by hand into an agent-instruction file, skill, or doc drifts into a stale parallel truth
+(and a stale list is what makes an agent hallucinate). Flags a declared hand-maintained surface that restates
+a cluster of DS component/token names (and calls out the same list duplicated across two or more surfaces),
+so it can reference the generated `llms.txt`/contracts instead of keeping a copy; totals each run, names with
+`--duplication`. Generated surfaces (the styleguide) are not listed here — showing every component is their job.
+It also **validates Figma Code Connect** when present (auto-detected from committed `*.figma.tsx`/`*.figma.ts`,
+or `ds-config.json → codeConnect.files`): Code Connect is a downstream artifact that can go stale, so the
+audit diffs each mapping against the emitted contract — joined by Figma **node id** — and flags a mapping
+that names a prop or enum option the contract no longer has (fix the mapping, not the contract; names with
+`--code-connect`). Like every plan-gated capability it reads **only what is already committed locally and
+never calls the Enterprise Code Connect API**, so any-plan projects are unaffected (no files = does not run).
+Each emitted `<component>.contract.json` also carries a **usage
+scaffold** (the element plus each prop with a concrete example value, derived from the contract itself
+so an agent instantiates the component without guessing). Two more **opt-in, project-declared** advisories
+(never imposed, never fail): **closed vocabulary** (`ds-config.json → closedVocab: { bannedTags, surfaces,
+suggest? }` — counts raw container tags the project banned, in the declared surfaces) and **multi-brand
+coverage** (flags a token defined in some brands but missing in others). Brands are resolved by
+`resolveBrands`, plan-agnostically: **declared** `ds-config.json → brands: [snapshotKey, …]` wins; else a
+captured **collections manifest** that marks a brand collection (the Enterprise / extended-collections
+enhancement, read as data the any-plan capture wrote — never a plan-gated API call); else it **suggests**
+candidate multi-mode collections but never assumes (modes may be theme/density/locale, not brands). Override paths with
+`ds-config.json → contracts.{authored,out,tokensOut,schemaOut,llmsOut,propTypesOut}`; the engine ships only the generator.
+
+**Figma prop types.** The same run writes `contracts/figma-props.d.ts`: per component, a `<Name>FigmaProps`
+interface (one union per variant property, `boolean` for a True/False variant or a boolean property,
+`string` for text, `unknown` for an instance slot) and a `<Name>FigmaDefaults` type. Names follow the props
+check (an authored binding, then `componentPropAliases`, then camelCase); interaction states are left out,
+as they are CSS. Type a component's props with it (`const check: ChipFigmaProps = {} as ChipProps`, or use
+it as the props type) and `tsc` shows prop drift in the editor and in CI. `contracts/` stays local, so set
+`contracts.propTypesOut` to a committed path when CI should check it.
+
+#### The code capture (every run, and `--capture-code` on its own)
+
+Figma is captured once per run into snapshots every gate reads. The code is now captured the same way:
+each audit run writes `.design-system-engine-out/code.snapshot.json` (local, keep `.design-system-engine-out` gitignored; setup adds
+it) before the gates start, and every fact in it says **where it came from** and **how sure the reading
+is**. It is cached by content, so an unchanged project reuses it at once; after a code change the
+browser part takes a few seconds per component. `rms-design-system-engine --capture-code` runs it on its
+own. `ds-config.json → codeReading.capture: "off"` skips it in the audit (the gates then keep their own
+readings, and Gate [25] (What this audit actually checked) says the capture did not run). Inside a git hook the capture is static only, so a
+commit never waits for the browser: a pre-commit hook is detected on its own, any other hook passes
+`--hook`, and `codeReading.hookBrowser: true` brings the browser back. The next normal run redoes the
+capture with the browser.
+
+- **Two readings of every token.** Chrome (via `cdp.mjs`) opens the theme and the built pages, switches
+  into each mode the way its `cssSelector` says (media emulation, a class, a data attribute, a viewport
+  width) and reads every custom property as the browser resolved it, including tokens a page injects at
+  runtime. `css-source.mjs` reads the same CSS statically: a real block parser (`@media`, `@layer`,
+  `@supports`, nesting, strings, `;` inside `url()`), local `@import` followed, `<style>` blocks read out
+  of HTML, file and line kept, and each mode resolved by the actual cascade (importance, specificity,
+  source order), so a later `:root` that silently overrides a dark block is seen as the browser sees it.
+- **Components measured where they render.** Each component (found through `component-locator.mjs`) is
+  measured in the generated styleguide or the built pages: a plain instance first, one that carries text
+  next; a usage with extra classes or an id is copied into a neutral host without them (and the removed
+  extras are recorded); a hidden one is measured as a copy; else a probe from `structure-contract.mjs`; else,
+  for a React component, the markup its own JSX returns (`jsx-markup.mjs`: the element types, the classes
+  that are always there, string attributes and default text, so a `<span>` or an `<input>` is measured as
+  one); else a bare element built from the selector, its contract children and the parts the selector map
+  names (lowest confidence, and never a height, since it has no content). When the rule already sets Figma's
+  height and the drawn box is another, the fix names the cause: an inline element that ignores a height, or
+  padding and border outside a content box. The parts the contract names
+  (`fontSel`, `radiusSel`, `gapSel`, `beforeSel`) and the first element holding text (what Figma's font
+  fields describe) are measured too. Numbers are repeatable: fixed viewport and pixel ratio, fonts loaded,
+  transitions off.
+- **Every value traced.** `CSS.getMatchedStylesForNode` names the declaration that won (importance, then
+  cascade order, inline last), its `var()` token, its rule and its source `file:line` (the built page's
+  line is kept as `renderedAt`). Inherited values name the ancestor rule; values no author rule sets are
+  labelled browser defaults and are not code facts. When another rule beats the component's own base rule,
+  the override is recorded (`overrides: { baseRule, baseValue, baseAt }`).
+- **States produced for real.** From each component's `propertyMap`: `:hover`/`:focus`/`:active` forced,
+  classes, attributes, `:disabled`/`:checked` applied, a BEM modifier swapped in; a state that cannot be put
+  on the instance is looked for, on every page, on an element already in it. Anything still not produced
+  is listed with the reason.
+- **Confidence on every fact.** `verified` (the browser and the source agree on the rule that won),
+  `single-source`, `uncertain` (the readings disagree: reported as a reading problem, never as a design
+  difference), `not-read` with the reason, or `default`. Known browser rules are applied, not flagged:
+  border widths drawn in whole pixels (the declared `1.5px` stays the code's fact, `drawn: 1px` beside it), an
+  inside stroke drawn as an inset ring (`box-shadow: inset 0 0 0 1.5px`, so it adds no height) compared by the
+  ring's width and colour, never by the border it does not have,
+  a unitless line-height is a multiple of the font size, a `min-height` larger than `height` wins.
+- **Cached by content.** A hash of every input; an unchanged project reuses the snapshot instantly
+  (`--force` recaptures). `ds-config.json → codeReading: { browser: "auto" | "off", pages: [...], out }`.
+  Without Chrome every fact is `single-source` from the static reading and says why.
+- **Component APIs (props).** Read from the best source the project already has, never a new dependency:
+  a Custom Elements Manifest (`custom-elements.json`), react-docgen or vue-docgen JSON
+  (`codeReading.docgen`), the project's own TypeScript compiler when installed (the `Props` type read by
+  syntax: allowed values, booleans, defaults, Vue `defineProps`/`withDefaults`), then text patterns. A
+  Storybook index (`storybook-static/index.json`, or `codeReading.storybookIndex`) and committed Figma
+  Code Connect files (`*.figma.tsx`, joined to the Figma component by node id) only say which file is
+  which component and which code prop a Figma property maps to; they never supply values. Each prop is
+  `verified` when two sources agree, `uncertain` when they disagree. With `frameworkComponents: false` no
+  props are read (the components are markup and CSS).
+- **Icons.** Every sprite `<symbol>` with its file and line, `viewBox`, path data and fill/stroke flags,
+  and every literal use (`file:line`).
+- **Markup.** Each app's fingerprint, the same one Gate [18] (Markup) compares.
+- **Nesting.** Which DS components sit inside which, read in the rendered page (so markup built by
+  JavaScript counts) and in the component's source file. Both readings agree: `verified`.
+
+**The gates read the same way.** The props, nesting, icon and markup gates use the capture's readers
+(`component-api.mjs`, `component-source.mjs`, `icon-source.mjs`, `markup-source.mjs`), and Gate [3] (Token values)
+reads the theme with the capture's cascade-aware reader: every `:root` block, local `@import`, and each
+mode resolved as the browser resolves it (a `:root` written after a dark block wins in dark mode too, and
+Gate [3] (Token values) now reports that). Where a gate needs a fact only the capture has, it reads the snapshot, and
+only while the snapshot still matches the code:
+- Gate [3] (Token values): a token the browser and the CSS text disagree on is listed as "could not read reliably"
+  (not verified, so the gate stays red) instead of blaming the design.
+- Gate [16] (Sub-components match Figma): a sub-component the rendered page shows inside its parent counts as used, so JavaScript-built
+  nesting passes, and a parent with no source file is judged by what renders.
+- Gate [25] (What this audit actually checked): one `CODE CAPTURE` line with what was read (tokens, components measured, states, props,
+  icons, nesting) and how, or that the capture is missing or out of date.
+
+**`--capture-code --compare`** lays the capture beside the Figma snapshots, field by field, and writes
+`.design-system-engine-out/code-vs-figma.json`. Tokens resolve exactly as Gate 3 resolves them (the trailing `/color`
+dropped, then `design-system-engine-map` `EXPLICIT` / `EXPLICIT_SIZING`, then the naming convention; `SKIP_TOKENS`,
+`NULL_TOKENS` and an explicit `null` skipped). Component fields: a height only where the code fixes one (a
+`height` rule compared as the drawn box, a `min-height` by its value), padding, gap and radius by token or
+value, font against the first text element, background as "paints or not" (Figma often paints on a child
+layer, code on the element). On a project whose parity is green this is a calibration: every difference is
+either a capture bug to fix or a real fact about the code that no gate looks at yet. Gate [13] (Structure)
+runs the same token, icon and nesting comparison on every audit, after the components. `MEASURED TOKENS` lists a
+Figma token the page resolves to another value only where the browser alone read it (a script, or a stylesheet
+the page loads that Gate 3 does not read), with what sets it to look for. Everything else is already listed by its
+own gate (tokens by Gate 3, icons by the icon check, nesting by the sub-component check), so one line counts it
+(`📋 measured too: tokens 346 match · icons 40 match`, with how many differ and which check lists
+them) and nothing is listed twice. Advisory like the rest of `MEASURED`; `renderedParityStrict` (and build mode)
+makes a listed token fail the gate.
+
+#### The component catalog and `--check-ui` (for UI generators)
+
+A generator (an AI agent, a small model in the browser, a template tool) composes real design-system UI
+only when it is told exactly what exists, and its output is checked every time. Every run writes
+`contracts/catalog.json` beside the contracts: each component with its props (allowed values, defaults,
+and the code prop name when known), the components it may contain (from Figma's composition and the
+nesting the code capture saw), what it must never contain, its status, and where it lives (`livesIn`, also
+in each contract): the products whose code uses it, with how many files and uses (a page built from a source
+beside it counted once), the system's own pages that show it, the components it sits inside and the ones it
+holds, and the Figma screens that draw it. `--query` prints it, and `differences.md` names it under each
+component, so a difference in a component five products use reads as the larger change it is. `llms.txt` gets the same
+catalog as an aligned table (`Badge  Tone=info|warn  Text=text`), because small models read aligned
+tables far better than JSON Schema. Interaction states (hover, focus) are not props a generator sets:
+the component owns them. When the code capture is fresh, each entry also has `rendered`: its size on a
+real page, `targetSize` for a control (with `atLeast24`, WCAG 2.5.8), and what each state changes, by
+token where the code uses one (`"State=Hover": { "backgroundColor": "var(--btn-bg-hover)" }`).
+
+`rms-design-system-engine --check-ui <generated.json>` checks one generated UI against that catalog. It
+accepts a flat A2UI-style list (`{ root, components: [{ id, component, children: [ids], …props }] }`) or a
+nested `{ component, props, children }` tree. The check is deterministic and prompt-blind: it never
+repairs the UI and never adds anything, so it can be run on every generation. Its rules are written
+down once (only catalog components; only listed props and values; booleans are true or false; unique
+ids, one root, existing children, one parent each, no cycles; nothing inside a component it must never
+combine with), and every finding names the rule it breaks. A deprecated component, a node not attached
+to the tree, or a child the design system never nests there is a warning; an experimental one is a warning that
+says it may be used for what it is for. Given a page or a component file instead (HTML, JSX, Vue, CSS), it runs the
+check every edit gets on what changed since the last commit, never failing the file as JSON. Findings are also written to
+`.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
+the generation's quality score. Exit 1 on any error.
+
+#### Prototypes
+
+`rms-design-system-engine --prototype --catalog` prints everything a prototype may use, in this order: what it was read
+from (each Figma snapshot with its age, the code, the authored contract, each guidelines file with the Notion or GitLab
+link it came from, and a link not fetched yet); for this request, what applies to it; the catalog's components with
+their options (a component the code does not have is marked: it is drawn as a labelled box); what each component is for;
+the team's rules for the product; the rules the check holds every prototype to; the templates in Figma; how the
+product's pages are arranged; the engine's layout pieces with the spacing tokens, text styles and screen widths they
+take; the format; and the prototypes already in `prototypes/`.
+
+- **What each component is for** comes from everything the team wrote, read as the design intent reads it
+  (`intent-gen.mjs`, nothing written): the Figma description and annotations (a `Role:` annotation is shown as its
+  role), each option's description, the code's notes and the comment above its CSS rule, the authored contract
+  (`whenNotToUse`, `useInstead`, status, notes) and the guidelines section named after it. Its usage, as the style
+  guide shows it (When to use, When not to use, Common mistakes, Limitations: a line of Figma's description or
+  annotations, the code's note, else `guidance` in the authored contract), and its Do and Don't (the captions of the
+  pictures in `<refs>/components/<name>/do` and `dont`, and the `examples` the authored contract names) are listed with
+  it. A common mistake and a Don't rule a use out as a never sentence does, when two of their words are in it.
+- **The team's rules** are every other guidelines section, each with its file (`guidelines.sources`, and the files the
+  Notion and GitLab links are fetched into), and the authored layers of `design-intent.json` (system, foundations,
+  patterns, templates, pages, flows). A link whose file is missing or older than `guidelines.maxAgeHours` (24) is
+  fetched again first, as the audit does (`DESIGN_SYSTEM_ENGINE_NO_FETCH=1` skips it); with no token or no network the
+  committed file is kept, and a link never fetched is listed with ⚠️.
+- **For this request.** The request is the one made with the command in the last hour (the prompt hook keeps it in
+  `.design-system-engine-out/prototypes/request.json`), or `--for "<text>"`. Against it: the guidelines' opening text
+  and the sections its words touch, in full; the components its words point to (by name, description, options, notes
+  or guidelines); and the closest page to start from, made already or designed in Figma.
+- **Rules the check holds.** A plain sentence in the guidelines, "one button per screen", "at most two fields on a
+  page", is a limit: a prototype with more is not drawn, and the error quotes the sentence and its section.
+- **What the request asks for.** A component the request names (every word of its name is in it: "an empty state"
+  → emptyState) that the prototype does not use is a warning the reply owes: add it, or say why. A kind of component
+  the request names that the system has none of (a switch, a toast, a dialog, a progress bar, or a message confirming
+  something saved, sent or done when the system has no toast, banner, alert or notification), shown neither as a
+  Missing box nor with `standInFor` (nor by a part whose `purpose` names it), is a warning the reply owes too: the
+  system has no such component, say so. The same line for several parts is said once, with how many. A component the
+  documentation rules out for the request's words ("a message confirming…" and a tag that is never a message that comes
+  and goes), used anyway, is an error, unless the node says what else it is for in `"purpose"` (a note, like
+  `standInFor`, that the check reads and the drawing ignores).
+- **Uses the documentation rules out.** A sentence with never, not for, do not or avoid in a component's guidelines,
+  notes or `whenNotToUse` rules out the words after it, up to the end of its clause ("it never submits anything" rules
+  out submitting, not the rest of the sentence). A request word it names lists that component as ruled out, not as one
+  the request points to; a stand-in it names is an error (show the need as a Missing box), and a label it names is a
+  warning.
+- **Templates in Figma** are `figma-templates.snapshot.json` (`templates` in `ds-config.json`): the components each
+  template composes, in order. **Screen widths** are the Figma breakpoints; a `Page.width` that is none of them is a
+  warning.
+- **Designed screens.** The screen capture (`paths.screenLayout`, or `figma-screen-layout.snapshot.json` beside the
+  Figma snapshots) is read even before `--from-screens` brings it into `prototypes/`: its screens count as the product's
+  pages and as places to start from. The product's screens the audit records with the components each uses
+  (`paths.snapshotScreenComponents`, `figma-screen-components.snapshot.json`) are listed in the catalog, the most used
+  first; a request that names a product or a screen gets that screen in view (what a new page for it is made of), and a
+  product's name never points to a component whose note mentions it.
+- **What each component is for** is what a designer reads: the engine's own placeholder description, Figma node ids,
+  the class a component maps to, a build stamp, a banner, a CSS sentence (`::before`, `h=32`, `CSS:`) and a bare list of
+  tokens are left out, and a note that only repeats the description is not repeated.
+
+`rms-design-system-engine --prototype prototypes/<name>.json` checks a composition (the format `--check-ui` reads, nested
+or flat) and, when it holds, draws it as one page under `.design-system-engine-out/prototypes/<name>.html`: each
+component from its own markup (the contract's probe, a page instance, or its React source) with the project's CSS, in
+every mode the system has, with a switch for the colour modes and one that outlines the engine's pieces.
+The page is set in the design's font: one installed on the machine is used as it is, one the system's CSS ships with
+`@font-face` comes from it, and any other is asked of Google Fonts after the page has loaded (never with
+`prototypeFonts: false` in `ds-config.json`). The page never waits for it: it draws at once in the system's own font
+stack, the design's family first, and a font found nowhere (not installed, not one of Google's, no network) is said on
+the page's bar and as a 🔤 line, the page and its pictures set in the system's fallback.
+The rules are `--check-ui`'s, plus:
+- **The engine's pieces** (Page, Stack, Row, Columns, Text) exist only where the system has no component of that name.
+  They carry no colour, border or font of their own: `gap` and `padding` take a spacing token, `Text.style` a text
+  style, `Page.width` the screen's width in px; `grow` takes the room a parent leaves. The page takes the system's own
+  page surface, text colour and font family. Each piece used is a layout gap, the pieces of one prototype said in one
+  line ("Row, Stack and Page layout components"). The engine's on/off options take `"true"` and `"false"` written as
+  words, as a component's do.
+- **Filling the container.** Figma's fill container belongs to the instance, so any part takes `"stretch": true` (as
+  wide, or as high in a row, as what holds it) or `"grow": true` (the room left). A component the system makes fill its
+  container (Figma sizes it to fill across, or its CSS gives its own class `width: 100%` or `flex: 1`) fills the
+  arrangement it is in, and an arrangement holding one fills its own, up to the page; one Figma sizes to fill down (a
+  panel) takes the height left in a column. When the products' screens are read (`--figma-screens`), what they do
+  decides: a component most of whose instances fill their parent's width there (a status bar fixed in its master,
+  stretched across every window) fills it in a prototype, and one fixed on every screen stays its own size, whatever
+  its Figma master says; a component no screen shows keeps its master's sizing. A Row that lines its parts up at the end, the centre or apart takes the
+  width to do it.
+- **Slots.** A Figma slot is a place for other components, shown in the catalog as `<its children>`: it takes any
+  component unless Figma lists the few it takes. A component given children is drawn from the plainest copy with a part
+  for each of its slots (a panel's head and main), each slot emptied of what the product put in it; a child goes in the
+  slot it names with `"inSlot": "<slot>"`, else in the main one. Words given to a slot (`"Slot": "…"`) are what it
+  holds when no child fills it.
+- **A need nothing fits** is `{ "component": "Missing", "props": { "need": "…", "kind": "…", "closest": "…" } }`, drawn
+  as a labelled box. A component used for a need it does not quite meet carries `"standInFor": "<the need>"`: the page
+  marks it where it is drawn (a dashed box and "Stand-in for <the need>", on a layer of its own so the component is
+  untouched), counts the stand-ins on its bar ("Stand-ins (2)", which turns the marks off and on), and leaves the
+  marks out of its pictures. A stand-in for a component the system has (`"standInFor": "date picker"` where it has
+  datePicker) is a ⚠️ line: the system's own is used.
+- **An option Figma and the code do not share by name** is drawn on the part its name points to: a text option
+  (`TitleContent`) writes the element whose class says title, or the one holding Figma's default text, or the
+  component's own text for a label; an on/off option (`Show Description`) set off removes the part it names. A page
+  instance's own state (a `hidden` class, a position on its page) is taken off. An option with no such part is drawn
+  without it, with a warning once per component.
+- **Copies from the products' pages.** A component that is one part of another's markup (a segment of a segmented
+  control) is drawn as that part, inside its parent, which keeps its own pieces (the pill) and takes the children in
+  place of its own. A copy of a component the system's CSS styles keeps the classes the system's own CSS knows and those
+  its options point at; the product's own (its panel's width) stay in the product, and so does the name the page gave
+  it (`aria-label`). Each copy keeps its ids to itself. An option is set as the style guide sets it: on its part (a
+  switch's checkbox), on and off, with the state a part is heard in (`heardOn`). A field's value option sets its value;
+  words for a part the copy lacks go nowhere, and Figma's default words never go through a guessed part. Figma's
+  default that leaves a component inert or alarming (a field `Disabled=True`, a `State` of Error), drawn because the
+  composition does not choose, is a ⚠️ line.
+- **Gaps.** Missing boxes, stand-ins, the engine's pieces and components the code does not have go on the gaps list:
+  `.design-system-engine-out/prototypes/gaps.json` keeps every prototype's (`byPrototype`) and the merged list, the most
+  needed first. Each gap records what was tried (`tried`), so whoever decides works from the evidence: what was
+  searched (the agent's `searched` on the Missing box or stand-in, and the system's own components by name and
+  description), the components nearest to the need, what stands in for it meanwhile, and why none fit (the agent's
+  `why`, the guidelines). The gaps list and the summary say it on each line; the prototype's own page keeps the short
+  line. The Stop hook holds the reply to the gaps of the prototype just drawn. The page lists its own gaps
+  (Gaps on its bar), each marked stand-in, missing or by its kind, with "Show on the page": it scrolls to the parts the
+  gap comes from and flashes them (the layout gap turns on the engine's outline); a part that is not drawn now (in
+  another state, or inside what a click opens) is said so.
+- **It works as in the product.** The system's own scripts (`systemScripts`) run on the page, a click moves a
+  selection (tabs, a segmented control, a list), a field takes typing, and a link stays on the page. A part that opens
+  another carries `"opens": "<id>"` and the part it opens has that `"id"`: it is drawn closed and opens on a click, as
+  the system's overlay when its CSS has one (container, layers, open and closing classes, as the style guide plays it),
+  else as a popover under the part; Escape, a click outside or a button inside closes it and the focus goes back. An
+  `opens` that names no part, the page or itself is an error. A part it opens drawn with the engine's layout pieces
+  (a Stack of buttons, not a Missing box or a stand-in) goes on the gaps list as a dialog or menu the system lacks. A
+  request that has a part open another (a button that opens a confirmation, a menu) owes an `opens`: a state alone is a
+  ⚠️ line. Each state is held to the request and the documentation as the page is: a tag a "saved" state adds where
+  the guidelines rule a tag out for a message is an error. With Chrome, each one is tried: it must open with the
+  focus inside, close with Escape and give the focus back, each field must take typing, each toggle (a switch, a toggle
+  button, a checkbox the system draws) must turn on and off when clicked, and each part that shows another
+  (`aria-expanded` with `aria-controls`) must show and hide it; what does not is a ⚠️ line under 🖱. The page does what
+  a product would where the system's own scripts do not: a click moves the selection in a group, flips a toggle (its
+  `aria-pressed` or `aria-checked` and the class the system's CSS turns on for it), and shows or hides what a part
+  controls; a component the system defines by id (a tooltip, `#tt`) is one element in the page, for its script. A
+  toggle button (`aria-pressed`) is on or off on its own beside others like it, never one of a pick-one group; once a
+  selection moves, the system's script is told the window changed, so what follows the selection (a sliding pill) moves
+  with it. A modal it opens keeps the focus inside it while Tab moves, a radio group one stop. A part that shows no
+  words or groups others carries `"name": "<what it is for>"`, what a screen reader says; a part with a tooltip carries
+  `"tip": "<its words>"`, set where the tooltip is carried so the system's script shows it. The drawn page's own
+  accessibility findings (a control or group with no name, a heading, a text's contrast) are ⚠️ lines with their fix;
+  what the system's components do themselves is one line for the audit.
+- **Every state.** A composition names its other states beside it, `"states": { "<name>": { "<id>": { …that part in
+  this state… } } }` (in the composition, or beside `"prototype"` in the file), each naming by `id` only the parts that
+  differ; `null` leaves a part out, and a part with no `component` keeps its own with the `props` given over its own.
+  Each state is checked as a whole page (a state that names no part is an error), its gaps join the prototype's, and
+  the page has a switch for it (`#state=<name>` opens one). A value written as a person would (`false` for an option of
+  False and True, an option in another case) is read as the system writes it. The page owes an empty state when it
+  shows a list (two or more of the same system component that is not a control, two or more arrangements alike, a
+  row each with a name and a tag, a component named or made for a list, table, grid or feed, or a request that says
+  list; fields, buttons and chips side by side are a form or a set of choices), an error state when it takes input (a
+  field and a button), and each state the request
+  names ("with a loading state") or the team's guidelines ask of the page or of a component it uses ("every list shows
+  an empty state"). A state is found by its kind, whatever its name ("No results" is an empty state). One not given is
+  a ⚠️ line the reply owes.
+- **Every screen size and state, with longer words.** With Chrome, each state is drawn at every screen width (Figma's
+  breakpoints, else Phone 375, Tablet 768 and Desktop 1280; a size mode of the same name is turned on, else the
+  system's media query decides), with the words as written and 40% longer, as a translation makes them. What runs past
+  the screen's edge (measured part by part, since a system often hides the page's overflow), a text cut by a box or an
+  ellipsis, a text that runs out of its component, a control's label on two lines, and on a phone a target under 24px
+  (WCAG 2.5.8; what a click lands on, a label or a `::after` laid over a bigger box included) are ⚠️ lines under 📱,
+  each with the widths and states it happens at; the ones that happen with the words as written are owed in the reply.
+  A system component that is under 24px at its own size is one line for the audit. A page that gives itself a width
+  (`Page.width`) is tried at it too ("Its own"). A picture is saved for each width (`<name>@<width>.png`) and each state
+  (`<name>.<state>.png`, at the page's own width when it has one). Row `wrap` and Columns `minWidth` (the narrowest a column may be, in px) let a layout fit a
+  narrow screen.
+- **Flows.** A part that leads to another page carries `"goesTo": "<prototype name>"` (`"<name>#<state>"` for one of
+  its states); a click on the drawn page opens it, and a link to a page not drawn yet is a ⚠️ line the reply owes.
+  `rms-design-system-engine --prototype --flow` reads every prototype in `prototypes/` and lists each link, where the
+  flow starts and where it ends, and the team's flows: steps joined by arrows ("Sign-up: Account → Plan → Welcome") in
+  the guidelines or the design intent's flows layer, or a numbered or bulleted list under a heading that says flow,
+  journey or funnel. Each step is matched to the prototype whose name or main heading shares its words; a step with no
+  prototype, and two steps in a row whose pages do not link, are ❌ lines, and so is a file in `prototypes/` that is not
+  one page (several pages in one file, a draft left behind). A link whose words go back (Back, Previous)
+  is a way back, not a step. The pages of a flow are held to each other as the product's pages are, every page of it
+  voting and the flow's own order breaking a tie, and when one page after the first has a way back, every one must.
+  A flow with a ❌ line exits 1 and is not done: each one is fixed in the page it names and the flow run again until
+  it says ✅ the flow holds.
+- **Design review.** With Chrome, the drawn page is reviewed as a designer would before anyone sees it, and scored out
+  of 10 under 🎨: the parts of a column start on one line (a component's own margin that pushes one in is named), one
+  arrangement keeps one spacing and the page a few, one part styled as the primary action is in view (the system's
+  primary component, or a class or option that says primary), the main heading is the largest text and each heading
+  smaller than the one above it and larger or heavier than its text, a line of text runs under about 90
+  characters, and two parts of an arrangement never touch, unless both are system components with a surface of their
+  own (a background or a border: a panel on a status bar), drawn to meet. Each ⚠️ line says what to change; the reply owes the ones it keeps. A heading already in the system's
+  largest text style, the same as its body text, cannot be made larger: an ℹ️ line and a gap the reply names (no
+  heading style), never taken off the score.
+- **A retired component** (status deprecated) is an error that names its replacement.
+- **What the documentation says.** After drawing, each system component the prototype uses is listed beside what it
+  uses it for (its labels and stand-ins) and what the documentation says it is for, so a use it is not for stands out:
+  that use gets `standInFor`, or a Missing box, and the prototype is drawn again.
+- **The product's other pages.** A prototype is compared with the other prototypes in `prototypes/`: page padding, the
+  space between sections, the screen width, the page heading's text style, where the actions sit and how they line up,
+  the frame (the containers at the top of the layout, a component holding other parts or named as a bar, panel, header,
+  window or nav, like an action bar and a side panel), the text styles of body text and section headings, what each
+  kind of action is called and the component it is (save, cancel, go on, go back, delete, create: "Save" on every page,
+  never "Submit" on one; a button for it everywhere, never a chip on one page), and the answer given to each need the
+  system lacks (a chip as a stand-in on one page and a Missing box on another is a difference). A decision counts when
+  two pages share it (the page being drawn votes too), or one screen a designer made in Figma (in the screen capture,
+  or a starting point from `--from-screens`), and no other value weighs as much; where nothing is shared yet (one page, or pages that disagree
+  evenly), the first page made sets it, for the pages made after it only, so a product with no patterns or templates
+  still gets pages that match. `prototypes/conventions.json` (`{ "page": { "padding":
+  … }, "heading": { "style": … }, "actions": { "at": "end", "justify": "end" }, "needs": { "<need>": "<answer>" } }`),
+  written by the team, wins. Each difference is listed with the pages it differs from, and the Stop hook holds the
+  reply to it like a gap. `rms-design-system-engine --prototype --consistency` compares every page with the others.
+- **The drawn page against the designed screens.** With Chrome, the drawn page is opened and measured: every part's
+  box, the page's padding, the space between its sections, each text's size. A prototype that redraws a designed screen
+  (same name) is compared with it part by part: each component and text in its place (the first from the page's corner,
+  each next one from the part before it, so a part drawn wider moves nothing after it into a finding) and at its size. A
+  new page is compared with the designed screen it started from, or the one sharing the most components: the page's
+  width, padding and spacing, and the size of each component the two share with the same options. A difference in the
+  page's own arrangement (padding, spacing, a part's place) is a ⚠️ line the Stop hook holds the reply to; a component
+  drawn at another size than Figma's is a • line for the audit, since it is the component's code. A picture of the page
+  is saved beside it (`<name>.png`), and Claude looks at it before answering. With a Figma image of the screen
+  (`.design-system-engine-refs/screens/<screen>.png`, at any scale, or FIGMA_TOKEN), the share of pixels that differ is
+  printed, with a diff image. `--no-browser` draws without measuring.
+- **Drawn as the designed screen shows.** A screen read from Figma (`--from-screens`, the screen capture records each
+  layer's place, the screen's modes, what clips and what fills its parent, and the words each small instance shows) is
+  drawn in its own modes (`Page.mode`), at its fixed size with what overflows cut (`Page.height`, `clip`), with each
+  side's padding (`paddingTop` … `paddingLeft`), filling its parent as in Figma (`grow` along, `stretch` across). A
+  layer placed over the layout (connector lines, a background) is left out and listed. A component Figma has and the
+  code lacks keeps what the screen put inside it and its size. A frame bound to one of the system's colour tokens is
+  drawn with the code's variable for it (`surface`; a text's `color`), and is still listed as a container the system
+  could own. An option value turns on the class the system's CSS adds for it (Selected=True the class that says
+  selected); one the CSS has no class for is drawn without it, with a warning. Each instance's own words are written
+  into its text parts, and an instance that shows no words (an icon-only button) shows none.
+- **Accessibility of the drawn page.** With Chrome, the page also goes through the accessibility check (contrast in
+  every mode, names, one main heading, the keyboard; the engine's bar left out). What the composition itself causes (no
+  main heading, a text colour that does not read on its surface) is a ⚠️ line the reply owes; what a system component
+  does is a • line for the audit.
+- A composition with an error is not drawn (exit 1). A file `{ "prototype": …, "gaps": [...] }` adds the gaps written
+  beside it.
+
+`rms-design-system-engine --prototype --from-screens <capture.json>` turns designed screens into starting points:
+`prototypes/<screen>.json`, each drawn at once. The capture is `SCREEN_CAPTURE_JS` in `screen-layout.mjs`, a read-only
+Plugin API script run with the Figma MCP (`use_figma`) or figma-cli on the screens' node ids; it records where each
+layer sits on its screen and whether it fills its parent (an older capture is placed by auto layout). Each screen keeps its
+arrangement (auto layout direction, gap and padding as spacing tokens, Fill as `grow`, alignment), the system's
+components with their options and what their slots hold; a local component that holds others (a whole screen made a
+component) is read as layout and listed as a template or component the system could own; a frame with its own fill,
+border or corner, a typed number, a text with no style, a shape and a component the catalog lacks are gaps. It ends with
+the spacing habits across the screens and the structures that repeat (template candidates). A starting point already
+in `prototypes/` is kept unless `--force`.
+
+#### --figma-edits (Figma brought in line with the code, once the person says yes)
+
+`rms-design-system-engine --figma-edits` lists what the code already states that Figma does not, as edits the engine
+writes itself (`figma-edits.mjs`). Today that is a component's role: each component's markup as the code shows it
+(every instance the pages, scripts, JSX or structure contract give; the role most of them have, a number field among
+text fields still a text field) gives a role in the engine's vocabulary (`button`, `togglebutton`, `disclosure`,
+`textbox`, `checkbox`, `radio`, `switch`, `spinbutton`, `link`, `dialog`, `tab`). A Figma component that states no role
+gets the annotation `Role: <role>`; one whose Figma role differs from the code is listed for a person to decide and
+never changed. A wrapper around several controls (a stepper, a group) has no single role and is left out, as is a
+component the code does not show. Each property or option named otherwise than most of the system's names
+(`naming-consistency.mjs`, the same list the props check prints) is renamed in its component set: an option in each
+variant's name (`state=default` → `state=Default`), then a property (`editComponentProperty`, "show-icon" → "Show
+Icon"); one already renamed is skipped. Every need the prototypes found the system lacks (`prototypes/gaps.json`, merged) becomes
+the design team's to do list: a page "Design system to do" with a frame "Gaps from prototypes", one card per need (what
+kind, what the prototypes use meanwhile or the closest component, and which prototypes need it), the most needed first,
+written afresh each time; nothing else in the file is touched. Each accessibility annotation no check reads
+(`annotationUses` gives it no use) goes on the same page, in a frame "Annotations no check reads": its component and
+layer, its words, and the wording a check reads when the engine can tell what it means (`annotationWording`: "This is a
+button" → `Role: button`, "Esc" → `Escape closes it`, "H2" → `Heading level 2`, a quoted name → `aria-label: …`, a
+layer named Error → `Role: errormessage`). A note is listed when its category is Accessibility, or when it has no
+category and the engine reads an accessibility meaning in it; a note in a design-intent category (Intent,
+Implementation, Content, Authoring), or one the engine reads nothing in, is for people and the agents, never a to do
+(see *Annotation categories*). The annotations themselves are never changed. With gaps and no Figma snapshot, only the
+gaps list is written.
+
+Two accessibility edits come with them, each in an annotation category of its own and replaced on each run, so what is
+fixed clears and nothing doubles:
+- **The screens' findings, pinned where they are** (once the screens are read with `--figma-a11y`): each failing layer
+  gets one annotation listing all its issues (what is wrong in plain words, then its WCAG number, then the fix), and
+  each screen a summary with the counts, in the category "Accessibility Review" (red). A layer inside an instance cannot
+  carry an annotation, so the capture records the outermost instance it sits in. What has no layer to pin it on (a
+  screen with no fill behind its text, or a snapshot read before layer ids were kept) is said in the screen's summary.
+- **Each component's accessibility spec, as the code gives it**: its role (or, when Figma says otherwise, that the
+  role is a decision still open), what names it (`aria-labelledby`, `aria-label`, a label, its words, or only a
+  tooltip), the states its markup says (`aria-pressed`, `aria-expanded`, `disabled`…), the keys its role owes (Tab
+  reaches it; Enter and Space press a button; Escape closes a dialog and the focus goes back), and what a screen reader
+  says for it (`heard`, from the last accessibility check), in the category "Accessibility" (blue), for whoever builds
+  it. A component whose spec states its role gets no separate `Role:` edit. A wrapper of several controls with no
+  state of its own has nothing to state and is left out. The engine's own notes are never listed among the
+  annotations no check reads.
+
+It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its Figma node, what it adds and why) and
+`figma-apply.js`, a Figma plugin script that makes exactly those edits, leaves a component that already states a role
+as it is, keeps every annotation a person wrote, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
+the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
+and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
+Descriptions, missing components and layout are never written: they stay in `figma-changes.md`.
+
+#### Adoption baseline / ratchet (opt-in, gate-level)
+
+A real codebase is rarely 100% green on day one. Rather than a wall of red (ignored) or turning gates
+off (drift hides), run `--baseline` once to record **today's failing gates as accepted debt** in a
+committed `design-system-engine-baseline.json`. After that, a normal run **tolerates** those baselined gates (shown
+as `⚠️ Debt`, verdict `NO REGRESSIONS ✅`) but **fails on any gate not in the baseline that goes red** —
+a real regression. Debt only ratchets **down**: a baselined gate that goes green is surfaced as "ready
+to ratchet" so you can re-run `--baseline` to lock it in (it can no longer regress silently); stale
+entries (a renamed/removed gate) are flagged for pruning. It is gate-level on purpose — it uses only
+the pass/fail the audit already has for all 25 gates, so it is fully deterministic and imposes no
+structure. Off by default (no file = no baseline); ignore a file for one run with `--no-baseline`, or
+per-project with `ds-config.json → baseline.enabled: false` (path via `baseline.path`).
+
+**Per finding.** `--baseline --findings` records each failing gate's `❌` lines instead of the gate, so one
+known difference can be accepted while everything else in the same gate keeps blocking. A failing gate whose
+`❌` lines are all accepted is debt; any other `❌` line is a regression, including an accepted one whose value
+changed (it is new text). The run lists the new lines, and the accepted lines that no longer appear as fixed,
+to drop with the next `--baseline --findings`. A failing gate with no `❌` line to accept is recorded as a gate.
+`--match <words>` (comma-separated) accepts only the lines that contain one of them, with their gate's count
+line, and adds them to the file (nothing accepted before is dropped): `--component chip --baseline --findings
+--match radi` accepts the chip's radius and keeps its prop names failing. The router adds it when the person
+names the kind of difference (radius, height, width, padding, gap, colour, props).
+
+#### Kept on purpose (`--keep`)
+
+A difference the team decided to keep is not debt: debt is what will be fixed. `--keep --match <words>` (with
+`--component <name>` when the person names one) records the open differences of the last full audit that match, in a
+committed `design-system-engine-kept.json`: the difference as the audit said it, `--reason` in the person's own words
+(required, never written for them), who decided (`--by`, else the git user) and when, `--truth figma|code` when one side
+is right, and `--review` (a date, or `90d`, `6m`, `1y`) when to look at it again. On every run a kept difference never
+fails its gate (a gate whose failing lines are all kept passes), its line is shown as `✋ kept on purpose` with the
+reason, and it leaves the open differences: `differences.md` lists it under Kept on purpose, and the style guide's
+Parity area shows it with the status Kept on purpose. What is kept is that difference with those values, matched by its
+check and its words (a file's line number and the severity icon aside): when a value changes on either side, it is open
+again and the decision is listed as no longer found, to drop with `--unkeep --match <words>` or to keep again. A kept
+difference whose review date has come is To check in the style guide. `--keep` alone lists the decisions. Only the
+person keeps a difference: the project's hooks ask before `--keep` or an edit of the file unless their latest message
+says to keep it.
+
+#### Values written by hand (`--census`)
+
+`rms-design-system-engine --census` reads every style file the project has (`.css`, `.scss`, `.less`, the `<style>`
+blocks of `.vue`, `.svelte` and pages) and lists each literal a token should carry, with its line and the token to use
+when the theme has one with that value (`raw-census.mjs`): a colour (an error, a token or not), a spacing (padding,
+margin, gap: an error, when the theme names spacing), a corner radius or a font size (an error when a token holds the
+value, a warning when none does), a duration (a warning, with its token when one holds it), a z-index other than -1, 0
+or 1 and a shadow written out (warnings). The theme files' custom properties are the tokens themselves and are not
+counted; their other rules are. 0, a 1px hairline, a pill's 999px radius, `calc()` and a value inside `var()` are left
+alone; the same value written twice on one line counts once. Files are listed with the ones that guess most first.
+
+The first run writes the count as the baseline (`design-system-engine-census.json`, committed with the change); a run
+with fewer errors lowers it; a run where a file has more errors than the baseline names the file and exits 1, so the
+count only falls. Every full audit prints the totals and the file with the most (`🧮`, advisory); `"census": false` in
+`ds-config.json` leaves that line out.
+
+#### Every check tested with a planted mistake
+
+`test/planted-faults.test.mjs` runs each of the 25 checks on a copy of the demo design system, set up so it has
+something to read, once clean and once with one known mistake (a token with another value, a dark value removed, a
+variable Figma does not have, a hover removed, a prop renamed, a border Figma does not draw, a transition slower than
+the contract, a frame changed in Figma, a component drawn at another height in the browser…): it must pass the first
+and fail the second, naming the mistake. A check with nothing to read says so: in the gate list it is **Not run**, with
+its reason, never Pass (a check whose every part was skipped is counted as not run, in the summary and in the
+scorecard's gate health).
+
+#### Accessibility check (advisory, from the render)
+
+A mechanical, agnostic accessibility pass (`a11y-check.mjs`) that reuses the Gate 22 CDP/headless-Chrome
+flow. It reports **WCAG AA contrast** per theme (computed `color` vs the background really painted behind the text: the layers at its centre in paint order, a sibling laid under it or a `::before` that covers its box included, not only its ancestors),
+**accessible name + role** (interactive nodes from the accessibility tree — a component that never exposes
+aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11; a field whose frame shows its focus (`:focus-within` on the box around it, when it holds only that control) passes, its frame's ring measured the same way, as does a part beside it in that box (a radio's circle, a switch's track); a native checkbox or radio hidden under such a part is judged by it, a control that takes no focus (inside an inert thumbnail) is not judged, and a style that eases in or out is read where its transition ends), **state exposure** (an element whose state
+is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.invalid` / … — with no matching
+`aria-*` or native state, so assistive tech never hears it; the state-class→aria map is common-English by
+default, extend via `a11y.stateClasses`), and **keyboard reachability** (an interactive control that cannot
+be reached by keyboard — an interactive role on a non-focusable element, or a native control with
+`tabindex=-1`), **a control said only in a tooltip** (`tooltipname`: an icon whose only name is its `title`, which
+no one on a touch screen or a keyboard sees; words beside the icon, or `aria-label` at least) and **icon contrast**
+(`iconcontrast`, WCAG 1.4.11: an icon that carries meaning, the only content of a control or one with a name of its
+own, at 3:1 against its background in every theme; its colour is its painted fill or stroke, a sprite's
+`<use href>` read from its `<symbol>`, a masked icon's background). The static check adds the same title-only icon
+button or link, and a sprite `<symbol>` painted in one fixed colour of its own (it keeps it in the dark theme).
+Findings come from measured pixels and the a11y tree, no assumed DS shape (No-imposed-structure).
+
+**Advisory by default**, and the report is written in **plain language, no jargon** — each issue says what is
+wrong, why it matters to a real person, and what to do about it. Three audiences, one set of findings:
+the default is the plain human summary; **`--a11y`** adds the exact elements (still plain); **`--json`** emits
+the same findings as a machine-readable record (selector, contrast ratio, theme, role, and the fix) for an
+agent or CI. When it runs against anything other than the styleguide it ends with a one-line tip on how to
+get the deepest, per-state result. **Each finding says how sure the check is of it**: a **blocker** is measured
+on the rendered page against a WCAG 2.2 A or AA criterion (a contrast, the name the accessibility tree gives, a key
+pressed and nothing happening); a **warning** is read from the code, the contract or a Figma note, or is a pattern
+that usually fails (a placeholder as the only label, an action on pointerdown), so it can be wrong; an **advisory**
+is beyond AA (a focus ring under 2px, motion left on when the person asked for less, a control under the comfortable
+44px touch size, text a colour-blind person cannot read) or for a person to judge (text on an image). The report lists
+blockers first and ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA` (`· not all of it
+checked` when a page could not be read or opened, axe-core could not be loaded, or a part was left out); `--json`
+carries `severity` on each issue and the same counts in `verdict`. `ds-config.json → a11yStrict: true` promotes
+blockers and warnings to a hard fail; an advisory never stops a run. The run's summary, the one the chat relays,
+carries the verdict and each kind of problem with its count and the components it is in, blockers first. It
+runs inside the audit and standalone: `node a11y-check.mjs [--component A,B|.selector] [--url <page>] [--a11y|--json] [--no-axe] [--no-states]`
+(`--component` scopes the sweep and accepts a raw CSS selector too). **Skips cleanly** (exit 0) with no
+browser, never a false fail. Deps: Node >= 22 (built-in WebSocket), Chrome/Chromium (or `CHROME_PATH`), and
+a render target.
+
+**Render targets are agnostic — it does not assume a Figma plugin, and aims for zero questions.** It checks
+whatever surface the project serves, in this order:
+1. **Configured / built** — `--url <route>` (repeatable/comma; runs with **no `ds-config.json`** at all),
+   or `ds-config.json → a11y.urls`.
+2. **The generated styleguide** (the preferred default when it exists) — `ds-config.json → styleguide.out`
+   (else `apps/styleguide/index.html`, else the engine template's `.design-system-engine-out/styleguide/index.html`),
+   opened via `file://`. It renders **every component × every
+   state on one static page**, so the sweep is deterministic, complete and needs **no dev server**, and —
+   because each state is its own instance in the resting DOM — the existing checks get **per-state coverage
+   for free** (a disabled/checked/error instance is measured directly). The checks that press keys, click or type act
+   only on components drawn in a preview (`.pg-preview`), never on the page's own controls built from them. A guide with more than six components is
+   checked in parts of six, the same page drawing only its own (`?all&only=a,b`), each finding named as the guide's:
+   on one page with every component its whole-page checks (the Tab walk, text spacing, reflow, zoom) outlasted any
+   time limit, and nothing it found was kept. `a11y.styleguide:false` opts out;
+   `a11y.regenerateStyleguide:true` rebuilds it first (via `styleguide-gen.mjs`) so a11y never audits a
+   stale one. Falls through to the built plugin UIs (`apps/*/ui.html`) when there is no styleguide.
+   **Each product's own page** comes after the guide (a run on the whole guide, no `--component`): the built page
+   of each product in `paths.plugins` (`ui.html` beside the `pluginCSS` source, else `<product>/ui.html`), opened
+   whole, with every rule, axe-core's page rules (heading order, landmarks) included. Each finding carries its
+   product (`product` in `a11y.json`) and the style guide lists them on the Status page under Products, one row per
+   product. `a11y.products: false` leaves them out.
+   **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
+   page to open: each React component (`.jsx`/`.tsx`) in each of its Figma variants on one served page, its CSS
+   linked and its JSX turned into calls to a small stand-in for React that keeps each component's state and updates
+   the page in place (TypeScript from the project, else the global npm folder). The page acts as an app does: it
+   gives a field or a spinbutton a name, and tells a controlled toggle its new state when it reports a click. So
+   names, roles, parts and behaviours are tried on what ships, with no dev server. One it cannot load is listed as
+   not rendered, never clean. `a11y.harness: false` turns it off.
+   **A Vue system's components, rendered with the project's own build** (`vue-harness.mjs`), once its packages are
+   installed: every `.vue` component (Figma's, and the ones only the code has) in each of its variants on one page,
+   checked beside the other targets on every run, so a variant no page shows is still tried. The build is the one the
+   project uses, read from its files: Nuxt (`nuxt.config`: its whole app in its dev server, client-side, its modules,
+   auto-imports and auto-registered components, the CSS its config names, the page every route shows replaced by the
+   components', its build files in the engine's output folder), Vite (`vite.config`: its plugins, aliases and the SCSS
+   its components share; with `@vitejs/plugin-vue` when it has no config), Vue CLI (`vue.config.js` or
+   `@vue/cli-service`: the webpack config Vue CLI resolves) or webpack (`webpack.config` with `vue-loader`); the page
+   loads the token CSS and the stylesheets the project's `src/main` imports. Each variant is given
+   back what it reports, as the page using it would: an `update:<prop>` event sets that prop, a toggle's click flips
+   the state it was told; Figma's values are written as the code's own options write them. A project whose packages
+   are not installed, or that has none of these builds, is told so, never rendered with tools of the engine's.
+   **Every variant, every run.** The components rendered from their code are tried in Figma's variants when Figma has
+   the component (the default, each other value of each variant prop, each on/off prop flipped), else in the code's
+   own props' (each value of each option, booleans on and off, each text emptied or set, each icon emptied), up to
+   `a11y.maxVariants` (16) each.
+3. **Auto-discovery (the default when nothing is configured)** — it reads `package.json`, **starts the
+   project's dev server** (`storybook` / `dev` / `serve` / `start` / `preview`, or `a11y.serve`), reads the
+   URL it prints, and **enumerates the pages itself**: Storybook stories → else static router routes → else
+   the base page. The routes are read from the usual router file and every file under `src/router` or
+   `src/routes` (route modules included), as `/#/…` addresses when the router uses hash history. Scoped to a
+   component, it opens only the pages whose view uses it, the component's own page first. A project whose
+   packages are not installed is told so, and a generated style guide that draws no component is not used.
+   A component whose class no element in the code has is said at once, with the classes that hold its name
+   (`.modal-wrapper` for modal), never waited for on every page. The check's time grows with its pages and
+   modes (`a11y.timeoutSec` sets it, and the audit waits for it past its other gates' limit). A check stopped by it
+   keeps what the pages it finished found, and says the page it was on and the ones it never reached not checked
+   (a style guide's part by its components), never clean.
+   **A component shown only after an action** (a modal behind its "Show modal" button, a menu kept hidden until
+   its trigger is pressed, a popover, a toast): when the scoped component is not seen on a page after two seconds,
+   the controls that may open it are pressed in turn, up to 8: those whose words name it first, then those that say
+   they open something (`aria-haspopup`, `aria-expanded`, `aria-controls`), then the rest. Never one inside it, one
+   that submits a form, or one whose words delete, send, save or sign out (unless they name it); a link does not
+   navigate, a press that leaves the page is undone by loading it again, and Escape closes what a press opened that
+   was not it. Once it shows, it is checked open, Escape included, and the report says what opened it (`opened` in
+   `--json`). One no press showed is said, never clean (`notRead`).
+   Override the base with `a11y.baseUrl`, delay the sweep for SPA hydration with
+   `a11y.waitFor`, or turn the whole thing off with `a11y.discover: false`.
+4. **Ask (last resort)** — only when auto-discovery finds nothing does the skill ask the user for the one
+   render URL. It **never fabricates a config or crawls the repo**; with no target it skips cleanly and says
+   how to provide one.
+
+So a Storybook or router-based DS runs fully automatically the first time — no config, no questions; a
+bespoke app that exposes no page index is the only case that needs a `--url` / `a11y.urls` hint (set once).
+
+**The whole check, every run.** Nothing else needs to be run beside it:
+- **axe-core runs in every accessibility check** (no npm dependency: downloaded once, pinned, then cached) on the
+  same page: its WCAG 2.0, 2.1 and 2.2 A and AA rules, the ones it keeps experimental that stand for a criterion (an
+  orientation lock, a label not in the name, a paragraph styled as a heading, table headers, an element in the Tab
+  order with no role) and its best practices (heading order, landmarks, a dialog's name, a page's one main heading).
+  Each element it fails is located as the engine's own findings are (`tag#id.class` and its component), so an element
+  both report is reported once, by the engine; what only axe-core found is a finding of its own, one per rule
+  (`axe:<rule>` in `--json`, with `rule`, `wcag`, `url` and its `elements`), a blocker for a serious or critical WCAG
+  rule, a warning for a moderate one, an advisory for a minor one or a best practice. The report ends with how many
+  of the elements axe-core failed are its own and how many were already the engine's. The install and every
+  `--update` fetch it into the cache (`node a11y-check.mjs --fetch-axe`, the same pinned hash), so the first check
+  needs no network, and `--doctor` says whether it is there. It cannot be downloaded (offline, blocked) and no copy is
+  cached: said as not checked, never clean (`a11y.axePath` points at a local copy).
+- **Every control hovered, focused and pressed**, in every colour mode (the pseudo-class forced through the DevTools
+  protocol, as a pointer or the keyboard sets it): its text measured again (`hovercontrast`, `statecontrast` with its
+  `state`, 1.4.3) and the edge of a field, a checkbox, a radio or a switch (`stateedge`, 1.4.11). Only what reads fine
+  at rest and fails in the state is reported; what pressed shares with hover or focus is said once, and a plain link
+  pressed, which takes the browser's own red, is not the system's.
+- `--no-axe`, `--no-states` (or `a11y.axe: false`, `a11y.interactionStates: false`) leave one out for a run: the report
+  says what was left out (`leftOut` in `--json`) and the verdict that not all of it was checked.
+- **What was measured** — the report says how many texts, icons and controls were read, in how many components and
+  themes, and how many instances of each component the per-component checks tried; `--json` carries `measured`, and
+  every element with its verdict (`elements`: text and icons with their ratio, controls with their focus) in the file
+  the audit keeps (with `--a11y` on the screen too).
+- **What a screen reader says** — for the first instance of each component (or the page itself), the lines VoiceOver
+  and NVDA read from the same accessibility tree: `checkbox, Remember me, not checked · button, Bold, not pressed`.
+  Words for a person to judge (whether a name says what it does), shown for a run about a few components or with
+  `--a11y`, and in `--json` as `heard`.
+- **What a screen reader says when something changes** — each press that shows something (a reveal button, a control
+  that opens a dialog or a menu) is recorded as it happens: the words each live region takes, said politely or at once
+  (`role="alert"`, `aria-live="assertive"`), and where the focus goes. Printed as one line per press, for a run about
+  a few components or with `--a11y` (`Export opens dialog: the focus goes to dialog "Export"`, `pressing "Save" shows
+  toast: says "Saved" politely`), and in `--json` as `heardOnChange` (`{ page, what, says, said, focus }`). A message that appears with no
+  live region and no focus moving to it, or in a live region put in the page already holding its words, which most
+  screen readers never say, is a finding (`unannounced`, 4.1.3) naming the press that showed it; the in-page status
+  check then says the same element once.
+
+**Deeper checks (every run, every page).** Each is isolated: a check that cannot run on a page is skipped
+there, never a failure.
+- **Every colour mode, switched properly** — media emulation, a class or a data attribute on the root, or
+  high contrast, the same way the code capture switches them — and contrast, focus and the focus ring are
+  checked in every mode (a finding in several modes is reported once, with its modes).
+- **Real keyboard focus** — a Tab key press first, so `:focus-visible` styles show as a keyboard user sees
+  them. A focus style drawn with a background change, an underline or on `::before`/`::after` counts; a ring
+  drawn outside the element is measured against the parent's background.
+- **Target size (2.5.8)** — a control under 24×24 whose 24px circle, on its centre, touches another control or
+  another small control's circle, in every mode, at the page's own width and again on a 320px screen, where a control
+  that shrinks is measured too (one finding per control, with the modes it is small in; one small only on the narrow
+  screen says `320px wide`). Links in
+  running text, and inputs whose label is the target, are exempt. A control between 24 and 44 pixels is an advisory
+  (`target44`, 2.5.5): a finger covers about 44 on a touch screen.
+- **Keyboard walk** — a real Tab walk, then the same with Shift+Tab: a focus trap (one control three presses running,
+  or Tab going round two to six controls while the page has more; a round inside a modal dialog is its own and is
+  left alone), any positive `tabindex` (visits out of order), and a focused control completely covered by other
+  content such as a sticky header (2.4.11; on real pages, not on the styleguide, whose sticky header is its own chrome).
+- **Focus order and lost focus, on a whole page** (a product's page, a page named with `--url`) — the first round of
+  the Tab walk is followed on the page: a stop drawn above the one before it in the same column sends the reader back
+  up the page (`pageorder`, 2.4.3; a bar fixed or sticky on screen is left alone), and a stop the focus lands on with
+  nothing seen (off the screen, inside a closed panel, no size) loses them (`focushidden`, 2.4.7). A skip link that
+  shows when it has the focus is seen.
+- **Clickable, but not by keyboard (2.1.1)** — an element a script makes clickable that Tab never reaches: its handler
+  read where a framework keeps it (an `onclick`, React's props, Vue's invokers), or, for one with a pointer cursor,
+  Chrome's own list of its listeners (one added with `addEventListener`). A part inside a control, a label, a card
+  around its own link or button, and a dialog's backdrop are left alone.
+- **Keyboard activation** — a control built from a plain element (`role="button"`, `checkbox`, `switch`,
+  `tab`, `link`…) that does nothing on Enter (and Space for buttons, checkboxes and switches). The click is
+  caught before the element's own handler, so the check never navigates or submits.
+- **Arrow keys** — a radio group, tab list, menu or list box whose items do not move with the arrow keys.
+- **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
+  menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
+  is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
+  and a form does not submit while it runs. A dialog already open as the page loads is judged when it lies over
+  the page (in the top layer, or fixed); one drawn in the page's flow with nothing that opened it (a specimen on a
+  style guide) is listed as not judged (`notJudged` in `--json`), never failed.
+- **A modal keeps the focus** — each modal dialog that opens (one shown with `showModal()`, or one with
+  `aria-modal="true"` lying over the page) is walked with Tab past its last control and Shift+Tab past its first: the focus must stay inside it
+  (`modalescape`, 2.4.3). A non-modal dialog may let the focus go.
+- **One main heading** — an app page (a `--url` page or a route found on its own, not the styleguide or a
+  story) has one `h1`, which a screen reader jumps to. The code part flags a page file with text and no `h1`,
+  or several.
+- **Zoom to 200% (1.4.4)** — text that becomes cut off when the page is shown at twice its size.
+- **Focus ring thickness (2.4.13, AAA, advisory)** — a focus ring thinner than 2 CSS pixels. The browser's
+  own ring is not counted.
+- **Figma accessibility annotations** — a note that states a role, a name, a heading level or alt text is
+  checked against what the component renders (see *Writing accessibility notes in Figma* below). Other notes
+  stay notes.
+- **Part roles** — a note `Role: label` (or `errormessage`, `description`, `indicator`, `increment`,
+  `decrement`, `placeholder`, `value`, `panel`; also `error`, `helper text`, `hint`, `icon`, `plus`, `minus`) on an
+  inner layer says what that part owes its control: a label names it (a `<label for>`, the control inside it, or
+  `aria-labelledby`), an error message is linked while it shows (`aria-describedby` or `aria-errormessage`, with
+  `aria-invalid="true"`), a description is linked with `aria-describedby`, an indicator stays silent
+  (`aria-hidden="true"`), a step button has a name with a word in it (a lone `-` is not one), a placeholder is not the
+  only name, a value is exposed by its spinbutton or slider, a panel is named by `aria-controls`. The part is the
+  contract's child of that name, else the element whose class ends with the layer's name. The build sheet lists
+  each part's duty.
+- **Behaviours** — what a person can do with a component comes with its role and runs in Chrome on the
+  first instance a page shows: Space flips a toggle button's `aria-pressed`; a click and Space flip a switch or a
+  checkbox; a click flips a disclosure's `aria-expanded` and shows or hides its panel; a click selects a tab and no
+  other; typing writes into a text box. A Figma note adds one: `Escape closes`, `arrow keys move`, `Enter and Space
+  activate`. A behaviour needs the component's own script, so it runs on a page that has it (`a11y.urls`, `--url`,
+  Storybook, the app); on the engine's style guide, which draws markup only, it is listed as not checked. An
+  exception is the person's: `contract.authored.json → components[name].behaviourExceptions` `{ "<behaviour id>":
+  "<why, with a link to the ADR or pull request>" }` (ids: `keys-toggle`, `click-toggle`, `click-expand`,
+  `click-select`, `types`, `escape-closes`, `arrows-move`, `keys-activate`). Without a link it is still checked, and
+  that is reported. The build sheet lists each role's behaviours. On the style guide they run when the project lists
+  its scripts in `systemScripts`.
+- **States follow their props** — on the style guide, an option that shows a state (Selected, Pressed, Checked,
+  Expanded, Error, Disabled) and changes only a class is reported: a screen reader still hears the component as it
+  was. The attribute its role names goes with it (`aria-pressed` for a toggle button, `aria-selected` for a tab,
+  `aria-checked` for a switch or checkbox, `aria-expanded`, `aria-invalid`, `disabled`). A computed ARIA attribute in
+  JSX (`aria-pressed={pressed ? 'true' : 'false'}`) is drawn with the props' defaults, so the drawn component says what
+  the real one does.
+
+**Writing accessibility notes in Figma.** Use Figma's annotation tool on the component (the component set or
+a standalone component), in the **Accessibility** category. One fact per line, or per sentence ending in `. ` or
+`;`. The keywords are English; the value can be in any language.
+
+**Annotation categories.** Figma lets each note carry one category, and the category says what the note is:
+
+| Category | What the engine does with the note |
+|---|---|
+| Accessibility | A requirement: the accessibility check verifies it, and one no check reads is a task (rewrite it so a check reads it) |
+| Intent, Implementation, Content, Authoring | Design intent: the agents read it; never a requirement, never a task, never acknowledged in Gate [13] (Structure) |
+| No category, or one the file deleted | Read as before: the text decides (a note the engine reads no accessibility in is design intent) |
+
+The REST API does not return a note's category, so it is captured apart with the Plugin API:
+`rms-design-system-engine --annotation-categories` writes the read-only script for the Figma tool of the session
+(`.design-system-engine-out/figma-capture/annotation-categories.js`); save what it returns, as it is, under the same
+folder, then run `rms-design-system-engine --annotation-categories <file …>`, which keeps it in
+`figma-annotation-categories.snapshot.json` beside the component-props snapshot. On a large file, run the script once
+per page (`PAGE_IDS` at its top) and pass every result. A note finds its category by its node and its words, so a note
+reworded in Figma has none until the next capture. Other category names map in `ds-config.json → annotations.categories`
+(`{ "Notas de acessibilidade": "accessibility" }`); the defaults also read Development and Interaction as
+Implementation, Documentation as Intent, Designers and Figma as Authoring.
+
+| Note | Checked against the rendered component |
+|---|---|
+| `Role: button` | The role a screen reader announces (an ARIA role) |
+| `Role: togglebutton` | A button that also exposes `aria-pressed`. Also `textinput` (a text box), `searchinput` (a search box), `iconbutton` (a button) |
+| `aria-label: Close dialog` | The accessible name, ignoring case (also `Accessible name:`, `Screen reader label:`) |
+| `Heading level 2` · `H2` | A heading, at that level |
+| `Alt: Sales chart` | An image whose text alternative is that text |
+
+Example of one note: `Role: button. aria-label: Close dialog`.
+
+- **On an inner layer.** A note on a layer inside the component's default variant (the first one) is checked on
+  the part the contract names the same way: `CONTRACT[component].children` with that `name` and a
+  `cssSelector`. A layer with no such part is listed as not checked, with what to add.
+- **No Gate [13] (Structure) entry needed.** A note the accessibility check can verify passes Gate [13] (Structure) on its own,
+  and a note in a design-intent category is not counted there; only prose notes with no category (or in Accessibility)
+  still need `CONTRACT.annotations`.
+- **Where the notes come from.** The component-props snapshot, refreshed with `FIGMA_TOKEN` or the Plugin API
+  capture below (both record `annotations` on the component and `layerAnnotations` on its inner layers).
+- **A name that changes with content** ("3 items") is compared as written, so it is reported as a difference.
+  Describe such names in prose instead.
+- **Reduced motion (2.3.3)** — under `prefers-reduced-motion: reduce`, anything that still transitions or
+  animates.
+- **Forced colours** — under `forced-colors: active` (Windows high contrast), a focus indicator that
+  disappears because it was only a shadow or a background, and an icon or a text the mode makes vanish
+  (`forcedcontrast`: an icon drawn as a background colour, a CSS mask, takes the page's colour). A selected, checked,
+  pressed or current item (`aria-selected`, `aria-checked`, `aria-pressed`, `aria-current`, or a state word in its
+  class) that, in the mode, draws exactly what an item of the same kind beside it at rest draws (the colours the mode
+  leaves, borders, outline, weight, decoration, opacity, and every part, a check mark or an icon) is a finding
+  (`forcedstate`, 1.4.11). A native checkbox or radio is drawn by the system, which keeps its state.
+- **Colour vision** — text that passes WCAG, read as people who do not see red, green or blue see it (the
+  matrices Chrome's own vision simulator uses): one that falls below its ratio for one of them is an advisory
+  (`cvdcontrast`, with the `vision` that loses it; red on black is the usual case). Two variants of one component
+  that are drawn the same but for their colour (the same text, borders, weight and parts) and stand clearly apart in
+  normal vision (a colour difference, ΔE, of 25 or more on their background, text or border) but all within 18 under
+  one simulation are an advisory too (`cvdvariant`, 1.4.1, with the `vision`): a success badge and an error badge with nothing but red and
+  green between them.
+- **Text spacing (1.4.12)** — the spacing a reader may set (line height 1.5, letter spacing 0.12em, word
+  spacing 0.16em); text that becomes cut off, or that spills out of a box that keeps its height onto what is
+  next to it (the same at 200% zoom). A box that scrolls keeps its text reachable.
+- **Semantics** — each component's rendered role (accessibility tree) against the contract's authored
+  `semantics` (`contract.authored.json`).
+- **What a role requires** — for each component with a role (the contract's `semantics`, or a Figma note,
+  which wins), up to 20 rendered instances are checked for what that role needs:
+  - a toggle button has `aria-pressed`, and clicking changes it (clicked back afterwards)
+  - a checkbox, radio or switch has a real control (a native input, or the role with `aria-checked`) and a
+    label; a switch exposes `role="switch"`
+  - a text field has a label; in its error state it has `aria-invalid="true"` and `aria-describedby` to its
+    message; `aria-describedby` points to an element that exists
+  - a tab is `role="tab"` inside a `role="tablist"`, and the selected one has `aria-selected="true"`
+  - anything that looks disabled is `disabled` or `aria-disabled`
+  A state is read from the instance's classes or `data-state` (error or invalid, selected, active or
+  current, disabled). Nothing is checked for a component without a declared role.
+- **Reflow at 320px (1.4.10)** — each component on a 320px screen, in every run that checks components: one
+  that cannot be narrower than the screen (its min-content, as nothing around it asks for more) is named with
+  the width it needs. Content that needs two dimensions (a data table, a picture, code) is left out, as WCAG
+  does. The whole page at 320px stays opt-in with `a11y.reflow: true`; the engine's style guide fits 320
+  pixels (its Parity filter and a control with many options scroll sideways).
+- **WCAG 2.2, the rest a component can be checked for** (`wcag-page.js`, run on up to 24 instances of each
+  component, so a grid of chips is judged on its chips, the first one also used) — an image or `role="img"` with no words (1.1.1); a video with no captions
+  track, sound that plays by itself (1.2.2, 1.4.2); radio buttons with no named group, a data table with no header
+  cells, a tab, an option or a list item outside the container its role needs (1.3.1); controls Tab reaches in
+  another order than they are shown (1.3.2, 2.4.3); a field that asks for a name, an email, a phone or an address
+  with no matching `autocomplete` (1.3.5); the edge of a field, a checkbox, a radio or a switch under 3:1 against what
+  is around it, a field's wrapper counted as its edge and a field with no edge drawn left alone (1.4.11); what
+  shows on hover or focus that Escape does not close, that goes when the pointer moves onto it, or that goes by
+  itself (1.4.13, a trigger with `data-tip` or `aria-describedby` given 1.6 seconds to show its tip); a tip that
+  shows on hover but not when the same trigger is tapped with a touch screen emulated (`tapcontent`, 1.4.13), often
+  because the tap opens and closes it at once; an
+  animation that runs more than 5 seconds with no pause, a loader excepted, or flashes more than three times a
+  second (2.2.2, 2.3.1); a link with no words or with "click here" (2.4.4); an empty heading, label or legend
+  (2.4.6); a control whose `aria-label` leaves out the words it shows (2.5.3); a control that acts on the press
+  rather than the release (2.5.2); taking the focus, or changing a value, that opens a page, sends a form, opens a
+  dialog or moves the focus (3.2.1, 3.2.2); something moved only by dragging (`draggable`, a grab cursor) with no
+  button or click beside it that does the same (2.5.7, a warning); a password or one-time-code field that cancels a
+  paste, or turns autofill off (3.3.8); an id used twice, a role or an `aria-*` attribute ARIA does not have, a value
+  it does not take, a reference to a missing id, `aria-hidden` over something Tab reaches, a link with nowhere to go
+  (`href="#"`, `javascript:`) that acts as a button (4.1.2; WCAG 2.2 removed 4.1.1, and a duplicate id is counted
+  here); a toast, a status line or a loader that no live region announces (4.1.3). Each finding carries its criterion in
+  `--json` (`wcag`), and `ran` lists the page-wide checks that finished (`wcag21`, `tabtrap`, `spacing`, `reflow`,
+  `zoom`, `states`, `targets`), so a criterion is said to be met only where its check ran. A tooltip drawn by CSS `:hover` alone is
+  tried through the focus, as events from a page cannot hover.
+- **WCAG 2.1 in the code, no browser needed** (`a11y-static.mjs`, every script, `.vue` and `.svelte` scripts
+  included) — a single letter, number or sign as a shortcut on the whole page with no Ctrl, Alt or Cmd (2.1.4);
+  something hidden, closed or removed by itself after 1 to 20 seconds, unless its timer stops while it has the
+  pointer or the focus (2.2.1); a gesture with two fingers or more (2.5.1); an action on shaking or tilting the
+  device (2.5.4). Printed with the rest of the code's accessibility in the audit. A rule that takes the focus
+  outline off a class in every state (`.quiet { outline: none }`) counts as put back when a more specific rule shows
+  focus on every element of a kind (`button:focus-visible` beats one class) and the markup, or the markup a script
+  writes, puts the class only on elements of that kind; a class also put on a `<div>`, or a rule as specific as
+  the one taking the outline off, is still reported.
+- **State contrast, no browser needed** — from the code capture: each component's text against its own
+  background in every mode and every state the capture produced (hover, selected, error…). Disabled states
+  are exempt. A see-through background (a tint made with opacity or `color-mix()`) is blended over what
+  the capture saw behind it and over each surface the system defines in that mode (its colour tokens with
+  `/surface/` in the name, or `a11y.surfaces`), the worst one reported with its surface. Each finding names the two colour tokens, the rule's file and line, and
+  links the component in Figma. Printed with the token contrast in the audit.
+- **Token contrast** — see-through text is blended over its background; a see-through background (no
+  known surface under it) is skipped; disabled pairs are exempt; pairs come from every mode's token names,
+  corrected by what Figma draws (the structure snapshot's `drawnOn`): a text is paired with the background
+  Figma draws it on, and a pair the names suggest is left out and listed when Figma paints that background in the same component but never under the text.
+  A text token with the same colour as its background token, or a background the code paints as a tint
+  (a `color-mix` or an opacity), is reported as not comparable: only the rendered state contrast measures it,
+  over every surface the system defines in that mode, worst first.
+  Border, outline and focus-ring tokens are paired at 3:1 with `a11y.nonTextPairs: true` (opt-in: a border is
+  often decorative); dividers never are.
+- **On the styleguide, only the design system's components are checked** (their selectors), not the page's
+  own navigation and notes. The styleguide pins its own `data-color` mode; the check (and the code capture)
+  sets it to each mode it measures, so dark is really measured in dark.
+- **One element failing the same way in many places is one finding**, with the number of places and a few
+  of its texts, and each element names the design-system component it sits in.
+- **axe-core** must match a pinned SHA-384 hash before it is ever injected into a page (from the CDN, or
+  from the npm registry's package when a CDN is blocked). With `a11yStrict`, its blockers and warnings
+  count toward failing the check as the engine's own do.
+- **axe-core** is cached in `~/.cache/rms-design-system-engine` after the first download (or `a11y.axePath`
+  points at a local copy), and is scoped to the checked components.
+
+**Not yet:** a component's contrast is measured in each mode the system declares (the system's text and background pairs
+are also checked in every combination of two switches, the `🎛` check, `modeCombinations` in config.md). The Figma side
+is read by `--figma-a11y` (contrast and target size on Figma's own screens) and its findings are pinned there by
+`--figma-edits`.
+
+#### Evals (a separate entry point — measures agent OUTPUT, never gates the repo)
+
+`eval-run.mjs` points the DS-conformance core at an agent's GENERATED output instead of the repo, so you
+can measure whether agents actually follow the DS. Configure in `ds-config.json → evals`:
+```jsonc
+"evals": {
+  "cases": [ { "id": "login", "prompt": "build a login screen with the DS", "component": "input" } ],
+  "outDir": "evals", "ext": "html",   // candidates at evals/<id>.<ext>
+  "strict": false,                     // true → exit 1 when any candidate has a violation
+  "runs": 1,                           // with generate.cmd, run each case N times (3–5 signal, 10+ definitive)
+  "generate": { "cmd": "your-agent-cli" },  // OPTIONAL: produce the candidate from the prompt
+  "judge":    { "cmd": "your-judge-cli" }   // OPTIONAL: advisory LLM-judge
+}
+```
+Run: `node eval-run.mjs`. For each case it reads the candidate `outDir/<id>.<ext>` and flags the same
+mechanical failures the gates catch — raw color/dimension literals that should be tokens, `var(--x)` not
+in the DS var universe (invented) — and reports per-case + aggregate metrics (produced?, zero-fix rate,
+violations, **inline-style count**, and, when generating, **avg generation time**), appending to
+`evals-history.json`. With `evals.runs > 1` (and a `generate.cmd`) each case is generated and checked
+**N times** and reported as a reliability fraction (`k/N runs clean`), since agent output is
+non-deterministic. **Advisory** (exit 0 unless `evals.strict`), and it **never gates the repo audit**.
+
+**Generation and the judge are pluggable commands** (any agent/CLI, no provider lock-in):
+- `evals.generate.cmd` — run with `--generate` (or when a candidate is missing): the prompt is piped on
+  stdin, the DS context (`llms.txt`) path is in `$EVAL_CONTEXT`, `$EVAL_ID`/`$EVAL_COMPONENT` are set, and
+  the command's **stdout** becomes the candidate (written to `evals/<id>.<ext>`). The prompt is the case's
+  `prompt` alone: the expected `component` is for the scoring, so do not pass `$EVAL_COMPONENT` to the agent.
+  The command may write what the generation spent to the file `$EVAL_USAGE` names (a number of tokens, or the
+  agent's JSON usage, `{ input_tokens, output_tokens }`); the summary then adds `avg N tokens a generation`, and the
+  history keeps it.
+- A case's `component` is what it expects: a candidate that does not use it (its class, or a tag of its name)
+  avoided the system and fails (`avoided-component`), and the summary counts `N avoided the system`. A prompt
+  that names a component is flagged before the run, since its score would measure reading the prompt.
+- `evals.judge.cmd` — advisory only: gets `{id,prompt,component,guidance,candidate}` as JSON on stdin (where
+  `guidance` is the component's own description + whenNotToUse/useInstead from its contract, so the judge
+  assesses "right component / correct usage" against the DS's rules, not blind) and must print
+  a JSON verdict `{ok, notes}` (right component for the intent, empty/error states). It never gates.
+- `evals.levels` (or `--levels bare,steering,parity`) — does the team's guidance help? The same cases run per
+  level: `bare` (no context), `steering` (the project's own instruction files, AGENTS.md, CLAUDE.md, rules,
+  joined into `evals/.context/steering.md`) and `parity` (`contracts/llms.txt`). The command gets the level in
+  `$EVAL_LEVEL` and the file in `$EVAL_CONTEXT`. Each level is scored by the same checks, the accessibility read
+  from the code included (a clean case has no violation and no accessibility finding), and compared with bare.
+  A level with nothing to give says why and is not run. A command that does not read its stdin is fine.
+Both **degrade safely** (a missing/failing command just leaves the committed candidates and skips the judge).
+Spec: `plans/PARITY-evals-spec.md`.

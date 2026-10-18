@@ -1,0 +1,412 @@
+// a11y-static.mjs - the accessibility checks that need no browser.
+//
+// The browser check needs a page to open; with no dev server, styleguide or gallery it cannot run and gives no
+// signal at all. These checks read the code and the CSS the project already has, so they always run, the same
+// on every machine and in CI, and the browser check deepens them when it can run. Framework-heuristic like the
+// engine's other source readers, advisory, never a failed build:
+//   • a control with no accessible name: a button with only an icon inside and no aria-label, aria-labelledby or
+//     title; an image with no alt; a text field with no label, aria-label or aria-labelledby;
+//   • an icon button or link named only by its title: a tooltip no one on a touch screen or a keyboard sees;
+//   • a sprite icon (<symbol>) that paints one fixed colour of its own: it keeps it in the dark theme and can
+//     disappear there (one in several colours is an illustration or a logo, left alone);
+//   • CSS that removes the focus outline and never puts a focus style back;
+//   • a positive tabindex (it breaks the reading order);
+//   • a click handler on a div or span with no role and no tabindex (a mouse-only control);
+//   • an aria-* attribute that does not exist;
+//   • a link with no accessible name, an image whose alt is a file name;
+//   • aria-hidden="true" on an element that takes focus (a keyboard reaches what a screen reader cannot see);
+//   • a page with no lang, a viewport that blocks zoom (user-scalable=no, maximum-scale=1);
+//   • a page with no main heading, or several: a document with text in its body has one h1 (an app shell
+//     its scripts fill has no text, and a template whose content comes from elsewhere is not read);
+//   • animations with no prefers-reduced-motion alternative anywhere in the project;
+//   • in the scripts (WCAG 2.1): a shortcut on a single letter or number, listened for on the whole page, with no
+//     modifier key (2.1.4); something hidden, closed or removed on a timer of 1 to 20 seconds that nothing pauses on
+//     hover or focus (2.2.1); a gesture with two fingers or more (2.5.1); an action on shaking or tilting the device
+//     (2.5.4).
+// An element whose attributes are spread ({...props}, v-bind="$attrs") can receive them from outside: it is
+// never reported. A finding that does not say its fix in `desc` carries it in `fix`, for the check of each edit
+// (edit-check.mjs), which hands the fix back to the agent that wrote the line.
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
+import { join, relative, extname } from 'node:path';
+import { ENGINE_DIRS } from './names.mjs';
+import { specificity } from './css-source.mjs';
+import { splitSelectors } from './selector-list.mjs';
+
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', 'out', '.git', '.next', '.nuxt', 'coverage', ...ENGINE_DIRS, 'contracts', 'storybook-static', 'vendor']);
+const MARKUP = new Set(['.html', '.htm', '.vue', '.jsx', '.tsx', '.svelte']);
+const STYLE = new Set(['.css', '.scss', '.less', '.vue', '.svelte']);
+
+// Every ARIA 1.2 state and property.
+const ARIA = new Set(('activedescendant atomic autocomplete braillelabel brailleroledescription busy checked colcount colindex colindextext ' +
+  'colspan controls current describedby description details disabled dropeffect errormessage expanded flowto grabbed haspopup hidden ' +
+  'invalid keyshortcuts label labelledby level live modal multiline multiselectable orientation owns placeholder posinset pressed ' +
+  'readonly relevant required roledescription rowcount rowindex rowindextext rowspan selected setsize sort valuemax valuemin valuenow ' +
+  'valuetext').split(' '));
+
+const lineAt = (text, i) => text.slice(0, i).split('\n').length;
+// The ARIA attribute a misspelt one meant: one letter added, missing, changed or two swapped.
+export function closestAria(name) {
+  const n = String(name ?? '').toLowerCase();
+  const near = (a, b) => {
+    if (Math.abs(a.length - b.length) > 1) return false;
+    let i = 0; while (i < a.length && a[i] === b[i]) i++;
+    if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+    return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+  };
+  return [...ARIA].find((a) => near(n, a)) ?? null;
+}
+// A name given inside the element: an image's alt, an svg <title>, an aria-label on a child.
+const innerName = (inner) => /<img\b[^>]*\balt\s*=\s*["'][^"']*\w[^"']*["']/i.test(inner) || /<title>\s*[^<\s][^<]*<\/title>/i.test(inner) || /\baria-label\s*=\s*["'][^"']*\w/i.test(inner);
+const visibleText = (inner) => inner.replace(/<[^>]*aria-hidden\s*=\s*["']?true["']?[^>]*>[\s\S]*?<\/[^>]+>/gi, '').replace(/<[^>]+>/g, '').trim();
+const spread = (attrs) => /\{\s*\.\.\.|v-bind\s*=\s*["']\$attrs|v-bind\s*=\s*["']\$props|\{\.\.\./.test(attrs);
+const has = (attrs, name) => new RegExp(`(?:^|\\s|:|v-bind:)${name}\\s*=`, 'i').test(attrs) || new RegExp(`(?:^|\\s):${name}\\b`, 'i').test(attrs);
+
+// Markup: HTML, JSX, Vue and Svelte templates. → [{ line, kind, desc }]
+export function markupFindings(text) {
+  const out = [];
+  const src = String(text ?? '').replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
+  for (const m of src.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/gi)) {
+    const [, attrs, inner] = m;
+    if (spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby')) continue;
+    if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
+    if (/<\w+\b[^>]*\bid\s*=\s*["'][^"']+["'][^>]*>\s*<\//.test(inner)) continue;   // an empty element with an id: a script fills it
+    if (visibleText(inner) || innerName(inner)) continue;
+    if (has(attrs, 'title')) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside, named only by its title: a tooltip no one sees on a touch screen or with the keyboard', fix: 'put words beside the icon, or at least add aria-label="<what it does>"' });
+    else out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a button with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<what it does>"' });
+  }
+  for (const m of src.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const [, attrs, inner] = m;
+    if (!has(attrs, 'href') || spread(attrs) || has(attrs, 'aria-label') || has(attrs, 'aria-labelledby')) continue;
+    if (/<slot\b|\{\{|\{[^}]*\}|<Slot\b|\$slots|children/.test(inner)) continue;   // text from the caller
+    if (visibleText(inner) || innerName(inner)) continue;
+    if (has(attrs, 'title')) out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside, named only by its title: a tooltip no one sees on a touch screen or with the keyboard', fix: 'put words beside the icon, or at least add aria-label="<where it goes>"' });
+    else out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a link with only an icon inside and no aria-label, aria-labelledby or title', fix: 'add aria-label="<where it goes>"' });
+  }
+  for (const m of src.matchAll(/<img\b([^>]*)>/gi)) {
+    if (!spread(m[1]) && !has(m[1], 'alt') && !has(m[1], 'aria-label') && !has(m[1], 'aria-labelledby') && !/role\s*=\s*["']presentation|role\s*=\s*["']none/i.test(m[1]))
+      out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'an image with no alt (use alt="" when it is decorative)', fix: 'add alt="<what it shows>"' });
+    const alt = /\balt\s*=\s*["']([^"']+)["']/i.exec(m[1])?.[1];
+    if (alt && /^[\w./-]+\.(png|jpe?g|gif|svg|webp|avif)$/i.test(alt.trim()))
+      out.push({ line: lineAt(src, m.index), kind: 'name', desc: `an image whose alt is a file name ("${alt.trim()}"): describe the image, or use alt="" when it is decorative` });
+  }
+  for (const m of src.matchAll(/<input\b([^>]*)>/gi)) {
+    const attrs = m[1];
+    if (/type\s*=\s*["']?(hidden|submit|button|reset|image)\b/i.test(attrs) || spread(attrs)) continue;
+    if (has(attrs, 'aria-label') || has(attrs, 'aria-labelledby') || has(attrs, 'id') || has(attrs, 'title')) continue;   // an id can be a label's for
+    const before = src.slice(0, m.index), open = before.lastIndexOf('<label'), close = before.lastIndexOf('</label>');
+    if (open > close) continue;   // inside a <label>
+    out.push({ line: lineAt(src, m.index), kind: 'name', desc: 'a text field with no label, aria-label or aria-labelledby', fix: 'give it a <label>, or aria-label="<what to type>"' });
+  }
+  for (const m of src.matchAll(/<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/gi)) {
+    const id = /\bid\s*=\s*["']([^"']+)["']/i.exec(m[1])?.[1] ?? 'an icon';
+    const paints = [...(m[1] + m[2]).matchAll(/\b(?:fill|stroke)\s*(?:=\s*["']|:\s*)\s*([^"';>\s]+)/gi)].map((p) => p[1].toLowerCase())
+      .filter((v) => !/^(none|currentcolor|inherit|transparent|context-fill|context-stroke|url\(.*)$/.test(v) && !/^var\(/.test(v));
+    const colours = [...new Set(paints)];
+    if (colours.length === 1) out.push({ line: lineAt(src, m.index), kind: 'contrast', desc: `the icon ${id} paints itself ${colours[0]}: it keeps that colour in every theme and can disappear on a dark background`, fix: `write fill="currentColor" (or stroke), so the icon takes the colour of the text around it` });
+  }
+  for (const m of src.matchAll(/\btab[iI]ndex\s*=\s*\{?\s*["']?([1-9]\d*)/g))
+    out.push({ line: lineAt(src, m.index), kind: 'keyboard', desc: `tabindex="${m[1]}": a positive tabindex breaks the order a keyboard moves in (use 0 or -1)` });
+  for (const m of src.matchAll(/<(div|span)\b([^>]*)>/gi)) {
+    const attrs = m[2];
+    if (!/(?:^|\s)(onClick|@click|v-on:click|on:click)\b/.test(attrs) || spread(attrs)) continue;
+    if (has(attrs, 'role') && /tab[iI]ndex/.test(attrs)) continue;
+    out.push({ line: lineAt(src, m.index), kind: 'keyboard', desc: `a clickable <${m[1]}> with no ${has(attrs, 'role') ? 'tabindex' : 'role and no tabindex'}: a keyboard cannot reach it (use a <button>)` });
+  }
+  for (const m of src.matchAll(/<(button|a|input|select|textarea|summary|[a-z][\w-]*)\b([^>]*)>/gi)) {
+    const [, tag, attrs] = m;
+    if (!/(?:^|\s)aria-hidden\s*=\s*(\{\s*true\s*\}|["']true["'])/.test(attrs)) continue;
+    const focusable = /^(button|input|select|textarea|summary)$/i.test(tag) || (/^a$/i.test(tag) && has(attrs, 'href')) || /\btab[iI]ndex\s*=\s*\{?\s*["']?(0|[1-9]\d*)\b/.test(attrs);
+    if (focusable && !/\btab[iI]ndex\s*=\s*\{?\s*["']?-1\b/.test(attrs) && !/\bdisabled\b/.test(attrs))
+      out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-hidden="true" on a <${tag}> that takes focus: a keyboard reaches what a screen reader cannot see`, fix: 'take aria-hidden off, or take it out of the tab order with tabindex="-1"' });
+  }
+  // Only a page's own root: the document starts with <!doctype html> or <html> (an <html> in prose or a comment is not one).
+  const root = /^\s*(?:<!doctype html[^>]*>\s*)?(<html\b([^>]*)>)/i.exec(src);
+  if (root && !has(root[2], 'lang') && !spread(root[2]))
+    out.push({ line: lineAt(src, root.index + root[0].indexOf(root[1])), kind: 'language', desc: 'a page with no lang: a screen reader cannot pick the voice (add lang="en", or the page\'s language)' });
+  if (root) {
+    const body = /<body\b[^>]*>([\s\S]*?)(?:<\/body>|$)/i.exec(src)?.[1] ?? '';
+    const text = body.replace(/<(script|style|noscript|template)\b[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[#\w]+;/g, ' ').trim();
+    const h1 = [...src.matchAll(/<h1\b|<[a-z][\w-]*\b(?=[^>]*\brole\s*=\s*["']heading["'])(?=[^>]*\baria-level\s*=\s*["']1["'])[^>]*>/gi)];
+    const template = /\{%|\{\{|<%|@yield|@section|<slot\b|<router-view\b|<ng-content\b|<ui-view\b|<Outlet\b/.test(body);   // its content comes from elsewhere
+    if (text && !h1.length && !template) out.push({ line: lineAt(src, root.index + root[0].indexOf(root[1])), kind: 'heading', desc: 'a page with no main heading (h1): a screen reader cannot jump to what the page is about', fix: 'add one <h1> that names the page (it can be visually hidden)' });
+    if (h1.length > 1) out.push({ line: lineAt(src, h1[1].index), kind: 'heading', desc: `a page with ${h1.length} main headings (h1): one names the page`, fix: 'keep one <h1> and make the others <h2> or below' });
+  }
+  for (const m of src.matchAll(/<meta\b[^>]*name\s*=\s*["']viewport["'][^>]*>/gi)) {
+    const content = /content\s*=\s*["']([^"']*)["']/i.exec(m[0])?.[1] ?? '';
+    if (/user-scalable\s*=\s*(no|0)\b|maximum-scale\s*=\s*1(\.0+)?\b(?!\.\d*[1-9])/i.test(content))
+      out.push({ line: lineAt(src, m.index), kind: 'zoom', desc: `the viewport blocks zoom (${content.trim()}): people who need larger text cannot zoom in`, fix: 'take out user-scalable=no and maximum-scale=1' });
+  }
+  // A name written after a spread replaces the one the caller passes: <input {...props} aria-label={label} /> gives
+  // <Field aria-label="Name" /> no name at all when label is not set.
+  for (const tag of jsxOpenTags(src)) {
+    const spreadAt = [...tag.attrs.matchAll(/\{\s*\.\.\.\s*([\w$.]+)\s*\}/g)];
+    if (!spreadAt.length) continue;
+    const last = spreadAt.at(-1);
+    for (const a of tag.attrs.slice(last.index + last[0].length).matchAll(/(?:^|\s)(aria-label|aria-labelledby)\s*=\s*\{([^}]*)\}/g)) {
+      if (a[2].includes(last[1].split('.')[0]) || /\?\?|\|\|/.test(a[2])) continue;   // it falls back to what the caller passed
+      out.push({ line: lineAt(src, tag.index), kind: 'name', desc: `${a[1]}={${a[2].trim()}} after {...${last[1]}} replaces the ${a[1]} the caller passes (with nothing when ${a[2].trim()} is not set)`, fix: `put ${a[1]} before the spread, or write ${a[1]}={${a[2].trim()} ?? ${last[1]}['${a[1]}']}` });
+    }
+  }
+  for (const m of src.matchAll(/\baria-([a-z]+)\s*=/g))
+    if (!ARIA.has(m[1])) { const near = closestAria(m[1]); out.push({ line: lineAt(src, m.index), kind: 'aria', desc: `aria-${m[1]} is not an ARIA attribute`, ...(near ? { fix: `write aria-${near}` } : {}) }); }
+  return out;
+}
+
+// The opening tags of JSX elements, with their attributes read past braces (an arrow's => is not the tag's end).
+function jsxOpenTags(src) {
+  const out = [];
+  for (const m of src.matchAll(/<([A-Za-z][\w.-]*)\b/g)) {
+    let i = m.index + m[0].length, depth = 0, quote = null;
+    for (; i < src.length; i++) {
+      const c = src[i];
+      if (quote) { if (c === quote) quote = null; continue; }
+      if (c === '"' || c === "'" || c === '`') { if (depth || /=\s*$/.test(src.slice(Math.max(0, i - 3), i))) quote = c; continue; }
+      if (c === '{') depth++;
+      else if (c === '}') depth--;
+      else if (c === '>' && depth === 0) break;
+    }
+    if (i - m.index < 4000) out.push({ tag: m[1], attrs: src.slice(m.index + m[0].length, i), index: m.index });
+  }
+  return out;
+}
+
+// CSS rules as { selectors:[...], decls, index }, from plain CSS or a <style> block, nested @-rules flattened. One pass,
+// linear in the text: a head (the text since the last {, } or ;) then a block with no brace inside. A pattern did this
+// before and backtracked over every long stretch with no brace (a blanked inline image): minutes on one file.
+function cssRules(text) {
+  const css = String(text ?? '').replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+  const rules = [];
+  const stop = (c) => c === '{' || c === '}' || c === ';';
+  let s = 0;
+  while (s < css.length) {
+    let i = s; while (i < css.length && !stop(css[i])) i++;
+    if (i === css.length) break;
+    if (css[i] === '{' && i > s) {
+      let j = i + 1; while (j < css.length && css[j] !== '{' && css[j] !== '}') j++;
+      if (css[j] === '}') {
+        const raw = css.slice(s, i), head = raw.trim();
+        if (head && !head.startsWith('@')) rules.push({ selectors: splitSelectors(head), decls: css.slice(i + 1, j), index: s + (raw.length - raw.trimStart().length) });
+        s = j + 1;
+        continue;
+      }
+    }
+    s = i + 1;
+  }
+  return { css, rules };
+}
+const removesOutline = (decls) => /(^|[;\s])outline\s*:\s*(none|0)\b/i.test(decls) || /(^|[;\s])outline-style\s*:\s*none\b/i.test(decls);
+const showsFocus = (decls) => (/(^|[;\s])outline\s*:/i.test(decls) && !removesOutline(decls)) || /(^|[;\s])(box-shadow|border(-color|-bottom|-width)?|background(-color)?|text-decoration)\s*:/i.test(decls);
+// A wrapper that shows focus for the field inside it: .field__input in .field:focus-within, .searchInput in
+// .searchBox:focus-within (their first class names share a stem of four letters or more).
+const firstClass = (sel) => (sel.match(/\.([A-Za-z][\w-]*)/) ?? [])[1] ?? '';
+const sameFamily = (a, b) => {
+  const x = firstClass(a).toLowerCase(), y = firstClass(b).toLowerCase();
+  let n = 0; while (n < x.length && n < y.length && x[n] === y[n]) n++;
+  return n >= 4 || (x && y && x.startsWith(y));
+};
+const base = (sel) => sel.replace(/:(focus-visible|focus-within|focus|hover|active)\b/g, '').replace(/::?[\w-]+(\([^)]*\))?$/, '').trim();
+
+// What puts focus back, read once from the text of every style file: for each element (its selector without the
+// state), the focus selectors that show focus on it, the :focus-within wrappers that show it, and the rules that show
+// focus on every element of a kind (button:focus-visible, :focus-visible) with how specific they are. Read once for the
+// whole project, not once per file (392 files read 2.7 MB each: hours). `tags` (class → the elements the markup puts it
+// on) says which kind of element a class is.
+export function focusIndex(all, { tags = new Map() } = {}) {
+  const byBase = new Map(), within = [], kinds = [];
+  for (const x of cssRules(all).rules) {
+    if (!showsFocus(x.decls)) continue;
+    for (const s of x.selectors) {
+      if (/:focus/.test(s)) { const b = base(s); if (!byBase.has(b)) byBase.set(b, new Set()); byBase.get(b).add(s); }
+      if (/:focus-within/.test(s)) within.push(base(s));
+      const kind = /^(\*|[a-z][\w-]*)?:focus(?:-visible)?$/i.exec(s);
+      if (kind) kinds.push({ tag: (kind[1] ?? '*').toLowerCase(), spec: specificity(s) });
+    }
+  }
+  return { byBase, within, kinds, tags };
+}
+
+// The elements each class is put on, read from the markup and from the markup the scripts write
+// (<button class="quiet">, `<button class="${cls} chip">`). → Map class → Set of tag names
+export function classTags(texts) {
+  const out = new Map();
+  for (const text of texts) {
+    for (const m of String(text ?? '').matchAll(/<([a-z][\w-]*)\b[^<>]*?\bclass(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)'|\{?`([^`]*)`)/gi)) {
+      const tag = m[1].toLowerCase();
+      for (const c of (m[2] ?? m[3] ?? m[4] ?? '').replace(/\$\{[^}]*\}/g, ' ').split(/\s+/).filter((c) => /^[A-Za-z_][\w-]*$/.test(c))) {
+        if (!out.has(c)) out.set(c, new Set());
+        out.get(c).add(tag);
+      }
+    }
+  }
+  return out;
+}
+
+// A rule that takes the outline off an element in every state (.quiet { outline: none }) loses to a rule
+// that shows focus on every element of its kind and is more specific (button:focus-visible beats one class), when
+// every element the class is put on is of a kind such a rule covers.
+const cmpSpec = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+function restoredByKind(sel, idx) {
+  if (!idx.kinds?.length) return false;
+  const last = sel.split(/\s*[\s>+~]\s*/).pop() ?? '';
+  const own = /^[a-z][\w-]*/i.exec(last)?.[0]?.toLowerCase();
+  const cls = (last.match(/\.([A-Za-z_][\w-]*)/g) ?? []).map((c) => c.slice(1)).find((c) => idx.tags?.has(c));
+  const tags = own ? new Set([own]) : cls ? idx.tags.get(cls) : null;
+  if (!tags?.size) return false;
+  const spec = specificity(sel);
+  return [...tags].every((t) => idx.kinds.some((k) => (k.tag === t || k.tag === '*') && cmpSpec(k.spec, spec) > 0));
+}
+
+// Styles: every rule that removes the focus outline must have a focus style for the same element somewhere.
+// `all` holds the text of every style file (or its focusIndex), so a restore in another file counts. → [{ line, kind, desc }]
+export function cssFindings(text, all = text) {
+  const out = [];
+  const { css, rules } = cssRules(text);
+  const idx = typeof all === 'string' ? focusIndex(all) : all;
+  for (const r of rules) {
+    if (!removesOutline(r.decls)) continue;
+    for (const sel of r.selectors) {
+      const onFocus = /:focus/.test(sel);
+      if (!onFocus && /:(hover|active|disabled|checked|visited)\b|\[disabled\]|\[aria-disabled/.test(sel)) continue;   // another state, not focus
+      const b = base(sel);
+      if (onFocus && showsFocus(r.decls.replace(/outline[^;]*;?/gi, ''))) continue;   // replaced in the same rule
+      const restored = [...(idx.byBase.get(b) ?? [])].some((s) => s !== sel) || idx.within.some((w) => sameFamily(b, w) && w !== b) || (!onFocus && restoredByKind(sel, idx));
+      if (!restored) out.push({ line: lineAt(css, r.index), kind: 'focus', desc: `${sel} removes the focus outline and no focus style puts one back`, fix: `add a ${b || sel}:focus-visible style that shows where focus is` });
+    }
+  }
+  return out;
+}
+
+// A component file with only its <style> blocks left, everything else blanked, so line numbers stay the file's.
+export function styleOnly(text) {
+  const t = String(text ?? '');
+  let out = '', last = 0;
+  for (const m of t.matchAll(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi)) {
+    const start = m.index + m[1].length;
+    out += t.slice(last, start).replace(/[^\n]/g, ' ') + m[2];
+    last = start + m[2].length;
+  }
+  return out + t.slice(last).replace(/[^\n]/g, ' ');
+}
+
+// A component file with only its <script> blocks left (a .vue or .svelte file), line numbers kept.
+export function scriptOnly(text) {
+  const t = String(text ?? '');
+  let out = '', last = 0;
+  for (const m of t.matchAll(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi)) {
+    const start = m.index + m[1].length;
+    out += t.slice(last, start).replace(/[^\n]/g, ' ') + m[2];
+    last = start + m[2].length;
+  }
+  return out + t.slice(last).replace(/[^\n]/g, ' ');
+}
+
+// Scripts (WCAG 2.1): what a component does that a page cannot show without being used a certain way. → [{ line, kind,
+// desc, fix, near }], `near` the code around it, so a finding in a shared script can be told apart by the component
+// it handles.
+export function scriptFindings(text) {
+  const out = [];
+  const src = String(text ?? '').replace(/\/\*[\s\S]*?\*\/|(^|[^:\\])\/\/[^\n]*/g, (c) => c.replace(/[^\n]/g, ' '));
+  const near = (i) => src.slice(Math.max(0, i - 400), i + 400);
+  // 2.1.4 Character key shortcuts: a single letter, number or sign as a shortcut, listened for on the whole page (one on
+  // a focused component is allowed), with no Ctrl, Alt or Cmd asked for around it.
+  if (/\b(?:document|window|globalThis|body)\s*\.\s*addEventListener\s*\(\s*['"]key(?:down|up|press)['"]|\b(?:document|window)\s*\.\s*onkey(?:down|up|press)\s*=/.test(src)) {
+    const seen = new Set();
+    for (const m of src.matchAll(/\.\s*key\s*===?\s*['"]([^'"\s])['"]|['"]([^'"\s])['"]\s*===?\s*\w+\s*\.\s*key\b|\.\s*code\s*===?\s*['"](Key[A-Z]|Digit\d)['"]|\bcase\s+['"]([a-zA-Z0-9?/])['"]\s*:/g)) {
+      const key = m[1] ?? m[2] ?? m[3] ?? m[4];
+      // A comparison is read with its own condition (the line it sits on); a switch case with what comes before it.
+      const ls = src.lastIndexOf('\n', m.index) + 1, le = src.indexOf('\n', m.index);
+      const line = src.slice(ls, le < 0 ? src.length : le);
+      const at = m.index - ls, cond = line.slice(Math.max(0, line.lastIndexOf('if', at), line.lastIndexOf(';', at), line.lastIndexOf('{', at)), line.slice(at).search(/\)\s*(?:\{|return\b|[\w.]+\s*\()|;|\}|$/) + at);
+      const around = m[4] ? src.slice(Math.max(0, m.index - 300), m.index) : cond;
+      if (/\b(?:ctrlKey|metaKey|altKey)\b|getModifierState/.test(around) || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ line: lineAt(src, m.index), kind: 'shortcut', desc: `the key "${key}" alone is a shortcut on the whole page: it fires by mistake for people using voice control or typing with one finger`, fix: 'ask for Ctrl, Alt or Cmd with it, or listen only while the component has the focus, or let the person turn it off', near: near(m.index) });
+    }
+  }
+  // 2.2.1 Timing adjustable: something hidden, closed or removed by itself after 1 to 20 seconds. Shorter is the end of
+  // an animation the person started; a timer the component stops while it has the pointer or the focus is adjustable.
+  for (const m of src.matchAll(/\bsetTimeout\s*\(/g)) {
+    let depth = 1, i = m.index + m[0].length, comma = -1;
+    while (i < src.length && depth) { const ch = src[i]; if (ch === '(' || ch === '[' || ch === '{') depth++; else if (ch === ')' || ch === ']' || ch === '}') depth--; else if (ch === ',' && depth === 1) comma = i; i++; }
+    if (comma < 0) continue;
+    const fn = src.slice(m.index + m[0].length, comma), delay = src.slice(comma + 1, i - 1);
+    const nums = [...delay.matchAll(/\b(\d[\d_]*)\b/g)].map((x) => Number(x[1].replace(/_/g, '')));
+    if (!nums.length || !/^[\s\d_?:()\w.!&|=<>]*$/.test(delay)) continue;
+    const n = Math.min(...nums);
+    if (n < 1000 || n >= 20000) continue;
+    if (!/\.\s*remove\s*\(|\b(?:hide|close|dismiss)\w*|\.hidden\s*=\s*true|display\s*=\s*['"]none|classList\s*\.\s*(?:remove\s*\(\s*['"](?:is-)?(?:open|visible|show|shown|active)|add\s*\(\s*['"](?:is-)?(?:hidden|closing|leaving))/i.test(fn)) continue;
+    // Its timer stopped while the pointer or the focus is on it: clearTimeout(<that timer>) in a hover or focus listener.
+    const v = src.slice(Math.max(0, m.index - 60), m.index).match(/(\w+)\s*=\s*$/)?.[1];
+    if (v && new RegExp(`(?:mouseenter|pointerenter|mouseover|focusin|['"]focus['"])[\\s\\S]{0,400}?clearTimeout\\s*\\(\\s*${v}\\b`).test(src)) continue;
+    out.push({ line: lineAt(src, m.index), kind: 'timing', desc: `something closes by itself after ${n / 1000} second${n === 1000 ? '' : 's'}: people who read slowly, or use a screen reader, need longer`, fix: 'keep it until the person closes it, or stop the timer while it has the pointer or the focus, or give at least 20 seconds', near: near(m.index) });
+  }
+  // 2.5.1 Pointer gestures: two fingers or more (a pinch, a two-finger swipe).
+  for (const m of src.matchAll(/\btouches\s*\.\s*length\s*(?:>=?\s*[12]|===?\s*[2-9])|['"]gesture(?:start|change|end)['"]|\bongesture(?:start|change)\b/g)) {
+    out.push({ line: lineAt(src, m.index), kind: 'gesture', desc: 'an action with two fingers or more: people who can use only one finger, or a mouse, cannot do it', fix: 'offer the same action with one tap (buttons for zoom, arrows for a swipe)', near: near(m.index) });
+    break;
+  }
+  // 2.5.4 Motion actuation: shaking or tilting the device does something.
+  for (const m of src.matchAll(/['"]device(?:motion|orientation)['"]|\bondevice(?:motion|orientation)\b|\bnew\s+(?:Accelerometer|Gyroscope|LinearAccelerationSensor)\s*\(/g)) {
+    out.push({ line: lineAt(src, m.index), kind: 'motionact', desc: 'an action on shaking or tilting the device: people with a mounted device or a tremor cannot do it, or do it by mistake', fix: 'offer a button for the same action, and let the motion be turned off', near: near(m.index) });
+    break;
+  }
+  return out;
+}
+
+function walk(ROOT, exts, limit = 4000) {
+  const files = [];
+  const go = (dir, depth) => {
+    if (files.length >= limit || depth > 8) return;
+    let names; try { names = readdirSync(dir); } catch { return; }
+    for (const n of names) {
+      if (SKIP_DIR.has(n) || n.startsWith('.')) continue;
+      const abs = join(dir, n);
+      let st; try { st = statSync(abs); } catch { continue; }
+      if (st.isDirectory()) go(abs, depth + 1);
+      // A built page with its source beside it (ui.html from ui.src.html) is read once, from the source.
+      else if (exts.has(extname(n).toLowerCase()) && st.size < 512 * 1024 && !(/\.html?$/i.test(n) && existsSync(abs.replace(/\.(html?)$/i, '.src.$1')))) files.push(abs);
+    }
+  };
+  for (const root of codeRoots(ROOT)) go(root, 0);
+  return files;
+}
+
+// Every style file of the project (.css, .scss, .less, and .vue and .svelte files for their <style> blocks); with html,
+// its pages too, for their <style> blocks.
+export const projectStyleFiles = (ROOT, { html = false } = {}) => walk(ROOT, html ? new Set([...STYLE, '.html', '.htm']) : STYLE);
+
+// Every style file of the project as one text (a component file's <style> blocks only): a focus style put back in
+// another file counts.
+export function projectStyleText(ROOT) {
+  const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
+  return walk(ROOT, STYLE).map((f) => (['.vue', '.svelte'].includes(extname(f)) ? styleOnly(read(f)) : read(f))).join('\n');
+}
+
+// The whole project: [{ file, line, kind, desc }], and how many files each side read.
+export function staticA11y(ROOT) {
+  const findings = [];
+  const markup = walk(ROOT, MARKUP), styles = walk(ROOT, STYLE);
+  const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
+  for (const f of markup) for (const x of markupFindings(read(f))) findings.push({ file: relative(ROOT, f), ...x });
+  const styleText = new Map(styles.map((f) => [f, ['.vue', '.svelte'].includes(extname(f)) ? styleOnly(read(f)) : read(f)]));
+  const all = [...styleText.values()].join('\n');
+  const scripts = walk(ROOT, new Set(['.js', '.mjs', '.ts']));
+  const focus = focusIndex(all, { tags: classTags([...markup, ...scripts].map(read)) });
+  for (const [f, text] of styleText) for (const x of cssFindings(text, focus)) findings.push({ file: relative(ROOT, f), ...x });
+  // Animations with no reduced-motion alternative anywhere: reported once, at the first animation.
+  // What the scripts do (WCAG 2.1): shortcuts, timers, gestures, device motion.
+  for (const f of [...scripts, ...walk(ROOT, new Set(['.jsx', '.tsx', '.vue', '.svelte']))]) {
+    const text = read(f);
+    for (const x of scriptFindings(['.vue', '.svelte'].includes(extname(f)) ? scriptOnly(text) : text)) findings.push({ file: relative(ROOT, f), ...x });
+  }
+  const reduced = /prefers-reduced-motion/.test(all) || markup.some((f) => /prefers-reduced-motion/.test(read(f))) || scripts.some((f) => /prefers-reduced-motion/.test(read(f)));
+  if (!reduced) {
+    for (const [f, text] of styleText) {
+      const css = text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+      const a = /(?:^|[;{\s])animation(?:-name)?\s*:(?!\s*(?:none|initial|inherit|unset)\s*[;}])\s*[^;}\s][^;}]*/.exec(css);
+      if (a) { findings.push({ file: relative(ROOT, f), line: lineAt(css, a.index + (a[0].match(/^\s*[;{]?\s*/)?.[0].length ?? 0)), kind: 'motion', desc: 'an animation, and no prefers-reduced-motion alternative anywhere in the project: people who get sick from motion cannot turn it off' }); break; }
+    }
+  }
+  return { findings, files: { markup: markup.length, styles: styles.length, scripts: scripts.length } };
+}

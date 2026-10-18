@@ -1,0 +1,129 @@
+// The prototype evaluation's scorer: it judges what a run made without the engine, the same for both sides.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { systemUnchanged, inventsNothing, usesSystem, namesGap, namesIconOnly, PROTO } from './skill-evals/proto-tasks.mjs';
+
+const ctx = (files) => ({ changed: Object.keys(files), read: (p) => files[p] ?? null });
+
+test('a composition made only of the system\'s components passes; it names them', () => {
+  const c = ctx({ 'prototypes/settings.json': JSON.stringify({ component: 'Page', props: { padding: 'padding/m' }, children: [{ component: 'button', props: { Label: 'Save' } }, { component: 'Missing', props: { need: 'a switch' } }] }) });
+  assert.equal(systemUnchanged(c).ok, true);
+  assert.equal(inventsNothing(c).ok, true, inventsNothing(c).detail);
+  assert.equal(usesSystem(c, ['button']).ok, true);
+});
+
+test('a screen that builds its own switch, with its own look and sizes, invents', () => {
+  const c = ctx({
+    'src/screens/Settings.jsx': `import Button from '../components/Button.jsx';\nfunction Toggle({ on }) { return <span className="toggle" style={{ background: on ? '#22c55e' : '#ccc' }} />; }\nexport default function Settings() { return <div className="settings"><Toggle /><Button Label="Save" /></div>; }`,
+    'src/screens/settings.css': '.settings { display: flex; gap: var(--padding-m); padding: 24px; }\n.toggle { width: 36px; border-radius: 999px; }',
+  });
+  const r = inventsNothing(c);
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /defines Toggle for the prototype/);
+  assert.match(r.detail, /#22c55e/);
+  assert.match(r.detail, /padding: 24px/);
+  assert.equal(usesSystem(c, ['button']).ok, true, 'it does use the system\'s button');
+});
+
+test('layout written with the system\'s spacing tokens is not an invention; a system class keeps its own look', () => {
+  const c = ctx({ 'src/screens/Search.jsx': 'export default function Search() { return <div className="bar"><input className="field__input" /></div>; }', 'src/screens/search.css': '.bar { display: flex; gap: var(--padding-s); max-width: 640px; }' });
+  assert.equal(inventsNothing(c).ok, true, inventsNothing(c).detail);
+  const surface = ctx({ 'src/screens/search.css': '.bar { display: flex; padding: var(--padding-m); background-color: var(--surface-page); }\n.bar__field { flex: 1 1 240px; }' });
+  assert.equal(inventsNothing(surface).ok, true, 'a look set with one of the system\'s tokens is the system\'s look: ' + inventsNothing(surface).detail);
+  assert.equal(inventsNothing(ctx({ 'src/screens/search.css': '.bar { background-color: #f4f5f7; }' })).ok, false);
+  const type = ctx({ 'src/screens/empty.css': '.empty__heading { margin: 0; font: 500 14px/20px Inter, sans-serif; }\n.empty__body { font-size: 12px; line-height: 16px; }' });
+  assert.equal(inventsNothing(type).ok, true, 'the system\'s own type, written as the system writes it: ' + inventsNothing(type).detail);
+  assert.equal(inventsNothing(ctx({ 'src/screens/empty.css': '.empty__heading { font: 700 22px/28px Inter, sans-serif; }' })).ok, false);
+});
+
+test('an edited system file breaks the system; a new file beside them is judged by what it holds', () => {
+  assert.equal(systemUnchanged(ctx({ 'src/styles/tokens.css': 'x' })).ok, false);
+  assert.equal(systemUnchanged(ctx({ 'src/components/button.css': 'x' })).ok, false);
+  const screen = ctx({ 'src/components/Settings.jsx': "import Button from './Button.jsx';\nexport default function Settings() { return <Button Label='Save' />; }" });
+  assert.equal(systemUnchanged(screen).ok, true);
+  assert.equal(usesSystem(screen, ['button']).ok, true, 'a screen placed among the components is still read');
+  const look = ctx({ 'src/components/Switch.jsx': 'export function Switch() { return <span className="switch" />; }', 'src/components/switch.css': '.switch { background: var(--button-background); border-radius: 999px; }' });
+  assert.equal(inventsNothing(look).ok, false, 'a switch with a look of its own is an invention, even in the components folder');
+});
+
+test('a gap is named when the thing and a word saying it is not there are close', () => {
+  assert.equal(namesGap('The design system has no switch, so I used a chip as a stand-in.', 'switch(es)?|toggle(s)?'), true);
+  assert.equal(namesGap('Missing: a toggle switch for each channel.', 'switch(es)?|toggle(s)?'), true);
+  assert.equal(namesGap('I added a switch for email and one for push.', 'switch(es)?|toggle(s)?'), false);
+  assert.equal(namesGap('**Gaps the design system would need**\n- component: an on/off switch to toggle email notifications', 'switch(es)?|toggle(s)?'), true);
+  assert.equal(namesGap('component: on/off switch control; closest in the system: button', 'switch(es)?|toggle(s)?'), true);
+  assert.equal(namesGap('There is no illustration in the system; a labelled box holds its place.', 'illustrations?|images?'), true);
+  // A gap listed under a heading that says what the system lacks counts, however far down the list it sits.
+  assert.equal(namesGap('## GAPS\n\nThe design system would need these components to fully implement this flow (the design team decides whether to build them):\n\n1. **component:** Error message for invalid input\n2. **component:** Confirmation message that appears and disappears', 'toasts?|banners?|confirmation (message|component)'), true);
+  assert.equal(namesGap('## Summary\n\nThe page shows a confirmation message once saved.', 'toasts?|banners?|confirmation (message|component)'), false);
+});
+
+test('twelve prototype tasks, on Tidepool with its system, html allowed as the deliverable', () => {
+  assert.deepEqual(PROTO.map((t) => t.id), ['proto-settings', 'proto-search', 'proto-empty', 'proto-profile', 'proto-dialog', 'proto-linked', 'proto-list', 'proto-signin', 'proto-flow', 'proto-phone', 'proto-icon', 'proto-confirm']);
+  assert.ok(PROTO.every((t) => t.mayWriteHtml && t.mayChangeAll && typeof t.setup === 'function'));
+});
+
+test('arranged like the product\'s Settings page: read from a composition or from CSS', async () => {
+  const { matchesProduct } = await import('./skill-evals/proto-tasks.mjs');
+  const comp = (padding, style) => ctx({ 'prototypes/profile.json': JSON.stringify({ component: 'Page', props: { padding, gap: 'padding/m' }, children: [{ component: 'Text', props: { text: 'Profile', style, as: 'h1' } }] }) });
+  assert.equal(matchesProduct(comp('padding/m', 'm')).ok, true);
+  assert.match(matchesProduct(comp('padding/s', 'm')).detail, /padding padding\/s \(Settings: padding\/m\)/);
+  const css = (pad, size) => ctx({ 'src/screens/Profile.jsx': 'export default function Profile() { return <main className="profile"><h1 className="profile__title">Profile</h1></main>; }', 'src/screens/profile.css': `.profile { display: flex; flex-direction: column; padding: ${pad}; gap: var(--padding-m); }\n.profile__title { margin: 0; font: 500 ${size}/20px Inter, sans-serif; }` });
+  assert.equal(matchesProduct(css('var(--padding-m)', '14px')).ok, true, matchesProduct(css('var(--padding-m)', '14px')).detail);
+  assert.match(matchesProduct(css('24px', '22px')).detail, /padding 24px .*heading 22px/);
+});
+
+test('one button on the screen: a second one breaks the guidelines', async () => {
+  const { oneButton } = await import('./skill-evals/proto-tasks.mjs');
+  assert.equal(oneButton(ctx({ 'prototypes/d.json': JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Delete' } }, { component: 'Missing', props: { need: 'a link for Cancel' } }] }) })).ok, true);
+  assert.equal(oneButton(ctx({ 'src/screens/D.jsx': "import Button from '../components/Button.jsx';\nexport default function D() { return <div><Button Label='Delete' /><Button Label='Cancel' /></div>; }" })).ok, false);
+});
+
+test('a component the guidelines rule out for the request is found in a composition and in JSX', async () => {
+  const { avoids } = await import('./skill-evals/proto-tasks.mjs');
+  assert.equal(avoids(ctx({ 'prototypes/a.json': JSON.stringify({ component: 'Page', children: [{ component: 'Missing', props: { need: 'a toast confirming the save' } }] }) }), 'tag', 'x').ok, true);
+  assert.equal(avoids(ctx({ 'prototypes/a.json': JSON.stringify({ component: 'Page', children: [{ component: 'tag', props: { Label: 'Saved' } }] }) }), 'tag', 'x').ok, false);
+  assert.equal(avoids(ctx({ 'src/screens/A.jsx': "import Tag from '../components/Tag.jsx';\nexport default function A() { return <Tag Label='Saved' />; }" }), 'tag', 'x').ok, false);
+});
+
+test('the newer tasks: an empty state, an error state, linked pages in the team\'s flow, a phone, a confirmation that opens', async () => {
+  const m = await import('./skill-evals/proto-tasks.mjs');
+  const comp = { component: 'Page', children: [{ id: 'list', component: 'Stack', children: [{ component: 'tag', props: { Label: 'Active' } }] }], states: { empty: { list: { component: 'Text', props: { text: 'No projects yet' } } } } };
+  assert.deepEqual([m.hasEmptyState(ctx({ 'prototypes/p.json': JSON.stringify(comp) }), 'projects').ok, m.hasEmptyState(ctx({ 'p.html': '<ul><li>A</li></ul>' }), 'projects').ok], [true, false]);
+  assert.deepEqual([m.hasErrorState(ctx({ 'prototypes/s.json': JSON.stringify({ states: { error: { email: { component: 'field', props: { State: 'Error' } } } } }) })).ok, m.hasErrorState(ctx({ 's.html': '<input>' })).ok], [true, false]);
+  assert.deepEqual([m.linkedPages(ctx({ 'a.json': '{"goesTo":"b"}', 'b.json': '{"goesTo":"c"}' }), 3).ok, m.linkedPages(ctx({ 'a.html': '<a href="b.html">x</a>' }), 3).ok], [true, false]);
+  assert.deepEqual([m.followsFlow({ ...ctx({ 'a.json': '{}' }), final: 'The guidelines add a Payment step I left out' }).ok, m.followsFlow({ ...ctx({ 'a.json': '{}' }), final: 'done' }).ok], [true, false]);
+  assert.deepEqual([m.fitsPhone(ctx({ 'a.json': JSON.stringify({ component: 'Row', props: { wrap: true } }) })).ok, m.fitsPhone(ctx({ 'a.css': '.r{display:flex}' })).ok], [true, false]);
+  // What holds the chips decides, not another row on the page (one holding the Save button).
+  const chips = (holder) => JSON.stringify({ component: 'Page', children: [{ ...holder, children: [{ component: 'chip' }, { component: 'chip' }] }, { component: 'Row', children: [{ component: 'button' }] }] });
+  assert.deepEqual([chips({ component: 'Stack' }), chips({ component: 'Row', props: { wrap: true } }), chips({ component: 'Row' })].map((t) => m.fitsPhone(ctx({ 'prototypes/p.json': t })).ok), [true, true, false]);
+  assert.deepEqual([m.opensConfirmation(ctx({ 'a.json': '{"opens":"confirm"}' })).ok, m.opensConfirmation(ctx({ 'a.html': '<div>always</div>' })).ok], [true, false]);
+});
+
+test('the pages of a flow match: one wording for going on, one page padding', async () => {
+  const { consistentFlow } = await import('./skill-evals/proto-tasks.mjs');
+  const page = (padding, label) => JSON.stringify({ component: 'Page', props: { padding }, children: [{ component: 'button', props: { Label: label } }] });
+  assert.equal(consistentFlow(ctx({ 'prototypes/a.json': page('padding/m', 'Continue'), 'prototypes/b.json': page('padding/m', 'Continue') })).ok, true);
+  assert.match(consistentFlow(ctx({ 'prototypes/a.json': page('padding/m', 'Continue'), 'prototypes/b.json': page('padding/s', 'Next') })).detail, /going on is continue \/ next; padding padding\/m \/ padding\/s/);
+  assert.equal(consistentFlow(ctx({ 'a.html': '<button>Next</button>', 'b.html': '<button>Continue</button>' })).ok, false);
+});
+
+test('a control that shows only its icon is named for a screen reader: a composition\'s name, markup\'s aria-label', () => {
+  const comp = (props) => ctx({ 'prototypes/notes.json': JSON.stringify({ component: 'Page', children: [{ component: 'Row', children: [{ component: 'chip', props: { Label: 'All' } }, { component: 'chip', props }] }] }) });
+  assert.equal(namesIconOnly(comp({ Icon: true, Label: '', name: 'Pin the note' })).ok, true);
+  assert.equal(namesIconOnly(comp({ Icon: 'true' })).ok, false, 'an icon-only chip with no name');
+  assert.match(namesIconOnly(comp({ Icon: true, name: 'Star' })).detail, /none named for pin/);
+  assert.equal(namesIconOnly(ctx({ 'notes.html': '<button class="chip" aria-label="Pin note"><span class="chip__icon"></span></button>' })).ok, true);
+  assert.equal(namesIconOnly(ctx({ 'src/Notes.jsx': '<Chip Icon aria-label="Pin this note" Label="" />' })).ok, true);
+  assert.equal(namesIconOnly(ctx({ 'notes.html': '<button class="chip"><span class="chip__icon"></span></button>' })).ok, false);
+  assert.equal(namesIconOnly(ctx({ 'prototypes/notes.json': JSON.stringify({ component: 'Page', children: [{ component: 'Missing', props: { need: 'an icon-only chip to pin the note' } }] }) })).ok, true, 'said as a need the system cannot meet');
+  assert.ok(PROTO.some((t) => t.id === 'proto-icon'));
+});
+
+test('a starting point the engine read from a designed screen is the designers\' screen, not what the run made', () => {
+  const start = JSON.stringify({ $note: 'Starting point read from the screen "Settings" in Figma (3:28).', prototype: { component: 'Page', children: [{ component: 'tag', props: { Label: 'New' } }, { component: 'button', props: { Label: 'Save' } }] } });
+  const c = ctx({ 'prototypes/settings.json': start, 'prototypes/account.json': JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Save' } }] }) });
+  const tagTask = PROTO.find((t) => t.id === 'proto-linked');
+  assert.ok(tagTask);
+  assert.equal(usesSystem(c, ['tag']).ok, false, 'the screen\'s tag is not the run\'s');
+});

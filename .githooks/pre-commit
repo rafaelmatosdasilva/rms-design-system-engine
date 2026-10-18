@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Before every commit: nothing private, then the doc counts.
+# Install once in this repo: git config core.hooksPath .githooks
+
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+# 0. Nothing private enters this public repository: no client, no person, no personal address, no backlog.
+node "$ROOT/.githooks/private-check.mjs" --staged
+
+# 1. Patch what can be auto-fixed (counts, headings, trend bars, example block).
+node "$ROOT/sync-docs.mjs"
+
+# 2. Re-stage any doc files that were changed by the patch so they land in this commit.
+git add "$ROOT/README.md" "$ROOT/rms-design-system-engine.md" 2>/dev/null || true
+
+# 3. Verify nothing remains that needs a manual fix (e.g. truncated checks table).
+#    Exits 1 and prints what needs fixing if stale; commit is blocked.
+node "$ROOT/sync-docs.mjs" --check

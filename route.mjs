@@ -1,0 +1,526 @@
+// route.mjs - the request, as the person wrote it, routed by the engine to a recipe and the exact command
+// ("if a decision can be made deterministically, the model does not make it").
+//
+//   rms-design-system-engine --route "<the request, as written>"
+//
+// The agent's first step for every request. Picking the recipe, the scope and the command was the model's
+// decision, and the evaluation showed smaller models get it wrong (a question answered from memory, the wrong
+// recipe, a pasted step list followed or asked about). Here it is a fixed table, tested, the same on any
+// model, in English and Portuguese. route() is pure: projectState() reads the project for it.
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { codeRoots } from './code-roots.mjs';
+import { createPairing } from './component-pairing.mjs';
+import { join, relative, basename } from 'node:path';
+
+// What the router needs from the project: is there a config, which components, when the snapshots were
+// captured (the oldest _updated stamp, as a date), and the command to write (the engine's path when the
+// terminal command is not on PATH).
+export function projectState(ROOT, { engineDir, env = process.env } = {}) {
+  const hasConfig = existsSync(join(ROOT, 'ds-config.json'));
+  let conf = {};
+  try { conf = hasConfig ? JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')) : {}; } catch { /* unreadable: the defaults */ }
+  const read = (rel) => { try { return JSON.parse(readFileSync(join(ROOT, rel), 'utf8')); } catch { return null; } };
+  const structure = read(conf.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json');
+  const vars = read(conf.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
+  const stamps = [structure?._updated, vars?._updated].filter(Boolean).map((u) => new Date(u)).filter((d) => !Number.isNaN(d.getTime()));
+  const oldest = stamps.length ? new Date(Math.min(...stamps)) : null;
+  const onPath = String(env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, 'rms-design-system-engine')));
+  // The names this folder's system goes by (its config, its package, its folder), so a request that names another
+  // system is told apart; and whether this session runs in the cloud, where a folder on the person's computer cannot be read.
+  let pkg = null; try { pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? null; } catch { /* no package.json */ }
+  return {
+    hasConfig,
+    names: [conf.name, pkg, basename(ROOT)].filter(Boolean),
+    cloud: env.CLAUDE_CODE_REMOTE === 'true',
+    build: conf.build === true,
+    pages: uiFiles(ROOT),
+    rawColours: rawColoursOf(structure?.components ?? {}),
+    components: withCodeNames(Object.keys(structure?.components ?? {}), () => createPairing({ ROOT, cfg: conf }).codeOnly()),
+    snapshotDate: oldest ? oldest.toISOString().slice(0, 10) : null,
+    cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${shellPath(join(engineDir, 'audit.mjs'))}`,
+  };
+}
+
+// A path as a shell reads it: quoted when it holds a space or a character the shell would act on (an engine kept in
+// "My Drive/tools"), as it is, so the command reads as before, when it holds none.
+export const shellPath = (p) => (/^[\w@%+=:,./\\-]+$/.test(p) ? p : `"${String(p).replace(/(["$`])/g, '\\$1')}"`);   // in double quotes, as the hooks' own command is
+
+// Figma's components and the ones only the code has (HbChip.vue, a file whose root carries a class of its own), so a
+// request that names a component the snapshot lacks is still scoped to it. The code's list comes from the shared
+// pairing (component-pairing.mjs), so a file paired with a Figma component, or proposed for one, is not in it; one the
+// snapshot has under its own name (HbBadge.vue for Figma's badge, Button.jsx for button) is not named twice either.
+export function withCodeNames(figmaNames, code) {
+  const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  let found = [];
+  try { found = code(); } catch { /* no code to read */ }
+  const own = found.filter((k) => !figmaNames.some((f) => sq(k.name).endsWith(sq(f)) || sq(k.cls ?? '') === sq(f) || sq(k.cls ?? '').endsWith(sq(f))));
+  return [...figmaNames, ...new Set(own.map((k) => k.name))];
+}
+
+// The colours each Figma component paints with no variable bound: { tag: ['Tone=Positive #d6f5e3, #136c3a'] }.
+export function rawColoursOf(components = {}) {
+  const out = {};
+  const hexes = (colors) => Object.values(colors ?? {}).filter((c) => c?.hex && !c.token).map((c) => c.hex.toLowerCase());
+  for (const [name, c] of Object.entries(components)) {
+    const list = [];
+    if (hexes(c?.colors).length) list.push(`${hexes(c.colors).join(', ')}`);
+    for (const [vk, v] of Object.entries(c?.variants ?? {})) if (hexes(v?.colors).length) list.push(`${vk} ${hexes(v.colors).join(', ')}`);
+    if (list.length) out[name] = list;
+  }
+  return out;
+}
+
+// The project's UI files (pages, screens, components), so a request that names a page by its name ("the gallery
+// page") is told which file that is. Bounded: the first 400, skipping dependencies, builds and the engine's own files.
+const UI_FILE = /\.(html?|jsx|tsx|vue|svelte|astro)$/i;
+const NOT_UI_DIR = /^(node_modules|\.git|dist|build|out|coverage|\.next|\.design-system-engine-out|\.claude|contracts|test|tests|__tests__|figma-mcp)$/;
+export function uiFiles(ROOT, limit = 400) {
+  const out = [];
+  const walk = (dir) => {
+    let entries = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (out.length >= limit) return;
+      if (e.isDirectory()) { if (!NOT_UI_DIR.test(e.name)) walk(join(dir, e.name)); }
+      else if (UI_FILE.test(e.name) && !/\.(test|spec|stories)\./.test(e.name)) out.push(relative(ROOT, join(dir, e.name)).split('\\').join('/'));
+    }
+  };
+  for (const root of codeRoots(ROOT)) walk(root);
+  return out.sort();
+}
+
+// The UI files whose path names a word of the request ("gallery" → apps/gallery/ui.html). Words that name a component,
+// or say nothing about a place (page, screen, button…), do not count.
+const PLACE_STOP = new Set(['page', 'pages', 'screen', 'screens', 'view', 'file', 'component', 'components', 'next', 'small', 'large', 'green', 'blue', 'with', 'from', 'that', 'this', 'there', 'where', 'add', 'make', 'build', 'create', 'show', 'index', 'main', 'app', 'apps', 'src', 'pagina', 'tela']);
+export function pagesNamed(text, pages = [], components = []) {
+  const comp = new Set(components.flatMap((c) => [c.toLowerCase(), ...c.split(/(?=[A-Z])|[-_ ]/).map((x) => x.toLowerCase())]));
+  const words = new Set((String(text).toLowerCase().match(/[a-zà-ú][a-zà-ú0-9]{3,}/g) ?? []).filter((w) => !PLACE_STOP.has(w) && !comp.has(w)));
+  if (!words.size) return [];
+  const hits = pages.map((p) => ({ p, n: p.toLowerCase().split(/[\/._-]+/).filter((seg) => words.has(seg)).length })).filter((h) => h.n > 0);
+  const best = Math.max(0, ...hits.map((h) => h.n));
+  return hits.filter((h) => h.n === best).map((h) => h.p).slice(0, 3);
+}
+
+// A component named in the request: its name as written in the snapshot, or split at camel case, hyphens and
+// underscores ("statusBar" is also "status bar" and "status-bar").
+export function namedComponents(text, components = []) {
+  const t = ` ${String(text).toLowerCase()} `;
+  const found = [];
+  for (const name of components) {
+    const words = name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase().trim();
+    const forms = new Set([name.toLowerCase(), words, words.replace(/ /g, '-'), words.replace(/ /g, '')]);
+    if ([...forms].some((f) => f && new RegExp(`[^a-z0-9]${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?[^a-z0-9]`).test(t))) found.push(name);
+  }
+  return found;
+}
+
+// A component the request names loosely, when no name matched as written: its words in another order ("the primary
+// button" is buttonPrimary), or one word that is part of the names ("the button" in a system of buttonPrimary,
+// buttonSecondary and iconButton). One component is taken. When the word fits several, a plural takes them all
+// ("the buttons") and a singular one is asked about (`ask: true`), so a request about one component never checks the
+// whole library in its place. Words that name an aspect of the check rather than a thing (text, icon, state) never do.
+const nameWords = (name) => name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase().trim().split(/\s+/).filter(Boolean);
+const orders = (w) => w.length < 2 ? [w] : w.flatMap((x, i) => orders([...w.slice(0, i), ...w.slice(i + 1)]).map((rest) => [x, ...rest]));
+const LOOSE_STOP = new Set(['text', 'texts', 'icon', 'icons', 'state', 'states', 'prop', 'props', 'token', 'tokens', 'mode', 'modes', 'colour', 'colours', 'color', 'colors', 'size', 'sizes', 'page', 'pages', 'screen', 'screens', 'system', 'library', 'design', 'style', 'guide', 'code', 'figma', 'component', 'components', 'file', 'files', 'value', 'values', 'variable', 'variables', 'contrast', 'spacing', 'radius', 'motion', 'shadow', 'shadows', 'border', 'borders', 'whole', 'entire', 'same', 'other', 'first', 'last', 'new', 'default', 'base', 'main']);
+const LOOSE_SPOT = /(?:^|[^a-z0-9])(?:the|a|an|our|this|that|my|each|every|all(?: the)?|of|on|for|in)\s+([a-z][a-z0-9]{2,})(?=['’]s?\b|\s*(?:[.,;:!?)]|$|\s(?:component|components|and|in|on|for|against|with|to|from|please|now|only|again|too|padding|paddings|radius|height|width|size|sizes|colou?rs?|borders?|labels?|states?|hover|focus|contrast|spacing|gaps?|accessibility|props?|tokens?|variants?|markup|structure)\b))/g;
+export function looseComponents(text, components = [], { anywhere = false } = {}) {
+  const t = ` ${String(text ?? '').toLowerCase()} `;
+  const reordered = components.filter((name) => {
+    const w = nameWords(name);
+    return w.length > 1 && w.length < 4 && orders(w).some((o) => new RegExp(`[^a-z0-9]${o.join('[\\s-]+')}s?[^a-z0-9]`).test(t));
+  });
+  if (reordered.length) return { names: reordered, ask: false };
+  for (const m of anywhere ? t.matchAll(/(?<![a-z0-9])([a-z][a-z0-9]{2,})(?![a-z0-9])/g) : t.matchAll(LOOSE_SPOT)) {
+    const said = m[1];
+    for (const w of [said, ...(said.endsWith('s') ? [said.slice(0, -1)] : [])]) {
+      if (LOOSE_STOP.has(w) || LOOSE_STOP.has(said)) continue;
+      const fits = components.filter((name) => nameWords(name).includes(w));
+      if (!fits.length) continue;
+      return { names: fits, ask: fits.length > 1 && w === said };
+    }
+  }
+  return { names: [], ask: false };
+}
+const orList = (names) => names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names[0];
+
+const NOT_COMPONENT = /^(GitHub|GitLab|JavaScript|TypeScript|FigJam|YouTube|LinkedIn|iPhone|iPad|macOS|iOS|DevTools|PostCSS|ESLint|NodeJS|VSCode|WordPress|PowerPoint|OpenAI|PayPal|WhatsApp|McDonald)$/i;
+export function guessedComponents(text) {
+  const t = String(text ?? '');
+  const camel = [...t.matchAll(/(?<![\w./-])([a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*)(?![\w./-])/g)].map((m) => m[1]).filter((w) => !NOT_COMPONENT.test(w) && !/[A-Z]{2}/.test(w));
+  const said = [...t.matchAll(/\b(?:the|a|o|a componente|o componente)\s+([a-z][\w-]{2,})\s+(?:component|componente)\b/gi)].map((m) => m[1]).filter((w) => !/^(whole|entire|same|new|other|first|last|right|wrong)$/i.test(w));
+  return [...new Set([...camel, ...said])].slice(0, 3);
+}
+
+const QUESTION = /^\s*(how|why|what|where|when|which|can i|should i|is there|como|porqu[eê]|porque|o que|onde|quando|qual|quais|d[aá] para|posso)\b|\?\s*$/i;
+const LINK = /https?:\/\/(?:[\w.-]*gitlab[\w.-]*|[\w.-]*notion\.(?:so|site))\/\S+/i;
+const links = (t) => t.match(new RegExp(LINK.source, 'gi')) ?? [];
+const STYLE_GUIDE = /\bstyle ?guide\b|\bguia de estilos?\b/i;
+// A request that names the style guide gets the style guide, accessibility named or not ("the accessibility of
+// buttonPrimary in the style guide"); one that asks to fix it, or how it works, does not build it.
+const NOT_STYLE_GUIDE = /\bfix\b|\bcorrig|\breflow|\bhow (?:do|to|does)\b/i;
+// The style guide shared with the team, rebuilt on every push: the CI job that publishes it is written.
+const PUBLISH_STYLE_GUIDE = /\b(?:publish|share|host|deploy|put)\w*\b[^.\n]{0,40}\bstyle ?guide\b|\bstyle ?guide\b[^.\n]{0,40}\b(?:online|link|url|the (?:whole )?team|everyone|pages|published|shared)\b|\b(?:publica|partilha|compartilha)\w*\b[^.\n]{0,30}\bguia de estilos?\b/i;
+const FIGMA_URL = /https?:\/\/(?:www\.)?figma\.com\/(?:design|file)\/[\w-]+\S*/i;
+const STEP_LIST = /(^|\s)1[.)]\s[\s\S]*\s2[.)]\s/;
+
+// Each rule: [recipe, test, what to run, a note]. First match wins; the order is part of the contract (tested).
+const BUILD_VERB = /\b(build|create|implement|generate|code|constr[oó]i\w*|cria\w*|implementa\w*|gera\w*)\b/i;
+const TO_CODE = /\b(turn|convert|transforma\w*|converte\w*)\b[\s\S]{0,60}\b(into|in|em)\s+(real\s+)?(code|components?|c[oó]digo|componentes)\b/i;
+// A prototype ("prototype a settings page", "mock up a checkout with our components"): made only of the system's
+// components, checked and drawn by the engine; what the system lacks is listed, never invented.
+export const PROTOTYPE = /\b(prototyp\w*|mock[\s-]?ups?|wireframes?|prot[oó]tipos?|maquet\w*)\b/i;
+// The prototypes' gaps sent to Figma as the design team's to do list ("send the gaps to Figma", "manda as lacunas pro
+// Figma"): the same engine-written script, after the same yes.
+export const FIGMA_GAPS = /\b(gaps?|lacunas?|to[\s-]?do( list)?|backlog|what the system lacks|o que (o sistema )?falta)\b[^.\n]{0,40}\b(to|in|into|on|no|na|pro|pra|para o)\s+figma\b/i;
+export const FIGMA_EDITS = /\b(update|align|sync|bring|make|annotat\w*|atualiz\w*|alinh\w*|sincroniz\w*|p[oõ]e)\b[^.\n]{0,20}\bfigma\b[^.\n]{0,60}\b(code|c[oó]digo)\b|\bfigma\b[^.\n]{0,30}\b(match(es)?|in line with|up to date with|aligned with|igual ao|alinhado com)\s+(the\s+|o\s+)?(code|c[oó]digo)\b|\b(add|write|put|set|acrescent\w*|adicion\w*|p[oõ]e|coloca\w*)\b[^.\n]{0,30}\b(the\s+|os?\s+|as?\s+)?(roles?|pap[eé]is|annotations?|anota[çc][õo]es)\b[^.\n]{0,20}\b(in|to|into|no|na|ao)\s+figma\b|\b(pin|add|write|put|send|mark|marca\w*|p[oõ]e|coloca\w*|manda\w*)\b[^.\n]{0,40}\b(accessibility|a11y|acessibilidade)\b[^.\n]{0,40}\b(in|to|into|on|no|na|pro|pra|ao)\s+figma\b|--figma-edits/i;
+// The person says they checked a criterion only a person can judge: "badge 1.3.3 is checked", "I checked 2.4.6 on
+// the input", "verifiquei o 1.4.5 do badge".
+const CHECKED_SAYS = /\b(is|are|was|were)\s+checked\b|\b(i|we)\s+(have\s+|'ve\s+)?(checked|verified|confirmed|reviewed)\b|\bmark\w*\b[\s\S]{0,60}\b(checked|done)\b|\b(verifiquei|conferi|chequei|est[áa] verificad)/i;
+const SC = /\b[1-4]\.\d{1,2}\.\d{1,2}\b/;
+// The team decided to keep a difference ("keep the chip's 28px height, it is on purpose", "mantém o raio, é
+// intencional"): recorded with --keep and the person's reason, never as debt.
+export const KEEP_SAYS = /\b(keep|kept|keeping)\b[^.\n]{0,60}\b(differences?|on purpose|intentional\w*|deliberate\w*|as (it|they) (is|are))\b|\b(on purpose|intentional(ly)?|deliberately|by design)\b|\b(mant[eé]m|manter|mantemos|mantenha|de prop[oó]sito|intencional\w*)\b/i;
+// The reason the person gives, in their words: what follows "because", "since", "porque".
+const KEEP_WHY = /\b(because|since|porque|pois|j[aá] que)\b\s+([^.!?\n]{4,200})/i;
+// A Figma link given to use from now on (a branch of the file, or another file): only the file key changes.
+const USE_FIGMA_FILE = /\b(use|using|switch\w*|point\w*|scan\w*|read\w*|change\w*|move\w*|instead|branch\w*|usa\w*|muda\w*|troca\w*|l[eê]r?)\b/i;
+const FIGMA_BRANCH = /\bfigma\b[\s\S]{0,30}\b(branch|ramo)\b|\b(branch|ramo)\b[\s\S]{0,30}\bfigma\b/i;
+// The team's guidance rated for what agents can take from it; the extraction test only when they ask for it.
+const RATE_GUIDANCE = /\b(rate|grade|score|classif\w*|evaluate|assess|review|avalia\w*|classifica\w*)\b[\s\S]{0,60}\b(guidance|guidelines?|documentation|docs|intent|diretrizes|documenta[çc][ãa]o)\b|\b(guidance|guidelines?|documentation|docs)\b[\s\S]{0,40}\b(for|para)\s+(agents?|ai|llms?|agentes)\b/i;
+const EXTRACT_ASKED = /\bextract\w*|\bwith a model\b|\bmodel test\b|\bteste?\b[\s\S]{0,20}\bmodelo\b/i;
+const RULES = [
+  ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
+  ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
+  ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
+  ['guidelines-links', (t) => LINK.test(t)],
+  // A token renamed in Figma: one change renames it everywhere, the old name kept pointing at the new one.
+  ['refresh-figma', (t) => /\b(renam\w*|renome\w*)\b/i.test(t) && /\btokens?\b|variab\w*|vari[aá]ve(l|is)|--[\w-]+/i.test(t), 'rename'],
+  ['prototype', (t) => PROTOTYPE.test(t) && !FIGMA_GAPS.test(t) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
+  // Building from Figma (a project that has only Figma, or a component Figma has and the code does not yet):
+  // the engine lists what to build and checks each piece; the agent writes it with the names and values it prints.
+  ['build-from-figma', (t, s) => (TO_CODE.test(t) || BUILD_VERB.test(t) && (/\bfrom (the )?(figma|design)\b|\bdo figma\b|design system|sistema de design|\btokens?\b|\b(components?|componentes?)\b|\binto code\b|em c[oó]digo/i.test(t) || (s.build && s.named.length > 0))) && !/\b(in|no|na)\s+figma(?![-\w/.])/i.test(t)],
+  // Figma brought in line with what the code already states (a component's role): the engine lists the edits and
+  // writes the script; it runs once the person says yes. A value to change in Figma stays the person's (next rule).
+  ['figma-edits', (t) => FIGMA_GAPS.test(t) || FIGMA_EDITS.test(t) && !/\b\d+(\.\d+)?\s*(px|rem|%|pt)?\b|#[0-9a-f]{3,8}\b/i.test(t)],
+  ['fix-a-difference', (t) => /\b(change|set|make|update|muda|mudar|altera|alterar|p[oõ]e|coloca)\w*\b[\s\S]{0,60}\b(in|no|na)\s+figma(?![-\w/.])|\bfigma\b[\s\S]{0,30}\b(to|para)\s+\d/i.test(t), 'figma'],
+  ['refresh-figma', (t) => /maxSnapshotAgeDays|go(es)? green|fica(r)? verde|raise the (age|limit)/i.test(t), 'forbidden-green'],
+  // Before accept-debt: "que valores aceita o size" asks what a prop accepts, it accepts no debt.
+  ['ask-the-system', (t) => QUESTION.test(t) && /\b(props?|propriedades?|values?|valores?|tokens?|variables?|vari[aá]ve(l|is)|names?|nomes?)\b/i.test(t) && !/debt|d[ií]vida|baseline/i.test(t)],
+  ['accept-debt', (t) => KEEP_SAYS.test(t) && !/debt|d[ií]vida|baseline/i.test(t), 'keep'],
+  ['accept-debt', (t) => /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit/i.test(t)],
+  ['fix-a-difference', (t) => /\b(fix|correct|repair|corrig|conserta|repara|resolve)\w*/i.test(t) && !QUESTION.test(t)],
+  // New UI to build ("add a Saved confirmation next to the Save button"): the names come from the system, never from
+  // memory, and a value the system does not have is said, not invented. Not a note, not Figma, not debt.
+  ['ask-the-system', (t) => /\b(add|create|build|make|put|insert|show|acrescent\w*|adicion\w*|cria\w*|constr[oó]i\w*|p[oõ]e|coloca\w*|mostra\w*)\b/i.test(t) && /\b(confirmation|message|badge|banner|toast|button|link|label|page|screen|section|row|card|list|menu|modal|dialog|form|field|header|footer|empty state|tooltip|confirma[çc][ãa]o|mensagem|p[aá]gina|ecr[ãa]|sec[çc][ãa]o|linha|bot[ãa]o|cart[ãa]o|lista|formul[aá]rio|campo|estado vazio)s?\b/i.test(t) && !/figma|\bnotes?\b|\bnotas?\b|baseline|debt|d[ií]vida|config/i.test(t) && !QUESTION.test(t), 'build-ui'],
+  // Only a part of the run: the accessibility check, the Figma checks, or some gates (--only). Before the notes
+  // recipe: "check the accessibility of the button" asks for the check, "how do I note its role" for the recipe.
+  ['audit-component', (t) => onlyPart(t) != null, 'only'],
+  ['a11y-notes', (t) => /\bnotes?\b|\bnotas?\b|annotat|anota|toggle|\brole\b|\baria\b|accessib|acessib|alt text|screen reader|leitor de ecr/i.test(t)],
+  ['visual-diff', (t) => /\bimages?\b|imagem|imagens|visual|screenshot|pixel/i.test(t)],
+  ['burndown', (t) => /fix first|first to fix|what first|primeiro|prioridad|priorit|work .{0,20}down|next up/i.test(t)],
+  ['states-and-variants', (t) => /hover|disabled|desativad|desabilitad|\bstates?\b|estado|variant|combina|pressed|focus|selected/i.test(t)],
+  ['refresh-figma', (t) => /refresh|atualiz|snapshot|stale|desatualiz|design (has )?changed|mudou|changed in figma/i.test(t)],
+  ['ci-and-hooks', (t) => /\bci\b|webhook|git hook|pipeline|pre-?commit|pre-?push|\bhooks?\b/i.test(t)],
+  ['first-setup', (t) => /\bset ?up\b|configur|install/i.test(t)],
+];
+
+// Sentences the agent says as written, so what it can and cannot do is never its own wording.
+export const SAY = {
+  figma: 'I can\'t change this in Figma: the skill writes to Figma only what the code already states (a component\'s role), and only once you approve it. A person makes this change in the Figma editor; the audit below shows the Figma value and the code value.',
+  noVariable: (name, list) => `Figma paints ${name} (${list.join('; ')}) with colours that have no variable: the code writes them as Figma has them, and the design system has no token for them yet.`,
+  noRefresh: (date) => `I couldn't refresh the Figma snapshots here: there is no Figma tool in this session. The audit below uses the committed snapshots${date ? ` (captured ${date})` : ''}, so a change made in Figma after that is not in it. To refresh them, connect the Figma MCP server to Claude Code, or set FIGMA_TOKEN in the project's .env file; never paste a token in the chat.`,
+};
+
+// route(text, { hasConfig, components, cmd, snapshotDate }) → { recipe, question, run: [commands], notes: [lines], say: [lines], sayIf }
+// A design system the request names that is not this folder's ("the style guide for Northwind DS" where another system is
+// set up): its name, or null. A name is the word before DS or design system (or after "design system of/for"), never
+// a word such as the, our or whole; it is this folder's system when its config, package or folder name holds it.
+const NAMED_DS = /\b([A-Za-z][\w-]*)[\s-]+(?:DS(?![\w.-])|[Dd]esign[ -]?[Ss]ystem\b)|\b(?:DS|[Dd]esign[ -]?[Ss]ystem)\s+(?:of|for|called|named|do|da|de)\s+([A-Za-z][\w-]*)/g;   // DS as a word of its own, never ds-config
+const NOT_A_NAME = /^(?:the|our|this|that|my|your|a|an|new|whole|entire|same|its|their|current|existing|full|living|another|other|o|os|as|nosso|nossa|este|esta|esse|essa|meu|minha|seu|sua|do|da|de|um|uma|outro|outra|check|audit|run|build|test|fix|update|show|scan|review|open|create|set|setup|verify|analy[sz]e|compare|refresh|document|prototype|verifica|corrige|mostra|cria|figma|code|c[oó]digo|react|vue|angular|svelte|html|css|web|ui|mobile|ios|android|team|company|equipa|empresa)$/i;   // a tool or a platform names no system
+const squashName = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+export function otherSystem(text, names = []) {
+  const here = names.filter(Boolean).map(squashName).filter((h) => h.length > 1);
+  for (const m of String(text ?? '').matchAll(NAMED_DS)) {
+    const n = m[1] ?? m[2];
+    if (!n || NOT_A_NAME.test(n)) continue;
+    const k = squashName(n);
+    if (k.length < 2 || here.some((h) => h.includes(k))) continue;
+    return n;
+  }
+  return null;
+}
+
+export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null, build = false, pages = [], rawColours = {}, names = [], cloud = false } = {}) {
+  // Another system than the one set up here: where its code is and its Figma file are asked for at once, in one message,
+  // and the request runs there (--project); this folder's system is never run in its place.
+  const other = hasConfig ? otherSystem(text, names) : null;
+  if (other) {
+    const inner = routeOnly(text, { hasConfig: true, components: [], cmd, build: false, pages: [], cloud });
+    const { figma, project } = codeAndFigma(String(text ?? ''));
+    const at = project ? ` --project='${project}'${figma ? ` --figma-url='${figma}'` : ''}` : ` --project='<${other}'s folder or repository link>'`;
+    const ask = [!project && whereCode(`${other}'s`, cloud), !figma && `the link to ${other}'s Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
+    const notes = [`The request names ${other}, and this folder is set up for ${names[0] ?? 'another system'}: never run this folder's system in its place. Its code may be on the person's computer (a folder) or online (a link to its repository on GitHub or GitLab); a run there with no setup sets it up first.`, ...inner.notes];
+    const run = (inner.run ?? []).map((c) => c.startsWith(cmd) ? cmd + at + c.slice(cmd.length) : c);
+    return { recipe: inner.recipe, question: false, run: run.length ? run : [`${cmd}${at}`], ...(ask.length ? { ask: ask.join(', and ') } : {}), notes, say: [], sayIf: null };
+  }
+  const r = routeOnly(text, { hasConfig, components, cmd, build, pages, cloud });
+  const say = [];
+  let sayIf = null;
+  // Building a component Figma paints with a colour that has no variable: the person hears it, in the reply.
+  if (r.recipe === 'build-from-figma' || r.kind === 'build-ui') for (const n of namedComponents(text, components)) if (rawColours[n]) say.push(SAY.noVariable(n, rawColours[n]));
+  if (r.kind === 'figma') say.push(SAY.figma);
+  if (r.recipe === 'refresh-figma' && r.kind !== 'forbidden-green') {
+    r.notes.push('A refresh needs a Figma tool in this session (the Figma MCP use_figma tool) for the capture in the recipe below. With it, capture first, then run the command. Without it, do not offer a refresh and never edit a snapshot.');
+    sayIf = 'when there is no Figma tool in this session';
+    say.push(SAY.noRefresh(snapshotDate));
+  }
+  delete r.kind;
+  return { ...r, say, sayIf };
+}
+
+// A check that would run on the whole library while the request named a word several components share ("check the
+// accessibility of the button"): the person is asked which one first, and the command waits for the answer.
+const WHOLE_LIBRARY_CHECK = new Set(['full-audit', 'audit-component', 'fix-a-difference', 'states-and-variants', 'a11y-notes', 'visual-diff', 'accept-debt']);
+function routeOnly(text, opts) {
+  const r = routeRequest(text, opts);
+  const { cmd, components = [] } = opts;
+  if (!opts.hasConfig || !components.length || namedComponents(text, components).length) return r;
+  const loose = looseComponents(text, components);
+  if (!loose.ask || !WHOLE_LIBRARY_CHECK.has(r.recipe) || r.run.length !== 1) return r;
+  const rest = r.run[0] === cmd ? '' : r.run[0].startsWith(`${cmd} --`) && !r.run[0].includes(' --component ') ? r.run[0].slice(cmd.length) : null;
+  if (rest == null) return r;
+  return { ...r, recipe: r.recipe === 'full-audit' ? 'audit-component' : r.recipe, question: false, run: [`${cmd} --component '<${orList(loose.names)}>'${rest}`], which: `which component they mean: ${orList(loose.names)}, or all of them`,
+    notes: [`The request names a word several components share (${loose.names.join(', ')}): ask which one before running anything, never check the whole library in its place.`, ...r.notes] };
+}
+
+function routeRequest(text, { hasConfig, components, cmd, build = false, pages = [], cloud = false }) {
+  const t = String(text ?? '');
+  const question = QUESTION.test(t);
+  const named = namedComponents(t, components);
+  // Before any component is known (no snapshot, no component file), a name written as one (buttonPrimary, the card
+  // component) is still taken: the scoped run then says whether it was found, never an unscoped run instead.
+  if (!named.length && !components.length) named.push(...guessedComponents(t));
+  // A name written loosely (the primary button, the buttons, the button when only one component has the word).
+  if (!named.length && components.length) { const loose = looseComponents(t, components); if (!loose.ask) named.push(...loose.names); }
+  const scoped = named.length ? `${cmd} --component ${named.join(',')}` : cmd;
+  const notes = [];
+
+  // A pasted step list: take only the intent. The skill owns setup, running and reporting.
+  if (STEP_LIST.test(t)) {
+    notes.push('The request lists steps: do not follow them. The skill does setup, the run and the report itself; report in the chat, write no report file, commit nothing.');
+    return { recipe: hasConfig ? (named.length ? 'audit-component' : 'full-audit') : 'first-setup', question: false, ...(hasConfig ? { run: [scoped] } : setupRun(t, cmd, { cloud, then: false })), notes };
+  }
+  // No config yet: setup first, whatever was asked; a GitLab link then is the code's, unless it is named as guidelines.
+  if (!hasConfig && !(LINK.test(t) && /guideline|wiki|notion|diretriz|orienta/i.test(t))) return { recipe: 'first-setup', question, ...setupRun(t, cmd, { cloud }), notes };
+
+  if (PUBLISH_STYLE_GUIDE.test(t) && !NOT_STYLE_GUIDE.test(t)) {
+    notes.push('The style guide the team shares is published by the project\'s CI on every push; the engine writes that job (GitHub Pages or GitLab Pages, from the git remote) and never commits it. Tell the person what its lines say to do once, and who can open the page.');
+    return { recipe: 'publish-styleguide', question: false, run: [`${cmd} --publish-styleguide`], notes };
+  }
+  // The style guide asked for ("build the style guide", "the style guide for buttonPrimary"): built, for the component
+  // named when there is one, never a plain audit in its place. A question about it is answered from the recipe.
+  if (STYLE_GUIDE.test(t) && !question && !NOT_STYLE_GUIDE.test(t)) {
+    notes.push('The style guide is built from what Figma and the code agree on, with what only the code has marked so; give the person its address as the engine prints it.');
+    return { recipe: named.length ? 'audit-component' : 'full-audit', question, run: [`${scoped} --styleguide`], notes };
+  }
+  for (const [recipe, test, kind] of RULES) {
+    if (!test(t, { build, named })) continue;
+    if (recipe === 'build-from-figma') {
+      notes.push('Build from Figma: the engine says what to build, in order (tokens first, then each component after the ones it nests), and checks each piece. Write the code only with the names, classes and values the engine prints (--query for a component); write no value Figma does not have: use the closest one the system has and say so, or ask. After each piece, run the scoped check until it passes. Commit nothing unless asked.');
+      return { recipe, question, run: question ? [] : named.length ? [`${cmd} --query ${named.join(' ')}`] : [cmd], notes };
+    }
+    if (recipe === 'figma-edits') {
+      notes.push('The engine lists every Figma edit and writes the script for it; show the person the list and ask. Only when they say yes, run .design-system-engine-out/handback/figma-apply.js with the Figma MCP\'s use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.');
+      return { recipe, question: false, run: [`${cmd} --figma-edits`], notes };
+    }
+    if (recipe === 'guidelines-links' && !kind) return { recipe, question, run: [`${cmd} --guidelines ${links(t).join(' ')}`], notes };
+    if (recipe === 'prototype') {
+      notes.push('A prototype is made only of the design system\'s components with their own options, and the engine\'s layout pieces; never write HTML, CSS or a component for it, and never change the system\'s files. Write it as a composition in prototypes/<name>.json, run --prototype on it, and fix each ❌ line until it is drawn. A need nothing fits is a Missing box; tell the person every gap it lists, as written.');
+      // "What can a prototype use?" is answered by the catalog itself; only a how-to is answered from the recipe alone.
+      if (question && /^\s*(how|why|como|porqu)/i.test(t)) return { recipe, question, run: [], notes };
+      // "Are our prototype pages consistent?": every page against the others.
+      if (/\b(consisten\w*|coeren\w*|match(es|ing)?|same as|alinhad\w*|iguais)\b/i.test(t) && (question || /\b(check|compare|verif\w*|compar\w*)\b/i.test(t))) return { recipe, question, run: [`${cmd} --prototype --consistency`], notes };
+      return { recipe, question, run: [`${cmd} --prototype --catalog`], notes };
+    }
+    if (kind === 'figma') {
+      notes.push('Nothing is changed in Figma for this request, and never offer to: a value in Figma is the person\'s change in the Figma editor (the skill writes to Figma only what the code already states, through --figma-edits). Run the audit, then tell the person what to change in Figma.');
+      return { recipe, question, run: [scoped], notes, kind };
+    }
+    if (kind === 'figma-file') {
+      const { figma } = codeAndFigma(t);
+      notes.push('Only the Figma file the engine reads changes (a branch link names the branch, which stays as it is while the main file changes); everything else in ds-config.json stays. Then refresh the Figma data from that file with the recipe below, and run the audit.');
+      return { recipe, question: false, run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link>'}'`], notes, kind, ...(figma ? {} : { ask: 'the link to the Figma branch or file to read (in Figma, open the branch and copy its link)', askHow: 'the link in --figma-url' }) };
+    }
+    if (kind === 'guidance-rating') {
+      notes.push('Rates the guidance for what an agent can take from it: a class for the whole and for each component (ready, partial, thin) and what to add. --extract also asks a model questions answered from the guidance alone, which spends the person\'s model tokens: only when they ask for it. Each component\'s rating is also in its Documentation area of the style guide.');
+      return { recipe, question: false, run: [`${cmd} --guidance-rating${EXTRACT_ASKED.test(t) ? ' --extract' : ''}`], notes, kind };
+    }
+    if (kind === 'checked') {
+      // Each criterion they named, on each component they named: recorded as theirs, then the page rebuilt.
+      const crits = [...new Set(t.match(new RegExp(SC.source, 'g')) ?? [])];
+      notes.push('The person says they checked these by hand: record each one exactly as they named it, then rebuild the style guide. Never mark a check they did not name; when the component or the criterion is missing, ask which one.');
+      return { recipe, question: false, run: named.length && crits.length ? [...named.flatMap((n) => crits.map((c) => `${cmd} --checked ${n} ${c}`)), `${cmd} --styleguide`] : [], notes, kind };
+    }
+    if (kind === 'rename') {
+      notes.push('A token renamed in Figma: refresh the Figma data first when it was read before the rename, then run the sweep. It pairs each old name with its new one by value and writes one patch for the system and one for each product, the old name kept in the theme pointing at the new one. Show the person the change and apply it only when they ask; never rename by hand.');
+      return { recipe, question: false, run: [`${cmd} --rename-sweep`], notes, kind };
+    }
+    if (kind === 'forbidden-green') {
+      notes.push('Do not raise maxSnapshotAgeDays or edit ds-config.json to go green: that hides drift. Say so, and run the audit to show what really fails.');
+      return { recipe, question: false, run: [cmd], notes, kind };
+    }
+    if (kind === 'only') {
+      const part = onlyPart(t);
+      notes.push(`Only ${part === 'accessibility' ? 'the accessibility check' : part === 'parity' ? 'the checks against Figma' : 'the gates asked for'} runs: report that part, and say the rest was not checked in this run.`);
+      return { recipe: named.length ? 'audit-component' : 'full-audit', question: false, run: [`${scoped} --only ${/\s/.test(part) ? `'${part}'` : part}`], notes };
+    }
+    if (kind === 'keep') {
+      // A difference the team keeps on purpose: recorded with the person's own reason, never failing again while its
+      // values stay as they are. Never as debt (debt is what will be fixed).
+      const match = debtWords(t), why = KEEP_WHY.exec(t)?.[2]?.trim().replace(/"/g, "'");
+      notes.push('The team decided to keep this difference: record it with --keep and the person\'s own reason, never one you write. While its values stay as they are it never fails a run, and the differences list and the style guide show it as kept with the reason; when a value changes it is open again. Never --baseline for it: debt is what will be fixed.');
+      const run = `${scoped} --keep${match.length ? ` --match ${match.join(',')}` : ''} --reason ${why ? JSON.stringify(why) : '"<their reason>"'}`;
+      return { recipe, question: false, run: [run], notes, kind, ...(why ? {} : { ask: 'why the team keeps this difference, in their own words (it is recorded with it)', askHow: 'their reason in --reason' }) };
+    }
+    if (recipe === 'accept-debt') {
+      // The difference the person named (the radius, not the rest): only the findings that name it are accepted.
+      const match = debtWords(t);
+      return { recipe, question, run: question ? [] : [`${scoped} --baseline --findings${match.length ? ` --match ${match.join(',')}` : ''}`], notes };
+    }
+    if (recipe === 'fix-a-difference') {
+      notes.push('Fix exactly what was asked, in the code, at the file and line the audit names, and nothing else: list the other differences the audit shows and leave them as they are; then run the same audit again.');
+      return { recipe, question, run: [scoped], notes };
+    }
+    if (recipe === 'burndown') return { recipe, question, run: [cmd], notes };
+    if (recipe === 'ask-the-system') {
+      const terms = [...named, ...(t.match(/(?:--[a-z][\w-]*|\b[a-z][\w-]*(?:\/[\w-]+)+)/gi) ?? [])];
+      // A word several components share ("which props does the button take?"): the query prints each of them.
+      if (!terms.length && components.length) terms.push(...looseComponents(t, components, { anywhere: true }).names);
+      if (kind === 'build-ui') {
+        notes.push('The person asks for new UI: build it, in the file they name, with the design system\'s own components, classes and CSS variables, their names exactly as the query prints them. Write no colour, size or variable the system does not have: the edit check hands back anything that is not the system\'s. When the system has no value for what is asked (a green where it has none), use the closest one it has and say so, or ask; never invent one.');
+        const where = pagesNamed(t, pages, components);
+        if (where.length === 1) notes.push(`The file the request names is ${where[0]}: build it there.`);
+        else if (where.length) notes.push(`The request names one of these files: ${where.join(', ')}. Use the one that fits; ask only if none does.`);
+        return { recipe, question: false, run: terms.length ? [`${cmd} --query ${terms.join(' ')}`] : [], notes };
+      }
+      if (!terms.length) notes.push('Ask which component or token, then run the query with it.');
+      return { recipe, question, run: terms.length ? [`${cmd} --query ${terms.join(' ')}`] : [], notes };
+    }
+    if (recipe === 'first-setup') return { recipe, question, run: question ? [] : [`${cmd} --doctor`], notes };
+    if (recipe === 'ci-and-hooks') return { recipe, question: true, run: [], notes };
+    // A how-to question is answered from the recipe; a question about a named component's states needs the
+    // audit's facts (the rule, file and line), so it runs the scoped audit too; anything else runs the audit.
+    if (question && !(recipe === 'states-and-variants' && named.length)) return { recipe, question, run: [], notes };
+    return { recipe, question, run: [scoped], notes };
+  }
+  return named.length ? { recipe: 'audit-component', question, run: [scoped], notes } : { recipe: 'full-audit', question, run: [cmd], notes };
+}
+
+// Setup needs to know where the code is (never guessed) and asks for the Figma link, which is optional. Both are taken
+// from the request when it gives them: a token stylesheet or a folder or repository link for the code, a Figma link. What
+// the request leaves out is asked first, in one message.
+const CODE_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:github|gitlab|bitbucket)(?:\.[\w-]+)+\/[^\s'"]+|git@[^\s'"]+/i;
+const CODE_PATH = /(?:^|[\s'"(])((?:~|\.{1,2})\/[^\s'"(),]*|\/[^\s'"(),/]+\/[^\s'"(),]+)/;   // ~/x, ./x, ../x, or /a/b (one bare /word is a command)
+const THIS_FOLDER = /\b(?:(?:this|the current|current) (?:folder|directory|repo(?:sitory)?)|(?:esta|nesta) pasta|(?:este|neste) reposit[oó]rio)\b/i;
+// Where the code is and the Figma file, as the request gives them: a Figma link, a token stylesheet, a git link (GitHub,
+// GitLab, Bitbucket; github.com/x/y without its https), a folder (quoted whole, spaces included), or this folder.
+export function codeAndFigma(t) {
+  const figma = t.match(FIGMA_URL)?.[0]?.replace(/[.,;:)]+$/, '') ?? null;
+  const css = t.match(/[\w./-]+\.css\b/)?.[0] ?? null;
+  const rest = t.replace(FIGMA_URL, ' ');
+  const link = rest.match(CODE_LINK)?.[0]?.replace(/[.,;:)]+$/, '');
+  // A path in quotes is taken whole, spaces included ('/Users/me/My Projects/ds'); a bare one ends at a space.
+  const quoted = rest.match(/(['"`])((?:~|\.{1,2})?\/[^'"`\n]+?)\1/)?.[2];
+  const project = css ? null : (link && !/^(https?:\/\/|git@)/i.test(link) ? `https://${link}` : link) ?? quoted ?? rest.match(CODE_PATH)?.[1]?.replace(/[.,;:]+$/, '') ?? (THIS_FOLDER.test(t) ? '.' : null);
+  return { figma, css, project };
+}
+// The question about the code's place. In a cloud session a folder on the person's own computer cannot be read: the
+// repository link is asked for, and how to work on a local folder is said (a session on their computer).
+const whereCode = (whose, cloud) => cloud
+  ? `where ${whose} code is: the link to its repository (a private GitHub repository works once it is attached to this session, a private GitLab project once GITLAB_TOKEN is set). This session runs in the cloud and cannot read a folder on the person's computer: to work on a local folder, they run \`claude remote-control\` in it on their computer, or open it in the Claude Desktop app, and ask there`
+  : `where ${whose} code is (this folder, another folder on this computer, or a link to its repository on GitHub or GitLab)`;
+// A request for something else than setup ("check buttonPrimary's accessibility" where nothing is set up yet) goes to
+// setup with it (--then), and setup's NEXT line routes it again once the project is set up, so it is never dropped.
+const SETUP_ASKED = /\bset ?up\b|\bsetup\b|configur|install|\binit\b/i;
+const shellQuote = (x) => `'${String(x).replace(/'/g, `'\\''`)}'`;
+function setupRun(t, cmd, { cloud = false, then = true } = {}) {
+  const { figma, css, project } = codeAndFigma(t);
+  const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or repository link>'}'`;
+  const ask = [!css && !project && whereCode('the design system\'s', cloud),
+    !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
+  const request = String(t ?? '').trim().replace(/\s+/g, ' ');
+  const after = then && request && !SETUP_ASKED.test(request) ? ` --then=${shellQuote(request.slice(0, 400))}` : '';
+  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}${after}`],
+    ask: ask.length ? ask.join(', and ') : null };
+}
+
+// A request for only part of the run → the --only value, or null. Accessibility asked for alone (or with "only"),
+// the parity without accessibility, or some gates named with "only" (by name or number).
+// Whole words, accents included (\b does not see "só" or "ícones" as words).
+const word = (src) => new RegExp(`(?<![\\p{L}\\p{N}_])(?:${src})(?![\\p{L}\\p{N}_])`, 'iu');
+const ONLY_WORD = word('only|just|solely|só|apenas|somente|unicamente');   // "só" with its accent: "so" is English
+const A11Y_WORD = /\b(accessib\w*|acessib\w*|a11y)\b/i;
+const NOTES_WORD = /\bnotes?\b|\bnotas?\b|annotat|anota|toggle|\brole\b|\baria\b|alt text|screen reader|leitor de ecr/i;
+const HOW_TO = /^\s*(how|why|what does|what is|what's|como|porqu[eê]|porque|o que (é|e|significa))\b/i;
+const NO_A11Y = word('(?:no|without|sem|except|exceto|menos)\\s+(?:the\\s+|a\\s+)?(?:accessib\\w*|acessib\\w*|a11y)');
+const BOTH = word('parity|paridade|figma|tokens?|everything|tudo|whole|todo o|all gates|includ\\w*|inclu[ií]\\w*|as well|tamb[eé]m|also|too');
+const GATE_WORDS = [
+  [word('token values?|valores? d[oe]s? tokens?'), 'token values'],
+  [word('states?|estados?'), 'states'],
+  [word('props?|propriedades?'), 'props'],
+  [word('structure|estrutura'), 'structure'],
+  [word('icons?|[ií]cones?'), 'icons'],
+  [word('markup'), 'markup'],
+  [word('shadows?|sombras?'), 'shadows'],
+  [word('motion|movimento'), 'motion'],
+  [word('transitions?|transi[çc][õo]es?'), 'transitions'],
+  [word('(?:dark|light) modes?|modes?|modos?'), 'mode'],
+];
+export function onlyPart(text) {
+  const t = String(text ?? '');
+  if (NOTES_WORD.test(t) || HOW_TO.test(t)) return null;   // a note to write, or how something works: the recipe, not a run
+  if (NO_A11Y.test(t)) return 'parity';
+  if (ONLY_WORD.test(t) && /\b(parity|paridade)\b/i.test(t) && !A11Y_WORD.test(t)) return 'parity';
+  if (A11Y_WORD.test(t) && !NOTES_WORD.test(t) && !HOW_TO.test(t) && (ONLY_WORD.test(t) || !BOTH.test(t))) return 'accessibility';
+  if (!ONLY_WORD.test(t)) return null;
+  const nums = [...t.matchAll(/\bgates?\s*#?\s*(\d{1,2})\b/gi)].map((m) => m[1]);
+  const named = GATE_WORDS.filter(([re]) => re.test(t)).map(([, w]) => w);
+  return nums.length || named.length ? [...new Set([...nums, ...named])].join(',') : null;
+}
+
+// Words a person uses for a kind of difference → what the audit's lines say for it. Only these, so the engine,
+// not the agent, decides what one named difference covers.
+const DEBT_WORDS = [
+  [/\b(radius|radii|corner|rounded|raio|cantos?|arredondad\w*)\b/i, 'radi'],
+  [/\b(height|altura)\b/i, 'height'],
+  [/\b(width|largura)\b/i, 'width'],
+  [/\b(padding|preenchimento)\b/i, 'padding'],
+  [/\b(gap|spacing|espa[cç]amento)\b/i, 'gap'],
+  [/\b(colou?rs?|cor(es)?)\b/i, 'color'],
+  [/\b(props?|propriedades?|prop names?)\b/i, 'props match'],
+];
+export function debtWords(text) {
+  return DEBT_WORDS.filter(([re]) => re.test(String(text ?? ''))).map(([, w]) => w);
+}
+
+// What --route prints: the route, the commands, the notes, one NEXT line, and the recipe itself.
+export function routeText(r, recipeText, cmd = 'rms-design-system-engine', { maxRecipe = null } = {}) {
+  const lines = [`ROUTE: ${r.recipe}`];
+  for (const c of r.run) lines.push(`RUN: ${c}`);
+  for (const n of r.notes) lines.push(`NOTE: ${n}`);
+  for (const s of r.say ?? []) lines.push(`SAY${r.sayIf ? ` (${r.sayIf})` : ''}: ${s}`);
+  const say = r.say?.length ? ` Put the SAY line${r.say.length > 1 ? 's' : ''} in your final reply, word for word${r.sayIf ? `, ${r.sayIf}` : ''}.` : '';
+  lines.push(r.ask
+    ? `NEXT: before running anything, ask the person, in one message: ${r.ask}. Then run the command above with their answers (${r.askHow ?? '--project=. when it is this folder; --figma-url left out when there is no Figma file'}) and follow its NEXT line.${say}`
+    : r.which
+    ? `NEXT: before running anything, ask the person ${r.which}. Then run the command above with their answer in --component (comma separated when they say all of them), relay its SUMMARY as it is, and follow its NEXT line.${say}`
+    : r.run.length
+    ? r.recipe === 'ask-the-system'
+      ? `NEXT: run the command above and answer from what it prints, with the names exactly as written there.${say}`
+      : `NEXT: run ${r.run.length > 1 ? 'these commands' : 'the command'} above, relay its SUMMARY as it is, and follow its NEXT line.${say}`
+    : `NEXT: answer from the recipe below (and the reference it points to), quoting its exact words for settings and formats; run nothing.${say}`);
+  const recipe = (recipeText ?? '').trimEnd();
+  if (maxRecipe != null && recipe.length > maxRecipe) lines.push('', `--- recipe ${r.recipe}: read it with ${cmd} --recipe ${r.recipe} before you follow a step it has ---`);
+  else lines.push('', `--- recipe ${r.recipe} (${cmd} --recipe ${r.recipe}) ---`, recipe);
+  return lines.join('\n');
+}

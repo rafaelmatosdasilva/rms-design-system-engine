@@ -1,0 +1,129 @@
+// what Figma and the code last agreed on, fact by fact, so a difference says which side moved.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { makeFixture } from './helpers.mjs';
+import { loadAgreed, classify, recordAgreed, AGREED_FILE } from '../agreed.mjs';
+import { compareTokens } from '../capture-compare.mjs';
+
+const f = (key, figma, code, same = figma === code) => ({ key, figma, code, same });
+
+test('record: only agreements are written; a difference never overwrites; the same agreement keeps its date', () => {
+  const dir = makeFixture({});
+  recordAgreed(dir, [f('chip · gap', '8px', '8px'), f('chip · radius', '4px', '6px')], { at: 'T1', commit: 'abc' });
+  let a = loadAgreed(dir);
+  assert.deepEqual(a.facts, { 'chip · gap': { figma: '8px', code: '8px', at: 'T1', commit: 'abc' } });
+  const r = recordAgreed(dir, [f('chip · gap', '8px', '8px'), f('chip · gap2', '1', '1')], { at: 'T2', commit: 'def' });
+  a = loadAgreed(dir);
+  assert.equal(a.facts['chip · gap'].at, 'T1');                          // unchanged agreement keeps its date
+  assert.equal(r.recorded, 2);
+  assert.match(readFileSync(join(dir, AGREED_FILE), 'utf8'), /commit it/);
+});
+
+test('classify: which side moved since they last agreed', () => {
+  const agreed = { facts: { 'chip · gap': { figma: '8px', code: '8px' } } };
+  assert.equal(classify(f('chip · gap', '12px', '8px'), agreed), 'figma-moved');
+  assert.equal(classify(f('chip · gap', '8px', '6px'), agreed), 'code-moved');
+  assert.equal(classify(f('chip · gap', '12px', '6px'), agreed), 'both-moved');
+  assert.equal(classify(f('chip · radius', '4px', '6px'), agreed), 'unknown');   // never agreed
+});
+
+test('the comparison records every fact it compares, matching or not', () => {
+  const code = { tokens: { '--brand': { modes: { light: { value: '#ffffff', confidence: 'verified' } } }, '--ink': { modes: { light: { value: '#000000', confidence: 'verified' } } } } };
+  const r = compareTokens(code, { color: { light: { 'brand/color': '#ffffff', 'ink/color': '#111111' } } }, { figma: { namingConvention: { dropSegments: ['color'] } } }, { EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {} });
+  assert.deepEqual(r.facts, [
+    { key: 'token brand [light]', figma: '#ffffff', code: '#ffffff', same: true },
+    { key: 'token ink [light]', figma: '#111111', code: '#000000', same: false },
+  ]);
+});
+
+test('hand-back: a patch for the code, a list for Figma, nothing applied', async () => {
+  const { patchLine, codePatch, figmaChanges, wantOf } = await import('../handback.mjs');
+  assert.equal(patchLine('  gap: var(--gap-m);   /* note */', 'gap', 'var(--gap-xl)'), '  gap: var(--gap-xl);   /* note */');
+  assert.equal(patchLine('.x { padding: var(--p-s) var(--p-m); }', 'padding (left/right)', 'var(--p-l)'), '.x { padding: var(--p-s) var(--p-l); }');
+  assert.equal(patchLine('  padding: 8px;', 'padding (top/bottom)', '4px'), null);         // one value sets both axes: by hand
+  assert.equal(patchLine('  border-radius: 4px 0 0 4px;', 'radius', '8px'), null);          // several corners: by hand
+  assert.equal(wantOf({ expectedVar: '--gap-xl', figma: 'gap/xl' }), 'var(--gap-xl)');
+  const dir = makeFixture({ 'a.css': '.chip {\n  gap: var(--gap-m);\n  height: 24px;\n}\n' });
+  const p = codePatch(dir, [{ component: 'chip', field: 'gap', figma: 'gap/xl', expectedVar: '--gap-xl', at: 'a.css:2' }, { component: 'chip', field: 'background', figma: 'paints a background', at: 'a.css:1' }]);
+  assert.equal(p.diff, '--- a/a.css\n+++ b/a.css\n@@ -1,3 +1,3 @@\n .chip {\n-  gap: var(--gap-m);\n+  gap: var(--gap-xl);\n   height: 24px;\n');
+  assert.equal(p.manual.length, 1);
+  const md = figmaChanges([{ d: { component: 'badge', field: 'gap', figma: 'gap/s', figmaValue: '4px', code: '8px', codeVar: '--gap-m', at: 'a.css:9' }, moved: 'code-moved' }], () => 'https://figma/x');
+  assert.match(md, /## badge  \(\[open in Figma\]\(https:\/\/figma\/x\)\)/);
+  assert.match(md, /\*\*gap\*\*: set it to the token behind --gap-m \(now gap\/s, 4px\)\. Code: a\.css:9/);
+});
+
+test('hand-back: changed lines next to each other share one hunk, and the patch applies', async () => {
+  const { codePatch } = await import('../handback.mjs');
+  const { execFileSync } = await import('node:child_process');
+  const { writeFileSync } = await import('node:fs');
+  const dir = makeFixture({ 'a.css': '.bar {\n  padding: 0 var(--p-l);\n  gap: var(--gap-m);\n}\n' });
+  const p = codePatch(dir, [
+    { component: 'bar', field: 'padding (top/bottom)', figma: 'p/m', expectedVar: '--p-m', at: 'a.css:2' },
+    { component: 'bar', field: 'gap', figma: 'gap/xl', expectedVar: '--gap-xl', at: 'a.css:3' },
+  ]);
+  assert.equal((p.diff.match(/^@@/gm) ?? []).length, 1);
+  writeFileSync(join(dir, 'x.diff'), p.diff);
+  execFileSync('git', ['apply', 'x.diff'], { cwd: dir });
+  assert.equal(readFileSync(join(dir, 'a.css'), 'utf8'), '.bar {\n  padding: var(--p-m) var(--p-l);\n  gap: var(--gap-xl);\n}\n');
+});
+
+test('census: what the comparison actually reached, per component', async () => {
+  const { censusOf, censusLines } = await import('../capture-compare.mjs');
+  const r = {
+    facts: [{ key: 'chip · gap', component: 'chip', same: true }, { key: 'chip · radius', component: 'chip', same: false }, { key: 'token a [light]', same: true }],
+    notComparable: [{ component: 'chip', field: 'height', why: 'the code height follows its content' }, { component: 'tag', field: 'width', why: 'x' }, { component: 'chip', field: 'width', why: 'the code height follows its content' }],
+    notCaptured: ['toast'],
+  };
+  const c = censusOf(r, { facts: [{ key: 'chip · padding at Phone', component: 'chip', same: true }] });
+  assert.deepEqual([c.compared, c.notComparable, c.notCaptured], [3, 3, ['toast']]);
+  assert.deepEqual(c.components.chip, { compared: 3, differ: 1, notComparable: 2, reasons: { 'the code height follows its content': 2 } });
+  assert.deepEqual(censusLines(c), [
+    'census: 3 facts compared on 2 components · 3 not comparable · 1 component not captured (toast)',
+    'least checked: chip, 2 not comparable of 5 (mostly the code height follows its content, 2)',
+    'least checked: tag, 1 not comparable of 1 (mostly x, 1)',
+  ]);
+});
+
+test('history: bouncing facts are churn; who moved first, per area', async () => {
+  const { churn, leaders, leadersLine, areaOf } = await import('../agreed.mjs');
+  const dir = makeFixture({});
+  const run = (at, gapF, gapC, tokF, tokC) => recordAgreed(dir, [f('chip · gap', gapF, gapC), f('token ink [light]', tokF, tokC)], { at, commit: null });
+  run('2026-09-01T00:00:00Z', '8px', '8px', '#000', '#000');
+  run('2026-09-02T00:00:00Z', '12px', '8px', '#111', '#000');   // Figma moves first on both
+  run('2026-09-03T00:00:00Z', '12px', '12px', '#111', '#111');  // code follows
+  run('2026-09-04T00:00:00Z', '12px', '8px', '#111', '#111');   // code moves first on gap
+  run('2026-09-05T00:00:00Z', '8px', '8px', '#111', '#111');    // Figma follows back
+  run('2026-09-06T00:00:00Z', '12px', '8px', '#111', '#111');   // Figma moves first again
+  const r = run('2026-09-07T00:00:00Z', '12px', '12px', '#111', '#111');   // code follows
+  const a = loadAgreed(dir);
+  assert.deepEqual(a.seen['chip · gap'].moves.map((m) => [m.side, !!m.lead]), [['figma', true], ['code', false], ['code', true], ['figma', false], ['figma', true], ['code', false]]);
+  assert.deepEqual(churn(a).map((c) => [c.key, c.switches]), [['chip · gap', 3]]);
+  const by = leaders(r.agreed, { now: Date.parse('2026-09-10T00:00:00Z') });
+  assert.deepEqual(by, { spacing: { figma: 2, code: 1, both: 0, total: 3 }, tokens: { figma: 1, code: 0, both: 0, total: 1 } });
+  assert.equal(leadersLine(by), 'spacing Figma 67% · code 33% of 3; tokens Figma 100% of 1');
+  assert.deepEqual(leaders(a, { now: Date.parse('2026-12-01T00:00:00Z') }), {});   // older than 30 days
+  assert.deepEqual(['token x [dark]', 'chip · background (State=Hover)', 'chip · font size', 'chip · layer "Icon"', 'chip · radius'].map(areaOf), ['tokens', 'states and variants', 'typography', 'layers', 'size and shape']);
+});
+
+test('a value set only by a global reset: the fix goes on the component, never on the reset', async () => {
+  const { measuredLine, pageLevelRule } = await import('../capture-compare.mjs');
+  const { codePatch } = await import('../handback.mjs');
+  assert.equal(pageLevelRule('*'), true);
+  assert.equal(pageLevelRule('html, body'), true);
+  assert.equal(pageLevelRule('.panel'), false);
+  const d = { component: 'panel', field: 'padding (left/right)', figma: 'padding/l', figmaValue: '16px', code: '0px', expectedVar: '--padding-l', rule: '*', at: 'theme.css:1' };
+  assert.equal(measuredLine(d), "panel padding (left/right): Figma padding/l (16px), rendered 0px  (only the global reset * sets it · theme.css:1)  → give panel's own rule var(--padding-l) (not the reset)");
+  const dir = makeFixture({ 'theme.css': '* { padding-left: 0; }\n' });
+  const p = codePatch(dir, [{ ...d, field: 'padding left' }]);
+  assert.equal(p.patched, 0);
+  assert.equal(p.manual.length, 1);
+});
+
+test('a measured fraction of a pixel with no variable behind it is listed for a person, never patched', async () => {
+  const { wantOf } = await import('../handback.mjs');
+  assert.equal(wantOf({ figma: 78.79 }), null, 'a frame that hugs its content measures 78.79: not a design value');
+  assert.equal(wantOf({ figma: 32 }), '32px');
+  assert.equal(wantOf({ expectedVar: '--thickness', figma: 1.5 }), 'var(--thickness)', 'a variable is always the answer');
+});

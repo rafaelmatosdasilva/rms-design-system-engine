@@ -1,0 +1,156 @@
+// cdp.mjs - the one shared headless-Chrome launcher + DevTools Protocol client.
+//
+// Every browser-backed check (Gate [16] rendered parity, the a11y check, the code capture)
+// used to carry its own copy of: find Chrome, launch it headless, wait for the DevTools
+// socket, a tiny JSON-RPC `send`, open a page, and poll until it has loaded. Two copies had
+// already drifted (different load guards and timeouts). This module is that code once.
+//
+// No npm dependencies: Node >= 22's built-in WebSocket. Callers keep their own policy
+// (timeouts, what "loaded" means, skip vs fail when Chrome is missing); this module only
+// provides the mechanics, so adopting it changes no check's behaviour.
+
+import { existsSync, mkdtempSync, rmSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir, homedir } from 'node:os';
+import { spawn, spawnSync } from 'node:child_process';
+
+// Chromium builds Playwright installs, newest first. Only consulted when a caller opts in
+// (`playwright: true`), so a machine that merely has Playwright installed does not suddenly
+// start running browser gates that skipped before.
+export function playwrightChromium({ env = process.env, exists = existsSync, list = readdirSync } = {}) {
+  const roots = [env.PLAYWRIGHT_BROWSERS_PATH, join(homedir(), '.cache', 'ms-playwright'), join(homedir(), 'Library', 'Caches', 'ms-playwright')].filter(Boolean);
+  const bins = ['chrome-linux/chrome', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium', 'chrome-win/chrome.exe'];
+  for (const root of roots) {
+    let dirs = [];
+    try { dirs = list(root).filter((d) => /^chromium-\d+$/.test(d)).sort((a, b) => +b.split('-')[1] - +a.split('-')[1]); } catch { continue; }
+    for (const d of dirs) for (const b of bins) { const p = join(root, d, b); if (exists(p)) return p; }
+  }
+  return null;
+}
+
+// Find a Chrome/Chromium binary. Order: CHROME_PATH, the macOS app bundles, then binaries on
+// PATH, then (opt-in) a Playwright Chromium.
+export function findChrome({ env = process.env, exists = existsSync, which = whichBin, playwright = false } = {}) {
+  // DESIGN_SYSTEM_ENGINE_CHROME=none: no Chrome, wherever one is installed (a Mac's /Applications is found without the
+  // PATH, so hiding it from the PATH is not enough). A run meant to read the code without a browser sets it.
+  if (env.DESIGN_SYSTEM_ENGINE_CHROME === 'none') return null;
+  const absolute = [
+    env.CHROME_PATH,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  ].filter(Boolean);
+  for (const p of absolute) if (exists(p)) return p;
+  for (const name of ['google-chrome', 'google-chrome-stable', 'chromium-browser', 'chromium']) {
+    const p = which(name);
+    if (p) return p;
+  }
+  return playwright ? playwrightChromium({ env, exists }) : null;
+}
+
+function whichBin(name) {
+  const r = spawnSync('which', [name], { encoding: 'utf8' });
+  return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : null;
+}
+
+// Launch headless Chrome and resolve once its DevTools socket is listening.
+// Returns { chrome, userDataDir, wsUrl, kill }. Rejects if Chrome exits first.
+// Gives up after timeoutMs (default 30 s) so a Chrome that never starts cannot hang a run.
+export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engine-chrome-', timeoutMs = 30000 } = {}) {
+  const userDataDir = mkdtempSync(join(tmpdir(), tmpPrefix));
+  // --use-mock-keychain (macOS) and --password-store=basic (Linux): a throwaway profile never touches the person's
+  // keychain, so no "Keychain Not Found" or keyring prompt appears while the engine or its tests read pages.
+  const chrome = spawn(chromePath, [
+    '--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-sandbox',
+    '--disable-gpu', '--disable-extensions', '--use-mock-keychain', '--password-store=basic', `--user-data-dir=${userDataDir}`, 'about:blank',
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const kill = () => {
+    try { chrome.kill(); } catch { /* already dead */ }
+    try { rmSync(userDataDir, { recursive: true, force: true }); } catch { /* best effort */ }
+  };
+  try {
+    const wsUrl = await new Promise((resolve, reject) => {
+      let buf = '';
+      chrome.stderr.on('data', (d) => {
+        buf += d.toString();
+        const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
+        if (m) resolve(m[1]);
+      });
+      chrome.on('exit', () => reject(new Error(`Chrome exited before DevTools was ready:\n${buf.slice(-400)}`)));
+      chrome.on('error', (e) => reject(new Error(`Chrome could not start: ${e.message}`)));
+      const timer = setTimeout(() => reject(new Error(`Chrome did not start within ${timeoutMs / 1000}s`)), timeoutMs);
+      timer.unref?.();
+    });
+    return { chrome, userDataDir, wsUrl, kill };
+  } catch (e) { kill(); throw e; }
+}
+
+// Connect to a DevTools socket. Returns { send, on, ws, close }.
+// send(method, params, sessionId) resolves with the result or rejects with "<method>: <message>".
+// Every call gives up after timeoutMs (default 30 s), and a socket that closes rejects every call
+// still waiting, so a stuck page or a dead browser can never hang a run.
+// on(method, fn) subscribes to a protocol event; fn(params, sessionId). Returns an unsubscribe.
+export async function connectCDP(wsUrl, { timeoutMs = 30000 } = {}) {
+  const ws = new WebSocket(wsUrl);
+  await new Promise((res, rej) => {
+    const timer = setTimeout(() => rej(new Error('DevTools socket did not open within 10s')), 10000);
+    timer.unref?.();
+    ws.onopen = () => { clearTimeout(timer); res(); };
+    ws.onerror = (e) => { clearTimeout(timer); rej(e?.error ?? new Error('DevTools socket error')); };
+  });
+  let msgId = 0;
+  const pending = new Map();
+  const listeners = new Map();
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); return; }
+    if (m.method) for (const fn of listeners.get(m.method) ?? []) { try { fn(m.params, m.sessionId); } catch { /* listener error */ } }
+  };
+  const on = (method, fn) => {
+    if (!listeners.has(method)) listeners.set(method, new Set());
+    listeners.get(method).add(fn);
+    return () => listeners.get(method)?.delete(fn);
+  };
+  let closed = false;
+  ws.onclose = () => {
+    closed = true;
+    for (const [id, fn] of pending) { pending.delete(id); fn({ error: { message: 'the browser connection closed' } }); }
+  };
+  // A call on a closed socket fails at once: a send on it is silently dropped, so it would wait out its whole timeout.
+  const send = (method, params = {}, sessionId) => new Promise((res, rej) => {
+    if (closed) { rej(new Error(`${method}: the browser connection closed`)); return; }
+    const id = ++msgId;
+    const timer = setTimeout(() => { pending.delete(id); rej(new Error(`${method}: no answer within ${timeoutMs / 1000}s`)); }, timeoutMs);
+    timer.unref?.();
+    pending.set(id, (m) => { clearTimeout(timer); return m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result); });
+    try { ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) })); }
+    catch (e) { clearTimeout(timer); pending.delete(id); rej(new Error(`${method}: ${e.message}`)); }
+  });
+  const close = () => { try { ws.close(); } catch { /* already closed */ } };
+  return { send, on, ws, close };
+}
+
+// Open a page in a new target and attach a flat session with the Runtime domain enabled.
+export async function openPage(send, url) {
+  const { targetId } = await send('Target.createTarget', { url });
+  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+  await send('Runtime.enable', {}, sessionId);
+  return { targetId, sessionId };
+}
+
+// Poll `expression` in the page until it evaluates to true. Returns true when it did.
+// tolerateErrors: treat a failed evaluation (a page mid-navigation) as "not yet".
+export async function waitForTrue(send, sessionId, expression, { attempts = 100, intervalMs = 50, tolerateErrors = false } = {}) {
+  for (let i = 0; i < attempts; i++) {
+    const r = tolerateErrors
+      ? await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId).catch(() => ({ result: {} }))
+      : await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId);
+    if (r.result?.value === true) return true;
+    await new Promise((res) => setTimeout(res, intervalMs));
+  }
+  return false;
+}
+
+// The load guard for a file:// page. The target's initial about:blank already reports
+// readyState "complete", so readyState alone races the navigation.
+// A style guide page is loaded once it has drawn itself (it marks <html> sg-ready), not only once the file is read.
+export const FILE_PAGE_LOADED = 'location.protocol === "file:" && document.readyState === "complete" && (!document.body.classList.contains("sg-page") || document.documentElement.classList.contains("sg-ready"))';

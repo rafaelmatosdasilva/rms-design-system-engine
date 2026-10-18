@@ -1,0 +1,273 @@
+// The style guide is the system's own: its controls come from what the code realizes, its look from the system's
+// tokens and components, and the page is checked against the system it shows.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { modeAxes, realizedControls, chromeRoles, segmentedUi, tabsUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } from '../styleguide-data.mjs';
+import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
+import { differences, differencesMarkdown, plainDifference, plainAction } from '../run-diff.mjs';
+import { appDir } from '../code-roots.mjs';
+
+const defs = {
+  'Label Content': { type: 'TEXT', defaultValue: 'Label' },
+  'Show Label': { type: 'BOOLEAN', defaultValue: true },
+  'Show Icon': { type: 'BOOLEAN', defaultValue: true },
+  Type: { type: 'VARIANT', defaultValue: 'negative', variantOptions: ['negative', 'warning', 'positive', 'neutral'] },
+  Filled: { type: 'VARIANT', defaultValue: 'True', variantOptions: ['False', 'True'] },
+  'Icon Content': { type: 'INSTANCE_SWAP', defaultValue: '1:2' },
+  Size: { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] },
+};
+const css = '.badge{} .badge.high{} .badge.medium{} .badge.low{} .badge.none{} .badge.no-label .badge-label{display:none} .badge.empty{}';
+
+test('an HTML system: a Figma prop is a control when the code realizes it, through the contract, the config or a class', () => {
+  const r = realizedControls({ name: 'badge', defs, cls: 'badge', cssText: css,
+    propertyMap: { State: { negative: '.badge.high', warning: '.badge.medium', positive: '.badge.low', neutral: '.badge.none' }, 'Show Label': '.badge.no-label .badge-label', Filled: { True: '.badge', False: '.badge.empty' } },
+    realizations: { 'Label Content': '.badge-label', 'Show Icon': '.badge svg' } });
+  const by = Object.fromEntries(r.controls.map((c) => [c.label, c]));
+  assert.deepEqual(by.Type.options.map((o) => [o.label, o.add]), [['negative', ['high']], ['warning', ['medium']], ['positive', ['low']], ['neutral', ['none']]], 'the contract spells it State: found by its options');
+  assert.deepEqual(by['Show Label'].off, { add: ['no-label'], attrs: {} }, 'a no- modifier hides the part when false');
+  assert.equal(by['Show Icon'].part, 'svg');
+  assert.equal(by['Label Content'].part, '.badge-label');
+  assert.deepEqual(by.Filled, { label: 'Filled', prop: 'Filled', type: 'BOOLEAN', default: true, off: { add: ['empty'], attrs: {} } });
+  assert.equal(by['Icon Content'], undefined, 'an instance swap is not a control');
+  assert.deepEqual(r.unrealized, ['Size'], 'a prop nothing in the code realizes is counted, not shown');
+  const part = realizedControls({ name: 'chip', defs: { 'Show Icon': { type: 'BOOLEAN', defaultValue: true } }, cls: 'chip', cssText: '.chip{} .chip-icon{}', realizations: { 'Show Icon': '.chip-icon' } });
+  assert.deepEqual(part.controls[0].part, '.chip-icon', 'a realization names a part, never a class put on the component itself');
+  assert.equal(part.controls[0].on, undefined);
+});
+
+const tokens = {
+  colors: [
+    { group: 'semantic', items: [{ figma: 'semantic/surface/elevationHigh', var: '--surface-high' }, { figma: 'semantic/surface/elevationMedium', var: '--bg' }, { figma: 'semantic/surface/elevationLow', var: '--bg-low' }, { figma: 'semantic/content/primary', var: '--text' }, { figma: 'semantic/content/secondary', var: '--text-2' }, { figma: 'semantic/warning', var: '--warn' }] },
+    { group: 'badge', items: [{ figma: 'badge/text/default', var: '--badge-text' }] },
+    { group: 'dividerLine', items: [{ figma: 'dividerLine/border', var: '--border' }] },
+  ],
+  typography: [{ scale: 'm', size: { var: '--m-size', value: '11px' }, weight: { var: '--m-weight' }, lh: { var: '--m-lh' } }, { scale: 's', size: { var: '--s-size', value: '10px' } }, { scale: 'l', size: { var: '--l-size', value: '13px' }, weight: { var: '--l-weight' } }],
+  radii: [{ figma: 'radii/card', var: '--radius-card', value: '12px' }, { figma: 'radii/checkbox', var: '--radius-s', value: '4px' }, { figma: 'radii/pill', var: '--radius-full', value: '24px' }],
+  spacing: [{ figma: 'gap/s', var: '--gap-s', value: '4px' }, { figma: 'gap/m', var: '--gap-m', value: '8px' }, { figma: 'padding/l', var: '--padding-l', value: '16px' }],
+};
+
+test('the page\'s look is the system\'s: its page colours, a shared token before a component\'s, its text styles, radii and spaces', () => {
+  const { roles, missing, css: out } = chromeRoles({ tokens, componentNames: ['badge'], themeCss: ':root { --font-family: Inter; } body { color: var(--text); background: var(--bg); }', icons: { size: 16 } });
+  assert.equal(roles.bg, 'var(--bg)', 'the background the system\'s own page uses');
+  assert.equal(roles.text, 'var(--text)');
+  assert.equal(roles.surface, 'var(--surface-high)');
+  assert.equal(roles['bg-2'], 'var(--bg-low)');
+  assert.equal(roles['text-2'], 'var(--text-2)');
+  assert.equal(roles.border, 'var(--border)', 'a shared group before a component\'s');
+  assert.notEqual(roles.muted, 'var(--badge-text)', 'a component\'s own token is never the page\'s look');
+  assert.equal(roles.font, undefined, 'no font of the page\'s own: its text inherits the system\'s page font and fallbacks');
+  // The page's text sizes are the template's own (12, 13, 14 and 15px), whatever the system's scale.
+  assert.deepEqual([roles.xs, roles.s, roles.m, roles.l, roles.h1], [undefined, undefined, undefined, undefined, undefined]);
+  const far = chromeRoles({ tokens: { typography: [{ scale: 'xxxs', size: { var: '--t8', value: '8px' } }, { scale: 'xl', size: { var: '--t24', value: '24px' } }] } }).roles;
+  assert.deepEqual([far.xs, far.s, far.m, far.l], [undefined, undefined, undefined, undefined], 'none near: the template\'s default sizes stay');
+  assert.deepEqual([chromeRoles({}).roles.s, chromeRoles({ tokens: { typography: [] } }).roles.m], [undefined, undefined], 'nothing read yet: the defaults');
+  assert.deepEqual([roles['radius-s'], roles.radius, roles['radius-l'], roles['radius-pill']], [undefined, undefined, undefined, undefined], 'corners are the template\'s own');
+  assert.equal(roles['space-s'], 'var(--gap-m)');
+  assert.equal(roles.icon, '16px', 'the size the system\'s icons are drawn at');
+  assert.deepEqual(missing, []);
+  assert.match(out, /^:root, \[data-color\], \[data-size\] \{ --sg-bg: var\(--bg\);/, 'declared again where a preview has its own mode');
+  assert.deepEqual(chromeRoles({ tokens, override: { accent: '--brand' } }).roles.accent, 'var(--brand)', 'styleguide.chrome names one by hand');
+});
+
+test('a page colour set by hand (styleguide.chrome) carries to the roles that follow it, unless they are set too', () => {
+  const page = 'body { color: var(--text); background: var(--bg); }';
+  const { roles, from } = chromeRoles({ tokens, themeCss: page, override: { bg: '--surface-high', 'text-2': '--warn' } });
+  assert.equal(roles.bg, 'var(--surface-high)');
+  assert.equal(roles.stage, 'var(--surface-high)', 'the stage behind each component is the new background');
+  assert.equal(from.stage, 'styleguide.chrome');
+  assert.equal(roles['bg-2'], 'var(--bg-low)', 'a role with a token of its own keeps it');
+  assert.equal(roles.muted, 'var(--warn)', 'the muted text follows the second text set by hand');
+  assert.match(chromeRoles({ tokens, themeCss: page, override: { bg: '--surface-high' } }).css, /--sg-stage: var\(--surface-high\);/);
+  const own = chromeRoles({ tokens, themeCss: page, override: { bg: '--surface-high', stage: '--bg-low' } }).roles;
+  assert.equal(own.stage, 'var(--bg-low)', 'a stage set by hand stays');
+  assert.equal(chromeRoles({ tokens, themeCss: page, override: { text: '--text-2' } }).roles.accent, 'var(--text-2)', 'the accent, with no token, follows the text');
+  assert.equal(chromeRoles({ tokens, themeCss: page }).roles.stage, 'var(--bg)', 'with nothing set, the stage is the page\'s own background');
+});
+
+test('the page\'s switches and text fields are the system\'s own components, read from their markup', () => {
+  const seg = segmentedUi([{ name: 'card', markup: '<div class="card"><button>A</button></div>' },
+    { name: 'segmentedControl', markup: '<div class="segmented-control full-width"><span class="seg-pill"></span><button class="selected"><span class="tab-label">A</span></button><button><span class="tab-label">B</span></button></div>' }]);
+  assert.deepEqual(seg, { from: 'segmentedControl', open: '<div class="segmented-control">', close: '</div>', item: { tag: 'button', classes: [], label: 'tab-label' }, selected: { add: ['selected'], attrs: {} }, standIn: null });
+  assert.equal(segmentedUi([{ name: 'x', markup: '<div><button>A</button><button>B</button></div>' }]), null, 'no selected state, not a segmented control');
+  // The switch between a component's areas: the system's own tabs, never its segmented control; none, the page's own.
+  const tabs = tabsUi([{ name: 'segmentedControl', markup: '<div class="seg"><button class="selected">A</button><button>B</button></div>' },
+    { name: 'tabBar', markup: '<nav class="tabs"><a class="tab is-active">A</a><a class="tab">B</a></nav>' }]);
+  assert.deepEqual(tabs, { from: 'tabBar', open: '<nav class="tabs">', close: '</nav>', item: { tag: 'a', classes: ['tab'], label: null }, selected: { add: ['is-active'], attrs: {} }, standIn: null });
+  assert.equal(tabsUi([{ name: 'segmentedControl', markup: '<div class="seg"><button class="selected">A</button><button>B</button></div>' }]), null, 'no tabs: the page draws its own');
+  const field = fieldUi([{ name: 'input', markups: ['<div class="fieldWrap product-x"><input type="number" class="fieldInput"></div>', '<div class="fieldWrap"><svg></svg><input type="text" class="fieldInput extra" value="v"></div>'] }], '.fieldWrap{} .fieldInput{}');
+  assert.deepEqual(field, { from: 'input', markup: '<div class="fieldWrap"><input type="text" aria-label="Value" class="fieldInput"></div>' });
+});
+
+test('the style guide check: only the system\'s tokens on the page; a role with no token is a warning; the page\'s own accessibility', () => {
+  const page = (css, body = '<main><h1>System</h1></main>') => `<html lang="en"><head><style data-system>.x{color:#f00}</style><style>${css}</style></head><body>${body}</body></html>`;
+  const clean = page(':root { --sg-bg: Canvas; } :root { --sg-bg: var(--bg); } .a { color: var(--sg-text); padding: var(--sg-space-s) 1px; font-size: var(--sg-s); }');
+  assert.deepEqual(failures(checkStyleguidePage(clean)), [], 'the system\'s own CSS (data-system) is not the page\'s');
+  const bad = failures(checkStyleguidePage(page('.a { color: #333; font-size: 12px; font-family: Arial; border-radius: 6px; padding: 12px; }')));
+  assert.deepEqual(bad.map((f) => f.property), ['color', 'font-size', 'font-family', 'border-radius', 'padding']);
+  assert.ok(missingRoles(clean).includes('text'), 'a role never filled is left to the browser');
+  assert.ok(checkStyleguidePage(clean).some((f) => f.warning && f.property === '--sg-text'));
+  assert.ok(failures(checkStyleguidePage(page('', '<main><img src="a.png"></main>'))).some((f) => f.property === 'accessibility'));
+  // An icon of the system's own sheet that paints itself white is the system's to fix: listed, never the page failing.
+  const white = '<svg id="ds-icon-sheet" width="0" height="0" aria-hidden="true"><symbol id="m-spin" viewBox="0 0 24 24"><path fill="#FFFFFF" d="M0 0h24v24H0z"/></symbol></svg>';
+  const sheetOnly = checkStyleguidePage(page('', `<main><h1>System</h1>${white}</main>`), { missing: [] });
+  const markupOnly = checkStyleguidePage(page('', `<main><h1>System</h1>${white.replace('id="ds-icon-sheet" ', '')}</main>`), { missing: [] });
+  assert.ok(failures(markupOnly).some((f) => f.property === 'accessibility'), 'the same icon drawn by the page fails');
+  assert.deepEqual(failures(sheetOnly), [], 'the system\'s icon is not the page failing');
+  assert.ok(sheetOnly.some((f) => f.warning && f.selector === 'the system\'s icons'), 'and it is still listed');
+});
+
+test('one list of differences: grouped by component, marked new, the data\'s freshness, accessibility and pointer lines left out', () => {
+  const now = ['Structure :: badge height: Figma 20, rendered 24', 'Token values :: ❌ [sizing] padding/s → --padding-s: 8px vs 10px', 'Data is up to date :: ⚠️ a snapshot is old', 'Accessibility :: no label', 'Token contrast :: a on b 2:1', 'Structure :: gate fails', 'Figma file hygiene :: badge has no description'];
+  const d = differences(now, ['badge'], ['Structure :: badge height: Figma 20, rendered 24']);
+  assert.equal(d.total, 3);
+  assert.equal(d.fresh, 2);
+  assert.deepEqual(d.groups.map((g) => [g.component, g.items.length]), [['badge', 2], [null, 1]]);
+  assert.equal(d.groups[0].items.find((x) => x.check === 'Figma file hygiene').side, 'figma');
+  const pointers = ['Structure :: 🔗 badge in Figma: https://example.test', 'Structure :: ↳ last changed 2026-07-31 by someone', 'Every mode is covered: :: ⏭  SKIPPED 17', 'Structure :: least checked: badge, 3 not comparable of 8', 'Docs tell the truth :: surface not found, skipped: a.html', 'Structure :: NO-SHRINK 1 component - advisory, not a difference from Figma', 'Exemption debt :: knownStateExemptions: 18'];
+  assert.equal(differences([...now, ...pointers], ['badge']).total, 3, 'a line that only points at a difference is not one');
+  const moved = differences(['Structure :: badge gap: Figma 4, rendered 8 (.badge · theme.css:1230)'], ['badge'], ['Structure :: badge gap: Figma 4, rendered 8 (.badge · theme.css:1216)']);
+  assert.equal(moved.fresh, 0, 'a difference whose line only moved is not new');
+  const md = differencesMarkdown(d, { handback: { code: 'out/handback/code-changes.diff' } });
+  assert.match(md, /^# Differences between Figma and the code\n\n3 open, 2 new since the last run/);
+  assert.match(md, /## badge \(2\)/);
+  assert.match(differencesMarkdown({ ...d, notChecked: [{ check: 'Figma frame unchanged', why: 'FIGMA_TOKEN not set' }] }), /Not checked this run, so a difference there would not show: Figma frame unchanged \(FIGMA_TOKEN not set\)\./, 'a check that did not run is named, never mistaken for a pass');
+  assert.match(md, /## The whole system \(1\)\n\n- \*\*new\*\* Token values: \[sizing\] padding\/s/);
+});
+
+test('an app lives where pluginDirs says, else apps/<app>', () => {
+  assert.equal(appDir({ pluginDirs: { gallery: '../gallery-app/' } }, 'gallery'), '../gallery-app');
+  assert.equal(appDir({}, 'gallery'), 'apps/gallery');
+});
+
+test('a preview never uses an instance that is hidden at rest', () => {
+  const css = '.chip { gap: 0 } .zoom-reset { display: none; } .zoom-reset.on { display: flex; }';
+  assert.equal(hiddenAtRest('<button class="chip zoom-reset">x</button>', 'chip', css), true, 'an extra class whose rule is display: none');
+  assert.equal(hiddenAtRest('<div class="chip hidden">x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<div class="chip" hidden>x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<div class="chip" style="display:none;">x</div>', 'chip'), true);
+  assert.equal(hiddenAtRest('<button class="chip">x</button>', 'chip', css), false);
+});
+
+test('a component switched to Light on a Dark page inherits the Light text colour, not the page\'s', () => {
+  const css = modeRootCSS('  body {\n    overflow-x: hidden;\n    color: var(--text);\n    font-size: var(--m-size);\n    background: var(--bg);\n  }');
+  assert.match(css, /\[data-color\], \[data-size\] \{ color: var\(--text\); font-size: var\(--m-size\); \}/, 'the page\'s inherited text styles, resolved again on the preview');
+  assert.equal(modeRootCSS('.x { color: red; }'), '', 'no page rule, nothing to repeat');
+});
+
+test('a preview uses the instance that holds the parts its props show and hide', () => {
+  assert.equal(holdsPart('<button class="b"><span>View</span><svg></svg></button>', 'svg'), true);
+  assert.equal(holdsPart('<button class="b">label</button>', 'span'), false, 'a bare text label is no part');
+  assert.equal(holdsPart('<button class="b"><span class="x-label">a</span></button>', '[class*="label"], span'), true);
+  assert.equal(holdsPart('<svg class="b"></svg>', 'svg'), false, 'the component itself is not one of its parts');
+});
+
+test('a component is dated from its own CSS rules and its contract and config entries', () => {
+  const css = '.chip { gap: 0; }\n.chips { gap: 1px; }\n@media (max-width: 480px) {\n  .chip.on {\n    gap: 2px;\n  }\n}\n/* .chip */ .other { x: 1 }\n#tt { y: 1 }';
+  assert.deepEqual(ruleLines(css, 'chip'), [1, 4, 5, 6], 'its rules, nested ones too, never a longer class or a comment');
+  assert.deepEqual(ruleLines(css, '#tt'), [9], 'an id selector');
+  const contract = 'export const C = {\n  chip: {\n    props: { a: 1 },\n  },\n  chipGroup: { },\n};';
+  assert.deepEqual(entryLines(contract, 'chip'), [2, 3, 4]);
+  assert.deepEqual(entryLines('{ "input": { "chip": { "x": 1 } } }', 'chip'), [], 'only an entry that starts its own line');
+  assert.deepEqual(entryLines('{\n  "chip": {\n    "x": 1\n  }\n}', 'chip'), [2, 3, 4]);
+});
+
+test('a show prop that hides its part with a no- class still names the part, so the page can draw one no instance has', () => {
+  const r = realizedControls({ name: 'badge', defs: { 'Show Icon': { type: 'BOOLEAN', defaultValue: true } }, cls: 'badge', cssText: '.badge{} .badge.no-icon svg{display:none}', realizations: { 'Show Icon': '.badge.no-icon svg' } });
+  assert.deepEqual(r.controls[0].off, { add: ['no-icon'], attrs: {} });
+  assert.equal(r.controls[0].part, 'svg');
+});
+
+test('the page\'s buttons and cards are the system\'s own: the quietest text button, never an icon-only one, and its card', () => {
+  const css = '.bPrimary{} .bTertiary{} .bQuaternary{} .card{} .label{}';
+  const comps = [
+    { name: 'bPrimary', role: 'button', markup: '<button class="bPrimary"><span>Scan</span></button>' },
+    { name: 'bQuaternary', role: 'button', markup: '<button class="bQuaternary"><svg></svg></button>' },
+    { name: 'bTertiary', role: 'button', markup: '<button class="bTertiary" disabled><span class="frame-name label"></span><svg></svg></button>' },
+    { name: 'card', markup: '<div class="card"><span>x</span></div>' },
+  ];
+  assert.deepEqual(buttonUi(comps, css), { from: 'bTertiary', cls: 'bTertiary', label: { tag: 'span', cls: 'label' } }, 'a label a product fills at run time still counts; only the system\'s classes');
+  assert.equal(buttonUi(comps, css, 'bPrimary').from, 'bPrimary', 'the config can name one');
+  assert.equal(buttonUi([comps[1]], css), null, 'an icon-only button never holds a label');
+  assert.deepEqual(cardUi(comps, css), { from: 'card', cls: 'card' });
+  const seg = segmentedUi([{ name: 'seg', markup: '<div class="seg"><span class="pill" aria-hidden="true"></span><button class="selected">A</button><button>B</button></div>' }]);
+  assert.equal(seg.open, '<div class="seg"><span class="pill" aria-hidden="true"></span>', 'its decoration, for the system\'s script to place');
+});
+
+test('how a component moves, from the system\'s CSS: its entry, its exit, the overlay it opens in; a spinner needs no button', () => {
+  const css = `.toast { animation: toast-in .2s; } .toast.toast-out { animation: toast-out .2s forwards; }
+    .modal { display: none; } .modal.is-open { display: flex; } .modal-overlay { background: var(--o); }
+    .modal.is-closing .modal-overlay { animation: bg-out .2s; } .modal-card { animation: in .2s both; } .modal.is-closing .modal-card { animation: out .2s both; }
+    .spin { animation: spin 1s linear infinite; }`;
+  assert.deepEqual(motionUi('toast', css), { entry: true, exits: ['toast-out'], overlay: null });
+  assert.deepEqual(motionUi('modal-card', css), { entry: true, exits: [], overlay: { container: 'modal', open: 'is-open', closing: 'is-closing', layers: ['modal-overlay'] } });
+  assert.equal(motionUi('spin', css), null);
+  assert.equal(motionUi('#tt', css), null);
+});
+
+test('the style guide check: a button or link the page draws itself fails; a font of its own fails; inherit passes', () => {
+  const page = (css, body) => `<html lang="en"><head><style>${css}</style></head><body><main><h1>S</h1>${body}</main></body></html>`;
+  const body = '<a class="chip-link" href="#">A</a><script>var b = document.createElement(\'button\'); b.className = \'mine\';</script>';
+  assert.deepEqual([...controlClasses(body)].sort(), ['chip-link', 'mine']);
+  const bad = failures(checkStyleguidePage(page('.chip-link { background: var(--sg-bg-2); border-radius: var(--sg-radius); } .mine { border: var(--sg-line); } .sg-nav a.active { box-shadow: inset 2px 0 0 var(--sg-text); background: var(--sg-bg); } .sg-nav a { background: var(--sg-bg); } .x { font-family: var(--font); } .y { font-family: inherit; }', body)));
+  assert.deepEqual(bad.map((f) => `${f.selector} ${f.property}`), ['.chip-link background', '.chip-link border-radius', '.mine border', '.x font-family'], 'the menu\'s own links (sg-nav) are the page\'s chrome, not buttons; every other link with a background is');
+  // The page's default controls (for one the system lacks) are drawn with its roles only; a value of their own fails.
+  const defaults = failures(checkStyleguidePage(page(':where(.sg-card) { border: var(--sg-line); border-radius: var(--sg-radius); } .sg-tip-btn { border-radius: 50%; background: var(--sg-bg); } .sg-seg-default > button { border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); box-shadow: 0 0 0 var(--sg-line-width, 1px) var(--sg-border); } .sg-tip-btn { background: #fff; }', '<a class="sg-card" href="#">A</a><button class="sg-tip-btn">?</button>')));
+  assert.deepEqual(defaults.map((f) => `${f.selector} ${f.property}`), ['.sg-tip-btn background'], 'only the colour of its own');
+});
+
+test('the colour modes in Figma\'s own order (Dark before Light), and the page resting on the root mode when the device is not dark', () => {
+  const axes = modeAxes({}, { _modeOrder: { color: ['dark', 'light'] } });
+  assert.deepEqual(axes[0].values.map((v) => v.label), ['Dark', 'Light']);
+  assert.equal(axes[0].restValue, 'light', 'Light is the rest, wherever Figma lists it');
+  assert.deepEqual(modeAxes({}, {})[0].values.map((v) => v.label), ['Light', 'Dark'], 'with no order recorded, the config\'s');
+});
+
+test('the primitive ramp: shown when the theme carries Figma\'s value for each primitive in every mode', () => {
+  const vars = { primitives: { light: { 'primitives/Neutral 100': '#0a0a0a', 'primitives/red': '#c20000' }, dark: { 'primitives/Neutral 100': '#f5f5f5', 'primitives/red': '#fe6767' } } };
+  const css = ':root { --neutral-100: #0a0a0a; --red: #c20000; } @media (prefers-color-scheme: dark) { :root { --neutral-100: #F5F5F5; } }';
+  assert.deepEqual(primitiveColours(vars, css), { group: 'primitives', items: [{ figma: 'Neutral 100', var: '--neutral-100', values: { light: '#0a0a0a', dark: '#f5f5f5' }, primitive: true }] }, 'red differs in dark: not agreed, not shown');
+  assert.equal(primitiveColours({}, css), null);
+});
+
+test('the page\'s menu and close buttons are the system\'s icon-only button', () => {
+  const css = '.bIcon{} .bText{}';
+  assert.deepEqual(iconButtonUi([{ name: 'bText', role: 'button', markup: '<button class="bText"><span>Go</span><svg></svg></button>' }, { name: 'bIcon', role: 'button', markup: '<button class="bIcon" data-tip="Copy"><svg></svg></button>' }], css), { from: 'bIcon', cls: 'bIcon' });
+  assert.equal(iconButtonUi([{ name: 'x', role: 'button', markup: '<button class="bText"><span class="label"></span><svg></svg></button>' }], css), null, 'an empty label holder is a text button');
+});
+
+test('each difference in plain English for the style guide: a contract field, a measurement, a contrast, a raw token', () => {
+  assert.equal(plainDifference('modal.fontSizeVar: contract=null  Figma="l"'), "In Figma the text size is the l text style; the code's contract (its written spec) says no text size is set.");
+  assert.equal(plainDifference('modal.children.header.gapVar: contract="(uncontracted - add a children entry)"  Figma="gap/s"'), "In Figma the space between the items in its header part is gap/s; the code's contract (its written spec) does not describe that part yet.");
+  assert.equal(plainDifference('input.fillStructure: contract="before"  Figma="none"'), "In Figma it has no fill; the code's contract (its written spec) says it has a fill on a layer behind its content.");
+  assert.equal(plainDifference('chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.chip--l · src/theme.css:60)  → set 32px'), 'When Size is L and Icon is True, the height is 32px in Figma and 36px in the code. (src/theme.css:60)');
+  assert.equal(plainDifference('node background: Figma paints a background, rendered no background  (.node · theme.css:443)  [Figma moved, code is behind]'), 'Figma has a background; the code draws none. Figma changed last, so the code should follow it. (theme.css:443)');
+  assert.match(plainDifference('list [State=Hover · light]: 1.23:1 (needs 4.5:1)  #e8e8e8 (--label) on #ffffff (--bg)  (theme.css:1)'), /^Hover, in light mode, its text \(--label\) on its background \(--bg\) has a contrast of 1.23 to 1; it needs 4.5 to 1/);
+  assert.match(plainDifference('· overlay/color'), /overlay\/color holds a raw colour/);
+  assert.equal(plainDifference('Something the engine has no rule for'), 'Something the engine has no rule for', 'kept as it is');
+});
+
+test('what to do about each difference, and who does it', () => {
+  assert.deepEqual(plainAction('chip height (Size=L): Figma 32, rendered 36px  (.chip · theme.css:60)  → set 32px'), { who: 'code', todo: 'In the code, set the chip height to 32px.' });
+  assert.deepEqual(plainAction('node font size: Figma m (11px), rendered 13px via --l-size  (.x · a.html:75)  → in Figma, set it to the token behind --l-size  [code moved, Figma is behind]'), { who: 'figma', todo: 'In Figma, set the node font size to the token behind --l-size.' });
+  assert.equal(plainAction('modal.fontSizeVar: contract=null  Figma="l"').who, 'code');
+  assert.equal(plainAction('· overlay/color').who, 'figma');
+  assert.equal(plainAction('x [default · light]: 3.1:1 (needs 4.5:1)  #000 (--a) on #111 (--b)').who, 'figma', 'a colour that fails contrast is changed in Figma, whose colours are deliberate');
+});
+
+test('a switch whose selector adds a negative class on a layer (no-divider-top::after) turns it on only when off', () => {
+  const r = realizedControls({ name: 'bar', defs: { 'Show Line': { type: 'BOOLEAN', defaultValue: true } }, cls: 'bar', cssText: '.bar{} .bar.no-line::after{content:none}', propertyMap: { 'Show Line': '.bar.no-line::after' } });
+  const c = r.controls.find((k) => k.label === 'Show Line');
+  assert.deepEqual(c.off?.add, ['no-line']);
+  assert.equal(c.on, undefined);
+});
+
+test('the system\'s own tip trigger, for what the page explains on demand: a component whose root carries data-tip', () => {
+  const css = '.tip{} .bText{}';
+  const comps = [
+    { name: 'bText', role: 'button', markup: '<button class="bText"><span>Go</span></button>' },
+    { name: 'infoTip', role: 'button', markup: '<button type="button" class="tip product-only" data-tip="Tooltip" aria-label="Tooltip"><svg aria-hidden="true"><use href="#icon-info"/></svg></button>' },
+  ];
+  assert.deepEqual(tipUi(comps, css), { from: 'infoTip', markup: '<button class="tip" type="button" data-tip="{tip}" aria-label="{name}"><svg aria-hidden="true"><use href="#icon-info"/></svg></button>' }, 'its words and name left to fill, only the system\'s classes kept');
+  assert.equal(tipUi([comps[0]], css), null, 'no data-tip: no tip trigger');
+  assert.equal(tipUi([{ name: 'x', markup: '<span class="unstyled" data-tip="a">i</span>' }], css), null, 'a class the system does not style is no trigger');
+});

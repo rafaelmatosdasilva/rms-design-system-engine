@@ -1,0 +1,477 @@
+// rendered-check.mjs - Run from project root: node scripts/rendered-check.mjs
+// Gate [16] - Rendered parity: the audit's static gates read CSS text; this gate
+// verifies what the browser actually computes. It launches headless Chrome via the
+// DevTools Protocol (no npm deps - requires Node >= 22 for built-in WebSocket),
+// loads each built plugin ui.html from file://, and asserts getComputedStyle values
+// declared in RENDERED_ASSERTIONS (structure-contract.mjs).
+//
+// This catches what static analysis cannot: cascade/specificity surprises, base-class
+// rules overridden by later plugin rules, var() chains resolving to the wrong value,
+// and geometry that only exists at layout time.
+//
+// Contract shape (structure-contract.mjs):
+//   export const RENDERED_ASSERTIONS = [
+//     { plugin: 'my-app', selector: '.toolbar', prop: 'height', expected: '56px',
+//       note: 'DS toolbar height' },
+//     // probe: HTML injected into <body> when the selector matches nothing
+//     // (for components only created at runtime, e.g. toasts)
+//     { plugin: 'my-app', selector: '.toast', probe: '<div class="toast">✓</div>',
+//       prop: 'height', expected: '32px', note: 'DS toast success state' },
+//   ];
+// prop is a camelCase computed-style key (height, paddingLeft, columnGap, minHeight…).
+// expected is compared as an exact string against getComputedStyle(el)[prop] (a colour by its value: #adadad is
+// rgb(173, 173, 173)). figmaVar: 'input/border/default' instead of expected takes the colour from that Figma variable
+// in the assertion's mode, so it never goes stale.
+// pseudo: '::before' or '::after' reads that layer instead (a component that draws its background or
+// its lines as their own layers, as Figma does): getComputedStyle(el, pseudo)[prop].
+//
+// Skips gracefully (exit 0, ⏭ lines) when Chrome is not installed or assertions are empty.
+
+import { appDir } from './code-roots.mjs';
+import { textStyle } from './text-styles.mjs';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { pathToFileURL } from 'url';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from './cdp.mjs';
+import { inProgressNames } from './in-progress.mjs';   // work in progress is not drift
+import { expandFigmaVars, renderedMatches, textStyleExpectations, schemeSwitch } from './rendered-expect.mjs';
+import { loadModes } from './mode-resolver.mjs';
+
+const ROOT = process.cwd();
+
+let cfg = {};
+try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch {
+  console.error('❌ ds-config.json not found at project root.'); process.exit(1);
+}
+
+let ASSERTIONS = [], FRAME_GEOMETRY_MAP = [], CROSS_PLUGIN = [], CONTRACT_SELECTORS = {};
+try {
+  const m = await import(pathToFileURL(join(ROOT, 'structure-contract.mjs')).href);
+  if (Array.isArray(m.RENDERED_ASSERTIONS))     ASSERTIONS         = m.RENDERED_ASSERTIONS;
+  if (m.COMPONENT_CSS_SELECTORS && typeof m.COMPONENT_CSS_SELECTORS === 'object') CONTRACT_SELECTORS = m.COMPONENT_CSS_SELECTORS;
+  if (Array.isArray(m.FRAME_GEOMETRY_MAP))       FRAME_GEOMETRY_MAP = m.FRAME_GEOMETRY_MAP;
+  if (Array.isArray(m.CROSS_PLUGIN_CONSISTENCY)) CROSS_PLUGIN       = m.CROSS_PLUGIN_CONSISTENCY;
+} catch { /* structure-contract.mjs optional */ }
+
+// Map a plugin NAME to its BUILT UI file. Prefer the configured source (paths.pluginCSS,
+// e.g. …/ui.src.html) with `.src.html` → `.html`; fall back to the apps/<name>/ layout.
+const _pluginNames = cfg.paths?.plugins ?? [];
+const _pluginSrc   = cfg.paths?.pluginCSS ?? [];
+function builtUiPath(plugin) {
+  const i = _pluginNames.indexOf(plugin);
+  const src = i >= 0 ? _pluginSrc[i] : null;
+  return join(ROOT, src ? src.replace(/\.src\.html$/, '.html') : `${appDir(cfg, plugin)}/ui.html`);
+}
+
+// #2 element-geometry auto-expand: a FRAME_GEOMETRY_MAP entry maps a CSS selector to a
+// DS frame node ONCE and expands into one frameGeom assertion per listed prop (default:
+// the four padding sides). Expected values then flow from the live frame-geometry snapshot
+// via the frameGeom resolver below - mapping a container once auto-checks all its box
+// geometry against the DS, with no hand-typed pixels.
+for (const e of FRAME_GEOMETRY_MAP) {
+  const props = e.props ?? ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'];
+  for (const prop of props) {
+    ASSERTIONS.push({
+      plugin: e.plugin, selector: e.selector, prop, probe: e.probe,
+      frameGeom: { node: e.node, path: e.path },
+      note: `${e.note ?? 'DS frame node ' + e.node} (${prop})`,
+    });
+  }
+}
+
+// DS-sourced icon sizes: an assertion with `iconSizeOf: '<component>'` takes its
+// expected value from that component's `iconSize` in the structure snapshot, so the
+// check auto-updates if the DS resizes its icon and can never silently drift (the
+// 12px search-icon bug). Length asserts (width/height) get `<n>px`; the assertion
+// is dropped with a warning if the snapshot has no iconSize for that component.
+try {
+  const snapPath = cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json';
+  const comps = JSON.parse(readFileSync(join(ROOT, snapPath), 'utf8')).components ?? {};
+  ASSERTIONS = ASSERTIONS.filter(a => {
+    if (!a.iconSizeOf) return true;
+    const size = comps[a.iconSizeOf]?.iconSize;
+    if (typeof size !== 'number') {
+      console.log(`⚠️  [16] ${a.plugin} ${a.selector}: iconSizeOf '${a.iconSizeOf}' has no iconSize in the snapshot - assertion skipped`);
+      return false;
+    }
+    a.expected = `${size}px`;
+    return true;
+  });
+} catch { /* snapshot optional - iconSizeOf assertions simply won't resolve */ }
+
+// DS-sourced container geometry: an assertion with `frameGeom: { node, path? }` takes
+// its expected value from that named node's box in the frame-geometry snapshot, mapped
+// by `prop` - paddingTop/Right/Bottom/Left → pad[0..3], columnGap/rowGap/gap → gap,
+// height → h. Container/context spacing (e.g. the 7px above the first divider) thus
+// tracks the LIVE DS frame instead of a hand-typed pixel that silently goes stale.
+try {
+  const geomPath = cfg.paths?.snapshotFrameGeometry
+    ?? (cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').replace(/[^/]+$/, 'figma-frame-geometry.snapshot.json');
+  const geom = JSON.parse(readFileSync(join(ROOT, geomPath), 'utf8')).nodes ?? {};
+  const PAD_IX = { paddingTop: 0, paddingRight: 1, paddingBottom: 2, paddingLeft: 3 };
+  ASSERTIONS = ASSERTIONS.filter(a => {
+    if (!a.frameGeom) return true;
+    const entry = geom[a.frameGeom.node];               // object (unique name) or array (repeated)
+    const list = entry == null ? [] : (Array.isArray(entry) ? entry : [entry]);
+    const box = list.find(v => !a.frameGeom.path || (v._path ?? '').includes(a.frameGeom.path)) ?? list[0];
+    if (!box) {
+      console.log(`⚠️  [16] ${a.plugin} ${a.selector}: frameGeom node '${a.frameGeom.node}'${a.frameGeom.path ? ` (path ~ '${a.frameGeom.path}')` : ''} not in frame-geometry snapshot - assertion skipped`);
+      return false;
+    }
+    let px = null;
+    if (a.prop in PAD_IX) px = box.pad?.[PAD_IX[a.prop]];
+    else if (/gap/i.test(a.prop)) px = box.gap;
+    else if (a.prop === 'height') px = box.h;
+    if (typeof px !== 'number') {
+      console.log(`⚠️  [16] ${a.plugin} ${a.selector}: frameGeom cannot map prop '${a.prop}' - assertion skipped`);
+      return false;
+    }
+    a.expected = `${px}px`;
+    return true;
+  });
+} catch { /* frame-geometry snapshot optional */ }
+
+// DS-sourced text styles: an assertion with `textStyle: '<name>'` verifies the element's
+// COMPUTED font-size, font-weight, line-height, letter-spacing and text-transform all match that
+// named DS text style from the typography snapshot. This catches the class of bug a static CSS scan can't see - an
+// element whose own rule looks fine but that inherits a heavier weight or a different size
+// from a container (a partial/hardcoded text style), and any drift from the DS type scale.
+// One entry expands into up to five per-property assertions; a style with no line-height
+// (e.g. an auto-leading tier) simply omits that one. Opt-in, so it never false-positives.
+try {
+  const varsPath = cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json';
+  const typo = JSON.parse(readFileSync(join(ROOT, varsPath), 'utf8')).typography ?? {};
+  const expanded = [];
+  for (const a of ASSERTIONS) {
+    if (!a.textStyle) { expanded.push(a); continue; }
+    const style = textStyle(typo, a.textStyle);
+    if (!style) {
+      console.log(`⚠️  [16] ${a.plugin} ${a.selector}: textStyle '${a.textStyle}' not in the typography snapshot - assertion skipped`);
+      continue;
+    }
+    for (const [prop, expected] of Object.entries(textStyleExpectations(style))) {
+      expanded.push({
+        plugin: a.plugin, selector: a.selector, probe: a.probe, colorScheme: a.colorScheme, pseudo: a.pseudo,
+        prop, expected: String(expected),
+        note: `${a.note ?? 'DS text style ' + a.textStyle} (${prop})`,
+      });
+    }
+  }
+  ASSERTIONS = expanded;
+} catch { /* vars snapshot optional - textStyle assertions simply won't resolve */ }
+
+// DS-sourced colours: an assertion with `figmaVar: '<figma path>'` takes its expected colour from that Figma variable in
+// its mode (colorScheme), so a colour typed into the contract never goes stale when the variable changes.
+{
+  let color = {};
+  try { color = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')).color ?? {}; } catch { /* no snapshot: figmaVar assertions are skipped, said below */ }
+  const { assertions, skipped } = expandFigmaVars(ASSERTIONS, color, loadModes(cfg), cfg.rendered?.colorScheme ?? 'light');
+  ASSERTIONS = assertions;
+  for (const why of skipped) console.log(`⚠️  [16] ${why} - assertion skipped`);
+}
+
+// ── Auto-generate assertions from the snapshots (opt-in: rendered.auto) ───────
+// So you don't hand-type expected values. For every component that has a fixed
+// height in the structure snapshot AND a base selector, generate a `height`
+// assertion (expected = the Figma height), targeting each built plugin UI, with a
+// bare element probe as a fallback when the selector isn't already in the DOM.
+// Height is the safest context-independent geometry; colours/layout stay manual
+// (a colour needs an rgb() match and layout props need real context via a probe).
+// Manual RENDERED_ASSERTIONS always win (auto entries that duplicate a manual
+// plugin+selector+prop are dropped). Skipped components: knownUnimplementedComponents.
+if (cfg.rendered?.auto) {
+  try {
+    const snapPath = cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json';
+    const comps    = JSON.parse(readFileSync(join(ROOT, snapPath), 'utf8')).components ?? {};
+    const plugins  = cfg.paths?.plugins ?? [];
+    const selectors = cfg.componentSelectors ?? {};
+    const skip     = await inProgressNames(ROOT, cfg);
+    const manual   = new Set(ASSERTIONS.map(a => `${a.plugin}|${a.selector}|${a.prop}`));
+    if (!plugins.length) {
+      console.log('⚠️  [16] rendered.auto is on but ds-config.json → paths.plugins is empty (no built UI to render against) - auto assertions skipped');
+    } else {
+      let added = 0;
+      for (const [name, c] of Object.entries(comps)) {
+        if (name === '_updated' || skip.has(name) || typeof c?.h !== 'number') continue;
+        // Only a height Figma fixes: one that hugs its content or fills its parent is no height of the component's own,
+        // and an empty probe has neither content nor parent to measure it by.
+        if (c.sizingV === 'HUG' || c.sizingV === 'FILL') continue;
+        // The component's own selector: the config's, else the contract's (its main class), else its name as a class.
+        const own = CONTRACT_SELECTORS[name], main = typeof own === 'string' ? own : own?.main;
+        const sel = selectors[name] ?? main ?? ('.' + name.charAt(0).toLowerCase() + name.slice(1));
+        const cls = /^\.([A-Za-z][\w-]*)$/.exec(sel)?.[1];   // only class selectors get a bare probe
+        for (const plugin of plugins) {
+          if (manual.has(`${plugin}|${sel}|height`)) continue;   // manual override wins
+          ASSERTIONS.push({
+            plugin, selector: sel, prop: 'height', expected: `${c.h}px`,
+            probe: cls ? `<div class="${cls}"></div>` : undefined,
+            auto: true, note: `auto: ${name} height from snapshot`,
+          });
+          added++;
+        }
+      }
+      if (added) console.log(`ℹ️  [16] rendered.auto: generated ${added} height assertion(s) from the snapshot`);
+    }
+  } catch { /* no structure snapshot - auto mode simply adds nothing */ }
+}
+
+if (!ASSERTIONS.length) {
+  console.log(cfg.rendered?.auto
+    ? '⏭  [16] rendered parity skipped - nothing to auto-generate (no component heights in the snapshot) and no RENDERED_ASSERTIONS'
+    : '⏭  [16] rendered parity skipped - RENDERED_ASSERTIONS empty (set ds-config.json → rendered.auto to generate height checks automatically)');
+  process.exit(0);
+}
+
+// Color scheme is emulated per assertion so mode-dependent color checks are
+// deterministic regardless of host OS appearance (headless Chrome otherwise
+// follows the machine's prefers-color-scheme - light on CI runners, often dark
+// on a developer's Mac, which silently flips any assertion on a mode-varying token).
+// Default from ds-config (`rendered.colorScheme`), else 'light' (the :root base and
+// the headless default). An assertion overrides it with its own `colorScheme` field.
+const DEFAULT_SCHEME = cfg.rendered?.colorScheme ?? 'light';
+const RENDER_MODES = loadModes(cfg);
+
+// ── Find + launch Chrome (shared plumbing in cdp.mjs) ─────────────────────────
+const CHROME = findChrome();
+if (!CHROME) {
+  console.log('⏭  [16] rendered parity skipped - Chrome not found (set CHROME_PATH to enable)');
+  process.exit(0);
+}
+if (typeof WebSocket === 'undefined') {
+  console.log('⏭  [16] rendered parity skipped - Node >= 22 required (built-in WebSocket)');
+  process.exit(0);
+}
+
+// Timer first, so a Chrome that never opens its DevTools socket still times out.
+let browser = null;
+process.on('exit', () => browser?.kill());
+// Chrome gets its own start-up time (launchChrome gives up after 30 s with a clear reason); the 60 s
+// budget for the checks starts once it is up, so a busy machine is not mistaken for a failure.
+try { browser = await launchChrome(CHROME, { tmpPrefix: 'rendered-check-' }); }
+catch (e) { console.log(`❌ [16] rendered parity not verified - ${e.message.split('\n')[0]}`); process.exit(1); }
+setTimeout(() => { console.error('❌ [16] rendered parity timed out (60s after Chrome started)'); browser?.kill?.(); process.exit(1); }, 60000).unref();
+
+const { send, close: closeCDP } = await connectCDP(browser.wsUrl);
+
+// ── Run assertions per plugin ─────────────────────────────────────────────────
+const byPlugin = {};
+for (const a of ASSERTIONS) (byPlugin[a.plugin] ??= []).push(a);
+
+const PASS = [], FAIL = [];
+
+for (const [plugin, asserts] of Object.entries(byPlugin)) {
+  const uiPath = builtUiPath(plugin);
+  if (!existsSync(uiPath)) {
+    for (const a of asserts) FAIL.push(`${plugin}: built UI not found at ${uiPath} (run the build first)`);
+    continue;
+  }
+  const { targetId, sessionId } = await openPage(send, pathToFileURL(uiPath).href);
+
+  // Wait for the file:// navigation to commit AND finish loading. The target's
+  // INITIAL blank document already reports readyState "complete", so checking
+  // readyState alone races the navigation and evaluates against about:blank.
+  const loaded = await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { attempts: 100, intervalMs: 50 });
+  if (!loaded) {
+    for (const a of asserts) FAIL.push(`${plugin} ${a.selector} → ${a.prop}: page did not finish loading (5s)`);
+    await send('Target.closeTarget', { targetId });
+    continue;
+  }
+
+  // Evaluate in color-scheme groups: set prefers-color-scheme via CDP before each
+  // group so results never depend on the host's ambient appearance. Mode-independent
+  // assertions (height/padding/gap) sit in the default group and are unaffected.
+  const schemeOf = a => a.colorScheme ?? DEFAULT_SCHEME;
+  const got = new Array(asserts.length);
+  // Transitions off before any group is measured: switching the colour scheme between groups otherwise leaves a
+  // transitioned property (an input's border-color 0.15s) mid-way, read as the previous scheme's value.
+  await send('Runtime.evaluate', { expression: `(() => { if (document.getElementById('__designSystemEngine_no_transitions__')) return; const s = document.createElement('style'); s.id = '__designSystemEngine_no_transitions__'; s.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}'; document.head.appendChild(s); })()` }, sessionId);
+  const indexed = asserts.map((a, i) => ({ a, i })).filter(x => !x.a.forcePseudo);
+  for (const scheme of [...new Set(indexed.map(x => schemeOf(x.a)))]) {
+    const group = indexed.filter(x => schemeOf(x.a) === scheme);
+    // The mode put on as the project puts it on (a class, a data attribute, a media query), not only by the colour scheme.
+    const sw = schemeSwitch(scheme, RENDER_MODES);
+    if (sw.unsupported) { group.forEach((x) => { got[x.i] = `(mode '${scheme}' cannot be put on: ${sw.unsupported})`; }); continue; }
+    await send('Emulation.setEmulatedMedia', { features: sw.media }, sessionId);
+    if (sw.apply) await send('Runtime.evaluate', { expression: sw.apply }, sessionId);
+    const expr = `(() => {
+      const asserts = ${JSON.stringify(group.map(x => ({ selector: x.a.selector, probe: x.a.probe, prop: x.a.prop, pseudo: x.a.pseudo ?? null })))};
+      // Probes render inside an absolutely-positioned host so the app shell's own
+      // flex/grid layout (e.g. body { display:flex; height:100vh }) cannot stretch
+      // or shrink them - computed values must reflect the component's own rules.
+      const probeHost = document.createElement('div');
+      probeHost.style.cssText = 'position:absolute;left:0;top:0;width:600px;visibility:hidden;display:block;';
+      document.body.appendChild(probeHost);
+      const out = asserts.map(a => {
+        let el = document.querySelector(a.selector);
+        // One the page holds but does not draw on load (in a closed panel, a list not filled yet) has no size of its own
+        // (its height reads auto): the probe, drawn, is measured instead.
+        if (el && a.probe && !el.getClientRects().length) el = null;
+        if (!el && a.probe) {
+          probeHost.insertAdjacentHTML('beforeend', a.probe);
+          el = probeHost.querySelector(a.selector) ?? document.querySelector(a.selector);
+        }
+        return el ? getComputedStyle(el, a.pseudo)[a.prop] : '(selector not found)';
+      });
+      probeHost.remove(); // isolate probe markup between scheme groups
+      return out;
+    })()`;
+    const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true }, sessionId);
+    if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId);
+    const vals = r.result.value ?? [];
+    group.forEach((x, k) => { got[x.i] = vals[k]; });
+  }
+
+  asserts.forEach((a, i) => {
+    if (a.forcePseudo) return; // handled below via CSS.forcePseudoState
+    const label = `${plugin} ${a.selector}${a.pseudo ?? ''} → ${a.prop}`;
+    if (renderedMatches(got[i], a.expected)) PASS.push(label);
+    else FAIL.push(`${label}: rendered "${got[i]}" ≠ expected "${a.expected}"${a.note ? `  [${a.note}]` : ''}`);
+  });
+
+  // forcePseudo assertions: geometry of :hover/:focus/:active rules cannot be read
+  // from JS alone - CSS.forcePseudoState applies the pseudo-class rules to the node,
+  // then getComputedStyle reflects them. Probes injected above are reused.
+  const pseudoAsserts = asserts.filter(a => a.forcePseudo);
+  if (pseudoAsserts.length) {
+    await send('DOM.enable', {}, sessionId);
+    await send('CSS.enable', {}, sessionId);
+    // Inject pseudo-assert probes into a persistent host (the scheme-grouped pass
+    // above runs its own throwaway host, so runtime-only elements like menuList
+    // probes must be re-injected here for DOM.querySelector to resolve them).
+    const injectExpr = `(() => {
+      const host = document.createElement('div');
+      host.style.cssText = 'position:absolute;left:0;top:0;width:600px;visibility:hidden;display:block;';
+      document.body.appendChild(host);
+      const probes = ${JSON.stringify(pseudoAsserts.map(a => ({ selector: a.selector, probe: a.probe })))};
+      for (const p of probes) if (p.probe && !document.querySelector(p.selector)) host.insertAdjacentHTML('beforeend', p.probe);
+      return true;
+    })()`;
+    await send('Runtime.evaluate', { expression: injectExpr, returnByValue: true }, sessionId);
+    // Kill transitions before measuring. getComputedStyle reports the CURRENT
+    // animated value, so a property with a transition (e.g. `border-color 0.15s`)
+    // still reads as the RESTING colour the instant a pseudo-state is forced -
+    // the assertion then fails against a value the user never sees at rest. This
+    // is timing, not cascade, so waiting would only trade one flake for another.
+    await send('Runtime.evaluate', {
+      expression: `(() => {
+        const s = document.createElement('style');
+        s.id = '__designSystemEngine_no_transitions__';
+        s.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}';
+        document.head.appendChild(s);
+        return true;
+      })()`,
+      returnByValue: true,
+    }, sessionId);
+    const { root } = await send('DOM.getDocument', {}, sessionId);
+    for (const a of pseudoAsserts) {
+      const sw = schemeSwitch(a.colorScheme ?? DEFAULT_SCHEME, RENDER_MODES);
+      if (sw.unsupported) { FAIL.push(`${plugin} ${a.selector} → ${a.prop}: mode '${a.colorScheme ?? DEFAULT_SCHEME}' cannot be put on (${sw.unsupported})`); continue; }
+      await send('Emulation.setEmulatedMedia', { features: sw.media }, sessionId);
+      if (sw.apply) await send('Runtime.evaluate', { expression: sw.apply }, sessionId);
+      // forcePseudoOn lets the pseudo-class land on a DIFFERENT element than the one
+      // measured - e.g. hovering a row and asserting a button inside it keeps its own
+      // colour. Without it a parent-hover rule can silently outrank a child rule and
+      // no assertion can see it. Defaults to the measured selector.
+      const forceSel = a.forcePseudoOn || a.selector;
+      const label = `${plugin} ${forceSel}:${a.forcePseudo.join(':')} → ${a.selector} ${a.prop}`;
+      const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: forceSel }, sessionId);
+      if (!nodeId) { if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId); FAIL.push(`${label}: selector not found (probe missing?)`); continue; }
+      await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: a.forcePseudo }, sessionId);
+      const pr = await send('Runtime.evaluate', {
+        expression: `getComputedStyle(document.querySelector(${JSON.stringify(a.selector)}))[${JSON.stringify(a.prop)}]`,
+        returnByValue: true,
+      }, sessionId);
+      await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }, sessionId);
+      if (sw.undo) await send('Runtime.evaluate', { expression: sw.undo }, sessionId);
+      const val = pr.result.value;
+      if (renderedMatches(val, a.expected)) PASS.push(label);
+      else FAIL.push(`${label}: rendered "${val}" ≠ expected "${a.expected}"${a.note ? `  [${a.note}]` : ''}`);
+    }
+  }
+
+  await send('Target.closeTarget', { targetId });
+}
+
+// ── #5: Cross-plugin consistency ──────────────────────────────────────────────
+// A shared base component must compute the same values in every plugin that uses it;
+// a plugin-local override silently changing it is a divergence. For each entry we render
+// its probe in every listed plugin, read the props, and compare across plugins.
+const XP_PASS = [], XP_FAIL = [];
+if (CROSS_PLUGIN.length) {
+  // Open each referenced plugin's target ONCE and evaluate every cross-plugin probe for it
+  // in a single round-trip, instead of reopening a target per (entry × plugin).
+  const xpPlugins = [...new Set(CROSS_PLUGIN.flatMap(e => e.plugins))];
+  const results = {}; // plugin -> { entryLabel -> {prop: val} }  (or { _missing: true })
+  for (const plugin of xpPlugins) {
+    const uiPath = builtUiPath(plugin);
+    if (!existsSync(uiPath)) { results[plugin] = { _missing: true }; continue; }
+    const { targetId, sessionId } = await openPage(send, pathToFileURL(uiPath).href);
+    // Guard on file: protocol too - the target's initial about:blank already reports
+    // readyState "complete", so readyState alone races the navigation and every probe
+    // then reads about:blank ("(selector not found)"), which can falsely agree across
+    // plugins. Mirrors the main render loop's guard.
+    const xpLoaded = await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { attempts: 60, intervalMs: 50 });
+    if (!xpLoaded) { results[plugin] = { _missing: true }; await send('Target.closeTarget', { targetId }); continue; }
+    const specs = CROSS_PLUGIN.filter(e => e.plugins.includes(plugin))
+      .map(e => ({ label: e.label, selector: e.selector, probe: e.probe, props: e.props }));
+    const expr = `(() => {
+      const specs = ${JSON.stringify(specs)};
+      const out = {};
+      for (const s of specs) {
+        const host = document.createElement('div');
+        host.style.cssText = 'position:absolute;left:0;top:0;width:600px;visibility:hidden;display:block;';
+        document.body.appendChild(host);
+        host.insertAdjacentHTML('beforeend', s.probe);
+        const el = host.querySelector(s.selector);
+        const cs = el ? getComputedStyle(el) : null;
+        const o = {};
+        for (const p of s.props) o[p] = cs ? cs[p] : '(selector not found)';
+        host.remove();
+        out[s.label] = o;
+      }
+      return out;
+    })()`;
+    const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true }, sessionId);
+    results[plugin] = r.result.value ?? {};
+    await send('Target.closeTarget', { targetId });
+  }
+  for (const entry of CROSS_PLUGIN) {
+    for (const prop of entry.props) {
+      const valOf = p => results[p]?._missing ? null : results[p]?.[entry.label]?.[prop];
+      const distinct = [...new Set(entry.plugins.map(valOf).filter(v => v != null))];
+      if (distinct.length > 1) {
+        const detail = entry.plugins.map(p => `${p}=${results[p]?._missing ? 'MISSING' : results[p]?.[entry.label]?.[prop]}`).join(', ');
+        XP_FAIL.push(`${entry.label} → ${prop} differs across plugins: ${detail}`);
+      } else {
+        XP_PASS.push(`${entry.label}/${prop}`);
+      }
+    }
+  }
+}
+
+closeCDP();
+browser.kill();
+
+// ── Report ────────────────────────────────────────────────────────────────────
+console.log('\n─── Gate [16] - Rendered parity (headless Chrome computed styles) ───\n');
+console.log(`✅ PASS  ${PASS.length}/${PASS.length + FAIL.length} rendered assertions`);
+console.log(`❌ FAIL  ${FAIL.length}`);
+if (FAIL.length) {
+  console.log();
+  for (const f of FAIL) console.log(`  ❌ ${f}`);
+  console.log('\n   Fix: the CSS cascade renders something different from the DS contract -');
+  console.log('   check for later rules overriding the base, wrong var() resolution, or a stale build.');
+}
+
+if (XP_PASS.length || XP_FAIL.length) {
+  console.log(`\n✅ PASS  ${XP_PASS.length}/${XP_PASS.length + XP_FAIL.length} cross-plugin consistency checks`);
+  console.log(`❌ FAIL  ${XP_FAIL.length}`);
+  if (XP_FAIL.length) {
+    console.log('\n─── #5 - shared component renders differently across plugins ───────');
+    for (const f of XP_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: a plugin-local rule is overriding a shared base component - move it to the base');
+    console.log('   or scope it so the shared component stays identical everywhere.');
+  }
+}
+
+process.exit(FAIL.length === 0 && XP_FAIL.length === 0 ? 0 : 1);

@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The build scorer and the component harness read JSX with TypeScript, from the project or a global install.
+      - name: Install TypeScript
+        run: npm install -g typescript@6
+      # The Vue harness renders a Vue project's components with that project's own build (Vite, Vue CLI and webpack,
+      # Nuxt): its tests lay the build tools such a project has in folders of their own (test/vue-harness.test.mjs,
+      # test/vue-builds.test.mjs).
+      - name: Install the Vue build tools the Vue tests use
+        run: |
+          npm install --prefix test/.vue-tools --no-audit --no-fund vite@6 @vitejs/plugin-vue@5 vue@3 sass@1 pinia@3 vue-router@4
+          npm install --prefix test/.vue-cli-tools --no-audit --no-fund @vue/cli-service@5 vue@3 sass@1 sass-loader@16
+          npm install --prefix test/.nuxt-tools --no-audit --no-fund nuxt@4 vue@3
+      # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.
+      # Each failing test is also written as an annotation, so its name and first error lines show on the check.
+      - name: Run the test suite
+        shell: bash
+        run: |
+          set -o pipefail
+          code=0
+          node --test test/*.test.mjs 2>&1 | tee test.log || code=$?
+          if [ "$code" != 0 ]; then
+            grep -n '^not ok' test.log | while IFS= read -r line; do
+              n=${line%%:*}
+              echo "::error title=${line#*:}::$(sed -n "$((n+1)),$((n+40))p" test.log | grep -E "error|expected|actual|Error|message" | head -6 | tr '\n' ' ' | cut -c1-900)"
+            done
+          fi
+          # A browser test that skipped for want of Chrome checked nothing: the run fails, so a missing Chrome can never pass quietly.
+          skipped=$(grep -ciE '# SKIP .*chrome' test.log || true)
+          if [ "$skipped" != 0 ]; then
+            echo "::error title=Browser tests skipped::$skipped browser test(s) skipped because Chrome was not found; they must run."
+            code=1
+          fi
+          exit $code

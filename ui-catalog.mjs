@@ -1,0 +1,225 @@
+// ui-catalog.mjs - the design system as a component catalog for UI generators, and a checker for
+// what they generate.
+//
+// A generator (an AI agent, a small model in the browser, a template tool) can only compose real
+// design-system UI if it is told exactly what exists, and its output is checked every time.
+//   • buildCatalog()  - one entry per component, from the contracts (Figma) and, when fresh, the
+//                       code snapshot: its props with their allowed values and defaults, the code
+//                       prop names (and the code's own values, with the wrong names an agent will guess), which components it may contain, what never goes with it, its
+//                       status, and what the code renders (size, target size, per-state values). Written as contracts/catalog.json, and as an aligned table in
+//                       llms.txt (small models read aligned tables far better than JSON Schema).
+//   • checkUi()       - a deterministic, prompt-blind checker for a generated UI. It applies one
+//                       written definition of valid output, never repairs and never adds anything,
+//                       and reports every finding by name. The count is the quality score.
+//
+// Pure: no I/O. contract-gen.mjs writes the catalog; ui-check.mjs is the command.
+
+import { rejectedNames, rightFor } from './prop-vocabulary.mjs';
+
+const STATE_PROP = /^(state|states|interaction)$/i;
+const TYPE = { enum: 'enum', boolean: 'boolean', text: 'text', instance: 'slot', children: 'children' };
+
+// A real use of the component, as the code writes it: its tag in a JSX, Vue or Svelte file (<Chip size="M" />), else
+// the opening tag of an element with its class in markup; one line, the first in a product's code before the system's
+// own (a story, a page), never its own definition. files: [{ file, text, product }]. → { code, file, line } | null.
+export function realExample(name, cls, files, { own = null } = {}) {
+  const tag = name.charAt(0).toUpperCase() + name.slice(1);
+  const tagRe = new RegExp(`<${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s/>])[^<>]*?(?:\\/>|>[^<>\\n]{0,60}<\\/${tag}>)`);
+  const c = cls ? String(cls).replace(/^\./, '') : null;
+  const classRe = c ? new RegExp(`<[a-z][\\w-]*\\s[^<>]*\\bclass(?:Name)?=["'][^"']*(?<![\\w-])${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])[^"']*["'][^<>]*>`) : null;
+  const order = [...(files ?? [])].sort((a, b) => (b.product ? 1 : 0) - (a.product ? 1 : 0));
+  const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const { file, text } of order) {
+    if ((own && file === own) || squash(file.split('/').pop().replace(/\.[^.]+$/, '')) === squash(name)) continue;   // its own definition
+    const src = String(text ?? '');
+    const m = (/\.(jsx|tsx|vue|svelte|mdx)$/i.test(file) ? tagRe.exec(src) : null) ?? (classRe && /\.(html?|vue|svelte|jsx|tsx)$/i.test(file) ? classRe.exec(src) : null);
+    if (m && m[0].length <= 200 && !m[0].includes('\n')) return { code: m[0], file, line: src.slice(0, m.index).split('\n').length };
+  }
+  return null;
+}
+
+// built: [{ name, contract }] (contract-gen). code: the code snapshot (optional, fresh only).
+// selectorFor: (name) → the component's selector (optional). examples: { name: realExample(…) } (optional).
+export function buildCatalog(built, { code = null, selectorFor = null, examples = {} } = {}) {
+  const names = new Set(built.map((b) => b.name));
+  const components = {};
+  for (const { name, contract: c } of built) {
+    const props = {};
+    const api = code?.api?.[name];
+    const codeNames = new Map(Object.keys(api?.props ?? {}).map((k) => [k.toLowerCase().replace(/[^a-z0-9]/g, ''), k]));
+    for (const p of c.props ?? []) {
+      if (STATE_PROP.test(p.name)) continue;   // interaction states are the component's, not a generator's choice
+      const e = { type: TYPE[p.type] ?? 'text' };
+      if (Array.isArray(p.options) && p.options.length) e.values = p.options;
+      if (p.default != null && p.default !== '' && e.type !== 'slot' && e.type !== 'children') e.default = p.default;   // a slot's default is a Figma node id
+      if (p.slot) e.slot = p.slot;
+      if (p.description) e.description = p.description;
+      const bound = p.bindings?.code?.attribute;
+      const codeName = typeof bound === 'string' ? bound : (api?.codeConnect?.[p.name] ?? codeNames.get(p.name.toLowerCase().replace(/[^a-z0-9]/g, '')));
+      if (codeName) e.codeName = codeName;
+      // the code's own values when it names them differently (a parity difference the props gate reports),
+      // and the wrong names an agent will guess, each with the right one.
+      if (e.type === 'enum' && e.values) {
+        const codeValues = codeName && Array.isArray(api?.props?.[codeName]?.options) ? api.props[codeName].options.map(String) : [];
+        if (codeValues.length && (codeValues.length !== e.values.length || codeValues.some((v, i) => v !== String(e.values[i])))) e.codeValues = codeValues;
+        const rejected = rejectedNames({ figma: e.values.map(String), code: codeValues });
+        if (Object.keys(rejected).length) e.rejected = rejected;
+      }
+      props[p.name] = e;
+    }
+    const rel = c.relationships ?? {};
+    const inCode = Object.entries(code?.nesting?.[name]?.contains ?? {}).filter(([k, v]) => names.has(k) && (v.renderedIn?.length || v.inSource)).map(([k]) => k);
+    const children = [...new Set([...(rel.composesWith ?? []), ...inCode])].filter((k) => k !== name);
+    const entry = { description: String(c.description ?? '').replace(/\s+/g, ' ').trim() };
+    if (selectorFor) entry.selector = selectorFor(name);
+    entry.props = props;
+    if (children.length) entry.children = children;
+    if (rel.neverCombineWith?.length) entry.neverCombineWith = rel.neverCombineWith;
+    if (c.status?.state && c.status.state !== 'current') entry.status = c.status.state;
+    if (c.useInstead?.length) entry.useInstead = c.useInstead;
+    if (c.whenNotToUse) entry.whenNotToUse = c.whenNotToUse;
+    const rendered = renderedFacts(code?.components?.[name], c.semantics);
+    if (rendered) entry.rendered = rendered;
+    if (examples[name]) entry.example = examples[name];
+    components[name] = entry;
+  }
+  return {
+    $description: 'Design-system component catalog for UI generators. Generated by rms-design-system-engine from Figma and the code; do not edit by hand. Check generated UI with ui-check.mjs.',
+    rules: RULES,
+    components,
+  };
+}
+
+// What the code renders, for a generator that builds a screen around the component: its size as
+// found on a real page, whether a control reaches the 24×24 target size (WCAG 2.5.8), and what each
+// state changes, by token where the code uses one. Only real instances count: a bare or hidden copy
+// takes the size of its test host, not its own.
+const INTERACTIVE = /^(button|a|input|select|textarea|summary|link|checkbox|radio|switch|tab|menuitem|option|slider|combobox|textbox|spinbutton)$/i;
+function renderedFacts(c, semantics) {
+  if (!c) return null;
+  const out = {};
+  const real = ['found', 'isolated-copy'].includes(c.instance?.how);
+  if (real && c.size?.height) {
+    out.size = { width: Math.round(c.size.width), height: Math.round(c.size.height) };
+    const role = semantics?.aria?.role ?? semantics?.element;
+    if (role && INTERACTIVE.test(role)) out.targetSize = { ...out.size, atLeast24: out.size.width >= 24 && out.size.height >= 24 };
+  }
+  const states = {};
+  for (const [label, st] of Object.entries(c.states ?? {})) {
+    const changed = Object.fromEntries(Object.entries(st.changed ?? {}).map(([p, f]) => [p, f.var ? `var(${f.var})` : f.value]));
+    if (Object.keys(changed).length) states[label] = changed;
+  }
+  if (Object.keys(states).length) out.states = states;
+  return Object.keys(out).length ? out : null;
+}
+
+// The definition of valid output, written down once. Every finding refers to one of these.
+export const RULES = [
+  'Use only components in this catalog.',
+  'Give a component only the props it lists, and an enum prop only one of its values.',
+  'A boolean prop takes true or false.',
+  'Every id is unique, there is one root, every child exists, and each node has one parent.',
+  'Never put a component inside one it must never combine with.',
+];
+
+// The aligned table for llms.txt: one line per component, props as name=value|value.
+export function catalogTable(catalog) {
+  const rows = Object.entries(catalog.components).map(([name, c]) => {
+    const props = Object.entries(c.props).map(([p, e]) =>
+      `${p}=${e.type === 'enum' ? (e.values ?? []).join('|') : e.type === 'boolean' ? 'true|false' : e.type === 'children' ? '<its children>' : e.type}`).join('  ');
+    const tail = [c.children?.length ? `contains ${c.children.join(', ')}` : null, c.status ? `[${c.status}${c.useInstead?.length ? ` → ${c.useInstead.join(', ')}` : ''}]` : null].filter(Boolean).join('  ');
+    return [name, props || '-', tail];
+  });
+  // The names line up; the props are as long as they are (padding them all to the longest buried the notes).
+  const w0 = Math.max(9, ...rows.map((r) => r[0].length));
+  const line = (a, b, c) => `${a.padEnd(w0)}  ${b}${c ? `  ${c}` : ''}`.trimEnd();
+  return ['```', line('component', 'props', 'notes'), ...rows.map((r) => line(...r)), '```'].join('\n');
+}
+
+// ── The checker ───────────────────────────────────────────────────────────────
+// Accepts a flat list (A2UI style: { root, components: [{ id, component, children: [ids], ...props }] },
+// props beside id/component or under `props`) or a nested tree ({ component, props, children: [nodes] }).
+// Returns { ok, findings: [{ rule, level: 'error'|'warning', id, message }], counts }.
+const RESERVED = new Set(['id', 'component', 'children', 'child', 'props', 'type']);
+
+function flatten(ui) {
+  if (Array.isArray(ui?.components)) {
+    return { root: ui.root ?? ui.components[0]?.id ?? null, nodes: ui.components, flat: true };
+  }
+  const nodes = [];
+  let n = 0;
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return null;
+    const id = node.id ?? `node-${++n}`;
+    const kids = (Array.isArray(node.children) ? node.children : []).map(walk).filter(Boolean);
+    nodes.push({ ...node, id, children: kids });
+    return id;
+  };
+  const root = walk(ui);
+  return { root, nodes, flat: false };
+}
+
+const near = (name, list) => {
+  const k = String(name).toLowerCase();
+  return list.find((x) => x.toLowerCase() === k) ?? list.find((x) => x.toLowerCase().includes(k) || k.includes(x.toLowerCase())) ?? null;
+};
+
+export function checkUi(ui, catalog) {
+  const findings = [];
+  const add = (rule, level, id, message) => findings.push({ rule, level, id, message });
+  const comps = catalog.components ?? {};
+  const names = Object.keys(comps);
+  const { root, nodes } = flatten(ui);
+  const byId = new Map();
+  for (const node of nodes) {
+    if (byId.has(node.id)) add(4, 'error', node.id, `id "${node.id}" is used more than once`);
+    else byId.set(node.id, node);
+  }
+  if (root == null || !byId.has(root)) add(4, 'error', root, `the root "${root}" is not a component in the output`);
+  const parents = new Map();
+  for (const node of byId.values()) {
+    const def = comps[node.component];
+    if (!def) {
+      const guess = near(node.component, names);
+      add(1, 'error', node.id, `"${node.component}" is not in the catalog${guess ? ` (did you mean ${guess}?)` : ''}`);
+    } else {
+      // A component on its way out names what replaces it; one still being settled (experimental, beta) is the system's
+      // own and may be used: the line says so, or an agent reads it as forbidden and leaves the need unmet.
+      if (def.status) add(1, 'warning', node.id, `${node.component} is ${def.status}${def.useInstead?.length ? `: use ${def.useInstead.join(' or ')}` : /^(experimental|beta|in progress|draft|new)$/i.test(def.status) ? ': it is in the system and may still change; use it for what it is for, and say so in the reply' : ''}`);
+      const props = { ...Object.fromEntries(Object.entries(node).filter(([k]) => !RESERVED.has(k))), ...(node.props ?? {}) };
+      for (const [k, v] of Object.entries(props)) {
+        const p = def.props?.[k] ?? Object.entries(def.props ?? {}).find(([, e]) => e.codeName === k)?.[1];
+        // A part's own keys (its id, its children) written inside its props: say where they go.
+        if (!p && ['id', 'children', 'component'].includes(k)) { add(2, 'error', node.id, `${node.component} has no prop "${k}": "${k}" goes beside "component", not inside "props"`); continue; }
+        if (!p) { add(2, 'error', node.id, `${node.component} has no prop "${k}"`); continue; }
+        const allowed = k === p.codeName && p.codeValues ? p.codeValues : p.values;   // code props take the code's own names
+        if (p.type === 'enum' && allowed && !allowed.includes(v)) {
+          const right = rightFor(p.rejected, v);
+          add(2, 'error', node.id, `${node.component}.${k} = ${JSON.stringify(v)} is not one of ${allowed.join(', ')}${right ? `: use ${JSON.stringify(right)}` : ''}`);
+        }
+        if (p.type === 'boolean' && typeof v !== 'boolean') add(3, 'error', node.id, `${node.component}.${k} must be true or false, not ${JSON.stringify(v)}`);
+      }
+    }
+    for (const kid of node.children ?? []) {
+      const kidId = typeof kid === 'object' ? kid?.id : kid;
+      if (!byId.has(kidId) && !nodes.some((x) => x.id === kidId)) { add(4, 'error', node.id, `child "${kidId}" does not exist`); continue; }
+      if (parents.has(kidId) && parents.get(kidId) !== node.id) add(4, 'error', kidId, `"${kidId}" has two parents (${parents.get(kidId)} and ${node.id})`);
+      parents.set(kidId, node.id);
+      const child = byId.get(kidId);
+      if (def && child && def.neverCombineWith?.includes(child.component)) add(5, 'error', node.id, `${node.component} must never contain ${child.component}`);
+      // What a component holds in Figma is not all it may hold: a slot takes any component unless Figma lists the few it takes.
+      const open = Object.values(def?.props ?? {}).some((e) => e.type === 'children' && !e.slot?.preferredOnly);
+      if (def && child && comps[child.component] && def.children?.length && !def.children.includes(child.component) && !open)
+        add(5, 'warning', node.id, `the design system never puts ${child.component} inside ${node.component}: put it beside ${node.component}, not inside it`);
+    }
+  }
+  // Cycles: walking up from any node must end at the root.
+  for (const id of byId.keys()) {
+    const seen = new Set([id]);
+    let p = parents.get(id);
+    while (p != null) { if (seen.has(p)) { add(4, 'error', id, `"${id}" is inside itself (a cycle)`); break; } seen.add(p); p = parents.get(p); }
+  }
+  for (const id of byId.keys()) if (id !== root && !parents.has(id)) add(4, 'warning', id, `"${id}" is not attached to the tree`);
+  const errors = findings.filter((f) => f.level === 'error').length;
+  return { ok: errors === 0, findings, counts: { components: byId.size, errors, warnings: findings.length - errors } };
+}

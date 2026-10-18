@@ -1,0 +1,2062 @@
+// structure-check.mjs - Run from project root: node scripts/structure-check.mjs
+// Gate [3] - structural parity: snapshot vs contract, CSS height rules,
+//             base-rule var bindings, and state/variant selector + var bindings.
+//
+// Full verification chain for every Figma state:
+//   1. Selector exists in CSS
+//   2. Selector's rule uses the correct token var for each property
+//   3. (Gate [2]) That var resolves to the correct hex value
+//
+// Requires at project root:
+//   ds-config.json          - themeCSS + snapshotStructure + pluginCSS paths
+//   structure-contract.mjs  - CONTRACT, CSS_HEIGHT_RULES, CSS_BASE_RULE_VARS,
+//                             STATE_SELECTORS
+//
+// Exit 0 = all checks pass. Exit 1 = any failure.
+// Exit 2 = cannot verify: no compiled component CSS configured (setup gap, not a parity fail).
+
+import { splitSelectors, withoutHeardState } from './selector-list.mjs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname, resolve as resolvePath } from 'path';
+import { loadCssSources, walkCss, styleBlocksOf, blankComments } from './css-source.mjs';
+import { rawGapMatches } from './raw-gap.mjs';
+import { resolveNamingSpec, tokenToVar, withTextScaleKeys } from './naming-convention.mjs';
+import { createLocator, codeClassesIn } from './component-locator.mjs';
+import { pathToFileURL } from 'url';
+import { inProgressNames } from './in-progress.mjs';   // work in progress is not drift
+import { codeSnapshotPath, projectPath } from './names.mjs';
+import { loadCategories, requirementEntry } from './annotation-categories.mjs';
+
+const ROOT = process.cwd();
+
+// ── Load ds-config.json ───────────────────────────────────────────────────────
+let cfg = {};
+try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch {
+  console.error('❌ ds-config.json not found at project root.'); process.exit(1);
+}
+
+const THEME_PATHS   = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();   // themeCSS may be an array of files
+const THEME_PATH    = THEME_PATHS[0];
+const SNAPSHOT_PATH = cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json';
+const PLUGIN_CSS    = cfg.paths?.pluginCSS          ?? [];
+
+// ── Load structure-contract.mjs ───────────────────────────────────────────────
+let CONTRACT = {}, CSS_HEIGHT_RULES = {}, CSS_BASE_RULE_VARS = [], STATE_SELECTORS = [];
+let FIGMA_LAYOUT_TO_CSS = {}, FONT_SCALE_TO_CSS = {}, COMPONENT_CSS_SELECTORS = {};
+let CSS_PROPERTY_ASSERTIONS = [], SURFACE_CONTAINERS = [], BUTTON_CLASS_RULES = [];
+try {
+  const m = await import(pathToFileURL(join(ROOT, 'structure-contract.mjs')).href);
+  if (m.CONTRACT)                  CONTRACT                  = m.CONTRACT;
+  if (m.CSS_HEIGHT_RULES)          CSS_HEIGHT_RULES          = m.CSS_HEIGHT_RULES;
+  if (m.CSS_BASE_RULE_VARS)        CSS_BASE_RULE_VARS        = m.CSS_BASE_RULE_VARS;
+  if (m.STATE_SELECTORS)           STATE_SELECTORS           = m.STATE_SELECTORS;
+  if (m.FIGMA_LAYOUT_TO_CSS)       FIGMA_LAYOUT_TO_CSS       = m.FIGMA_LAYOUT_TO_CSS;
+  if (m.FONT_SCALE_TO_CSS)         FONT_SCALE_TO_CSS         = m.FONT_SCALE_TO_CSS;
+  if (m.COMPONENT_CSS_SELECTORS)   COMPONENT_CSS_SELECTORS   = m.COMPONENT_CSS_SELECTORS;
+  if (m.CSS_PROPERTY_ASSERTIONS)   CSS_PROPERTY_ASSERTIONS   = m.CSS_PROPERTY_ASSERTIONS;
+  if (m.SURFACE_CONTAINERS)        SURFACE_CONTAINERS        = m.SURFACE_CONTAINERS;
+  if (m.BUTTON_CLASS_RULES)        BUTTON_CLASS_RULES        = m.BUTTON_CLASS_RULES;
+} catch { /* optional - runs with empty contract */ }
+// Build mode (a project that starts from Figma): a component built without a structure-contract.mjs entry is
+// compared through the build convention (build-list.mjs), its facts taken from the Figma snapshot. The
+// project's own entries always win.
+if (cfg.build === true) {
+  const { projectDerivedContract } = await import('./build-list.mjs');
+  const loc = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS, codeClasses: codeClassesIn(ROOT, cfg) });
+  const naming = resolveNamingSpec(cfg);
+  const d = projectDerivedContract(ROOT, cfg, (n) => loc.classFor(n), (t) => tokenToVar(t, naming));
+  const unbuilt = await inProgressNames(ROOT, cfg);   // still to build: nothing to compare yet
+  const own = new Set(Object.keys(CONTRACT));   // the project's own entries win, whole
+  const built = (o) => Object.fromEntries(Object.entries(o).filter(([n]) => !unbuilt.has(n) && !own.has(n)));
+  CONTRACT = { ...built(d.CONTRACT), ...CONTRACT };
+  COMPONENT_CSS_SELECTORS = { ...built(d.COMPONENT_CSS_SELECTORS), ...COMPONENT_CSS_SELECTORS };
+  CSS_HEIGHT_RULES = { ...built(d.CSS_HEIGHT_RULES), ...CSS_HEIGHT_RULES };
+  FIGMA_LAYOUT_TO_CSS = { ...d.FIGMA_LAYOUT_TO_CSS, ...FIGMA_LAYOUT_TO_CSS };
+  const manual = new Set(CSS_BASE_RULE_VARS.map((a) => `${a.selector}|${a.prop}`));
+  CSS_BASE_RULE_VARS = [...d.CSS_BASE_RULE_VARS.filter((a) => { const n = a.key.split('/')[0]; return !unbuilt.has(n) && !own.has(n) && !manual.has(`${a.selector}|${a.prop}`); }), ...CSS_BASE_RULE_VARS];
+}
+
+// ── Load design-system-engine-map.mjs (EXPLICIT + SKIP_TOKENS for auto-derivation) ─────────
+let EXPLICIT = {}, SKIP_TOKENS = new Set();
+try {
+  const pm = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
+  if (pm.EXPLICIT)    EXPLICIT    = pm.EXPLICIT;
+  if (pm.SKIP_TOKENS) SKIP_TOKENS = pm.SKIP_TOKENS;
+} catch { /* optional */ }
+
+// ── Load component-state-bindings.json (written by --capture-import) ─────────
+// Format: { componentSetName: { variantName: { props, bindings: [{ token, bindingField, isText, depth }] } } }
+// Used to auto-derive CSS_BASE_RULE_VARS assertions without manual entries.
+let stateBindings = {};
+try {
+  stateBindings = JSON.parse(readFileSync(join(ROOT, 'component-state-bindings.json'), 'utf8'));
+} catch { /* optional - falls back to manual CSS_BASE_RULE_VARS only */ }
+
+// ── Load snapshot ─────────────────────────────────────────────────────────────
+let snap;
+try {
+  snap = JSON.parse(readFileSync(join(ROOT, SNAPSHOT_PATH), 'utf8'));
+  snap.components = withTextScaleKeys(snap.components);   // a bound typography variable reads as its scale key
+} catch {
+  console.log('\n❌ figma-structure.snapshot.json not found or unreadable.');
+  console.log('   Run /rms-design-system-engine Phase 1 to capture it.\n');
+  process.exit(1);
+}
+
+if (!Object.keys(CONTRACT).length && !STATE_SELECTORS.length) {
+  console.log('\n⏭  structure-contract.mjs not found or all exports empty.');
+  console.log('   Copy structure-contract.example.mjs → structure-contract.mjs and fill in your components.\n');
+  process.exit(0);
+}
+
+// ── Load CSS sources ──────────────────────────────────────────────────────────
+// themeCSS  - used for height rules and base-rule var checks (central declarations)
+// allCss    - theme + all plugin files, used for state selector checks
+//             (state rules often live in plugin/component files)
+// Each CSS entry (themeCSS / pluginCSS) is resolved agnostically: a local repo path OR an http(s)
+// URL. Compiled CSS is often not committed - it is a build artifact, sometimes served from a CDN the
+// repo only links to - so a URL entry is fetched. No assumption about framework or build tool.
+const isUrl        = s => /^https?:\/\//i.test(String(s));
+const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, '');
+async function loadCss(entry) {
+  if (isUrl(entry)) {
+    try {
+      const opts = AbortSignal.timeout ? { signal: AbortSignal.timeout(15000) } : {};
+      const res  = await fetch(entry, opts);
+      if (!res.ok) return { entry, ok: false, kind: 'url', err: `HTTP ${res.status}` };
+      return { entry, text: stripComments(await res.text()), ok: true, kind: 'url' };
+    } catch (e) { return { entry, ok: false, kind: 'url', err: e.message }; }
+  }
+  const abs = join(ROOT, entry);
+  if (!existsSync(abs)) return { entry, ok: false, kind: 'local' };
+  return { entry, text: stripComments(readFileSync(abs, 'utf8')), ok: true, kind: 'local' };
+}
+
+const themeSources  = await Promise.all(THEME_PATHS.map(loadCss));
+const pluginSources = await Promise.all(PLUGIN_CSS.map(loadCss));
+// Stylesheets the local theme files @import (css-source.mjs, the reader the code capture uses):
+// their rules count wherever a selector is looked up across all CSS.
+const importedSources = (() => {
+  const own = new Set(THEME_PATHS.filter(p => !isUrl(p)).map(p => resolvePath(ROOT, p)));
+  return loadCssSources(ROOT, THEME_PATHS.filter(p => !isUrl(p))).files
+    .filter(f => !own.has(f.abs)).map(f => ({ entry: f.file, text: f.text, ok: true, kind: 'import' }));
+})();
+// Value gates read the first theme file. In build mode every theme file counts: the components are built into their
+// own stylesheets, which the audit records as theme files after the token file (build-list.mjs).
+const ownTheme = cfg.build === true ? themeSources.filter(s => s.ok) : themeSources.slice(0, 1).filter(s => s.ok);
+let themeCSS = ownTheme.length ? ownTheme.map(s => s.text).join('\n') : null;
+const allCss = [...themeSources, ...importedSources, ...pluginSources].filter(s => s.ok).map(s => s.text).join('\n');
+// The CSS itself, for the rule index: an HTML entry contributes only its <style> blocks (never its
+// script text), and the theme counts with the files it @imports.
+const cssOnly = (s) => (/\.html?$/i.test(String(s.entry)) ? styleBlocksOf(s.text) : s.text);
+const themeRulesCSS = [...ownTheme, ...importedSources].filter(s => s.ok).map(cssOnly).join('\n');
+const allRulesCSS   = [...themeSources, ...importedSources, ...pluginSources].filter(s => s.ok).map(cssOnly).join('\n');
+
+// Rule indexes, built once. Each selector maps to the declarations that WIN for it, the way the
+// browser applies them (cascade layers, !important, source order; grouped selectors and nesting
+// read by css-source.mjs). @media blocks are overrides, not the base rule, so they are left out.
+const themeIndex = themeCSS ? buildBlockIndex(themeRulesCSS) : null;
+const lightIndex = themeIndex;
+const lightCSS   = themeCSS ? stripAtRules(themeCSS) : null;   // line-scan fallback text for complex selectors
+const allIndex   = buildBlockIndex(allRulesCSS);
+// Every rule, @media ones included, for checks that must see overrides too (phantom borders).
+const allRuleList = walkCss(blankComments(allRulesCSS), '').flatMap(r =>
+  r.selectors.map(sel => [sel.replace(/\s+/g, ' ').trim(), r.decls.map(d => `${d.prop}: ${d.value}${d.important ? ' !important' : ''};`).join('\n')]));
+
+// ── Preflight: is there real, COMPILED component CSS to check against? ─────────
+// This gate matches literal compiled selectors (e.g. `.button-primary.m`). Those never appear in
+// pre-processor SOURCE - a nested `.button-primary { &.m { … } }` only becomes `.button-primary.m`
+// after a build, and `@include`/`@use`/mixins never expand at all - regardless of framework or build
+// tool. A pluginCSS entry may be a local path or an http(s) URL; when it is empty, still un-compiled
+// source, or a URL that can't be fetched, the gate would silently report every component as
+// "missing" - which looks like a parity failure but is really a setup gap. Detect it up front and
+// exit 2 (cannot-verify) with instructions, instead of a bare fail.
+{
+  const SOURCE_EXT = /\.(vue|svelte|scss|sass|styl|less)$/i;   // any pre-processor / single-file-component source
+  // Pre-processor / SFC markers that prove a payload is source, not compiled CSS. NB: an inline
+  // `<style>` block is NOT itself a marker - a plugin that ships compiled CSS inside an HTML file
+  // is common and legitimate. So scan only the CSS (the <style> contents), never the surrounding
+  // HTML/JS, or a bitwise `&` or a `<style` tag in a <script> would read as a nested SCSS selector.
+  const SOURCE_MARKERS = /@(?:include|mixin|use|forward|extend|if|each|for|function)\b|(?:^|[{;\s])&[.:#>~+\s]/m;
+  // For an HTML payload, reduce it to the concatenated <style> block contents before scanning;
+  // a raw stylesheet (.css / .scss / URL body) is scanned as-is.
+  const cssOnly = text => {
+    const styles = [...String(text || '').matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]);
+    return styles.length ? styles.join('\n') : String(text || '');
+  };
+
+  const sourceLike  = pluginSources.filter(s =>
+    SOURCE_EXT.test(s.entry) || (s.ok && SOURCE_MARKERS.test(cssOnly(s.text))));
+  const fetchFailed = pluginSources.filter(s => s.kind === 'url' && !s.ok);
+
+  // Root selectors the contract expects a compiled stylesheet to contain (best-effort; empty is fine).
+  const expected = new Set();
+  const addSel = s => {
+    const m = String(s || '').match(/\.[A-Za-z_][\w-]*/); // first class token, e.g. ".button-primary"
+    if (m) expected.add(m[0]);
+  };
+  for (const c of Object.values(COMPONENT_CSS_SELECTORS)) for (const v of Object.values(c || {})) addSel(v);
+  for (const s of STATE_SELECTORS) addSel(s?.selector);
+  const expectedList = [...expected];
+  const foundAny     = expectedList.some(sel => allCss.includes(sel));
+
+  // The real signal that there is nothing to check against is: the contract names component
+  // selectors, yet NONE of them appear anywhere in the loaded CSS (theme + plugin). An empty
+  // pluginCSS is NOT itself the signal - many design systems keep component rules in the main/theme
+  // file, and this gate reads them from there. If the contract names no component selectors, there is
+  // nothing component-level to verify and the preflight stays quiet.
+  const selectorsMissing = expectedList.length > 0 && !foundAny;
+  const cannotVerify     = sourceLike.length > 0 || fetchFailed.length > 0 || selectorsMissing;
+
+  if (cannotVerify) {
+    console.log('\n🚧 Gate [3] STRUCTURE cannot run - no compiled component CSS to verify against.\n');
+    if (sourceLike.length)
+      console.log('   ❌ the CSS in ds-config.json → paths.pluginCSS is pre-processor source, not compiled CSS:');
+    else if (fetchFailed.length)
+      console.log('   ❌ a pluginCSS URL could not be fetched, so no compiled CSS was loaded:');
+    else
+      console.log('   ❌ none of the design system\'s component selectors were found in the CSS that is loaded:');
+
+    for (const s of sourceLike.slice(0, 10))  console.log(`        · ${s.entry}  (pre-processor / SFC source)`);
+    for (const s of fetchFailed.slice(0, 10)) console.log(`        · ${s.entry}  (${s.err})`);
+    if (!sourceLike.length && !fetchFailed.length && selectorsMissing) {
+      for (const s of expectedList.slice(0, 8)) console.log(`        · looked for ${s} - not present`);
+      if (PLUGIN_CSS.length === 0)
+        console.log('        (paths.pluginCSS is empty - if component CSS lives in a separate/compiled file, list it there.)');
+    }
+
+    console.log('\n   Why: this gate matches literal compiled selectors like `.button-primary.m`. In any');
+    console.log('   pre-processor / component source that selector is written nested');
+    console.log('   (`.button-primary { &.m { … } }`) and only exists after a build; mixins never expand.');
+    console.log('   Note: pluginCSS is auto-detected only from apps/*/ui.src.html (else list it explicitly).');
+    console.log('   A folder of .css dropped into the repo is NOT picked up - add its files to paths.pluginCSS.\n');
+    console.log('   Fix (pick one), then re-run - each pluginCSS entry may be a local path OR an http(s) URL:');
+    console.log('     1. Build the design system to compiled CSS (whatever your build tool) and list that');
+    console.log('        output in paths.pluginCSS. It is usually a build artifact, so run the build before');
+    console.log('        each audit (the compiled file is typically not committed).');
+    console.log('     2. If the compiled CSS is served from a URL, list that URL in paths.pluginCSS - it is');
+    console.log('        fetched. (Point it at the stylesheet the page links to, not the page itself.)');
+    console.log('   Do NOT point paths.pluginCSS at pre-processor source (.vue/.scss/…) - it reads as text');
+    console.log('   and mis-reports.\n');
+    process.exit(2);
+  }
+}
+
+// ── CSS utility helpers ───────────────────────────────────────────────────────
+// Both helpers take an explicit css string so they work on themeCSS or allCss.
+
+// stripAtRules - remove @media/@supports/@layer blocks (including nested braces)
+// so buildBlockIndex only indexes light-mode (top-level) rules.
+// Dark-mode overrides inside @media blocks would otherwise overwrite earlier entries.
+function stripAtRules(css) {
+  let result = '';
+  let depth = 0;
+  let inAt = false;
+  for (let i = 0; i < css.length; i++) {
+    if (!inAt && /^@(?:media|supports|layer|keyframes)/.test(css.slice(i))) {
+      while (i < css.length && css[i] !== '{') i++;
+      depth = 1; inAt = true;
+    } else if (inAt) {
+      if (css[i] === '{') depth++;
+      else if (css[i] === '}' && --depth === 0) inAt = false;
+    } else {
+      result += css[i];
+    }
+  }
+  return result;
+}
+
+// buildBlockIndex - parse CSS once into Map<normalizedSelector → winning declarations>. Every rule
+// for the selector counts (not only the longest one), and per property the one the browser applies
+// wins: normal layered < normal unlayered < !important unlayered < !important layered, then order.
+function buildBlockIndex(css) {
+  const bySel = new Map();
+  let order = 0;
+  for (const rule of walkCss(blankComments(css), '')) {
+    if (rule.atRules.some(a => !/^@(layer|supports)\b/i.test(a))) continue;
+    const layered = rule.atRules.some(a => /^@layer\b/i.test(a));
+    for (const sel of rule.selectors) {
+      const k = sel.replace(/\s+/g, ' ').trim();
+      if (!k) continue;
+      if (!bySel.has(k)) bySel.set(k, []);
+      for (const d of rule.decls) bySel.get(k).push({ ...d, order: order++, rank: d.important ? (layered ? 3 : 2) : (layered ? 0 : 1) });
+    }
+  }
+  const index = new Map();
+  for (const [k, decls] of bySel) {
+    const win = new Map();
+    for (const d of [...decls].sort((a, b) => (a.rank - b.rank) || (a.order - b.order))) win.set(d.prop, d);
+    index.set(k, [...win.values()].sort((a, b) => a.order - b.order).map(d => `  ${d.prop}: ${d.value}${d.important ? ' !important' : ''};`).join('\n'));
+  }
+  return index;
+}
+
+// findBlock - O(1) index lookup with linear-scan fallback for complex selectors.
+function findBlock(css, selector, index) {
+  if (index) {
+    // Exact match
+    if (index.has(selector)) return index.get(selector);
+    // Normalised-whitespace match (handles extra spaces in source)
+    const norm = selector.replace(/\s+/g, ' ').trim();
+    if (index.has(norm)) return index.get(norm);
+  }
+  // Fallback: original line-scan for selectors not found in the index
+  // (e.g. multi-selector rules `.a, .b { }`, or selectors with combinators)
+  const lines   = css.split('\n');
+  const escaped = selector.split(/\s+/).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+  const pat     = new RegExp('^\\s*' + escaped + '(?![.\\w-])\\s*\\{');
+  const start   = lines.findIndex(l => pat.test(l));
+  if (start < 0) return null;
+  if (/\}/.test(lines[start])) { const m = lines[start].match(/\{([^}]*)\}/); return m ? m[1] : ''; }
+  const block = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^\s*\}/.test(lines[i])) break;
+    block.push(lines[i]);
+  }
+  return block.join('\n');
+}
+
+// A variant mapped as the base class plus a modifier (.tag.tag--positive) is also met by a rule on the modifier
+// alone (.tag--positive): the class is only ever on the component's element, so the two select the same thing.
+function modifierFound(selector) {
+  const parts = String(selector).trim().match(/^(\.[\w-]+)((?:\.[\w-]+)+)$/);
+  if (!parts) return false;
+  const rest = parts[2];
+  return findBlock(allCss, rest, allIndex) !== null;
+}
+
+function extractPropVar(block, prop) {
+  const re = new RegExp('(?<![a-zA-Z-])' + prop + '\\s*:\\s*([^;\\n]+)');
+  const m  = block?.match(re);
+  if (!m) return null;
+  const val = m[1].trim();
+  const allVars = [...val.matchAll(/var\((--[\w-]+)/g)].map(v => v[1]);
+  if (!allVars.length) return null;
+  // For a border shorthand (`border`, `border-top|right|bottom|left` - each is width style
+  // color), the color var is always the LAST var(). `border-color`/`border-*-color`,
+  // `border-width`, `border-radius` etc. are single-purpose → first var(). For everything
+  // else, the first var() is the expected one.
+  const isBorderShorthand = /^border(-(top|right|bottom|left))?$/.test(prop);
+  return isBorderShorthand ? allVars[allVars.length - 1] : allVars[0];
+}
+
+function selectorExists(css, selector) {
+  const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[,\\n])\\s*${esc}\\s*(?:,|\\{)`, 'm').test(css);
+}
+
+// propHasVar / propActual - hoisted here so Gate [3j] can share them with Gate [3b]
+function propHasVar(block, prop, expectedVar) {
+  if (!block || !expectedVar) return false;
+  const re = new RegExp('(?<![a-zA-Z-])' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*([^;]+)');
+  const m  = block.match(re);
+  return m ? new RegExp(`var\\(\\s*${expectedVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[,)]`).test(m[1]) : false;
+}
+function propActual(block, prop) {
+  if (!block) return '(not set)';
+  const re = new RegExp('(?<![a-zA-Z-])' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*([^;]+)');
+  const m  = block?.match(re);
+  return m ? m[1].trim().slice(0, 60) : '(not set)';
+}
+
+// The four padding sides a rule sets, read like the browser: the shorthand, then physical and logical
+// longhands in order (last wins; logical sides assume left-to-right). Values are the raw expressions.
+function paddingSides(block) {
+  const sides = { top: null, right: null, bottom: null, left: null };
+  if (!block) return sides;
+  const split = (v) => v.trim().match(/(?:[^\s()]+|\((?:[^()]|\([^()]*\))*\))+/g) ?? [];
+  for (const m of block.matchAll(/(?<![a-zA-Z-])(padding(?:-(?:top|right|bottom|left|inline|block|inline-start|inline-end|block-start|block-end))?)\s*:\s*([^;\n]+)/g)) {
+    const prop = m[1], v = m[2].replace(/!important/, '').trim(), p = split(v);
+    if (prop === 'padding') {
+      const [a, b = a, c = a, d = b] = p;
+      Object.assign(sides, { top: a, right: b, bottom: c, left: d });
+    } else if (prop === 'padding-inline') { sides.left = p[0]; sides.right = p[1] ?? p[0]; }
+    else if (prop === 'padding-block') { sides.top = p[0]; sides.bottom = p[1] ?? p[0]; }
+    else {
+      const side = { 'padding-top': 'top', 'padding-right': 'right', 'padding-bottom': 'bottom', 'padding-left': 'left',
+        'padding-inline-start': 'left', 'padding-inline-end': 'right', 'padding-block-start': 'top', 'padding-block-end': 'bottom' }[prop];
+      if (side) sides[side] = v;
+    }
+  }
+  return sides;
+}
+const usesVar = (expr, v) => !!expr && new RegExp(`var\\(\\s*${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[,)]`).test(expr);
+
+// ── 1. Snapshot vs CONTRACT ───────────────────────────────────────────────────
+const components = snap.components ?? {};
+const UNIMPLEMENTED_SET = await inProgressNames(ROOT, cfg);
+const FAIL = [], PASS = [], MISSING = [];
+const UNCONTRACTED = []; // DS components absent from both contract and knownUnimplementedComponents
+
+// Load component-props snapshot to get the authoritative list of all DS components.
+// Build a set of all Figma component names covered by the contract (including figmaName aliases).
+const CONTRACTED_FIGMA_NAMES = new Set([
+  ...Object.keys(CONTRACT),
+  ...Object.values(CONTRACT).map(e => e.figmaName).filter(Boolean),
+]);
+const UNCONTRACTED_SET = new Set();
+function noteUncontracted(name) {
+  if (name.startsWith('_')) return;
+  if (CONTRACTED_FIGMA_NAMES.has(name) || UNIMPLEMENTED_SET.has(name)) return;
+  if (UNCONTRACTED_SET.has(name)) return;
+  UNCONTRACTED_SET.add(name);
+  UNCONTRACTED.push(name);
+}
+const COMP_PROPS_PATH = cfg.paths?.compPropsSnapshot;
+if (COMP_PROPS_PATH) {
+  try {
+    const compProps = JSON.parse(readFileSync(join(ROOT, COMP_PROPS_PATH), 'utf8'));
+    for (const name of Object.keys(compProps)) noteUncontracted(name);
+  } catch { /* optional */ }
+}
+// The component-props snapshot only lists components that HAVE variant/boolean properties, so a
+// propertyless component (a single-variant COMPONENT like `loader`, or a set whose props didn't
+// register) never appears there and slipped through unverified. The STRUCTURE snapshot is the
+// fuller list — every component captured with real structural facts. Treat it as authoritative too:
+// anything captured there but absent from the contract is unverified and must be flagged.
+for (const name of Object.keys(components)) noteUncontracted(name);
+
+const SCALAR_FIELDS = ['h', 'gapVar', 'fontSizeVar', 'fontWeightVar', 'fillStructure', 'innerRadiusVar', 'strokeOnDefault'];
+
+// A CONTRACT entry is "structural" if it declares at least one structural field.
+// Entries that only carry propertyMap (no h/gapVar/etc.) skip snapshot comparison.
+function hasStructuralFields(entry) {
+  return SCALAR_FIELDS.some(f => entry[f] !== undefined) || entry.paddingVar !== undefined
+      || entry.children !== undefined;
+}
+
+for (const [name, expect] of Object.entries(CONTRACT)) {
+  if (!hasStructuralFields(expect)) continue; // propertyMap-only entry - skip snapshot check
+  const got = components[name];
+  if (!got) { MISSING.push(name); continue; }
+  // sizing:'hug' — the component hugs its content, so its captured `h` is a measurement
+  // that drifts by a sub-pixel or a content tweak with no fixed code height to enforce. Skip
+  // the exact-`h` contract↔snapshot comparison for it (the height is informational), so a hug
+  // component's 20→19px re-measure doesn't churn and doesn't force a paired contract edit. Every
+  // other structural field is still compared. Default (no `sizing`, or 'fixed') is unchanged.
+  const skipH = expect.sizing === 'hug';
+  for (const f of SCALAR_FIELDS) {
+    if (f === 'h' && skipH) continue;
+    if (expect[f] !== got[f])
+      FAIL.push({ component: name, field: f, expected: expect[f], got: got[f] });
+  }
+  for (const side of ['tb', 'lr']) {
+    const e = expect.paddingVar?.[side] ?? null, g = got.paddingVar?.[side] ?? null;
+    if (e !== g) FAIL.push({ component: name, field: `paddingVar.${side}`, expected: e, got: g });
+  }
+  // Root gapPx: a raw/flush root gap pinned in the contract (gapVar null). When both sides carry it,
+  // a DS-side change to it (e.g. flush 0 → a real gap) is a divergence. (The CSS side is enforced
+  // in the per-component gap check below.) Only compared when the snapshot captured it, so older
+  // snapshots without root gapPx don't churn.
+  if (typeof expect.gapPx === 'number' && typeof got.gapPx === 'number' && expect.gapPx !== got.gapPx)
+    FAIL.push({ component: name, field: 'gapPx', expected: expect.gapPx, got: got.gapPx });
+
+  // Child-frame gap/padding bindings: snapshot childFrameGaps/childFramePadding vs contract.children.
+  // Catches DS-side spacing rebinds on inner frames (e.g. a toast content gap changed from gap/s
+  // to gap/m) that root-level fields cannot see. Every child binding in the snapshot must have a
+  // contracted expectation, and every contracted binding must still exist in Figma.
+  const contractChildren = expect.children ?? [];
+  const contractChildPad = [...contractChildren, ...(expect.childFramePadding ?? [])];
+  for (const sc of got.childFrameGaps ?? []) {
+    const c = contractChildren.find(k => k.name === sc.name);
+    if (!c) {
+      // A BOUND gap (a real DS token on an inner frame) must be contracted. An UNBOUND gap
+      // (gapVar null, only a raw gapPx — captured so flush/raw inner frames are visible) is NOT
+      // a hard requirement: contracting every raw inner gap would flood the contract, so it is
+      // only enforced when the author opts in with a children entry carrying gapPx. Ignore here.
+      if (sc.gapVar) FAIL.push({ component: name, field: `children.${sc.name}.gapVar`, expected: '(uncontracted - add a children entry)', got: sc.gapVar });
+      continue;
+    }
+    if ((c.gapVar ?? null) !== (sc.gapVar ?? null))
+      FAIL.push({ component: name, field: `children.${sc.name}.gapVar`, expected: c.gapVar ?? null, got: sc.gapVar ?? null });
+    // When both sides pin a raw px gap, a DS-side change to it (e.g. flush 0 → 4px) is a divergence.
+    if (typeof c.gapPx === 'number' && typeof sc.gapPx === 'number' && c.gapPx !== sc.gapPx)
+      FAIL.push({ component: name, field: `children.${sc.name}.gapPx`, expected: c.gapPx, got: sc.gapPx });
+  }
+  for (const c of contractChildren) {
+    if (c.gapVar && !(got.childFrameGaps ?? []).some(k => k.name === c.name))
+      FAIL.push({ component: name, field: `children.${c.name}.gapVar`, expected: c.gapVar, got: '(no longer bound in Figma)' });
+  }
+  for (const sc of got.childFramePadding ?? []) {
+    const c = contractChildPad.find(k => k.name === sc.name);
+    if (!c) { FAIL.push({ component: name, field: `children.${sc.name}.paddingVar`, expected: '(uncontracted - add a children entry)', got: sc.paddingVar }); continue; }
+    for (const side of ['tb', 'lr']) {
+      const e = c.paddingVar?.[side] ?? null, g = sc.paddingVar?.[side] ?? null;
+      if (e !== g) FAIL.push({ component: name, field: `children.${sc.name}.paddingVar.${side}`, expected: e, got: g });
+    }
+  }
+  for (const c of contractChildPad) {
+    if ((c.paddingVar?.tb || c.paddingVar?.lr) && !(got.childFramePadding ?? []).some(k => k.name === c.name))
+      FAIL.push({ component: name, field: `children.${c.name}.paddingVar`, expected: c.paddingVar, got: '(no longer bound in Figma)' });
+  }
+
+  if (!FAIL.some(x => x.component === name)) PASS.push(name);
+}
+
+const extra = Object.keys(components).filter(c => !CONTRACT[c]);
+
+// ── CSS var resolver (shared by height checks and pill geometry checks) ───────
+const cssVars = {};
+if (themeCSS) {
+  let inRoot = false, rootDepth = 0, rootContent = '';
+  // The base values only: a :root inside @media (dark mode, a breakpoint's sizes) holds another mode's values.
+  const baseCSS = themeCSS.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).replace(/@(media|supports|container)\b[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/g, '');
+  for (const line of baseCSS.split('\n')) {
+    if (!inRoot && /:root\s*\{/.test(line)) { inRoot = true; rootDepth = 1; continue; }
+    if (inRoot) {
+      rootDepth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+      if (rootDepth <= 0) { inRoot = false; continue; }
+      rootContent += line + '\n';
+    }
+  }
+  for (const m of rootContent.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) cssVars[`--${m[1]}`] = m[2].trim();
+}
+function resolveVar(val, d = 0) {
+  if (d > 8) return val;
+  const m = String(val).match(/^var\((--[\w-]+)\)/);
+  if (m && cssVars[m[1]]) return resolveVar(cssVars[m[1]], d + 1);
+  return val;
+}
+function toPx(val) {
+  const r = resolveVar(val.trim()), m = String(r).match(/^(\d+(?:\.\d+)?)px/);
+  return m ? Math.round(parseFloat(m[1])) : null;
+}
+
+// ── 2. CSS height cross-check ─────────────────────────────────────────────────
+const CSS_FAIL = [], CSS_PASS = [];
+
+if (themeCSS) {
+  for (const [comp, rule] of Object.entries(CSS_HEIGHT_RULES)) {
+    const contractH = CONTRACT[comp]?.h;
+    if (contractH === undefined || contractH === 'auto') { CSS_PASS.push(comp); continue; }
+    const block = findBlock(themeCSS, rule.selector, themeIndex);
+    if (!block) { CSS_FAIL.push(`${comp}: selector "${rule.selector}" not found in theme CSS`); continue; }
+    const propPattern = rule.prop === 'height' ? '(?<!-)height' : 'min-height';
+    const hMatch = block.match(new RegExp(propPattern + '\\s*:\\s*([^;\\n]+)'));
+    if (!hMatch) { CSS_FAIL.push(`${comp}: "${rule.prop}" not set - contract expects ${contractH}px`); continue; }
+    const cssPx = toPx(hMatch[1]);
+    if (cssPx === null) CSS_FAIL.push(`${comp}: could not resolve "${hMatch[1].trim()}" to px`);
+    else if (cssPx !== contractH) CSS_FAIL.push(`${comp}: CSS ${rule.prop} is ${cssPx}px - contract expects ${contractH}px`);
+    else CSS_PASS.push(comp);
+  }
+}
+
+// ── 3. CSS base-rule var bindings ─────────────────────────────────────────────
+// Auto-derives assertions from component-state-bindings.json × CONTRACT.propertyMap.
+// Manual CSS_BASE_RULE_VARS entries always win over auto-derived for the same selector+prop.
+
+// Convert a Figma token name → expected CSS var name via EXPLICIT map + convention.
+// Returns null if the token should be skipped (EXPLICIT null, SKIP_TOKENS, or rgba-only).
+const NAMING = resolveNamingSpec(cfg);
+function tokenToExpectedVar(token) {
+  if (Object.prototype.hasOwnProperty.call(EXPLICIT, token)) return EXPLICIT[token]; // null means skip
+  if (SKIP_TOKENS.has(token)) return null;
+  return tokenToVar(token, NAMING);
+}
+
+// extractPropVar for border-color: falls back to border: shorthand (returns last var).
+function extractPropVarWithFallback(block, prop) {
+  const v = extractPropVar(block, prop);
+  if (v !== null) return v;
+  if (prop === 'border-color') return extractPropVar(block, 'border');
+  if (prop === 'background-color') return extractPropVar(block, 'background');
+  return null;
+}
+
+// Build auto-derived assertions using naming convention:
+//   Figma component set name → CSS base selector (convention: lowercase first letter)
+//   Figma variant props       → CSS modifier (standard state map: hover → :hover, etc.)
+//   cfg.componentSelectors    → project-specific overrides for non-convention selectors
+//
+// Only standard, universally-derivable state values are mapped. Unknown values (e.g.
+// "negative", "selected", "true") return null → that variant is skipped → no false positives.
+// Manual CSS_BASE_RULE_VARS entries handle non-standard states.
+
+const STANDARD_STATE_MODIFIER = {
+  'default':      '',
+  'hover':        ':hover',
+  'focus':        ':focus',
+  'active':       ':active',
+  'pressed':      ':active',
+  'focus-within': ':focus-within',
+  'false':        '', // "Disabled=False", "Selected=False" → base selector
+};
+
+// The one shared component finder (component-locator.mjs): componentSelectors, then the
+// contract's COMPONENT_CSS_SELECTORS main, then the naming convention.
+const LOCATOR = createLocator(cfg, { contractSelectors: COMPONENT_CSS_SELECTORS, codeClasses: codeClassesIn(ROOT, cfg) });
+const componentToBaseSelector = (name) => LOCATOR.selectorFor(name);
+
+function variantToModifier(props) {
+  const mods = [];
+  for (const [, val] of Object.entries(props)) {
+    if (!Object.prototype.hasOwnProperty.call(STANDARD_STATE_MODIFIER, val)) return null; // unknown → skip variant
+    const m = STANDARD_STATE_MODIFIER[val];
+    if (m && !mods.includes(m)) mods.push(m);
+  }
+  return mods.join('');
+}
+
+// The colour a part of the component sets: a rule for .base__part, .base-part or .base .x, read the way the base
+// rule is read.
+function partColor(css, base) {
+  const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const part = new RegExp(`^${esc}(__|-)[\\w-]+$|^${esc}\\s+[^,]+$`);
+  for (const m of String(css).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+    if (!splitSelectors(m[1]).some((sel) => part.test(sel))) continue;
+    const v = extractPropVarWithFallback(m[2], 'color');
+    if (v) return v;
+  }
+  return null;
+}
+
+const autoAssertions = [];
+if (Object.keys(stateBindings).length) {
+  for (const [compSetName, variants] of Object.entries(stateBindings)) {
+    if (compSetName.startsWith('_') || !variants || typeof variants !== 'object') continue;   // _updated, _source, _built: the capture's own notes
+    const baseSelector = componentToBaseSelector(compSetName);
+    for (const { props, bindings } of Object.values(variants)) {
+      if (!Array.isArray(bindings)) continue;
+      const modifier = variantToModifier(props);
+      if (modifier === null) continue;
+      const selector = baseSelector + modifier;
+      const emitted  = new Set();
+      for (const { token, bindingField, isText, depth } of bindings) {
+        if (depth === 1 && !isText) continue; // skip non-text depth-1 children (icon SVGs)
+        if (depth > 1) continue;
+        let cssProp;
+        if      (bindingField === 'fills')   cssProp = isText ? 'color' : 'background';
+        else if (bindingField === 'strokes') cssProp = 'border-color';
+        else continue;
+        if (emitted.has(cssProp)) continue;
+        emitted.add(cssProp);
+        const expectedVar = tokenToExpectedVar(token);
+        if (!expectedVar) continue;
+        autoAssertions.push({ key: `auto:${compSetName}/${modifier || 'default'}/${cssProp}`, selector, prop: cssProp, expectedVar, _auto: true });
+      }
+    }
+  }
+}
+
+// Merge: auto-derived first, manual CSS_BASE_RULE_VARS override by selector+prop key.
+const assertionMap = new Map();
+for (const a of autoAssertions)     assertionMap.set(`${a.selector}|${a.prop}`, a);
+for (const a of CSS_BASE_RULE_VARS) assertionMap.set(`${a.selector}|${a.prop}`, a); // manual wins
+const ALL_ASSERTIONS = [...assertionMap.values()];
+
+const VAR_FAIL = [], VAR_PASS = [];
+
+if (lightCSS) {
+  for (const rule of ALL_ASSERTIONS) {
+    const block = findBlock(lightCSS, rule.selector, lightIndex);
+    if (!block) { VAR_FAIL.push(`${rule.key}: selector "${rule.selector}" not found`); continue; }
+    let usedVar = extractPropVarWithFallback(block, rule.prop);
+    // A text colour set on the component's own text part (.field__input inside .field) is the component's text colour.
+    if (!usedVar && rule.prop === 'color') usedVar = partColor(allRulesCSS, rule.selector);
+    if (!usedVar) VAR_FAIL.push(`${rule.key}: "${rule.prop}" not set in "${rule.selector}"`);
+    else if (usedVar !== rule.expectedVar) VAR_FAIL.push(`${rule.key}: "${rule.selector}" ${rule.prop} uses ${usedVar} - expected ${rule.expectedVar}`);
+    else VAR_PASS.push(rule.key);
+  }
+}
+
+// ── 4. State/variant selectors + var bindings ─────────────────────────────────
+// Full chain per state:
+//   (a) selector exists in CSS (theme or plugin files)
+//   (b) for each declared var: selector's rule uses the expected token var
+//
+// Token values are verified by Gate [2] - this gate verifies the wiring.
+const SELECTOR_FAIL = [], SELECTOR_PASS = [];
+
+for (const entry of STATE_SELECTORS) {
+  const label = `${entry.component} [${entry.figmaState}] "${entry.selector}"`;
+
+  // (a) Selector existence
+  if (!selectorExists(allCss, entry.selector)) {
+    SELECTOR_FAIL.push({ label, issue: 'selector not found in any CSS file' });
+    continue;
+  }
+
+  // (b) Var bindings (if declared)
+  if (!entry.vars?.length) {
+    SELECTOR_PASS.push(label);
+    continue;
+  }
+
+  const block = findBlock(allCss, entry.selector, allIndex);
+  if (!block) {
+    SELECTOR_FAIL.push({ label, issue: 'selector found but rule block could not be parsed' });
+    continue;
+  }
+
+  let allVarsPass = true;
+  for (const v of entry.vars) {
+    const usedVar = extractPropVar(block, v.prop);
+    if (!usedVar) {
+      SELECTOR_FAIL.push({ label, issue: `"${v.prop}" not set in rule`, expected: v.expectedVar });
+      allVarsPass = false;
+    } else if (usedVar !== v.expectedVar) {
+      SELECTOR_FAIL.push({ label, issue: `"${v.prop}" uses ${usedVar} - expected ${v.expectedVar}` });
+      allVarsPass = false;
+    }
+  }
+  if (allVarsPass) SELECTOR_PASS.push(label);
+}
+
+// ── 5. CSS property binding checks ───────────────────────────────────────────
+// Verifies each component's CSS rule uses the Figma-bound CSS var for key layout
+// properties. Catches right-value-wrong-var bugs (e.g. gap: var(--padding-m) when
+// gap/m and padding/m have the same px but differ by DS spec).
+// Only runs when COMPONENT_CSS_SELECTORS is exported from structure-contract.mjs.
+const PROP_FAIL = [], PROP_PASS = [];
+
+if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length) {
+  for (const [comp, contract] of Object.entries(CONTRACT)) {
+    const selCfg = COMPONENT_CSS_SELECTORS[comp];
+    if (!selCfg) continue;
+
+    const mainBlock   = findBlock(themeCSS, selCfg.main, themeIndex);
+    const gapBlock    = selCfg.gapSel    ? findBlock(themeCSS, selCfg.gapSel,    themeIndex) : mainBlock;
+    const fontBlock   = selCfg.fontSel   ? findBlock(themeCSS, selCfg.fontSel,   themeIndex) : mainBlock;
+    const radiusBlock = selCfg.radiusSel ? findBlock(themeCSS, selCfg.radiusSel, themeIndex) : mainBlock;
+
+    if (!mainBlock) {
+      PROP_FAIL.push(`${comp}: selector "${selCfg.main}" not found in theme CSS`);
+      continue;
+    }
+
+    const check = (label, block, prop, expectedVar, sel) => {
+      if (!expectedVar) return;
+      if (!block) { PROP_FAIL.push(`${comp}/${label}: selector "${sel}" not found`); return; }
+      if (propHasVar(block, prop, expectedVar)) {
+        PROP_PASS.push(`${comp}/${label}`);
+      } else {
+        PROP_FAIL.push(`${comp}/${label}: expected var(${expectedVar}) in "${prop}" - got: ${propActual(block, prop)}`);
+      }
+    };
+
+    if (contract.gapVar) {
+      // gap, or the axis-specific row-gap / column-gap, may carry the token.
+      const gv = FIGMA_LAYOUT_TO_CSS[contract.gapVar];
+      const gprop = ['gap', 'column-gap', 'row-gap'].find(p => propHasVar(gapBlock, p, gv)) ?? 'gap';
+      check('gap', gapBlock, gprop, gv, selCfg.gapSel ?? selCfg.main);
+    }
+    else if (typeof contract.gapPx === 'number') {
+      // Root gap the DS renders as a raw literal, INCLUDING 0 (a flush root — e.g. a button whose
+      // label sits against the icon with only the LabelContainer padding). Token-bound root gaps go
+      // through gapVar above; this is the UNBOUND case the child-frame gapPx check couldn't see
+      // (it only walks children). It is exactly how all four buttons drifted: the DS root is flush
+      // (rootGap 0) but the code added gap/s on top of the span padding, doubling the label↔icon gap.
+      const sel = selCfg.gapSel ?? selCfg.main;
+      if (!gapBlock) PROP_FAIL.push(`${comp}/gap: selector "${sel}" not found`);
+      else {
+        const m = gapBlock.match(/(?<![a-zA-Z-])gap\s*:\s*([^;\n]+)/);
+        const got = m ? m[1].trim() : null;
+        if (rawGapMatches(got, contract.gapPx)) PROP_PASS.push(`${comp}/gap`);
+        else PROP_FAIL.push(`${comp}/gap: "${got ?? '(not set)'}" ≠ ${contract.gapPx === 0 ? '0' : contract.gapPx + 'px'} [raw ${contract.gapPx}px root gap]`);
+      }
+    }
+    // Padding by side: top and bottom must both use the tb token, left and right the lr token, so a
+    // swapped shorthand (`padding: var(--lr) var(--tb)`) fails and padding-inline/-block count.
+    const sides = paddingSides(mainBlock);
+    const checkSides = (label, pair, expectedVar) => {
+      if (!expectedVar) return;
+      const bad = pair.filter(s => !usesVar(sides[s], expectedVar));
+      if (!bad.length) PROP_PASS.push(`${comp}/${label}`);
+      else PROP_FAIL.push(`${comp}/${label}: expected var(${expectedVar}) on ${pair.join(' and ')} - got ${pair.map(s => `${s} ${sides[s] ?? '(not set)'}`).join(', ')}`);
+    };
+    if (contract.paddingVar?.tb && !selCfg.skipTBPadding)
+      checkSides('padding-tb', ['top', 'bottom'], FIGMA_LAYOUT_TO_CSS[contract.paddingVar.tb]);
+    if (contract.paddingVar?.lr && !selCfg.skipLRPadding)
+      checkSides('padding-lr', ['left', 'right'], FIGMA_LAYOUT_TO_CSS[contract.paddingVar.lr]);
+    if (contract.fontSizeVar)
+      check('font-size', fontBlock, 'font-size', FONT_SCALE_TO_CSS[contract.fontSizeVar]?.size, selCfg.fontSel ?? selCfg.main);
+    if (contract.fontWeightVar)
+      check('font-weight', fontBlock, 'font-weight', FONT_SCALE_TO_CSS[contract.fontWeightVar]?.weight, selCfg.fontSel ?? selCfg.main);
+    if (contract.innerRadiusVar)
+      check('radius', radiusBlock, 'border-radius', FIGMA_LAYOUT_TO_CSS[contract.innerRadiusVar], selCfg.radiusSel ?? selCfg.main);
+  }
+}
+
+// ── Gate [3b]: Border-sides check ────────────────────────────────────────────
+// When contract.strokeSides is set, verifies the CSS uses exactly those border sides.
+//   'bottom' → must have border-bottom; must NOT have bare "border:" shorthand
+//   'all'    → must have bare "border:" shorthand
+// This catches the specific class of bug where all-sides border is used when only
+// a bottom divider is correct (or vice versa).
+// strokeSides values:
+//   'all'                        - CSS must use the `border:` shorthand.
+//   'top'|'right'|'bottom'|'left'- CSS must use `border-<side>:` and NOT the shorthand.
+//   'none'                       - the component draws NO border of its own (its stroke flag
+//                                  comes from a nested sub-component or a consumer wrapper, not
+//                                  its own frame - e.g. sectionHeader's nested buttonSecondary).
+//                                  Documents that and skips the CSS side assertion.
+const BSIDES_FAIL = [], BSIDES_PASS = [];
+// A strokeful component that omits strokeSides used to be silently skipped - which is
+// exactly how a full-border ("border:") bug reaches a component that Figma strokes on
+// only one side (moreMenu, 2026-08). So strokeSides is now MANDATORY whenever Figma
+// draws any stroke: an undeclared strokeful component fails here unless it is explicitly
+// parked in ds-config.json → knownUndeclaredStrokeSides (same escape-hatch pattern as the
+// other known* lists). Park entries are tech-debt, not exemptions - declare the real value
+// per Figma as each is verified, and remove it from the list.
+const STROKESIDES_SKIP = new Set(cfg.knownUndeclaredStrokeSides ?? []);
+const SIDE_NAMES = new Set(['top', 'right', 'bottom', 'left']);
+
+if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length) {
+  for (const [comp, contract] of Object.entries(CONTRACT)) {
+    if (!contract.strokeSides) {
+      const hasStroke = contract.strokeOnDefault || contract.strokeOnAnyState;
+      if (hasStroke && COMPONENT_CSS_SELECTORS[comp] && !STROKESIDES_SKIP.has(comp)) {
+        BSIDES_FAIL.push(`${comp}/stroke-sides: Figma strokes this component but the contract omits strokeSides - declare 'all', a single side ('top'|'right'|'bottom'|'left'), or 'none' if the stroke is only on a nested sub-component (or park in knownUndeclaredStrokeSides)`);
+      }
+      continue;
+    }
+    // 'none' documents a component with no own border - nothing to assert in CSS.
+    if (contract.strokeSides === 'none') { BSIDES_PASS.push(`${comp}/stroke-sides (none - no own border)`); continue; }
+    const selCfg = COMPONENT_CSS_SELECTORS[comp];
+    if (!selCfg) continue;   // declared but no base selector to verify against (plugin-side border)
+    // The border commonly lives on the same child element as the radius (a visual box inside the
+    // component root - e.g. a checkbox's `.checkbox-mark`), not on `main`. Honour strokeSel, then
+    // radiusSel, then main, so a component whose border is on a child is still verified correctly.
+    const borderSel = selCfg.strokeSel ?? selCfg.radiusSel ?? selCfg.main;
+    const mainBlock = findBlock(themeCSS, borderSel, themeIndex);
+    if (!mainBlock) { BSIDES_FAIL.push(`${comp}/stroke-sides: selector "${borderSel}" not found`); continue; }
+
+    // \bborder\s*: matches the bare "border:" shorthand but NOT "border-bottom:", "border-radius:", etc.
+    const hasShorthand = /\bborder\s*:/.test(mainBlock);
+    // Figma's stroke drawn inside the box, as Figma draws an inside stroke: an inset ring that adds no size
+    // (box-shadow: inset 0 0 0 <width> <colour>) is an all-sides stroke too.
+    const insetRing = /\bbox-shadow\s*:[^;]*\binset\s+0(px)?\s+0(px)?\s+0(px)?\s+(var\([^)]*\)|[\d.]+px)/.test(mainBlock);
+
+    if (contract.strokeSides === 'all') {
+      if (!hasShorthand && insetRing) BSIDES_PASS.push(`${comp}/stroke-sides (inside, an inset ring)`);
+      else if (!hasShorthand) BSIDES_FAIL.push(`${comp}/stroke-sides: CSS missing "border:" shorthand - contract says all-sides stroke`);
+      else BSIDES_PASS.push(`${comp}/stroke-sides`);
+    } else if (SIDE_NAMES.has(contract.strokeSides)) {
+      const side = contract.strokeSides;
+      const hasSide = new RegExp(`\\bborder-${side}\\s*:`).test(mainBlock);
+      if (hasShorthand) BSIDES_FAIL.push(`${comp}/stroke-sides: CSS uses "border:" (all sides) - contract says border-${side} only`);
+      else if (!hasSide) BSIDES_FAIL.push(`${comp}/stroke-sides: CSS missing "border-${side}" - contract says ${side} stroke only`);
+      else BSIDES_PASS.push(`${comp}/stroke-sides`);
+    } else {
+      BSIDES_FAIL.push(`${comp}/stroke-sides: unknown strokeSides value "${contract.strokeSides}" - use 'all', 'top'|'right'|'bottom'|'left', or 'none'`);
+    }
+  }
+}
+
+// ── Gate [3c]: Phantom CSS borders ───────────────────────────────────────────
+// Scans EVERY CSS rule whose selector contains a component's base class and flags
+// any `border` or `outline` property when Figma has no stroke on any variant.
+//
+// Uses snapshot.strokeOnAnyState (walk all COMPONENT_SET children) when present;
+// falls back to strokeOnDefault (default-variant only) when the field is absent.
+//
+// Focus rules (:focus, :focus-visible, :focus-within) are never flagged: their outline or border is the focus
+// indicator. Other exceptions: add selector strings to ds-config.json → knownPhantomBorderExceptions.
+const PHANTOM_FAIL = [], PHANTOM_PASS = [];
+const PHANTOM_SKIP = new Set(cfg.knownPhantomBorderExceptions ?? []);
+
+// Matches border/outline properties but NOT border-radius or border-spacing.
+const BORDER_PROP_RE = /\b(border(?:-(?:top|right|bottom|left|color|width|style))?|outline(?:-(?:color|width|style))?)\s*:/;
+// Values that represent no visible stroke - don't flag these.
+// Catches: "none", "0", "0px", "transparent", "1px solid transparent", "var(--x) solid transparent"
+const TRANSPARENT_VAL_RE = /\btransparent\b|^\s*(?:none|0(?:px)?)\s*(?:!important)?\s*$/i;
+
+if (Object.keys(components).length) {
+  // Build flat list of (selector, block) from allIndex once, reuse per component.
+  const allRules = allRuleList; // [selector, declarations] for every rule, @media overrides included
+
+  // Every component Figma has, found in the code as the other checks find it: the contract's selector, else the
+  // shared component finder (a component with no entry of its own, a panel drawn by its class alone, is checked too).
+  const located = Object.keys(components).filter((c) => !c.startsWith('_')).map((comp) => [comp, COMPONENT_CSS_SELECTORS[comp] ?? { main: LOCATOR.selectorFor(comp) }]).filter(([, sc]) => sc?.main && /^[.]/.test(sc.main));
+  for (const [comp, selCfg] of located) {
+    const snapComp = components[comp];
+    if (!snapComp) continue;
+
+    // strokeOnAnyState = explicit field when available; fallback to strokeOnDefault.
+    const hasAnyStroke = snapComp.strokeOnAnyState ?? snapComp.strokeOnDefault ?? false;
+    if (hasAnyStroke) {
+      PHANTOM_PASS.push(`${comp} (Figma has stroke - CSS borders permitted)`);
+      continue;
+    }
+
+    // Extract the root CSS class from the main selector (e.g. ".badge" from ".badge").
+    const baseClass = selCfg.main.match(/(\.[a-zA-Z][\w-]*)/)?.[1];
+    if (!baseClass) continue;
+
+    for (const [sel, block] of allRules) {
+      // Only rules whose selector contains the component's base class.
+      if (!new RegExp(baseClass.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])').test(sel)) continue;   // .badge, not .badge-wrapper
+      // Skip known exceptions.
+      if (PHANTOM_SKIP.has(sel)) { PHANTOM_PASS.push(`${comp}: "${sel}" (exempted)`); continue; }
+      // A border or outline in a focus rule is the focus indicator a keyboard user needs, not a stroke of the
+      // design: Figma rarely draws focus, and removing it is an accessibility failure.
+      if (/:focus(-visible|-within)?\b/.test(sel)) continue;
+
+      // Inspect EVERY border/outline declaration in the rule, not just the first: a rule
+      // may null one border (`border-color: transparent`) yet still set a visible one on a
+      // side (`border-left: 3px solid …`). Flag the first non-transparent border found.
+      const borderReAll = new RegExp(BORDER_PROP_RE.source + '\\s*([^;]+)', 'gi');
+      let phantom = null;
+      for (const bm of block.matchAll(borderReAll)) {
+        const val = (bm[2] ?? '').trim();
+        if (!TRANSPARENT_VAL_RE.test(val)) { phantom = { prop: bm[1], val }; break; }
+      }
+      if (!phantom) continue;
+
+      PHANTOM_FAIL.push(`${comp}: "${sel}" has \`${phantom.prop}: ${phantom.val.slice(0, 60)}\` - Figma has no stroke on any variant (strokeOnAnyState=false)`);
+    }
+
+    if (!PHANTOM_FAIL.some(f => f.startsWith(`${comp}:`))) PHANTOM_PASS.push(`${comp} (no phantom borders)`);
+  }
+}
+
+// ── Gate [3c], fills: a surface Figma does not have ─────────────────────────
+// The fill counterpart of phantom borders. A component Figma draws with no fill in any variant (no fill on it or on a
+// layer behind its content, no fill variable in any state) that a rule paints a background on: the component itself,
+// its ::before or ::after, in any state, from the system's CSS or a product's (a product rule that gives the system's
+// empty state a band of colour). A rule on a part inside the component is the part's, not the component's surface.
+// Exceptions: add selector strings to ds-config.json → knownPhantomFillExceptions.
+const PHANTOM_FILL_FAIL = [], PHANTOM_FILL_PASS = [];
+const PHANTOM_FILL_SKIP = new Set(cfg.knownPhantomFillExceptions ?? []);
+// No paint: none, transparent, or a value that takes the paint from elsewhere.
+const NO_FILL_VAL_RE = /^\s*(?:none|transparent|inherit|initial|unset|revert)\s*(?:!important)?\s*$|^\s*(?:none\s+)?transparent\b/i;
+// A variant with a Background layer has a fill there, bound to a variable or not (a swatch's colour is the page's).
+const drawsNoFill = (snap) => snap.fillStructure === 'none' && !(snap.fills?.length) && !snap.colors?.fill
+  && !Object.values(snap.variants ?? {}).some((v) => (v.layers ?? []).some((l) => /^background$/i.test(String(l).trim())));
+// The components Figma nests in one (its switches show them: a status bar's dividerLine). A paint made only of a nested
+// component's tokens is that part, drawn by CSS (a divider as a ::after line), not the component's surface.
+const partKeys = (snap) => [...new Set(Object.values(snap.toggles ?? {}).flat().map((n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, '')).filter(Boolean))];
+const paintsAPart = (val, parts) => { const vars = [...val.matchAll(/var\(\s*--([\w-]+)/g)].map((m) => m[1].toLowerCase().replace(/[^a-z0-9]/g, '')); return vars.length > 0 && vars.every((v) => parts.some((p) => v.startsWith(p))); };
+
+if (Object.keys(components).length) {
+  const located = Object.keys(components).filter((c) => !c.startsWith('_')).map((comp) => [comp, COMPONENT_CSS_SELECTORS[comp] ?? { main: LOCATOR.selectorFor(comp) }]).filter(([, sc]) => sc?.main && /^[.]/.test(sc.main));
+  for (const [comp, selCfg] of located) {
+    const snapComp = components[comp];
+    if (!snapComp || !drawsNoFill(snapComp)) continue;
+    const baseClass = selCfg.main.match(/(\.[a-zA-Z][\w-]*)/)?.[1];
+    if (!baseClass) continue;
+    const ownClass = new RegExp(baseClass.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
+    let found = false;
+    for (const [sel, block] of allRuleList) {
+      // The rule's subject (its last compound) must be the component itself, its ::before or its ::after.
+      const subject = sel.split(/\s*[\s>+~]\s*(?![^[(]*[\])])/).pop() ?? '';
+      if (!ownClass.test(subject)) continue;
+      if (PHANTOM_FILL_SKIP.has(sel)) { PHANTOM_FILL_PASS.push(`${comp}: "${sel}" (exempted)`); continue; }
+      const parts = partKeys(snapComp);
+      const paint = [...block.matchAll(/\bbackground(?:-color|-image)?\s*:\s*([^;]+)/gi)].map((m) => [m[0].split(':')[0].trim(), m[1].trim()]).find(([, v]) => !NO_FILL_VAL_RE.test(v) && !paintsAPart(v, parts));
+      if (!paint) continue;
+      found = true;
+      PHANTOM_FILL_FAIL.push(`${comp}: "${sel}" has \`${paint[0]}: ${paint[1].slice(0, 60)}\` - Figma draws ${comp} with no fill in any variant`);
+    }
+    if (!found) PHANTOM_FILL_PASS.push(`${comp} (no fill Figma lacks)`);
+  }
+}
+
+// ── Gate [3k]: Stroke-width token binding ────────────────────────────────────
+// Components with strokeOnDefault=true must use a CSS var for the border-width
+// segment, not a hardcoded literal like "1.5px". Checks the default-state selector.
+// A literal first token in "border: <width> <style> <color>" is the failure signal.
+const STROKE_WIDTH_FAIL = [], STROKE_WIDTH_PASS = [];
+
+if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length && Object.keys(components).length) {
+  for (const [comp, selCfg] of Object.entries(COMPONENT_CSS_SELECTORS)) {
+    const snapComp = components[comp];
+    if (!snapComp?.strokeOnDefault) continue;
+
+    // Look in the base first, then across the plugin files. A component whose rule
+    // lives in a plugin is still a DS component and still owes its border width to a
+    // token - skipping it was a blind spot, not a safety measure.
+    let mainBlock = findBlock(themeCSS, selCfg.main, themeIndex);
+    let foundIn   = 'theme';
+    if (!mainBlock && allCss) {
+      mainBlock = findBlock(allCss, selCfg.main, allIndex);
+      foundIn   = 'plugin CSS';
+    }
+    if (!mainBlock) {
+      STROKE_WIDTH_PASS.push(`${comp}/stroke-width (selector not found in any configured CSS)`);
+      continue;
+    }
+
+    const borderVal =
+      mainBlock.match(/(?<![a-zA-Z-])border\s*:\s*([^;]+)/)?.[1] ??
+      mainBlock.match(/(?<![a-zA-Z-])border-width\s*:\s*([^;]+)/)?.[1] ?? null;
+
+    if (borderVal == null) {
+      // No inline border rule on this selector - nothing to flag.
+      STROKE_WIDTH_PASS.push(`${comp}/stroke-width (no inline border rule)`);
+      continue;
+    }
+
+    // A bare `1.5px` as the first whitespace token in border shorthand is a
+    // hardcoded width. Anything starting with `var(` is a token binding.
+    const firstToken = borderVal.trim().split(/\s+/)[0];
+    if (/^\d+(?:\.\d+)?px$/.test(firstToken)) {
+      STROKE_WIDTH_FAIL.push(`${comp}: border-width is hardcoded "${firstToken}" in ${foundIn} - use var(--thickness) or a sizing token var`);
+    } else {
+      STROKE_WIDTH_PASS.push(`${comp}/stroke-width`);
+    }
+  }
+}
+
+// ── Gate [3l]: Borderless resting-state lock ─────────────────────────────────
+// When the DS gives a component a borderless *resting* state (e.g. node's "Idle"
+// variant, strokeCount 0) the bare component selector must render with NO visible
+// border - the stroke belongs only to the interactive/selection states. A component
+// opts in by declaring `restingStroke: false` in its CONTRACT entry (set from the
+// Phase-1 snapshot, which records the pure-resting variant's stroke). The gate then
+// asserts the base selector's border is transparent/none, so a colored resting border
+// can never creep back in. Only the false→visible direction is checked: many DS
+// components model their border on a child rect while the root variant has no stroke,
+// so auto-deriving a "must have border" assertion from root stroke would false-positive.
+const RESTING_FAIL = [], RESTING_PASS = [];
+if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length) {
+  for (const [comp, selCfg] of Object.entries(COMPONENT_CSS_SELECTORS)) {
+    const contract = CONTRACT[comp];
+    if (!contract || contract.restingStroke !== false) continue; // opt-in per component
+
+    const mainBlock = findBlock(themeCSS, selCfg.main, themeIndex);
+    if (!mainBlock) { RESTING_PASS.push(`${comp}/resting-stroke (selector not in theme.css)`); continue; }
+
+    // Effective base border color: prefer an explicit border-color, else the colour
+    // token of the `border` shorthand (width style COLOR).
+    let borderColorVal = mainBlock.match(/(?<![a-zA-Z-])border-color\s*:\s*([^;]+)/)?.[1]?.trim() ?? null;
+    if (borderColorVal == null) {
+      const sh = mainBlock.match(/(?<![a-zA-Z-])border\s*:\s*([^;]+)/)?.[1]?.trim();
+      if (sh) borderColorVal = sh.split(/\s+/).slice(2).join(' ') || sh;
+    }
+    if (borderColorVal == null) { RESTING_PASS.push(`${comp}/resting-stroke (no base border)`); continue; }
+
+    if (!TRANSPARENT_VAL_RE.test(borderColorVal)) {
+      RESTING_FAIL.push(`${comp}: DS resting state "${contract.restingState ?? 'idle'}" has NO stroke but base "${selCfg.main}" draws a border "${borderColorVal}" - set border-color: transparent and color the interactive states instead`);
+    } else {
+      RESTING_PASS.push(`${comp}/resting-stroke`);
+    }
+  }
+}
+
+// ── Gate [3n]: Mixed-stroke variants must declare a resting state ────────────
+// The snapshot now records `variantStroke` (per-variant root stroke) for the whole
+// COMPONENT_SET - not just the single /default/i variant. When a set contains BOTH a
+// borderless and a bordered variant (the exact shape that hid node's new "Idle" state),
+// the author must consciously declare which state is at rest: the CONTRACT entry needs a
+// `restingStroke` boolean. That declaration then activates Gate [3l], which pins the base
+// selector's border to match. So a newly-added borderless state can't slip in unnoticed -
+// it makes the set mixed-stroke, this gate fails until restingStroke is declared, and [3l]
+// locks the render. Components that are uniformly bordered or uniformly borderless are fine.
+const MIXED_FAIL = [], MIXED_PASS = [];
+for (const [comp, snapComp] of Object.entries(components)) {
+  const vs = snapComp?.variantStroke;
+  if (!vs || typeof vs !== 'object') continue;
+  const vals = Object.values(vs);
+  const mixed = vals.includes(true) && vals.includes(false);
+  if (!mixed) { MIXED_PASS.push(`${comp}/mixed-stroke (uniform)`); continue; }
+  const declared = typeof CONTRACT[comp]?.restingStroke === 'boolean';
+  if (declared) {
+    MIXED_PASS.push(`${comp}/mixed-stroke (restingStroke declared)`);
+  } else {
+    const borderless = Object.entries(vs).filter(([, s]) => s === false).map(([n]) => n.replace(/,.*$/, ''));
+    MIXED_FAIL.push(`${comp}: has both bordered and borderless variants (borderless: ${borderless.join(', ')}) but no restingStroke in the contract - declare which state is at rest so Gate [3l] can lock the base border`);
+  }
+}
+
+// ── Gate [3o]: Per-variant height states must be declared ────────────────────
+// #2 multi-variant capture: the snapshot records `variantHeight` (every variant's
+// height, not just the default). When a set has variants of DIFFERENT heights (e.g.
+// toast: loading=48, success=32), each non-base height must be declared in the contract's
+// `states` map - otherwise a state's geometry is unmodeled and any check runs against the
+// wrong height. A newly-added variant with a new height fails this until it's contracted.
+const VHEIGHT_FAIL = [], VHEIGHT_PASS = [];
+for (const [comp, snapComp] of Object.entries(components)) {
+  const vh = snapComp?.variantHeight;
+  if (!vh || typeof vh !== 'object') continue;
+  const contract = CONTRACT[comp];
+  // A hug component's variants differ in height by content, not by a modelled state geometry -
+  // gating each height would demand a meaningless `states` entry per content length. Skip.
+  if (contract?.sizing === 'hug') { VHEIGHT_PASS.push(`${comp}/variant-height (hug - content-driven)`); continue; }
+  const heights = Object.values(vh).filter(h => typeof h === 'number');
+  if (new Set(heights).size <= 1) { VHEIGHT_PASS.push(`${comp}/variant-height (uniform)`); continue; }
+  const baseH = contract?.h;
+  const stateHeights = new Set(Object.values(contract?.states ?? {}).map(s => s?.h).filter(h => typeof h === 'number'));
+  const uncovered = [...new Set(heights)].filter(h => h !== baseH && !stateHeights.has(h));
+  if (uncovered.length) {
+    VHEIGHT_FAIL.push(`${comp}: variant height(s) ${uncovered.join(', ')}px not covered by contract.h (${baseH ?? '-'}) or any states entry - declare the state's geometry in the contract`);
+  } else {
+    VHEIGHT_PASS.push(`${comp}/variant-height`);
+  }
+}
+
+// ── Gate [3m]: Fixed-height components must not shrink ────────────────────────
+// A DS component with a fixed (hug) height renders that exact height in Figma. In
+// code it's often placed as a flex-column child (a list row, a toolbar item); a
+// flex child with `height:Npx` but no `flex-shrink:0` compresses below Npx when the
+// container runs short (the menuList shrinking-rows bug 2026-07-12). So any component
+// whose snapshot height is a fixed number and whose base rule pins that height via
+// `height`/`min-height` should also declare `flex-shrink:0` (harmless when it's never a
+// flex child). Advisory: it is a risk in how the component is placed, not a difference from
+// Figma, and a library whose fixed-height components never sit in a flex column would fail on
+// every one of them. Exempt via ds-config → knownShrinkExceptions.
+const SHRINK_FAIL = [], SHRINK_PASS = [];
+const SHRINK_SKIP = new Set(cfg.knownShrinkExceptions ?? []);
+if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length && Object.keys(components).length) {
+  for (const [comp, selCfg] of Object.entries(COMPONENT_CSS_SELECTORS)) {
+    if (SHRINK_SKIP.has(comp)) { SHRINK_PASS.push(`${comp}/no-shrink (exempted)`); continue; }
+    const snapComp = components[comp];
+    if (!snapComp || typeof snapComp.h !== 'number') continue; // only fixed-height (hug) components
+
+    const mainBlock = findBlock(themeCSS, selCfg.main, themeIndex);
+    if (!mainBlock) { SHRINK_PASS.push(`${comp}/no-shrink (selector not in theme.css)`); continue; }
+
+    // Does the base rule pin a fixed height? (height: Npx or min-height: Npx)
+    const pinsHeight = /(?<![a-zA-Z-])(?:min-)?height\s*:\s*[0-9]/.test(mainBlock);
+    if (!pinsHeight) { SHRINK_PASS.push(`${comp}/no-shrink (no fixed height in base rule)`); continue; }
+
+    if (/(?<![a-zA-Z-])flex-shrink\s*:\s*0\b/.test(mainBlock) || /(?<![a-zA-Z-])flex\s*:\s*(?:none\b|0\s+0\b)/.test(mainBlock)) {
+      SHRINK_PASS.push(`${comp}/no-shrink`);
+    } else {
+      SHRINK_FAIL.push(`${comp}: fixed DS height ${snapComp.h}px but "${selCfg.main}" has no flex-shrink:0 - it will compress as a flex-column child`);
+    }
+  }
+}
+
+// ── 6. Hover/Selected pill geometry checks ────────────────────────────────────
+// Components that implement hover/selected backgrounds via a positioned ::before
+// element (a "pill") need two geometry checks the default-state snapshot misses:
+//   (a) inset - must equal (outer_h - inner_h) / 2 so the pill fills the inner frame
+//   (b) border-radius - must use the DS var from hoverPill.radiusVar in the contract
+//
+// To enable: add hoverPill: { innerH, radiusVar } to the component in CONTRACT
+// and beforeSel: '.<comp>::before' to COMPONENT_CSS_SELECTORS.
+// capture innerH from the hover/selected variant's Content child frame in Figma.
+const PILL_FAIL = [], PILL_PASS = [];
+
+if (themeCSS && Object.keys(COMPONENT_CSS_SELECTORS).length) {
+  for (const [comp, contract] of Object.entries(CONTRACT)) {
+    const pill = contract.hoverPill;
+    if (!pill) continue;
+    const selCfg = COMPONENT_CSS_SELECTORS[comp];
+    if (!selCfg?.beforeSel) continue;
+
+    const beforeBlock = findBlock(themeCSS, selCfg.beforeSel, themeIndex);
+    if (!beforeBlock) {
+      PILL_FAIL.push(`${comp}: "${selCfg.beforeSel}" not found in theme CSS`);
+      continue;
+    }
+
+    // (a) inset vertical component - must equal (outer_h − inner_h) / 2
+    // Supports "4px" (all-sides) or "4px 0" (vertical horizontal) - checks first value only
+    const expectedInset = (contract.h - pill.innerH) / 2;
+    const insetMatch = beforeBlock.match(/\binset\s*:\s*([^;]+)/);
+    if (!insetMatch) {
+      PILL_FAIL.push(`${comp}/pill-inset: "inset" not set in "${selCfg.beforeSel}" - expected ${expectedInset}px`);
+    } else {
+      const verticalPart = insetMatch[1].trim().split(/\s+/)[0];
+      const actualPx = toPx(verticalPart);
+      if (actualPx === null) {
+        PILL_FAIL.push(`${comp}/pill-inset: could not resolve vertical inset "${verticalPart}" to px`);
+      } else if (actualPx !== expectedInset) {
+        PILL_FAIL.push(`${comp}/pill-inset: vertical inset is ${actualPx}px - expected ${expectedInset}px  (outer ${contract.h}px − inner ${pill.innerH}px) / 2`);
+      } else {
+        PILL_PASS.push(`${comp}/pill-inset`);
+      }
+    }
+
+    // (b) border-radius must use the mapped DS var
+    if (pill.radiusVar) {
+      const expectedRadiusVar = FIGMA_LAYOUT_TO_CSS[pill.radiusVar];
+      if (expectedRadiusVar) {
+        const usedVar = extractPropVar(beforeBlock, 'border-radius');
+        if (!usedVar) {
+          PILL_FAIL.push(`${comp}/pill-radius: "border-radius" not set in "${selCfg.beforeSel}"`);
+        } else if (usedVar !== expectedRadiusVar) {
+          PILL_FAIL.push(`${comp}/pill-radius: border-radius uses ${usedVar} - expected var(${expectedRadiusVar}) [${pill.radiusVar}]`);
+        } else {
+          PILL_PASS.push(`${comp}/pill-radius`);
+        }
+      }
+    }
+
+    // (c) inset horizontal component - when hoverPill.insetH is defined
+    // Catches "inset: 4px" (wrong - pill narrowed LR) vs "inset: 4px 0" (full width)
+    if (pill.insetH !== undefined && insetMatch) {
+      const insetParts = insetMatch[1].trim().split(/\s+/);
+      if (insetParts.length < 2) {
+        const expectedH = pill.insetH === 0 ? '0' : `${pill.insetH}px`;
+        PILL_FAIL.push(`${comp}/pill-inset-h: inset has no horizontal value - expected "…px ${expectedH}" (horizontal must be ${expectedH})`);
+      } else {
+        const horizPart  = insetParts[1];
+        const expectedH  = pill.insetH;
+        const actualH    = (horizPart === '0') ? 0 : toPx(horizPart);
+        if (actualH === expectedH) {
+          PILL_PASS.push(`${comp}/pill-inset-h`);
+        } else {
+          const expectedStr = expectedH === 0 ? '0' : `${expectedH}px`;
+          PILL_FAIL.push(`${comp}/pill-inset-h: horizontal inset is "${horizPart}" - expected ${expectedStr}`);
+        }
+      }
+    }
+  }
+}
+
+// ── Gate [3f]: Sub-frame layout (children) ───────────────────────────────────
+// Verifies gap and padding on named child frames that have explicit CSS selectors.
+// Contract: CONTRACT[comp].children = [{ name, cssSelector, gapVar?, paddingVar? }]
+// cssSelector: null = the child frame is flattened into the parent (gap/padding expressed
+// geometrically or on the root rule, asserted elsewhere) - CSS lookup is skipped, but the
+// entry still anchors the snapshot cross-check above (childFrameGaps/childFramePadding).
+// Uses allCss (all files) since child selectors may live in plugin or shared files.
+const CHILD_FAIL = [], CHILD_PASS = [];
+
+for (const [comp, contract] of Object.entries(CONTRACT)) {
+  if (!contract.children?.length) continue;
+  for (const child of contract.children) {
+    if (child.cssSelector === null) {
+      // A documentary (flattened / empty-shell) slot skips the CSS lookup — but a slot that
+      // carries a real DS PADDING token has an inset the code must reproduce, and skipping it
+      // silently is exactly how a slot's top/side padding drifts unseen (the DS said padding/l,
+      // the code shipped padding/s, every gate stayed green). So a null-selector slot with a
+      // padding token MUST name what verifies that padding, via `verifiedBy` (a selector, a
+      // RENDERED_ASSERTIONS reference, or 'geometric …'). No verifiedBy = an unverified DS inset
+      // = FAIL. (Gap-only slots are exempt: a slot's gap spaces whatever is slotted in per-context,
+      // so it isn't a fixed value to assert here.)
+      const padTok = child.paddingVar?.tb || child.paddingVar?.lr;
+      if (padTok && !child.verifiedBy) {
+        CHILD_FAIL.push(`${comp}/${child.name}: DS slot padding (${child.paddingVar?.tb ? 'tb '+child.paddingVar.tb : ''}${child.paddingVar?.lr ? ' lr '+child.paddingVar.lr : ''}) is unverified against code — cssSelector is null and there is no verifiedBy. Give the slot a real cssSelector, or set verifiedBy naming what checks the padding (a selector / RENDERED_ASSERTIONS / 'geometric …').`);
+      }
+      continue; // flattened child frame - asserted via other gates
+    }
+    const block = findBlock(allCss, child.cssSelector, allIndex);
+    if (!block) {
+      CHILD_FAIL.push(`${comp}/${child.name}: selector "${child.cssSelector}" not found in CSS`);
+      continue;
+    }
+    if (child.gapVar) {
+      const expectedVar = FIGMA_LAYOUT_TO_CSS[child.gapVar];
+      if (expectedVar) {
+        const usedVar = extractPropVar(block, 'gap');
+        if (usedVar === expectedVar) CHILD_PASS.push(`${comp}/${child.name}/gap`);
+        else CHILD_FAIL.push(`${comp}/${child.name}/gap: "${usedVar ?? '(not set)'}" ≠ var(${expectedVar}) [${child.gapVar}]`);
+      }
+    } else if (typeof child.gapPx === 'number') {
+      // Raw (unbound) inner-frame gap, INCLUDING 0 — a "flush" child frame the DS renders with no
+      // gap token. This is exactly the class token-only childFrameGaps misses: a DS frame whose
+      // children sit flush (gap 0), so nothing stops the code adding a stray gap. The CSS must
+      // render the same literal. Accept "0"/"0px" for 0, else "<n>px".
+      const m = block.match(/(?<![a-zA-Z-])gap\s*:\s*([^;\n]+)/);
+      const got = m ? m[1].trim() : null;
+      if (rawGapMatches(got, child.gapPx)) CHILD_PASS.push(`${comp}/${child.name}/gap`);
+      else CHILD_FAIL.push(`${comp}/${child.name}/gap: "${got ?? '(not set)'}" ≠ ${child.gapPx === 0 ? '0' : child.gapPx + 'px'} [raw ${child.gapPx}px]`);
+    }
+    for (const [side, tokenName] of [['tb', child.paddingVar?.tb], ['lr', child.paddingVar?.lr]]) {
+      if (!tokenName) continue;
+      const expectedVar = FIGMA_LAYOUT_TO_CSS[tokenName];
+      if (!expectedVar) continue;
+      const padMatch = block.match(/(?<![a-zA-Z-])padding\s*:\s*([^;]+)/);
+      const padVal   = padMatch?.[1] ?? '';
+      if (padVal.includes(`var(${expectedVar})`)) CHILD_PASS.push(`${comp}/${child.name}/padding-${side}`);
+      else CHILD_FAIL.push(`${comp}/${child.name}/padding-${side}: padding missing var(${expectedVar}) [${tokenName}] - got: ${padVal.trim().slice(0, 60) || '(not set)'}`);
+    }
+  }
+}
+
+// ── Gate [3e]: CSS property assertions ───────────────────────────────────────
+// Verifies arbitrary CSS properties on any selector - for plugin-specific
+// selectors that mirror DS components (e.g. menuListRow) but aren't in CONTRACT.
+//
+// Export CSS_PROPERTY_ASSERTIONS from structure-contract.mjs as an array of:
+//   { sel, prop, expected }    - CSS value must equal exactly this string
+//   { sel, prop, present }     - true = property must exist; false = must NOT exist
+//   { sel, prop, expectedVar } - property must use var(expectedVar)
+//
+// Uses allIndex (comment-stripped, all CSS files) so pseudo-elements work too.
+const ASSERT_FAIL = [], ASSERT_PASS = [];
+
+if (CSS_PROPERTY_ASSERTIONS.length) {
+  const propRe = (prop) => new RegExp(
+    '(?<![a-zA-Z-])' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*([^;\\n]+)'
+  );
+  const presentRe = (prop) => new RegExp(
+    '(?<![a-zA-Z-])' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:'
+  );
+
+  for (const a of CSS_PROPERTY_ASSERTIONS) {
+    const block = findBlock(allCss, a.sel, allIndex);
+
+    if ('expected' in a) {
+      const m = block?.match(propRe(a.prop));
+      const actual = m ? m[1].trim() : null;
+      if (actual === a.expected) {
+        ASSERT_PASS.push(`${a.sel}/${a.prop}`);
+      } else {
+        ASSERT_FAIL.push(`${a.sel}/${a.prop}: "${actual ?? '(not set)'}" ≠ "${a.expected}"`);
+      }
+    } else if ('present' in a) {
+      const found = block ? presentRe(a.prop).test(block) : false;
+      if (a.present === found) {
+        ASSERT_PASS.push(`${a.sel}/${a.prop}`);
+      } else if (a.present) {
+        ASSERT_FAIL.push(`${a.sel}/${a.prop}: property missing - must be present`);
+      } else {
+        ASSERT_FAIL.push(`${a.sel}/${a.prop}: has "${a.prop}:" - must NOT be present`);
+      }
+    } else if ('expectedVar' in a) {
+      // Match var(--x) OR var(--x, fallback) - the closing paren moves when a fallback is present.
+      const m = block?.match(propRe(a.prop));
+      const fullVal = m ? m[1].trim() : null;
+      const varPat = new RegExp(`var\\(${a.expectedVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[,)]`);
+      if (fullVal && varPat.test(fullVal)) {
+        ASSERT_PASS.push(`${a.sel}/${a.prop}`);
+      } else {
+        const usedVar = block ? extractPropVar(block, a.prop) : null;
+        ASSERT_FAIL.push(`${a.sel}/${a.prop}: uses "${usedVar ?? '(not set)'}" ≠ var(${a.expectedVar})`);
+      }
+    }
+  }
+}
+
+// ── Gate [3g]: Component Property Parity ─────────────────────────────────────
+// Verifies that every Figma component property (BOOLEAN/VARIANT) has a CSS
+// implementation. Reads figma-component-props.snapshot.json (written by audit.mjs
+// on every run when FIGMA_TOKEN is set).
+//
+// CONTRACT entry fields:
+//   figmaName   - Figma component set name (defaults to the CONTRACT key)
+//   propertyMap - map of Figma property name → one of:
+//     null / false         → explicitly skipped (no CSS needed)
+//     'css-selector'       → selector must exist somewhere in allCss
+//     { k: 'selector', … } → each value must exist in allCss (variant states or
+//                            show/hide pair, e.g. { show: '.el', hide: '@container ...' })
+const COMP_PROPS_SNAP_PATH = cfg.paths?.compPropsSnapshot ??
+  SNAPSHOT_PATH.replace(/[^/\\]+$/, 'figma-component-props.snapshot.json');
+
+let COMP_PROPS = {};
+try { COMP_PROPS = JSON.parse(readFileSync(join(ROOT, COMP_PROPS_SNAP_PATH), 'utf8')); } catch {}
+
+const CPROP_PASS = [], CPROP_FAIL = [], CPROP_WARN = [];
+const SCAFFOLD = []; // starter CONTRACT entries for undeclared components
+
+// Figma property keys include internal node IDs as suffixes: "Show Label#958:0"
+// Strip them so propertyMap authors use clean names: "Show Label"
+function normPropName(k) { return k.replace(/#[\d:]+$/, '').trim(); }
+
+// Components deliberately not implemented in code - exempt from Gate [3g] FAIL.
+// Add to ds-config.json → knownUnimplementedComponents with a reason comment.
+const KNOWN_UNIMPLEMENTED = await inProgressNames(ROOT, cfg);
+
+// Build lookup: figmaName → CONTRACT key (for components in CONTRACT)
+const figmaNameToContractKey = {};
+for (const [key, c] of Object.entries(CONTRACT)) {
+  figmaNameToContractKey[c.figmaName ?? key] = key;
+}
+
+// Discovery: FAIL for any Figma component with BOOLEAN/VARIANT properties that is
+// not covered by a propertyMap in CONTRACT and not explicitly exempted.
+// Warn (not fail) for CONTRACT components that are missing their propertyMap.
+for (const [figmaName, entry] of Object.entries(COMP_PROPS)) {
+  if (figmaName === '_updated' || !entry?.properties) continue;
+  const hasBehavioural = Object.values(entry.properties).some(
+    p => p.type === 'BOOLEAN' || p.type === 'VARIANT'
+  );
+  if (!hasBehavioural) continue;
+
+  const contractKey = figmaNameToContractKey[figmaName];
+
+  if (!contractKey) {
+    if (!KNOWN_UNIMPLEMENTED.has(figmaName)) {
+      const propList = Object.entries(entry.properties)
+        .filter(([, d]) => d.type === 'BOOLEAN' || d.type === 'VARIANT')
+        .map(([k, d]) => `${normPropName(k)} (${d.type})`)
+        .join(', ');
+      CPROP_FAIL.push(
+        `${figmaName}: no CONTRACT entry - [${propList}]` +
+        ` - add propertyMap or list in ds-config.json → knownUnimplementedComponents`
+      );
+      SCAFFOLD.push({ name: figmaName, entry });
+    }
+    continue;
+  }
+
+  if (!CONTRACT[contractKey]?.propertyMap) {
+    // In CONTRACT but propertyMap not yet filled in
+    CPROP_WARN.push(`${contractKey}: in CONTRACT but missing propertyMap - ${
+      Object.entries(entry.properties)
+        .filter(([, d]) => d.type === 'BOOLEAN' || d.type === 'VARIANT')
+        .map(([k]) => normPropName(k))
+        .join(', ')
+    }`);
+  }
+}
+
+// Implementation check: for each CONTRACT entry with propertyMap
+for (const [comp, contract] of Object.entries(CONTRACT)) {
+  if (!contract.propertyMap) continue;
+  const figmaName   = contract.figmaName ?? comp;
+  const figmaEntry  = COMP_PROPS[figmaName];
+
+  if (!figmaEntry?.properties) {
+    CPROP_WARN.push(`${comp}: "${figmaName}" not in component props snapshot - run parity to refresh`);
+    continue;
+  }
+
+  // Build normalized property lookup from snapshot
+  const figmaProps = Object.fromEntries(
+    Object.entries(figmaEntry.properties).map(([k, v]) => [normPropName(k), v])
+  );
+
+  // Coverage: warn about BOOLEAN/VARIANT props not in propertyMap (use normalized names)
+  for (const [normName, propDef] of Object.entries(figmaProps)) {
+    if (propDef.type === 'TEXT' || propDef.type === 'INSTANCE_SWAP' || propDef.type === 'SLOT') continue;
+    if (!(normName in contract.propertyMap)) {
+      CPROP_WARN.push(`${comp}/${normName}: Figma ${propDef.type} property not in propertyMap`);
+    }
+  }
+
+  // Implementation: verify each propertyMap entry's CSS selector exists.
+  // null = unimplemented → FAIL for BOOLEAN/VARIANT (they require a CSS mechanism).
+  // TEXT/INSTANCE_SWAP/SLOT mapped to null = intentionally skipped (no CSS needed).
+  for (const [propName, mapping] of Object.entries(contract.propertyMap)) {
+    if (mapping === null || mapping === false) {
+      const propType = figmaProps[propName]?.type;
+      if (propType === 'BOOLEAN' || propType === 'VARIANT') {
+        CPROP_FAIL.push(`${comp}/${propName}: ${propType} property has no CSS implementation (null) - add a selector or use a CSS class`);
+      }
+      continue;
+    }
+
+    const pairs = typeof mapping === 'string'
+      ? [['', mapping]]
+      : Object.entries(mapping);
+
+    for (const [state, selector] of pairs) {
+      if (!selector) continue;
+      const label = state ? `${comp}/${propName}=${state}` : `${comp}/${propName}`;
+      // A state written with what a screen reader hears ([aria-disabled="true"]) is built by a rule for the rest of it;
+      // the attribute is the markup's duty, which the accessibility check reads.
+      const bare = withoutHeardState(selector);
+      const foundAs = (sel) => findBlock(allCss, sel, allIndex) !== null || allCss.includes(sel) || modifierFound(sel);
+      const found = foundAs(selector) || (bare && bare !== selector && foundAs(bare));
+      if (found) CPROP_PASS.push(label);
+      else CPROP_FAIL.push(`${label}: "${selector}" not found in CSS: write a rule for ${selector} with what this option changes, and put the class on the element when ${propName} is ${state || 'on'}`);
+    }
+  }
+}
+
+// ── Gate [3g] - Annotation parity ────────────────────────────────────────────
+// Every Figma annotation on a component set must be acknowledged in CONTRACT.annotations.
+// Acknowledged annotations with a CSS selector are verified to exist in the codebase.
+const CANN_PASS = [], CANN_FAIL = [], CANN_WARN = [];
+const { annotationFacts } = await import('./a11y-check.mjs');
+
+// A note in a design-intent category (Intent, Implementation, Content, Authoring) asks nothing of the code: the agents
+// read it. Only the notes that are requirements (Accessibility, or no category) are acknowledged here.
+const ANN_CATS = loadCategories(ROOT, cfg);
+for (const [figmaName, entry0] of Object.entries(COMP_PROPS)) {
+  if (figmaName === '_updated' || !entry0?.annotations?.length) continue;
+  const entry = requirementEntry(entry0, ANN_CATS, cfg);
+  if (!entry.annotations?.length) continue;
+  const contractKey = figmaNameToContractKey[figmaName];
+  if (!contractKey) {
+    if (!KNOWN_UNIMPLEMENTED.has(figmaName)) {
+      CANN_FAIL.push(`${figmaName}: has Figma annotations but no CONTRACT entry - add to CONTRACT or knownUnimplementedComponents`);
+    }
+    continue;
+  }
+  const contractAnns = CONTRACT[contractKey]?.annotations ?? {};
+  for (const ann of entry.annotations) {
+    const annLabel = ann.label ?? ann.name ?? String(ann);
+    // An accessibility note the accessibility check reads as facts (role, name, heading level, alt
+    // text) is verified against the rendered page there; it needs no acknowledgement here.
+    if (!(annLabel in contractAnns) && Object.keys(annotationFacts([ann])).length) {
+      CANN_PASS.push(`${contractKey}: "${annLabel}" is checked by the accessibility check`);
+      continue;
+    }
+    if (!(annLabel in contractAnns)) {
+      CANN_FAIL.push(`${contractKey}: annotation "${annLabel}" not acknowledged in CONTRACT.annotations`);
+      continue;
+    }
+    const mapping = contractAnns[annLabel];
+    if (!mapping) { CANN_PASS.push(`${contractKey}/${annLabel} (prose - acknowledged)`); continue; }
+    const label = `${contractKey}/${annLabel}`;
+    if (typeof mapping === 'string') {
+      // Simple selector existence check
+      const found = findBlock(allCss, mapping, allIndex) !== null || allCss.includes(mapping);
+      if (found) CANN_PASS.push(label);
+      else CANN_FAIL.push(`${label}: "${mapping}" not found in CSS`);
+    } else if (typeof mapping === 'object' && mapping.sel && mapping.prop) {
+      // Property-level assertion: { sel, prop, expectedVar } or { sel, prop, expected }
+      const block = findBlock(allCss, mapping.sel, allIndex);
+      if (!block) { CANN_FAIL.push(`${label}: selector "${mapping.sel}" not found in CSS`); continue; }
+      const propRe = new RegExp('(?<![a-zA-Z-])' + mapping.prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*([^;\\n]+)');
+      const pm = block.match(propRe);
+      const fullVal = pm ? pm[1].trim() : null;
+      if (mapping.expectedVar) {
+        const varPat = new RegExp(`var\\(${mapping.expectedVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[,)]`);
+        if (fullVal && varPat.test(fullVal)) CANN_PASS.push(label);
+        else CANN_FAIL.push(`${label}: "${mapping.sel}" ${mapping.prop} uses "${fullVal ?? '(not set)'}" - expected var(${mapping.expectedVar}[,)])`);
+      } else if (mapping.expected !== undefined) {
+        if (fullVal === mapping.expected) CANN_PASS.push(label);
+        else CANN_FAIL.push(`${label}: "${mapping.sel}" ${mapping.prop} is "${fullVal ?? '(not set)'}" - expected "${mapping.expected}"`);
+      }
+    }
+  }
+}
+
+// ── Gate [3h] - Surface container token enforcement ───────────────────────────
+// Each entry in SURFACE_CONTAINERS must declare --area-bg referencing its bgVar.
+// This ensures every surface container explicitly opts in to the surface-aware
+// background pattern rather than inheriting silently.
+const SURF_PASS = [], SURF_FAIL = [];
+
+for (const { sel, bgVar } of SURFACE_CONTAINERS) {
+  const block = findBlock(allCss, sel, allIndex);
+  if (!block) { SURF_FAIL.push(`Surface "${sel}": selector not found in CSS`); continue; }
+  const m = block.match(/(?<![a-zA-Z-])--area-bg\s*:\s*([^;]+)/);
+  const val = m ? m[1].trim() : null;
+  const pat = new RegExp(`var\\(${bgVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[,)]`);
+  if (val && pat.test(val)) SURF_PASS.push(`${sel} --area-bg → var(${bgVar})`);
+  else SURF_FAIL.push(`Surface "${sel}": --area-bg is "${val ?? '(missing)'}" - expected var(${bgVar}...)`);
+}
+
+// ── Gate [3g] - Inverse annotation check (WARN only) ─────────────────────────
+// For every CONTRACT propertyMap entry with a CSS selector, warn if no Figma
+// annotation covers that property. Surfaces undocumented behaviors without blocking.
+const CANN_UNDOC = [];
+
+if (Object.keys(COMP_PROPS).length > 0) {
+  for (const [contractKey, entry] of Object.entries(CONTRACT)) {
+    if (!entry?.propertyMap) continue;
+    const figmaEntry = COMP_PROPS[entry.figmaName ?? contractKey];
+    const labels = new Set((figmaEntry?.annotations ?? []).map(a => (a.label ?? '').toLowerCase()));
+    for (const [propName, mapping] of Object.entries(entry.propertyMap)) {
+      if (!mapping || typeof mapping !== 'string') continue;
+      const covered = [...labels].some(l => l.includes(propName.toLowerCase()));
+      if (!covered) CANN_UNDOC.push(`${contractKey}/${propName}: CSS mapped but no Figma annotation`);
+    }
+  }
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+console.log(`\n✅ PASS  ${PASS.length}/${Object.keys(CONTRACT).length} components (structure)`);
+console.log(`❌ FAIL  ${FAIL.length} field(s)`);
+if (MISSING.length) {
+  console.log(`❌ MISSING from snapshot (${MISSING.length}): ${MISSING.join(', ')}`);
+  console.log(`   Add these to figma-structure.snapshot.json (inspect via Figma plugin API)`);
+  console.log(`   or to knownUnimplementedComponents in ds-config.json.`);
+}
+if (UNCONTRACTED.length) {
+  console.log(`❌ NOT IN CONTRACT (${UNCONTRACTED.length}): ${UNCONTRACTED.join(', ')}`);
+  console.log(`   These DS components have no structure-contract.mjs entry and are NOT exempted.`);
+  console.log(`   Add them to CONTRACT + figma-structure.snapshot.json, or to knownUnimplementedComponents.`);
+}
+if (extra.length)   console.log(`🆕 In snapshot, not in contract: ${extra.join(', ')}`);
+
+if (FAIL.length) {
+  console.log('\n─── Structural drift ──────────────────────────────────────────');
+  for (const f of FAIL)
+    console.log(`  ❌ ${f.component}.${f.field}: contract=${JSON.stringify(f.expected)}  Figma=${JSON.stringify(f.got)}`);
+}
+
+if (themeCSS) {
+  console.log(`\n✅ PASS  ${CSS_PASS.length}/${Object.keys(CSS_HEIGHT_RULES).length} CSS height rules`);
+  console.log(`❌ FAIL  ${CSS_FAIL.length}`);
+  if (CSS_FAIL.length) for (const f of CSS_FAIL) console.log(`  ❌ ${f}`);
+
+  const autoCount   = autoAssertions.length;
+  const manualCount = CSS_BASE_RULE_VARS.length;
+  const totalLabel  = autoCount
+    ? `  (${autoCount} auto-derived · ${manualCount} manual)`
+    : `  (${manualCount} manual)`;
+  console.log(`\n✅ PASS  ${VAR_PASS.length}/${ALL_ASSERTIONS.length} CSS base-rule var bindings${totalLabel}`);
+  console.log(`❌ FAIL  ${VAR_FAIL.length}`);
+  if (VAR_FAIL.length) for (const f of VAR_FAIL) console.log(`  ❌ ${f}`);
+
+  if (Object.keys(COMPONENT_CSS_SELECTORS).length) {
+    const propTotal = PROP_PASS.length + PROP_FAIL.length;
+    console.log(`\n✅ PASS  ${PROP_PASS.length}/${propTotal} CSS property bindings`);
+    console.log(`❌ FAIL  ${PROP_FAIL.length}`);
+    if (PROP_FAIL.length) {
+      console.log('\n─── Wrong var in property binding (Figma-bound token, wrong CSS var in rule) ──');
+      for (const f of PROP_FAIL) console.log(`  ❌ ${f}`);
+    }
+  }
+} else {
+  console.log('\n⚠️  theme CSS not found - height and base-rule var checks skipped');
+}
+
+if (STATE_SELECTORS.length) {
+  const totalVarChecks = STATE_SELECTORS.reduce((n, e) => n + (e.vars?.length ?? 0), 0);
+  console.log(`\n✅ PASS  ${SELECTOR_PASS.length}/${STATE_SELECTORS.length} state/variant selectors`);
+  if (totalVarChecks) console.log(`   (${totalVarChecks} var binding(s) verified across all states)`);
+  console.log(`❌ FAIL  ${SELECTOR_FAIL.length}`);
+  if (SELECTOR_FAIL.length) {
+    console.log('\n─── State selector failures ───────────────────────────────────');
+    for (const f of SELECTOR_FAIL) {
+      console.log(`  ❌ ${f.label}`);
+      console.log(`       ${f.issue}${f.expected ? `  →  expected: ${f.expected}` : ''}`);
+    }
+  }
+} else {
+  console.log('\n⏭  STATE_SELECTORS empty in structure-contract.mjs - state/variant check skipped');
+}
+
+if (Object.keys(COMPONENT_CSS_SELECTORS).length) {
+  if (BSIDES_PASS.length + BSIDES_FAIL.length > 0) {
+    const bTotal = BSIDES_PASS.length + BSIDES_FAIL.length;
+    console.log(`\n✅ PASS  ${BSIDES_PASS.length}/${bTotal} CSS border-sides checks`);
+    console.log(`❌ FAIL  ${BSIDES_FAIL.length}`);
+    if (BSIDES_FAIL.length) {
+      console.log('\n─── Gate [3b] - wrong CSS border sides vs contract.strokeSides ──────');
+      for (const f of BSIDES_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: match border-side CSS to contract.strokeSides (\'bottom\' → border-bottom; \'all\' → border).');
+    }
+  }
+
+  console.log(`\n✅ PASS  ${PHANTOM_PASS.length} component(s) - no phantom CSS borders`);
+  console.log(`❌ FAIL  ${PHANTOM_FAIL.length} phantom border(s)`);
+  if (PHANTOM_FAIL.length) {
+    console.log('\n─── Gate [3c] - CSS has border/outline but Figma has no stroke ──────');
+    for (const f of PHANTOM_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: remove the border/outline from CSS, or add the stroke to Figma.');
+    console.log('   Exemptions: add the selector string to ds-config.json → knownPhantomBorderExceptions');
+  }
+
+  if (PHANTOM_FILL_PASS.length + PHANTOM_FILL_FAIL.length > 0) {
+    console.log(`\n✅ PASS  ${PHANTOM_FILL_PASS.length} component(s) - no fill Figma does not have`);
+    console.log(`❌ FAIL  ${PHANTOM_FILL_FAIL.length} phantom fill(s)`);
+    if (PHANTOM_FILL_FAIL.length) {
+      console.log('\n─── Gate [3c] - CSS paints a background but Figma has no fill ──────');
+      for (const f of PHANTOM_FILL_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: remove the background from CSS, or add the fill to Figma.');
+      console.log('   Exemptions: add the selector string to ds-config.json → knownPhantomFillExceptions');
+    }
+  }
+
+  if (STROKE_WIDTH_PASS.length || STROKE_WIDTH_FAIL.length) {
+    const swTotal = STROKE_WIDTH_PASS.length + STROKE_WIDTH_FAIL.length;
+    console.log(`\n✅ PASS  ${STROKE_WIDTH_PASS.length}/${swTotal} stroke-width token bindings`);
+    console.log(`❌ FAIL  ${STROKE_WIDTH_FAIL.length}`);
+    if (STROKE_WIDTH_FAIL.length) {
+      console.log('\n─── Gate [3k] - stroke-width is hardcoded instead of a token var ───');
+      for (const f of STROKE_WIDTH_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: replace the literal px with var(--thickness) or the appropriate sizing token.');
+    }
+  }
+
+  if (RESTING_PASS.length || RESTING_FAIL.length) {
+    const rTotal = RESTING_PASS.length + RESTING_FAIL.length;
+    console.log(`\n✅ PASS  ${RESTING_PASS.length}/${rTotal} resting-state stroke checks`);
+    console.log(`❌ FAIL  ${RESTING_FAIL.length}`);
+    if (RESTING_FAIL.length) {
+      console.log('\n─── Gate [3l] - base CSS border ≠ DS resting-variant stroke ────────');
+      for (const f of RESTING_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: the bare component selector renders the DS resting state (first variant).');
+      console.log('   Match its border to that variant\'s stroke, then color the interactive states.');
+    }
+  }
+
+  if (SHRINK_PASS.length || SHRINK_FAIL.length) {
+    const sTotal = SHRINK_PASS.length + SHRINK_FAIL.length;
+    if (!SHRINK_FAIL.length) console.log(`\n✅ PASS  ${SHRINK_PASS.length}/${sTotal} fixed-height no-shrink checks`);
+    else console.log(`\n⚠️  NO-SHRINK ${SHRINK_FAIL.length}/${sTotal} fixed-height component(s) with no flex-shrink:0 (${SHRINK_FAIL.map((f) => f.split(':')[0]).join(', ')}) - advisory, a risk in a flex column, not a difference from Figma`);
+    if (SHRINK_FAIL.length) {
+      console.log('\n─── Gate [3m] - fixed-height component can shrink as a flex child (advisory) ──');
+      for (const f of SHRINK_FAIL) console.log(`  ⚠️  ${f}`);
+      console.log('   A risk, not a difference from Figma: it never fails the gate. Where the component sits in a');
+      console.log('   flex column, add flex-shrink:0 to the base rule; exempt one that never does via');
+      console.log('   ds-config.json → knownShrinkExceptions.');
+    }
+  }
+
+  if (MIXED_PASS.length || MIXED_FAIL.length) {
+    const mTotal = MIXED_PASS.length + MIXED_FAIL.length;
+    console.log(`\n✅ PASS  ${MIXED_PASS.length}/${mTotal} mixed-stroke resting-state checks`);
+    console.log(`❌ FAIL  ${MIXED_FAIL.length}`);
+    if (MIXED_FAIL.length) {
+      console.log('\n─── Gate [3n] - mixed bordered/borderless variants, no resting state ──');
+      for (const f of MIXED_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: add restingStroke (+ restingState) to the component contract so the');
+      console.log('   at-rest border is consciously mapped and Gate [3l] can lock it.');
+    }
+  }
+
+  if (VHEIGHT_PASS.length || VHEIGHT_FAIL.length) {
+    const vhTotal = VHEIGHT_PASS.length + VHEIGHT_FAIL.length;
+    console.log(`\n✅ PASS  ${VHEIGHT_PASS.length}/${vhTotal} per-variant height checks`);
+    console.log(`❌ FAIL  ${VHEIGHT_FAIL.length}`);
+    if (VHEIGHT_FAIL.length) {
+      console.log('\n─── Gate [3o] - variant height not covered by contract h/states ────');
+      for (const f of VHEIGHT_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: add the state to the component contract\'s `states` map with its height.');
+    }
+  }
+
+  const pillTotal = PILL_PASS.length + PILL_FAIL.length;
+  if (pillTotal > 0) {
+    console.log(`\n✅ PASS  ${PILL_PASS.length}/${pillTotal} hover/selected pill geometry checks`);
+    console.log(`❌ FAIL  ${PILL_FAIL.length}`);
+    if (PILL_FAIL.length) {
+      console.log('\n─── Gate [3d] - ::before pill inset or border-radius wrong ──────────');
+      for (const f of PILL_FAIL) console.log(`  ❌ ${f}`);
+      console.log('   Fix: set inset to (outer_h − inner_h)/2 px; border-radius to the DS radius var.');
+      console.log('   Contract: add hoverPill: { innerH, radiusVar, insetH } to structure-contract.mjs.');
+    }
+  }
+}
+
+if (CSS_PROPERTY_ASSERTIONS.length) {
+  const aTotal = ASSERT_PASS.length + ASSERT_FAIL.length;
+  console.log(`\n✅ PASS  ${ASSERT_PASS.length}/${aTotal} CSS property assertions`);
+  console.log(`❌ FAIL  ${ASSERT_FAIL.length}`);
+  if (ASSERT_FAIL.length) {
+    console.log('\n─── Gate [3e] - CSS property assertion failed ───────────────────────');
+    for (const f of ASSERT_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: update the CSS rule to match the assertion in CSS_PROPERTY_ASSERTIONS.');
+  }
+}
+
+if (CHILD_PASS.length + CHILD_FAIL.length > 0) {
+  const cTotal = CHILD_PASS.length + CHILD_FAIL.length;
+  console.log(`\n✅ PASS  ${CHILD_PASS.length}/${cTotal} sub-frame layout checks`);
+  console.log(`❌ FAIL  ${CHILD_FAIL.length}`);
+  if (CHILD_FAIL.length) {
+    console.log('\n─── Gate [3f] - sub-frame gap/padding mismatch ──────────────────────');
+    for (const f of CHILD_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: update the child CSS selector to use the correct DS token var.');
+  }
+}
+
+const hasCpropChecks = CPROP_PASS.length + CPROP_FAIL.length + CPROP_WARN.length > 0;
+if (hasCpropChecks) {
+  const cTotal = CPROP_PASS.length + CPROP_FAIL.length;
+  console.log(`\n✅ PASS  ${CPROP_PASS.length}/${cTotal} component property implementations`);
+  console.log(`❌ FAIL  ${CPROP_FAIL.length}`);
+  if (CPROP_WARN.length) console.log(`⚠️  WARN  ${CPROP_WARN.length} (unmapped Figma properties)`);
+  if (CPROP_FAIL.length) {
+    console.log('\n─── Gate [3g] - component property has no CSS implementation ────────');
+    for (const f of CPROP_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: implement a CSS selector/class for this behavior.');
+    console.log('   null is only valid for TEXT/INSTANCE_SWAP/SLOT - BOOLEAN/VARIANT must have a selector.');
+  }
+  if (SCAFFOLD.length) {
+    console.log('\n─── Starter CONTRACT scaffolds (copy to structure-contract.mjs) ─────');
+    for (const { name, entry } of SCAFFOLD) {
+      const props = Object.entries(entry.properties)
+        .filter(([, d]) => d.type === 'BOOLEAN' || d.type === 'VARIANT');
+      console.log(`  ${name}: {`);
+      console.log(`    h: null, gapVar: null, paddingVar: { tb: null, lr: null },`);
+      console.log(`    fontSizeVar: null, fontWeightVar: null,`);
+      console.log(`    fillStructure: 'none', innerRadiusVar: null, strokeOnDefault: false,`);
+      console.log(`    propertyMap: {`);
+      for (const [k, d] of props) {
+        const clean = normPropName(k);
+        if (d.type === 'VARIANT') {
+          const opts = (d.variantOptions ?? []).map(v => `${v}: '.${name}'`).join(', ');
+          console.log(`      '${clean}': { ${opts} }, // VARIANT`);
+        } else {
+          console.log(`      '${clean}': '.${name}', // BOOLEAN - add selector for toggled state`);
+        }
+      }
+      console.log(`    },`);
+      console.log(`  },`);
+    }
+  }
+  if (CPROP_WARN.length) {
+    console.log('\n─── Gate [3g] - unmapped Figma component properties ─────────────────');
+    for (const w of CPROP_WARN) console.log(`  ⚠️  ${w}`);
+    console.log('   Add to propertyMap in structure-contract.mjs.');
+  }
+} else if (Object.keys(COMP_PROPS).length === 0 && Object.values(CONTRACT).some(c => c.propertyMap)) {
+  console.log('\n⏭  Component props snapshot missing - run parity with FIGMA_TOKEN to populate Gate [3g]');
+}
+
+const hasCannChecks = CANN_PASS.length + CANN_FAIL.length > 0;
+if (hasCannChecks) {
+  const cannTotal = CANN_PASS.length + CANN_FAIL.length;
+  console.log(`\n✅ PASS  ${CANN_PASS.length}/${cannTotal} Figma annotation acknowledgments`);
+  console.log(`❌ FAIL  ${CANN_FAIL.length}`);
+  if (CANN_FAIL.length) {
+    console.log('\n─── Gate [3g] - unacknowledged Figma annotation ─────────────────────');
+    for (const f of CANN_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: add CONTRACT.annotations[label] = \'css-selector\' | null (prose-only).');
+  }
+}
+
+if (SURF_PASS.length + SURF_FAIL.length > 0) {
+  const surfTotal = SURF_PASS.length + SURF_FAIL.length;
+  console.log(`\n✅ PASS  ${SURF_PASS.length}/${surfTotal} surface container --area-bg declarations`);
+  console.log(`❌ FAIL  ${SURF_FAIL.length}`);
+  if (SURF_FAIL.length) {
+    console.log('\n─── Gate [3h] - surface container missing --area-bg ─────────────────');
+    for (const f of SURF_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: add `--area-bg: var(--bgVar)` to the selector in SURFACE_CONTAINERS.');
+  }
+}
+
+if (CANN_UNDOC.length > 0) {
+  console.log(`\n⚠️  WARN  ${CANN_UNDOC.length} CSS behavior(s) mapped but not annotated in Figma:`);
+  for (const w of CANN_UNDOC) console.log(`   ⚠️  ${w}`);
+  console.log('   Consider adding a Figma annotation to document why this behavior exists.');
+}
+
+// ── Gate [3i]: button HTML class rules ───────────────────────────────────────
+// Scans plugin HTML source files for <button> elements whose class attribute
+// violates a rule defined in BUTTON_CLASS_RULES.
+//
+// Export BUTTON_CLASS_RULES from structure-contract.mjs as an array of:
+//   { modifier, allowedBases }
+//   modifier     - class that triggers the check (e.g. 'buttonCompact')
+//   allowedBases - at least one of these classes must also be on the button
+//
+// Catches wrong-base errors like buttonTertiary+buttonCompact instead of
+// buttonGhost+buttonCompact, independent of which project defines them.
+const BCLASS_FAIL = [], BCLASS_PASS = [];
+
+if (BUTTON_CLASS_RULES.length) {
+  const htmlFiles = [THEME_PATH, ...PLUGIN_CSS].filter(f => f.endsWith('.html') && existsSync(join(ROOT, f)));
+  // Match <button ...> tags - handles double and single-quoted class attributes
+  const btnRe = /<button\b[^>]*\bclass\s*=\s*(?:"([^"]+)"|'([^']+)'|`([^`]+)`)[^>]*>/g;
+  for (const file of htmlFiles) {
+    const src = readFileSync(join(ROOT, file), 'utf8');
+    let m;
+    while ((m = btnRe.exec(src)) !== null) {
+      const cls = (m[1] ?? m[2] ?? m[3]).trim();
+      const classes = cls.split(/\s+/);
+      for (const rule of BUTTON_CLASS_RULES) {
+        if (!classes.includes(rule.modifier)) continue;
+        const hasAllowed = rule.allowedBases.some(b => classes.includes(b));
+        if (hasAllowed) {
+          BCLASS_PASS.push(`${file}: .${rule.modifier} uses allowed base`);
+        } else {
+          const disallowed = classes.filter(c => c !== rule.modifier && !rule.allowedBases.includes(c) && /^button[A-Z]/.test(c));
+          BCLASS_FAIL.push(
+            `${file}: <button class="${cls}"> - .${rule.modifier} requires one of [${rule.allowedBases.join(', ')}]` +
+            (disallowed.length ? `; found [${disallowed.join(', ')}] instead` : '')
+          );
+        }
+      }
+    }
+  }
+}
+
+if (BUTTON_CLASS_RULES.length) {
+  const bTotal = BCLASS_PASS.length + BCLASS_FAIL.length;
+  console.log(`\n✅ PASS  ${BCLASS_PASS.length}/${bTotal} button class-base rules`);
+  console.log(`❌ FAIL  ${BCLASS_FAIL.length}`);
+  if (BCLASS_FAIL.length) {
+    console.log('\n─── Gate [3i] - button class-base violation ─────────────────────────');
+    for (const f of BCLASS_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: replace the disallowed base class with one from allowedBases.');
+    console.log('   Contract: edit BUTTON_CLASS_RULES in structure-contract.mjs.');
+  }
+}
+
+// ── Gate [3j]: Variant / state geometry ──────────────────────────────────────
+// For each CONTRACT entry with `states: { stateName: { h?, paddingVar?, gapVar? } }`,
+// verifies that the CSS selector for that state (from propertyMap.state[stateName])
+// uses the correct token vars for every declared geometry field.
+//
+// WHY THIS GATE EXISTS: Gate [3b] only checks the contract.main selector. When a
+// component has multiple states with distinct geometry (e.g. toast loading h=48 vs
+// success h=32, or menuList default vs hover/selected padding-right + gap), every
+// non-main state was invisible to every gate - a completely wrong value could ship
+// without a single gate detecting it. Gate [3j] closes that gap: declare state geometry
+// once in contract.states and every future run verifies it automatically.
+//
+// Supported fields per state:
+//   h            - fixed height in px
+//   paddingVar   - { tb?, lr?, r? } - shorthand tb+lr or asymmetric right-only
+//   gapVar       - gap token name (key in FIGMA_LAYOUT_TO_CSS)
+const STATE_GEOM_FAIL = [], STATE_GEOM_PASS = [];
+
+if (themeCSS) {
+  for (const [comp, contract] of Object.entries(CONTRACT)) {
+    if (!contract.states) continue;
+    const pm = contract.propertyMap ?? {};
+    const stateKey = Object.keys(pm).find(k => k.toLowerCase() === 'state');
+    const stateSelMap = stateKey ? pm[stateKey] : {};
+
+    for (const [stateName, stateGeom] of Object.entries(contract.states)) {
+      const cssSelector = stateSelMap[stateName];
+      if (!cssSelector) {
+        STATE_GEOM_FAIL.push(`${comp}/${stateName}: no CSS selector in propertyMap.state`);
+        continue;
+      }
+
+      const block = findBlock(themeCSS, cssSelector, themeIndex)
+                 ?? findBlock(allCss,   cssSelector, allIndex);
+      if (!block) {
+        STATE_GEOM_FAIL.push(`${comp}/${stateName}: selector "${cssSelector}" not found in CSS`);
+        continue;
+      }
+
+      let statePass = true;
+      const lbl = `${comp}/${stateName}`;
+
+      function sgCheck(key, prop, tokenName) {
+        if (tokenName === undefined || tokenName === null) return;
+        const cssVar = FIGMA_LAYOUT_TO_CSS[tokenName];
+        if (!cssVar) {
+          STATE_GEOM_FAIL.push(`${lbl}/${key}: FIGMA_LAYOUT_TO_CSS missing entry for "${tokenName}"`);
+          statePass = false; return;
+        }
+        if (!propHasVar(block, prop, cssVar)) {
+          STATE_GEOM_FAIL.push(`${lbl}/${key}: "${prop}" expected var(${cssVar}) [${tokenName}] - got: ${propActual(block, prop)}`);
+          statePass = false;
+        }
+      }
+
+      if (stateGeom.h !== undefined && stateGeom.h !== null) {
+        const hMatch = block.match(/(?<!-)height\s*:\s*([^;\n]+)/);
+        const cssPx  = hMatch ? toPx(hMatch[1]) : null;
+        if (cssPx !== stateGeom.h) {
+          STATE_GEOM_FAIL.push(`${lbl}/height: CSS is ${cssPx ?? '(not set)'}px - contract is ${stateGeom.h}px`);
+          statePass = false;
+        }
+      }
+
+      sgCheck('padding-tb',    'padding',       stateGeom.paddingVar?.tb);
+      sgCheck('padding-lr',    'padding',       stateGeom.paddingVar?.lr);
+      sgCheck('padding-right', 'padding-right', stateGeom.paddingVar?.r);
+      sgCheck('gap',           'gap',           stateGeom.gapVar);
+
+      if (statePass) STATE_GEOM_PASS.push(lbl);
+    }
+  }
+}
+
+if (STATE_GEOM_PASS.length + STATE_GEOM_FAIL.length > 0) {
+  const sgTotal = STATE_GEOM_PASS.length + STATE_GEOM_FAIL.length;
+  console.log(`\n✅ PASS  ${STATE_GEOM_PASS.length}/${sgTotal} state/variant geometry checks`);
+  console.log(`❌ FAIL  ${STATE_GEOM_FAIL.length}`);
+  if (STATE_GEOM_FAIL.length) {
+    console.log('\n─── Gate [3j] - state/variant geometry mismatch ─────────────────────');
+    for (const f of STATE_GEOM_FAIL) console.log(`  ❌ ${f}`);
+    console.log('   Fix: update the CSS selector to use the correct token var.');
+    console.log('   Contract: edit contract.states[stateName] in structure-contract.mjs.');
+  }
+}
+
+const anyFail = FAIL.length > 0 || MISSING.length > 0 || UNCONTRACTED.length > 0 || CSS_FAIL.length > 0
+             || VAR_FAIL.length > 0 || SELECTOR_FAIL.length > 0 || PROP_FAIL.length > 0
+             || PHANTOM_FAIL.length > 0 || PHANTOM_FILL_FAIL.length > 0 || PILL_FAIL.length > 0
+             || BSIDES_FAIL.length > 0 || ASSERT_FAIL.length > 0 || CHILD_FAIL.length > 0
+             || CPROP_FAIL.length > 0 || CANN_FAIL.length > 0 || SURF_FAIL.length > 0
+             || BCLASS_FAIL.length > 0 || STATE_GEOM_FAIL.length > 0
+             || STROKE_WIDTH_FAIL.length > 0 || RESTING_FAIL.length > 0
+             || MIXED_FAIL.length > 0 || VHEIGHT_FAIL.length > 0;   // [3m] no-shrink is advisory
+
+let measuredFail = false;
+// ── Measured check (code capture) ─────────────────────────────────────────────
+// The checks above read CSS text. When the code capture measured the components in a browser (and
+// still matches the code), its field-by-field comparison with Figma is listed here too: a rendered
+// value that differs although the text check passed (an overriding rule, a token that resolves
+// elsewhere). Advisory: it never changes this gate's result.
+try {
+  const { readFreshSnapshot } = await import('./code-capture.mjs');
+  const cap = await readFreshSnapshot(ROOT, cfg);
+  if (cap?._sources?.browser) {
+    const { loadParityMaps, compareComponents, measuredLine } = await import('./capture-compare.mjs');
+    let vars = {};
+    try { vars = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { /* optional */ }
+    const r = compareComponents(cap, snap?.components ?? {}, vars, cfg, await loadParityMaps(ROOT, cfg));
+    // At each Figma breakpoint width too, for the tokens the breakpoint collection changes.
+    const { compareBreakpoints } = await import('./capture-compare.mjs');
+    const bpr = compareBreakpoints(cap, snap?.components ?? {}, vars);
+    r.match += bpr.match; r.differ.push(...bpr.differ);
+    // ds-config.json → renderedParityStrict: true makes these differences fail the gate. In build mode they fail by
+    // default (the code was just written from Figma), except a value the page could only read as the browser's
+    // default: the engine drew that instance from the CSS alone and may lack the child the code styles.
+    const buildStrict = cfg.build === true && cfg.renderedParityStrict !== false;
+    const strictMeasured = cfg.renderedParityStrict === true || buildStrict;
+    if (buildStrict && !(cfg.renderedParityStrict === true)) {
+      const soft = r.differ.filter((d) => d.confidence === 'default');
+      r.differ = r.differ.filter((d) => d.confidence !== 'default');
+      for (const d of soft) console.log(`   ⚠️  ${measuredLine(d)}  [read as the browser default: not failed]`);
+    }
+    const mark = strictMeasured ? '❌' : '⚠️ ';
+    if (r.differ.length) {
+      console.log(`\n${mark} MEASURED ${r.differ.length}  (rendered in the browser, the component differs from Figma${strictMeasured ? '' : ' - advisory'})`);
+      // Who last changed the rule's line, and why (git), so the reason travels with the finding.
+      const { codeReason, reasonLine, prefetchReasons } = await import('./change-reason.mjs');
+      prefetchReasons(ROOT, r.differ.map((d) => d.at));
+      // Which side moved since they last agreed (design-system-engine-agreed.json), when there is a record.
+      const { loadAgreed, classify, MOVED_LABEL } = await import('./agreed.mjs');
+      const { factOf } = await import('./capture-compare.mjs');
+      const agreed = loadAgreed(ROOT);
+      const toCode = [], toFigma = [];
+      for (const d of r.differ) {
+        // Build mode: Figma leads; a component written from it that differs moves back to Figma, whatever the record says.
+        const seen = classify({ ...factOf(d), same: false }, agreed);
+        const kind = cfg.build === true && (seen === 'code-moved' || seen === 'both-moved') ? 'unknown' : seen;
+        const moved = MOVED_LABEL[kind];
+        console.log(`   ${mark} ${measuredLine(d, kind)}${moved ? `  [${moved}]` : ''}`);
+        if (kind === 'code-moved' || kind === 'both-moved') toFigma.push({ d, moved: kind }); else toCode.push(d);
+        const why = d.at ? reasonLine(codeReason(ROOT, d.at)) : null;
+        if (why) console.log(`      ↳ ${why}`);
+      }
+      const { figmaLinker } = await import('./figma-link.mjs');
+      const linkFor = figmaLinker(ROOT, cfg);
+      for (const comp of [...new Set(r.differ.map((d) => d.component))]) { const u = linkFor(comp); if (u) console.log(`   🔗 ${comp} in Figma: ${u}`); }
+      // Which way each difference goes back: a patch for the code, a list for Figma. Never applied.
+      const { writeHandback } = await import('./handback.mjs');
+      const outDir = dirname(codeSnapshotPath(cfg));
+      const hb = writeHandback(ROOT, outDir, { codeDiffs: toCode, figmaItems: toFigma, linkFor });
+      if (hb.code) console.log(`   ↳ code changes proposed (${hb.patched}): ${hb.code}  (review, then git apply it; ${hb.manual.length} more by hand)`);
+      else if (toCode.length) console.log(`   ↳ ${toCode.length} code change(s) to make by hand (no single-value declaration to patch)`);
+      if (hb.figma) console.log(`   ↳ Figma changes to make (${toFigma.length}): ${hb.figma}`);
+      if (strictMeasured) measuredFail = true;
+    } else console.log(`\n✅ MEASURED  every rendered component value matches Figma (${r.match})`);
+    // What was actually checked: a clean result is only as good as its reach.
+    const { censusOf, censusLines } = await import('./capture-compare.mjs');
+    const census = censusOf(r, bpr);
+    const censusFile = join(dirname(codeSnapshotPath(cfg)), 'census.json');
+    try { mkdirSync(join(ROOT, dirname(censusFile)), { recursive: true }); writeFileSync(join(ROOT, censusFile), JSON.stringify(census, null, 1) + '\n'); } catch { /* the report line still shows it */ }
+    censusLines(census).forEach((l, i) => console.log(`   ${i ? '  ' : '📋 '}${l}${i ? '' : `  (${censusFile})`}`));
+    // Each component as drawn against its Figma image, when codeReading.visual is on.
+    if (cfg.codeReading?.visual === true) {
+      try {
+        const { visualDiff, visualLines } = await import('./visual-diff.mjs');
+        const vr = await visualDiff(ROOT, cfg, cap, snap?.components ?? {}, { outDir: dirname(codeSnapshotPath(cfg)), version: snap?._figmaVersion ?? null });
+        for (const l of visualLines(vr, cfg.visualRefs ?? projectPath(ROOT, 'refs'))) console.log(`   ${l.trimStart().startsWith('🖼  VISUAL') ? l : l.trimStart()}`);
+      } catch (e) { console.log(`   🖼  ⏭ visual diff not run (${String(e.message || e).split('\n')[0]})`); }
+    }
+    // Every variant built: each Figma axis value has a counterpart the capture found in code.
+    const { compareVariants } = await import('./capture-compare.mjs');
+    const v = compareVariants(cap, snap?.components ?? {});
+    if (v.missing.length) {
+      console.log(`\n⚠️  VARIANTS ${v.missing.length}  (a Figma variant value with no state or class the code capture could find - advisory)`);
+      for (const m of v.missing) console.log(`   ⚠️  ${m.component}: ${m.axis}=${m.value} has no counterpart in code (add it, or map it in the contract's propertyMap)`);
+    } else if (v.built) console.log(`\n✅ VARIANTS  every Figma variant value has a counterpart in code (${v.built})`);
+  }
+  // Tokens, icons and nesting as the capture read them, on every audit. A token only the browser reads (set by a
+  // script, or a stylesheet the token check does not read) is listed here when it differs from Figma; what the token,
+  // icon and sub-component checks already read is counted, never listed twice. Advisory like the rest of the measured
+  // check; renderedParityStrict (and build mode) makes a listed difference fail the gate.
+  if (cap) {
+    const { loadParityMaps, compareTokens, compareIcons, compareNesting } = await import('./capture-compare.mjs');
+    const readJson = (f) => { try { return JSON.parse(readFileSync(join(ROOT, f), 'utf8')); } catch { return null; } };
+    const vars = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
+    const strict = cfg.renderedParityStrict === true || (cfg.build === true && cfg.renderedParityStrict !== false);
+    const mark = strict ? '❌' : '⚠️ ';
+    const t = compareTokens(cap, vars, cfg, await loadParityMaps(ROOT, cfg));
+    const browserOnly = t.differ.filter((d) => cap.tokens?.[d.cssVar]?.modes?.[d.mode]?.readBy === 'browser');
+    if (browserOnly.length) {
+      console.log(`\n${mark} MEASURED TOKENS ${browserOnly.length}  (the page resolves a Figma token to another value, read only in the browser${strict ? '' : ' - advisory'})`);
+      for (const d of browserOnly.slice(0, 30)) console.log(`   ${mark} ${d.token} [${d.mode}] → ${d.cssVar}: Figma ${d.figma}, rendered ${d.code}  → find what sets ${d.cssVar} at run time (a script, a stylesheet loaded by the page) and give it ${d.figma}`);
+      if (strict) measuredFail = true;
+    }
+    const figmaIcons = cfg.paths?.snapshotIcons ? readJson(cfg.paths.snapshotIcons) : null;
+    const ic = figmaIcons ? compareIcons(cap, figmaIcons) : null;
+    const composition = readJson(cfg.paths?.compositionSnapshot ?? 'component-composition.snapshot.json');
+    const n = composition ? compareNesting(cap, composition) : null;
+    const part = (label, match, off, by) => `${label} ${match} match${off ? `, ${off} differ (listed by ${by})` : ''}`;
+    const parts = [
+      ...(t.match || t.differ.length ? [part('tokens', t.match, t.differ.length - browserOnly.length, 'the token check')] : []),
+      ...(ic && (ic.match || ic.differ.length || ic.missingInCode.length) ? [part('icons', ic.match, ic.differ.length + ic.missingInCode.length, 'the icon check')] : []),
+      ...(n && (n.match || n.differ.length) ? [part('nesting', n.match, n.differ.length, 'the sub-component check')] : []),
+    ];
+    if (parts.length) console.log(`   📋 measured too: ${parts.join(' · ')}`);
+  }
+} catch { /* the capture is optional */ }
+
+if (!anyFail && !measuredFail) { console.log('\nAll structural checks pass. ✓\n'); process.exit(0); }
+else { console.log(''); process.exit(1); }

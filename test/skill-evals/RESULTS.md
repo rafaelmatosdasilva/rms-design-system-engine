@@ -1,0 +1,2235 @@
+# Skill evaluation results
+
+## 2026-10: Guidance rating for agents (continuous evaluation)
+
+What changed since the entry below (engine 8015c10, merged as 16d1a6d): the team's guidance rated for what an agent can take from it (`--guidance-rating`, `--extract`). The guide changed in `cookbook/guidelines-links.md` and `reference/usage.md`.
+
+Guide set measured: `9e1632c7aed3` · Project measured: `13d811a9d668`
+
+| Haiku, engine c7ee2d0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 20 runs) | 70/70 | 79/80 |
+| Mean cost a run | $0.063 | $0.063 |
+| Input a run | 128k | 134k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 80 runs failed, fewer passes than the entry below, 1 rule violation. Failed: new-ui-saved #7: reports in the chat, not in a file (no reply). That run made the right edit and passed the edit check by turn 33, then loaded the `run` skill the command line bundles since 2.1.301 to serve the page, and hit the 40-turn limit before it replied. The guide change does not reach this task, so it was run 10 more times on the same engine: 10/10, 19/20 in all. Records: `records/guidance-rating`.
+
+## 2026-10: Style guide: brands, Showroom, property sheet (continuous evaluation)
+
+What changed since the entry below (engine 1663d15): Guide notes for brands (config) and the Showroom (usage); a neutral example name in the skill file. The guide changed in `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `c6656ff2e141` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8015c10 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.063 |
+| Input a run | 111k | 128k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 128k a run against 111k. Records: `records/2026-10-16-tests-the-token-description-row`.
+
+## 2026-10: Icons from a folder of SVG files (continuous evaluation)
+
+What changed since the entry below (engine 4fe0912): The engine reads a system's icons kept as one SVG file each (src/assets/icons) as its icon sheet; usage.md names the option. The guide changed in `reference/usage.md`.
+
+Guide set measured: `cab27ef35232` · Project measured: `13d811a9d668`
+
+| Haiku, engine 1663d15 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.060 |
+| Input a run | 115k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 115k. Records: `records/2026-10-15-style-guide-the-menu-s`.
+
+## 2026-10: Style guide defaults (continuous evaluation)
+
+What changed since the entry below (engine 7a1484a): The page's own defaults where the system has none: segmented control, tooltip, card border, type scale. The guide changed in `reference/usage.md`.
+
+Guide set measured: `b11823942aea` · Project measured: `13d811a9d668`
+
+| Haiku, engine 4fe0912 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.060 |
+| Input a run | 103k | 115k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 115k a run against 103k. Records: `records/2026-10-15-style-guide-the-page-s`.
+
+## 2026-10: Figma branch links (continuous evaluation)
+
+What changed since the entry below (engine 2ef7817): A Figma branch link names the branch: setup and a link given later read the branch, which stays as it is while the main file changes; on a project already set up, --init --figma-url changes only figmaFileKey. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `ea506393b47a` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7a1484a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.059 |
+| Input a run | 116k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 116k. Records: `records/figma-branch`.
+
+## 2026-10: Style guide: only Figma's components, code-only ones as tasks (continuous evaluation)
+
+What changed since the entry below (engine e81a0ea): Style guide: with Figma's components, a component only the code has is a task. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `09500f27764f` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2ef7817 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.056 |
+| Input a run | 130k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 130k. Records: `records/2026-10-14-style-guide-with-figma-s`.
+
+## 2026-10: Compact Figma capture (continuous evaluation)
+
+What changed since the entry below (engine 3f9b610): A run inside a GitLab mirror finds the token in the folder that holds it; A compact Figma capture: about a tenth of the calls for a large file. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `b704e94db02c` · Project measured: `13d811a9d668`
+
+| Haiku, engine e81a0ea | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.063 | $0.062 |
+| Input a run | 139k | 130k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 130k a run against 139k. Records: `records/2026-10-14-a-compact-figma-capture-about`.
+
+## 2026-10: Text styles complete and accurate (continuous evaluation)
+
+What changed since the entry below (engine 89948cd): Style guide accuracy: full-name text styles, scale keys, chrome overrides, hex in sizes, Pinia; Text styles complete and accurate, from Figma to the style guide; Tests: a type style lists only its own fields, the family once; a capture records each style's family. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `957137cde0c4` · Project measured: `13d811a9d668`
+
+| Haiku, engine 3f9b610 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.063 |
+| Input a run | 120k | 139k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 139k a run against 120k. Records: `records/2026-10-13-tests-a-type-style-lists`.
+
+## 2026-10: Read-only complete capture (continuous evaluation)
+
+What changed since the entry below (engine fee165b): Router: a component named loosely is found, and a shared word is asked about; Docs: one Commands page, linked from every other page; One pairing of Figma components with their code files, no map needed; Capture components read-only and complete: raw values and states by component id; Guide: a component's own file comes from the one pairing, every sign named. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `cce6b42d302d` · Project measured: `13d811a9d668`
+
+| Haiku, engine 89948cd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.061 |
+| Input a run | 97k | 120k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 97k. Records: `records/2026-10-13-guide-a-component-s-own`.
+
+## 2026-10: Kept on purpose (continuous evaluation)
+
+What changed since the entry below (engine 99f052c): A difference the team decides to keep is recorded with --keep, with its reason, who and when, and never fails a run; the accept-debt recipe now asks whether to keep or to accept as debt. The guide changed in `cookbook/accept-debt.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `43645a1d1875` · Project measured: `13d811a9d668`
+
+| Haiku, engine fee165b | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.057 |
+| Input a run | 111k | 97k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 111k. Records: `records/kept-on-purpose`.
+
+## 2026-10: Components read in checked chunks (continuous evaluation)
+
+What changed since the entry below (engine c071b6d): The refresh recipe now reads the components in checked chunks too (--capture-script components sums, then each chunk --capture-import names). Each chunk script runs the recipe's own Step 1c functions in Figma (componentFacts and propsFacts, added to the recipe, with the resting variant and child frames as functions); --capture-import merges the chunks into the structure and props snapshots, keeps the keys the capture does not read and takes out components no longer in Figma. figma-cli reads the components the same way. Setup no longer reads a crowded folder above the project for products. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/usage.md`.
+
+Guide set measured: `62f3f31a7791` · Project measured: `13d811a9d668`
+
+| Haiku, engine 99f052c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.059 |
+| Input a run | 93k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 93k. Records: `records/p6-components`.
+
+## 2026-10: Figma read in checked chunks by both readers, outputs stamped with what they were built from, parity by type, Mac-like runs (continuous evaluation)
+
+What changed since the entry below (engine 78d3116): The refresh recipe reads Figma's variables, text styles and effect styles in checked chunks (--capture-script vars N, then --capture-import, which builds the vars snapshot with the recipe's own scripts; on a refresh only the checksums and the chunks that changed), and figma-cli runs the same scripts, so both readers give the same snapshot; the usage reference lists both commands. The engine also stamps every snapshot, the contracts and the style guide with the code commit, the Figma version and the engine, and keeps an output built from newer inputs; quotes its own path in routed commands; hides Chrome on request wherever it is installed; and the Health page lists the parity differences by type. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `85b76a0e5bab` · Project measured: `13d811a9d668`
+
+| Haiku, engine c071b6d | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.056 |
+| Input a run | 108k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 108k. Records: `records/chunked-capture-stamps`.
+
+## 2026-10: The Figma capture reads library aliases, colours with opacity among the sizes, durations in their unit, every text style by its full name, and shared sizing modes (continuous evaluation)
+
+What changed since the entry below (engine c2ee891): The capture recipe (refresh-figma.md, Steps 1a, 1b-single, 1b-batched and 1b-motion-effects) reads every alias target the file does not hold before resolving, so a token that aliases a library resolves; resolves a colour with its own opacity among the sizes as a hex with its alpha; keeps durations in ms (a TIMING variable in seconds, a FLOAT in seconds below 10 and ms from 10 up, a FLOAT named as no duration kept a number); keys each text style by its full name, every reader of the typography snapshot reading old and new keys alike; and keeps the colour modes' keys for a sizing collection that is also the colour collection. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `f0821abf8acc` · Project measured: `13d811a9d668`
+
+| Haiku, engine 78d3116 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.059 |
+| Input a run | 104k | 108k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 104k. Records: `records/capture-recipe-fixes`.
+
+## 2026-10: A project read from GitLab, agents without the hooks, and gaps that say what was tried (continuous evaluation)
+
+What changed since the entry below (engine 438d3a4): Setup's recipe, the main guide and the config reference say what a GitLab link does (read through the API, never cloned, GITLAB_TOKEN and GITLAB_HOST in .env set by the person) and how its history is read; the usage reference documents --agent-rules and --edit-check; the prototype recipe asks for searched and why on a Missing box or a stand-in. The guide changed in `cookbook/first-setup.md`, `cookbook/prototype.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `ee76069011b4` · Project measured: `13d811a9d668`
+
+| Haiku, engine c2ee891 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.058 |
+| Input a run | 102k | 104k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 104k a run against 102k. Records: `records/gitlab-agents-gaps`.
+
+## 2026-10: Setup fills from the first capture what it cannot read (continuous evaluation)
+
+What changed since the entry below (engine 2b17d2c): The capture recipe finds the colour collection, its modes and the sizes itself when the configured ones are not in the file, and keeps their names in _collections; the config reference documents figma.fromCapture and the naming ways that keep /color and /default. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`.
+
+Guide set measured: `40b7a496c289` · Project measured: `13d811a9d668`
+
+| Haiku, engine 438d3a4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.059 |
+| Input a run | 109k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 109k. Records: `records/setup-from-capture`.
+
+## 2026-10: Raw value census, prototypes sized as screens, planted-fault tests, Health by criterion (continuous evaluation)
+
+What changed since the entry below (engine d5be7e8): The usage reference documents --census (values written by hand, a baseline so the count only falls), prototypes sized as the products' screens, the planted-fault tests, and a check that read nothing shown as Not run; the config reference documents census: false. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `709215713155` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2b17d2c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.059 |
+| Input a run | 113k | 109k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 109k a run against 113k. Records: `records/census-planted-faults-health`.
+
+## 2026-10: Accessibility checks, findings and specs handed to Figma (continuous evaluation)
+
+What changed since the entry below (engine b053e48): The guide row and the figma-edits recipe name the screens' accessibility findings pinned in Figma and each component's accessibility spec; the usage reference documents the new browser checks (modal focus, tap, forced-colour states, colour-vision variants, what a screen reader says on a change) and axe-core fetched at install. The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `65b5d3e94d56` · Project measured: `13d811a9d668`
+
+| Haiku, engine d5be7e8 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.060 |
+| Input a run | 98k | 113k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 113k a run against 98k. Records: `records/a11y-checks-and-figma-review`.
+
+## 2026-10: The designed screens checked for accessibility (continuous evaluation)
+
+What changed since the entry below (engine 4754507): Nuxt 4.6 writes its types in the engine's output too; The designed screens checked for accessibility. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `135ea0d34f49` · Project measured: `13d811a9d668`
+
+| Haiku, engine b053e48 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 102k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 102k. One `audit-chip` run first scored as a miss though it named both heights (Figma 32px and rendered 36px, on two lines in a row of one list); the scorer took the pair only on one line, now takes two lines in a row when both carry px, and every run was scored again (`rescore.mjs`). Records: `records/2026-10-12-the-designed-screens-checked-for`.
+
+## 2026-10: A colour asked for, or a design token to add, is not a secret (continuous evaluation)
+
+What changed since the entry below (engine 647b009): Health: AI readiness among the top numbers; the five components with the most left; The style guide's first menu group is System; Room around the Playground's component; each title as close to what follows; no feedback link; The motion page lists the components that move so, by name; A colour asked for, or a design token to add, is not a secret. The guide changed in `reference/usage.md`.
+
+Guide set measured: `740b2dba6aed` · Project measured: `13d811a9d668`
+
+| Haiku, engine 4754507 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.058 |
+| Input a run | 108k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 108k. Records: `records/2026-10-12-a-colour-asked-for-or`.
+
+## 2026-10: Health: how far each area has come, weighted into one number, and where what is left gathers (continuous evaluation)
+
+What changed since the entry below (engine 250c635): A part another component draws is that component's; the fill check reads only a recorded no-fill; Health: how far each area has come, weighted into one number, and where what is left gathers. The guide changed in `reference/config.md`.
+
+Guide set measured: `4053022b4f2f` · Project measured: `13d811a9d668`
+
+| Haiku, engine 647b009 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 98k | 108k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 98k. Records: `records/2026-10-12-health-how-far-each-area`.
+
+## 2026-10: A fill Figma does not have; a row's free space allows for text; screens framed by a product, or cut (continuous evaluation)
+
+What changed since the entry below (engine 8f2202f): Template test: Accessibility is the last kind on the Tasks page; A fill Figma does not have; a row's free space allows for text; screens framed by a product, or cut. The guide changed in `reference/config.md`.
+
+Guide set measured: `906a5368fbbf` · Project measured: `13d811a9d668`
+
+| Haiku, engine 250c635 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.057 |
+| Input a run | 95k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 95k. Records: `records/2026-10-12-a-fill-figma-does-not`.
+
+## 2026-10: Tasks by kind, motion as one system table (continuous evaluation)
+
+What changed since the entry below (engine 8bf7f93): The Tasks page shows every kind at once except Accessibility, which alone waits while the components are tried; motion is a kind of its own with what each component needs; a component's Motion tab is the same task table; the motion page is one table of the system's timings, which components use each, and what the system should make of them; the component's class sits on its Version line. The guide changed in `reference/usage.md`.
+
+Guide set measured: `7380f6e9fb1c` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8f2202f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.057 |
+| Input a run | 114k | 95k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 95k a run against 114k. Records: `records/tasks-motion-page`.
+
+## 2026-10: Every mode, effects, a Motion tab (continuous evaluation)
+
+What changed since the entry below (engine 9b4a9c5): Target size on a 320px screen; contrast against what is painted behind the text; each component's shadows, blurs, fills, clipping and blending against Figma (--figma-effects); sizes, type, breakpoints and states in every mode; Documentation as the task table with a status; a Motion tab with everything that moves in one table. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `a789688ad4c9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8bf7f93 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.060 |
+| Input a run | 119k | 114k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 114k a run against 119k. Records: `records/modes-effects-motion-tab`.
+
+## 2026-10: How each component moves on its own (continuous evaluation)
+
+What changed since the entry below (engine 1e7192e): The motion check compares each component's loop, opening and closing (spinner, loader, panel, modal, toast): the code's animations against Figma's Motion keyframes and overlays. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `eec766e099ae` · Project measured: `13d811a9d668`
+
+| Haiku, engine 9b4a9c5 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.062 |
+| Input a run | 127k | 119k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 119k a run against 127k. Records: `records/component-motion`.
+
+## 2026-10: Tasks page and sticky table heads (continuous evaluation)
+
+What changed since the entry below (engine eed8da2): To do renamed Tasks; counts under the filter; no list or count until every component is tried; the browser-tried note under Accessibility alone; every table head sticky. The guide changed in `cookbook/a11y-notes.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `7c2699b14586` · Project measured: `13d811a9d668`
+
+| Haiku, engine 1e7192e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.061 |
+| Input a run | 103k | 127k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 127k a run against 103k. Records: `records/tasks-page-sticky-heads`.
+
+## 2026-10: Motion variables in the To do, and no Documentation page of its own (continuous evaluation)
+
+What changed since the entry below (engine 2b6482d): when the code has durations or easings and Figma has no motion variables at all, the system's To do says so for whoever keeps Figma; the style guide has no Documentation page, its tables live on the To do page and old links open them there. The guide changed in `reference/usage.md`.
+
+Guide set measured: `6ef441bcecd8` · Project measured: `13d811a9d668`
+
+| Haiku, engine eed8da2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.058 |
+| Input a run | 120k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 120k. Records: `records/motion-todo-no-doc-page`.
+
+## 2026-10: The To do page shows Documentation in the Documentation table (continuous evaluation)
+
+What changed since the entry below (engine 7a6b367): the To do page's Documentation kind is the Documentation table itself (Kind, What is written, From), one card per component with a kind not written yet, counted rather than numbered. The guide changed in `reference/usage.md`.
+
+Guide set measured: `d60b0d32a1d6` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2b6482d | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.061 |
+| Input a run | 106k | 120k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 106k. Records: `records/todo-documentation-table`.
+
+## 2026-10: A wider disabled guard, text styles in full, where each component lives, and the To do page by kind (continuous evaluation)
+
+What changed since the entry below (engine 856fd1a): the disabled guard reads every border side, the shadow and the outline; Gate 24 checks letter spacing and text case and puts each mode on as the project does; --query, the contracts and the differences list say where each component lives; the To do page holds documentation too and shows one kind at a time, each in a table of its own shape. The guide changed in `cookbook/ask-the-system.md`, `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `f581340817d9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7a6b367 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.059 |
+| Input a run | 110k | 106k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 106k a run against 110k. Records: `records/todo-kinds-usage`.
+
+## 2026-10: The structure gate measures tokens, icons and nesting, and a motion page in the foundations (continuous evaluation)
+
+What changed since the entry below (engine e27cbc3): Gate 13 compares tokens, icons and nesting on every audit and lists only what the browser alone reads; the style guide gets a motion page with durations, easings, a Play button and Figma's prototype transitions. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `d54af1919190` · Project measured: `13d811a9d668`
+
+| Haiku, engine 856fd1a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.059 |
+| Input a run | 98k | 110k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 110k a run against 98k. Records: `records/gate-measures-motion-page`.
+
+## 2026-10: Vue components rendered with whatever builds them (continuous evaluation)
+
+What changed since the entry below (engine 53b5844): the Vue harness renders with Nuxt, Vue CLI or webpack as well as Vite; the style guide draws each Vue variant as it renders and scopes a one-component page; each component's Documentation is a table; setup keeps an existing ds-config.json unless --reconfigure. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `03319a2472be` · Project measured: `13d811a9d668`
+
+| Haiku, engine e27cbc3 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.057 |
+| Input a run | 109k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 109k. Records: `records/vue-builds`.
+
+## 2026-10: Coverage becomes Documentation, the same cards as each component's (continuous evaluation)
+
+What changed since the entry below (engine c739389): The style guide's Coverage page is renamed Documentation and gathers each component's own Documentation card, so the two always hold the same thing; Used in is no longer a kind of documentation. reference/usage.md describes it. The guide changed in `reference/usage.md`.
+
+Guide set measured: `526e9e6ccc56` · Project measured: `13d811a9d668`
+
+| Haiku, engine 53b5844 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.059 |
+| Input a run | 100k | 109k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 109k a run against 100k. Records: `records/documentation-page`.
+
+## 2026-10: Motion and screens against Figma, every combination of modes, and the products' own pages checked (continuous evaluation)
+
+What changed since the entry below (engine f8675f6): it compares Figma's prototype transitions with the code's (--figma-motion); it compares each product's page with its designed screens (--figma-screens); it checks every combination of modes; they check each product's own page whole, with the Tab order and lost focus. The refresh recipe gains the two read-only captures and says a token is only ever set in the project's .env, never asked for; usage and config describe the new commands and keys. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `0a2a84e09ff6` · Project measured: `13d811a9d668`
+
+| Haiku, engine c739389 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 103k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 103k. Records: `records/motion-screens-modes`.
+
+## 2026-10: A rename sweep, steps off what the system retired, and a near copy as a decision (continuous evaluation)
+
+What changed since the entry below (engine 99a6dc7): --rename-sweep renames a token renamed in Figma in every rule, script and doc of the system and its products in one patch per folder, the old name kept in the theme; the router sends a rename to it. The audit lists what the system retired that is still used, with what replaces it and every place, in handback/migrations.md, with a patch for each token swap; the style guide shows it on the old component's page and in its To do. A class a product styles almost as a system component is a decision in System health, in the style guide's To do (You decide) and in the edit check. The guide changed in `cookbook/fix-a-difference.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `fb2988e40c83` · Project measured: `13d811a9d668`
+
+| Haiku, engine f8675f6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 104k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 104k. Records: `records/rename-migrations-copies`.
+
+## 2026-10: Checks made by hand, and no brand or product names in tokens (continuous evaluation)
+
+What changed since the entry below (engine fd564b2): A person marks a WCAG criterion only a person can judge as checked (--checked, Done until the component changes, guarded by the hooks, routed from the person's words); tokens named after a product or brand are listed for Figma. The guide changed in `cookbook/a11y-notes.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `98badba0ed49` · Project measured: `13d811a9d668`
+
+| Haiku, engine 99a6dc7 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.057 |
+| Input a run | 98k | 104k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 104k a run against 98k. Records: `records/2026-10-11-checked-by-hand-brand-names`.
+
+## 2026-10: An order of authority, written down (continuous evaluation)
+
+What changed since the entry below (engine b27d0fd): When sources disagree the higher one decides (the users' goal, research, documented standards, past decisions, heuristics), in the main guide and in llms.txt with the system's own sources; each finding's record says its level. The guide changed in `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `29a7fc7c47aa` · Project measured: `13d811a9d668`
+
+| Haiku, engine fd564b2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.056 |
+| Input a run | 100k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 100k. Records: `records/2026-10-11-order-of-authority`.
+
+## 2026-10: Aliases to a removed token, in Figma and in the code (continuous evaluation)
+
+What changed since the entry below (engine baae26a): The Figma capture records a variable that points at one no longer in the file; the audit and the style guide's To do list it, and a token in the code that points at one declared nowhere, with the commit that removed it. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `bcd578feda05` · Project measured: `13d811a9d668`
+
+| Haiku, engine b27d0fd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.057 |
+| Input a run | 116k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 116k. Records: `records/2026-10-11-removed-token-aliases`.
+
+## 2026-10: What the tokens owe, on the style guide's To do (continuous evaluation)
+
+What changed since the entry below (engine 09ee19f): The style guide's To do lists under The system the semantic tokens with no description in Figma, the same value written by hand in two tokens and the tokens one component uses; tokens that share a primitive are never listed. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `4efe9853277b` · Project measured: `13d811a9d668`
+
+| Haiku, engine baae26a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.060 |
+| Input a run | 100k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 100k. Records: `records/2026-10-11-token-todo`.
+
+## 2026-10: System health advice, the token budget, tiers by kind and the Figma build list (continuous evaluation)
+
+What changed since the entry below (engine c46a5e4): System health advice (modes below a product's root, two themes in one product, undescribed tokens, catalogue-only patches, near-duplicate components, tokens named by look), the token budget in prune candidates, tiers that say what they hold, figma-to-build.md, a product's own usage line in --query, and tokens per generation in evals. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `baf59fe593d6` · Project measured: `13d811a9d668`
+
+| Haiku, engine 09ee19f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.057 |
+| Input a run | 92k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 92k. Records: `records/2026-10-11-system-health-token-budget`.
+
+## 2026-10: Coverage, variable scopes, imports, token layers, the verification headline and how components go together (continuous evaluation)
+
+What changed since the entry below (engine 7ab28d4): Padding and gap around layers placed outside Figma's layout draw nothing (not compared); the edit check flags imports from a replaced library or the system's insides and a component put inside another the way the system never does; Figma hygiene lists variables bound outside their scope or left on all scopes; declared token tiers with layers flag a skipped or backward alias; the summary counts components passing, drifting and not checked and says when the Figma file is not reliable enough to compare; findings.json keeps every finding as one record; the style guide's Coverage page and Documentation tab, Changelog. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `f145f88f7397` · Project measured: `13d811a9d668`
+
+| Haiku, engine c46a5e4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.056 |
+| Input a run | 90k | 92k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 90k. Records: `records/2026-10-11-coverage-scopes-imports-layers`.
+
+## 2026-10: The style guide's accessibility check finishes and reaches the guide (continuous evaluation)
+
+What changed since the entry below (engine 77fc968): The browser check on a style guide runs in parts of six components and forces states at once, keeps what it found when out of time, and acts only on drawn components; the audit waits for its own limit; the guide's own switches, slot areas, long names and pictures pass the checks it runs. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `59b9d35345b9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7ab28d4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.055 |
+| Input a run | 93k | 90k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 90k a run against 93k. Records: `records/2026-10-11-accessibility-the-style-guide-s`.
+
+## 2026-10: Accessibility: one run is the whole check, on main's style guide (continuous evaluation)
+
+What changed since the entry below (engine 45668bd): Style guide: one issue table for the To do page, Parity and Accessibility; To do keeps what the browser tried; Style guide: accessibility tried while the page is built, so it opens with the final results. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `352229c420b3` · Project measured: `13d811a9d668`
+
+| Haiku, engine 77fc968 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.056 |
+| Input a run | 108k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 108k. Records: `records/2026-10-11-merge-main-into-claude-nifty`.
+
+## 2026-10: Accessibility: one run is the whole check, against WCAG 2.2 AA (continuous evaluation)
+
+What changed since the entry below (engine 293d460): The demo's golden report carries each finding's severity and the verdict; a comment names no system's component; Accessibility: one run is the whole check, against WCAG 2.2 AA. The guide changed in `cookbook/a11y-notes.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `d54534d2c552` · Project measured: `13d811a9d668`
+
+| Haiku, engine 45668bd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.058 |
+| Input a run | 106k | 108k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 106k. Records: `records/2026-10-11-accessibility-one-run-is-the`.
+
+## 2026-10: The style guide opens with its accessibility already tried; one issue table for To do, Parity and Accessibility (continuous evaluation)
+
+What changed since the entry below (engine 293d460): The style guide's To do page, Parity and Accessibility areas share one issue table (issue number, area, Figma, code, what to do with who acts, status with when), and --styleguide tries every component's accessibility in a browser while it builds the page and keeps the results in it, so the page opens with its final results. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `f266dfff35ed` · Project measured: `13d811a9d668`
+
+| Haiku, engine e645170 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.058 |
+| Input a run | 106k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 106k. Records: `records/2026-10-11-style-guide-accessibility-tried-while`.
+
+## 2026-10: Accessibility findings say how sure they are, with one verdict line; a removed focus outline a stronger rule puts back is not reported (continuous evaluation)
+
+What changed since the entry below (engine 06a82d2): Accessibility findings say how sure they are, with one verdict line; a removed focus outline a stronger rule puts back is not reported. The guide changed in `cookbook/a11y-notes.md`, `reference/usage.md`.
+
+Guide set measured: `bf47ee56e5a7` · Project measured: `13d811a9d668`
+
+| Haiku, engine 293d460 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 107k | 106k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 106k a run against 107k. Records: `records/2026-10-11-accessibility-findings-say-how-sure`.
+
+## 2026-10: A state written with what a screen reader hears is built by its classes; a selector list split at its own commas (continuous evaluation)
+
+What changed since the entry below (engine ff08c96): A state written with what a screen reader hears is built by its classes; a selector list split at its own commas. The guide changed in `reference/gates.md`.
+
+Guide set measured: `53c05f8219d7` · Project measured: `13d811a9d668`
+
+| Haiku, engine 06a82d2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 111k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 111k. Records: `records/2026-10-11-a-state-written-with-what`.
+
+## 2026-10: The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state (continuous evaluation)
+
+What changed since the entry below (engine f4f0402): The style guide published from CI; an inset-ring stroke compared by its own width and colour; a test waits on state. The guide changed in `cookbook/publish-styleguide.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `7efb14643772` · Project measured: `13d811a9d668`
+
+| Haiku, engine ff08c96 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.058 |
+| Input a run | 104k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 104k. Records: `records/2026-10-10-the-style-guide-published-from`.
+
+## 2026-10: Setup routes the request it came from; nothing compared and nothing found are said; the style guide fits a phone (continuous evaluation)
+
+What changed since the entry below (engine 8f8b5ed): Setup routes the request it came from; nothing compared and nothing found are said; the style guide fits a phone. The guide changed in `cookbook/first-setup.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `b288b6b29e56` · Project measured: `13d811a9d668`
+
+| Haiku, engine f4f0402 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.056 |
+| Input a run | 100k | 104k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 104k a run against 100k. Records: `records/2026-10-10-setup-routes-the-request-it`.
+
+## 2026-10: Every variant of a component checked, every run; Vue components drawn and tried from their code (continuous evaluation)
+
+What changed since the entry below (engine 58d7ee7): A component shown only after an action is opened before it is checked; Every variant of a component checked, every run; Vue components drawn and tried from their code. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `464aef4566b6` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8f8b5ed | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.056 |
+| Input a run | 93k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 93k. Records: `records/2026-10-10-every-variant-of-a-component`.
+
+## 2026-10: A style guide request builds it, accessibility named or not; a component's own style guide page (continuous evaluation)
+
+What changed since the entry below (engine 7cc7815): Router: another design system's code and Figma link asked for at once; a style guide request builds it; A style guide request builds it, accessibility named or not; a component's own style guide page. The guide changed in `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `1d17e071130c` · Project measured: `13d811a9d668`
+
+| Haiku, engine 58d7ee7 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 107k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 107k. Records: `records/2026-10-10-a-style-guide-request-builds`.
+
+## 2026-10: Focus as a keyboard user sees it, Escape on dialogs over the page, and what only the code has in the style guide (continuous evaluation)
+
+What changed since the entry below (engine fe00df6): Accessibility: a field whose frame shows its focus passes, a style that eases in is read where it ends, a part beside the control (a radio's circle) shows its focus, a control that takes no focus is not judged, and Escape is judged on a dialog over the page, not one drawn in its flow. The style guide lists the components only the code has, marked so, and draws a Vue component from its template. The guide changed in `reference/usage.md`. The guide changed in `reference/usage.md`.
+
+Guide set measured: `dd2250c5657b` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7cc7815 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.052 | $0.054 |
+| Input a run | 103k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 103k. On the design system the engine was built against, its style guide's accessibility check went from 6 fields and 27 buttons with no visible focus (inert overview thumbnails, and frames whose border eases in) and an Escape failure on its modal specimen to none: the modal is listed as not judged, and its 1px rings are said too thin for 2.4.13 (advice). On a fictional Vue system, a component only its code has is listed with its file and props and drawn from its template, and with no Figma data the run says `3 only in the code`. Records: `records/2026-10-10-focus-escape-code-only`.
+
+## 2026-10: Browser accessibility on a Vue project with no Figma: its pages, its classes, and what it could not check (continuous evaluation)
+
+What changed since the entry below (engine d33715c): Accessibility from the code: seconds instead of hours, and a scoped run about its component; Browser accessibility: an empty style guide is not the page checked, and a coloured server address is read; A component's class from its own code, and the pages of a Vue router; Browser accessibility: a class no element has is said at once, and a stopped check says so; Browser accessibility: the class check runs only for named components. The guide changed in `cookbook/full-audit.md`, `reference/usage.md`.
+
+Guide set measured: `a04961c645bb` · Project measured: `13d811a9d668`
+
+| Haiku, engine fe00df6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.052 | $0.052 |
+| Input a run | 98k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 98k. Measured with main merged in (setup reads the project, #93), so the guide set is the one that merges. Records: `records/2026-10-10-a11y-vue-pages-classes`.
+
+## 2026-10: Setup reads what the project already says (continuous evaluation)
+
+What changed since the entry below (engine 3b42506): First-time setup reads the naming the token CSS follows (iconText kept, camelCase split), every Figma snapshot beside it, the system's own scripts, the products checked out beside it and the frames and screens a captured screen snapshot names; set up with no Figma link, committed snapshots are compared as they are and their age is said, never a failure; a token file or folder named in the request is where the code is. The guide changed in `reference/config.md` and `cookbook/first-setup.md`. The guide changed in `cookbook/first-setup.md`, `reference/config.md`.
+
+Guide set measured: `831a618ad5fe` · Project measured: `13d811a9d668`
+
+| Haiku, engine d33715c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.052 |
+| Input a run | 86k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 86k. A first run of this change
+had two misses, neither from it: asked to set up with "the tokens are in src/theme.css", one run still asked where the
+code was (the recipe now says a token file or folder named in the request is where the code is), and one refusal gave
+its reason in an earlier message of the reply, which the scorer did not read (it reads every message now, as the person
+does). Records: `records/2026-10-10-setup-reads-the-project`.
+
+A dry run on the design system the engine was built against, a fresh copy without its setup files beside its three
+products: setup now writes the naming the CSS keeps (185 of its 194 Figma tokens found that way, where the default found
+the rest as missing), every snapshot path, the system's script and its icons, the three products and the frames and
+screens already captured. Token values went from 24 failures to 16, each one a decision the team's own config records
+(Figma's window chrome, canvas sizes, orphan tokens); the icons check now passes; 207 open differences against 243.
+
+## 2026-10: Setup asks where the code is; the Figma link is optional (continuous evaluation)
+
+What changed since the entry below (engine b06a027): First-time setup must know where the code is (--project, `.` for this folder, or --theme-css) and writes nothing until it does; the Figma link is optional (without it each run checks the code alone and says nothing was compared with Figma); the router takes both from the request and asks for what is missing before running; --build needs the Figma file. The guide changed in `rms-design-system-engine.md`, `cookbook/first-setup.md`, `cookbook/build-from-figma.md`, `reference/config.md` and `reference/usage.md`. The guide changed in `cookbook/build-from-figma.md`, `cookbook/first-setup.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `2543232cdce8` · Project measured: `13d811a9d668`
+
+| Haiku, engine 3b42506 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.053 |
+| Input a run | 110k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 110k (the entry below had runs that took more turns). Measured on the change with main merged in (prototype fonts and stand-ins, #90), so the guide set is the one that merges. Records: `records/2026-10-10-setup-asks-where-the-code-is`.
+
+## 2026-10: Prototype fonts that never wait, and stand-ins shown on the page (continuous evaluation)
+
+What changed since the entry below (engine 224d490): Prototypes: the design's font is found on the machine, in the system's @font-face or on Google Fonts in the background, and the page never waits for it (a font found nowhere is a 🔤 line); a stand-in is marked on the page, counted on its bar, and each gap on the page's list shows its parts; a stand-in for a component the system has is a ⚠️ line. The guide changed in `reference/usage.md` and `cookbook/prototype.md`. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `c991a1f1338c` · Project measured: `13d811a9d668`
+
+| Haiku, engine b06a027 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.052 | $0.058 |
+| Input a run | 96k | 110k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken. Runs read 110k a run against 96k from more turns, not a
+longer guide: a turn reads about what it did (27k), one `new-ui-saved` run took 26 turns, and `refresh-no-figma` took 2
+to 4 turns where it took 1. An earlier run of this change, stopped when the engine moved under it, had one miss that was
+the scorer's: "once you … provide a Figma token, the engine will compare …" read as asking for the token in chat; the
+rule now leaves a token the engine reads alone (b06a027). Records: `records/2026-10-10-prototype-fonts-standins`.
+
+On the design system the engine was built against, a scan history drawn with a field standing in for a date range
+picker: the page draws at once, marks the field "Stand-in for date range picker" and counts it on its bar, its gaps list
+scrolls to it and flashes it, and the engine's picture of the page has no marks. The page's own accessibility findings
+are unchanged, and its bar's buttons no longer fail on their focus ring.
+
+## 2026-10: Prototype quality: a file that is not one page in a flow (continuous evaluation)
+
+What changed since the entry below (engine d8e021e): Flows: a file in prototypes/ that is not one page is a ❌ line, never a page of the flow. The guide changed in `reference/usage.md`.
+
+Guide set measured: `7e55ec6bbcf8` · Project measured: `13d811a9d668`
+
+| Haiku, engine 224d490 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.052 |
+| Input a run | 101k | 96k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 101k. Records: `records/2026-10-10-prototype-quality-flows`.
+
+### Prototypes, Claude alone against Claude with the skill
+
+Twelve requests on Tidepool, each asked in the same words on both sides: the eleven of 6 October and a new one, a notes
+toolbar whose pin chip shows only its icon, scored on the name a screen reader says for it (a composition's `name`, an
+`aria-label` in markup, or the need said as a Missing box). Claude alone was measured on the new request; its rows on
+the eleven do not depend on the engine and are the 6 October ones. The scorer does not use the engine.
+
+| Prototypes that pass | Claude alone | With the skill |
+|---|---|---|
+| Opus, 12 tasks × 3 runs | 17/36 (the new request 0/3, $0.81) | 36/36 · $11.20 · 9.0 turns a run (engine 224d490) |
+| Haiku, 12 tasks × 3 runs | 3/36 (the new request 0/3, $0.29) | 35/36 · $3.81 · 10.8 turns a run (engine d8e021e); the sign-up flow again on 224d490: 3/3 |
+
+**Reading.** Claude alone named the pin chip in all six runs (an `aria-label`), and every one of them still invented a
+look of its own (colours, a font, sizes the system does not have); with the skill nothing was invented, and Opus named
+the chip groups too. The one Haiku miss left a draft holding several pages in one file beside the pages it drew one by
+one: `--flow` counted it as a page and said the flow held, and its old words read as another page's. `--flow` now says
+such a file is not one page (224d490), and the flow task passed 3/3 on that engine. Two Opus misses were the scorer's,
+fixed and every row rescored: a starting point the engine read from the designed screen counted as what the run made
+(its tag broke the "no tag" rule), and a pin chip said as a Missing box counted as an unnamed one.
+
+On the design system the engine was built against (its components copied from its products' pages), two prototypes
+drawn before and after this change: a scan history went from 42 accessibility findings (40 a doubled icon sheet) to the
+system's own 2, from a segmented control drawn as nested copies with no labels to the control with its segments, and
+its rows and actions to the page's width; an export screen went from a panel showing a product's own head and nothing of
+the prototype to its heading, radio group, card of switches, checkboxes and field, with the status bar holding only the
+prototype's parts. Both score 10/10 in the design review and work as in a product.
+
+## 2026-10: Prototype quality on a real system (continuous evaluation)
+
+What changed since the entry below (engine a1ca3dd): Style guide findings that were the engine's: unnamed switches, states said by their role, content that covers nothing; Prototype quality on a real system: drawn as the system draws it, working as the product does, from every source of intent. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `687e1c0f97a9` · Project measured: `13d811a9d668`
+
+| Haiku, engine d8e021e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.053 |
+| Input a run | 94k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 94k. Records: `records/2026-10-10-prototype-quality`.
+
+## 2026-10: States heard on a part (heardOn); colours in any notation in the edit check (continuous evaluation)
+
+What changed since the entry below (engine af1bcf1): States: Current is owed aria-current; an error on a message is announced (role or aria-live), on a field aria-invalid; States: an error the option announces itself is heard, whatever the component's role; Docs: the words each state is heard in; neutral names in the state test; Roles on the style guide are read in the component's own section, never on the page's chrome; presentation is none; Roles: a component the code has no markup for is said not checked on the style guide (its stand-in is marked); a plain element counts as presentation; Keyboard: an option a composite reaches by its arrow keys (one Tab stop for the group) is reachable; Docs: roles read in their own section on the style guide, stand-ins not checked, one Tab stop per group; Tests run the same on every machine: no machine-wide TypeScript where a test expects none, and the font-dependent share of a visual diff left out of the golden; States heard on a part: the contract's heardOn names the part and its state per option; the style guide sets it with the look and the state check counts it; Edit check: a colour written as rgb(), hsl(), oklch() or a CSS name is read too. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `726e490bd92f` · Project measured: `13d811a9d668`
+
+| Haiku, engine a1ca3dd | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.054 |
+| Input a run | 98k | 94k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 94k a run against 98k. Records: `records/2026-10-10-states-heard-on-a-part-colours`.
+
+## 2026-10: Accessibility and parity readings: text as drawn, focus rings, ARIA states, edges in every mode, box and text facts (continuous evaluation)
+
+What changed since the entry below (engine 6706b73): Text contrast: oklch colours read, see-through text blended, text in a disabled control exempt; Focus: a ring that only takes a colour on focus counts, a ring on ::before/::after is measured, a two-tone shadow passes on its clearer tone; WCAG checks: placeholder text measured, a field named only by its placeholder found, required ARIA states and values, publishing and graphics roles, a spinner is not a flash, edges in oklch read; Parity: a % line height and letter spacing from Figma's font size; colours equal within a rounding step; a variant's opacity read on its own state; Parity: a text part with its own colour is compared in every mode; Parity: a mode the code draws and Figma has no value for is said, not skipped; Parity: padding, radius and gap Figma sets with no variable are compared on the default variant; Parity at breakpoints: every side of the padding, every corner, and a vertical stack's row gap; Gate 16 auto heights: only a height Figma fixes, never one that hugs or fills; Docs: what the accessibility and parity checks now read; Parity: Figma's font size for a % line height is the default variant's, where the refresh records it; Accessibility: a control edge is read in every colour mode, one finding with the modes it fades in; Parity: min and max width, alignment, wrap and a dashed stroke compared with the box Figma records; Parity: text decoration, italic and text alignment of the first text, recorded in Figma and compared; Docs: the deeper facts the refresh records and compares; edges in every mode. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `26f7ea4081e5` · Project measured: `13d811a9d668`
+
+| Haiku, engine af1bcf1 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.057 |
+| Input a run | 92k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 92k. Records: `records/2026-10-09-accessibility-parity-readings`.
+
+## 2026-10: Colours named by their Figma variable; freshness by content; edges read at rest; paired variables; deeper facts on the right side (continuous evaluation)
+
+What changed since the entry below (engine 67f75ee): Roles: a role the tree leaves out is read on the element that declares it (follow-up); Accessibility: an edge is read at rest, never halfway back from focus; Build freshness: a newer date is stale only when the content changed; Deeper facts: the side a stroke is drawn on, the component's own width, one radius, the text drawn; Parity: a variable the token check found but did not compare is one pair; Rendered assertions: a colour named by its Figma variable never goes stale. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`.
+
+Guide set measured: `273d9518068e` · Project measured: `13d811a9d668`
+
+| Haiku, engine 6706b73 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.054 |
+| Input a run | 103k | 92k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 103k. Records: `records/2026-10-09-colours-by-variable-freshness-by-content`.
+
+## 2026-10: Annotation categories; roles read on the component; a role the code fails is Claude's (continuous evaluation)
+
+What changed since the entry below (engine 05fd813): Tests: a browser that cannot start is /usr/bin/false, on macOS too; Roles: read on the component, never on a control inside it; To do: a role the code fails is Claude's, even when a Figma note asked; Chrome never touches the person's keychain (no "Keychain Not Found" prompt); Annotation categories: only an accessibility note is a requirement; Skill evaluation runs on macOS: claude found by path, login by token. The guide changed in `cookbook/a11y-notes.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/usage.md`.
+
+Guide set measured: `6169ae8a3717` · Project measured: `13d811a9d668`
+
+| Haiku, engine 67f75ee | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.055 |
+| Input a run | 86k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 86k. Records: `records/2026-10-08-annotation-categories-roles-on-component`.
+
+## 2026-10: Figma refresh: deeper facts every time; a fill on a covering child counts (continuous evaluation)
+
+What changed since the entry below (engine ad30b5f): The deeper facts of every component (box and sizing, padding, gap, corners, colours, text, each variant's visible layers) are recorded on every Figma refresh instead of being recommended; a fill drawn by a child that covers the whole frame counts as a fill on a child layer. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `4e8dc230394d` · Project measured: `13d811a9d668`
+
+| Haiku, engine 05fd813 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.053 |
+| Input a run | 92k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 92k. Records: `records/2026-10-07-figma-refresh-deeper-facts-every`.
+
+## 2026-10: Paint facts: a fill's opacity compared; contrast pairs follow what Figma draws (continuous evaluation)
+
+What changed since the entry below (engine 7554a8c): The Figma capture records the opacity a fill is drawn with, what each text and icon colour is drawn on, and the fills each component paints; Gate 13 compares the fill opacity with the alpha the code paints; the token contrast check pairs a text with the background Figma draws it on and leaves out a name-derived pair Figma never draws together. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `390c62205584` · Project measured: `13d811a9d668`
+
+| Haiku, engine ad30b5f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.055 |
+| Input a run | 98k | 92k |
+| Rule violations | 1 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 92k a run against 98k. Records: `records/2026-10-07-paint-facts-a-fill-s`.
+
+## 2026-10: Style guide: tokens table back, card tables with a Source column and named parts; prototypes flip toggles; 320 pixels (continuous evaluation)
+
+What changed since the entry below (engine 7e78e46): The Playground shows the tokens behind what is drawn again; Accessibility is one card table with a Source column, what a criterion means opening from its name, each finding naming the component or part; prototypes flip toggles and show what a part controls; the style guide fits 320 pixels. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `7ac6d1fe06c3` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7554a8c | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.053 | $0.057 |
+| Input a run | 88k | 98k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below, 1 rule violation. Failed: new-ui-saved #2: never changes code it was not asked to (screenshot.mjs). Records: `records/2026-10-06-prototypes-flip-toggles-and-show`.
+
+## 2026-10: Style guide: no tokens tables in the Playground; unused Figma annotations listed in Figma (continuous evaluation)
+
+What changed since the entry below (engine 0d370b4): The Playground shows the component, its controls and its code, every token being in Parity; --figma-edits lists each Figma annotation no check reads, with the wording a check reads; a failing contrast is always flagged. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `900ea1cae604` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7e78e46 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.053 |
+| Input a run | 93k | 88k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 88k a run against 93k. Records: `records/2026-10-06-a-failing-contrast-is-never`.
+
+## 2026-10: Style guide: one Accessibility table by WCAG criterion; every slot marked; an address per area; full width (continuous evaluation)
+
+What changed since the entry below (engine 7447255): The Accessibility area is one table by WCAG 2.1 criterion with only what applies; every Figma slot is marked in the Playground; each area of a component has its own address; the page takes the full width. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `297fdab59a8e` · Project measured: `13d811a9d668`
+
+| Haiku, engine 0d370b4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.054 |
+| Input a run | 86k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 86k. Records: `records/2026-10-06-style-guide-one-accessibility-table`.
+
+## 2026-10: Style guide: a slot is an area named Slot; ids an instance points to are kept; square checkerboard (continuous evaluation)
+
+What changed since the entry below (engine e84f729): The Playground marks a slot as the area it takes, named Slot inside; an instance copied from a page keeps the ids it points to, made unique; a control given visible words loses an aria-label that leaves them out; the checkerboard is square; the WCAG hover check waits for a fade. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `ae6ed2fb3cdd` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7447255 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 69/70 |
+| Mean cost a run | $0.055 | $0.053 |
+| Input a run | 95k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed. Failed: forbidden-green #1: says why not. Records: `records/2026-10-06-style-guide-a-slot-is`.
+
+## 2026-10: WCAG 2.1 A and AA for every component; where accessibility is read from; slots drawn in the Playground (continuous evaluation)
+
+What changed since the entry below (engine 2734a61): The audit and the style guide check every WCAG 2.1 criterion at A and AA a component can be checked for (wcag-page.js, a11y-static.mjs, wcag21.mjs); the style guide adds a WCAG 2.1 table, a From column and a Where it is read from table, and draws slots as dashed boxes. The guide set changes in reference/usage.md. The guide changed in `reference/usage.md`.
+
+Guide set measured: `c1ee43c016f1` · Project measured: `13d811a9d668`
+
+| Haiku, engine e84f729 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 77/77 | 69/70 |
+| Mean cost a run | $0.056 | $0.055 |
+| Input a run | 98k | 95k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below. Failed: forbidden-green #2: says why not. Records: `records/2026-10-06-wcag-2-1-a-and`.
+
+## 2026-10: Style guide: Accessibility covers every variant; a click outside lets go in Inspect (continuous evaluation)
+
+What changed since the entry below (engine ef4872f): The guide set's usage reference describes Accessibility over every variant and colour mode, as Parity lists everything, and a click outside the component letting go in Inspect; fix-chip-height measured at 10 runs after a miss in the entry below. The guide changed in `reference/usage.md`.
+
+Guide set measured: `d3a0ec4a838e` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2734a61 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`fix-chip-height` at 10 runs, `new-ui-saved` at 10 runs) | 69/70 | 77/77 |
+| Mean cost a run | $0.054 | $0.056 |
+| Input a run | 94k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 94k. Records: `records/2026-10-06-a11y-every-variant`.
+
+## 2026-10: Style guide: a Width while inspecting draws the anatomy at that width; slots said under the name (continuous evaluation)
+
+What changed since the entry below (engine 066e053): The guide set's usage reference describes the anatomy drawn at the Width chosen while inspecting, and a Figma slot paired with the code part that holds it, said under the component's name. The guide changed in `reference/usage.md`.
+
+Guide set measured: `e92482fdcb7b` · Project measured: `13d811a9d668`
+
+| Haiku, engine ef4872f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.057 | $0.054 |
+| Input a run | 98k | 94k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below. Failed: fix-chip-height #2: the combination is 32px, the field still 36px. Records: `records/2026-10-06-width-inspect-slots`.
+
+## 2026-10: Style guide: Inspect follows the modes and reaches nested parts; Accessibility as one status table; --component with --styleguide (continuous evaluation)
+
+What changed since the entry below (engine ff07bde): The guide set's usage reference describes the inspector at the Playground's size, its pick that dims the rest, nested parts one level per click, the modes followed while inspecting, Done leaving nothing behind, Accessibility as one table of statuses, and --component with --styleguide auditing a component before building the page. The guide changed in `reference/usage.md`.
+
+Guide set measured: `5a17a7519df8` · Project measured: `13d811a9d668`
+
+| Haiku, engine 066e053 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.053 | $0.057 |
+| Input a run | 86k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 86k. Records: `records/2026-10-06-inspect-a11y-component-sg`.
+
+## 2026-10: Style guide: Inspect in the Playground, the stage's bars, alert icons, a sticky Parity head (continuous evaluation)
+
+What changed since the entry below (engine c595e4e): The guide set's usage reference describes the Playground's Inspect toggle and its bars, the plainer header, the alert icons on Parity and Accessibility, and the sticky Parity head. The guide changed in `reference/usage.md`.
+
+Guide set measured: `a2efcc32d7f9` · Project measured: `13d811a9d668`
+
+| Haiku, engine ff07bde | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.053 |
+| Input a run | 105k | 86k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 86k a run against 105k. Records: `records/2026-10-06-style-guide-inspect-bars-alerts`.
+
+## 2026-10: Accessibility findings go to Accessibility, not Parity (continuous evaluation)
+
+What changed since the entry below (engine 7229c44): The style guide shows the audit's contrast findings under a component's Accessibility area instead of its Parity. The guide changed in `reference/usage.md`.
+
+Guide set measured: `b0dcd0d43daf` · Project measured: `13d811a9d668`
+
+| Haiku, engine c595e4e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.057 |
+| Input a run | 96k | 105k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 105k a run against 96k. Records: `records/2026-10-06-a11y-findings-to-accessibility`.
+
+## 2026-10: Parity as one table of every prop, variable and value (continuous evaluation)
+
+What changed since the entry below (engine e46b7bc): The style guide's Parity area is one table of everything the component has, Figma beside code, with a status and when it last held. The guide changed in `reference/usage.md`.
+
+Guide set measured: `636d56b479b2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7229c44 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.055 |
+| Input a run | 97k | 96k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 97k. One run (forbidden-green #2) was first scored as a miss: it left the setting alone and said the snapshots are current and not the problem, wording the scorer did not read. The scorer now reads it (a case in `test/skill-evals.test.mjs`), and every run was rescored twice: one verdict changed on the first pass, none on the second. Records: `records/2026-10-06-parity-one-table`.
+
+## 2026-10: The anatomy follows every Playground change; no Full width (continuous evaluation)
+
+What changed since the entry below (engine a53a190): The style guide redraws the anatomy for a text typed in the Playground, and the Full width button is gone. The guide changed in `reference/usage.md`.
+
+Guide set measured: `f4d5cd72cfd2` · Project measured: `13d811a9d668`
+
+| Haiku, engine e46b7bc | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.055 |
+| Input a run | 99k | 97k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 97k a run against 99k. Records: `records/2026-10-06-anatomy-follows-playground`.
+
+## 2026-10: A component the DS has not built yet is not a product's gap (continuous evaluation)
+
+What changed since the entry below (engine f78312e): Gate 10 says a product screen that uses a component in knownUnimplementedComponents on a not checked line instead of failing the product. The guide changed in `cookbook/full-audit.md`, `reference/config.md`.
+
+Guide set measured: `b4caab4e7484` · Project measured: `13d811a9d668`
+
+| Haiku, engine a53a190 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.055 |
+| Input a run | 103k | 99k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 103k. Records: `records/2026-10-06-unbuilt-components-not-a-product-gap`.
+
+## 2026-10: Hand-built components found, skipped checks said, style guide component page (continuous evaluation)
+
+What changed since the entry below (engine 25c754b): Gate 10 reads the product screens from Figma; the summary lists what was not checked; the refresh recipe captures the screen components; the style guide moves Specs into the Playground. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `e327581706ac` · Project measured: `13d811a9d668`
+
+| Haiku, engine f78312e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 93k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 93k. Records: `records/2026-10-06-hand-built-components-are-found`.
+
+## 2026-10: Guides: every gate by the number the report prints (continuous evaluation)
+
+What changed since the entry below (engine b454dee): every gate reference in the guide (about 160, from older numberings such as Gate [10g], [3f], [11] for the states gate) is now the report's number with its name, and the full-audit table follows the report's order. The guide changed in `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/gates.md`, `reference/maintainers.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `2e192c56b1b9` · Project measured: `13d811a9d668`
+
+| Haiku, engine 25c754b | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.054 |
+| Input a run | 96k | 93k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 93k a run against 96k. Records: `records/2026-10-06-guides-every-gate-named-by`.
+
+## 2026-10: Style guide: specs, every variant, a token panel, names held to one style (continuous evaluation)
+
+What changed since the entry below (engine e67aeb3): reference/usage.md, reference/config.md and the Figma edits recipe: the style guide's Specs area, every variant at once, a token panel in place, Full width, Simplify, issue links, common mistakes from the products; property and option names held to the style most of the system writes, listed in the differences and renamed in Figma after a yes; icon contrast and title-only names in the accessibility check; a docs surface that is not there is not a pass; an experimental component may be used and one a part never holds goes beside it; each state held to the request and the documentation; a request that opens a part owes an opens; --check-ui on a page checks it as an edit. The guide changed in `cookbook/figma-edits.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `05eea94dbbcb` · Project measured: `13d811a9d668`
+
+| Haiku, engine b454dee | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 95k | 96k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 96k a run against 95k. Records: `records/2026-10-06-check-ui-on-a-page`.
+
+The eleven prototype tasks with the skill on Haiku, this engine: 33/33 ($3.70, 3 runs each). On the way here the
+measurement found four engine gaps, each now a check with its test: a run read "tag is experimental" (filed under
+rule 1) as forbidden and left the New label as a Missing box (32/33); a tag a saved state added passed unchecked
+though the guidelines rule a tag out for a message, and a confirmation was drawn as a state after an id written inside
+props (31/33, engine 4b9460f); and on engine a13db77 (70/70, 33/33) the guide runs read 112k a run, because
+`--check-ui` on the gallery page failed as not valid JSON (36 times in ten new-ui-saved runs, the same on the
+engine before) and the agent fell back to a full audit. Each sentence the engine prints for these now says what to
+do; this version reads 96k a run.
+
+## 2026-10: Prototypes: flows that hold, lists owe an empty state, what the system cannot give said once (continuous evaluation)
+
+What changed since the entry below (engine ce48769): the prototype recipe and reference/usage.md: --flow stops with ❌ until its pages decide alike, every page voting; a list owes an empty state; a state's part changes props; false read as False; a heading at the largest text style and a missing confirmation message are said once as gaps; a part opened from layout pieces is a dialog the system lacks; NEXT names the measured differences; a Missing box carries what the guidelines say the system lacks; the router row for the visual comparison names where the Figma image comes from. The guide changed in `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `d3c2da2c5184` · Project measured: `13d811a9d668`
+
+| Haiku, engine e67aeb3 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.054 |
+| Input a run | 100k | 95k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 95k a run against 100k. Records: `records/2026-10-06-a-missing-box-carries-what`.
+
+The guide runs: 4 on Claude Code 2.1.289, then a usage limit paused the run and the other 66 ran on 2.1.290.
+
+### Prototypes, Claude alone against Claude with the skill
+
+Eleven requests on Tidepool, each asked in the same words on both sides: the six of the entry on prototyping below,
+and five new ones: a list (owes its empty state), a sign-in form (owes the form sent with a mistake), the team's
+sign-up flow (Account, Plan, Payment, Welcome, its pages deciding alike), a page at phone width, and a page whose
+Delete button opens a confirmation. The scorer does not use the engine. Claude alone has the Figma MCP output and the
+repository, the guidelines included; its rows do not depend on the engine (Opus measured with 020b677, Haiku with
+ce48769, both scored with the scorers below).
+
+| Prototypes that pass | Claude alone | With the skill (engine e67aeb3) |
+|---|---|---|
+| Opus, 11 tasks × 3 runs | 17/33 · $7.09 · 7.0 turns a run | 33/33 · $9.36 · 6.6 turns a run |
+| Haiku, 11 tasks × 3 runs | 3/33 · $3.30 · 20.7 turns a run | 32/33 · $3.65 · 10.8 turns a run |
+
+| Task | Opus alone | Opus with the skill | Haiku alone | Haiku with the skill |
+|---|---|---|---|---|
+| Settings page (no switch in the system) | 0/3 | 3/3 | 0/3 | 3/3 |
+| Search page | 3/3 | 3/3 | 0/3 | 3/3 |
+| Empty state | 2/3 | 3/3 | 0/3 | 3/3 |
+| Profile, like the designed Settings screen | 3/3 | 3/3 | 3/3 | 3/3 |
+| Dialog, one button by the guidelines | 2/3 | 3/3 | 0/3 | 3/3 |
+| Guidelines from GitLab and Notion links | 3/3 | 3/3 | 0/3 | 3/3 |
+| A list, with its empty state | 0/3 | 3/3 | 0/3 | 3/3 |
+| A sign-in form, with its error state | 0/3 | 3/3 | 0/3 | 3/3 |
+| The team's sign-up flow | 0/3 | 3/3 | 0/3 | 2/3 |
+| A page at phone width | 2/3 | 3/3 | 0/3 | 3/3 |
+| A Delete button that opens a confirmation | 2/3 | 3/3 | 0/3 | 3/3 |
+
+**Reading.** Without the skill most failures were inventions: a component, a look, a colour or a size the system does
+not have (Opus in 10 of 33 runs, Haiku in 29), and neither model showed a list empty or a form sent with a mistake.
+With the skill nothing was invented on either model. Haiku with the skill was measured on three engines, each with the
+misses of the one before turned into checks: b1a0758 (32/33: a confirmation built from layout pieces whose reply never
+said the system has no dialog), 36df45b (32/33: a Cancel shown as a Missing box whose reply never said link, though the
+guidelines say the other action is a link the system lacks) and e67aeb3 (32/33: a sign-up flow run that went round on
+"where the actions sit" and ran out of turns before it replied; each such line now says how to match it, in the next
+change). Opus with the skill passed 33/33 on all three. Every miss of the guide runs on the first two engines became a
+check too: the NEXT line names the measured differences, the router row for the visual comparison names where the Figma
+image comes from.
+
+Scorer fixes, applied to every row of both sides: a gap named under a heading of gaps, missing or would need counts as
+said; a phone-width check reads the JSON parent of the chips; for the guide set, markdown around a word ("actually
+*current*") no longer hides it. Every row above is scored with them.
+
+## 2026-10: Prototypes: flows, a design review, and pages held to each other (continuous evaluation)
+
+What changed since the entry below (engine ca59a27): reference/usage.md and the prototype recipe: click-through flows held to the team's flows, a design review scored in Chrome, and pages compared on text styles and action words, the first page made setting what none share yet. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `ab809a3f4f96` · Project measured: `13d811a9d668`
+
+| Haiku, engine ce48769 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.055 |
+| Input a run | 105k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 105k. Records: `records/2026-10-05-prototypes-click-through-flows-a`.
+
+## 2026-10: Prototypes: usage, Do and Don't, interactive, gaps to Figma, every state and screen size (continuous evaluation)
+
+What changed since the entry below (engine cf070d8): reference/usage.md and the prototype and figma-edits recipes: a component's usage and Do and Don't in the prototype catalog and checks; prototypes that work (opens, selections, fields); the prototypes' gaps written to Figma as a to do list after a yes; every state, every screen width and longer words checked in Chrome. The guide changed in `cookbook/figma-edits.md`, `cookbook/prototype.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `79efc313786b` · Project measured: `13d811a9d668`
+
+| Haiku, engine ca59a27 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.057 |
+| Input a run | 121k | 105k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 105k a run against 121k. Records: `records/2026-10-05-prototypes-every-state-every-screen`.
+
+## 2026-10: Setup without technical questions and the style guide's playground batch (continuous evaluation)
+
+What changed since the entry below (engine fc83ee2): Style guide: every box has the system card's border, corners and shadow; documentation, accessibility and changelog in the Playground's tables; Parity marked with the system's alert icon and laid out in two columns; the code as tall as its tokens; a text after the boolean that shows it; a hidden text's style out of the tokens; the name and foundation titles stay at the top; Style guide: Width frames run the system's scripts and move a selection; Do and Don't from references or Figma frames; What's new by release; a Disabled prop disables the native controls; the focus check reads past transitions and passes a disabled control by; README: a short overview of the benefits for designers and developers (quality, style guide, prototypes, accessibility, building from Figma, Claude alone against Claude with the engine), with everything else on a new page, Everything it does; Style guide and setup: modes named after Figma's collections inside the playground, a clickable Inspect, every token a component uses, tokens before the code, six colours a row, no overview notes or Hide; setup takes every hosted mode file, asks where the code is when the folder has none, and installs from one pasted sentence. The guide changed in `cookbook/first-setup.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `6032ffcc1914` · Project measured: `13d811a9d668`
+
+| Haiku, engine cf070d8 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.062 |
+| Input a run | 103k | 121k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 121k a run against 103k. Records: `records/2026-10-05-style-guide-and-setup-modes`.
+
+## 2026-10: Style guide: system card look, documentation in tables, Parity icon and columns, code height, prop order, sticky titles (continuous evaluation)
+
+What changed since the entry below (engine 22050d1): Style guide: every box has the system card's border, corners and shadow; documentation, accessibility and changelog in the Playground's tables; Parity marked with the system's alert icon and laid out in two columns; the code as tall as its tokens; a text after the boolean that shows it; a hidden text's style out of the tokens; the name and foundation titles stay at the top. The guide changed in `reference/usage.md`.
+
+Guide set measured: `74dec7cc135a` · Project measured: `13d811a9d668`
+
+| Haiku, engine fc83ee2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.056 |
+| Input a run | 116k | 103k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 103k a run against 116k. Records: `records/2026-10-05-style-guide-every-box-has`.
+
+## 2026-10: Style guide: Figma beside the code, what uses each token, props in search (continuous evaluation)
+
+What changed since the entry below (engine 45caddf): Style guide: Figma beside the code (each variant's Figma image beside or over the live component, from references or the Figma API); what uses each token (linked from every token name, directly or through another token); search finds props; no line under the area switch. The guide changed in `reference/usage.md`.
+
+Guide set measured: `e12f10bfe869` · Project measured: `13d811a9d668`
+
+| Haiku, engine 22050d1 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 107k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 107k. Records: `records/2026-10-05-style-guide-figma-beside-the`.
+
+## 2026-10: Style guide: Inspect numbers apart, a link to each variant, accessibility tried on the live variant (continuous evaluation)
+
+What changed since the entry below (engine 659b70b): Style guide: Inspect numbers never cover each other; a link to each variant (its props and width in the address, Copy link); its accessibility tried on the live variant (Tab stops in order, visible focus at 3:1, names, a control drawn disabled that Tab reaches, its role's behaviours). The guide changed in `reference/usage.md`.
+
+Guide set measured: `9847ee43506c` · Project measured: `13d811a9d668`
+
+| Haiku, engine 45caddf | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.057 |
+| Input a run | 101k | 107k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 107k a run against 101k. Records: `records/2026-10-05-style-guide-inspect-numbers-never`.
+
+## 2026-10: Style guide: Inspect and Width in the Playground (continuous evaluation)
+
+What changed since the entry below (engine 5597eda): Skill evaluation: status and test coverage, 70/70 on Haiku, no rule broken; a record never written over an earlier one of the same day; Style guide: Inspect marks each part, padding and gap on the live component with the tokens behind them; Width shows it at Phone, Tablet and Desktop widths in a frame with the system's own stylesheets. The guide changed in `reference/usage.md`.
+
+Guide set measured: `be1a88a2e2b2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 659b70b | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.055 |
+| Input a run | 118k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 118k. Records: `records/2026-10-05-style-guide-inspect-marks-each`.
+
+## 2026-10: Style guide: each component's status and test coverage, the overview counting statuses and describing its groups (continuous evaluation)
+
+What changed since the entry below (engine 6fb1975): Style guide: each component's status (stable, beta, deprecated, only when the team said so) under its name and on its card, its test coverage from the project's coverage summary, the overview counting the statuses and saying what each group holds; a card's preview always centred. The guide changed in `reference/usage.md`.
+
+Guide set measured: `9eb207a43515` · Project measured: `13d811a9d668`
+
+| Haiku, engine 5597eda | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.058 |
+| Input a run | 119k | 118k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 118k a run against 119k. Records: `records/2026-10-05-style-guide-status-coverage`.
+
+## 2026-10: Style guide: links, changelog, Built with area, sticky area switch, square colours and four columns, numbers-only anatomy, a linked playground, a menu that gives the page the whole width (continuous evaluation)
+
+What changed since the entry below (engine 1b60458): Style guide: anatomy marks padding and gaps with numbers only, never colours; the code sits beside the tokens behind what is drawn, its own tokens below them all; a segmented control's sliding pill follows every new selection; Style guide: Built with is its own area of overview cards; the area switch stays at the top on scroll; square colour previews, the colour twice as tall on its page, four overview columns with more room; the playground and the preview stay linked (a part's state set on the part, a product's selector ignored, a chosen state from the component's own :checked rule, an option not built marked so) and a label edit changes only its words; Test: a neutral class name for a product's own markup; Style guide: links (Figma, the code, the team's pages) on the overview and under each component's name; a Changelog area with every commit that changed the component, by release and pull request, the dates moved there from Documentation; hiding the menu gives the page the whole width, from a small Hide at the menu's top right. The guide changed in `reference/usage.md`.
+
+Guide set measured: `2f45b048ab4f` · Project measured: `13d811a9d668`
+
+| Haiku, engine 6fb1975 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.059 |
+| Input a run | 101k | 119k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 119k a run against 101k. Records: `records/2026-10-05-style-guide-links-figma-the`.
+
+## 2026-10: Style guide: anatomy, usage sections, a menu that hides, worded buttons, the page's own contrast in every mode (continuous evaluation)
+
+What changed since the entry below (engine c8ec2b2): Style guide: each component's anatomy (parts numbered, a slot outlined, padding and gaps named by their tokens) and its usage (when to use, when not to, common mistakes, limitations, counted on the overview); the menu hides on a wide screen and every button says what it does in words; the check fails the page's own text below 4.5:1 in any colour mode. The guide changed in `reference/usage.md`.
+
+Guide set measured: `25e6f04f89aa` · Project measured: `13d811a9d668`
+
+| Haiku, engine 1b60458 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.056 |
+| Input a run | 106k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 106k. Records: `records/2026-10-05-style-guide-each-component-s`.
+
+## 2026-10: Style guide: stand-ins for a control the system lacks; audit: Figma's fill sizing, own minimum height and default variant compared (continuous evaluation)
+
+What changed since the entry below (engine 53c57b6): Style guide: each component's code with a copy button, its API (props with the required ones marked, events, slots) and its accessibility (role, what it owes with WCAG, text contrast measured as drawn, the last browser check); Accessibility check: a big page is read role by role (the whole tree in one answer closed the browser socket and stalled the check); a closed socket fails at once; an invalid selector is said not checked instead of failing the page; each finding names its component; Contracts: a text style with Figma variables under its name keeps its token at textStyle.<style>; style guide: one line per kind of accessibility finding, only the data attributes the system styles in the HTML; Style guide: a component's page in areas (Playground, Documentation, Accessibility, Parity, Used in), its import line and file, the components it is built with; Parity lists what agrees since when and what differs; Used in shows each product's own picture. Audit: the browser reading of components no longer fails on a node the page replaced (it fell back to static for every component), an instance with words is measured first, and a height left to content is compared by Figma's sizing, so nothing is left uncompared; Style guide: a control the system lacks gets its nearest stand-in from the system (a segmented control: tabs, a radio group, its buttons), said on the overview and in the To do list; audit: a component Figma sets to fill its container agrees with a code height left to the page, Figma's own minimum height is compared, a state on a part is compared on the whole component, Figma's default variant is measured with its classes. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `121566e89571` · Project measured: `13d811a9d668`
+
+| Haiku, engine c8ec2b2 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.056 |
+| Input a run | 104k | 106k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 106k a run against 104k. Records: `records/2026-10-05-style-guide-a-control-the`.
+
+## 2026-10: Guide: loading the skill runs nothing, run the command now; scorer: a token set up in .env is not asked for in the chat; contracts: a component named with a slash gets its own folder (continuous evaluation)
+
+What changed since the entry below (engine 58685ab): Accessibility check: the page counts as focused, so a focus ring is never read as missing because another tab holds the window; Style guide: using the component in the playground sets its props (a box ticked, a switch flipped, a value typed); Style guide: on a phone the documentation is one column, each name above its text; Test reads the phone rules from the page's own style block; Style guide: controls in Figma's panel order, every text prop writes its own part, a shape part stays empty and leads, overlays open over the whole window, documentation sections spaced apart; Style guide: each type style lists its family, size, weight, line height and letter spacing; titles have no line under them; Style guide: the Computed box is removed; the tokens behind what is drawn and the component's own tokens stay; Style guide: each type style beside a token table, as a component has (property, then variable and value); Style guide: typography by Figma's names and order; the search covers everything and shows only its results below the field; Naming check lists every variable not called by its Figma name (figmaNames strict fails it); style guide: each type sample in its card under the style name, no frame around the list, no device label under the colour switch; Guide: loading the skill runs nothing, run the command now; scorer: a token set up in .env is not asked for in the chat; contracts: a component named with a slash gets its own folder. The guide changed in `reference/config.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `d8499e64545b` · Project measured: `13d811a9d668`
+
+| Haiku, engine 53c57b6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.056 |
+| Input a run | 102k | 104k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 104k a run against 102k. Records: `records/2026-10-05-guide-loading-the-skill-runs`.
+
+## 2026-10: Style guide: Figma's annotations and slots as documentation, times to the minute, every component centred, any state selectable, a nested component drawn once, overlays open in the playground, component-only tokens in their component (continuous evaluation)
+
+What changed since the entry below (engine 298b82e): The browser check turns transitions off before every colour scheme group, not only the forced-state one; Style guide: a text part no text prop writes is drawn with its name, so its switch shows something Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> Claude-Session: https://claude.ai/code/session_01NAiQF7FaCvTe9vgNQmgsRB; Style guide: Figma's annotations and slots as documentation, times to the minute, every component centred, any state selectable, a nested component drawn once, overlays open in the playground, component-only tokens in their component. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `476f365cbcd2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 58685ab | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.055 |
+| Input a run | 100k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 100k. Records: `records/2026-10-04-style-guide-figma-s-annotations`.
+
+## 2026-10: The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers (continuous evaluation)
+
+What changed since the entry below (engine 926750e): Evaluation 70/70 on Haiku for the style guide icons and capture fixes; the forbidden-green scorer reads hidden as a reason; The browser check can read a ::before or ::after layer, for components that draw their background or lines as their own layers. The guide changed in `cookbook/full-audit.md`.
+
+Guide set measured: `46c0014f7509` · Project measured: `13d811a9d668`
+
+| Haiku, engine 298b82e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.054 | $0.055 |
+| Input a run | 96k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 96k. Records: `records/2026-10-04-the-browser-check-can-read`.
+
+## 2026-10: Style guide icons at Figma's size and name; the capture never measures card thumbnails; a hidden Figma stroke is not a stroke (continuous evaluation)
+
+What changed since the entry below (engine 3191dd5): Style guide: one view at a time, each component at its own address; Style guide: what belongs to a component is in its view, and its differences read as English; Style guide: a numbered To do list in plain English, with who acts and exactly what to do; Read the FigJam board only when the diagram is to change; Style guide: cards show the name only, update rows and documentation at the bottom, differences not sticky, no per-mode value lists; Style guide icons at Figma's size and name; the capture never measures card thumbnails; a hidden Figma stroke is not a stroke. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `f720fce72b24` · Project measured: `13d811a9d668`
+
+| Haiku, engine 926750e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.054 |
+| Input a run | 114k | 96k |
+| Rule violations | 1 | 0 |
+
+**Reading.** Haiku: all 70 runs passed. One run (forbidden-green #2) was first scored as a miss: it refused and said raising the limit would have hidden the real failures, a reason the scorer did not read (it knew hide and hiding, not hidden). The scorer now reads it, and every run was rescored twice with no other verdict changed. Records: `records/2026-10-04-style-guide-icons-at-figma`.
+
+## 2026-10: the modes in Figma's order: the capture records each collection's order (continuous evaluation)
+
+What changed since the entry below (engine 8082467): Evaluation 70/70 on Haiku, recorded by the new command; the README names the checks that did not run; Style guide: a component's own mode is independent of the page's, and its props show and hide its parts; Style guide: every boolean prop shows and hides its part, every text lands in its own; Style guide: every component starts in the device's mode and shows when it last changed; Style guide: components work as in a product, and nothing on the page is drawn by the page; Style guide: modes in Figma's order with Auto, thumbnails and search, the primitive ramp, a phone menu; Style guide: a size mode is switched on each component and section, not for the page. The guide changed in `cookbook/refresh-figma.md`.
+
+Guide set measured: `9d43017cacae` · Project measured: `13d811a9d668`
+
+| Haiku, engine 3191dd5 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.057 | $0.058 |
+| Input a run | 113k | 114k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below, 1 rule violation. Failed: guidelines-link #0: never asks for a token in chat (the reply asks for a secret). Records: `records/2026-10-04-style-guide-a-size-mode`.
+
+## 2026-10: a stroked icon is not a border, a bound typography variable reads as its scale, the evaluation recorded in one command (continuous evaluation)
+
+What changed since the entry below (engine 681ecf6): Evaluation 70/70 on Haiku; the differences list leaves out token contrast; Gate 5 reads the map's sizing names and skips; The differences list holds differences only, not the lines that point at them; The style guide finds a component's controls under the contract name it is mapped by; The style guide's own heading rules no longer reach the components it previews; A breakpoint mode in the CSS is read as a mode, not as a value or as the base; The style guide switches a breakpoint mode with the code's own values and says what it changes; A stroked icon is not a border, and a bound typography variable reads as its text scale; The differences list names the checks that did not run; a measured height is never patched; The evaluation a guide change needs is one command, recorded automatically. The guide changed in `cookbook/refresh-figma.md`, `reference/maintainers.md`.
+
+Guide set measured: `f0da7d60203a` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8082467 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.057 |
+| Input a run | 115k | 113k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 113k a run against 115k. Records: `records/2026-10-04-the-evaluation-a-guide-change`.
+
+## 2026-10: the style guide is the system's own and is checked against it; every mode checked; one list of differences (continuous evaluation)
+
+What changed since the entry below (engine 681ecf6): the style guide's template is the layout only, and its colours,
+text styles, radii, spaces, icon size, switches and text fields come from the system itself; `--styleguide` checks
+the built page against the system and its own accessibility. An HTML and CSS system's components get controls from
+what the code realizes. The capture keeps every collection with two or more modes, Gate [5] checks them even when
+`ds-config.json` declares none, and a full audit writes every difference between Figma and the code to
+`differences.md`. The guide changed in `reference/usage.md`, `reference/config.md` and `cookbook/refresh-figma.md`.
+
+Guide set measured: `6d1d7c1796a2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 681ecf6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.055 | $0.058 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Every task passes and no rule is broken. Runs read a little more (115k input a run against 99k), from
+the longer style guide and capture sections.
+
+**Also measured, outside the evaluation.** On a private design system the refreshed capture found a sizing
+collection's second mode the old capture had dropped (seven values), and Gate [5] now fails the mode the code never
+implements; the style guide built from that system passes its own check. Its results are kept out of this
+repository. Records: `records/2026-10-04-styleguide-system`.
+
+## 2026-10: products in their own repositories, read as the project's code (continuous evaluation)
+
+What changed since the entry below (engine 7765e76): a design system whose products live in their own repositories,
+checked out beside it, names those folders in `ds-config.json` (`pluginDirs`, or `codeRoots` for any other folder),
+and every source scan reads their code as the project's own, so a variable or class only a product uses is no longer
+listed as unused. The audit no longer reads its own output files (the history, the check result) as usage, which had
+made a class named only in the engine's findings count as used. The guide changed in `reference/config.md`.
+
+Guide set measured: `83f140fd6d10` · Project measured: `13d811a9d668`
+
+| Haiku, engine 7765e76 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.055 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Every task passes and no rule is broken; the guide change is two lines of configuration reference.
+
+**Also measured, outside the evaluation.** On a private design system split into one repository per product, the audit
+from the design system's repository read 74 source files instead of 23 and gave the same 25 gate results as before the
+split; its results are kept out of this repository. Records: `records/2026-10-04-sibling-repos`.
+
+## 2026-10: Figma brought in line with the code, by the engine, once the person says yes (continuous evaluation)
+
+What changed since the entry below (engine 27b2d1f): `--figma-edits` reads each component's role from what the code
+renders (every instance it shows, the role most of them have) and lists the Figma components that state none, each
+with the annotation it adds and why; a role that differs between Figma and code is listed for a person, never applied.
+It writes the Figma plugin script for those edits, which the agent runs with the Figma MCP only after the person says
+yes; the project hooks refuse any other script that writes to Figma. The router sends "update Figma to match the code"
+to the new `figma-edits` recipe; a value to change in Figma stays the person's. A guide task, `figma-roles`, asks for it
+on the demo project (the field states no role, the chip is a toggle in Figma and a plain button in code). The guide
+changed in `rms-design-system-engine.md`, `cookbook/figma-edits.md`, `cookbook/fix-a-difference.md`,
+`cookbook/ci-and-hooks.md`, `cookbook/full-audit.md` and `reference/usage.md`.
+
+Guide set measured: `f4cb303c881e` · Project measured: `13d811a9d668`
+
+| Haiku, engine 64f93b1 | Entry below | This version |
+|---|---|---|
+| The 20 guide tasks (`new-ui-saved` at 10 runs) | 67/67 | 67/67 |
+| `figma-roles` (new) | | 3/3 |
+| Mean cost a run | $0.056 | $0.058 |
+| Rule violations | 0 | 0 |
+
+**Reading.** Every task passes. In each `figma-roles` run Claude ran the engine's list, showed the field's annotation
+and the chip's decision as printed, and asked before changing anything; it wrote no Figma script of its own.
+
+**Found by this evaluation and fixed.** On engine 40360ec `figma-roles` failed 3 of 3: the router read the word
+"states" in "update Figma so it states the roles the code has" and sent it to the states recipe, so the list never
+ran. The router now matches a request to update, align or sync Figma with the code whatever words sit between (64f93b1);
+every row above was run again on that engine.
+
+**Also measured, outside the evaluation.** The generated script was run on the Tidepool Figma file: it added the
+listed annotation to a component set, skipped a component that already states a role, reported a node that does not
+exist, and the change was undone after. On a private design system the engine listed 7 roles the code proves and left
+out a modal whose code has no dialog role and two components the code does not build yet; its results are kept out of
+this repository. Records: `records/2026-10-04-figma-edits`.
+
+## 2026-10: accessibility tried on the components' own code, what the design owes, a task the Figma MCP alone cannot finish (build evaluation and continuous evaluation)
+
+What changed since the entry below (engine b8145b9 for the guide, 48bdb04 for the builds): the accessibility check
+renders a React design system's components from their own code (`component-harness.mjs`), with no dev server, in
+build mode or when there is no page to open, and tries each one in its Figma variants with the keyboard; a part's role
+(a stepper's Decrement and Increment) and its behaviour (a step button stops at the end of the range) are contracts
+checked in the browser; `design-a11y.mjs` lists what the Figma file itself owes (no focus state, an error shown by
+colour alone, a control under 24px), in the audit for whoever keeps the file and in the build sheet for the agent; in
+build mode the accessibility lines are part of the next step. A prototype is drawn from what the code really shows
+(the markup its scripts build, the theme's classes for each state, the colours its comments name, the font the design
+is set in). The guide changed in `cookbook/a11y-notes.md`, `reference/usage.md` and `reference/config.md`.
+
+Guide set measured: `43140f3f410f` · Project measured: `13d811a9d668`
+
+### Two new build tasks, Claude with the Figma MCP alone against Claude with the Figma MCP and the skill
+
+- **Stepper.** A component whose parts carry roles in Figma's annotations (a spinbutton, a Decrement and an Increment
+  button): the scorer presses each part, reads its spoken name, tries the arrow keys and the range ends.
+- **Figma changed.** The chip is already built; a designer then changed its colours in Figma. Both sides get the new
+  MCP output and the request "Figma changed, update the chip". The MCP returns the light values only, so the dark
+  mode has to come from somewhere else.
+
+| Task | Opus alone | Opus with the skill | Haiku alone | Haiku with the skill |
+|---|---|---|---|---|
+| Stepper | 3/3 · $0.50 | 3/3 · $1.24 | 0/3 · $0.15 | 3/3 · $0.72 |
+| Figma changed | 0/3 · $0.42 | 3/3 · $0.80 | 0/3 · $0.20 | 2/3 · $0.27 |
+
+| Builds with the skill, new engine | Opus | Haiku |
+|---|---|---|
+| Disclosure (part roles, expanded state) | 3/3 | 3/3 |
+| Field (error state, a labelled input) | 3/3 | 3/3 |
+
+**Reading.** Figma changed is the task the skill wins on every model: without it no run updated the dark mode, on Opus
+or Haiku, since the MCP output has no dark values and the old ones stayed. The skill's capture holds every mode and its
+fix lines name each colour per mode. Opus alone builds an accessible stepper; Haiku alone does not (no spoken names on
+the step buttons, no arrow keys). Haiku with the skill went from 0/3 to 3/3 once the build sheet listed the
+accessibility lines and the check tried the stepper from its own code (engine 8998271, then 1108c3b). The one Haiku
+miss on Figma changed kept one old dark colour.
+
+### The guide tasks on this engine
+
+| | Entry below | This version |
+|---|---|---|
+| Haiku, all 20 guide tasks (`new-ui-saved` at 10 runs) | 66/67 (baeeefe) | 67/67 (27b2d1f) |
+| Haiku, mean cost a run | $0.057 | $0.056 |
+| Rule violations | 1 (`guidelines-link`) | 0 |
+
+**Reading.** Every guide task passes on Haiku, `guidelines-link` included (the run in the entry below asked for the
+GitLab token in its first answer; none did here), and no rule is broken. The guide change is three files of
+accessibility notes; the main guide is the same.
+
+**Disclosed.** Two scorer bugs were found and fixed during the round, and every row was rescored after each. The
+stepper scorer measured the floor of a stepper whose value its parent holds on the path for one that holds its own,
+so Opus alone read 0/3 instead of 3/3 and two Opus runs with the skill failed falsely. The rescore read only the files
+a run saved, so a Figma changed run that left `Chip.jsx` as it was read as "did not write Chip.jsx". The new tasks ran
+on engines 8998271 (both sides), 1108c3b (Haiku stepper, disclosure and field with the skill) and 9fee7af (Opus
+stepper with the skill); the runs without the skill do not use the engine. The prototype drawing was measured on a
+private system, its results kept out of this repository. Records: `records/2026-10-04-a11y-and-figma-changed`.
+
+**Limits.** One fictional design system, three runs a task, two models. Sonnet was not measured this round.
+
+## 2026-10: prototyping with the design system, and the guide that adds it (prototype evaluation and continuous evaluation)
+
+What changed since the adopted version (engine b8145b9): `--prototype` checks a composition made only of the system's
+components and the engine's neutral layout pieces, draws it with the components' own markup and CSS in every mode, and
+lists what the system lacks; it can be asked for in words (the router and the `prototype` recipe), starts from the
+screens designed in Figma (`--from-screens`), and puts everything the engine knows in front of Claude (Figma
+descriptions and annotations, code notes, recorded decisions, guidelines from Notion, GitLab or the repository, the
+templates, the designed screens), with what applies to the request. The check holds the guidelines' limits ("one button
+per screen"), a use the documentation rules out, a component the request names and the prototype leaves out, and the
+product's conventions across pages. The misses of the first measurements became checks: an `aria-label` written after a
+props spread, a colour Figma has nowhere written in the theme file, a text colour set on a component's text part. The
+guide changed in `rms-design-system-engine.md`, `cookbook/prototype.md` and `reference/usage.md`.
+
+Guide set measured: `ad79498aa649` · Project measured: `13d811a9d668`
+
+### Prototypes, Claude alone against Claude with the skill
+
+Six requests on Tidepool, each asked in the same words on both sides: a notification settings page (a switch the
+system lacks), a search page, an empty state, a profile page that must match the designed Settings screen, a dialog
+whose guidelines allow one button, and a page whose guidelines come from GitLab and Notion links (a tag is never a
+confirmation). The scorer does not use the engine: it reads what the run made for anything invented (a component, a
+look, a colour or a size the system does not have), any change to the system's files, the system's components it was
+asked to use, and whether the reply names what the system lacks. Claude alone has the Figma MCP output and the
+repository, the guidelines included.
+
+| Prototypes that pass | Claude alone | With the skill |
+|---|---|---|
+| Opus, 6 tasks × 3 runs | 13/18 · $3.64 · 5.4 turns a run | 18/18 · $3.61 · 3.8 turns a run |
+| Haiku, 6 tasks × 3 runs | 2/18 · $1.57 · 19.4 turns a run | 17/18 · $1.27 · 5.6 turns a run |
+| Sonnet, the first 3 tasks (engine a425870) | 2/15 · $5.92 | 6/6 · $0.92 |
+
+| Task | Opus alone | Opus with the skill | Haiku alone | Haiku with the skill |
+|---|---|---|---|---|
+| Settings page (no switch in the system) | 0/3 | 3/3 | 0/3 | 2/3 |
+| Search page | 3/3 | 3/3 | 0/3 | 3/3 |
+| Empty state | 1/3 | 3/3 | 0/3 | 3/3 |
+| Profile, like the designed Settings screen | 3/3 | 3/3 | 2/3 | 3/3 |
+| Dialog, one button by the guidelines | 3/3 | 3/3 | 0/3 | 3/3 |
+| Guidelines from GitLab and Notion links | 3/3 | 3/3 | 0/3 | 3/3 |
+
+**Reading.** Without the skill every failure was an invention: Opus built its own Switch, drew an illustration, wrote
+colours and sizes the system does not have (5 of its 18 runs); Haiku did so in 16 of 18, and twice changed the system's
+own tokens file. With the skill nothing was invented on either model; what the system lacks is a labelled box on the
+page and a line on the gaps list. Opus alone followed the written guidelines when they sat in the repository; the skill
+makes them checks. The one miss with the skill: a Haiku run used the chip for the switches, which the catalog had
+pointed to because its description says people "switch it on and off", and the reply did not say the system has no
+switch. The skill side cost the same on Opus and less on Haiku, in far fewer turns.
+
+### Builds and the guide tasks on the same engine
+
+| | Earlier on this branch | This version |
+|---|---|---|
+| Builds, Opus with the skill (6 tasks × 3) | 18/18 (acb7808) | 18/18 · $5.65 (48bdb04) |
+| Builds, Haiku with the skill (6 tasks × 3) | 16/18 (acb7808) | 18/18 · $1.93 (48bdb04) |
+| Haiku, all 20 guide tasks (`new-ui-saved` at 10 runs) | 66/67 (acb7808) | 66/67 (baeeefe) |
+| Haiku, held-out (3 runs each) | 18/18 · 89k | 18/18 · 95k |
+| Haiku, mean cost a run | $0.057 | $0.057 |
+| Rule violations | 0 | 1 (`guidelines-link`) |
+
+The adopted version measured 67/67 and held-out 18/18 at 83k on Haiku (the entry below).
+
+**Reading.** Every build passes on both models: the two Haiku misses before (a field with no text colour, an accessible
+name lost a second way) became checks, and the field's text colour was missing from the Tidepool capture itself
+(restored in `figma-structure.snapshot.json`). On the guide tasks the one miss moved: `new-ui-saved` now passes 10 of
+10 (a green the system does not have is caught in the theme file), and one `guidelines-link` run asked the person for
+the GitLab token in its first answer; the Stop hook sent it back and the final answer pointed to `.env`, but the person
+would have read the first one, so it counts. Held-out input rose from 89k to 95k a run: one `change-figma` run took 7
+turns (190k against 49k for the other two) and two `pasted-steps` runs took a third turn. By the adoption rule this is
+not adopted on its own (a development task lower, held-out input higher); the decision is the owner's.
+
+**Disclosed.** The prototype runs with the skill and the guide runs are on engine baeeefe; the builds were run again on
+48bdb04, whose only engine change is the structure check accepting a text colour set on a component's text part (a
+false failure of the reference field on baeeefe stopped two Haiku builds before they started). The runs without the
+skill do not use the engine and are the recorded ones (acb7808, e1c068f, 8261d39, 6eb7baa). The build scorer accepts a
+field named through its own `label` prop as well as `aria-label`; no run without the skill changed verdict. Records:
+`records/2026-10-03-misses-made-checks`.
+
+## 2026-10: every build from Figma checked as it renders, one style guide template, the old name gone (continuous evaluation)
+
+What changed since the adopted version (engine f475251): in build mode a difference measured in the browser fails
+and its fix always goes back to Figma; Figma's role annotation is read even when every prop is a state (a field whose
+only prop is `State` still has to be an `<input>`); a component the pages do not show is drawn as the JSX it returns
+(`jsx-markup.mjs`), so a `<span>` or an `<input>` is measured as one; when the rule already sets Figma's height and
+the drawn box is another, the fix names the cause (an inline element, padding outside a content box); a path that
+holds "figma" (`figma-mcp/`) is no longer read as "in Figma"; the Stop hook can send an owed line back a second time
+when the first hand-back went to something else; `--styleguide` builds one style guide from the engine's template for
+every project, showing only what Figma and the code agree on; the engine no longer recognises its old name. The
+guide changed in `reference/usage.md` and `reference/config.md`. Engine b8145b9, the same 20 tasks on the same
+project, compared with the adopted version; both scored by the current scorers.
+
+Guide set measured: `8f7981d52194` · Project measured: `13d811a9d668`
+
+| | Adopted (f475251) | This version |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 30/30 · 152k | 30/30 · 154k |
+| Sonnet, all 20 tasks (`fix-first` at 10 runs) | 105/105 | 105/105 |
+| Sonnet, mean cost / input per request | $0.140 / 33k | $0.137 / 33k |
+| Haiku, held-out (3 runs each) | 18/18 · 89k | 18/18 · 83k |
+| Haiku, all 20 tasks (`new-ui-saved` at 10 runs) | 67/67 | 67/67 |
+| Haiku, mean cost / input per request | $0.056 / 26k | $0.055 / 26k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Sonnet / Haiku) | 3.01 / 2.78 | 2.64 / 2.73 |
+
+**Reading.** Every task passes on both models, as on the adopted version, and no rule is broken. On Haiku the rule
+adopts it (held-out input 83k a run against 89k). On Sonnet the one count against it is input on the held-out set,
+154k a run against 152k (1.3% more, most of it `refresh-no-figma`, 128k against 119k); it costs less a run and the
+agent made fewer choices of its own. The rule says do not adopt on Sonnet; the guide change is two reference files,
+and 2k is less than one guide moves from one hour to the next (g9 read 136k, then 144k when run again, in an earlier
+entry). Adopted by the owner on these numbers.
+
+**Disclosed.** Four Sonnet runs (`toggle-note` twice, `change-figma`, `forbidden-green`) timed out after 15 minutes
+without a turn, the API not answering; they were run again and passed. The engine moved on after the guide runs (build mode's next steps, the build scorer, and a
+variant written as its modifier class alone); none of it can turn a pass into a fail, and every guide run passed.
+
+## 2026-10: building from Figma, Claude with the Figma MCP alone against Claude with the Figma MCP and the skill (build evaluation)
+
+A project that has only Figma: the Tidepool design system as a real Figma file (two colour modes, a sizing
+collection, two text styles, button, chip, field, tag, a Settings screen), no code. Six tasks, each asked in the same
+words on both sides: build the tokens, the button, the chip, the field, the tag, then the Settings screen from the
+components. Both sides get what the Figma MCP returns for the task (`get_design_context`, `get_variable_defs` and a
+screenshot, captured once from the file and handed to both, so both see the same design). The MCP side has nothing
+else: no skill, no engine, no snapshots, no hooks. The skill side has the skill, its hooks and the engine in build
+mode. The scorer is the same for both and does not use the engine: it renders each component in Chrome with React,
+measures every case (sizes, spacing, radius, colours in light and dark, hover, disabled, the element and its role)
+against Figma, reads the CSS for values and variables the system does not have, and reads the final reply where a
+task asks for a sentence.
+
+Skill side: engine d8fc435, Claude Code 2.1.288. MCP side: Claude Code 2.1.287 (no engine). Scored by
+`build-score.mjs` and `build-tasks.mjs`, every row rescored twice with no verdict changed.
+
+| Builds that pass | Figma MCP alone | Figma MCP and the skill |
+|---|---|---|
+| Sonnet, 6 tasks × 5 runs | 16/30 · $6.42 · 16 turns a run | 30/30 · $9.86 · 18 turns a run |
+| Haiku, 6 tasks × 3 runs | 4/18 · $0.86 · 10 turns a run | 18/18 · $2.02 · 14 turns a run |
+
+| Task | Sonnet, MCP alone | Sonnet, with the skill | Haiku, MCP alone | Haiku, with the skill |
+|---|---|---|---|---|
+| Tokens, light and dark | 0/5 | 5/5 | 0/3 | 3/3 |
+| Button (hover, disabled, dark) | 5/5 | 5/5 | 1/3 | 3/3 |
+| Chip (sizes, icon, toggle role) | 1/5 | 5/5 | 0/3 | 3/3 |
+| Field (error state, a real labelled input) | 3/5 | 5/5 | 0/3 | 3/3 |
+| Tag (a colour Figma has no variable for) | 2/5 | 5/5 | 0/3 | 3/3 |
+| Settings screen from the components | 5/5 | 5/5 | 3/3 | 3/3 |
+
+**Reading.** Without the skill no run built the dark mode right: the MCP's design-to-code tools return the light
+values only, so every dark colour was guessed. The skill's token list carries every mode. The other gaps are facts
+Figma holds and the MCP's code does not pass on: the chip's toggle role and the field's text box (annotations), the
+variables to use instead of literal colours, the tag's height. The skill side costs more and takes more turns: it
+reads the build sheet, builds, and runs the engine's check until it passes. With the skill every build passed on
+both models; the 30 Sonnet builds cost $9.86 against $6.42, the 18 Haiku builds $2.02 against $0.86.
+
+**Disclosed.** The field's Figma component had no role annotation, so nothing asked for a real `<input>`; "Role:
+textbox" was added to it in the Figma file and the fixture before the last round, the way the chip and the button
+already carried theirs. Both sides see the same Figma; the MCP's outputs carry no annotations either way.
+
+**Found by this evaluation and fixed** (each round measured from the start, every row rescored after each scorer fix):
+- The engine never read a component's own stylesheet: build mode now records each stylesheet that holds a
+  component's rules as a theme file.
+- The edit check flagged a colour Figma paints with no variable as invented; it is now Figma's own value.
+- The React prop reader lost every prop after a plain one, and a name recorded in `contract.authored.json` never
+  counted.
+- Engine f475251, Haiku 12/18: measured heights and line heights were advisory in build mode (now they fail, and the
+  fix goes back to Figma); the role check skipped a component whose only prop is a state (two fields with no input);
+  the router read the path `figma-mcp/` as "in Figma"; the owed sentence about the tag's colour was lost when the one
+  Stop hand-back went to leftover values.
+- Engine c3c4682, Haiku 16/18: the rendered check drew a component the pages do not show as a bare `<div>`, so a
+  `<span>` tag that ignores its height and a field `<input>` with line-height 1 passed; and the fix line repeated
+  "set 36px" while the rule already said 36px (one run tried four times, then reported the failure). Replayed on all
+  48 builds, the fixed engine fails exactly the builds the scorer fails.
+- Engine b8145b9, Haiku 15/18: two token runs went on to build every component and ran out of turns (the next step
+  now builds a component only when the person asks); the scorer measured the field's wrapper or label instead of its
+  input (fixed, both sides rescored).
+- Engine a802c65, Haiku 17/18: a tag build reported the failing check instead of fixing it; in build mode the next
+  step now says to fix each failing line and run again until it passes.
+- Engine 38e9aad, Haiku 17/18: the variant check wanted the selector exactly as the build sheet wrote it
+  (`.tag.tag--positive`) and failed `.tag--positive`, which selects the same element and which the browser measured
+  right; the run looped, wrote a demo page so the engine would see the class, and stopped with the check failing.
+  The modifier alone now counts, and a missing variant says how to add it.
+- Scorer: the chip's icon was missed next to plain text and when the component kept Figma's text values; a 0.2 s
+  colour transition was read mid-way.
+
+**Limits.** One fictional design system, six tasks, five and three runs. The Figma file is small and the tasks are
+built one at a time; a real system with many components and screens is the next test (a private run on the owner's
+file, its results kept out of this repository). The two sides ran on consecutive Claude Code releases.
+
+## 2026-10: building from Figma, the misses made deterministic, a smaller main guide (continuous evaluation)
+
+What changed since g9 (engine 40906c4): build mode for a project that has only Figma, with its recipe
+(`build-from-figma`) and build sheets; the router names the file a request means ("the gallery page"); the summary
+says what to fix first, a tie included; the props check reads every destructured React prop, counts a name recorded
+in `contract.authored.json`, and checks the markup a Figma role annotation asks for (a toggle is a `<button>` with
+`aria-pressed`); the edit check hands back a token an edit invents and accepts a colour Figma itself paints with no
+variable; the Stop hook holds the reply to the sentence it owes (a colour with no variable), sends back a reply that
+asks for a secret, and runs the edit check once more over the files the session changed; the main guide file drops
+three paragraphs only one recipe each needs (25.4 KB, from 27.9 KB). Engine f475251, the same 20 tasks on the same
+project, compared with g9; both scored by the current scorers.
+
+Guide set measured: `c5b201920acc` · Project measured: `13d811a9d668`
+
+| | g9 (adopted) | This version |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 30/30 · 136k | 30/30 · 152k |
+| Sonnet, all 20 tasks (`fix-first` at 10 runs) | 105/105 | 105/105 |
+| Sonnet, mean cost / input per request | $0.140 / 34k | $0.140 / 33k |
+| Haiku, held-out (3 runs each) | 17/18 · 98k | 18/18 · 89k |
+| Haiku, all 20 tasks (`new-ui-saved` at 10 runs) | 65/67 | 67/67 |
+| Haiku, mean cost / input per request | $0.057 / 26k | $0.056 / 25k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Sonnet / Haiku) | 2.56 / 2.69 | 3.01 / 2.78 |
+
+g9 run again on Sonnet's held-out set at the hour this version was measured: 30/30, 144k a run, 35k a request,
+$0.168 a run; this version 30/30, 152k, 34k, $0.168.
+
+**Reading.** Every task passes as often or more often on both models, and no rule is broken. On Haiku the rule
+adopts it (held-out 18/18 against 17/18, less input). On Sonnet every task passes and the one count against it is
+input on the held-out set: 152k a run against 136k. g9, run again at the same hour, read 144k, so about half of that
+is the hour (as the rename's entry recorded for `pasted-steps`); the rest is two tasks where Sonnet ran one
+exploratory command more (`no-cli-on-path`, `pasted-steps`). It reads less per request and costs the same per run.
+Adopted by the owner on these numbers.
+
+**Found by this evaluation and fixed** (four rounds, each measured from the start):
+- Engine 0ce7b3d: Sonnet `fix-first` 9/10 (the burndown was a tie and the summary named no first); Haiku
+  `new-ui-saved` 8/10 (one run asked which file the gallery page is, one declared `--success-background` in the theme,
+  which the edit check did not read).
+- Engine 82d11ec: the new check for an invented token mapped sizing tokens with the colour convention, so a copied
+  `--stroke-default` looked invented and every build-tokens run deleted it; the scorer read "a hex/token to use" as a
+  request for a secret (both Sonnet `new-ui-saved` misses); one Haiku run asked the person to provide a GitLab token.
+- Engine da8f07c: a Haiku run got the edit check's warning about a green the system lacks, asked which colour to use,
+  and left the green in the page: the Stop hook now checks the changed files once more.
+- The eval transcripts do not record hook feedback; a short run confirmed the edit check reaches the model.
+
+## 2026-10: primitives, --only, the agent kept from making a check pass, each edit read for accessibility and sizes, the final check of the reply (continuous evaluation)
+
+What changed since the rename (engine 28aa8ba): a primitive written by hand; `--only` runs the
+accessibility check, the Figma checks or some gates, and the router sends "only the accessibility of the button"
+there; the hooks ask before the agent accepts a difference, adds an exception or replaces an approved picture, and
+hand back a comment that switches a check off; each UI edit is also read for accessibility and for
+sizes written by hand; the browser check opens dialogs and menus from their trigger and checks that Escape
+gives the focus back, and an app page has one main heading; a Stop hook sends the agent back once when
+its last reply leaves out a line the route asked the person to hear (first part). The guide changed in the
+hooks paragraph of the main file, `reference/usage.md`, `reference/config.md`, `reference/maintainers.md` and
+`cookbook/ci-and-hooks.md`. Engine 98e474b, the same 22 tasks on the same project, compared with the rename's
+measurement; both scored by the current scorers.
+
+Guide set measured: `281780c63cb3` · Project measured: `13d811a9d668`
+
+| | Rename (adopted) | This version |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 · 131k | 40/40 · 135k |
+| Sonnet, all 22 tasks | 110/110 | 110/110 |
+| Sonnet, mean cost / input per request, 22 tasks | $0.142 / 130k | $0.142 / 131k |
+| Haiku, held-out (3 runs each) | 24/24 · 81k | 24/24 · 89k |
+| Haiku, all 22 tasks | 66/66 | 66/66 |
+| Haiku, mean cost / input per request, 22 tasks | $0.053 / 78k | $0.054 / 81k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Sonnet / Haiku) | 2.67 / 1.86 | 2.70 / 1.91 |
+
+Every task that read more, on both models, was run to 13 runs on both versions (mean input per request):
+
+| Task (13 runs each) | Rename | This version |
+|---|---|---|
+| Haiku `refresh-no-figma` (held-out) | 13/13 · 76k | 13/13 · 62k |
+| Haiku `pasted-steps` (held-out) | 13/13 · 110k | 13/13 · 62k |
+| Haiku `forbidden-green` (held-out) | 12/13 · 72k | 13/13 · 100k |
+| Haiku `private-badge-pt` (held-out) | 13/13 · 87k | 13/13 · 90k |
+| Haiku `audit-all`, `first-setup` | 13/13, 13/13 · 51k, 96k | 13/13, 13/13 · 57k, 97k |
+| Sonnet `pasted-steps` (held-out) | 13/13 · 122k | 13/13 · 154k |
+| Sonnet `forbidden-green` (held-out) | 13/13 · 102k | 13/13 · 102k |
+| Sonnet `private-statusbar` (held-out) | 13/13 · 98k | 13/13 · 117k |
+| Sonnet `toggle-note` | 10/13 · 65k | 13/13 · 91k |
+| Sonnet `visual-howto`, `disabled-hover` | 13/13, 13/13 · 31k, 111k | 13/13, 13/13 · 36k, 125k |
+
+**Reading.** Every task passes on both models, no rule is broken, and over the repeats no task passes less often
+(`toggle-note` on Sonnet and `forbidden-green` on Haiku pass more often). On the held-out set over all runs Haiku
+reads 4% less; Sonnet reads 2% more, all of it from `pasted-steps`. That task moves with the hour: the rename,
+unchanged, read 122k on 13 runs in the morning and 140k on 13 more in the evening, against 143k and 144k for this
+version in the evening (with its own guide, and with the rename's main file in place of its own). What remains is
+that on this engine Sonnet sometimes loads the skill again at its first step of that task (4 to 8 runs in 13,
+none on the rename); nothing it reads before that step differs. Adopted by the owner on these numbers, the 2% on
+Sonnet's held-out input noted.
+
+**Found by this evaluation and fixed.**
+- A first measurement (engine dd847e2) ran on another project: one commit had added its example to the demo
+  every run works on, next to the page the UI tasks edit. The demo is back to the rename's project, the example is
+  laid over it only by the tests that need it, and every run and this file record the project's hash.
+- The guard read the person's message wrong in the most common session. A request made as
+  `/rms-design-system-engine <words>` reaches the transcript followed by the whole guide Claude Code expands it into,
+  and the guard took the guide for the message: it holds every word the rules listen for, so a code edit and
+  `--baseline` passed without asking. It now reads the command's words and skips what Claude Code adds.
+- In the second measurement (engine 1e906e5) two Haiku `refresh-no-figma` runs out of 13 never said the snapshots
+  were not refreshed. The Stop hook now checks the last reply says it, and sends the agent back once with the line.
+
+## 2026-10: the skill renamed to rms-design-system-engine (continuous evaluation)
+
+A fresh run of the adopted guide after the rename: the command, the terminal command, the install folder, the
+guide's file name and the files the engine keeps in a project have the new name (`rms-design-system-engine`,
+`design-system-engine-*`); the guide's text changed only in those names and its title. Engine 28aa8ba. The same 22
+tasks, each run as `/rms-design-system-engine <task>`. Compared with the hygiene-record measurement below (engine 51d0466), its
+first runs of each task up to the same count; both scored by the current scorers.
+
+Guide set measured: `eab10f44308d` · Project measured: `13d811a9d668` (recorded later, when the project's hash was added)
+
+| | Hygiene record (adopted) | Renamed |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 · 133k | 40/40 · 131k |
+| Sonnet, all 22 tasks | 110/110 | 110/110 |
+| Sonnet, mean cost / input per request, 22 tasks | $0.141 / 127k | $0.142 / 130k |
+| Haiku, held-out (3 runs each) | 24/24 · 96k | 24/24 · 81k |
+| Haiku, all 22 tasks | 66/66 | 66/66 |
+| Haiku, mean cost / input per request, 22 tasks | $0.057 / 87k | $0.053 / 78k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 2.0 | 1.9 |
+
+**Reading.** Every task passes on both models under the new name and no rule is broken. The adoption rule passes
+on the held-out set for both models, with less input. Over all 22 tasks Sonnet read 2% more, from `new-ui-saved`
+(380k to 470k per request): its five runs range from 199k to 521k on the hygiene record and from 402k to 601k now, the longest a run
+that stopped to ask which way to go, so the difference is within what single runs of this task vary by. No run used
+the old command or failed to find the new one: the engine was called as `rms-design-system-engine` or through
+`~/.claude/skills/rms-design-system-engine/audit.mjs`, in the same proportions as under the old name.
+
+**Found by this evaluation and fixed (in the scorers, not the skill).**
+- The scorers' list of files the engine writes on every run still named the agreed record and the
+  history by their old names, so in every `props-question` run and two `toggle-note` runs (7 on Sonnet, 3 on Haiku) the
+  engine's own `design-system-engine-agreed.json` and `-history.json` first counted as files the agent changed. The
+  list now has both names, and a run saved before the rename is read with its files and command under their new
+  names: scored again with these scorers, the 236 runs of the hygiene-record measurement keep every verdict.
+- One Sonnet `new-ui-saved` reply, which suggested asking the designer to "give it an actual fill/color token", was
+  read as asking for a secret. A design token (a colour, fill or spacing token) is not one; the case is in the
+  scorer's test.
+
+## 2026-09: renamed instances in the Figma hygiene record
+
+A fresh run of the adopted guide (the `cookbook` variant, the checkout) after the full-audit recipe's hygiene
+snippet learned to record an instance whose layer spells its component's name another way. Engine 51d0466. 22
+tasks: `new-ui-saved` (build a new screen with the design system, the router sending it to `ask-the-system`) is
+new. Compared with the adopted measurement above (engine 2365d8a), its first runs of each task up to the same count.
+
+Guide set measured: `8b6372801eb8`
+
+| | Adopted | This guide |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 | 40/40 |
+| Sonnet, the 21 common tasks | 104/105 | 105/105 |
+| Sonnet, mean cost / input per request, 21 tasks | $0.138 / 118k | $0.138 / 115k |
+| Haiku, held-out (3 runs each) | 24/24 | 24/24 |
+| Haiku, the 21 common tasks | 63/63 | 63/63 |
+| Haiku, mean cost / input per request, 21 tasks | $0.052 / 69k | $0.055 / 74k |
+| `new-ui-saved` (new) | | Sonnet 5/5 · Haiku 3/3 |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 1.5 | 1.6 |
+
+**Reading.** Every task passes on both models and no rule is broken. On Sonnet the adoption rule passes (input
+118k to 115k, held-out 136k to 133k). On Haiku input was higher at 3 runs (held-out 81k to 96k), in six tasks
+where some runs read the full-audit recipe before running the command the router gave, or listed the project
+first. The recipe grew by 545 bytes, so those six were run to 13 runs on both versions, the protocol the deterministic core used:
+
+| Haiku, 13 runs each | Adopted | This guide |
+|---|---|---|
+| refresh-no-figma, pasted-steps, forbidden-green, private-statusbar, audit-all, visual-howto | 77/78 | 78/78 |
+| Mean input / cost per request on these six | 69k / $0.051 | 65k / $0.052 |
+
+With 13 runs the input is lower, not higher: the 3-run difference was which runs chose to read the recipe. The
+adopted guide's one miss, read by hand: on refresh-no-figma the reply said the audit used today's committed
+snapshots but never said the Figma data could not be refreshed here.
+
+## 2026-09: change only what was asked, one named difference, and the guide for the edit check and its follow-ups (continuous evaluation)
+
+A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: an Audit Rule to
+change only what was asked, the `ask-the-system` recipe, `--match` in the accept-debt recipe (never narrow
+the accepted-debt file by hand), and the reference for the edit check, the Figma call budget, the
+llms.txt mandate, the hidden expected component and prompt check in evals and Tailwind.
+Engine 2365d8a: the hooks every run installs include the edit check. 21 tasks: `props-question` is new. Both
+this guide and the adopted one (engine c3fd998) are scored by the current scorers: the `accept-radius` scorer
+now also requires everything else to stay strict, and every saved run of both was scored again.
+
+Guide set measured: `59ea4c33daac`
+
+| | Adopted (rescored) | This guide |
+|---|---|---|
+| Sonnet, held-out (5 runs each) | 40/40 | 40/40 |
+| Sonnet, the 20 common tasks | 95/100 | 100/100 |
+| Sonnet, mean cost / input per request, 20 tasks | $0.143 / 124k | $0.139 / 118k |
+| Haiku, held-out (3 runs each) | 24/24 | 24/24 |
+| Haiku, the 20 common tasks | 54/60 | 60/60 |
+| Haiku, mean cost / input per request, 20 tasks | $0.055 / 75k | $0.052 / 67k |
+| `props-question` (new) | | Sonnet 4/5 · Haiku 3/3 |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 1.6 | 1.4 |
+
+**Reading.** Every common task passes on both models where the adopted guide missed 5 on Sonnet and 6 on
+Haiku, and no rule is broken. Input is lower over the 20 tasks on both models, and on the held-out set for
+Haiku (95k to 81k). On the Sonnet held-out set it was 3% higher at 5 runs (132k to 136k), so the held-out tasks
+whose input grew were run to 13 runs on both versions, and so were the four Sonnet tasks that grew in the
+previous measurement, the protocol the deterministic core used:
+
+| Sonnet, 13 runs each | Adopted (rescored) | This guide |
+|---|---|---|
+| two-turns-pt, forbidden-green, change-figma (held-out) | 39/39 · 183k / $0.202 | 39/39 · 190k / $0.206 |
+| audit-all, accept-radius, private-badge-pt, fix-first | 42/52 · 112k / $0.138 | 52/52 · 112k / $0.136 |
+| Haiku, two-turns-pt | 33/33 | 13/13 |
+
+With 13 runs the held-out difference is about 4% more input per request, the same as in the previous
+measurement: mostly noise, the rest the longer report. accept-radius, which the adopted guide got right 3 times
+in 13, is right every time and cheaper (98k to 69k): one routed command instead of a hand edit.
+
+**The misses the adopted guide had.** Asked to accept only the chip's radius and keep everything else strict,
+most runs of the adopted guide accepted every failing line of the chip, its prop names too: `accept-radius`
+2/5 and `accept-radius-pt` 3/5 on Sonnet, 0/3 and 0/3 on Haiku. The old scorer passed them (it checked only
+that the radius was accepted). `--baseline --findings --match radi`, which the router adds when the person
+names the kind of difference, accepts that line alone: 5/5, 5/5, 3/3, 3/3.
+
+**Found by this evaluation and fixed.**
+- Two intermediate guides were measured and not recorded. The first (the `ask-the-system` recipe alone) had
+  2 of 33 Haiku runs of `two-turns-pt` rename the chip's props when asked only for its height, against 0 of 33
+  on the adopted guide: the rule to change only what was asked lived only in the fix recipe, which those runs
+  never opened. It is now an Audit Rule, and the routed fix note says it too (33/33 after). The second showed
+  the `accept-radius` narrowing by hand (7 of 13 Sonnet runs), the reason for `--match`.
+- One Sonnet `props-question` run stopped to ask whether it could run the audit, because `--query` said there was
+  no catalog yet. `--query` now runs the audit itself the first time (94ee399).
+
+## 2026-09: the guide after five changes and exact prop names (continuous evaluation)
+
+A fresh run of the adopted guide (the `cookbook` variant, the checkout) after guide changes: the flex-shrink
+rule made advisory, the focus-ring note on literals, the Figma hygiene record in the value sweep, and the
+props gate's NAME difference. Same tasks, runs and scorers as the deterministic core; engine c3fd998. Compared with the adopted
+deterministic-core measurement, its first runs of each task up to the same count.
+
+Guide set measured: `8fe89ab23319`
+
+| | Deterministic core (adopted) | This guide |
+|---|---|---|
+| Sonnet, all 20 tasks (5 runs each) | 100/100 | 100/100 |
+| Sonnet, mean cost / input per request | $0.130 / 121k | $0.143 / 124k |
+| Haiku, all 20 tasks (3 runs each) | 60/60 | 60/60 |
+| Haiku, mean cost / input per request | $0.047 / 65k | $0.055 / 75k |
+| Rule violations (both models) | 0 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 1.3 | 1.6 |
+
+**Reading.** Every task passes on both models and no rule is broken. The adoption rule passes for Sonnet and
+not for Haiku, on input tokens alone: a request that ran the audit once costs the same (49k) as before; the
+difference is in runs where Haiku took extra steps (opening the skill through the Skill tool before the
+command, reading the recipe and the config first, splitting the audit output with head and tail). Three runs
+per task cannot tell that from noise, so the six tasks whose input grew were run to 13 runs on both versions,
+the protocol the deterministic core used for a lower pass rate:
+
+| Haiku, 13 runs each | Deterministic core (adopted) | This guide |
+|---|---|---|
+| forbidden-green, pasted-steps, fix-first, first-setup, refresh-no-figma, audit-all | 76/78 | 78/78 |
+| Mean input / cost per request on these six | 71k / $0.048 | 74k / $0.052 |
+
+With 13 runs the difference is about 4% more input per request, not 21%: mostly noise, the rest the longer
+report (the new checks print more). The two deterministic-core misses, read by hand: on refresh-no-figma the reply called
+the snapshots current and never said the refresh had not happened (one only implied it). This guide's
+no-refresh SAY line names how to give Figma access, and it had no miss. Two of this guide's forbidden-green
+replies first scored as misses were scorer false negatives ("the snapshots aren't actually stale", "are
+actually current"); the scorer was fixed and every saved run scored again.
+
+**Found by this evaluation and fixed.** One Sonnet run, in a first pass on the previous guide, ended by
+offering to take "Figma access (MCP tool or token)", which the never-ask-for-a-token rule counts as a
+violation. The no-refresh SAY line now says how to give access: the Figma MCP server, or FIGMA_TOKEN in the
+project's .env file, never in the chat. No violation in this run.
+
+## 2026-09: a bare guide, the engine's router and nothing else
+
+The `bare` variant (`variants.mjs`, 449 bytes) only says to run `--route` and do what it prints. Same tasks, runs and
+engine as the adopted deterministic-core measurement (158802e; the harness file carrying the variant marks it +dirty).
+
+| | Adopted guide (deterministic core) | Bare |
+|---|---|---|
+| Sonnet, all 20 tasks | 100/100 | 100/100 |
+| Sonnet, mean cost / input per request | $0.130 / 121k | $0.118 / 122k |
+| Haiku, all 20 tasks | 60/60 | 59/60 |
+| Haiku, mean cost / input per request | $0.047 / 65k | $0.046 / 76k |
+| Rule violations | 0 | 1 |
+
+**Decision.** Not adopted: a new rule violation, and almost no saving (the adopted guide is about 7k tokens of the
+120k a request reads; the audit's output is the rest). The violation: without the guide, Haiku on refresh-no-figma ran
+an internal script by hand, edited `src/theme.css` unasked and tried to commit (the hook refused the commit). The edit
+got through because the hook read "the design changed yesterday" as a request to change something; the hook now counts
+only the asking forms of a change verb (fixed after this measurement).
+
+## 2026-09: deterministic core, thin agent layer
+
+Same harness, tasks and scorers as the cookbook measurement below; every saved run of all variants scored again with
+the final scorers. The deterministic core is the cookbook guide plus decisions moved from the model into the engine: `--route` picks the
+recipe and the exact command; the project's hook routes each `/rms-design-system-engine` request before the agent reads
+it; `SAY:` lines give the exact words for what the skill cannot do (change Figma, refresh without a Figma tool); the
+SUMMARY says whether the Figma data was refreshed; the hooks read the person's latest message before a code edit or
+the hand-back apply; accepting debt is scoped to a named component, and a scoped `--baseline` keeps the rest of the
+file. Engine 158802e.
+
+Guide set measured: `60eff78d1beb`
+
+| | Baseline | Cookbook | Deterministic core |
+|---|---|---|---|
+| Sonnet, all 20 tasks (5 runs each) | 100/100 | 100/100 | 100/100 |
+| Sonnet, mean cost per request | $0.68 | $0.19 | $0.13 |
+| Sonnet, mean input tokens per request | 730k | 224k | 121k |
+| Haiku, held-out tasks | 26/34 (76%) | 22/24 (92%) | 34/34 (100%) |
+| Haiku, all tasks | 96/110 | 62/67 | 110/110 |
+| Haiku, mean cost per request | $0.23 | $0.06 | $0.04 |
+| Haiku, mean input tokens per request | 368k | 95k | 55k |
+| Rule violations (both models) | 5 | 2 | 0 |
+| Choices the agent made that no `NEXT:` line gave, per request (Haiku) | 2.4 | 2.3 | 1.1 |
+
+Haiku ran 13 times on the five tasks the earlier variants had re-run, so each comparison has the same counts
+(against the cookbook, the first runs of each task up to its count).
+
+**Decision.** Adopted: the adoption rule passes against the baseline and against the cookbook, on both models.
+
+**Found by the evaluation and fixed along the way.** A scoped `--baseline` rewrote the accepted-debt file with only
+that component's findings, dropping every other accepted line; an accessibility check the browser was slow to answer
+disappeared from the report instead of being reported as not checked (seen as an intermittent demo failure under
+load). Five scorer misreads, each fixed with a case in `test/skill-evals.test.mjs`.
+
+## 2026-09: the guide split into a main file, recipes and reference
+
+Isolated headless runs (`claude -p "/rms-design-system-engine <task>"`), scored by code, every run scored again with
+the final scorers (`rescore.mjs`). Baseline is the one-file guide (tag `guide-monolith`); cookbook is the split guide
+after the fixes the first measurement asked for (commit 3318dd8). Same engine for both (6707623 for the engine code).
+Private held-out tasks run on a real library and are named A and B here.
+
+| | Baseline | Cookbook |
+|---|---|---|
+| Sonnet, all 20 tasks (5 runs each) | 100/100 | 100/100 |
+| Sonnet, mean cost per request | $0.68 | $0.19 |
+| Sonnet, mean input tokens per request | 730k | about 260k |
+| Haiku, held-out tasks | 76% | 92% |
+| Haiku, all tasks | 96/110 | 62/67 |
+| Haiku, mean cost per request | $0.23 | $0.06 |
+| Haiku, rule violations | 4 | 1 |
+
+Haiku per task (baseline against cookbook; tasks that dropped on the first measurement were run 10 more times on the
+baseline): toggle-note 13/13 against 9/10, the one task lower on the cookbook; pasted-steps 0/3 against 2/3,
+refresh-no-figma 0/3 against 2/3, forbidden-green 2/3 against 3/3, first-setup 2/3 against 3/3, no-cli-on-path 12/13
+against 3/3, audit-all 12/13 against 3/3; the rest equal.
+
+The baseline's Haiku violations: source code changed without a request (three runs) and an HTML report file written;
+the cookbook's one violation is an HTML report file on the pasted step list that asked for one.
+
+**Decision.** Adopted (the owner's call). On the strict rule the cookbook passes on Sonnet and falls one run short on
+Haiku's toggle-note, a routing miss that the deterministic core moves into the engine.
+
+**Found by the evaluation and fixed along the way.** `--init` wrote every dark mode as a media query (the
+theme's data attribute was ignored); the guide pointed the no-CLI fallback at the wrong folder; questions were
+answered from the index without the recipe; audits and refreshes were claimed without output. Open: the hook asks
+again before a hand-back apply the person already asked for (deterministic core).
+
+**What a native Skill (`SKILL.md`) measured.** Sonnet 99/100 at $0.19; Haiku 42/60, with Haiku opening the skill
+instead of running the engine and asking instead of running a pasted request. Not adopted.

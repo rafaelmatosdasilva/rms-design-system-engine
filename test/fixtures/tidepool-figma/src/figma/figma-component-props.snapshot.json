@@ -1,0 +1,190 @@
+{
+  "_updated": "2026-01-01T00:00:00.000Z",
+  "button": {
+    "nodeId": "3:8",
+    "properties": {
+      "State": {
+        "type": "VARIANT",
+        "defaultValue": "Default",
+        "variantOptions": [
+          "Default",
+          "Hover"
+        ]
+      },
+      "Disabled": {
+        "type": "VARIANT",
+        "defaultValue": "False",
+        "variantOptions": [
+          "False",
+          "True"
+        ]
+      },
+      "Label#3:0": {
+        "type": "TEXT",
+        "defaultValue": "Save"
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: button"
+      }
+    ],
+    "description": "The main action on a screen."
+  },
+  "chip": {
+    "nodeId": "3:16",
+    "properties": {
+      "Size": {
+        "type": "VARIANT",
+        "defaultValue": "M",
+        "variantOptions": [
+          "M",
+          "L"
+        ]
+      },
+      "Icon": {
+        "type": "VARIANT",
+        "defaultValue": "False",
+        "variantOptions": [
+          "False",
+          "True"
+        ]
+      },
+      "Label#3:4": {
+        "type": "TEXT",
+        "defaultValue": "Filter"
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: togglebutton"
+      }
+    ],
+    "description": "A filter people switch on and off."
+  },
+  "field": {
+    "nodeId": "3:21",
+    "properties": {
+      "State": {
+        "type": "VARIANT",
+        "defaultValue": "Default",
+        "variantOptions": [
+          "Default",
+          "Error"
+        ]
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: textbox"
+      }
+    ],
+    "description": "A one-line text input."
+  },
+  "tag": {
+    "nodeId": "3:26",
+    "description": "A small status label. @experimental Still being designed.",
+    "properties": {
+      "Tone": {
+        "type": "VARIANT",
+        "defaultValue": "Neutral",
+        "variantOptions": [
+          "Neutral",
+          "Positive"
+        ]
+      },
+      "Label#3:8": {
+        "type": "TEXT",
+        "defaultValue": "New"
+      }
+    },
+    "annotations": []
+  },
+  "disclosure": {
+    "nodeId": "15:14",
+    "properties": {
+      "Label#15:0": {
+        "type": "TEXT",
+        "defaultValue": "Details"
+      },
+      "Content#15:3": {
+        "type": "TEXT",
+        "defaultValue": "Shipping takes two business days."
+      },
+      "Expanded": {
+        "type": "VARIANT",
+        "defaultValue": "False",
+        "variantOptions": [
+          "False",
+          "True"
+        ]
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: disclosure"
+      }
+    ],
+    "layerAnnotations": [
+      {
+        "layer": "Chevron",
+        "annotations": [
+          {
+            "label": "Role: indicator"
+          }
+        ]
+      },
+      {
+        "layer": "Panel",
+        "annotations": [
+          {
+            "label": "Role: panel"
+          }
+        ]
+      }
+    ],
+    "description": "Shows or hides a short passage under its label."
+  },
+  "_note": "Tidepool, a fictional design system, as captured from its Figma file (b0LpOCBsaRgo8lUqbkQNaY) for the build evaluation. Every name is invented.",
+  "stepper": {
+    "nodeId": "17:2",
+    "properties": {
+      "Value#17:0": {
+        "type": "TEXT",
+        "defaultValue": "1"
+      }
+    },
+    "annotations": [
+      {
+        "label": "Role: spinbutton"
+      }
+    ],
+    "layerAnnotations": [
+      {
+        "layer": "Decrement",
+        "annotations": [
+          {
+            "label": "Role: decrement"
+          }
+        ]
+      },
+      {
+        "layer": "Value",
+        "annotations": [
+          {
+            "label": "Role: value"
+          }
+        ]
+      },
+      {
+        "layer": "Increment",
+        "annotations": [
+          {
+            "label": "Role: increment"
+          }
+        ]
+      }
+    ],
+    "description": "Picks a whole number from 0 to 10 by stepping it down or up."
+  }
+}

@@ -1,0 +1,521 @@
+// capture-compare.mjs — the code capture side by side with the Figma snapshots. Token names must
+// resolve exactly as Gate 3 resolves them, and a component field is only compared when the code
+// really fixes it (content-sized heights, icon-only instances and "how" a background is drawn are
+// not differences).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { compareTokens, compareComponents, measuredLine } from '../capture-compare.mjs';
+
+const maps = (over = {}) => ({ EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {}, ...over });
+const cfg = { figma: { namingConvention: { dropSegments: ['color', 'default'] } } };
+const tok = (v) => ({ modes: { light: { value: v, confidence: 'verified' } } });
+
+test('tokens: "/color" is dropped before design-system-engine-map lookup, an explicit null is skipped, values compare by meaning', () => {
+  const code = { tokens: { '--card-bg': tok('#FFFFFF'), '--shared': tok('rgb(0, 0, 0)'), '--gap-s': tok('8px'), '--m-size': tok('11px') } };
+  const vars = {
+    color: { light: { 'card/bg/color': '#ffffff', 'badge/label/color': '#000000', 'overlay/color': '#000000', 'ghost/color': '#123456' } },
+    sizing: { 'gap/s': '8px' },
+    typography: { m: { size: '11px' } },
+  };
+  const r = compareTokens(code, vars, cfg, maps({ EXPLICIT: { 'badge/label': '--shared', overlay: null }, TYPO: { '--m-size': ['m', 'size'] } }));
+  assert.equal(r.match, 4);                                    // card, badge (via EXPLICIT), gap, typography
+  assert.equal(r.skipped, 1);                                  // overlay → no variable on purpose
+  assert.deepEqual(r.missingInCode.map((m) => m.cssVar), ['--ghost']);
+});
+
+test('components: heights only when the code fixes one; min-height by its value; background by "paints or not"', () => {
+  const code = { components: {
+    bar: { confidence: 'high', instance: { hasText: true }, size: { height: 49 }, fill: 'direct', props: { minHeight: { value: '48px', rule: '.bar', confidence: 'verified' } } },
+    card: { confidence: 'high', instance: { hasText: true }, size: { height: 232 }, fill: 'none', props: { height: { value: '232px', from: 'initial', confidence: 'default' } } },
+    btn: { confidence: 'high', instance: { hasText: true }, size: { height: 24 }, fill: 'direct', props: { height: { value: '24px', rule: '.btn', confidence: 'verified' } } },
+  } };
+  const structure = { bar: { h: 48 }, card: { h: 248 }, btn: { h: 24, fillStructure: 'before' } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  assert.equal(r.match, 3);                                    // bar min-height 48, btn height 24, btn paints (before ≈ direct)
+  // Figma's sizing not in the snapshot: the one height left uncompared says how to make it comparable.
+  assert.deepEqual(r.notComparable.map((n) => `${n.component}:${n.why}`), ['card:Figma\'s sizing is not in the structure snapshot (refresh it: sizingV)']);
+  assert.equal(r.differ.length, 0);
+});
+
+test('components: a height the code leaves to its content is compared by what Figma says about it', () => {
+  const code = { components: {
+    card: { confidence: 'high', instance: { hasText: true }, size: { height: 76 }, props: {} },
+    chip: { confidence: 'high', instance: { hasText: true }, size: { height: 20 }, props: {} },
+    tag: { confidence: 'high', instance: { hasText: true }, size: { height: 24 }, props: {} },
+    group: { confidence: 'high', instance: { hasText: true }, size: { height: 23 }, props: {} },
+    menu: { confidence: 'static-only', props: {} },
+  } };
+  const structure = { card: { h: 248, sizingV: 'FIXED', layout: 'VERTICAL' }, chip: { h: 19, sizingV: 'HUG', layout: 'HORIZONTAL' }, tag: { h: 24, sizingV: 'HUG', layout: 'HORIZONTAL' },
+    group: { h: 53, sizingV: 'HUG', layout: 'VERTICAL' }, menu: { h: 'auto' } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const facts = r.facts.map((f) => `${f.key}=${f.same}`);
+  // Figma fixes the card's height and the code lets its content decide: compared as drawn, a difference with its fix.
+  assert.ok(facts.includes('card · height=false'));
+  assert.match(measuredLine(r.differ.find((d) => d.component === 'card')), /Figma fixes its height at 248px; the code sets none, so its content decides \(76px drawn\)/);
+  // Both hug: agreed; a row's drawn height is compared too (chip 20 against 19 differs, tag agrees).
+  assert.ok(facts.includes('chip · height sizing=true') && facts.includes('chip · height (drawn)=false') && facts.includes('tag · height (drawn)=true'));
+  // A vertical stack grows with its items: its sizing is compared, not Figma's sample height.
+  assert.ok(facts.includes('group · height sizing=true') && !facts.some((f) => f.startsWith('group · height (drawn)')));
+  // 'auto' in an older snapshot is a hug; with no browser drawing, the row's drawn height says so.
+  assert.deepEqual(r.notComparable.map((n) => `${n.component}:${n.why}`), []);
+  assert.ok(facts.includes('menu · height sizing=true'));
+});
+
+test('components: Figma fills its container: a height left to the page agrees, a fixed one differs', () => {
+  const code = { components: {
+    panel: { confidence: 'high', instance: { hasText: true }, size: { height: 32 }, props: {} },
+    sheet: { confidence: 'high', instance: { hasText: true }, size: { height: 300 }, props: { height: { value: '300px', rule: '.sheet', at: 'theme.css:9' } } },
+  } };
+  const structure = { panel: { h: 460, sizingV: 'FILL', layout: 'VERTICAL', slot: true }, sheet: { h: 460, sizingV: 'FILL', layout: 'VERTICAL' } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const facts = r.facts.map((f) => `${f.key}=${f.same}`);
+  assert.ok(facts.includes('panel · height sizing=true'));
+  assert.ok(facts.includes('sheet · height=false'));
+  assert.match(measuredLine(r.differ.find((d) => d.component === 'sheet')), /Figma fills its container; the code fixes 300px/);
+  assert.deepEqual(r.notComparable, []);
+});
+
+test('components: a real difference names the token, the rule and the source line', () => {
+  const code = { components: { bar: { confidence: 'high', instance: { hasText: true }, props: { columnGap: { value: '8px', var: '--gap-m', rule: '.bar', at: 'theme.css:12', confidence: 'verified' } } } } };
+  const r = compareComponents(code, { bar: { gapVar: 'gap/xl' } }, { sizing: { 'gap/xl': '16px' } }, cfg, maps());
+  assert.deepEqual(r.differ[0], { component: 'bar', field: 'gap', figma: 'gap/xl', figmaValue: '16px', code: '8px', codeVar: '--gap-m', expectedVar: '--gap-xl', rule: '.bar', at: 'theme.css:12', confidence: 'verified' });
+  // The line a person reads: what differs, where, and what to write.
+  assert.equal(measuredLine(r.differ[0]), 'bar gap: Figma gap/xl (16px), rendered 8px via --gap-m  (.bar · theme.css:12)  → set var(--gap-xl)');
+  assert.match(measuredLine({ ...r.differ[0], confidence: 'single-source' }), /\[read from one source\]/);
+  assert.doesNotMatch(measuredLine({ component: 'x', field: 'background', figma: 'paints a background', code: 'no background', rule: '.x', at: 'a.css:1' }), /→ set/);
+});
+
+test('components: padding of icon-only instances is not compared with a labelled design default', () => {
+  const code = { components: { btn: { confidence: 'high', instance: { hasText: false }, props: { paddingLeft: { value: '0px', rule: '.btn:has(svg)', confidence: 'verified' } } } } };
+  const r = compareComponents(code, { btn: { paddingVar: { lr: 'padding/xs' }, fontSizeVar: 'm' } }, { sizing: { 'padding/xs': '4px' } }, cfg, maps());
+  assert.equal(r.differ.length, 0);
+  assert.match(r.notComparable[0].why, /icon-only/);
+});
+
+test('icons: compared by viewBox and path data; missing and code-only icons counted', async () => {
+  const { compareIcons } = await import('../capture-compare.mjs');
+  const { pathHash } = await import('../icon-source.mjs');
+  const code = { icons: {
+    'icon-a': { viewBox: '0 0 16 16', paths: 1, pathHash: pathHash(['M1']), definedAt: ['a.html:3'] },
+    'icon-b': { viewBox: '0 0 24 24', paths: 1, pathHash: pathHash(['M2']), definedAt: ['a.html:4'] },
+    'icon-app': { viewBox: '0 0 16 16', paths: 1, pathHash: 'x' },
+  } };
+  const r = compareIcons(code, { _updated: 'x', 'icon-a': { viewBox: '0 0 16 16', paths: ['M1'] }, 'icon-b': { viewBox: '0 0 16 16', paths: ['M9'] }, 'icon-c': { viewBox: '0 0 16 16', paths: [] } });
+  assert.equal(r.match, 1);
+  assert.deepEqual(r.differ, [{ id: 'icon-b', what: 'viewBox Figma 0 0 16 16, code 0 0 24 24 · path data differs (Figma 1 path(s), code 1)', at: 'a.html:4' }]);
+  assert.deepEqual(r.missingInCode, ['icon-c']);
+  assert.equal(r.codeOnly, 1);
+});
+
+test('nesting: Figma sub-components against what the code nests', async () => {
+  const { compareNesting } = await import('../capture-compare.mjs');
+  const code = { nesting: { Card: { instancesSeen: 2, contains: { Badge: { renderedIn: ['app'] }, Avatar: { inSource: true } } } } };
+  const r = compareNesting(code, { Card: ['Badge', 'Button', 'Icon/Star'], Modal: ['Button'] });
+  assert.equal(r.match, 1);
+  assert.deepEqual(r.differ, [{ parent: 'Card', child: 'Button', figma: 'nests it', code: 'not inside any of 2 rendered instance(s)' }]);
+  assert.deepEqual(r.notComparable, [{ parent: 'Modal', why: 'not seen in the code' }]);
+  assert.deepEqual(r.codeOnly, [{ parent: 'Card', child: 'Avatar' }]);
+});
+
+test('components: padding on both sides, every corner, and line height from the text style', () => {
+  const v = (value, extra = {}) => ({ value, confidence: 'verified', rule: '.c', ...extra });
+  const code = { components: { c: { confidence: 'high', instance: { hasText: true }, props: {
+    paddingLeft: v('8px'), paddingRight: v('4px'), paddingTop: v('4px'), paddingBottom: v('4px'),
+    borderTopLeftRadius: v('6px'), borderTopRightRadius: v('6px'), borderBottomRightRadius: v('0px'), borderBottomLeftRadius: v('6px'),
+    fontSize: v('11px'), lineHeight: v('1.5'),
+  } } } };
+  const vars = { sizing: { 'padding/s': '4px', 'padding/m': '8px', 'radii/m': '6px' }, typography: { m: { size: '11px', lh: '16px' } } };
+  const r = compareComponents(code, { c: { paddingVar: { lr: 'padding/m', tb: 'padding/s' }, innerRadiusVar: 'radii/m', fontSizeVar: 'm' } }, vars, cfg, maps());
+  const d = Object.fromEntries(r.differ.map((x) => [x.field, x.code]));
+  assert.equal(d['padding (left/right)'], '4px');            // the right side is off
+  assert.equal(d.radius, '0px');                             // one corner is square
+  assert.equal(d['line height'], '16.5px');                  // 1.5 × 11px ≠ 16px
+  assert.equal(d['padding (top/bottom)'], undefined);
+});
+
+test('components: a page-level line height, a wrapper root and content-only state heights are not compared', () => {
+  const code = { components: {
+    b: { confidence: 'high', instance: { hasText: true }, props: { fontSize: { value: '11px', confidence: 'verified' }, lineHeight: { value: '20px', inherited: true, rule: 'html, body', confidence: 'single-source' } } },
+    w: { confidence: 'high', instance: { hasText: true }, props: { borderTopWidth: { value: '0px' }, borderRightWidth: { value: '0px' }, borderBottomWidth: { value: '0px' }, borderLeftWidth: { value: '0px' }, backgroundColor: { value: 'rgba(0, 0, 0, 0)' }, borderTopLeftRadius: { value: '0px' } },
+      states: { 'State=Default': { changed: { height: { value: '49px' } } } } },
+  } };
+  const r = compareComponents(code, { b: { fontSizeVar: 'm' }, w: { strokeOnDefault: true, variantHeight: { 'State=default': 40 } } }, { typography: { m: { size: '11px', lh: '16px' } } }, cfg, maps());
+  assert.equal(r.differ.length, 0, JSON.stringify(r.differ));
+  assert.match(r.notComparable.find((n) => n.field === 'stroke').why, /wrapper/);
+});
+
+test('components: a stroked design with no visible border, sides Figma names, and state opacity', () => {
+  const w = (t, r = '0px', b = '0px', l = '0px') => ({ borderTopWidth: { value: t, rule: '.x' }, borderRightWidth: { value: r }, borderBottomWidth: { value: b }, borderLeftWidth: { value: l }, borderTopColor: { value: 'rgb(0, 0, 0)' }, backgroundColor: { value: 'rgb(255, 255, 255)' } });
+  const code = { components: {
+    a: { confidence: 'high', instance: { hasText: true }, props: { ...w('0px'), borderTopColor: { value: 'rgba(0, 0, 0, 0)' } } },
+    s: { confidence: 'high', instance: { hasText: true }, props: w('0px', '0px', '1px', '0px') },
+    o: { confidence: 'high', instance: { hasText: true }, props: { opacity: { value: '1' } }, states: { 'Disabled=true': { changed: { opacity: { value: '0.4', rule: '.o:disabled' } } } } },
+  } };
+  const structure = { a: { strokeOnDefault: true }, s: { strokeOnDefault: true, strokeSides: 'right' }, o: { variantOpacity: { disabled: 0.24 } } };
+  const d = Object.fromEntries(compareComponents(code, structure, {}, cfg, maps()).differ.map((x) => [x.component, `${x.field}: ${x.figma} / ${x.code}`]));
+  assert.equal(d.s, 'stroke: border on right / border on bottom');
+  assert.equal(d.o, 'opacity (disabled): 0.24 / 0.4');
+  // An inside stroke drawn as an inset ring is a border on every side; a drop shadow is none.
+  const ring = (shadow) => ({ components: { t: { confidence: 'high', instance: { hasText: true }, props: { ...w('0px'), borderTopColor: { value: 'rgb(64, 64, 64)' }, boxShadow: { value: shadow } } } } });
+  const strokeOf = (code) => compareComponents(code, { t: { strokeOnDefault: true } }, {}, cfg, maps()).differ.filter((x) => x.field === 'stroke').length;
+  assert.equal(strokeOf(ring('rgb(232, 232, 232) 0px 0px 0px 1.5px inset')), 0, 'an inset ring is the stroke');
+  assert.equal(strokeOf(ring('rgba(0, 0, 0, 0.2) 0px 1px 2px 0px')), 1, 'a drop shadow is no stroke');
+});
+
+test('components: the extended capture adds width, stroke widths, opacity and text facts', () => {
+  const v = (value, extra = {}) => ({ value, confidence: 'verified', rule: '.k', ...extra });
+  const code = { components: { k: { confidence: 'high', instance: { hasText: true }, size: { width: 120 },
+    props: { width: v('120px'), borderTopWidth: v('1px'), borderRightWidth: v('1px'), borderBottomWidth: v('2px'), borderLeftWidth: v('1px'), borderTopColor: v('rgb(0, 0, 0)'), backgroundColor: v('rgb(255, 255, 255)'), opacity: v('1'), fontSize: v('12px'),
+      fontFamily: v('"Inter", sans-serif'), letterSpacing: v('0.6px'), textTransform: v('none'), lineHeight: v('18px') } } } };
+  const f = { k: { box: { width: 100, sizing: { h: 'FIXED' } }, stroke: { weights: [1, 1, 1, 1] }, opacity: 0.5,
+    text: { fontFamily: 'Inter', letterSpacing: { unit: 'PERCENT', value: 5 }, textCase: 'UPPER', lineHeight: { unit: 'PERCENT', value: 150 } } } };
+  const r = compareComponents(code, f, {}, cfg, maps());
+  const d = Object.fromEntries(r.differ.map((x) => [x.field, `${x.figma} / ${x.code}`]));
+  assert.equal(d.width, '100 / 120');
+  assert.equal(d['border bottom width'], '1 / 2px');
+  assert.equal(d.opacity, '0.5 / 1');
+  assert.equal(d['text case'], 'uppercase / none');
+  assert.equal(d['font family'], undefined);           // "Inter" = Inter
+  assert.equal(d['letter spacing'], undefined);        // 5% of 12px = 0.6px
+  assert.equal(d['line height'], undefined);           // 150% of 12px = 18px
+});
+
+test('colours: every mode against the token value, paint opacity included; a variant compares only what it changes', () => {
+  const fact = (value, v) => ({ value, var: v, rule: '.chip', at: 'a.css:2', confidence: 'verified' });
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, fill: 'direct',
+    props: { backgroundColor: fact('rgb(255, 255, 255)', '--local-bg'), color: fact('rgb(0, 0, 0)', '--ink'), paddingTop: fact('4px') },
+    colors: { light: { backgroundColor: 'rgb(255, 255, 255)', color: 'rgb(0, 0, 0)' }, dark: { backgroundColor: 'rgb(0, 0, 0)', color: 'rgb(255, 255, 255)' } },
+    states: { 'State=Hover': { changed: { backgroundColor: { value: 'rgb(200, 200, 200)', rule: '.chip:hover', at: 'a.css:9' } },
+      colors: { light: { backgroundColor: 'rgb(200, 200, 200)', color: 'rgb(0, 0, 0)' }, dark: { backgroundColor: 'rgba(255, 255, 255, 0.1)', color: 'rgb(255, 255, 255)' } } } } } } };
+  const paint = (token, opacity = 1) => ({ token, hex: '#000000', opacity });
+  const structure = { chip: { fillStructure: 'direct', colors: { fill: paint('chip/bg/color'), text: paint('ink/color') }, defaultVariant: 'State=Default',
+    variants: { 'State=Default': { paddingPx: [4, 8, 4, 8], colors: { fill: paint('chip/bg/color') } }, 'State=Hover': { paddingPx: [4, 8, 4, 8], colors: { fill: paint('chip/hover/color', 0.1) } } } } };
+  const vars = { color: { light: { 'chip/bg/color': '#ffffff', 'ink/color': '#000000', 'chip/hover/color': '#c8c8c8' }, dark: { 'chip/bg/color': '#111111', 'ink/color': '#ffffff', 'chip/hover/color': '#ffffff' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps());
+  const got = r.differ.map((d) => `${d.field}: ${d.figmaValue} vs ${d.code}`);
+  assert.deepEqual(got, ['background [dark]: #111111 vs rgb(0, 0, 0)', 'background (State=Hover) [light]: #c8c8c81a vs rgb(200, 200, 200)'], JSON.stringify(r.differ));
+  assert.equal(r.differ[1].at, 'a.css:9');                                   // the state's own rule
+  // The token's own variable in code is a match by itself (its value per mode is Gate 3's job).
+  code.components.chip.props.backgroundColor.var = '--chip-bg';
+  assert.equal(compareComponents(code, structure, vars, cfg, maps()).differ.filter((d) => d.field === 'background [dark]').length, 0);
+});
+
+test('variants: each Figma axis value is the default, a produced state or a declared one; the rest is listed', async () => {
+  const { compareVariants } = await import('../capture-compare.mjs');
+  const code = { components: { chip: { states: { 'State=Hover': {} }, statesNotProduced: [{ state: 'State=Focus' }] } } };
+  const structure = { chip: { defaultVariant: 'State=Default, Size=M', variants: { 'State=Default, Size=M': {}, 'State=Hover, Size=M': {}, 'State=Focus, Size=M': {}, 'State=Default, Size=L': {} } } };
+  const r = compareVariants(code, structure);
+  assert.deepEqual(r.missing, [{ component: 'chip', axis: 'Size', value: 'L' }]);   // Figma's own names
+  assert.equal(r.built, 4);
+});
+
+test('breakpoints: a responsive token against the value measured at that breakpoint width', async () => {
+  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  const code = { components: { card: { props: { paddingLeft: { rule: '.card', at: 'a.css:3' } }, breakpoints: { Phone: { width: 375, paddingLeft: '8px', columnGap: '8px' }, Desktop: { width: 1024, paddingLeft: '16px', columnGap: '8px' } } } } };
+  const structure = { card: { paddingVar: { lr: 'padding/page' }, gapVar: 'gap/m' } };
+  const vars = { breakpoints: { Phone: { 'viewport/min-width': '0', 'padding/page': '12px' }, Desktop: { 'viewport/min-width': '1024', 'padding/page': '16px' } } };
+  const r = compareBreakpoints(code, structure, vars);
+  assert.deepEqual(r.differ.map((d) => `${d.field}: ${d.figmaValue} vs ${d.code}`), ['padding (left) @ Phone (375px): 12px vs 8px']);
+  assert.equal(r.match, 1);                                  // gap/m is not responsive: not compared here
+});
+
+test('every mode: sizing and type tokens in each mode the code was read in, breakpoints from a sizing collection and in every colour mode', async () => {
+  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  // A token a Sizing collection sets per mode: checked in each mode the code has a reading for, against that mode's value.
+  const two = (a, b) => ({ modes: { light: { value: a, confidence: 'verified' }, desktop: { value: a, confidence: 'verified' }, phone: { value: b, confidence: 'verified' } } });
+  const code = { tokens: { '--padding-m': two('12px', '12px'), '--gap-s': { modes: { light: { value: '8px', confidence: 'verified' } } } } };
+  const vars = { sizing: { 'padding/m': '12px', 'gap/s': '8px' }, modeVariants: { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { kind: 'scalar', values: { desktop: '12px', phone: '14px' } }, 'gap/s': { kind: 'scalar', values: { desktop: '8px', phone: '10px' } } } } } };
+  const r = compareTokens(code, vars, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => `${d.token} [${d.mode}]: ${d.figma} vs ${d.code}`), ['padding/m [phone]: 14px vs 12px']);
+  assert.equal(r.match, 2, 'padding/m on a desktop, and gap/s in the first mode, as the code was read in no sizing mode for it');
+  // Breakpoints from that collection (no breakpoint collection of its own), and a colour mode that pads otherwise.
+  const card = { props: { paddingLeft: { rule: '.card', at: 'a.css:3' } }, breakpoints: { phone: { width: 350, paddingLeft: '14px', byMode: { dark: { paddingLeft: '16px' } } }, desktop: { width: 1680, paddingLeft: '12px' } } };
+  const b = compareBreakpoints({ components: { card } }, { card: { paddingVar: { lr: 'padding/m' } } }, { modeVariants: { Sizing: { modes: vars.modeVariants.Sizing.modes, vars: { 'viewport/min-width': { values: { desktop: '1680px', phone: '350px' } }, 'padding/m': vars.modeVariants.Sizing.vars['padding/m'] } } } });
+  assert.deepEqual(b.differ.map((d) => `${d.field}: ${d.figmaValue} vs ${d.code}`), ['padding (left) @ phone (350px) [dark]: 14px vs 16px']);
+  assert.equal(b.match, 2);
+});
+
+test('a state in a mode with a rule of its own: its difference points at that mode\'s rule', () => {
+  const fact = (value, rule = '.chip') => ({ value, rule, at: 'a.css:1', confidence: 'verified' });
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, fill: 'direct', props: { backgroundColor: fact('#ffffff') },
+    colors: { light: { backgroundColor: '#ffffff', color: '#000000' }, dark: { backgroundColor: '#000000', color: '#ffffff' } },
+    states: { 'State=Hover': { produced: 'forced :hover', changed: { backgroundColor: { value: '#eeeeee', rule: '.chip:hover', at: 'a.css:5' } }, byMode: { dark: { backgroundColor: { value: '#333333', rule: '[data-theme=dark] .chip:hover', at: 'a.css:9' } } },
+      colors: { light: { backgroundColor: '#eeeeee', color: '#000000' }, dark: { backgroundColor: '#333333', color: '#ffffff' } } } } } } };
+  const structure = { chip: { fillStructure: 'direct', colors: { fill: { token: 'chip/bg' } }, variants: { 'State=Hover': { colors: { fill: { token: 'chip/bg/hover' } } } }, defaultVariant: 'State=Default' } };
+  const vars = { color: { light: { 'chip/bg': '#ffffff', 'chip/bg/hover': '#eeeeee' }, dark: { 'chip/bg': '#000000', 'chip/bg/hover': '#222222' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps());
+  const dark = r.differ.find((d) => /\[dark\]/.test(d.field) && /Hover/.test(d.field));
+  assert.ok(dark, JSON.stringify(r.differ));
+  assert.equal(dark.at, 'a.css:9', 'the dark hover rule, not the light one');
+});
+
+test('variant combinations: built from propertyMap selectors; compared with height and visible layers', async () => {
+  const { variantCombos } = await import('../code-capture.mjs');
+  const states = [{ label: 'Size=L', selector: '.chip.chip--l' }, { label: 'Icon=True', selector: '.chip.has-icon' }, { label: 'State=Hover', selector: '.chip:hover' }];
+  const figma = { defaultVariant: 'Size=M, Icon=False, State=Default', variants: { 'Size=M, Icon=False, State=Default': {}, 'Size=L, Icon=True, State=Default': {}, 'Size=L, Icon=False, State=Default': {}, 'Size=S, Icon=True, State=Default': {} } };
+  assert.deepEqual(variantCombos(figma, states), [{ name: 'Size=L, Icon=True, State=Default', parts: [{ label: 'size=l', selector: '.chip.chip--l' }, { label: 'icon=true', selector: '.chip.has-icon' }] }]);   // Size=S has no selector
+  const fact = (value) => ({ value, rule: '.chip', at: 'a.css:1', confidence: 'verified' });
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, props: { height: fact('32px'), paddingLeft: fact('8px') }, layers: { Icon: false, Label: true },
+    combos: { 'Size=L, Icon=True, State=Default': { changed: { paddingLeft: { value: '12px', rule: '.chip--l', at: 'a.css:9' } }, size: { height: 32 }, layers: { Icon: false, Label: true } } } } } };
+  const structure = { chip: { defaultVariant: 'Size=M, Icon=False, State=Default', variants: {
+    'Size=M, Icon=False, State=Default': { h: 32, paddingPx: [4, 8, 4, 8], layers: ['Label'] },
+    'Size=L, Icon=True, State=Default': { h: 40, paddingPx: [4, 12, 4, 12], layers: ['Icon', 'Label'] } } } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => `${d.field}: ${d.figma} vs ${d.code}`), [
+    'height (Size=L, Icon=True, State=Default): 40 vs 32px',
+    'layer "Icon" (Size=L, Icon=True, State=Default): shown vs hidden',
+  ], JSON.stringify(r.differ));
+});
+
+test('components: Figma\'s own minimum height, and a state set on a part compared on the whole component as drawn', () => {
+  const code = { components: {
+    row: { confidence: 'high', instance: { hasText: true }, size: { height: 24 }, props: { minHeight: { value: '32px', rule: '.row', at: 'theme.css:3' } } },
+    tag: { confidence: 'high', instance: { hasText: true }, size: { height: 24 }, props: { minHeight: { value: '24px', rule: '.tag', at: 'theme.css:5' } } },
+    checkbox: { confidence: 'high', selector: '.checkbox', instance: { hasText: true }, size: { height: 16 }, props: {},
+      states: { 'State=Checked': { selector: '.checkbox-input:checked + .checkbox-box', changed: { height: { value: '14px', rule: '.checkbox-box' } } } } },
+  } };
+  const structure = { row: { h: 24, sizingV: 'HUG', minH: null }, tag: { h: 24, sizingV: 'HUG', minH: 24 }, checkbox: { variantHeight: { 'State=Checked': 16 } } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const facts = r.facts.map((f) => `${f.key}=${f.same}`);
+  assert.ok(facts.includes('row · min height=false') && facts.includes('tag · min height=true'));
+  assert.match(measuredLine(r.differ.find((d) => d.component === 'row')), /Figma sets no minimum height \(its content decides\); remove min-height/);
+  // The box's own 14px is the part's; Figma's 16 is the whole checkbox's, and the whole is drawn at 16.
+  assert.ok(facts.includes('checkbox · height (State=Checked)=true'));
+});
+
+test('capture: options a component\'s own checkbox draws are that checkbox ticked or not; a lone :checked option is not', async () => {
+  const { checkedOptions } = await import('../code-capture.mjs');
+  assert.deepEqual(checkedOptions({ True: '.sw-input:checked + .sw-track', False: '.sw-track' }),
+    { True: { part: '.sw-input', value: true }, False: { part: '.sw-input', value: false } });
+  assert.deepEqual(checkedOptions({ On: '.cb-input:checked ~ .cb-box', Off: '.cb-box' }), { On: { part: '.cb-input', value: true }, Off: { part: '.cb-input', value: false } });
+  assert.deepEqual(checkedOptions({ True: '.sw-input:checked + .sw-track', False: '.sw.off' }), {}, 'the other option is not the same part');
+  assert.deepEqual(checkedOptions({ True: '.sw.on', False: '.sw' }), {});
+});
+
+test('capture: Figma\'s default variant is drawn with the classes the contract gives it, never a state or a part', async () => {
+  const { defaultVariantClasses } = await import('../code-capture.mjs');
+  const props = { properties: { Type: { type: 'VARIANT', defaultValue: 'Negative' }, State: { type: 'VARIANT', defaultValue: 'Hover' }, 'Size#1:2': { type: 'VARIANT', defaultValue: 'M' }, Label: { type: 'TEXT', defaultValue: 'x' } } };
+  const map = { Type: { Negative: '.badge.high', Positive: '.badge.low' }, State: { Hover: '.badge:hover' }, Size: { M: '.badge .badge-icon' } };
+  assert.deepEqual(defaultVariantClasses(props, map, '.badge'), ['high']);
+  assert.deepEqual(defaultVariantClasses(props, { Type: { Negative: '.chip.high' } }, '.badge'), [], 'another component\'s classes add nothing');
+  assert.deepEqual(defaultVariantClasses(null, map, '.badge'), []);
+});
+
+test('components: the fill\'s own opacity in Figma against the alpha the code paints, default and per variant', () => {
+  // A tag whose Background layer is at 8% in Figma; the code paints color-mix(... 12%) by default and 8% for Amber.
+  const tag = (pct, amberPct) => ({ components: { tag: { confidence: 'high', instance: { hasText: true }, fill: 'direct',
+    props: { backgroundColor: { value: `color(srgb 0.76 0 0 / ${pct})`, var: '--tag-bg', rule: '.tag', at: 'theme.css:10' } },
+    colors: { light: { backgroundColor: `color(srgb 0.76 0 0 / ${pct})` } },
+    states: { 'Type=Amber': { changed: { backgroundColor: { value: `color(srgb 0.8 0.6 0 / ${amberPct})`, var: '--tag-bg-amber', rule: '.tag.amber' } }, colors: { light: { backgroundColor: `color(srgb 0.8 0.6 0 / ${amberPct})` } } } } } },
+    tokens: { '--tag-bg': tok('#c20000'), '--tag-bg-amber': tok('#cf9e00') } });
+  const structure = { tag: { fillStructure: 'before', fillOpacity: 0.08, variantFillOpacity: { 'Type=Red': 0.08, 'Type=Amber': 0.08 } } };
+  const differ = (code) => compareComponents(code, structure, {}, cfg, maps()).differ.filter((x) => /opacity/.test(x.field)).map((x) => `${x.field}: ${x.figma} / ${x.code}`);
+  assert.deepEqual(differ(tag(0.12, 0.15)), ['background opacity: 0.08 / 0.12', 'background opacity (Type=Amber): 0.08 / 0.15']);
+  assert.deepEqual(differ(tag(0.08, 0.08)), []);
+  const line = measuredLine(compareComponents(tag(0.12, 0.08), structure, {}, cfg, maps()).differ.find((x) => x.field === 'background opacity'));
+  assert.match(line, /→ paint the background at 8%, as Figma's layer: color-mix\(in srgb, var\(--tag-bg\) 8%, transparent\)$/);
+});
+
+// deeper facts read on the right side, the component's own width, and one radius however many corners set it.
+test('components: a bottom-only stroke is read on its bottom, never through the top', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.rule' });
+  const code = { components: { rule: { confidence: 'high', instance: { hasText: false },
+    props: { borderTopWidth: v('0px'), borderRightWidth: v('0px'), borderBottomWidth: v('1px'), borderLeftWidth: v('0px'), borderTopColor: v('rgb(0, 0, 0)'), borderBottomColor: v('rgb(200, 0, 0)'), backgroundColor: v('rgb(255, 255, 255)') },
+    colors: { light: { borderTopColor: 'rgb(0, 0, 0)', borderBottomColor: 'rgb(200, 0, 0)', backgroundColor: 'rgb(255, 255, 255)' } } } } };
+  const structure = { rule: { strokeOnDefault: true, stroke: { weights: [0, 0, 1, 0] }, colors: { stroke: { token: 'line/color', hex: '#c80000', opacity: 1 } } } };
+  const r = compareComponents(code, structure, { color: { light: { 'line/color': '#c80000' } } }, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => d.field), [], JSON.stringify(r.differ));
+});
+
+test('components: an inside stroke drawn as an inset ring has the ring\'s width on every side, as Figma\'s stroke does', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.tip' });
+  const ring = (w) => ({ components: { tip: { confidence: 'high', instance: { hasText: true },
+    props: { borderTopWidth: v('0px'), borderRightWidth: v('0px'), borderBottomWidth: v('0px'), borderLeftWidth: v('0px'), boxShadow: v(`rgb(51, 51, 51) 0px 0px 0px ${w}px inset`), backgroundColor: v('rgb(0, 0, 0)') } } } });
+  const figma = { tip: { stroke: { weights: [1.5, 1.5, 1.5, 1.5], align: 'INSIDE' } } };
+  assert.deepEqual(compareComponents(ring(1.5), figma, {}, cfg, maps()).differ.filter((d) => /border .* width/.test(d.field)), []);
+  const wrong = compareComponents(ring(1), figma, {}, cfg, maps()).differ.filter((d) => /border .* width/.test(d.field));
+  assert.deepEqual(wrong.map((d) => `${d.field}: ${d.figma} / ${d.code}`), ['border top width: 1.5 / 1px (an inset ring)', 'border right width: 1.5 / 1px (an inset ring)', 'border bottom width: 1.5 / 1px (an inset ring)', 'border left width: 1.5 / 1px (an inset ring)']);
+  // Its colour is the ring's in every mode, never the border colour that follows the text.
+  const coloured = ring(1.5);
+  coloured.components.tip.colors = { light: { borderTopColor: 'rgb(64, 64, 64)', boxShadow: 'rgb(232, 232, 232) 0px 0px 0px 1.5px inset' }, dark: { borderTopColor: 'rgb(191, 191, 191)', boxShadow: 'rgb(43, 43, 43) 0px 0px 0px 1.5px inset' } };
+  const paint = { tip: { strokeOnDefault: true, stroke: { weights: [1.5, 1.5, 1.5, 1.5], align: 'INSIDE' }, colors: { stroke: { token: 'tip/border/color', hex: '#e8e8e8', opacity: 1 } } } };
+  const vars = { color: { light: { 'tip/border/color': '#e8e8e8' }, dark: { 'tip/border/color': '#2b2b2b' } } };
+  assert.deepEqual(compareComponents(coloured, paint, vars, cfg, maps()).differ.filter((d) => /border colour/.test(d.field)), []);
+  coloured.components.tip.colors.dark.boxShadow = 'rgb(255, 0, 0) 0px 0px 0px 1.5px inset';
+  assert.deepEqual(compareComponents(coloured, paint, vars, cfg, maps()).differ.filter((d) => /border colour/.test(d.field)).map((d) => d.field), ['border colour [dark]']);
+});
+
+test('components: a width the page gives (width: 100%) is not the component\'s to compare', () => {
+  const code = { components: { divider: { confidence: 'high', instance: { hasText: false }, size: { width: 600 },
+    props: { width: { value: '600px', declared: '100%', confidence: 'single-source', rule: '.divider' } } } } };
+  const r = compareComponents(code, { divider: { box: { width: 240, sizing: { h: 'FIXED' } } } }, {}, cfg, maps());
+  assert.deepEqual(r.differ, []);
+  assert.match(r.notComparable.find((n) => n.field === 'width').why, /follows its container \(100%\)/);
+});
+
+test('variants: a radius set on every corner is one difference, not four', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.tab' });
+  const corners = (px) => Object.fromEntries(['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map((k) => [k, v(px)]));
+  const code = { components: { tab: { confidence: 'high', instance: { hasText: true }, props: corners('4px'), states: { 'State=Selected': { changed: corners('4px') } } } } };
+  const structure = { tab: { defaultVariant: 'State=Default', variants: { 'State=Default': { radiusPx: [4, 4, 4, 4] }, 'State=Selected': { radiusPx: [8, 8, 8, 8] } } } };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => `${d.field}: ${d.figma} / ${d.code}`), ['radius (State=Selected): 8 / 4px']);
+});
+
+// a line height or letter spacing Figma gives in % is a share of Figma's font size, not the code's: a wrong font size
+// in the code must not move the line height Figma expects with it.
+test('components: a % line height and letter spacing are worked out from Figma\'s font size', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.k' });
+  const code = { components: { k: { confidence: 'high', instance: { hasText: true }, props: { fontSize: v('14px'), lineHeight: v('21px'), letterSpacing: v('0.7px') } } } };
+  // The refresh records the first text's font size on each variant (geometry), not on the text facts.
+  const f = { k: { defaultVariant: 'Size=M', variants: { 'Size=M': { fontSize: 12 } }, text: { lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PERCENT', value: 5 } } } };
+  const d = Object.fromEntries(compareComponents(code, f, {}, cfg, maps()).differ.map((x) => [x.field, `${x.figmaValue ?? x.figma} / ${x.code}`]));
+  assert.equal(d['line height'], '18px / 21px');
+  assert.equal(d['letter spacing'], '0.6px / 0.7px');
+});
+
+// a colour drawn in oklch or hsl that rounds one step away from Figma's hex is the same colour (as css-values
+// sameColor reads it), and a variant's opacity is read on the state that has that value, never one whose name only
+// contains it ("on" is not "Icon=Only").
+test('components: colours equal within a rounding step; a variant found by its value, not by a substring', async () => {
+  const { sameValue } = await import('../component-capture.mjs');
+  assert.equal(sameValue('color', 'rgb(10, 20, 30)', 'rgb(11, 20, 30)'), true);
+  assert.equal(sameValue('color', 'rgb(10, 20, 30)', 'rgb(13, 20, 30)'), false);
+  assert.equal(sameValue('color', 'rgba(10, 20, 30, 0.5)', 'rgba(10, 20, 30, 0.6)'), false);
+  const v = (value) => ({ value, confidence: 'verified', rule: '.t' });
+  const code = { components: { t: { confidence: 'high', instance: { hasText: true }, props: { opacity: v('1') },
+    states: { 'Icon=Only': { changed: { opacity: v('0.3') } }, 'State=On': { changed: { opacity: v('0.5') } } } } } };
+  const r = compareComponents(code, { t: { variantOpacity: { on: 0.5 } } }, {}, cfg, maps());
+  assert.deepEqual(r.differ.filter((d) => /opacity/.test(d.field)), []);
+});
+
+// a text part with its own colour rule is compared in every mode from the part's own colours, never only in the first.
+test('colours: a text part that sets its own colour is compared in dark mode too', () => {
+  const fact = (value) => ({ value, rule: '.chip__label', at: 'a.css:4', confidence: 'verified' });
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, fill: 'none', props: { color: fact('rgb(0, 0, 0)') },
+    colors: { light: { color: 'rgb(0, 0, 0)' }, dark: { color: 'rgb(255, 255, 255)' } },
+    parts: { text: { selector: '(first text)', props: { color: fact('rgb(20, 20, 20)') }, colors: { light: { color: 'rgb(20, 20, 20)' }, dark: { color: 'rgb(20, 20, 20)' } } } } } } };
+  const structure = { chip: { colors: { text: { token: 'label/color', hex: '#141414', opacity: 1 } } } };
+  const vars = { color: { light: { 'label/color': '#141414' }, dark: { 'label/color': '#f0f0f0' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => d.field), ['text colour [dark]']);
+});
+
+// a mode the code draws but Figma has no value for is said (not comparable, with why), never skipped silently.
+test('colours: a mode Figma has no value for is counted as not comparable, with why', () => {
+  const code = { components: { chip: { confidence: 'high', instance: { hasText: true }, fill: 'direct', props: { backgroundColor: { value: 'rgb(255, 255, 255)', confidence: 'verified' } },
+    colors: { light: { backgroundColor: 'rgb(255, 255, 255)' }, contrast: { backgroundColor: 'rgb(0, 0, 0)' } } } } };
+  const structure = { chip: { fillStructure: 'direct', colors: { fill: { token: 'chip/bg/color', hex: '#ffffff', opacity: 1 } } } };
+  const vars = { color: { light: { 'chip/bg/color': '#ffffff' } } };
+  const r = compareComponents(code, structure, vars, cfg, maps());
+  assert.deepEqual(r.differ, []);
+  assert.deepEqual(r.notComparable.map((n) => [n.field, n.why]), [['background [contrast]', 'Figma has no value for this mode']]);
+});
+
+// padding, radius and gap Figma sets with no variable are compared on the default variant too (as each variant is):
+// a raw 12px padding drawn as 8px is a difference; values that agree are matches.
+test('components: raw padding, radius and gap on the default variant are compared', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.p' });
+  const code = { components: { p: { confidence: 'high', instance: { hasText: true }, props: {
+    paddingTop: v('4px'), paddingRight: v('8px'), paddingBottom: v('4px'), paddingLeft: v('8px'),
+    borderTopLeftRadius: v('4px'), borderTopRightRadius: v('4px'), borderBottomRightRadius: v('4px'), borderBottomLeftRadius: v('4px'), columnGap: v('6px'), rowGap: v('6px') } } } };
+  const f = { p: { defaultVariant: 'Size=M', variants: { 'Size=M': { paddingPx: [4, 12, 4, 12], radiusPx: [4, 4, 4, 4], gapPx: 8 } } } };
+  const d = compareComponents(code, f, {}, cfg, maps()).differ.map((x) => `${x.field}: ${x.figma} / ${x.code}`).sort();
+  assert.deepEqual(d, ['gap: 8 / 6px', 'padding left: 12 / 8px', 'padding right: 12 / 8px']);
+});
+
+// at each breakpoint every side of the padding and every corner is compared, and a vertical stack's gap is its row gap.
+test('breakpoints: bottom and right padding, every corner, and a vertical gap', async () => {
+  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  const at = { width: 375, paddingTop: '12px', paddingRight: '12px', paddingBottom: '4px', paddingLeft: '12px', rowGap: '2px', columnGap: '8px',
+    borderTopLeftRadius: '8px', borderTopRightRadius: '8px', borderBottomRightRadius: '0px', borderBottomLeftRadius: '8px' };
+  const code = { components: { card: { props: {}, breakpoints: { Phone: at } } } };
+  const structure = { card: { paddingVar: { lr: 'pad', tb: 'pad' }, gapVar: 'gap', innerRadiusVar: 'rad', layout: 'VERTICAL' } };
+  const vars = { breakpoints: { Phone: { pad: '12px', gap: '8px', rad: '8px' } } };
+  const r = compareBreakpoints(code, structure, vars);
+  assert.deepEqual(r.differ.map((d) => d.field).sort(), ['gap @ Phone (375px)', 'padding (bottom) @ Phone (375px)', 'radius (bottom right) @ Phone (375px)']);
+});
+
+// what the refresh records of a component's box and stroke is compared: min and max width, how auto layout lines its
+// children up (main axis, cross axis), whether it wraps, and a dashed stroke. A cross axis Figma lines up at the start
+// while the code stretches is not comparable (it shows only when a child is smaller than the row).
+test('components: min and max width, alignment, wrap and a dashed stroke against the box Figma records', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.row' });
+  const comp = (props, layout) => ({ confidence: 'high', instance: { hasText: true }, props: { borderTopWidth: v('1px'), borderRightWidth: v('1px'), borderBottomWidth: v('1px'), borderLeftWidth: v('1px'), ...props }, layout: { display: 'flex', ...layout } });
+  const code = { components: {
+    row: comp({ minWidth: v('80px'), maxWidth: { value: 'none', confidence: 'default' }, justifyContent: v('flex-start'), alignItems: v('center'), flexWrap: v('nowrap') }, { borderStyles: { Top: 'solid', Right: 'solid', Bottom: 'solid', Left: 'solid' } }),
+    ok: comp({ minWidth: v('80px'), maxWidth: v('320px'), justifyContent: v('space-between'), alignItems: v('normal'), flexWrap: v('wrap') }, { borderStyles: { Top: 'dashed', Right: 'dashed', Bottom: 'dashed', Left: 'dashed' } }),
+  } };
+  const box = (primary, counter) => ({ layout: 'HORIZONTAL', minWidth: 80, maxWidth: 320, align: { primary, counter }, wrap: 'WRAP' });
+  const f = { row: { box: box('CENTER', 'CENTER'), stroke: { weights: [1, 1, 1, 1], dashed: true } }, ok: { box: box('SPACE_BETWEEN', 'MIN'), stroke: { weights: [1, 1, 1, 1], dashed: true } } };
+  const r = compareComponents(code, f, {}, cfg, maps());
+  const d = r.differ.map((x) => `${x.component} ${x.field}: ${x.figma} / ${x.code}`).sort();
+  assert.deepEqual(d, ['row alignment (main axis): center / flex-start', 'row max width: 320 / none', 'row stroke style: dashed / solid', 'row wrap: wrap / nowrap']);
+  assert.ok(r.notComparable.some((n) => n.component === 'ok' && n.field === 'alignment (cross axis)'), JSON.stringify(r.notComparable));
+});
+
+// the first text's decoration, italic and alignment, as the refresh records them, against the text the code draws.
+test('components: text decoration, italic and text alignment against Figma\'s first text', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.link' });
+  const code = { components: {
+    link: { confidence: 'high', instance: { hasText: true }, props: { textDecorationLine: v('none'), fontStyle: v('normal'), textAlign: v('start') } },
+    ok: { confidence: 'high', instance: { hasText: true }, props: { textDecorationLine: v('underline'), fontStyle: v('italic'), textAlign: v('center') } },
+  } };
+  const text = { textDecoration: 'UNDERLINE', italic: true, textAlign: 'CENTER' };
+  const r = compareComponents(code, { link: { text }, ok: { text } }, {}, cfg, maps());
+  assert.deepEqual(r.differ.map((x) => `${x.component} ${x.field}: ${x.figma} / ${x.code}`).sort(),
+    ['link italic: italic / normal', 'link text alignment: center / start', 'link text decoration: underline / none']);
+});
+
+// What Figma cannot show is not a difference: a root that draws no fill or stroke shows no corners (a child Background
+// rectangle draws the shape), an alignment along an axis the box hugs has no room to show, a root holding its content in
+// a slot is lined up by the slot, a root spaced by a wrapper frame inside it carries the wrapper's spacing in the code,
+// and a width the page sets in a style attribute is the page's.
+test('components: corners of a root that draws nothing, alignment it cannot show, a wrapper\'s spacing and a width the page sets', () => {
+  const v = (value, rule = '.c') => ({ value, confidence: 'verified', rule });
+  const corners = (px) => Object.fromEntries(['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map((k) => [k, v(px)]));
+  const comp = (props, layout = { display: 'flex' }) => ({ confidence: 'high', instance: { hasText: true }, props, layout });
+  const code = { components: {
+    ghost: comp(corners('24px')),
+    framed: comp(corners('24px')),
+    bar: comp({ columnGap: v('8px') }),
+    tight: comp({ columnGap: v('4px') }),
+    stack: comp({ justifyContent: v('normal'), alignItems: v('center') }),
+    slotted: comp({ justifyContent: v('flex-start'), alignItems: v('center') }),
+    line: { confidence: 'high', instance: { hasText: false }, size: { width: 533 }, props: { width: v('533px', '(style attribute)') } },
+  } };
+  const structure = {
+    ghost: { radiusPx: [0, 0, 0, 0], colors: { fill: null, stroke: null } },
+    framed: { radiusPx: [0, 0, 0, 0], colors: { fill: { token: 'x/background', hex: '#000' }, stroke: null } },
+    bar: { gapPx: 0, childFrameGaps: [{ name: 'Slot', gapVar: 'gap/m' }] },
+    tight: { gapPx: 0, childFrameGaps: [{ name: 'Slot', gapVar: 'gap/m' }] },
+    stack: { box: { layout: 'VERTICAL', sizing: { h: 'FIXED', v: 'HUG' }, align: { primary: 'CENTER', counter: 'CENTER' } } },
+    slotted: { slot: true, box: { layout: 'HORIZONTAL', sizing: { h: 'FIXED', v: 'HUG' }, align: { primary: 'CENTER', counter: 'MIN' } } },
+    line: { box: { width: 100, sizing: { h: 'FIXED', v: 'HUG' } } },
+  };
+  const r = compareComponents(code, structure, { sizing: { 'gap/m': '8px' } }, cfg, maps());
+  assert.deepEqual(r.differ.map((d) => `${d.component} ${d.field}: ${d.figma} / ${d.code}`).sort(), ['framed radius: 0 / 24px', 'tight gap: 0 / 4px']);
+  const why = (comp, field) => r.notComparable.find((n) => n.component === comp && n.field === field)?.why ?? '';
+  assert.match(why('ghost', 'radius'), /child layer/);
+  assert.match(why('bar', 'gap'), /wrapper frame/);
+  assert.match(why('stack', 'alignment (main axis)'), /hugs its content/);
+  assert.match(why('slotted', 'alignment (cross axis)'), /slot/);
+  assert.match(why('line', 'width'), /page sets this width/);
+});
+
+test('components: padding and gap around layers all placed outside the layout draw nothing; with a layer inside they count', () => {
+  const v = (value) => ({ value, confidence: 'verified', rule: '.c' });
+  const comp = () => ({ confidence: 'high', instance: { hasText: true }, props: { paddingLeft: v('0px'), paddingRight: v('0px'), columnGap: v('0px') }, layout: { display: 'flex' } });
+  const code = { components: { chipdot: comp(), pill: comp(), old: comp() } };
+  const box = { paddingPx: [0, 8, 0, 8], gapPx: 8, box: { layout: 'HORIZONTAL', sizing: { h: 'FIXED', v: 'FIXED' } } };
+  const structure = {
+    chipdot: { ...box, inFlow: 0, defaultVariant: 'Filled=True', variants: { 'Filled=True': { ...box, inFlow: 0 } } },
+    pill: { ...box, inFlow: 1 },
+    old: { ...box },   // captured before inFlow was read: compared as before
+  };
+  const r = compareComponents(code, structure, {}, cfg, maps());
+  const differ = r.differ.map((d) => `${d.component} ${d.field}`).sort();
+  assert.deepEqual(differ.filter((d) => d.startsWith('chipdot')), []);
+  assert.ok(differ.includes('pill padding left') && differ.includes('pill gap') && differ.includes('old padding right'));
+  assert.match(r.notComparable.find((n) => n.component === 'chipdot' && n.field === 'padding left')?.why ?? '', /placed outside it/);
+});

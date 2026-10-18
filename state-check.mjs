@@ -1,0 +1,154 @@
+// state-check.mjs - Run from project root: node scripts/state-check.mjs
+// Gate [10]: every token found in a full COMPONENT_SET variant walk must be
+// covered by a CSS var, an EXPLICIT mapping, or an approved COVERED entry.
+//
+// Unlike bound-check.mjs (which only sees tokens used in instantiated DS frames),
+// this gate walks ALL COMPONENT_SET states (hover, selected, disabled, etc.) so
+// that state tokens defined in the DS but not yet used in any plugin frame are
+// still verified.
+//
+// Requires at project root:
+//   ds-config.json              - themeCSS + pluginCSS paths
+//   design-system-engine-map.mjs              - COVERED_STATE (or COVERED), COVERED_PREFIX, EXPLICIT
+//   component-state-tokens.json - output of Phase 2 COMPONENT_SET state walk
+//
+// Exit 0 = all state tokens covered.
+// Exit 1 = uncovered state token(s).
+// Exit 2 = component-state-tokens.json missing (gate did NOT run - never a pass).
+
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { declaredVarNames } from './css-source.mjs';
+import { join } from 'path';
+import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
+
+const ROOT = process.cwd();
+
+// ── Load ds-config.json ───────────────────────────────────────────────────────
+let cfg = {};
+try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch {
+  console.error('❌ ds-config.json not found at project root.'); process.exit(1);
+}
+const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();   // themeCSS may be an array of files
+const THEME_PATH  = THEME_PATHS[0];
+const PLUGIN_CSS = cfg.paths?.pluginCSS ?? [];
+
+// ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
+let COVERED = new Set(), COVERED_PREFIX = [], EXPLICIT = {}, EXPLICIT_SIZING = {};
+try {
+  const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
+  // Prefer COVERED_STATE (state-walk superset) if provided, fall back to COVERED
+  if (map.COVERED_STATE)  COVERED        = map.COVERED_STATE;
+  else if (map.COVERED)   COVERED        = map.COVERED;
+  if (map.COVERED_PREFIX) COVERED_PREFIX = map.COVERED_PREFIX;
+  if (map.EXPLICIT)       EXPLICIT       = map.EXPLICIT;
+  if (map.EXPLICIT_SIZING) EXPLICIT_SIZING = map.EXPLICIT_SIZING;
+} catch { /* optional - runs with empty maps */ }
+
+// ── Load component-state-tokens.json ─────────────────────────────────────────
+if (!existsSync(join(ROOT, 'component-state-tokens.json'))) {
+  console.log('\n⚠️  component-state-tokens.json not found at project root.');
+  console.log('   Run Phase 2 COMPONENT_SET state walk in Figma and save output here.');
+  console.log('   (exit 2 - treated as "not run", never as a pass)\n');
+  process.exit(2);
+}
+const parsed = JSON.parse(readFileSync(join(ROOT, 'component-state-tokens.json'), 'utf8'));
+// _-prefixed keys are metadata (_updated stamp), not tokens
+const stateTokens = Object.keys(parsed).filter(t => !t.startsWith('_'));
+// Hard Rule 7: tokens bound only on hidden nodes are not a hard requirement in this
+// project - the element is switched off here (it may be toggled on elsewhere). They
+// are deferred, not failed. _hiddenToggleable is the subset gated by a visibility
+// boolean ("off in this project"); the rest are statically hidden.
+const hiddenOnly   = new Set(Array.isArray(parsed._hiddenOnly) ? parsed._hiddenOnly : []);
+const hiddenToggle = new Set(Array.isArray(parsed._hiddenToggleable) ? parsed._hiddenToggleable : []);
+
+// ── Collect declared CSS vars ─────────────────────────────────────────────────
+// Every declared var in the theme and app CSS, plus stylesheets they @import (css-source.mjs).
+const declared = declaredVarNames(ROOT, [...THEME_PATHS, ...PLUGIN_CSS]);
+// Case-insensitive index + component-code usage: a state token whose var is declared
+// under a different case, or runtime-injected (token CSS loaded from a backend, absent
+// from static files) but USED in the code, DOES have a CSS variable. A token neither
+// declared nor used stays UNCOVERED. Mirrors parity-check / bound-check.
+const declaredLower = new Set([...declared].map(n => n.toLowerCase()));
+const usedVarsLower = new Set();
+(function scanUsedVars() {
+  const dirs = [cfg.componentSrcDirs].flat().filter(Boolean);
+  if (!dirs.length) return;
+  const EXT = /\.(vue|css|scss|sass|less|html|ts|tsx|js|jsx)$/i;
+  const walk = (dir, depth = 0) => {
+    if (depth > 8) return;
+    let entries; try { entries = readdirSync(join(ROOT, dir)); } catch { return; }
+    for (const e of entries) {
+      if (e === 'node_modules' || e === '.git' || e === 'dist') continue;
+      const rel = join(dir, e); let st; try { st = statSync(join(ROOT, rel)); } catch { continue; }
+      if (st.isDirectory()) walk(rel, depth + 1);
+      else if (EXT.test(e) && st.size < 2_000_000) {
+        try { for (const mm of readFileSync(join(ROOT, rel), 'utf8').matchAll(/var\(\s*(--[a-zA-Z][a-zA-Z0-9-]*)/g)) usedVarsLower.add(mm[1].toLowerCase()); } catch {}
+      }
+    }
+  };
+  for (const d of dirs) walk(d);
+})();
+const hasVar = (v) => declared.has(v) || declaredLower.has(v.toLowerCase()) || usedVarsLower.has(v.toLowerCase());
+
+// ── Coverage check ────────────────────────────────────────────────────────────
+function normalize(token) { return token.replace(/\/color$/, ''); }
+
+const NAMING = resolveNamingSpec(cfg);
+
+function isCovered(token) {
+  const t = normalize(token);
+  if (t.startsWith('primitives/')) return true;
+  if (COVERED.has(t)) return true;
+  if (COVERED_PREFIX.some(p => t.startsWith(p))) return true;
+  if (EXPLICIT[t] && hasVar(EXPLICIT[t])) return true;
+  if (EXPLICIT_SIZING[t] && hasVar(EXPLICIT_SIZING[t])) return true;
+  if (hasVar(tokenToVar(t, NAMING))) return true;
+  if (hasVar(tokenToVar(t, NAMING, { raw: true }))) return true;
+  return false;
+}
+
+// Hard Rule 7 - three states, not two:
+//   • visible token          → REQUIRED now; missing var ⇒ ❌ UNCOVERED (fails the gate)
+//   • hidden + boolean        → may be TOGGLED ON later; the code must PERMIT that. If the
+//                               CSS var exists the code already supports activation (OK); if
+//                               it is missing, the element would not render when switched on
+//                               ⇒ ⚠️ advisory (surfaced, but does NOT fail - it is off here)
+//   • hidden, no boolean      → statically off/dead ⇒ ⏭ ignored, never a requirement
+const UNCOVERED = [], OK = [], TOGGLE_WARN = [], HIDDEN_STATIC = [];
+for (const token of stateTokens) {
+  const covered = isCovered(token);
+  if (!hiddenOnly.has(token)) {
+    (covered ? OK : UNCOVERED).push(token);            // visible - required now
+  } else if (hiddenToggle.has(token)) {
+    if (covered) OK.push(token);                       // code already permits activation
+    else TOGGLE_WARN.push(token);                      // activation NOT yet supported - advise
+  } else {
+    HIDDEN_STATIC.push(token);                         // dead here - ignore
+  }
+}
+
+console.log(`\n✅ COVERED   ${OK.length}`);
+console.log(`❌ UNCOVERED ${UNCOVERED.length}`);
+if (TOGGLE_WARN.length)   console.log(`⚠️ UNCOVERED-TOGGLEABLE ${TOGGLE_WARN.length} (hidden+boolean, no CSS var - code cannot render it when toggled on; advisory, not blocking)`);
+if (HIDDEN_STATIC.length) console.log(`⏭ HIDDEN-STATIC ${HIDDEN_STATIC.length} (hidden, no visibility boolean - not a requirement)`);
+
+if (TOGGLE_WARN.length) {
+  console.log('\n─── Advisory: hidden but visibility-toggleable - the element can be switched on later, so verify the code PERMITS it (declare the CSS var so it renders when shown) ──');
+  for (const t of TOGGLE_WARN.slice(0, 12)) console.log(`  ⚠️ ${t}`);
+}
+if (HIDDEN_STATIC.length) {
+  console.log('\n─── Ignored: statically hidden (off, no visibility boolean) ──');
+  for (const t of HIDDEN_STATIC.slice(0, 20)) console.log(`  ⏭ ${t}`);
+}
+
+if (UNCOVERED.length) {
+  console.log('\n─── In COMPONENT_SET variants (visible), no CSS var (implement or add to COVERED_STATE in design-system-engine-map.mjs) ──');
+  for (const t of UNCOVERED) console.log(`  ❌ ${t}`);
+  console.log('');
+  process.exit(1);
+} else {
+  console.log('\nAll visible COMPONENT_SET state tokens are implemented. Toggleable-hidden advisories above (if any) do not block. ✓\n');
+  process.exit(0);
+}

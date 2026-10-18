@@ -1,0 +1,161 @@
+// Stage 5: the report says what changed since the last run, links each component to Figma, and
+// leaves out lines that report nothing.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { collectFindings, diffFindings, diffReport, ZERO_FAIL } from '../run-diff.mjs';
+import { figmaLink, figmaLinker } from '../figma-link.mjs';
+import { stateContrastFindings } from '../contrast-check.mjs';
+import { makeFixture } from './helpers.mjs';
+
+const report = (extra = []) => [
+  '  PARITY AUDIT  ·  2026-01-01',
+  '✅  [13] Structure  (height · spacing)',
+  '       ✅ PASS  7/7 CSS height rules',
+  '       ❌ FAIL  0',
+  '       ⚠️  toast height: Figma 32, rendered 48  (.toast · theme.css:890)',
+  '❌  [16] Sub-components match Figma  (nesting)',
+  '       (exit 2 - treated as "not run", never a pass)',
+  '       bound-tokens.json ✓ (updated today)',
+  '  GATE SUMMARY',
+  '  ❌  [16]   Sub-components match Figma     Fail',
+  '  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)',
+  '⚠️  State contrast: 3 component state(s) below WCAG AA (30 checked).',
+  '     chip [default · light]: 3.11:1 (needs 4.5:1)',
+  '   Advisory: pairs are derived …',
+  '─── Accessibility check (advisory — never blocks the build) ───',
+  'Found 107 things (checked in 2 themes):',
+  '• 4 pieces of text are hard to read',
+  '     Why it matters: The text colour is too close.',
+  ...extra,
+];
+
+test('findings: failing gates, warning lines and listed advisory items; never zero counts or summaries', () => {
+  const f = collectFindings(report());
+  assert.deepEqual(f, [
+    'Structure :: ⚠️  toast height: Figma 32, rendered 48  (.toast · theme.css:890)',
+    'Sub-components match Figma :: gate fails',
+    'Sub-components match Figma :: (exit 2 - treated as "not run", never a pass)',
+    'State contrast :: chip [default · light]: 3.11:1 (needs 4.5:1)',
+    'Accessibility :: • 4 pieces of text are hard to read',
+  ]);
+  assert.equal(ZERO_FAIL.test('❌ MISSING  0  propertyMap selectors'), true);
+  assert.equal(ZERO_FAIL.test('❌ FAIL  3 field(s)'), false);
+  assert.equal(ZERO_FAIL.test('❌ FAIL      0/140  (missing per-mode override, or CSS ≠ Figma in a mode)'), true);
+  assert.equal(ZERO_FAIL.test('❌ FAIL      2/140  (missing per-mode override)'), false);
+});
+
+test('since the last run: new, gone, and a count that moved is one changed finding', () => {
+  const prev = collectFindings(report());
+  const cur = collectFindings(report().map((l) => l.replace('4 pieces', '6 pieces').replace(/^.*toast height.*$/, '       ⚠️  chip gap: Figma 8, rendered 4')));
+  const d = diffFindings(prev, cur);
+  assert.deepEqual(d.added, ['Structure :: ⚠️  chip gap: Figma 8, rendered 4']);
+  assert.deepEqual(d.gone, ['Structure :: ⚠️  toast height: Figma 32, rendered 48  (.toast · theme.css:890)']);
+  assert.equal(d.changed.length, 1);
+  assert.match(diffReport(d).join('\n'), /changed  Accessibility: • 4 pieces .*→  • 6 pieces/);
+  assert.deepEqual(diffFindings(prev, prev), { added: [], gone: [], changed: [] });
+});
+
+test('Figma links: from the snapshots node ids and the file key, nothing without them', () => {
+  assert.equal(figmaLink('KEY', '12:345'), 'https://www.figma.com/design/KEY?node-id=12-345');
+  assert.equal(figmaLink(null, '1:2'), null);
+  const dir = makeFixture({ 's.json': { components: { chip: { nodeId: '1:2' } } }, 'p.json': { chip: { nodeId: '9:9' }, tag: { nodeId: '3:4' } } });
+  const link = figmaLinker(dir, { figmaFileKey: 'K', paths: { snapshotStructure: 's.json', compPropsSnapshot: 'p.json' } });
+  assert.equal(link('chip'), 'https://www.figma.com/design/K?node-id=1-2');
+  assert.equal(link('tag'), 'https://www.figma.com/design/K?node-id=3-4');
+  assert.equal(link('none'), null);
+});
+
+test('state contrast: each state in every mode, with the token names and the source line', () => {
+  const code = { components: { chip: { instance: { hasText: true },
+    props: { color: { value: 'rgb(0, 0, 0)', var: '--chip-text', at: 'theme.css:4' }, backgroundColor: { value: 'rgb(255, 255, 255)', var: '--chip-bg', at: 'theme.css:5' } },
+    colors: { light: { color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)' }, dark: { color: 'rgb(255, 255, 255)', backgroundColor: 'rgb(0, 0, 0)' } },
+    states: { 'State=Hover': { produced: 'forced :hover', changed: { color: { value: 'rgb(230, 230, 230)', var: '--chip-text-hover', at: 'theme.css:9' } },
+      colors: { light: { color: 'rgb(230, 230, 230)', backgroundColor: 'rgb(255, 255, 255)' }, dark: { color: 'rgb(40, 40, 40)', backgroundColor: 'rgb(0, 0, 0)' } } } } } } };
+  const r = stateContrastFindings(code);
+  assert.deepEqual(r.findings.map((f) => [f.state, f.mode, f.fgVar, f.bgVar, f.at]), [['State=Hover', 'light', '--chip-text-hover', '--chip-bg', 'theme.css:9'], ['State=Hover', 'dark', '--chip-text-hover', '--chip-bg', 'theme.css:9']]);
+});
+
+test('right-to-left: one-sided and asymmetric physical properties, with the logical one to use', async () => {
+  const { rtlFindings } = await import('../rtl-check.mjs');
+  const r = rtlFindings([{ file: 'a.css', text: '.ok { padding-left: 8px; padding-right: 8px; margin: 0 auto; }\n.pad { padding-left: 8px; }\n.four { padding: 1px 2px 3px 4px; text-align: left; }\n.pos { left: 4px; float: right; }' }]);
+  assert.deepEqual(r.map((f) => `${f.selector} ${f.use}`), ['.pad padding-inline-start', '.four padding-block and padding-inline (or -inline-start / -inline-end)', '.four text-align: start', '.pos inset-inline-start', '.pos float: inline-end']);
+  assert.equal(r[0].at, 'a.css:2');
+});
+
+test('burndown: open findings per component, most specific name, with what the last run had', async () => {
+  const { burndown, burndownLines, componentOf } = await import('../run-diff.mjs');
+  const names = ['button', 'buttonPrimary', 'chip', 'field'];
+  assert.equal(componentOf('Structure :: ⚠️  button-primary radius', names), 'buttonPrimary');
+  assert.equal(componentOf('Token values :: ❌ [sizing/-] radii/chip → --radii-chip', names), 'chip');
+  assert.equal(componentOf('Token values :: ❌ FAIL  1', names), null);
+  assert.equal(componentOf('Accessibility from the code :: components/HbIconButton.vue:3  a button with only an icon inside', ['button', 'iconButton']), 'iconButton');
+  assert.equal(componentOf('Structure :: ⚠️  NO-SHRINK 2/2 fixed-height component(s) with no flex-shrink:0 (button, badge)', ['button', 'badge']), null);
+  const now = ['Token values :: ❌ [sizing/-] radii/chip → --radii-chip', 'Structure :: ⚠️  chip height (Size=L): x', 'Structure :: ⚠️  button-primary radius',
+    'Structure :: gate fails', 'Structure :: 🔗 chip in Figma: https://example.com', 'Accessibility :: focus .tp-field', 'Token values :: ❌ FAIL  1',
+    'Token values :: ⚠️  NEW SKIP  0', 'Token values :: Fix:  src/theme.css:10 - change 4px → 6px', 'Icons :: ⚠️  this gate printed no result line, so its outcome is not visible here', 'Token values :: ⚠️  a note on no component'];
+  const b = burndown(now, names, ['Structure :: ⚠️  chip a', 'Structure :: ⚠️  chip b', 'Structure :: ⚠️  chip c', 'Structure :: ⚠️  button x']);
+  assert.deepEqual(burndownLines(b), [
+    'Burndown, open findings per component: chip 2 (was 3) · buttonPrimary 1 (was 0) · field 1 (was 0) · 1 not tied to a component',
+    '   cleared since the last run: button',
+    '   next up: chip. Run with --component chip, fix, run again.',
+  ]);
+  assert.equal(burndownLines(b, { scoped: true }).length, 2);   // scoped to a component: no "next up"
+});
+
+test('every finding as one record (rule, evidence, verdict, who acts), each gate with its verdict', async () => {
+  const { findingRecords, gateRecords, differences } = await import('../run-diff.mjs');
+  const findings = [
+    'Token values :: gate fails',
+    'Token values :: ❌ [sizing/-] radii/chip → --radii-chip',
+    'Token values :: Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px',
+    'Figma file hygiene :: chip: no description',
+    'Structure :: ⚠️  chip height: Figma 32, rendered 36px (src/theme.css:60)',
+    'Structure :: 🔗 chip in Figma: https://figma.com/x',
+  ];
+  const gates = [{ n: 1, label: 'Token values  (color · sizing)', pass: false }, { n: 2, label: 'Structure', pass: true }, { n: 3, label: 'Motion', pass: true, notRun: true }];
+  const gr = gateRecords(gates, ['Token values match Figma', 'Structure matches', 'Motion matches']);
+  assert.deepEqual(gr, [
+    { check: 'Token values', rule: 'Token values match Figma', verdict: 'fails' },
+    { check: 'Structure', rule: 'Structure matches', verdict: 'passes' },
+    { check: 'Motion', rule: 'Motion matches', verdict: 'not checked' },
+  ]);
+  const rules = Object.fromEntries(gr.map((g) => [g.check, g.rule]));
+  const r = findingRecords(findings, ['chip'], { rules, failing: ['Token values'], prev: [findings[1]] });
+  assert.deepEqual(r.map((x) => [x.check, x.rule, x.component, x.verdict, x.side, x.new, x.difference]), [
+    ['Token values', 'Token values match Figma', 'chip', 'fails', 'decide', false, true],
+    ['Figma file hygiene', null, 'chip', 'advisory', 'figma', true, true],
+    ['Structure', 'Structure matches', 'chip', 'advisory', 'decide', true, true],
+    ['Structure', 'Structure matches', 'chip', 'advisory', 'decide', true, false],   // a link points at a difference, it is not one
+  ]);
+  assert.equal(r[0].evidence, '[sizing/-] radii/chip → --radii-chip');
+  // Each record says which level of the order of authority its rule stands on.
+  assert.deepEqual(r.map((x) => x.authority), ['standard', 'standard', 'standard', 'standard']);
+  assert.deepEqual(findingRecords(['System health :: 3 of 3 semantic tokens have no description', 'Exemption debt :: chip/height'], []).map((x) => x.authority), ['heuristic', 'decision']);
+  assert.match(r[0].id, /^[0-9a-z]+$/);
+  // The same finding after an edit higher up the file keeps its identity.
+  assert.equal(findingRecords(['Structure :: ⚠️  x (src/a.css:61)'], [])[0].id, findingRecords(['Structure :: ⚠️  x (src/a.css:9)'], [])[0].id);
+  // The differences list is built from the same records.
+  assert.deepEqual(differences(findings, ['chip']).groups[0].items.map((i) => i.check), ['Token values', 'Figma file hygiene', 'Structure']);
+});
+
+test('a component only in code gets what to build in Figma, its props and the tokens its styles use', async () => {
+  const { figmaToBuild } = await import('../handback.mjs');
+  assert.equal(figmaToBuild([]), '');
+  const md = figmaToBuild([
+    { name: 'StatusPill', file: 'src/components/StatusPill.tsx', props: [{ name: 'tone', options: ['info', 'warn'], default: 'info' }, { name: 'label', required: true }],
+      tokens: [{ prop: 'background', var: '--pill-bg' }, { prop: 'padding', var: '--space-s' }, { prop: 'gap', var: '--space-s' }] },
+    { name: 'Divider', file: 'src/components/Divider.tsx', props: [], tokens: [] },
+  ]);
+  assert.match(md, /^# Components to build in Figma\n\nProposed by rms-design-system-engine: 2 components the code has and Figma does not\./);
+  assert.match(md, /## StatusPill\n\nFrom `src\/components\/StatusPill\.tsx`\.\n\n- \*\*Props\*\*: tone \(info \| warn, default info\); label, required\n- \*\*Tokens its styles use\*\*: --pill-bg \(background\); --space-s \(padding, gap\)/);
+  assert.match(md, /## Divider[\s\S]*- \*\*Props\*\*: none the code declares\.\n- \*\*Tokens its styles use\*\*: none \(its values are written by hand; bind them to variables in Figma\)\./);
+});
+
+test('advice on the system (prune candidates, system health) is neither an open finding nor a difference', async () => {
+  const { burndown, differences } = await import('../run-diff.mjs');
+  const f = ['Prune candidates :: 1 group(s) of tokens with the same value written by hand', 'System health :: 17 of 17 semantic tokens have no description in Figma', 'Token values :: ❌ [sizing/-] radii/chip → --radii-chip'];
+  const b = burndown(f, ['chip']);
+  assert.equal(b.loose, 0);
+  assert.deepEqual(b.rows.map((r) => r.name), ['chip']);
+  assert.equal(differences(f, ['chip']).total, 1);
+});

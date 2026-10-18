@@ -1,0 +1,5668 @@
+// audit.mjs - Single-command parity audit runner.
+// Run from project root: node scripts/audit.mjs [--trend]
+//
+// --trend: print the last 20 audit runs and exit (no new run)
+// --init:  run first-time setup (scaffold config files) and exit without auditing; a project already set up keeps its
+//          ds-config.json unless --reconfigure is added
+//
+// First run: if ds-config.json is missing, asks a few questions (Figma URL, token CSS
+// path, and whether it is a consumer file) then auto-detects collection structure via the
+// Figma API when a token is present, scaffolds
+// design-system-engine-map.mjs + structure-contract.mjs, and writes ds-config.json.
+// Commit all three - they contain no secrets and are required for CI.
+// Subsequent runs: config exists, audit starts immediately.
+//
+// Gates: the authoritative list of gates (labels and count) is the GATE SUMMARY printed at
+// the end of a run - it is generated from the addGate(...) calls below, and sync-docs.mjs
+// keeps README.md and the skill doc in step with them.
+//
+// Performance: the subprocess-based gates all run in parallel via Promise.all; the inline
+//              gates (freshness, CSS hygiene) are computed on the main thread.
+
+import './stdio-sync.mjs';   // first: a report read through a pipe is never cut off at exit
+import { hasCode, PROJECT_GIVEN, PROJECT_FROM, GITLAB_SOURCE }  from './project-dir.mjs';  // second: moves to the project (--project, or the one remembered) before anything reads the folder
+import readline                                                  from 'readline';
+import { spawn, spawnSync }                                      from 'child_process';
+import { existsSync, readdirSync, readFileSync, statSync,
+         writeFileSync, copyFileSync, mkdirSync,
+         symlinkSync, unlinkSync }                               from 'fs';
+import { join, dirname, resolve, relative, basename }           from 'path';
+import { printDoc, readDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, logUsage } from './skill-files.mjs';
+import { readGateLabels, parseOnly, onlyWords, onlyHelp } from './only.mjs';
+import { styleNames }                                           from './text-styles.mjs';
+import { detectModes }                                          from './mode-resolver.mjs';
+import { takeableUrls, fetchHosted, mergeHosted, siblingUrls }               from './hosted-tokens.mjs';
+import { fileURLToPath, pathToFileURL }                         from 'url';
+import { makeFigmaFetch, byNodeId, budgetLine, unchangedSince }  from './figma-fetch.mjs';
+import { createHash }                                           from 'crypto';
+import { collectRawValues, COLLECT_NODE_BUDGET }                from './collect-raw-values.mjs';
+import { hygieneOf }                                            from './figma-hygiene.mjs';
+import { usesTailwind, usedByUtility }                          from './tailwind-check.mjs';
+import { extractDynamicClassPrefixes }                          from './dynamic-class-prefixes.mjs';
+import { frameworkGateSkipReason }                              from './component-framework-gate.mjs';
+import { parseGateOutput, GATE_SUMMARY as S }                   from './audit-parse.mjs';
+import { ZERO_FAIL }                                             from './run-diff.mjs';
+import { loadBaselineLabels, loadBaselineFindings, classifyBaseline, writeBaseline } from './baseline.mjs';
+import { readKept, keepInGates, matchKept, keptState, keptReport } from './kept.mjs';
+import { figmaFileKeyOf, figmaMainKeyOf } from './figma-link.mjs';
+import { ENGINE_DIRS, OUT_DIR, PROJECT, codeSnapshotPath, envVar, newPath, projectPath } from './names.mjs';
+import { buildFreshness, buildRecordPath }                    from './build-freshness.mjs';
+import { codeRoots } from './code-roots.mjs';
+
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const ROOT       = process.cwd();
+
+// Load .env from project root if present (no dotenv dependency)
+const envPath = join(ROOT, '.env');
+if (existsSync(envPath)) {
+  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);
+    if (m && !process.env[m[1]]) {
+      let v = m[2].trim();
+      const q = v[0];
+      if ((q === '"' || q === "'") && v.length >= 2 && v.endsWith(q)) v = v.slice(1, -1);        // strip a matching quote pair
+      else { const h = v.indexOf(' #'); if (h >= 0) v = v.slice(0, h).trim(); }                   // strip an inline comment on unquoted values
+      process.env[m[1]] = v;
+    }
+  }
+}
+const today      = new Date().toISOString().slice(0, 10);
+const WIDTH      = 60;
+const SHOW_TREND = process.argv.includes('--trend');
+const INIT_ONLY  = process.argv.includes('--init');
+
+// Every Figma REST call goes through figmaFetch, which adds a hard timeout — Node's global fetch
+// has none, so one stalled/rate-limited response would otherwise hang the whole audit (and the
+// pre-commit hook) forever. On timeout it throws; each caller catches and falls back to the cached
+// snapshot. See figma-fetch.mjs for the full rationale.
+const figmaFetch = makeFigmaFetch();
+
+// ── Scoped runs: audit one or more chosen components, not the whole DS ─────────
+// `--component ButtonPrimary` or `--component ButtonPrimary,Toast` or repeated
+// `--component A --component B`. When set, the global gates report ONLY findings
+// belonging to the chosen components and collapse everything else to a single
+// "outside scope - not audited" line; a gate that failed only on out-of-scope
+// items is treated as pass for the scoped run. Off by default (whole-DS audit).
+function _argValues(flag) {
+  const out = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === flag && process.argv[i + 1]) out.push(process.argv[i + 1]);
+    else if (process.argv[i].startsWith(flag + '=')) out.push(process.argv[i].slice(flag.length + 1));
+  }
+  return out;
+}
+const SCOPE_COMPONENTS = [..._argValues('--component'), ..._argValues('--components')]
+  .flatMap(v => v.split(',')).map(s => s.trim()).filter(Boolean);
+
+// ── --only: just the accessibility check, just the Figma checks (parity), or some gates by number or name ──
+// What was not asked is neither shown nor counted (only.mjs). A run that records the whole system (--baseline)
+// needs the whole run.
+const ONLY_GIVEN = process.argv.some((a) => a === '--only' || a.startsWith('--only='));
+let ONLY_LABELS = ONLY_GIVEN ? readGateLabels(join(SCRIPT_DIR, 'audit.mjs')) : [];
+let ONLY = ONLY_GIVEN ? parseOnly(_argValues('--only'), ONLY_LABELS) : null;
+let NO_FIGMA = false;   // set up without a Figma file: only the checks of the code alone run (see the config load)
+if (ONLY && (ONLY.unknown.length || (!ONLY.a11y && !ONLY.gates.size))) {
+  console.log(onlyHelp(ONLY.unknown.length ? ONLY.unknown : ['(nothing named)'], ONLY_LABELS));
+  process.exit(2);
+}
+if (ONLY && process.argv.includes('--baseline')) {
+  console.log('--baseline records the whole run: run it without --only.\nNEXT: rms-design-system-engine --baseline');
+  process.exit(2);
+}
+
+// ── Non-interactive first-time setup (for agents / CI) ────────────────────────
+// First-time setup normally prompts on stdin, which an agent turn or CI job cannot
+// drive reliably. Supply the answers as flags instead and setup runs without any
+// prompt:
+//   --project=<folder|git link>   --figma-url=<url|key>   --theme-css=a.css,b.css   --figma-source-url=<url>
+// Where the code is must be known before anything is written: --project (`.` for this
+// folder), or --theme-css naming its token file here. Without it setup stops and its
+// NEXT line asks the person. The Figma link is optional: without it the checks that
+// need Figma wait until it is added. Any of these flags (or a project remembered from
+// before), or a stdin that is not a terminal, makes setup non-interactive.
+function _argValue(flag) { const v = _argValues(flag); return v.length ? v[v.length - 1] : null; }
+const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key');
+const INIT_THEME_CSS      = _argValue('--theme-css');
+const INIT_SOURCE_URL     = _argValue('--figma-source-url');
+// The request setup was reached from (--then='check the button'): carried through setup's questions, and routed again
+// as its last NEXT line, so it is never dropped for a generic first run.
+const INIT_THEN           = _argValue('--then');
+const thenArg             = INIT_THEN ? ` --then='${INIT_THEN.replace(/'/g, `'\\''`)}'` : '';
+// Build mode: the code's folder has no design tokens yet, so they are built from Figma. Asked with --build, or chosen
+// when the code's folder has no stylesheet of tokens and a Figma file is given.
+const INIT_BUILD          = process.argv.includes('--build');
+const INIT_CODE_GIVEN     = PROJECT_GIVEN || INIT_THEME_CSS != null;
+const INIT_NONINTERACTIVE = INIT_FIGMA_URL != null || INIT_CODE_GIVEN || INIT_BUILD || !process.stdin.isTTY;
+const BUILD_THEME_DEFAULT = 'src/styles/tokens.css';
+
+// ── Easy updates: link the command to this folder, and pull latest ────────────
+// So people never have to re-download. `--link-command` points the global
+// /rms-design-system-engine command at THIS local skill folder via a symlink, so a
+// plain `git pull` here updates the command too. `--update` does the pull for them
+// and refreshes the link. Works whether the folder is a sibling clone or a submodule.
+const HOME = process.env.HOME || process.env.USERPROFILE || '';
+function linkCommand() {
+  // A person who chose the classic guide (--guide classic) keeps it across updates.
+  let src = join(SCRIPT_DIR, 'rms-design-system-engine.md');
+  if (existsSync(join(SCRIPT_DIR, '.guide-choice')) && readFileSync(join(SCRIPT_DIR, '.guide-choice'), 'utf8').trim() === 'classic') {
+    const classic = writeClassicGuide(SCRIPT_DIR);
+    if (classic) src = classic;
+    else console.log('⚠️  The classic guide is not in this copy of the skill (no guide-monolith tag); linking the current guide.');
+  }
+  const cmdDir = join(HOME, '.claude', 'commands');
+  const link = join(cmdDir, 'rms-design-system-engine.md');
+  try {
+    mkdirSync(cmdDir, { recursive: true });
+    try { unlinkSync(link); } catch { /* nothing to replace */ }
+    symlinkSync(src, link);
+    console.log(`✅ Command linked: ${link}`);
+    console.log(`   → ${src}`);
+    console.log('   From now on a `git pull` in this folder updates /rms-design-system-engine - no re-download.');
+    return true;
+  } catch (e) {
+    console.log(`⚠️  Could not link the command (${e.message}).`);
+    console.log(`   Manual alternative: ln -sf "${src}" "${link}"`);
+    return false;
+  }
+}
+// Date + time of the commit HEAD points at: "2026-09-03 10:10". So "you are on the
+// latest" says WHEN, instead of a bare "Already up to date" that leaves people unsure
+// how fresh what they just landed on actually is.
+function describeHead() {
+  const r = spawnSync('git', ['-C', SCRIPT_DIR, 'log', '-1', '--date=format:%Y-%m-%d %H:%M', '--format=%cd'], { encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
+function updateSkill() {
+  console.log(`Updating the skill in ${SCRIPT_DIR} …`);
+  const r = spawnSync('git', ['-C', SCRIPT_DIR, 'pull', '--ff-only'], { stdio: 'inherit' });
+  if (r.status !== 0) {
+    console.log('⚠️  `git pull` did not succeed here. If this folder is a git checkout, run:');
+    console.log(`      git -C "${SCRIPT_DIR}" pull`);
+  }
+  linkCommand();
+  // The accessibility scanner the check runs (axe-core, pinned), fetched now so a run offline still checks everything.
+  spawnSync(process.execPath, [join(SCRIPT_DIR, 'a11y-check.mjs'), '--fetch-axe'], { stdio: 'inherit', timeout: 60000 });
+  const head = describeHead();
+  console.log(`\n✅ Done. You are on the latest${head ? `:\n   ${head}` : '.'}`);
+  console.log('   Run /rms-design-system-engine to use it.');
+}
+// "Am I on the latest?" - compare local HEAD to the remote main tip with a single
+// lightweight `git ls-remote` (no fetch/merge, short timeout). Returns null when it
+// can't tell (not a git checkout, or offline). Plain output only: this may run before
+// the color helper C is initialised.
+function checkForUpdate({ quiet } = {}) {
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: SCRIPT_DIR, encoding: 'utf8' });
+  if (head.status !== 0) {
+    if (!quiet) console.log('ℹ️  Version check unavailable - this skill folder is not a git checkout.\n   Reinstall via the installer to get update tracking.');
+    return null;
+  }
+  const local = head.stdout.trim();
+  const ls = spawnSync('git', ['ls-remote', 'origin', 'refs/heads/main'], { cwd: SCRIPT_DIR, encoding: 'utf8', timeout: 5000 });
+  if (ls.status !== 0 || !ls.stdout.trim()) {
+    if (!quiet) console.log(`ℹ️  Could not reach the remote to check for updates (offline?). You are on ${local.slice(0, 7)}.`);
+    return null;
+  }
+  const remote = ls.stdout.split(/\s+/)[0];
+  const behind = remote !== local;
+  if (!quiet) {
+    const head = describeHead();
+    console.log(behind
+      ? `⚠️  A newer version is available.\n   you: ${head || local.slice(0, 7)}\n   latest: ${remote.slice(0, 7)}\n   Update: rms-design-system-engine --update`
+      : `✅ You are on the latest version${head ? `:\n   ${head}` : ` (${local.slice(0, 7)}).`}`);
+  }
+  return { behind, local, remote };
+}
+if (process.argv.includes('--update'))                                      { updateSkill(); process.exit(0); }
+// ── --recipe / --reference: the guide's recipes and reference, printed from the engine ──
+for (const kind of ['recipe', 'reference']) {
+  const at = process.argv.indexOf(`--${kind}`);
+  if (at === -1) continue;
+  const name = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  if (name) logUsage(ROOT, { kind, name });
+  process.exit(printDoc(SCRIPT_DIR, kind, name));
+}
+// ── --route "<request>": the request routed by the engine to a recipe and the exact command ──
+if (process.argv.includes('--route')) {
+  const { route, routeText, projectState } = await import('./route.mjs');
+  const text = process.argv.slice(process.argv.indexOf('--route') + 1).join(' ');
+  if (!text.trim()) { console.log('Give the request as the person wrote it: rms-design-system-engine --route "<request>"'); process.exit(2); }
+  const state = projectState(ROOT, { engineDir: SCRIPT_DIR });
+  const cmd = state.cmd;
+  const r = route(text, state);
+  logUsage(ROOT, { kind: 'route', recipe: r.recipe, run: r.run });
+  console.log(routeText(r, readDoc(SCRIPT_DIR, 'recipe', r.recipe), cmd));
+  process.exit(0);
+}
+// ── --guide classic|current: which guide the command loads (rollback) ──
+if (process.argv.includes('--guide')) {
+  const which = process.argv[process.argv.indexOf('--guide') + 1];
+  if (which === 'classic') {
+    if (!fetchClassic(SCRIPT_DIR)) { console.log('❌ The classic guide is not in this copy of the skill (no guide-monolith tag here, and it could not be fetched from the remote). Check the connection, then try again.'); process.exit(1); }
+    writeFileSync(join(SCRIPT_DIR, '.guide-choice'), 'classic\n');
+  } else if (which === 'current') { try { unlinkSync(join(SCRIPT_DIR, '.guide-choice')); } catch { /* already current */ } }
+  else { console.log('Use --guide classic (the guide as one file, as before the split) or --guide current.'); process.exit(2); }
+  const ok = linkCommand();
+  console.log(ok ? `NEXT: open a new Claude Code session so /rms-design-system-engine loads the ${which} guide` : 'NEXT: link the command by hand with the line above');
+  process.exit(ok ? 0 : 1);
+}
+// ── --doctor: is the skill installed right? One fix per problem ──
+if (process.argv.includes('--doctor')) {
+  const { hooksStatus } = await import('./hooks-install.mjs');
+  const { findChrome } = await import('./cdp.mjs');
+  const { axeCached } = await import('./a11y-check.mjs');
+  const rows = doctor({ engineDir: SCRIPT_DIR, projectDir: ROOT, findChrome: () => findChrome({ playwright: true }), hooksStatus, axeReady: () => axeCached() });
+  for (const r of rows) console.log(`${r.ok ? '✅' : '⚠️ '} ${r.what}${r.fix ? `\n   fix: ${r.fix}` : ''}`);
+  const bad = rows.filter((r) => !r.ok);
+  console.log(bad.length ? `NEXT: ${bad[0].fix}` : 'NEXT: rms-design-system-engine');
+  process.exit(bad.length ? 1 : 0);
+}
+if (process.argv.includes('--link-command'))                                { process.exit(linkCommand() ? 0 : 1); }
+
+// ── --install-hooks / --remove-hooks: the never-rules as Claude Code hooks in this project ──
+if (process.argv.includes('--install-hooks') || process.argv.includes('--remove-hooks')) {
+  const { installHooks } = await import('./hooks-install.mjs');
+  const remove = process.argv.includes('--remove-hooks');
+  try {
+    const r = installHooks(ROOT, { remove });
+    console.log(remove ? `✅ Hooks removed from ${relative(ROOT, r.file)}` : `✅ Hooks ${r.changed ? 'installed' : 'already installed'} in ${relative(ROOT, r.file)}: a Figma snapshot is never edited by hand, ds-config.json edits, commits, pushes and applying the hand-back ask you first, and each /rms-design-system-engine request is routed by the engine.`);
+    if (r.gitignored) console.log('   Added .claude/settings.local.json to .gitignore (it holds this machine\'s engine path).');
+    if (!remove) console.log('   Turn them off with rms-design-system-engine --remove-hooks, or "hooks": false in ds-config.json.');
+    console.log('NEXT: rms-design-system-engine');
+    process.exit(0);
+  } catch (e) { console.log(`❌ ${e.message}`); process.exit(1); }
+}
+if (process.argv.includes('--version') || process.argv.includes('--check-update')) { process.exit(checkForUpdate({ quiet: false }) === null ? 1 : 0); }
+
+// ── --summary: the plain result of the last run, to relay in the chat as is ──
+if (process.argv.includes('--summary')) {
+  const f = join(process.cwd(), projectPath(process.cwd(), 'out'), 'summary.md');
+  if (existsSync(f)) { process.stdout.write(readFileSync(f, 'utf8')); process.exit(0); }
+  console.log('No summary yet: run the audit first (rms-design-system-engine, or --component <name>).');
+  console.log('NEXT: rms-design-system-engine');
+  process.exit(2);
+}
+
+// ── --figma-effects: each component's shadows, blurs, gradient and image fills, clipping and blend mode ──
+// Without a file: writes the read-only capture script to run with the Figma tool of the session. With the file its
+// answer was saved to: keeps it as the effects snapshot, then compares it with the code's own rules.
+if (process.argv.includes('--figma-effects')) {
+  let ecfg = {};
+  try { ecfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const ep = await import('./effects-parity.mjs');
+  const at = process.argv.indexOf('--figma-effects'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!file) {
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'effects-capture.js'), ep.effectsCaptureScript(ecfg.figma?.componentsPage ?? null));
+    console.log(`Effects capture script → ${relative(ROOT, join(capDir, 'effects-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'effects.json'))}, then run rms-design-system-engine --figma-effects ${relative(ROOT, join(capDir, 'effects.json'))}`);
+    process.exit(0);
+  }
+  let snap;
+  try { snap = ep.effectsSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = ecfg.paths?.snapshotEffects ?? join(dirname(ecfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-effects.snapshot.json');
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  console.log(`✓ the effects of ${Object.keys(snap.components).length} component${Object.keys(snap.components).length === 1 ? '' : 's'} read from Figma → ${target}`);
+  const r = await ep.projectEffects(ROOT, ecfg);
+  if (r?.findings?.length) { console.log(`🌫  ${r.findings.length} difference${r.findings.length === 1 ? '' : 's'} in shadows, blurs, fills, clipping or blending between Figma and the code:`); for (const f of r.findings.slice(0, 20)) console.log(`   ${f.message}`); }
+  else console.log('✓ The code draws the shadows, blurs, fills, clipping and blending Figma has.');
+  process.exit(0);
+}
+
+// ── --figma-motion: Figma's prototype transitions between variants, its Motion keyframes and its overlays ──
+// Without a file: writes the read-only capture script to run with the Figma tool of the session. With the file its
+// answer was saved to: keeps it as the motion snapshot, then compares it with the code's transitions and animations
+// (a spinner's turn, a panel's or a modal's opening and closing).
+if (process.argv.includes('--figma-motion')) {
+  let mcfg = {};
+  try { mcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const mp = await import('./motion-parity.mjs');
+  const at = process.argv.indexOf('--figma-motion'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!file) {
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'motion-capture.js'), mp.motionCaptureScript(null));   // every page: overlays live on the screens
+    console.log(`Motion capture script → ${relative(ROOT, join(capDir, 'motion-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'motion.json'))}, then run rms-design-system-engine --figma-motion ${relative(ROOT, join(capDir, 'motion.json'))}`);
+    process.exit(0);
+  }
+  let snap;
+  try { snap = mp.motionSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = mcfg.paths?.snapshotMotion ?? join(dirname(mcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json');
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  const n = Object.values(snap.components).reduce((k, l) => k + l.length, 0);
+  const plural = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  console.log(`✓ ${plural(n, 'transition', 'transitions')} on ${plural(Object.keys(snap.components).length, 'component', 'components')}, ${plural(Object.keys(snap.motion ?? {}).length, 'component', 'components')} with Motion keyframes and ${plural((snap.overlays ?? []).length, 'overlay', 'overlays')} read from Figma → ${target}`);
+  const r = await mp.projectMotion(ROOT, mcfg);
+  if (r?.findings?.length) { console.log(`🎞  ${r.findings.length} difference${r.findings.length === 1 ? '' : 's'} in motion between Figma and the code:`); for (const f of r.findings.slice(0, 20)) console.log(`   ${f.message}`); }
+  else console.log('✓ The code moves as Figma does: its changes between variants, its loops, and how it opens and closes.');
+  process.exit(0);
+}
+
+// ── --figma-examples: the examples the design team placed in Figma, each component opened as one of them ────────
+// Through figma-cli when it answers (read in parts, figma-examples.mjs); else the script for the Figma tool of the
+// session, run part by part (--from N). With the files its answers were saved to: keeps them as the examples snapshot.
+if (process.argv.includes('--figma-examples')) {
+  let ecfg = {};
+  try { ecfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fe = await import('./figma-examples.mjs');
+  const at = process.argv.indexOf('--figma-examples');
+  const files = []; for (let k = at + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) files.push(process.argv[k]);
+  const target = ecfg.paths?.snapshotExamples ?? join(dirname(ecfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json');
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  let snap = null;
+  if (files.length) {
+    try { snap = fe.examplesSnapshot(files.map((f) => readFileSync(resolve(ROOT, f), 'utf8'))); } catch (e) { console.log(`❌ ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  } else {
+    const cli = (script) => spawnSync('figma-cli', ['eval', script], { encoding: 'utf8', maxBuffer: 1e8, timeout: 600000 }).stdout ?? '';
+    if (/^\s*1\s*$/m.test(cli('return 1'))) {
+      console.log('  Reading the examples in Figma through figma-cli, in parts…');
+      try { snap = await fe.readExamplesWith(cli, { log: (m) => console.log(`  ${m}`) }); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+    } else {
+      const fromAt = process.argv.indexOf('--from'), from = fromAt > 0 ? Number(process.argv[fromAt + 1]) || 0 : 0;
+      mkdirSync(capDir, { recursive: true });
+      const file = join(capDir, `examples-${from}.js`);
+      writeFileSync(file, fe.examplesCaptureScript({ from, count: 20 }));
+      console.log(`Examples capture script → ${relative(ROOT, file)} (read-only: it changes nothing in Figma).`);
+      console.log(`NEXT: run it unchanged with the Figma tool of this session (use_figma), save what it returns as ${relative(ROOT, join(capDir, `examples-${from}.json`))}; while its answer says a next part, run rms-design-system-engine --figma-examples --from <next> for that part's script; then rms-design-system-engine --figma-examples ${relative(ROOT, join(capDir, 'examples-*.json'))} keeps them all.`);
+      process.exit(0);
+    }
+  }
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  console.log(`✓ Figma's examples of ${Object.keys(snap.components).length} components → ${target}. The style guide's Playground opens each one as its best example.`);
+  process.exit(0);
+}
+
+// ── --brands-css: the system's brands kept as stylesheets (one file a brand, a path or an address), the same snapshot
+// --figma-brands writes, so the Brand switch reads brands wherever they live: Figma today, the repository later.
+if (process.argv.includes('--brands-css')) {
+  let bcfg = {};
+  try { bcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fb = await import('./figma-brands.mjs');
+  const at = process.argv.indexOf('--brands-css');
+  const given = []; for (let k = at + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) given.push(process.argv[k]);
+  const list = given.length ? given : [].concat(bcfg.brands?.css ?? []);
+  if (!list.length) { console.log('❌ no brand stylesheets: name them (--brands-css a.css b.css, or addresses), or list them in ds-config.json brands.css.'); process.exit(2); }
+  const files = [];
+  for (const f of list) {
+    try {
+      const css = /^https?:\/\//.test(f) ? await (await fetch(f)).text() : readFileSync(resolve(ROOT, f), 'utf8');
+      files.push({ name: basename(String(f).split('?')[0]), css, source: f });
+    } catch (e) { console.log(`❌ ${f}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  }
+  const modes = [...(bcfg.figma?.modes ?? []), ...(bcfg.figma?.collections ?? []).flatMap((c) => c.modes ?? [])];
+  const snap = fb.brandsFromCss(files, { modes });
+  const target = bcfg.paths?.snapshotBrands ?? join(dirname(bcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-brands.snapshot.json');
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  const brands = fb.brandList(snap);
+  console.log(`✓ ${brands.length} brand${brands.length === 1 ? '' : 's'} from ${files.length} stylesheet${files.length === 1 ? '' : 's'} (${brands.map((b) => b.name).join(', ')}) → ${target}. The style guide shows every component in each of them.`);
+  process.exit(0);
+}
+
+// ── --showroom-compare: each Showroom screen measured against the Figma screen it was written from ───────────────────
+// Figma's boxes for the screen (showroom/<Screen>.figma-layout.json: read through figma-cli when it answers, else the
+// script for the Figma tool of the session), the built page measured in Chrome, every text and named part compared.
+if (process.argv.includes('--showroom-compare')) {
+  let scfg = {};
+  try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { compareShowroom } = await import('./showroom-compare.mjs');
+  const page = resolve(ROOT, scfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html');
+  const tol = Number((process.argv.find((a) => a.startsWith('--tolerance=')) ?? '').split('=')[1]) || 2;
+  const { results, next, why } = await compareShowroom(ROOT, scfg, page, { refresh: process.argv.includes('--refresh'), tol });
+  if (why) { console.log(`❌ ${why}`); process.exit(2); }
+  for (const r of Object.values(results)) {
+    console.log(`\n📏 ${r.title} against Figma: ${r.off ? `${r.off} off by more than ${r.tol}px` : `every text and part within ${r.tol}px`}`);
+    for (const l of r.lines.slice(0, 40)) console.log(`   • ${l}`);
+    if (r.lines.length > 40) console.log(`   … ${r.lines.length - 40} more`);
+  }
+  for (const n of next) console.log(`NEXT: ${n}`);
+  process.exit(0);
+}
+
+// ── --figma-brands: the system's brands, Figma's extended collections (each a skin over the system's own collections) ──
+// Read from the file that holds them (the FigCli plugin open on it), through figma-cli when it answers; else the
+// script for the Figma tool of the session, a collection at a time (--collection "<name>" --from N). With the files its
+// answers were saved to: keeps them as the brands snapshot, which the style guide's brand switch reads.
+if (process.argv.includes('--figma-brands')) {
+  let bcfg = {};
+  try { bcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fb = await import('./figma-brands.mjs');
+  const at = process.argv.indexOf('--figma-brands');
+  const files = []; for (let k = at + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) files.push(process.argv[k]);
+  const target = bcfg.paths?.snapshotBrands ?? join(dirname(bcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-brands.snapshot.json');
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  let snap = null;
+  if (files.length) {
+    try { snap = fb.brandsSnapshot(files.map((f) => readFileSync(resolve(ROOT, f), 'utf8'))); } catch (e) { console.log(`❌ ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  } else {
+    const cli = (script) => spawnSync('figma-cli', ['eval', script], { encoding: 'utf8', maxBuffer: 1e8, timeout: 600000 }).stdout ?? '';
+    if (/^\s*1\s*$/m.test(cli('return 1'))) {
+      console.log('  Reading the brands in Figma through figma-cli, a collection at a time…');
+      try { snap = await fb.readBrandsWith(cli, { log: (m) => console.log(`  ${m}`) }); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+    } else {
+      const val = (f) => { const i = process.argv.indexOf(f); return i > 0 ? process.argv[i + 1] : null; };
+      const collection = val('--collection'), from = Number(val('--from')) || 0;
+      mkdirSync(capDir, { recursive: true });
+      const file = join(capDir, collection ? `brands-${collection.replace(/[^\w-]+/g, '-')}-${from}.js` : 'brands.js');
+      writeFileSync(file, fb.brandsCaptureScript({ collection, from }));
+      console.log(`Brands capture script → ${relative(ROOT, file)} (read-only: it changes nothing in Figma).`);
+      console.log(`NEXT: run it unchanged with the Figma tool of this session (use_figma) on the file that holds the brands, and save what it returns beside it as .json; ${collection ? 'while its answer says a next part, run rms-design-system-engine --figma-brands --collection "<name>" --from <next>' : 'then, for each collection it lists, run rms-design-system-engine --figma-brands --collection "<name>"'}; then rms-design-system-engine --figma-brands ${relative(ROOT, join(capDir, 'brands*.json'))} keeps them all.`);
+      process.exit(0);
+    }
+  }
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
+  const list = fb.brandList(snap);
+  console.log(`✓ ${list.length} brand${list.length === 1 ? '' : 's'} from ${snap._file ?? 'Figma'} (${list.map((b) => b.name + (b.parent ? ` under ${list.find((x) => x.key === b.parent)?.name ?? b.parent}` : '')).join(', ')}) → ${target}. The style guide shows every component in each of them.`);
+  process.exit(0);
+}
+
+// ── --capture-script / --capture-import: Figma read in checked chunks ──
+// --capture-script vars N writes the read-only script for chunk N of the variables, text styles and effect styles
+// ('sums' for the checksums alone); --capture-script components sums|next the same for the components (structure,
+// props, raw values and states), run in Figma with the recipes' own functions: sums gives each component's checksum,
+// page by page ('sums new' starts over), and next reads as many of the components no answer holds yet as fit. The agent
+// runs each with the Figma tool and saves its answer as it came. --capture-import checks every saved answer against the checksum Figma
+// computed, says which chunks are missing or changed, and once all are there writes the snapshots. No value is copied
+// by hand, and no script switches Figma's page.
+if (process.argv.includes('--capture-script') || process.argv.includes('--capture-import')) {
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const fc = await import('./figma-capture.mjs');
+  const dir = fc.captureDir(ROOT), rel = relative(ROOT, dir);
+  mkdirSync(dir, { recursive: true });
+  const KINDS = ['vars', 'components'];
+  if (process.argv.includes('--capture-script')) {
+    const at = process.argv.indexOf('--capture-script');
+    const kind = process.argv[at + 1], which = process.argv[at + 2] ?? (kind === 'components' ? 'sums' : '0');
+    if (!KINDS.includes(kind)) { console.log('rms-design-system-engine --capture-script vars <chunk|sums>: the variables, text styles and effect styles. rms-design-system-engine --capture-script components <sums|sums new|next>: the components, their structure, props, raw values and states.'); process.exit(2); }
+    const chunk = which === 'sums' ? 'sums' : kind === 'components' ? 'next' : Number.parseInt(which, 10);
+    if (chunk !== 'sums' && chunk !== 'next' && !(chunk >= 0)) { console.log(`❌ ${which}: a chunk number (0, 1, ...) or sums`); process.exit(2); }
+    const call = kind === 'vars' ? { script: fc.captureScript(kind, chunk), save: `vars-${chunk}.json` } : fc.componentsCall(dir, chunk, { cfg: ccfg, fresh: process.argv[at + 3] === 'new' });
+    if (call.error) { console.log(`❌ ${call.error}`); process.exit(2); }
+    const file = join(dir, call.save.replace(/\.json$/, '.js'));
+    writeFileSync(file, call.script);
+    console.log(`Capture script for ${chunk === 'sums' ? 'the checksums' : chunk === 'next' ? 'the next read' : `chunk ${chunk}`} of the ${kind === 'vars' ? 'variables' : 'components'} → ${relative(ROOT, file)} (read only: it changes nothing in Figma).`);
+    const then = kind === 'vars' && chunk === 0 ? 'then do the same for each chunk up to the "of" it gives, ' : chunk === 'sums' ? 'then run rms-design-system-engine --capture-import: it names each chunk to read. ' : '';
+    console.log(`NEXT: run it unchanged with the Figma tool (use_figma) on the design system's file, save its answer as it came to ${rel}/${call.save}, ${then}${chunk === 'sums' ? '' : 'then run rms-design-system-engine --capture-import.'}`.trim());
+    process.exit(0);
+  }
+  const asked = process.argv[process.argv.indexOf('--capture-import') + 1];
+  const kinds = KINDS.includes(asked) ? [asked] : KINDS;
+  const saved = (k) => { try { return readdirSync(dir).some((f) => f.startsWith(`${k}-`) && f.endsWith('.json')); } catch { return false; } };
+  let figmaVersion = null;
+  // The file's version, read after the capture as Step 5 says, when the API can give it (FIGMA_TOKEN in .env).
+  if (process.env.FIGMA_TOKEN && ccfg.figmaFileKey) {
+    try { const res = await fetch(`https://api.figma.com/v1/files/${ccfg.figmaFileKey}?depth=1`, { headers: { 'X-Figma-Token': process.env.FIGMA_TOKEN }, signal: AbortSignal.timeout(15000) }); if (res.ok) figmaVersion = (await res.json()).version ?? null; } catch { /* offline: no version stamped */ }
+  }
+  const tried = kinds.length === 1 ? kinds : kinds.filter(saved);
+  if (!tried.length) tried.push('vars');
+  let ok = true;
+  for (const k of tried) {
+    const r = k === 'vars' ? await fc.importCapture(ROOT, ccfg, { dir, figmaVersion }) : await fc.importComponents(ROOT, ccfg, { dir, figmaVersion });
+    for (const line of fc.importLines(r, rel)) console.log(line);
+    ok = ok && r.ok;
+  }
+  // The structure is read in the same run as the variables (Step 1c): say so when only one was read.
+  for (const k of kinds.filter((x) => !tried.includes(x))) console.log(`${k === 'components' ? 'Components' : 'Variables'}: none read in checked chunks yet. Read them in the same run: rms-design-system-engine --capture-script ${k} sums.`);
+  process.exit(ok ? 0 : 1);
+}
+
+// ── --figma-screens: the screens designed for each product, for the screen check ──
+// Without a file: writes the read-only capture script for the frames and screens ds-config.json names. With the file
+// its answer was saved to: keeps it as the screen layout snapshot, then compares each product's page with its screens.
+if (process.argv.includes('--figma-screens')) {
+  let scfg = {};
+  try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--figma-screens'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!file) {
+    const ids = [...new Set([...(scfg.frames ?? []), ...(scfg.screens ?? [])].map((f) => f.nodeId).filter(Boolean))];
+    if (!ids.length) { console.log('ℹ️  ds-config.json names no frames or screens: add each product\'s screen ({ name, nodeId, plugin }) to frames, then run this again.'); process.exit(0); }
+    const { screenCaptureScript } = await import('./screen-layout.mjs');
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'screen-capture.js'), screenCaptureScript(ids).trim() + '\n');
+    console.log(`Screen capture script for ${ids.length} screen${ids.length === 1 ? '' : 's'} → ${relative(ROOT, join(capDir, 'screen-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'screens.json'))}, then run rms-design-system-engine --figma-screens ${relative(ROOT, join(capDir, 'screens.json'))}`);
+    process.exit(0);
+  }
+  const sp = await import('./screen-parity.mjs');
+  let snap;
+  try { snap = sp.screenSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = scfg.paths?.screenLayout ?? join(dirname(scfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-layout.snapshot.json');
+  // One answer holds as many screens as fit (use_figma returns at most 20 KB): each answer is added to the screens kept
+  // so far, and the ones it left get a script of their own.
+  const ids = [...new Set([...(scfg.frames ?? []), ...(scfg.screens ?? [])].map((f) => f.nodeId).filter(Boolean))];
+  let prev = null;
+  try { prev = JSON.parse(readFileSync(join(ROOT, target), 'utf8')); } catch { /* the first answer */ }
+  const { left = [], ...kept } = snap;
+  const merged = { ...kept, screens: sp.mergeScreens(prev?.screens ?? [], snap.screens, ids) };
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(merged, null, 1) + '\n');
+  const cut = snap.screens.filter((s) => s.cut).map((s) => `"${s.name}"`);
+  console.log(`✓ ${snap.screens.length} screen${snap.screens.length === 1 ? '' : 's'} read from Figma → ${target}${left.length ? ` (${merged.screens.length} of ${ids.length} so far)` : ''}`);
+  if (cut.length) console.log(`ℹ️  Too large for one answer, read without its words or its deepest layers: ${cut.join(', ')}.`);
+  if (left.length) {
+    const { screenCaptureScript } = await import('./screen-layout.mjs');
+    mkdirSync(capDir, { recursive: true });
+    writeFileSync(join(capDir, 'screen-capture.js'), screenCaptureScript(left).trim() + '\n');
+    console.log(`NEXT: ${left.length} screen${left.length === 1 ? '' : 's'} did not fit in that answer. Run ${relative(ROOT, join(capDir, 'screen-capture.js'))} the same way (unchanged, with use_figma), save what it returns as ${relative(ROOT, join(capDir, 'screens.json'))}, then run rms-design-system-engine --figma-screens ${relative(ROOT, join(capDir, 'screens.json'))} again.`);
+    process.exit(0);
+  }
+  const { findChrome } = await import('./cdp.mjs');
+  let r = null;
+  try { r = await sp.projectScreens(ROOT, scfg, { chromePath: process.env.CHROME_PATH || findChrome() }); }
+  catch (e) { r = { screens: [], notCompared: [`every screen (Chrome did not start: ${String(e.message).split('\n').filter(Boolean).slice(0, 2).join(' ')}; set CHROME_PATH to a Chrome that runs)`] }; }
+  for (const s of r?.screens ?? []) {
+    if (s.findings.length) { console.log(`🖼  ${s.product}'s page against "${s.name}" (${s.width}px), ${s.findings.length} difference${s.findings.length === 1 ? '' : 's'}:`); for (const f of s.findings.slice(0, 12)) console.log(`   ${f.message}`); }
+    else console.log(`✓ ${s.product}'s page is laid out as "${s.name}".`);
+  }
+  for (const why of r?.notCompared ?? []) console.log(`ℹ️  Not compared: ${why}`);
+  process.exit(0);
+}
+
+// ── --figma-a11y: the designed screens themselves checked for accessibility ──
+// Without a file: writes the read-only capture script for the frames and screens ds-config.json names (every text and
+// lone icon with what is drawn behind it, inside every instance; each control under 24 by 24). With the file its
+// answer was saved to: keeps it as the screen accessibility snapshot and says what each screen owes.
+if (process.argv.includes('--figma-a11y')) {
+  let scfg = {};
+  try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--figma-a11y'), file = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const capDir = join(ROOT, OUT_DIR, 'figma-capture');
+  const ids = [...new Set([...(scfg.frames ?? []), ...(scfg.screens ?? [])].map((f) => f.nodeId).filter(Boolean))];
+  const sa = await import('./screen-a11y.mjs');
+  const script = (list) => { mkdirSync(capDir, { recursive: true }); writeFileSync(join(capDir, 'screen-a11y-capture.js'), sa.screenA11yCaptureScript(list).trim() + '\n'); };
+  const saved = relative(ROOT, join(capDir, 'screen-a11y.json'));
+  if (!file) {
+    if (!ids.length) { console.log('ℹ️  ds-config.json names no frames or screens: add each product\'s screen ({ name, nodeId, plugin }) to frames, then run this again.'); process.exit(0); }
+    script(ids);
+    console.log(`Screen accessibility capture script for ${ids.length} screen${ids.length === 1 ? '' : 's'} → ${relative(ROOT, join(capDir, 'screen-a11y-capture.js'))} (read-only: it changes nothing in Figma).`);
+    console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${saved}, then run rms-design-system-engine --figma-a11y ${saved}`);
+    process.exit(0);
+  }
+  let snap;
+  try { snap = sa.screenA11ySnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  const target = scfg.paths?.screenA11y ?? join(dirname(scfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-a11y.snapshot.json');
+  let prev = null;
+  try { prev = JSON.parse(readFileSync(join(ROOT, target), 'utf8')); } catch { /* the first answer */ }
+  const { left = [], ...kept } = snap;
+  const merged = { ...kept, screens: sa.mergeA11yScreens(prev?.screens ?? [], snap.screens, ids) };
+  mkdirSync(dirname(join(ROOT, target)), { recursive: true });
+  writeFileSync(join(ROOT, target), JSON.stringify(merged, null, 1) + '\n');
+  console.log(`✓ ${snap.screens.length} screen${snap.screens.length === 1 ? '' : 's'} read for accessibility → ${target}${left.length ? ` (${merged.screens.length} of ${ids.length} so far)` : ''}`);
+  const cut = snap.screens.filter((x) => x.cut).map((x) => `"${x.name}"`);
+  if (cut.length) console.log(`ℹ️  Too much on one screen for one answer, its rarest colours left out: ${cut.join(', ')}.`);
+  if (left.length) {
+    script(left);
+    console.log(`NEXT: ${left.length} screen${left.length === 1 ? '' : 's'} did not fit in that answer. Run ${relative(ROOT, join(capDir, 'screen-a11y-capture.js'))} the same way (unchanged, with use_figma), save what it returns as ${saved}, then run rms-design-system-engine --figma-a11y ${saved} again.`);
+    process.exit(0);
+  }
+  const { annotatedRole } = await import('./design-a11y.mjs');
+  let props = {};
+  try { props = JSON.parse(readFileSync(join(ROOT, scfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* roles from names */ }
+  const roles = Object.fromEntries(Object.entries(props).filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object').map(([k, v]) => [k, annotatedRole(v)]).filter(([, r]) => r));
+  for (const l of sa.screenA11yLines(sa.screenA11yFindings(merged, { roles }), { screens: merged.screens.length })) console.log(l);
+  process.exit(0);
+}
+
+// ── --rename-sweep: a token renamed in Figma, renamed everywhere in one change ──
+// Pairs the tokens gone and new between the vars snapshot as last committed (or as of --since <git ref>) and as now, by
+// their values in every mode, and writes one patch per root (the system's, then each product's) that renames the CSS
+// variable in every rule, script and doc, with the old name kept pointing at the new one in the theme (--no-keep-old
+// leaves it out). Nothing is applied: the person reviews the patch and applies it when they ask.
+if (process.argv.includes('--rename-sweep')) {
+  let rcfg = {};
+  try { rcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const snapPath = rcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json';
+  const rs = await import('./rename-sweep.mjs');
+  const sinceAt = process.argv.indexOf('--since');
+  const prevRaw = rs.previousSnapshot(ROOT, snapPath, sinceAt > 0 ? process.argv[sinceAt + 1] : null);
+  let next = {};
+  try { next = JSON.parse(readFileSync(join(ROOT, snapPath), 'utf8')); } catch { console.log(`❌ ${snapPath} not found: refresh the Figma data first.`); process.exit(2); }
+  if (!prevRaw) { console.log(`No earlier read of Figma to compare with: ${snapPath} has no committed history${sinceAt > 0 ? ` at ${process.argv[sinceAt + 1]}` : ''}.`); process.exit(0); }
+  const { resolveNamingSpec } = await import('./naming-convention.mjs');
+  let explicit = {};
+  try { const map = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href); explicit = { ...(map.EXPLICIT ?? {}), ...(map.EXPLICIT_SIZING ?? {}) }; } catch { /* no map */ }
+  const { sourceFiles } = await import('./code-roots.mjs');
+  const themes = [rcfg.paths?.themeCSS ?? []].flat();
+  const sweep = rs.renameSweep({ prev: prevRaw.vars, next, spec: resolveNamingSpec(rcfg), explicit, files: sourceFiles(ROOT, rcfg, { docs: true }), themes, keepOld: !process.argv.includes('--no-keep-old') });
+  if (!sweep.renames.length) { console.log(`✓ No token renamed in Figma since ${prevRaw.label} that the code still writes by its old name.`); process.exit(0); }
+  const dir = join(ROOT, OUT_DIR, 'handback');
+  mkdirSync(dir, { recursive: true });
+  console.log(`🔁 ${sweep.renames.length} token${sweep.renames.length === 1 ? '' : 's'} renamed in Figma since ${prevRaw.label}:`);
+  for (const r of sweep.renames) console.log(`   ${r.token.from} → ${r.token.to}   (${r.from} → ${r.to})`);
+  const written = [];
+  for (const p of sweep.patches) {
+    const name = p.root === '.' ? 'rename-sweep.diff' : `rename-sweep-${basename(p.root)}.diff`;
+    writeFileSync(join(dir, name), p.diff);
+    written.push({ ...p, file: relative(ROOT, join(dir, name)) });
+    console.log(`   ${p.root === '.' ? 'This system' : basename(p.root)}: ${p.lines} line${p.lines === 1 ? '' : 's'} in ${p.files} file${p.files === 1 ? '' : 's'} → ${relative(ROOT, join(dir, name))}`);
+  }
+  if (!process.argv.includes('--no-keep-old')) console.log('   The old names stay in the theme, pointing at the new ones, until every product has moved (migrations.md lists where).');
+  const sys = written.find((p) => p.root === '.'), others = written.filter((p) => p.root !== '.');
+  console.log(`NEXT: show the person the change; when they ask, apply it${sys ? ` with git apply ${sys.file}` : ''}${others.length ? `${sys ? ', and' : ''} in each product's folder with git apply ${others.map((p) => resolve(ROOT, p.file)).join(', ')}` : ''}, then run rms-design-system-engine`);
+  process.exit(0);
+}
+
+// ── --guidance-rating: how much an agent can take from the team's guidance (guidance-rating.mjs) ──
+// Rates each component's guidance (its guidelines section and Figma's words) for what an agent needs, and the whole
+// document from that: ready, partial or thin, with what to add. --extract also runs the extraction test, which spends
+// the person's model tokens: questions from the system's facts, answered by a model that sees only the guidance
+// (guidelines.extract.cmd, default claude -p). Writes .design-system-engine-out/guidance-rating.json.
+if (process.argv.includes('--guidance-rating')) {
+  const gr = await import('./guidance-rating.mjs');
+  const { ingestGuidelines } = await import('./intent-gen.mjs');
+  let gcfg = {}; try { gcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* no setup: Figma's snapshots by their default names */ }
+  const { facts, props } = gr.readFacts(ROOT, gcfg);
+  if (!Object.keys(facts.components).length) { console.log('No Figma components read yet: refresh the Figma data first, then rate the guidance against them.'); process.exit(0); }
+  const gl = ingestGuidelines(ROOT, gcfg);
+  const view = gr.sectionsFrom(gl, facts, gr.figmaWords(props));
+  const rating = gr.rateGuidance(view, facts);
+  let extraction = null;
+  if (process.argv.includes('--extract')) {
+    const qs = gr.extractionQuestions(facts);
+    const text = [gl.general, ...gl.sections.map((x) => `## ${x.heading}\n${x.body}`), ...Object.entries(gr.figmaWords(props)).map(([n, t]) => `## ${n} (Figma)\n${t}`)].filter(Boolean).join('\n\n');
+    if (!qs.length) console.log('No property with options to ask about: the extraction test has nothing to measure.');
+    else {
+      const asked = gr.askModel(gr.extractionPrompt(text, qs), gcfg.guidelines?.extract?.cmd ?? 'claude -p');
+      if (!asked.ok) console.log(`The extraction test did not run: ${asked.why}. Set guidelines.extract.cmd in ds-config.json to the command that answers a prompt on stdin.`);
+      else extraction = gr.scoreExtraction(qs, asked.out);
+    }
+  }
+  if (extraction) for (const c of rating.components) if (c.name in extraction.byComponent) c.extracted = Math.round(extraction.byComponent[c.name] * 100) / 100;
+  mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+  writeFileSync(join(ROOT, OUT_DIR, 'guidance-rating.json'), JSON.stringify({ at: new Date().toISOString(), sources: gl.sources, ...rating, ...(extraction ? { extraction: { score: extraction.score, answers: extraction.answers } } : {}) }, null, 1) + '\n');
+  for (const l of gr.ratingLines(rating, { extraction })) console.log(l);
+  if (!gl.sources.length) console.log('   No guidelines file yet: only Figma\'s descriptions were read. Add one with rms-design-system-engine --guidelines <link>, or list files in guidelines.sources.');
+  console.log(`NEXT: tell the person the class and the components that need the most, from the lines above; the style guide shows each component's rating in its Documentation area.`);
+  process.exit(0);
+}
+
+// ── --keep / --unkeep: a difference the team decided to keep (kept.mjs) ──
+// --keep --match <words> [--component <name>] --reason "<why>" [--by "<name>"] [--truth figma|code] [--review <date|90d>]
+// keeps the open differences of the last full audit that match, each with why, who and when; they never fail a run
+// again while their values stay as they are. --keep alone lists the decisions. --unkeep --match <words> takes some back.
+// Only the person keeps a difference: the project's hooks ask otherwise.
+if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
+  const undo = process.argv.includes('--unkeep');
+  const argOf = (flag) => { const i = process.argv.indexOf(flag); return i > -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null; };
+  const mi = process.argv.indexOf('--match');
+  const words = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : [];
+  const components = (argOf('--component') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const component = components.length ? components : null;
+  const km = await import('./kept.mjs');
+  const file = PROJECT.kept.now;
+  if (undo) {
+    if (!words.length && !component) { console.log('Usage: rms-design-system-engine --unkeep --match <words> [--component <name>]: takes back the kept differences that match.'); process.exit(2); }
+    const gone = km.dropKept(ROOT, (d) => km.pick([d], { component, words }).length > 0);
+    if (!gone.length) { console.log(`No kept difference matches${component ? ` in ${component.join(', ')}` : ''}${words.length ? ` "${words.join(', ')}"` : ''}.`); process.exit(1); }
+    console.log(`✓ ${gone.length} difference${gone.length === 1 ? '' : 's'} no longer kept: the next audit lists ${gone.length === 1 ? 'it' : 'them'} as open again.`);
+    for (const d of gone) console.log(`   • ${km.keptLine(d)}`);
+    console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`);
+    process.exit(0);
+  }
+  const all = km.readKept(ROOT);
+  if (!words.length && !component) {
+    if (!all.length) console.log(`No difference is kept on purpose yet. Keep one: rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>".`);
+    else { console.log(`Kept on purpose (${file}): ${all.length}`); for (const d of all) console.log(`   • ${km.keptLine(d)}`); }
+    process.exit(0);
+  }
+  const reason = argOf('--reason');
+  if (!reason) { console.log('❌ A kept difference needs its reason: add --reason "<why the team keeps it>". Ask the person for it; never write one for them.'); process.exit(2); }
+  const truth = argOf('--truth');
+  if (truth && !['figma', 'code'].includes(truth)) { console.log('❌ --truth is figma or code: the side that is right.'); process.exit(2); }
+  const reviewArg = argOf('--review'), review = reviewArg ? km.reviewDate(reviewArg) : null;
+  if (reviewArg && !review) { console.log(`❌ --review ${reviewArg}: a date (2027-01-31) or a span from today (90d, 6m, 1y).`); process.exit(2); }
+  let records = null;
+  try { records = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'findings.json'), 'utf8')).findings ?? null; } catch { /* no full audit yet */ }
+  if (!records) { console.log('❌ No full audit yet: run rms-design-system-engine first, then keep the differences it lists.'); process.exit(2); }
+  const open = records.filter((r) => r.difference).map((r) => ({ check: r.check, what: r.evidence, component: r.component ?? null }));
+  const chosen = km.pick(open, { component, words });
+  if (!chosen.length) {
+    const near = km.pick(open, { component });
+    console.log(`❌ No open difference${component ? ` in ${component.join(', ')}` : ''} matches${words.length ? ` "${words.join(', ')}"` : ''} in the last full audit.`);
+    for (const x of near.slice(0, 10)) console.log(`   • ${x.check}: ${x.what}`);
+    process.exit(1);
+  }
+  const git = spawnSync('git', ['config', 'user.name'], { cwd: ROOT, encoding: 'utf8' });
+  const by = argOf('--by') || String(git.stdout ?? '').trim() || null;
+  const added = km.recordKept(ROOT, chosen, { reason, by, truth, review });
+  console.log(`✓ Kept on purpose: ${added.length} difference${added.length === 1 ? '' : 's'}, in ${file}.`);
+  for (const d of added) console.log(`   • ${km.keptLine(d)}`);
+  console.log('   While the values stay as they are, they never fail a run and the differences list and the style guide show them as kept, with the reason. When a value changes, the difference is open again.');
+  console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`);
+  process.exit(0);
+}
+
+// ── --checked <component> <criterion>: a person checked a WCAG criterion by hand ──
+// Recorded with the component as it is now (checked.mjs): the style guide shows it Done, by whom and when, until the
+// component changes. --unchecked takes one back. Only the person marks a check; the project's hooks ask otherwise.
+if (process.argv.includes('--checked') || process.argv.includes('--unchecked')) {
+  const undo = process.argv.includes('--unchecked');
+  const at = process.argv.indexOf(undo ? '--unchecked' : '--checked');
+  const [component, sc] = process.argv.slice(at + 1).filter((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--by');
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { WCAG22 } = await import('./wcag21.mjs');
+  const byPerson = WCAG22.filter((k) => k.person);
+  if (!component || !sc) {
+    console.log(`Usage: rms-design-system-engine ${undo ? '--unchecked' : '--checked'} <component> <criterion> [--by "<name>"]`);
+    console.log(`   The criteria a person checks: ${byPerson.map((k) => `${k.sc} ${k.name}`).join(', ')}.`);
+    process.exit(2);
+  }
+  const ck = await import('./checked.mjs');
+  if (undo) {
+    console.log(ck.removeCheck(ROOT, component, sc) ? `✓ ${component} ${sc} is to check again.` : `${component} ${sc} was not marked as checked.`);
+    console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks`);
+    process.exit(0);
+  }
+  const crit = byPerson.find((k) => k.sc === sc);
+  if (!crit) { console.log(`❌ ${sc} is not a criterion a person checks by hand. Those are ${byPerson.map((k) => k.sc).join(', ')}.`); process.exit(2); }
+  // A component the system has, as Figma or the code names it, in any case.
+  const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+  const known = [...new Set([...Object.keys(readJ(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {}),
+    ...Object.keys(readJ(ccfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json')), ...Object.keys(ccfg.componentSelectors ?? {}), ...Object.keys(ccfg.componentFiles ?? {})])].filter((n) => n && !/^[_$]/.test(n));
+  const name = known.find((n) => n === component) ?? known.find((n) => n.toLowerCase() === String(component).toLowerCase());
+  if (!name) { console.log(`❌ ${component}: no component of that name in this system${known.length ? ` (${known.slice(0, 12).join(', ')}${known.length > 12 ? ', …' : ''})` : ''}.`); process.exit(2); }
+  const { loadLocator } = await import('./component-locator.mjs');
+  const cls = (await loadLocator(ROOT, ccfg)).classFor(name);
+  const byAt = process.argv.indexOf('--by');
+  const git = spawnSync('git', ['config', 'user.name'], { cwd: ROOT, encoding: 'utf8' });
+  const by = (byAt > 0 && process.argv[byAt + 1]) || String(git.stdout ?? '').trim() || 'a person';
+  const e = ck.recordCheck(ROOT, { component: name, sc, by, signature: ck.componentSignature(ROOT, ccfg, name, cls) });
+  console.log(`✓ ${name}, ${sc} ${crit.name}: checked by ${e.by} on ${e.at.slice(0, 10)}. The style guide shows it Done until ${name} changes.`);
+  console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks, then rebuild the style guide (rms-design-system-engine --styleguide)`);
+  process.exit(0);
+}
+
+// Set when Figma rejects the credential itself (expired/revoked token), as opposed to
+// the plan or scope gating an endpoint. Kept separate so the audit prescribes the right
+// fix: a stale snapshot blamed on the plan hides a token that just needs reissuing.
+let _figmaAuthFailed = false;
+// The DS file's `version` id at the moment this run started, from
+// GET /v1/files/:key?depth=1 - the ONE Figma endpoint that reports "has this file
+// changed" on every plan. Compared
+// against the `_figmaVersion` recorded in the vars snapshot, it answers the question
+// snapshot AGE cannot: a snapshot captured an hour ago is stale the moment the
+// designer touches the file, and until now nothing noticed until someone re-ran
+// Phase 1 by hand. null when unfetched (no token / network error).
+let _figmaFileVersion = null;
+let _figmaFileModified = null;
+
+let _figmaReason = null;   // the Figma file's latest named version, when a token is set
+async function fetchFigmaFileVersion(fileKey, token) {
+  if (!token || !fileKey) return;
+  try {
+    // depth=1 keeps the payload to the document node - no page or child traversal.
+    const res = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}?depth=1`, {
+      headers: { 'X-Figma-Token': token },
+    });
+    if (!res.ok) {
+      if (res.status === 403 || res.status === 401) {
+        const body = await res.text();
+        if (/invalid token|token.*expired|expired.*token/i.test(body)) _figmaAuthFailed = true;
+      }
+      return;
+    }
+    const j = await res.json();
+    _figmaFileVersion  = j.version ?? null;
+    _figmaFileModified = j.lastModified ?? null;
+  } catch { /* offline - leave null, gate reports "could not check" */ }
+}
+
+// Live DS component inventory - the set of COMPONENT_SET names plus standalone COMPONENT
+// names (variants of a set are excluded; the set name represents them). Both /component_sets
+// and /components work on every plan. Gate [1] diffs this against the
+// structure snapshot's component keys so a component ADDED to the DS (a new `loader`) or
+// REMOVED can never stay invisible just because the snapshot was captured with a partial
+// component list - the failure mode where a whole new component slips through unaudited.
+// null when unfetched (no token / network error): the check then reports "could not verify".
+let _liveComponentNames = null;
+
+async function fetchComponentInventory(fileKey, token, pageId) {
+  if (!token || !fileKey) return;
+  try {
+    const h = { 'X-Figma-Token': token };
+    // Preferred: enumerate the DS components PAGE node's top-level children via /nodes -
+    // works on every plan and, unlike /component_sets, sees UNPUBLISHED components (a DS
+    // file usually isn't published to a library, so /component_sets returns empty there).
+    if (pageId) {
+      const nRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(pageId)}&depth=1`, { headers: h });
+      if (nRes.ok) {
+        const { nodes } = await nRes.json();
+        const doc = nodes?.[pageId]?.document ?? Object.values(nodes ?? {})[0]?.document;
+        const kids = doc?.children ?? [];
+        const names = new Set(kids.filter(c => c.type === 'COMPONENT_SET' || c.type === 'COMPONENT').map(c => c.name));
+        if (names.size) { _liveComponentNames = names; return; }
+      }
+    }
+    // Fallback: published library endpoints (only populated for published DS files).
+    const csRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/component_sets`, { headers: h });
+    if (!csRes.ok) return;
+    const { meta: csMeta } = await csRes.json();
+    const names = new Set(Object.values(csMeta?.component_sets ?? {}).map(s => s.name));
+    const compRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/components`, { headers: h });
+    if (compRes.ok) {
+      const { meta: compMeta } = await compRes.json();
+      for (const c of Object.values(compMeta?.components ?? {})) {
+        if (!c.containing_frame?.containingStateGroup) names.add(c.name);
+      }
+    }
+    if (names.size) _liveComponentNames = names;
+  } catch { /* offline - leave null */ }
+}
+
+// ── ANSI helpers (available before config loads) ──────────────────────────────
+const isTTY = process.stdout.isTTY;
+const C = {
+  bold:   s => isTTY ? `\x1b[1m${s}\x1b[0m`  : s,
+  green:  s => isTTY ? `\x1b[32m${s}\x1b[0m` : s,
+  red:    s => isTTY ? `\x1b[31m${s}\x1b[0m` : s,
+  yellow: s => isTTY ? `\x1b[33m${s}\x1b[0m` : s,
+  dim:    s => isTTY ? `\x1b[2m${s}\x1b[0m`  : s,
+};
+
+// ── --capture-code: capture the code side once (code-capture.mjs) and exit ────────
+// The code equivalent of the Figma snapshots: every token as the browser and the CSS resolve it,
+// per mode, with where it came from and how sure the reading is. Runs on its own, never as part
+// of a normal audit run, so it changes no gate result.
+// ── --guidelines <link>: add a pasted GitLab or Notion link, fetch it now, and exit ─────────
+// People paste a link to their written guidelines into the chat; the agent runs this command. It
+// records the link in ds-config.json (guidelines.source), fetches the page into its committed file
+// right away, and says in plain words whether it worked and, if not, the one thing to fix. With no
+// link it lists the links already set. Tokens stay in .env and are never asked for in the chat.
+if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWith('--guidelines='))) {
+  const cfgPath = join(ROOT, 'ds-config.json');
+  if (!existsSync(cfgPath)) { console.error('❌ ds-config.json not found. Run the first-time setup first (rms-design-system-engine --init).'); process.exit(1); }
+  const conf = JSON.parse(readFileSync(cfgPath, 'utf8'));
+  const { parseGitlabUrl, fetchGitlabMarkdown, tokenAllowedFor } = await import('./gitlab-fetch.mjs');
+  const { pageIdFromUrl, fetchNotionMarkdown } = await import('./notion-fetch.mjs');
+  const { gitlabTargets, notionTargets } = await import('./intent-gen.mjs');
+  const links = _argValues('--guidelines').flatMap((v) => v.split(/[\s,]+/)).map((s) => s.trim()).filter(Boolean);
+  if (!links.length) {
+    const g = gitlabTargets(conf), n = notionTargets(conf);
+    console.log('\nGuidelines links in ds-config.json:');
+    for (const t of n) console.log(`  Notion  ${t.url}  → ${t.file}`);
+    for (const t of g) console.log(`  GitLab  ${t.url}  → ${t.file}`);
+    if (!n.length && !g.length) console.log('  none yet. Paste a GitLab or Notion link: rms-design-system-engine --guidelines <link>');
+    process.exit(0);
+  }
+  let failed = 0;
+  for (const url of links) {
+    conf.guidelines ??= {}; conf.guidelines.source ??= {};
+    let provider, file, md;
+    if (parseGitlabUrl(url)) {
+      provider = 'GitLab';
+      const list = Array.isArray(conf.guidelines.source.gitlab) ? conf.guidelines.source.gitlab : conf.guidelines.source.gitlab ? [conf.guidelines.source.gitlab] : [];
+      if (!list.some((e) => (typeof e === 'string' ? e : e?.url) === url)) list.push(url);
+      conf.guidelines.source.gitlab = list;
+      file = gitlabTargets(conf).find((t) => t.url === url).file;
+      md = await fetchGitlabMarkdown(url, {});
+    } else if (/notion\.(so|site)\//i.test(url) || pageIdFromUrl(url)) {
+      provider = 'Notion';
+      // One or several pages, like GitLab. The first link on a fresh project keeps the classic single
+      // form (→ guidelines.sources[0]); a second link turns it into a list, the first keeping its file.
+      const cur = conf.guidelines.source.notion;
+      const same = (e) => (typeof e === 'string' ? e : e?.url) === url;
+      if (!cur) { conf.guidelines.source.notion = url; if (!conf.guidelines.sources?.length) conf.guidelines.sources = ['guidelines.md']; }
+      else if (typeof cur === 'string') { if (cur !== url) conf.guidelines.source.notion = [{ url: cur, file: conf.guidelines.sources?.[0] ?? 'guidelines.md' }, url]; }
+      else { const list = Array.isArray(cur) ? cur : [cur]; if (!list.some(same)) list.push(url); conf.guidelines.source.notion = list; }
+      file = notionTargets(conf).find((t) => t.url === url).file;
+      md = await fetchNotionMarkdown(url, {});
+    } else {
+      console.log(`\n❌ ${url}\n   This is not a GitLab wiki page, a GitLab Markdown file, or a Notion page, so it was not added.`);
+      failed++; continue;
+    }
+    writeFileSync(cfgPath, JSON.stringify(conf, null, 2) + '\n');
+    if (md && md.trim()) {
+      mkdirSync(dirname(join(ROOT, file)), { recursive: true });
+      writeFileSync(join(ROOT, file), md);
+      const title = md.match(/^#\s+(.+)$/m)?.[1] ?? file;
+      console.log(`\n✅ Added and read "${title}" from ${provider} → ${file} (${md.split('\n').length} lines).`);
+      console.log('   It is refreshed on every run, and each section headed with a component name goes into that component in the design intent.');
+    } else {
+      failed++;
+      console.log(`\n⚠️  Added the ${provider} link, but the page could not be read yet. The link is saved and will be fetched on the next run once this is fixed:`);
+      if (provider === 'GitLab') {
+        const host = parseGitlabUrl(url).host;
+        if (!process.env.GITLAB_TOKEN) console.log('   If the project is private, create a GitLab personal access token with the read_api scope and put it in this project\'s .env as GITLAB_TOKEN=... (never paste it into the chat).');
+        if (!tokenAllowedFor(host)) console.log(`   This is a company GitLab (${host}), so also add GITLAB_HOST=${host} to .env.`);
+        console.log('   Also check that the link opens for you in the browser.');
+      } else {
+        console.log('   Put a Notion integration secret in .env as NOTION_TOKEN=... and share the page with that integration.');
+      }
+    }
+  }
+  console.log(failed ? `\nNEXT: make the fix named above, then run rms-design-system-engine --guidelines ${links.join(' ')} again` : '\nNEXT: rms-design-system-engine   (every run refreshes these pages and folds them into the design intent)');
+  process.exit(failed ? 1 : 0);
+}
+
+if (process.argv.includes('--capture-code')) {
+  const passthrough = process.argv.slice(2).filter((a) => a !== '--capture-code');
+  const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'code-capture.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
+// ── --query <term> …: a component or token, names exactly as written (query.mjs) ──
+if (process.argv.includes('--query')) {
+  const passthrough = process.argv.slice(2).filter((a) => a !== '--query');
+  const r = spawnSync(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, join(SCRIPT_DIR, 'query.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
+// What setup could not read before Figma was captured (figma.fromCapture), filled from the first capture that read it:
+// the collection names, the colour modes and the token naming (setup-facts.mjs). Said once, then gone.
+async function settleConfig(cfg) {
+  if (!Array.isArray(cfg?.figma?.fromCapture)) return cfg;
+  try {
+    const { settleFromCapture } = await import('./setup-facts.mjs');
+    const vars = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8'));
+    const themeText = [cfg.paths?.themeCSS ?? []].flat().map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
+    const r = settleFromCapture(cfg, vars, themeText);
+    if (!r) return cfg;
+    const next = { ...cfg, figma: r.figma };
+    writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify(next, null, 2) + '\n');
+    console.log(C.green('✅ From the first Figma capture, ds-config.json now says what setup could not know:'));
+    for (const l of r.lines) console.log(C.green(`   ${l}`));
+    if (r.unsure.length) console.log(C.yellow(`  ⚠️  No block of its own found in the theme CSS for ${r.unsure.join(', ')}: set its cssSelector in ds-config.json → figma.modes.`));
+    return next;
+  } catch { return cfg; }
+}
+
+// ── --from-figma-cli [design.json] · --refresh-figma: read Figma the best way there is (figma-source.mjs) ──
+if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refresh-figma')) {
+  let fcConfig = {};
+  try { fcConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const src = await import('./figma-source.mjs');
+  try {
+    if (process.argv.includes('--from-figma-cli')) {
+      const i = process.argv.indexOf('--from-figma-cli'), file = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : src.designJsonPath(fcConfig);
+      console.log(`✅ ${src.importLine(await src.importDesign(ROOT, fcConfig, file))}`);
+      await settleConfig(fcConfig);
+      console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
+      process.exit(0);
+    }
+    const route = await src.chooseFigmaSource(ROOT, fcConfig);
+    console.log(`Figma source: ${route.route} (${route.why})`);
+    if (route.route === 'design-json') console.log(`✅ ${src.importLine(await src.importDesign(ROOT, fcConfig, route.file))}`);
+    else if (route.route === 'figma-cli') console.log(`✅ ${src.importLine(await src.refreshFromFigmaCli(ROOT, fcConfig))}`);
+    else if (route.route === 'rest') { console.log('NEXT: rms-design-system-engine (it refreshes from the Figma API as it runs)'); process.exit(0); }
+    else { console.log('NEXT: rms-design-system-engine --recipe refresh-figma (read the variables and components with the Figma tool of this session)'); process.exit(0); }
+    await settleConfig(fcConfig);
+    console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
+    process.exit(0);
+  } catch (e) { console.error(`❌ Figma not read: ${e.message}`); process.exit(1); }
+}
+
+// ── --styleguide: the style guide of what Figma and the code agree on (styleguide-gen.mjs) ──
+if (process.argv.includes('--styleguide')) {
+  let sgConfig = {};
+  try { sgConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  // With --component: the audit of those components first (the gates against Figma and the accessibility check in a
+  // browser, as any scoped run), so the page shows their Parity and Accessibility as of now; then a page of those
+  // components and the ones they nest only, beside the whole system's. A finding does not stop the page: it is
+  // what the page shows.
+  if (SCOPE_COMPONENTS.length) {
+    console.log(`Auditing ${SCOPE_COMPONENTS.join(', ')}, then building the style guide.`);
+    spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...process.argv.slice(2).filter((a) => a !== '--styleguide')], { cwd: ROOT, stdio: 'inherit' });
+  }
+  try {
+    const { generateStyleguide } = await import('./styleguide-gen.mjs');
+    const r = await generateStyleguide(ROOT, sgConfig, SCOPE_COMPONENTS.length ? { only: SCOPE_COMPONENTS } : {});
+    if (r.kept) { console.log(`🖼  ${r.kept}`); process.exit(0); }
+    // What agrees with Figma and what only the code has (shown and compared with nothing before Figma's data is
+    // captured, a task each once it is), never one count called agreed.
+    const agreedN = r.components - (r.codeOnly ?? 0);
+    const counted = [agreedN || !r.codeOnly ? `${agreedN} component${agreedN === 1 ? '' : 's'} agreed` : null, r.codeOnly ? `${r.codeOnly} only in the code` : null,
+      r.notInFigma ? `${r.notInFigma} in the code and not in Figma, on the Status page` : null].filter(Boolean).join(', ');
+    const tpl = r.template === 'engine' ? "the engine's template" : "the project's template";
+    if (r.scope) {
+      // A page for the components asked for: which they are, what they nest, and one asked for that the system lacks.
+      const { asked, nested, missing } = r.scope;
+      console.log(`🖼  Style guide of ${asked.join(', ') || SCOPE_COMPONENTS.join(', ')} → ${relative(ROOT, r.out)}  (${nested.length ? `and the ${nested.length === 1 ? 'component' : `${nested.length} components`} ${asked.length > 1 ? 'they nest' : 'it nests'}: ${nested.join(', ')}` : `${asked.length > 1 ? 'they nest' : 'it nests'} no other component`} · ${tpl})`);
+      if (missing.length) console.log(`   ${missing.join(', ')}: not a component of this system (neither Figma's nor the code's), so not on the page.`);
+      if (r.scope.notInFigma?.length) console.log(`   ${r.scope.notInFigma.join(', ')}: in the code and not in Figma, so not on the page; a task on the whole system's Status page.`);
+      console.log('   The whole system\'s style guide: rms-design-system-engine --styleguide');
+    } else {
+      console.log(`🖼  Style guide → ${relative(ROOT, r.out)}  (${counted} · ${tpl})`);
+      if (r.notAgreed) console.log(`   ${r.notAgreed}`);
+    }
+    // The Showroom's screens measured against the Figma screens they were written from, every build (a screen built
+    // from Figma is only right when it is measured): said here and written beside each screen on the page.
+    if (!r.scope && existsSync(r.out)) {
+      try {
+        const { compareShowroom } = await import('./showroom-compare.mjs');
+        const m = await compareShowroom(ROOT, sgConfig, r.out);
+        for (const x of Object.values(m.results)) console.log(`   📏 Showroom, ${x.title}: ${x.off ? `${x.off} texts or parts more than ${x.tol}px off Figma (${x.lines.slice(0, 2).join('; ')}${x.lines.length > 2 ? '…' : ''})` : `every text and part within ${x.tol}px of Figma`}`);
+        for (const n of m.next) console.log(`   📏 NEXT: ${n}`);
+        if (Object.keys(m.results).length) {
+          const html = readFileSync(r.out, 'utf8');
+          const data = JSON.stringify(m.results).replace(/</g, '\\u003c');
+          writeFileSync(r.out, html.replace(/<\/body>(?![\s\S]*<\/body>)/, () => `<script>window.__dseShowroomMeasured = ${data}; if (window.__dseShowroomMeasure) window.__dseShowroomMeasure(window.__dseShowroomMeasured);</script></body>`));
+        }
+      } catch (e) { console.log(`   📏 Showroom not measured: ${String(e.message).split('\n')[0]}`); }
+    }
+    // Its Vue components: drawn from what the project's own Vite renders, or from their templates, and why.
+    if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own ${r.vue.build ?? 'build'} renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? `; the rest from their templates${r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);
+    for (const name of r.scope?.asked ?? SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
+    // Accessibility tried now in a browser, every variant of every component, and kept in the page: whoever opens it reads
+    // the final results at once, nothing running while they read (styleguide-bake.mjs). --no-a11y-bake builds the page
+    // without it (a page only measured, as a CI's first build is); styleguide.bakeA11y: false in ds-config.json too.
+    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false) {
+      const { bakeA11y } = await import('./styleguide-bake.mjs');
+      console.log('   Trying every component\'s accessibility in a browser, to keep the results in the page...');
+      const b = await bakeA11y(resolve(ROOT, r.out)).catch((e) => ({ skipped: String(e.message).split('\n')[0] }));
+      console.log(b.skipped ? `   Accessibility not tried while building (${b.skipped}): a browser that opens the page tries it and keeps what it finds.`
+        : `♿ Accessibility tried in a browser: ${b.tried} of ${b.of} components, every variant, kept in the page (${Math.round(b.ms / 1000)}s)${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
+      for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
+      // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
+      if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
+    }
+    // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
+    const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
+    const found = checkFile(r.out);
+    for (const line of checkLines(found)) console.log(line);
+    process.exit(failures(found).length ? 1 : 0);
+  } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
+}
+
+// ── --styleguide-check [page]: the same check on a page already built (after a project added its own links) ──
+if (process.argv.includes('--styleguide-check')) {
+  const i = process.argv.indexOf('--styleguide-check');
+  let page = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null;
+  if (!page) { try { const c = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); page = c.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html'; } catch { page = '.design-system-engine-out/styleguide/index.html'; } }
+  const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
+  try { const found = checkFile(resolve(ROOT, page)); for (const line of checkLines(found)) console.log(line); process.exit(failures(found).length ? 1 : 0); }
+  catch (e) { console.error(`❌ style guide not checked: ${e.message}`); process.exit(1); }
+}
+
+// ── --publish-styleguide: the CI job that publishes the style guide, one link the team shares (publish-job.mjs) ──
+// GitHub Pages or GitLab Pages, as the project's git remote says (--host github|gitlab to choose); --print shows the
+// job without writing it. Never overwrites a job that is there, never commits.
+if (process.argv.includes('--publish-styleguide')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { writePublishJob, githubJob, gitlabJob, hostOf, productRepos } = await import('./publish-job.mjs');
+  const host = _argValue('--host') ?? null;
+  if (host && !/^(github|gitlab)$/.test(host)) { console.error('❌ --host is github or gitlab.'); process.exit(1); }
+  if (process.argv.includes('--print')) {
+    const h = host ?? hostOf(ROOT) ?? 'github';
+    const out = pcfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html';
+    console.log((h === 'gitlab' ? gitlabJob : githubJob)({ out, products: productRepos(ROOT) }));
+    process.exit(0);
+  }
+  const r = writePublishJob(ROOT, pcfg, { host });
+  for (const l of r.lines) console.log(l);
+  console.log(r.wrote ? `NEXT: tell the person the job is written (${r.file}) and what the lines above say to do once; commit it only when they ask.` : r.file ? 'NEXT: tell the person what the line above says; change nothing.' : 'NEXT: ask the person whether the project is on GitHub or GitLab, then run this again with --host.');
+  process.exit(r.file || r.wrote ? 0 : 1);
+}
+
+// ── --census: every value written by hand in the project's styles, with the token to use ──
+// Lists each file's literal colours, sizes, durations, layers and shadows, the files that guess most first; keeps the
+// count in design-system-engine-census.json so it only falls (the first run writes it, a run with fewer lowers it, a
+// file with more than it fails the run).
+if (process.argv.includes('--census')) {
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const rc = await import('./raw-census.mjs');
+  const census = rc.censusOf(ROOT, ccfg), against = rc.censusAgainst(census, rc.readCensusBaseline(ROOT));
+  const all = process.argv.includes('--all');
+  for (const l of rc.censusLines(census, against, all ? { top: Infinity, each: Infinity } : {})) console.log(l);
+  if (against.first || against.fell) rc.writeCensusBaseline(ROOT, census);
+  if (!all && census.files.some((f) => f.findings.length > 8)) console.log('   (--census --all lists every line)');
+  process.exit(against.grew.length ? 1 : 0);
+}
+
+// ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
+if (process.argv.includes('--figma-edits')) {
+  let feConfig = {};
+  try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  try {
+    const { figmaEdits, gapEdits, renameEdits, annotationEdits, reviewEdits, specEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { annotationUses } = await import('./a11y-check.mjs');
+    const { generateStyleguide } = await import('./styleguide-gen.mjs');
+    // What the prototypes needed and the system lacks: the design team's to do list.
+    let gaps = [];
+    try { gaps = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'gaps.json'), 'utf8')).merged ?? []; } catch { /* no prototype yet */ }
+    let propsSnap = null;
+    try { propsSnap = JSON.parse(readFileSync(resolve(ROOT, feConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { if (!gaps.length) { console.error('❌ no Figma component snapshot: refresh Figma first (rms-design-system-engine --refresh-figma).'); process.exit(1); } }
+    const parts = propsSnap ? await generateStyleguide(ROOT, feConfig, { partsOnly: true, names: Object.keys(propsSnap).filter((k) => !k.startsWith('_')) }) : null;
+    // Names written otherwise than most of the system's: renamed in their component sets, after the same yes.
+    let renames = [];
+    if (propsSnap && feConfig.namingConsistency !== false) { const { namingFindings } = await import('./naming-consistency.mjs'); renames = renameEdits(propsSnap, namingFindings(propsSnap).findings); }
+    const { loadCategories } = await import('./annotation-categories.mjs');
+    // each component's accessibility spec as the code gives it, with what a screen reader said (the last check).
+    let heard = {};
+    try { heard = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'a11y.json'), 'utf8')).heard ?? {}; } catch { /* no accessibility check yet */ }
+    const specs = propsSnap ? specEdits(propsSnap, parts.view?.components ?? [], { heard }) : [];
+    const specRole = new Set(specs.filter((e) => e.role).map((e) => e.component));
+    // the designed screens' accessibility findings (--figma-a11y), pinned on their layers.
+    let review = [];
+    try {
+      const sa = await import('./screen-a11y.mjs');
+      const snap = JSON.parse(readFileSync(join(ROOT, feConfig.paths?.screenA11y ?? join(dirname(feConfig.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-a11y.snapshot.json')), 'utf8'));
+      const { annotatedRole } = await import('./design-a11y.mjs');
+      const roles = Object.fromEntries(Object.entries(propsSnap ?? {}).filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object').map(([k, v]) => [k, annotatedRole(v)]).filter(([, r]) => r));
+      review = reviewEdits(sa.screenA11yFindings(snap, { roles }), snap.screens ?? []);
+    } catch { /* the screens not read for accessibility yet (--figma-a11y) */ }
+    // A role the spec states is not added twice.
+    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []).filter((e) => !(e.kind === 'role' && specRole.has(e.component))) : []), ...specs, ...review, ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses, loadCategories(ROOT, feConfig), feConfig) : [])];
+    const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
+    for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
+    if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
+    process.exit(0);
+  } catch (e) { console.error(`❌ Figma edits not listed: ${e.message}`); process.exit(1); }
+}
+
+// ── --annotation-categories [capture.json …]: the category of each Figma note, read with the Plugin API ──
+// Figma's REST API does not return a note's category (Intent, Accessibility…). With no file, the engine writes the
+// read-only script for the Figma tool of the session; with the files that script returned, it keeps them in the
+// categories snapshot, which the checks and the To do list read (annotation-categories.mjs).
+if (process.argv.includes('--annotation-categories')) {
+  let acConfig = {};
+  try { acConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const ac = await import('./annotation-categories.mjs');
+  const files = [];
+  for (const a of process.argv.slice(process.argv.indexOf('--annotation-categories') + 1)) { if (a.startsWith('--')) break; files.push(a); }
+  const dir = join(ROOT, OUT_DIR, 'figma-capture');
+  if (!files.length) {
+    mkdirSync(dir, { recursive: true });
+    const script = join(dir, 'annotation-categories.js');
+    writeFileSync(script, ac.captureScript());
+    console.log(`📝 The script that reads the category of each Figma annotation (it reads, it changes nothing): ${relative(ROOT, script)}`);
+    console.log(`   Run it with the Figma tool of this session on the file ${acConfig.figmaFileKey ?? 'named by figmaFileKey in ds-config.json'}. On a large file, run it once per page (PAGE_IDS at its top) and keep every result.`);
+    console.log(`   Save what it returns, as it is, under ${relative(ROOT, dir)}/ (one .json file per run).`);
+    console.log(`NEXT: rms-design-system-engine --annotation-categories ${relative(ROOT, join(dir, 'annotation-categories.json'))}`);
+    process.exit(0);
+  }
+  try {
+    const captures = files.map((f) => JSON.parse(readFileSync(resolve(ROOT, f), 'utf8')));
+    const r = ac.mergeCaptures(ac.loadCategories(ROOT, acConfig), captures);
+    const path = ac.categoriesPath(ROOT, acConfig);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(r.snapshot, null, 2) + '\n');
+    console.log(`✅ Annotation categories kept: ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}, ${r.notes} categorised note${r.notes === 1 ? '' : 's'} on ${r.nodes} node${r.nodes === 1 ? '' : 's'} → ${relative(ROOT, path)}`);
+    // What that means for the notes the checks read: the component-props snapshot's notes, by kind.
+    let props = {};
+    try { props = JSON.parse(readFileSync(resolve(ROOT, acConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { /* no component snapshot yet */ }
+    const by = {};
+    for (const [name, e] of Object.entries(props)) {
+      if (name.startsWith('_') || !e || typeof e !== 'object') continue;
+      for (const [a, node] of [...(e.annotations ?? []).map((x) => [x, e.nodeId]), ...(e.layerAnnotations ?? []).flatMap((l) => (l.annotations ?? []).map((x) => [x, l.nodeId]))]) {
+        const k = ac.noteKind(a, node, r.snapshot, acConfig) ?? 'no category';
+        by[k] = (by[k] ?? 0) + 1;
+      }
+    }
+    if (Object.keys(by).length) console.log(`   The component notes: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')}. Accessibility and uncategorised notes are requirements; the rest is design intent, never a task.`);
+    console.log('NEXT: rms-design-system-engine (the audit, reading each note as a requirement or as design intent)');
+    process.exit(0);
+  } catch (e) { console.error(`❌ Annotation categories not kept: ${e.message}`); process.exit(1); }
+}
+
+// ── --prototype <composition.json>: draw a prototype from the system's own components (prototype.mjs) ──
+if (process.argv.includes('--prototype')) {
+  const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'prototype.mjs'), ...process.argv.slice(2)], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
+// ── --check-ui <file>: check a generated UI against the component catalog (ui-check.mjs) ──
+if (process.argv.includes('--check-ui')) {
+  const passthrough = process.argv.slice(2).filter((a) => a !== '--check-ui');
+  const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'ui-check.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
+// ── --agent-rules [--write[=<file>]]: the engine's rules for agents without its hooks (agent-rules.mjs) ──
+// Cursor, Copilot and other agents read only their own instruction file. Without --write the section is shown and the
+// person is asked; --write puts it in the project's instruction files (or the one named), once they said yes.
+if (process.argv.includes('--agent-rules')) {
+  const { rulesSection, ruleTargets, writeRules } = await import('./agent-rules.mjs');
+  const w = process.argv.find((a) => a === '--write' || a.startsWith('--write='));
+  const targets = w?.includes('=') ? [w.slice('--write='.length)] : ruleTargets(ROOT);
+  if (!w) {
+    console.log(rulesSection());
+    console.log(`\nThese are the engine's rules for an agent that has no hooks (Cursor, Copilot and others read only their own instruction file). Nothing was written.`);
+    console.log(`NEXT: ask the person whether to add them to ${targets.join(' and ')}; once they say yes, run rms-design-system-engine --agent-rules --write${targets.length === 1 && targets[0] !== 'AGENTS.md' ? `=${targets[0]}` : ''}.`);
+    process.exit(0);
+  }
+  for (const f of targets) {
+    const r = writeRules(ROOT, f);
+    console.log(r.done === 'unchanged' ? `✓ ${f} already has the engine's rules.` : `✅ The engine's rules ${r.done === 'added' ? 'added to' : 'updated in'} ${f} (between the rms-design-system-engine markers; run again to update them).`);
+  }
+  process.exit(0);
+}
+
+// ── --edit-check [file …]: the check the hook makes on each UI edit, on demand ──
+// For an agent with no hooks, before committing: each file named, else every UI file changed since the last commit,
+// against what it held then. Exit 1 when something the design system does not have was added.
+if (process.argv.includes('--edit-check')) {
+  let ecfg = {};
+  try { ecfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  if (ecfg.editCheck === false) { console.log('The edit check is off in this project ("editCheck": false in ds-config.json).'); process.exit(0); }
+  const { sessionLeftovers, editCheck } = await import('./edit-check.mjs');
+  const cfgOn = { ...ecfg, hooks: true };
+  const files = process.argv.slice(process.argv.indexOf('--edit-check') + 1).filter((a) => !a.startsWith('--'));
+  const lines = [];
+  if (files.length) {
+    for (const f of files) {
+      let now = ''; try { now = readFileSync(resolve(ROOT, f), 'utf8'); } catch { console.log(`⚠️  ${f}: not found`); continue; }
+      const rel = relative(ROOT, resolve(ROOT, f));
+      const head = (() => { const r = spawnSync('git', ['show', `HEAD:${rel}`], { cwd: ROOT, encoding: 'utf8' }); return r.status === 0 ? r.stdout : null; })();
+      const reason = editCheck({ tool_name: 'Write', tool_input: { file_path: resolve(ROOT, f), content: now } }, { root: ROOT, cfg: cfgOn, headOf: () => head });
+      if (reason) lines.push(...reason.split('\n').filter((l) => /^ {2}\S/.test(l)).map((l) => `  ${rel}${l.trim().replace(/^[^\s:]+/, '')}`));
+    }
+  } else lines.push(...sessionLeftovers(ROOT, cfgOn));
+  if (!lines.length) { console.log(`✅ Edit check: nothing the design system does not have was added${files.length ? ` in ${files.join(', ')}` : ' since the last commit'}.`); process.exit(0); }
+  console.log(`❌ Edit check: ${lines.length} thing${lines.length === 1 ? '' : 's'} the design system does not have:`);
+  for (const l of lines) console.log(l);
+  console.log('NEXT: fix each one with the system\'s token or component (rms-design-system-engine --query <name> when unsure of a name), then run the edit check again; ask the person when nothing in the system fits.');
+  process.exit(1);
+}
+
+// ── --trend: no config needed - just show history and exit ────────────────────
+if (SHOW_TREND) {
+  const histPath = join(ROOT, projectPath(ROOT, 'history'));
+  try {
+    const hist = JSON.parse(readFileSync(histPath, 'utf8'));
+    console.log('\n' + C.bold('─── Parity Trend ───────────────────────────────────────────'));
+    const recent = hist.slice(-20);
+    for (const entry of recent) {
+      const icon   = entry.fail === 0 ? C.green('✅') : C.red('❌');
+      const filled = entry.pass ?? 0;
+      const total  = entry.total ?? 8;
+      const bar    = C.green('█'.repeat(filled)) + C.dim('░'.repeat(total - filled));
+      console.log(`  ${icon}  ${entry.date}  ${String(filled).padStart(2)}/${total} [${bar}]`);
+    }
+    if (!hist.length) console.log('  No history yet - run: node scripts/audit.mjs');
+
+    // Regression delta: show gate changes since last run
+    if (recent.length >= 2) {
+      const prev = recent[recent.length - 2];
+      const curr = recent[recent.length - 1];
+      const prevMap = Object.fromEntries((prev.gates ?? []).map(g => [g.label, g.pass]));
+      const changes = (curr.gates ?? []).filter(g => prevMap[g.label] !== undefined && prevMap[g.label] !== g.pass);
+      if (changes.length) {
+        console.log('\n  ⚠️  Changes since last run:');
+        for (const g of changes)
+          console.log(`       ${g.pass ? C.green('✅') : C.red('❌')} ${g.label}  ${prevMap[g.label] ? 'PASS→FAIL' : 'FAIL→PASS'}`);
+      } else {
+        console.log('\n  ✅ No gate changes since last run');
+      }
+    }
+
+    // Oscillation detector: gate that flipped ≥3× in last 6 runs
+    const last6 = hist.slice(-6);
+    for (const gate of (last6[0]?.gates ?? [])) {
+      const states = last6.map(r => (r.gates ?? []).find(g => g.label === gate.label)?.pass);
+      const flips = states.filter((s, i) => i > 0 && s !== states[i - 1]).length;
+      if (flips >= 3) console.log(`  ⚠️  UNSTABLE: "${gate.label}" flipped ${flips}× in last ${last6.length} runs`);
+    }
+
+    console.log(C.bold('─'.repeat(WIDTH)) + '\n');
+  } catch {
+    console.log('\n⏭  No history yet - run: node scripts/audit.mjs\n');
+  }
+  process.exit(0);
+}
+
+// Collection auto-detect is disabled. ds-config's collection fields come from the config, or are
+// set manually. Returns null so config generation falls back to sensible defaults.
+async function analyseCollections() {
+  return null;
+}
+
+// ── Refresh component-property definitions from Figma REST API ───────────────
+// Writes figma-component-props.snapshot.json. Called on every audit run when
+// FIGMA_TOKEN is set. Queries /component_sets (names + nodeIds) then
+// /nodes?ids=... (componentPropertyDefinitions). Safe to skip: gate [3g]
+// falls back to reading an existing snapshot and warns if it's missing.
+// Notes on a component's inner layers ("this layer is the label"), from its default variant (the first
+// one; a standalone component is its own). [{ layer, nodeId, annotations }], at most 50.
+function layerAnnotationsOf(doc) {
+  const root = doc?.type === 'COMPONENT_SET' ? doc.children?.[0] : doc;
+  const out = [];
+  const walk = (n, depth) => {
+    for (const c of n?.children ?? []) {
+      if (out.length >= 50) return;
+      if (c.annotations?.length) out.push({ layer: c.name, nodeId: c.id, annotations: c.annotations });
+      if (depth < 8) walk(c, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return out;
+}
+async function refreshComponentProps(fileKey, token, outPath) {
+  try {
+    const h = { 'X-Figma-Token': token };
+
+    // ① Component SETS (variant groups) - the primary source
+    const csRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/component_sets`, { headers: h });
+    if (!csRes.ok) {
+      console.log(C.yellow(`  ⚠️  Figma ${csRes.status} - component props refresh skipped`));
+      return false;
+    }
+    const { meta: csMeta } = await csRes.json();
+    const sets  = Object.entries(byNodeId(csMeta?.component_sets));
+    const ids   = sets.map(([id]) => id);
+    const names = Object.fromEntries(sets.map(([id, s]) => [id, s.name]));
+
+    // ② Standalone COMPONENTS (single components not in a variant set)
+    const compRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/components`, { headers: h });
+    const { meta: compMeta } = compRes.ok ? await compRes.json() : { meta: {} };
+    const standaloneEntries = Object.entries(byNodeId(compMeta?.components))
+      .filter(([, c]) => !c.containing_frame?.containingStateGroup);
+    for (const [nodeId, c] of standaloneEntries) {
+      if (!names[nodeId]) { ids.push(nodeId); names[nodeId] = c.name; }
+    }
+
+    // ③ Fallback: for unpublished files (API returns nothing), refresh known nodeIds
+    //    from the existing snapshot so annotations always stay current.
+    let existingSnap = {};
+    try { existingSnap = JSON.parse(readFileSync(outPath, 'utf8')); } catch {}
+    for (const [name, entry] of Object.entries(existingSnap)) {
+      if (name === '_updated' || !entry?.nodeId) continue;
+      if (!names[entry.nodeId]) { ids.push(entry.nodeId); names[entry.nodeId] = name; }
+    }
+
+    if (!ids.length) return false;
+    const result = {};
+
+    const BATCH = 50;
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH);
+      const nRes  = await figmaFetch(
+        `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${batch.join(',')}`,
+        { headers: h }
+      );
+      if (!nRes.ok) continue;
+      const { nodes } = await nRes.json();
+      for (const [nodeId, data] of Object.entries(nodes ?? {})) {
+        const doc   = data?.document;
+        const props = doc?.componentPropertyDefinitions ?? {};
+        const anns  = doc?.annotations ?? [];
+        const layerAnns = layerAnnotationsOf(doc);
+        if (Object.keys(props).length || anns.length || layerAnns.length) {
+          result[names[nodeId] ?? doc?.name ?? nodeId] = { nodeId, properties: props, annotations: anns, ...(layerAnns.length ? { layerAnnotations: layerAnns } : {}) };
+        }
+      }
+    }
+
+    result._updated = new Date().toISOString();
+    writeFileSync(outPath, JSON.stringify(result, null, 2) + '\n');
+    console.log(C.dim(`  ✅ Component props: ${Object.keys(result).length - 1} component(s)`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Component props refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
+// ── Auto-refresh bound-tokens.json + component-state-tokens.json via REST API ─
+// Replaces the manual Phase 2 Plugin API walk. Called on every audit run when
+// FIGMA_TOKEN + frames are configured. Writes the same format consumed by
+// bound-check.mjs and state-check.mjs: { "Token/Path": true, ... }.
+
+
+
+
+// Shared /nodes cache. Several Phase-1 refreshers fetch the SAME frame node trees
+// (bound tokens and frame geometry request identical `/nodes?ids=<frame>` URLs), so
+// without sharing, every frame is pulled once per refresher - multiplying the request
+// count and the odds of a 429. Fetch each (fileKey,nodeId) once and reuse it; the
+// in-flight PROMISE is cached so concurrent refreshers share a single request. Combined
+// with figmaFetch's retry/backoff, this both lowers pressure and survives throttling -
+// full depth, fewer calls.
+const _nodeDocCache = new Map();
+async function fetchNodeDoc(fileKey, nodeId, token) {
+  const key = fileKey + ' ' + nodeId;
+  if (_nodeDocCache.has(key)) return _nodeDocCache.get(key);
+  const p = (async () => {
+    const res = await figmaFetch(
+      `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${nodeId}`,
+      { headers: { 'X-Figma-Token': token } },
+    );
+    if (!res.ok) return { ok: false, status: res.status, nodes: null };
+    const { nodes } = await res.json();
+    return { ok: true, status: res.status, nodes: nodes ?? {} };
+  })();
+  // Cache the in-flight promise so concurrent refreshers share ONE request, but EVICT
+  // it if the fetch failed (or threw) so a later refresher can retry that frame rather
+  // than inheriting a permanent failure - a cached failure would silently lose depth.
+  _nodeDocCache.set(key, p);
+  p.then((r) => { if (!r.ok) _nodeDocCache.delete(key); }).catch(() => _nodeDocCache.delete(key));
+  return p;
+}
+
+// Bounded-concurrency runner: run every task to completion but at most `limit` in
+// flight at once. Phase-1 fires many independent refreshers; launching them all via
+// Promise.all bursts the Figma API into a 429 storm. Capping the peak in-flight count
+// keeps FULL depth (all tasks still run) while cutting the burst - pairs with
+// figmaFetch's 429 backoff (survive a throttle) and fetchNodeDoc (dedupe identical
+// /nodes). `tasks` are thunks (() => Promise); results preserve input order.
+async function runPool(tasks, limit) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const i = next++;
+      results[i] = await tasks[i]();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, tasks.length)) }, worker));
+  return results;
+}
+
+
+// ── Auto-refresh figma-frame-geometry.snapshot.json via REST /nodes ──────────
+// Captures every FRAME/INSTANCE/COMPONENT's box (h, pad[t,r,b,l], gap) from the DS
+// layout frame(s), keyed by node name (array + _path when a name repeats). Consumed
+// by RENDERED_ASSERTIONS `frameGeom` sourcing (Gate [16]). Uses the /nodes endpoint -
+// available on any plan.
+async function refreshFrameGeometry(fileKey, frames, token, outPath) {
+  if (!frames?.length) return false;
+  try {
+    const byName = {};
+    for (const frame of frames) {
+      const nd = await fetchNodeDoc(fileKey, frame.nodeId, token);
+      if (!nd.ok) { console.log(C.yellow(`  ⚠️  /nodes ${frame.nodeId} → ${nd.status}`)); continue; }
+      for (const data of Object.values(nd.nodes)) {
+        (function rec(n, path) {
+          if (!n) return;
+          if (n.type === 'FRAME' || n.type === 'INSTANCE' || n.type === 'COMPONENT') {
+            const pad = [n.paddingTop ?? 0, n.paddingRight ?? 0, n.paddingBottom ?? 0, n.paddingLeft ?? 0];
+            const h = Math.round(n.absoluteBoundingBox?.height ?? n.size?.y ?? 0);
+            const gap = typeof n.itemSpacing === 'number' ? n.itemSpacing : null;
+            (byName[n.name] ??= []).push({ _path: path, h, pad, gap });
+          }
+          for (const c of n.children ?? []) rec(c, path + '/' + n.name);
+        })(data?.document, '');
+      }
+    }
+    // Per name: drop _path when all entries are identical (collapse to a single object).
+    const outNodes = {};
+    for (const [name, arr] of Object.entries(byName)) {
+      const seen = new Map();
+      for (const e of arr) { const k = JSON.stringify([e.h, e.pad, e.gap]); if (!seen.has(k)) seen.set(k, e); }
+      const uniq = [...seen.values()];
+      outNodes[name] = uniq.length === 1
+        ? { h: uniq[0].h, pad: uniq[0].pad, gap: uniq[0].gap }
+        : uniq;
+    }
+    const out = {
+      _updated: new Date().toISOString(),
+      _note: 'Per-container geometry (h, pad [t,r,b,l], gap) captured from the DS layout frame(s). Consumed by RENDERED_ASSERTIONS frameGeom sourcing. Auto-generated - do not edit by hand.',
+      nodes: outNodes,
+    };
+    writeFileSync(outPath, JSON.stringify(out, null, 1) + '\n');
+    console.log(C.dim(`  ✅ Frame geometry: ${Object.keys(outNodes).length} node name(s) across ${frames.length} frame(s)`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Frame geometry refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
+// ── Per-template composition inventory (the template-composition gate) ─────────────────
+// Walks each registered TEMPLATE frame (cfg.templates) and records, in document order, the DS
+// components it composes - the top-level component INSTANCE names, WITHOUT descending into an
+// instance's own internals (those are the component's business, already covered by the
+// sub-component gate). Written to figma-templates.snapshot.json and consumed by
+// template-composition-check.mjs, which requires the template's code to use each composed
+// component. Opt-in: no cfg.templates → returns without writing (gate stays a no-op PASS).
+async function refreshTemplateComposition(fileKey, templates, token, outPath) {
+  if (!templates?.length) return false;
+  try {
+    const out = {};
+    for (const tpl of templates) {
+      if (!tpl?.name || !tpl?.nodeId) continue;
+      const nd = await fetchNodeDoc(fileKey, tpl.nodeId, token);
+      if (!nd.ok) { console.log(C.yellow(`  ⚠️  /nodes ${tpl.nodeId} → ${nd.status}`)); continue; }
+      const components = [];
+      const seen = new Set();
+      (function rec(n) {
+        if (!n) return;
+        // Skip statically-hidden subtrees (visible:false with no visibility variable) - a dead
+        // layer is not part of the composition. A visibility-bound node is a real conditional and
+        // IS captured (matches refreshScreenElements).
+        if (n.visible === false && !(n.boundVariables && n.boundVariables.visible)) return;
+        if (n.type === 'INSTANCE' || n.type === 'COMPONENT') {
+          const name = (n.name || '').trim();
+          if (name && !seen.has(name)) { seen.add(name); components.push(name); }
+          return;   // do NOT descend into the instance's internals - top-level composition only
+        }
+        for (const c of n.children ?? []) rec(c);
+      })(Object.values(nd.nodes ?? {})[0]?.document);
+      const id = String(tpl.nodeId).replace('-', ':');
+      out[tpl.name] = { name: tpl.name, nodeId: id, components };
+    }
+    const payload = {
+      _updated: new Date().toISOString(),
+      _note: 'Per-template inventory of the DS components each template frame composes (top-level instances, document order). Consumed by template-composition-check.mjs. Auto-generated - do not edit by hand.',
+      templates: out,
+    };
+    writeFileSync(outPath, JSON.stringify(payload, null, 1) + '\n');
+    const total = Object.values(out).reduce((a, t) => a + t.components.length, 0);
+    console.log(C.dim(`  ✅ Template composition: ${total} component instance(s) across ${templates.length} template(s)`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Template composition refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
+// ── The DS components each product screen uses (Gate [10], Figma -> code) ─────────────
+// Walks every frame and screen in ds-config.json and counts each visible instance by its main
+// component (the component set's name when it is a variant). reimplementation-check.mjs then requires
+// the product's code to use each DS component its screens use, so a hand-built one is found.
+async function refreshScreenComponents(fileKey, screens, token, outPath) {
+  const list = (screens ?? []).filter((s) => s?.nodeId);
+  if (!list.length) return false;
+  try {
+    const out = {};
+    for (const scr of list) {
+      const nd = await fetchNodeDoc(fileKey, scr.nodeId, token);
+      if (!nd.ok) { console.log(C.yellow(`  ⚠️  /nodes ${scr.nodeId} → ${nd.status}`)); continue; }
+      const entry = Object.values(nd.nodes ?? {})[0] ?? {};
+      const comps = entry.components ?? {}, sets = entry.componentSets ?? {};
+      const nameOf = (id) => { const c = comps[id]; if (!c) return null; return (c.componentSetId && sets[c.componentSetId]?.name) || c.name; };
+      const components = {};
+      (function rec(n) {
+        if (!n) return;
+        if (n.visible === false && !(n.boundVariables && n.boundVariables.visible)) return;
+        if (n.type === 'INSTANCE') { const name = nameOf(n.componentId) ?? n.name; if (name) components[name] = (components[name] ?? 0) + 1; }
+        for (const c of n.children ?? []) rec(c);
+      })(entry.document);
+      const id = String(scr.nodeId).replace('-', ':');
+      out[id] = { name: scr.name || id, plugin: scr.plugin, components };
+    }
+    writeFileSync(outPath, JSON.stringify({
+      _updated: new Date().toISOString(),
+      _note: 'The components each product screen uses in Figma (frames and screens in ds-config.json), with how many times. Read from Figma; do not edit by hand.',
+      screens: out,
+    }, null, 2) + '\n');
+    console.log(C.dim(`  ✅ Screen components: ${Object.keys(out).length} screen(s)`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Screen components refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
+// ── Per-reference-screen element inventory (the Markup gate) ──────────────────────────
+// Walks each reference SCREEN (cfg.screens, falling back to cfg.frames) and records every
+// interactive DS control instance as { component, label } - the visible label being the control's
+// first TEXT descendant. Written to figma-screens.snapshot.json and consumed by
+// screen-element-check.mjs, which requires each to have a code counterpart of the same kind.
+async function refreshScreenElements(fileKey, screens, token, outPath) {
+  if (!screens?.length) return false;
+  try {
+    const INTERACTIVE = /button|switch|toggle|radio|segment|check|modal|dialog|overlay|input|field|stepper/i;
+    const firstText = (n) => {
+      if (!n) return '';
+      if (n.type === 'TEXT' && n.characters) return n.characters.trim();
+      for (const c of n.children ?? []) { const t = firstText(c); if (t) return t; }
+      return '';
+    };
+    const out = {};
+    for (const scr of screens) {
+      const nRes = await figmaFetch(
+        `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${scr.nodeId}`,
+        { headers: { 'X-Figma-Token': token } },
+      );
+      if (!nRes.ok) { console.log(C.yellow(`  ⚠️  /nodes ${scr.nodeId} → ${nRes.status}`)); continue; }
+      const { nodes } = await nRes.json();
+      const elements = [];
+      const seen = new Set();
+      let rowSeparators = 0; // divider components placed BETWEEN interactive controls in a container
+      const SEP = /divider|separator/i;
+      (function rec(n) {
+        if (!n) return;
+        // Skip a node (and its subtree) only when it is STATICALLY hidden - visible:false with NO
+        // visibility variable. A node whose visibility is bound to a (boolean) variable is a real
+        // conditional / white-label control: off in this file but toggled ON in a consumer project,
+        // so it MUST still be captured. Only genuinely dead layers (an old panel parked in a hidden
+        // tab, no variable driving it) are ignored - which is what removed the phantom checkboxes.
+        if (n.visible === false && !(n.boundVariables && n.boundVariables.visible)) return;
+        if ((n.type === 'INSTANCE' || n.type === 'COMPONENT') && INTERACTIVE.test(n.name || '')) {
+          const label = firstText(n);
+          if (label) {
+            const key = `${n.name}|${label}`;
+            if (!seen.has(key)) { seen.add(key); elements.push({ component: n.name, label }); }
+          }
+        }
+        // Row separators: a divider/separator that is a SIBLING of an interactive control inside the
+        // same container (a card's slot, a section). They structure the screen but carry no label, so
+        // they never enter `elements` - counted here so the code can be required to render them (the
+        // "dividerLines added between the card rows" miss the label-based inventory can't see).
+        const kids = n.children ?? [];
+        if (kids.length && kids.some(c => (c.type === 'INSTANCE' || c.type === 'COMPONENT') && INTERACTIVE.test(c.name || ''))) {
+          for (const c of kids) if ((c.type === 'INSTANCE' || c.type === 'COMPONENT') && SEP.test(c.name || '')) rowSeparators++;
+        }
+        for (const c of kids) rec(c);
+      })(Object.values(nodes ?? {})[0]?.document);
+      const id = scr.nodeId.replace('-', ':');
+      out[id] = { name: scr.name || id, plugin: scr.plugin, elements, rowSeparators };
+    }
+    const payload = {
+      _updated: new Date().toISOString(),
+      _note: 'Per-reference-screen inventory of interactive DS controls (component + visible label) plus rowSeparators (dividerLines between controls). Consumed by the Markup gate screen-element-check.mjs. Auto-generated - do not edit by hand.',
+      screens: out,
+    };
+    writeFileSync(outPath, JSON.stringify(payload, null, 1) + '\n');
+    const total = Object.values(out).reduce((a, s) => a + s.elements.length, 0);
+    console.log(C.dim(`  ✅ Screen elements: ${total} control(s) across ${screens.length} screen(s)`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Screen elements refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
+// ── Collect structured state bindings: component → variant → { props, bindings } ─
+// Used by structure-check.mjs Gate [3c] to auto-derive CSS assertions without
+// manual CSS_BASE_RULE_VARS entries. Only fills + strokes at root and direct TEXT
+// children are collected - these map cleanly to background/border-color/color.
+function collectBindingsFromNode(node, idToName, result, maxDepth = 1, depth = 0) {
+  if (depth > maxDepth) return;
+  const isText = node.type === 'TEXT';
+  for (const [field, ref] of Object.entries(node.boundVariables ?? {})) {
+    if (field !== 'fills' && field !== 'strokes') continue;
+    const refs = Array.isArray(ref) ? ref : [ref];
+    for (const r of refs) {
+      const name = idToName[r?.id];
+      if (name) result.push({ token: name, bindingField: field, isText, depth });
+    }
+  }
+  for (const child of node.children ?? []) {
+    collectBindingsFromNode(child, idToName, result, maxDepth, depth + 1);
+  }
+}
+
+
+
+// ── Per-component raw-value sweep (Gate [8] parity scoping) ──────────────────
+// Walks EVERY node of a component (all variants, all descendants, hidden included)
+// and collects the raw geometry numbers and colours those nodes actually use - NOT
+// tokens, the literal values. This is what lets the hardcoded-value gate answer
+// "is this 24px the same 24px Figma uses on THIS component?" per component instead
+// of globally. Written as component-values.snapshot.json: { "Comp": { nums, colors, hygiene } },
+// where hygiene is the Figma file's own readiness for that component (figma-hygiene.mjs).
+// collectRawValues + its node-visit budget live in a module so the runaway-tree guard is unit-
+// tested. See collect-raw-values.mjs for why the budget exists (a synchronous walk of a giant
+// instance-expanded tree spins the CPU and hangs the whole audit).
+
+// Icon inventory (Gate 15): list the icon names the DS defines in Figma so the check can
+// confirm each has a code symbol. The icon set often lives in a SEPARATE library file
+// (cfg.iconLibraryFileKey), which can have any structure - so this just lists the library's
+// component names, with optional filters: cfg.icons.page (only that page), cfg.icons.namePrefix
+// (only names starting with it), cfg.icons.nameFrom = 'last' (use the last "/"-segment).
+async function refreshIcons(libraryKey, token, outPath, opts = {}) {
+  try {
+    const res = await figmaFetch(`https://api.figma.com/v1/files/${libraryKey}/components`, { headers: { 'X-Figma-Token': token } });
+    if (!res.ok) { console.log(C.yellow(`  ⚠️  icons /components → ${res.status} (icon inventory not refreshed)`)); return false; }
+    const comps = (await res.json())?.meta?.components ?? {};
+    const names = new Set();
+    for (const c of Object.values(comps)) {
+      const page = c.containing_frame?.pageName ?? '';
+      if (opts.page && page !== opts.page) continue;
+      let name = c.name ?? '';
+      if (opts.namePrefix) { if (!name.startsWith(opts.namePrefix)) continue; name = name.slice(opts.namePrefix.length); }
+      if (opts.nameFrom === 'last' && name.includes('/')) name = name.split('/').pop();
+      name = name.trim();
+      if (name) names.add(name);
+    }
+    if (!names.size) { console.log(C.yellow('  ⚠️  icon inventory: 0 icons matched the filters - not written')); return false; }
+    writeFileSync(outPath, JSON.stringify({ _updated: new Date().toISOString(), icons: [...names].sort() }, null, 2) + '\n');
+    console.log(C.dim(`  ✅ Icon inventory: ${names.size} icon(s) from the library file`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Icon inventory refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
+// A REST /nodes entry's instances name their component by id: id → the component's name (its set's, for a variant).
+function instanceNames(data) {
+  const out = {};
+  for (const [id, c] of Object.entries(data?.components ?? {})) out[id] = (c.componentSetId && data?.componentSets?.[c.componentSetId]?.name) || c.name;
+  return out;
+}
+
+async function refreshComponentValues(fileKey, token, outPath) {
+  try {
+    const csRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/component_sets`, {
+      headers: { 'X-Figma-Token': token },
+    });
+    if (!csRes.ok) return false;
+    const { meta: csMeta } = await csRes.json();
+    const sets   = byNodeId(csMeta?.component_sets);
+    const setIds = Object.keys(sets);
+    if (!setIds.length) return false;
+    const result = {};
+    const BATCH  = 50;
+    const budget = { n: COLLECT_NODE_BUDGET };   // shared across the whole sweep — bounds total CPU
+    const hygieneBudget = { n: COLLECT_NODE_BUDGET };   // the Figma file hygiene record, same bound
+    for (let i = 0; i < setIds.length; i += BATCH) {
+      const batch = setIds.slice(i, i + BATCH);
+      const nRes  = await figmaFetch(
+        `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${batch.join(',')}`,
+        { headers: { 'X-Figma-Token': token } },
+      );
+      if (!nRes.ok) continue;
+      const { nodes } = await nRes.json();
+      for (const [setId, data] of Object.entries(nodes ?? {})) {
+        const name = sets[setId]?.name ?? data?.document?.name ?? setId;
+        const nums = new Set(), colors = new Set();
+        collectRawValues(data?.document, nums, colors, budget);
+        result[name] = { nums: [...nums].sort((a, b) => a - b), colors: [...colors].sort(), hygiene: hygieneOf(data?.document, sets[setId]?.description ?? data?.componentSets?.[setId]?.description, hygieneBudget, instanceNames(data)) };
+      }
+      if (budget.n <= 0) break;   // hit the node budget — stop rather than spin on a pathological tree
+    }
+    const capped = budget.n <= 0;
+    writeFileSync(outPath, JSON.stringify({ _updated: new Date().toISOString(), ...result }, null, 2) + '\n');
+    console.log(C.dim(`  ✅ Component values: ${Object.keys(result).length} component set(s) swept${capped ? ` (walk capped at ${COLLECT_NODE_BUDGET} nodes — raise DESIGN_SYSTEM_ENGINE_VALUE_NODE_BUDGET if needed)` : ''}`));
+    return true;
+  } catch (e) {
+    console.log(C.yellow(`  ⚠️  Component values refresh failed: ${e.message}`));
+    return false;
+  }
+}
+
+// ── Bootstrap: generate ds-config.json from 3 questions ──────────────────────
+// Called when ds-config.json is missing (or --init flag). Auto-detects CSS paths,
+// plugin files, snapshot locations, and Figma collection structure via API.
+async function bootstrapConfig() {
+  console.log('\n' + C.bold('rms-design-system-engine - first-time setup'));
+  console.log(C.dim('─'.repeat(WIDTH)));
+
+  // Auto-detect token CSS
+  const candidates = [];
+  const CSS_EXTS = ['.css', '.scss', '.sass', '.less'];
+  function looksLikeTokenFile(absPath) {
+    try { const t = readFileSync(absPath, 'utf8'); return t.includes(':root') && t.includes('--'); }
+    catch { return false; }
+  }
+  const scanRoots = ['packages', 'src', 'app', 'styles', 'assets', 'tokens'];
+  for (const base of scanRoots) {
+    const baseDir = join(ROOT, base);
+    if (!existsSync(baseDir)) continue;
+    try {
+      for (const f of readdirSync(baseDir)) {
+        const dot = f.lastIndexOf('.');
+        if (dot !== -1 && CSS_EXTS.includes(f.slice(dot))) {
+          const rel = join(base, f);
+          if (looksLikeTokenFile(join(ROOT, rel))) candidates.push(rel);
+        }
+      }
+      for (const sub of readdirSync(baseDir)) {
+        const subDir = join(baseDir, sub);
+        if (!statSync(subDir).isDirectory()) continue;
+        for (const entry of ['styles', 'src', '']) {
+          const dir = entry ? join(subDir, entry) : subDir;
+          if (!existsSync(dir)) continue;
+          try {
+            for (const f of readdirSync(dir)) {
+              const dot = f.lastIndexOf('.');
+              if (dot !== -1 && CSS_EXTS.includes(f.slice(dot))) {
+                const rel = join(base, sub, entry, f).replace(/[\\/]+/g, '/').replace(/\/$/, '');
+                if (looksLikeTokenFile(join(ROOT, rel))) candidates.push(rel);
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+  for (const f of readdirSync(ROOT)) {
+    const dot = f.lastIndexOf('.');
+    if (dot !== -1 && CSS_EXTS.includes(f.slice(dot)) && looksLikeTokenFile(join(ROOT, f)))
+      candidates.push(f);
+  }
+  const unique = [...new Set(candidates)];
+  const detectedCSS = unique.length === 1 ? unique[0] : null;
+
+  // No static token CSS? Many design systems declare no token values on disk - they load
+  // them at RUNTIME from a dynamic <link> or a remote stylesheet URL built in code. Scan the
+  // source for those so a runtime-token DS gets a concrete pointer ("your values live here")
+  // instead of a dead end. Fully generic - matches any stylesheet URL / dynamic <link>, no
+  // project-specific strings.
+  function detectRuntimeStylesheets(root) {
+    const hits = new Set();
+    const SRC_EXT = ['.js', '.ts', '.mjs', '.vue', '.jsx', '.tsx', '.html'];
+    const SKIP = new Set(['node_modules', '.git', 'dist', 'build', ...ENGINE_DIRS, 'coverage']);
+    const URL_RE  = /https?:\/\/[^'"`\s)]+\.css(?:[^'"`\s)]*)?/gi;      // remote .css (incl. ${..} in backticks)
+    const TMPL_RE = /(?:href|url)\s*[:=]\s*`([^`]*\.css[^`]*)`/gi;      // href = `…css` template literals
+    const LINK_RE = /<link\b[^>]*\bid=["']([^"']+)["'][^>]*\brel=["']stylesheet["']|<link\b[^>]*\brel=["']stylesheet["'][^>]*\bid=["']([^"']+)["']/gi;
+    let scanned = 0;
+    (function walk(dir, depth) {
+      if (depth > 6 || scanned > 4000) return;
+      let entries; try { entries = readdirSync(dir); } catch { return; }
+      for (const e of entries) {
+        const p = join(dir, e);
+        let st; try { st = statSync(p); } catch { continue; }
+        if (st.isDirectory()) { if (!SKIP.has(e)) walk(p, depth + 1); continue; }
+        const dot = e.lastIndexOf('.'); if (dot === -1 || !SRC_EXT.includes(e.slice(dot))) continue;
+        scanned++;
+        let t; try { t = readFileSync(p, 'utf8'); } catch { continue; }
+        let m;
+        URL_RE.lastIndex = 0;  while ((m = URL_RE.exec(t)))  hits.add(m[0]);
+        TMPL_RE.lastIndex = 0; while ((m = TMPL_RE.exec(t))) hits.add(m[1]);
+        LINK_RE.lastIndex = 0; while ((m = LINK_RE.exec(t))) hits.add(`<link id="${m[1] || m[2]}"> - href set at runtime`);
+      }
+    })(root, 0);
+    return [...hits];
+  }
+  // Rank hints so the likely token loader shows first: the dynamic <link> mechanism, then
+  // app/same-origin URLs, and well-known third-party CDNs (highlighters, fonts) last - those
+  // are almost never where DS token values live.
+  const CDN_RE = /cdnjs|jsdelivr|unpkg|googleapis|gstatic|cloudflare/i;
+  const rankHint = h => h.startsWith('<link') ? 0 : (CDN_RE.test(h) ? 2 : 1);
+  const runtimeHints = (unique.length ? [] : detectRuntimeStylesheets(ROOT))
+    .sort((a, b) => rankHint(a) - rankHint(b));
+  const printHints = (out, indent) => { for (const h of runtimeHints.slice(0, 8)) out(C.dim(indent + h)); };
+
+  if (unique.length) {
+    console.log(C.dim(`  Found token CSS file(s): ${unique.join(', ')}`));
+  } else if (runtimeHints.length) {
+    console.log(C.yellow('  ⚠️  No static token CSS found - token values look loaded at runtime from:'));
+    printHints(console.log, '       ');
+    console.log(C.dim('     Download the theme stylesheet(s) locally, then pass them via --theme-css.'));
+  }
+
+  // Auto-detect plugin CSS
+  const pluginCSS = [], plugins = [];
+  const appsDir = join(ROOT, 'apps');
+  if (existsSync(appsDir)) {
+    try {
+      for (const p of readdirSync(appsDir).sort()) {
+        const uiSrc = join('apps', p, 'ui.src.html');
+        if (existsSync(join(ROOT, uiSrc))) { pluginCSS.push(uiSrc); plugins.push(p); }
+      }
+    } catch {}
+  }
+  if (!pluginCSS.length && existsSync(join(ROOT, 'src', 'ui.src.html')))
+    pluginCSS.push('src/ui.src.html');
+  if (pluginCSS.length) {
+    const names = plugins.length ? plugins.slice(0, 3).join(', ') + (plugins.length > 3 ? '…' : '') : pluginCSS.join(', ');
+    console.log(C.dim(`  Found ${pluginCSS.length} plugin CSS file(s): ${names}`));
+  }
+  console.log('');
+
+  // ── Setup answers ─────────────────────────────────────────────────────────────
+  // Answers come from flags (non-interactive) or interactive prompts. Both paths
+  // produce: figmaRaw, themeCSS, figmaSourceKey.
+  const parseKey = raw => figmaFileKeyOf(raw);   // a branch link names the branch
+  const defaultHint = detectedCSS ?? (unique.length > 1 ? unique.join(', ') : null);
+  // Resolve a token-CSS answer to a string / array / null. A blank answer falls
+  // back to any auto-detected file(s); null means "nothing given and none found".
+  const resolveTheme = ans => {
+    const parts = (ans || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length) return parts.length === 1 ? parts[0] : parts;
+    if (unique.length) return unique.length === 1 ? unique[0] : unique;
+    return null;
+  };
+
+  // Where the code is, before anything is written: never guessed (a run in a folder of other code took it for the
+  // design system and set it up there). The Figma link is optional. In a terminal setup asks; an agent or a script
+  // is stopped, told what this folder holds, and its NEXT line asks the person.
+  const holds = () => !hasCode(ROOT) ? 'has no code'
+    : unique.length ? `has code, with design tokens in ${unique.join(', ')}`
+    : takeableUrls(runtimeHints).length ? 'has code that loads its design tokens from hosted stylesheets'
+    : 'has code, but no stylesheet that declares design tokens';
+  const figmaArg = INIT_FIGMA_URL ? ` --figma-url='${INIT_FIGMA_URL}'` : '';
+  if (INIT_NONINTERACTIVE && !INIT_CODE_GIVEN) {
+    console.log(C.yellow('  ⚠️  Setup needs to know where the code is first. Nothing was written.'));
+    console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
+    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or repository link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${thenArg}.`);
+    process.exit(2);
+  }
+  // Told the code is in a folder that has none: the code is somewhere else, or it starts here from Figma. One question.
+  if (INIT_NONINTERACTIVE && !INIT_BUILD && !INIT_THEME_CSS && !hasCode(ROOT)) {
+    console.log(C.yellow(`  ⚠️  This folder has no code: ${ROOT}. Nothing was written.`));
+    console.log(`NEXT: ask the person one question: is the code somewhere else (a folder on this computer or a link to its repository on GitHub or GitLab), or should it start here, built from Figma? Then run rms-design-system-engine --init --project='<their folder or link>'${figmaArg}${thenArg}, or add --build to start it in this folder from Figma${INIT_FIGMA_URL ? '' : ' (with --figma-url=<the Figma link>, which building needs)'}.`);
+    process.exit(2);
+  }
+  if (INIT_BUILD && !INIT_FIGMA_URL) {
+    console.log(C.yellow('  ⚠️  Building from Figma needs the Figma file. Nothing was written.'));
+    console.log(`NEXT: ask the person for the link to the design system's Figma file, then run the same command with --figma-url='<the Figma link>'.`);
+    process.exit(2);
+  }
+  let figmaRaw, themeCSS, figmaSourceKey = '', buildMode = INIT_BUILD;
+  // Token values the product loads from hosted stylesheets (given as URLs, or found in its code when no local file
+  // declares them): every one is taken, each mode in its own block of one local file, so no mode is left out and
+  // nobody is asked which to take (hosted-tokens.mjs).
+  const HOSTED_FILE = 'src/styles/tokens.hosted.css';
+  const takeHosted = async (theme) => {
+    const given = theme == null ? [] : [theme].flat();
+    const urls = given.length ? given.filter((t) => /^https?:\/\//i.test(t)) : takeableUrls(runtimeHints);
+    if (!urls.length) return theme;
+    const local = given.filter((t) => !/^https?:\/\//i.test(t));
+    const files = await fetchHosted(urls, { log: (m) => console.log(C.yellow(`  ⚠️  Not taken: ${m}`)) });
+    // The same address in every other mode the product may have (the code builds it from parts, ${theme}_desktop.css):
+    // each one that answers is taken too, so a mode nobody listed (phone) is never left out.
+    const sizeNames = (() => { try { return Object.values(JSON.parse(readFileSync(join(ROOT, 'src/figma-vars.snapshot.json'), 'utf8')).modeVariants ?? {}).flatMap((d) => (d?.modes ?? []).map((m) => m.name ?? m.snapshotKey)); } catch { return []; } })();
+    if (files.length) files.push(...await fetchHosted(siblingUrls(urls, sizeNames), { log: () => {} }));
+    if (!files.length) { console.log(C.yellow('  ⚠️  None of the hosted token stylesheets could be read.')); return local.length ? (local.length === 1 ? local[0] : local) : null; }
+    const merged = mergeHosted(files);
+    mkdirSync(dirname(join(ROOT, HOSTED_FILE)), { recursive: true });
+    writeFileSync(join(ROOT, HOSTED_FILE), merged.css);
+    const modes = [merged.base.colour, ...merged.colours].filter(Boolean).length > 1 || merged.sizes.length ? ` (${[[merged.base.colour, ...merged.colours].filter(Boolean).join(', '), [merged.base.size, ...merged.sizes].filter(Boolean).join(', ')].filter(Boolean).join(' × ')})` : '';
+    console.log(C.green(`  ✅ Took ${files.length} hosted token stylesheet(s), every mode${modes}, into ${HOSTED_FILE}`));
+    const all = [...local, HOSTED_FILE];
+    return all.length === 1 ? all[0] : all;
+  };
+
+  if (INIT_NONINTERACTIVE) {
+    console.log(C.dim('  Non-interactive setup (flags provided)'));
+    figmaRaw = INIT_FIGMA_URL || '';
+    themeCSS = await takeHosted(resolveTheme(INIT_THEME_CSS));
+    if (INIT_SOURCE_URL) figmaSourceKey = parseKey(INIT_SOURCE_URL);
+    if (themeCSS == null && !figmaRaw && !runtimeHints.length) {
+      console.log(C.yellow(`  ⚠️  No stylesheet that declares design tokens in ${ROOT}, and no Figma file to build them from. Nothing was written.`));
+      console.log(`NEXT: ask the person which file holds the design tokens (then run the same command with --theme-css=<that file>), or for the link to the design system's Figma file to build them from (--figma-url=<the link>).`);
+      process.exit(2);
+    }
+    if (themeCSS == null && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
+    if (themeCSS == null) {
+      console.error(C.red('\n❌ No token CSS file: pass --theme-css=<path[,path]> (none was auto-detected).'));
+      console.error(C.dim('   This DS may inject token values at runtime rather than declaring them in a static CSS file;'));
+      console.error(C.dim('   the value gates need a file that declares :root { --token: value } to resolve against.'));
+      if (runtimeHints.length) {
+        console.error(C.dim('   Detected runtime-loaded stylesheet(s) that likely hold the values - download one and point --theme-css at it:'));
+        printHints(console.error, '     ');
+      }
+      process.exit(2);
+    }
+  } else {
+    const rl  = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = q => new Promise(res => rl.question(q, res));
+
+    figmaRaw = (await ask('Figma file URL (optional, Enter to skip): ')).trim();
+    if (figmaRaw) {
+      const isConsumer = (await ask('Is this a Figma consumer file that uses an external DS library? (y/N): ')).trim().toLowerCase();
+      if (isConsumer === 'y' || isConsumer === 'yes') {
+        const srcUrl = (await ask('DS source Figma URL: ')).trim();
+        if (srcUrl) figmaSourceKey = parseKey(srcUrl);
+      }
+    }
+    if (!INIT_CODE_GIVEN) {
+      console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
+      const where = (await ask('Where is your code? Enter for this folder, or another folder or a link to its repository: ')).trim();
+      if (where && resolve(ROOT, where.replace(/^~(?=\/|$)/, HOME)) !== ROOT) {
+        // The code is elsewhere: setup runs there, with the answers already given.
+        rl.close();
+        const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), '--init', `--project=${where}`, ...(figmaRaw ? [`--figma-url=${figmaRaw}`] : []),
+          ...(figmaSourceKey ? [`--figma-source-url=${figmaSourceKey}`] : []), ...(process.argv.includes('--no-hooks') ? ['--no-hooks'] : [])],
+          { stdio: 'inherit', cwd: PROJECT_FROM, env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+        process.exit(r.status ?? 1);
+      }
+    }
+    const themeAns = defaultHint
+      ? ((await ask(`Token CSS file(s) [${defaultHint}]: `)).trim() || defaultHint)
+      : (await ask(`Token CSS file(s) (e.g. src/styles/theme.css${figmaRaw ? '; leave empty to build them from Figma' : ''}): `)).trim();
+    themeCSS = await takeHosted(resolveTheme(themeAns));
+    if (themeCSS == null && figmaRaw && (INIT_BUILD || !runtimeHints.length)) { themeCSS = BUILD_THEME_DEFAULT; buildMode = true; }
+
+    rl.close();
+    if (themeCSS == null) {
+      console.error(C.red('\n❌ No token CSS file provided and none auto-detected. Re-run and give a path.'));
+      if (runtimeHints.length) {
+        console.error(C.dim('   Token values look loaded at runtime from - download one and point --theme-css at it:'));
+        printHints(console.error, '     ');
+      }
+      process.exit(2);
+    }
+  }
+
+  const figmaFileKey = parseKey(figmaRaw);
+
+  // No token prompt. Parity is token-free and plan-agnostic: running the skill captures
+  // the Figma data via the plugin and commits it, and everyone runs against that. A
+  // FIGMA_TOKEN is a purely optional power-user optimisation (auto-refresh the data each
+  // run + the screenshot gate); if one is already in the environment we quietly use it.
+  const figmaToken = process.env.FIGMA_TOKEN ?? '';
+
+  console.log('');
+
+  // ── Auto-detect Figma collections ─────────────────────────────────────────────
+  // Only the keys something reads. Before Figma is captured the collection names, the colour modes and the naming are
+  // not known: setup lists them in figma.fromCapture and the first capture fills them from what it read.
+  let figmaCfg = { colorCollection: 'Color', sizingCollection: null, primitivePrefix: 'primitives/' };
+  if (figmaFileKey && figmaToken) {
+    // Collection auto-detect is disabled (analyseCollections returns null); kept as a forward hook.
+    // No log line here: an earlier "Querying Figma…" message claimed work that never happens.
+    const detected = await analyseCollections();
+    if (detected) figmaCfg = { ...figmaCfg, ...detected };
+  }
+
+  // ── Write config ──────────────────────────────────────────────────────────────
+  const firstTheme        = [themeCSS].flat()[0];
+  const cssDir            = dirname(firstTheme);
+  const snapshotVars      = join(cssDir, 'figma-vars.snapshot.json').replace(/\\/g, '/');
+  const snapshotStructure = join(cssDir, 'figma-structure.snapshot.json').replace(/\\/g, '/');
+
+  // Colour modes: the Figma snapshot's modes when there is one, each mapped to where the theme CSS puts its
+  // overrides (a data attribute, a class or a media query), never assumed.
+  let modeKeys = ['light', 'dark'], captured = false;
+  try {
+    const color = JSON.parse(readFileSync(join(ROOT, snapshotVars), 'utf8')).color;
+    const keys = color && typeof color === 'object' ? Object.keys(color).filter((k) => !k.startsWith('_') && color[k] && typeof color[k] === 'object') : [];
+    if (keys.length) { modeKeys = keys; captured = true; }
+  } catch { /* no snapshot yet: light and dark, until the first capture says */ }
+  const themeText = [themeCSS].flat().map((f) => { try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; } }).join('\n');
+  const detected = detectModes(themeText, modeKeys);
+  for (const m of detected.modes) {
+    const f = detected.found.find((x) => x.key.toLowerCase() === m.snapshotKey);
+    if (m.cssSelector === 'root') console.log(C.green(`  ✅ Mode ${m.name}: the base :root`));
+    else if (f) console.log(C.green(`  ✅ Mode ${m.name}: ${f.how} in ${[themeCSS].flat().join(', ')}`));
+  }
+  if (detected.unsure.length) console.log(C.yellow(`  ⚠️  No override block found for ${detected.unsure.join(', ')} in the theme CSS: set its cssSelector in ds-config.json → figma.modes (it defaulted to ${detected.modes.filter((m) => detected.unsure.includes(m.snapshotKey) || detected.unsure.includes(m.name)).map((m) => m.cssSelector).join(', ')}).`));
+
+  // A Tailwind v4 theme names its tokens under namespaces (--color-…, --spacing-…): the preset matches them.
+  let twThemeText = '';
+  for (const p of [themeCSS].flat()) { try { twThemeText += readFileSync(resolve(ROOT, p), 'utf8'); } catch { /* not readable yet */ } }
+  if (usesTailwind(twThemeText, ROOT) && !figmaCfg.namingConvention?.preset) {
+    figmaCfg.namingConvention = { ...(figmaCfg.namingConvention ?? {}), preset: 'tailwind' };
+    console.log(C.green('  ✓ Tailwind theme found: token names are matched as Tailwind writes them (figma.namingConvention.preset "tailwind").'));
+  }
+  // What the project's own files already say (setup-facts.mjs): the naming its token CSS follows, every Figma snapshot
+  // beside it, the system's own scripts, the products checked out beside it, and the frames and screens a captured
+  // screen snapshot names. So the first run checks what is there, never setup's guesses.
+  const { repoFacts, namingWords, FROM_CAPTURE } = await import('./setup-facts.mjs');
+  const facts = repoFacts(ROOT, { themeCSS, naming: figmaCfg.namingConvention ?? {} });
+  if (Object.keys(facts.naming.naming).length) {
+    figmaCfg.namingConvention = { ...(figmaCfg.namingConvention ?? {}), ...facts.naming.naming };
+    console.log(C.green(`  ✅ Token names: the CSS ${namingWords(facts.naming.naming)} (${facts.naming.found} of ${facts.naming.of} Figma tokens found that way; figma.namingConvention)`));
+  }
+  if (!captured) {
+    figmaCfg.fromCapture = FROM_CAPTURE;
+    if (figmaFileKey) console.log(C.dim('  The Figma collections, the colour modes and the token naming are filled from the first capture (figma.fromCapture), from what it reads.'));
+  }
+  for (const p of facts.products) {
+    if (p.ui && !pluginCSS.includes(p.ui)) pluginCSS.push(p.ui);
+    if (!plugins.includes(p.key)) plugins.push(p.key);
+  }
+  if (facts.products.length) console.log(C.green(`  ✅ Products beside it that use the system: ${facts.products.map((p) => `${p.key} (${p.dir})`).join(', ')}: their code is read with the system's`));
+  if (facts.crowded) console.log(C.dim(`  Products beside it were not looked for: the folder above this one holds ${facts.crowded} entries, not a folder of projects. Name any in ds-config.json → pluginDirs.`));
+  if (facts.missing.length) console.log(C.yellow(`  ⚠️  products.json lists ${facts.missing.join(', ')}, not checked out beside this folder: clone ${facts.missing.length === 1 ? 'it' : 'them'} next to it and run setup again, so their code is checked too`));
+  if (facts.scripts.length) console.log(C.green(`  ✅ The system's own script${facts.scripts.length === 1 ? '' : 's'}: ${facts.scripts.join(', ')}${facts.iconSources.length ? ` (its icons are defined in ${facts.iconSources.join(', ')})` : ''}`));
+  if (facts.frames.length || facts.screens.length) console.log(C.green(`  ✅ From the screens already captured: ${facts.frames.length} frame${facts.frames.length === 1 ? '' : 's'} and ${facts.screens.length} screen${facts.screens.length === 1 ? '' : 's'} (${facts.snapshots.snapshotScreenComponents})`));
+  const generated = {
+    figmaFileKey:  figmaFileKey || '',
+    ...(figmaSourceKey ? { figmaSourceKey } : {}),
+    frames: facts.frames,
+    ...(facts.screens.length ? { screens: facts.screens } : {}),
+    figma: {
+      ...figmaCfg,
+      modes: detected.modes,
+    },
+    paths: { themeCSS, ...facts.snapshots, snapshotVars, snapshotStructure, pluginCSS, plugins, ...(facts.iconSources.length ? { sharedIconSources: facts.iconSources } : {}) },
+    ...(facts.products.length ? { pluginDirs: Object.fromEntries(facts.products.map((p) => [p.key, p.dir])) } : {}),
+    ...(facts.scripts.length ? { systemScripts: facts.scripts } : {}),
+    visualRefs: newPath('refs'),
+    // No webhook until one is set up (setup-webhook.mjs): a placeholder secret is a setting nobody asked for.
+    knownUnusedVars: [],
+    knownHardcodedExceptions: [],
+    ...(buildMode ? { build: true } : {}),
+  };
+
+  writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify(generated, null, 2) + '\n');
+  console.log(C.green('✅ ds-config.json written'));
+  if (buildMode) console.log(C.green(`✅ Build mode: ${INIT_BUILD ? 'this project' : `no stylesheet declares design tokens in ${ROOT}, so it`} starts from Figma. What Figma has and the code does not yet is listed as to build, never as a failure, and the tokens go in ${firstTheme}.`));
+  if (!figmaFileKey) console.log(C.yellow('  ⚠️  No Figma file: the checks of the code alone run; the checks against Figma wait until its link is added (figmaFileKey in ds-config.json).'));
+
+  // ── Save FIGMA_TOKEN to .env ──────────────────────────────────────────────────
+  // (The `!envContent.includes('FIGMA_TOKEN')` guard below already prevents a duplicate, so no
+  // separate "already exists" flag is needed — an earlier `!existingToken` here referenced an
+  // undeclared identifier and threw a ReferenceError mid-setup whenever FIGMA_TOKEN was set.)
+  if (figmaToken) {
+    const envContent = existsSync(join(ROOT, '.env')) ? readFileSync(join(ROOT, '.env'), 'utf8') : '';
+    if (!envContent.includes('FIGMA_TOKEN')) {
+      writeFileSync(join(ROOT, '.env'), envContent + (envContent.endsWith('\n') ? '' : '\n') + `FIGMA_TOKEN=${figmaToken}\n`);
+      console.log(C.green('✅ FIGMA_TOKEN saved to .env'));
+    }
+  }
+
+  // ── Scaffold design-system-engine-map.mjs and structure-contract.mjs ───────────────────────
+  for (const [example, target] of [
+    ['design-system-engine-map.example.mjs', newPath('map')],
+    ['structure-contract.example.mjs',  'structure-contract.mjs'],
+  ]) {
+    const src  = join(SCRIPT_DIR, example);
+    const dest = join(ROOT, target);
+    if (!existsSync(dest) && existsSync(src)) {
+      copyFileSync(src, dest);
+      console.log(C.green(`✅ ${target} scaffolded from example - fill in your DS values`));
+    }
+  }
+
+  // ── Update .gitignore ─────────────────────────────────────────────────────────
+  const giPath    = join(ROOT, '.gitignore');
+  const giContent = existsSync(giPath) ? readFileSync(giPath, 'utf8') : '';
+  // Only gitignore secrets and auto-generated transients.
+  // ds-config.json, design-system-engine-map.mjs, structure-contract.mjs contain no secrets -
+  // commit them so CI can run parity without interactive setup.
+  const toAdd     = ['.env', 'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', newPath('checkResult'), `${OUT_DIR}/`]
+    .filter(e => !giContent.split('\n').some(l => l.trim() === e));
+  if (toAdd.length) {
+    const block = '\n# rms-design-system-engine: secrets + auto-generated transients - do not commit\n' + toAdd.join('\n') + '\n';
+    writeFileSync(giPath, giContent + (giContent.endsWith('\n') ? '' : '\n') + block);
+    console.log(C.green('✅ .gitignore updated'));
+  }
+
+  // ── Next-steps checklist ──────────────────────────────────────────────────────
+  console.log('\n' + C.bold('─── Next steps ─────────────────────────────────────────────'));
+  console.log(`  1. Run ${C.bold('/rms-design-system-engine')} - it captures the Figma data for you`);
+  console.log(`     (no token needed) and audits the code. Commit the *.snapshot.json files.`);
+  console.log(`  2. ${C.bold(newPath('map'))} - fill in primitive scale (NEUTRAL_LIGHT/DARK)`);
+  console.log(`       and any token→var exceptions (EXPLICIT, SKIP_TOKENS)`);
+  console.log(`  3. ${C.bold('structure-contract.mjs')} - add component height/padding contracts`);
+  console.log(`       (only needed for Gates [3] and [8])`);
+  console.log(C.dim('  Advanced (optional): a FIGMA_TOKEN in .env auto-refreshes the data each run'));
+  console.log(C.dim('  and enables the screenshot gate. Never required - parity runs without it.'));
+  console.log('─'.repeat(WIDTH) + '\n');
+  // The never-rules as hooks in this project, unless --no-hooks.
+  if (!process.argv.includes('--no-hooks')) {
+    try {
+      const { installHooks } = await import('./hooks-install.mjs');
+      const r = installHooks(ROOT);
+      console.log(C.green(`✅ Hooks installed in ${relative(ROOT, r.file)}`) + C.dim(' (never edit a Figma snapshot by hand; ask before commit, push, applying the hand-back or editing ds-config.json; route each /rms-design-system-engine request). Off: --remove-hooks.'));
+    } catch (e) { console.log(C.yellow(`⚠️  Hooks not installed: ${e.message}`)); }
+  }
+  // Other agents set up here (Cursor, Copilot) have no hooks: their instruction file can carry the engine's rules.
+  try {
+    const { otherAgents } = await import('./agent-rules.mjs');
+    const others = otherAgents(ROOT);
+    if (others.length) console.log(C.dim(`  Agents with no hooks read their own instruction file (${others.join(', ')} here): rms-design-system-engine --agent-rules shows the engine's rules for it, written there once you say yes.`));
+  } catch { /* an offer, never a step */ }
+  // The request setup was reached from comes back first: routed now, as the person asked it.
+  if (INIT_THEN) console.log(`NEXT: the person asked: "${INIT_THEN}". Setup is done; route that request now: rms-design-system-engine --route '${INIT_THEN.replace(/'/g, `'\\''`)}', and follow what it prints.\n`);
+  else console.log(buildMode
+    ? 'NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then lists what to build, tokens first)\n'
+    : 'NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then audits)\n');
+
+  return generated;
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+(async () => {
+  // ── Load or generate config ─────────────────────────────────────────────────
+  // The installed skill keeps itself current (once a day, clean main only), then restarts on the new code.
+  try {
+    const { autoUpdate, updatedLine } = await import('./self-update.mjs');
+    const up = autoUpdate(SCRIPT_DIR);
+    if (up.updated) {
+      console.log(updatedLine(up, describeHead() ?? ''));
+      const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+      process.exit(r.status ?? 1);
+    }
+  } catch { /* an update must never stop an audit */ }
+
+  let cfg = {};
+  if (INIT_ONLY) {
+    // A project already set up keeps its config: setup again replaces it only when asked to (--reconfigure).
+    if (existsSync(join(ROOT, 'ds-config.json')) && !process.argv.includes('--reconfigure')) {
+      // Another Figma link for a project already set up (a branch of the file, or another file): only the file key
+      // changes, everything else in ds-config.json stays. The next refresh reads the new file.
+      const key = INIT_FIGMA_URL ? figmaFileKeyOf(INIT_FIGMA_URL) : '';
+      let had = null;
+      try { had = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* unreadable: said below */ }
+      if (key && had && had.figmaFileKey !== key) {
+        const main = figmaMainKeyOf(INIT_FIGMA_URL);
+        writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify({ ...had, figmaFileKey: key }, null, 2) + '\n');
+        console.log(`✓ The Figma file is now ${key}${main ? `, a branch of ${main}: it stays as it is while the main file changes` : ''} (it was ${had.figmaFileKey || 'none'}). Nothing else in ds-config.json changed.`);
+        console.log('NEXT: refresh the Figma data, so the snapshots are read from this file (the ones there now were read from the previous one), then run the audit.');
+        process.exit(0);
+      }
+      console.log('This project is already set up (ds-config.json); nothing was written.');
+      console.log('NEXT: run the audit (rms-design-system-engine), or answer a question with rms-design-system-engine --query <name>. To set it up again from scratch, replacing ds-config.json, add --reconfigure.');
+      process.exit(0);
+    }
+    await bootstrapConfig();
+    process.exit(0);
+  }
+  try {
+    cfg = await settleConfig(JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')));
+  } catch {
+    if (process.env.CI) {
+      console.error('❌ ds-config.json not found. In CI, commit ds-config.json to the repository (it contains no secrets - only paths and the public Figma file key).');
+      process.exit(1);
+    }
+    cfg = await bootstrapConfig();
+  }
+  logUsage(ROOT, { kind: 'run', args: process.argv.slice(2).filter((a) => a.startsWith('--') || !a.includes('/')) });
+  // Hooks installed before the router existed get it now: the update reaches every opted-in project.
+  try {
+    const { upgradeHooks } = await import('./hooks-install.mjs');
+    if (upgradeHooks(ROOT, cfg)) console.log(C.dim('ℹ️  Hooks updated: each /rms-design-system-engine request is now routed by the engine (.claude/settings.local.json). Off: --remove-hooks.'));
+  } catch { /* never blocks a run */ }
+
+  // Set up without a Figma file (setup writes figmaFileKey "" then), and no Figma data captured: every gate compares
+  // the code with Figma, so only the accessibility check of the code runs, and the run says the rest waits for the
+  // Figma link. A config with no figmaFileKey at all keeps its Figma data elsewhere and is audited as it always was.
+  const figmaData = [cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json', cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json', cfg.paths?.compPropsSnapshot].filter(Boolean);
+  if (!ONLY && cfg.figmaFileKey === '' && !cfg.figmaSourceKey && !figmaData.some((f) => existsSync(join(ROOT, f)))) {
+    ONLY_LABELS = readGateLabels(join(SCRIPT_DIR, 'audit.mjs'));
+    ONLY = parseOnly(['accessibility'], ONLY_LABELS);
+    NO_FIGMA = true;
+    console.log(C.yellow('ℹ️  No Figma file in ds-config.json (figmaFileKey): only the accessibility check of the code runs. The checks against Figma wait until its link is added.'));
+  }
+
+  // Build mode: a component built into its own stylesheet is read from then on (build-list.mjs).
+  try {
+    const { recordComponentStylesheets } = await import('./build-list.mjs');
+    const added = await recordComponentStylesheets(ROOT, cfg);
+    if (added.length) console.log(C.dim(`ℹ️  Build mode: ${added.join(', ')} ${added.length === 1 ? 'holds' : 'hold'} a component's rules, so ds-config.json → paths.themeCSS now lists ${added.length === 1 ? 'it' : 'them'} and every gate reads ${added.length === 1 ? 'it' : 'them'}.`));
+  } catch { /* never blocks a run */ }
+
+  // THEMES: always an array - supports single string or array of paths
+  const THEMES      = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
+  const THEME       = THEMES[0]; // primary path (for snapshot derivation, Gate 7)
+  const THEME_LABEL = THEMES.length === 1 ? THEMES[0] : `[${THEMES.map(p => p.split('/').pop()).join(', ')}]`;
+  function readThemeCSS() {
+    return THEMES.filter(p => existsSync(join(ROOT, p)))
+      .map(p => readFileSync(join(ROOT, p), 'utf8')).join('\n');
+  }
+  const SNAP_VARS        = cfg.paths?.snapshotVars       ?? 'src/figma-vars.snapshot.json';
+  const SNAP_STRUCT      = cfg.paths?.snapshotStructure  ?? 'src/figma-structure.snapshot.json';
+  const SNAP_COMP_PROPS  = cfg.paths?.compPropsSnapshot  ??
+    SNAP_VARS.replace(/[^/\\]+$/, 'figma-component-props.snapshot.json');
+  const SNAP_FRAME_GEOM  = cfg.paths?.snapshotFrameGeometry ?? null;
+  const SNAP_SCREEN_COMPONENTS = cfg.paths?.snapshotScreenComponents ?? 'figma-screen-components.snapshot.json';
+  const PLUGIN_CSS  = cfg.paths?.pluginCSS          ?? [];
+  const PLUGINS     = cfg.paths?.plugins            ?? [];
+  const KNOWN_UNUSED     = new Set(cfg.knownUnusedVars         ?? []);
+
+// ── Full findings on disk ─────────────────────────────────────────────────────
+// Every list here is capped so the terminal stays readable, but a capped list is a
+// half-truth: "80 hit(s)" that prints 20 sends you off to write your own scanner to
+// see the rest - which is exactly what happened. Write the complete list next to the
+// summary and name the file, so nothing is ever only-partly reported.
+const _overflowDir = join(ROOT, OUT_DIR);
+const _overflowFiles = [];
+function reportFull(label, items, shown) {
+  if (items.length <= shown) return [];
+  try {
+    if (!existsSync(_overflowDir)) mkdirSync(_overflowDir, { recursive: true });
+    const file = join(_overflowDir, `${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`);
+    writeFileSync(file, items.join('\n') + '\n');
+    _overflowFiles.push(file);
+    return [C.dim(`     … ${items.length - shown} more - full list: ${relative(ROOT, file)}`)];
+  } catch {
+    return [C.dim(`     … ${items.length - shown} more (could not write the full list)`)];
+  }
+}
+
+  const KNOWN_FS_EXCEPTS = cfg.knownHardcodedExceptions        ?? cfg.knownFontSizeExceptions ?? [];
+  // Indices of exceptions that suppressed at least one real line this run. Everything
+  // else is either stale (the code it excused is gone) or was never needed.
+  const _exceptHits = new Set();
+  // findIndex → record + report truthiness in one step, so every call site that
+  // consults the exception list also contributes to the staleness audit.
+  const markExceptHit = (i) => { if (i !== -1) { _exceptHits.add(i); return true; } return false; };
+
+  // Directories and files to never scan for var() references or hardcoded values.
+  const SCAN_EXCLUDE_DIRS = new Set([
+    'node_modules', '.git', 'dist', 'build', '.nuxt', '.next', '.output',
+    'coverage', '.cache', 'public', 'static',
+    ...ENGINE_DIRS,   // the engine's own output and references, never the project's source
+    ...(cfg.scanExcludeDirs ?? []),
+  ]);
+  // Only scan files that can realistically contain CSS var() references.
+  const SCAN_EXTENSIONS = new Set([
+    '.css', '.scss', '.sass', '.less', '.styl',
+    '.vue', '.svelte',
+    '.html', '.htm',
+    '.jsx', '.tsx', '.js', '.ts',
+  ]);
+  // Files whose content is auto-generated and should not be treated as source.
+  const SCAN_EXCLUDE_FILENAMES = new Set([
+    'figma-vars.snapshot.json', 'figma-structure.snapshot.json',
+    'figma-component-props.snapshot.json',
+    'bound-tokens.json', 'component-state-tokens.json', 'component-state-bindings.json', PROJECT.history.now, 'master-token-table.md',
+    ...(cfg.scanExcludeFilenames ?? []),
+  ]);
+
+  // scanExcludeFilenames entries may use `*` wildcards (e.g. "preview-*.html"), so a
+  // project can exclude a family of generated files without listing each one. Exact
+  // names still match as before.
+  const SCAN_EXCLUDE_GLOBS = [...SCAN_EXCLUDE_FILENAMES]
+    .filter(n => n.includes('*'))
+    .map(n => new RegExp('^' + n.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$'));
+
+  // Generated surfaces are not source: the styleguide template and its output show every component
+  // on purpose (their own layout classes and demo values are not the project's CSS).
+  const SCAN_EXCLUDE_PATHS = new Set([(cfg.styleguide ?? cfg.showroom)?.template, (cfg.styleguide ?? cfg.showroom)?.out]
+    .filter(Boolean).map(p => resolve(ROOT, p)));
+  function collectSourceFiles(dir = ROOT, results = []) {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return results; }
+    for (const e of entries) {
+      if (SCAN_EXCLUDE_DIRS.has(e.name)) continue;
+      if (e.isDirectory()) {
+        collectSourceFiles(join(dir, e.name), results);
+      } else if (e.isFile()) {
+        if (SCAN_EXCLUDE_FILENAMES.has(e.name) || SCAN_EXCLUDE_GLOBS.some(r => r.test(e.name))) continue;
+        if (SCAN_EXCLUDE_PATHS.has(join(dir, e.name))) continue;
+        const dot = e.name.lastIndexOf('.');
+        if (dot !== -1 && SCAN_EXTENSIONS.has(e.name.slice(dot))) {
+          results.push(join(dir, e.name));
+        }
+      }
+    }
+    return results;
+  }
+
+  // Lazily collected once and reused across gates.
+  let _allSourceFiles = null;
+  function allSourceFiles() {
+    // The project and the sibling folders ds-config.json names (code-roots.mjs).
+    if (!_allSourceFiles) { _allSourceFiles = []; for (const root of codeRoots(ROOT, cfg)) collectSourceFiles(root, _allSourceFiles); }
+    return _allSourceFiles;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function sh(cmd, args = [], opts = {}) {
+    return spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
+  }
+
+  // grep with a chunked file list + forced -H. A single grep over every source file can
+  // exceed the OS argv limit on a large repo, which makes the call fail and the scan
+  // silently find nothing; chunking avoids that, and -H keeps the `file:line:` prefix the
+  // hit parsers rely on even when a chunk (e.g. the last one) holds a single file.
+  function grepFiles(args, files) {
+    const CHUNK = 400;
+    let stdout = '';
+    for (let i = 0; i < files.length; i += CHUNK) {
+      const r = sh('grep', ['-H', ...args, ...files.slice(i, i + CHUNK)]);
+      if (r.stdout) stdout += r.stdout;
+    }
+    return { stdout };
+  }
+
+  // Run one gate script. Never rejects and never hangs the audit:
+  //   • the gate runs under this same Node (process.execPath), so a hook with a different PATH
+  //     cannot pick an older Node or fail to find one;
+  //   • a gate that cannot start, is killed (out of memory, a signal) or runs past its time limit
+  //     (ds-config.json → gateTimeoutSec, default 180) is a FAIL with the reason, never a pass;
+  //   • status null is kept for one meaning only: the script file does not exist.
+  const GATE_TIMEOUT_MS = Math.max(10, Number(cfg.gateTimeoutSec) || 180) * 1000;
+  function runScriptAsync(scriptPath, args = [], timeoutMs = GATE_TIMEOUT_MS) {
+    return new Promise(res => {
+      const abs = resolve(SCRIPT_DIR, scriptPath);
+      if (!existsSync(abs)) return res({ status: null, stdout: '', stderr: '' });
+      let stdout = '', stderr = '', done = false, timedOut = false;
+      const finish = (status, why) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (why) stdout += `\n❌ ${scriptPath} ${why} - not verified\n`;
+        res({ status: why ? 1 : status, stdout, stderr, ...(why ? { stopped: why } : {}) });
+      };
+      let child;
+      try { child = spawn(process.execPath, ['--import', pathToFileURL(join(SCRIPT_DIR, 'stdio-sync.mjs')).href, abs, ...args], { cwd: ROOT, env: process.env }); }
+      catch (e) { return finish(1, `could not start (${e.message})`); }
+      const timer = setTimeout(() => { timedOut = true; try { child.kill('SIGKILL'); } catch { /* already gone */ } }, timeoutMs);
+      child.stdout.on('data', d => { stdout += d; });
+      child.stderr.on('data', d => { stderr += d; });
+      child.on('error', e => finish(1, `could not start (${e.message})`));
+      child.on('close', (status, signal) => {
+        if (timedOut) return finish(1, `timed out after ${timeoutMs / 1000}s (raise ds-config.json → gateTimeoutSec if it needs longer)`);
+        if (status === null) return finish(1, `was stopped (${signal ?? 'killed'})`);
+        finish(status);
+      });
+    });
+  }
+
+  // A snapshot can be fresh and still be useless: if a capture returns nothing, the
+  // file is written with only its _updated stamp, every consuming gate silently
+  // checks zero items, and the audit reports green. Age alone cannot see that -
+  // count the real entries too. Metadata keys are _-prefixed by convention.
+  function snapshotEntryCount(file, key = null) {
+    try {
+      const snap = JSON.parse(readFileSync(join(ROOT, file), 'utf8'));
+      const scope = key ? (snap[key] ?? {}) : snap;
+      return Object.keys(scope).filter((k) => !k.startsWith('_')).length;
+    } catch { return null; }
+  }
+
+  function snapshotAge(file) {
+    try {
+      const snap = JSON.parse(readFileSync(join(ROOT, file), 'utf8'));
+      if (!snap._updated) return null;
+      return Math.floor((Date.now() - new Date(snap._updated).getTime()) / 3_600_000);
+    } catch { return null; }
+  }
+
+  // ── Gate parsers (subprocess-based gates) ────────────────────────────────────
+  function parseGate2(r) {
+    if (r.status === null) return { pass: false, lines: [C.red('parity-check.mjs not found')] };
+    const out  = r.stdout + r.stderr;
+    const pass = r.status === 0;
+    const summary    = out.split('\n').filter(l => /✅|❌|⚠️/.test(l) && l.trim()).map(l => l.trim());
+    const shown      = new Set(summary);
+    const failDetails = pass ? [] : out.split('\n')
+      .filter(l => (l.trim().startsWith('❌') || l.trim().startsWith('Fix:')) && !shown.has(l.trim()))
+      .map(l => '  ' + l.trim()).slice(0, 30);
+    return { pass, lines: [...summary, ...failDetails] };
+  }
+
+  function parseGate3(r) {
+    if (r.status === null) return { pass: true, lines: ['⏭ structure-check.mjs not found - skipped'] };
+    const out  = r.stdout + r.stderr;
+    if (r.status === 2) {
+      // Cannot verify: no compiled component CSS to check against (paths.pluginCSS empty, or pointed
+      // at SCSS/Vue source). Not a parity divergence - a setup gap. Surface the checker's remediation
+      // verbatim so the fix is on screen, and block (pass:false) rather than a bare/opaque fail.
+      const guidance = out.split('\n')
+        .filter(l => /🚧|❌|·|Why:|Fix|Note:|Do NOT|^\s+\d\./.test(l))
+        .map(l => l.replace(/\s+$/, ''));
+      return { pass: false, lines: [C.yellow('🚧 STRUCTURE cannot verify - no compiled component CSS.'), ...guidance] };
+    }
+    const pass = r.status === 0;
+    // A measured, variant or visual item about a component outside a scoped run is left out, like any other gate's.
+    const perComponent = (l) => /⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🖼  (⚠️|✓) /.test(l);
+    const summary    = out.split('\n').filter(l => /✅|❌|⚠️  MEASURED|⚠️  VARIANTS|⚠️  NO-SHRINK|⚠️  .*: Figma .*, rendered |⚠️  .* has no counterpart in code|🔗 .* in Figma: |↳ |📋 census: |least checked: |🖼  /.test(l) && l.trim())
+      .filter(l => !_scopeForms.length || !perComponent(l) || _lineInScope(l)).map(l => l.trim());
+    // A ❌ line the summary already shows is not said again under it.
+    const inSummary = new Set(summary);
+    const failDetails = pass ? [] : out.split('\n')
+      .filter(l => l.trim().startsWith('❌') && !l.includes('FAIL  0') && !inSummary.has(l.trim()))
+      .map(l => '  ' + l.trim()).slice(0, 20);
+    return { pass, lines: [...summary, ...failDetails] };
+  }
+
+  function parseGate4(r) {
+    if (r.status === null) return { pass: true, lines: ['⏭ bound-check.mjs not found - skipped'] };
+    const out = r.stdout + r.stderr;
+    if (r.status === 2) {
+      // bound-tokens.json is missing. Frames are optional - when the audited URL is a
+      // COMPONENT_SET definition (not a screen with instances), ds-config.json frames[]
+      // is legitimately empty and there is nothing to walk. Degrade to SKIP rather than
+      // hard-fail: the user opted out of frame-usage coverage, not misconfigured it.
+      if (!cfg.frames?.length) {
+        return {
+          pass: true,
+          lines: [
+            C.yellow('⏭ SKIPPED - no frames[] configured in ds-config.json.'),
+            C.dim('   Bound-token coverage checks tokens bound in usage frames (screens with instances).'),
+            C.dim('   Add ds-config.json frames[] to enable it; auditing a COMPONENT_SET definition needs none.'),
+          ],
+        };
+      }
+      // Frames ARE configured but the file was never generated - that is a real error.
+      return {
+        pass: false,
+        lines: [
+          C.red('❌ HARD FAIL - bound-tokens.json missing (frames[] are configured).'),
+          C.red('   Generate it with the Phase 1 Plugin API bound walk (works on any plan) and commit it.'),
+        ],
+      };
+    }
+    // Coverage always runs fully against bound-tokens.json - the file is produced by the Phase 1
+    // Plugin API walk (any plan) and committed. Staleness of the file itself is Gate [1]'s job.
+    const pass       = r.status === 0;
+    const summary    = out.split('\n').filter(l => /COVERED|UNCOVERED/.test(l) && l.trim()).map(l => l.trim());
+    const failDetails = pass ? [] : out.split('\n').filter(l => l.trim().startsWith('❌')).map(l => '  ' + l.trim()).slice(0, 20);
+    const boundAge   = snapshotAge('bound-tokens.json');
+    const provenance = boundAge === null
+      ? C.dim('coverage source: bound-tokens.json (no _updated stamp - age tracked by Gate [1] once refreshed)')
+      : C.dim(`coverage source: bound-tokens.json (updated ${boundAge}h ago via the Phase 1 Plugin API capture)`);
+    return { pass, lines: [provenance, ...summary, ...failDetails] };
+  }
+
+  function parseGate8(r) {
+    if (r.status === null) return { pass: true, lines: ['⏭ subcomponent-isolation-check.mjs not found - skipped'] };
+    const out  = r.stdout + r.stderr;
+    const pass = r.status === 0;
+    const summary    = out.split('\n')
+      .filter(l => /✅ DOCUMENTED|✅ No new|❌ UNDOCUMENTED/.test(l) && l.trim())
+      .map(l => l.trim());
+    const failDetails = pass ? [] : out.split('\n')
+      .filter(l => l.trim().startsWith('❌') && !l.includes('UNDOCUMENTED'))
+      .map(l => '  ' + l.trim()).slice(0, 20);
+    return { pass, lines: [...summary, ...failDetails] };
+  }
+
+  function parseGate9(r) {
+    if (r.status === null) return { pass: true, lines: ['⏭ visual-regression-check.mjs not found - skipped'] };
+    const out = r.stdout + r.stderr;
+    if (r.status === 0 && out.includes('No frames')) {
+      const msg = out.split('\n').find(l => l.trim()) ?? 'Skipped';
+      return { pass: true, lines: [`⏭ ${msg.trim()}`] };
+    }
+    // A status-0 run that compared NO frame (FIGMA_TOKEN absent, token lacks scope, images-API or
+    // network error) prints only a "⏭ … skipped" line that the summary filter below drops, leaving
+    // a silent green that asserted nothing - the exact "silence is never a pass" hole. Surface it as
+    // an explicit SKIP instead, so a green here always means at least one frame was actually checked.
+    const compared = /✅|❌|📸/.test(out);
+    if (r.status === 0 && !compared) {
+      const msg = (out.split('\n').find(l => l.trim() && /skip/i.test(l))
+        ?? out.split('\n').find(l => l.trim())
+        ?? 'visual check did not run (no frame was compared)').replace(/^[⏭\s]+/, '').trim();
+      return { pass: true, planLimited: true, lines: [`⏭ ${msg}`] };
+    }
+    const pass     = r.status === 0;
+    const summary  = out.split('\n').filter(l => /✅|❌|📸|ℹ️/.test(l) && l.trim()).map(l => l.trim()).slice(0, 8);
+    // The script prints its accept hint as `Accept: mv "…"`, so the old `startsWith('mv ')` never
+    // matched - key off the `.new.png` path and the `Accept:` prefix instead.
+    const fixLines = pass ? [] : out.split('\n')
+      .filter(l => l.includes('.new.png') || l.trim().startsWith('Accept:'))
+      .map(l => '  ' + l.trim()).slice(0, 6);
+    return { pass, lines: [...summary, ...fixLines] };
+  }
+
+  function combineGates(...results) {
+    const allPass = results.every(r => r.pass || r.planLimited);
+    // A part that could not run is shown in the lines; it makes the whole gate ⏭ only when no part ran.
+    const anyPlanLimited = results.some(r => r.planLimited && !r.notRun) || results.every(r => r.notRun);
+    return {
+      pass: results.every(r => r.pass),
+      planLimited: allPass && anyPlanLimited,
+      notRun: allPass && results.every(r => r.notRun || r.planLimited) && results.some(r => r.notRun) ? results.filter(r => r.notRun).map(r => r.notRun).join('; ') : undefined,
+      lines: results.flatMap(r => r.lines),
+    };
+  }
+
+  // Generic parser for subprocess gates: pass/fail from exit code, summary from keyword lines
+  // (audit-parse.mjs: skip lines always shown, no silent green, each line once)
+  function parseGeneric(r, summaryRe) {
+    return parseGateOutput(r, summaryRe);
+  }
+
+  // ── Inline gate computations (no subprocess) ─────────────────────────────────
+  // An age in hours, said as people say it: 5 hours, 3 days, 277 days.
+  const ageWords = (h) => (h < 48 ? `${h} hour${h === 1 ? '' : 's'}` : `${Math.floor(h / 24)} days`);   // as the summary counts them
+  function computeGate1() {
+    const vars      = snapshotAge(SNAP_VARS);
+    const struct    = snapshotAge(SNAP_STRUCT);
+    const compProps = snapshotAge(SNAP_COMP_PROPS);
+    const lines  = [];
+    let warn     = false;
+    let versionMismatch = false;   // set when the DS file version differs from a snapshot's stamp
+
+    // An invalid credential must never be excused as a plan limitation - that reads as
+    // "nothing to do here" while every REST-backed refresh silently stops running.
+    if (_figmaAuthFailed) {
+      lines.push(C.red('❌ FIGMA_TOKEN rejected by Figma (invalid or expired)'));
+      lines.push(C.red('   Every REST-backed snapshot refresh and Gate [14] icon freshness is'));
+      lines.push(C.red('   skipped until it is reissued - stale data below is a consequence, not'));
+      lines.push(C.red('   a plan limitation. Reissue at figma.com → Settings → Personal access'));
+      lines.push(C.red('   tokens (needs file_content:read) and update .env / CI secrets.'));
+      warn = true;
+    }
+
+    // ── Has the DS file changed since the snapshot was captured? (ADVISORY) ──────
+    // Figma versions the WHOLE file: any edit anywhere - an unrelated component, a
+    // comment, a moved frame - bumps the `version` id. So a file-version mismatch does
+    // NOT mean the audited component changed, and it must not hard-fail the audit (that
+    // was a false positive on any shared DS file). It is surfaced as an advisory: re-run
+    // Phase 1 if the change touched what you are auditing. REAL drift is still a hard
+    // fail below - the component inventory (added/removed components) and the value,
+    // structure and icon gates, which compare the snapshot against the code directly.
+    if (_figmaFileVersion) {
+      let snapVersion = null;
+      try { snapVersion = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8'))._figmaVersion ?? null; } catch { /* handled below */ }
+      if (!snapVersion) {
+        lines.push(C.yellow('⚠️  vars snapshot has no _figmaVersion stamp - cannot tell whether the DS'));
+        lines.push(C.yellow('    changed since it was captured. Re-run Phase 1 to record one.'));
+      } else if (String(snapVersion) !== String(_figmaFileVersion)) {
+        lines.push(C.yellow('⚠️  The Figma file changed since this snapshot was captured (advisory)'));
+        lines.push(C.yellow(`   snapshot version ${snapVersion} → file is now ${_figmaFileVersion}`));
+        if (_figmaFileModified) lines.push(C.yellow(`   last modified ${_figmaFileModified}`));
+        lines.push(C.yellow('   Figma versions the whole file, so this is often an unrelated edit elsewhere.'));
+        lines.push(C.yellow('   Re-run /rms-design-system-engine (Phase 1) if the change touched audited components.'));
+        lines.push(C.yellow('   Real drift is still caught below by the component inventory and the value gates.'));
+        versionMismatch = true;
+        // Advisory only by default - escalated to a hard fail below when versionLockStrict is set.
+      } else {
+        lines.push('DS file unchanged since capture ✓ (version matches)');
+      }
+
+      // Structure snapshot captured at a different file version - same reasoning: advisory,
+      // not a hard fail. A genuine padding/gap/height rebind still surfaces in the structure
+      // gate itself (which compares captured geometry to the CSS), not here.
+      let structVersion = null;
+      try { structVersion = JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8'))._figmaVersion ?? null; } catch { /* struct snapshot missing - flagged below */ }
+      if (structVersion == null) {
+        lines.push(C.yellow('⚠️  structure snapshot has no _figmaVersion stamp - a padding/gap/height'));
+        lines.push(C.yellow('    rebind cannot be detected. Re-run Phase 1 Step 1c to record one.'));
+      } else if (String(structVersion) !== String(_figmaFileVersion)) {
+        lines.push(C.yellow('⚠️  Structure snapshot captured at an older file version (advisory)'));
+        lines.push(C.yellow(`   structure version ${structVersion} → file is now ${_figmaFileVersion}`));
+        lines.push(C.yellow('   Re-run Phase 1 Step 1c if a padding/gap/height rebind was part of the change.'));
+        versionMismatch = true;
+        // Advisory only by default - escalated to a hard fail below when versionLockStrict is set.
+      }
+    }
+
+    // ── Component inventory: has the DS gained or lost a whole component? ─────────
+    // A version bump says "something changed" but not what - and a new component whose
+    // tokens the code hasn't seen is the change most likely to slip through, because a
+    // token-value diff can't see a component the snapshot never listed. Diff the LIVE set
+    // of DS component names against the structure snapshot's keys so an added/removed
+    // component always surfaces by name. Genuinely-unused DS components go in
+    // knownUnimplementedComponents (the same exemption Gate [18] uses).
+    if (_liveComponentNames) {
+      let snapComps = [];
+      try { snapComps = Object.keys(JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8')).components ?? {}); } catch { /* struct snapshot missing - flagged elsewhere */ }
+      const known = new Set(cfg.knownUnimplementedComponents ?? []);
+      const snapSet = new Set(snapComps);
+      let added   = [...(_liveComponentNames)].filter(n => !snapSet.has(n) && !known.has(n)).sort();
+      let removed = snapComps.filter(n => !_liveComponentNames.has(n) && !known.has(n)).sort();
+      // Scoped run: only inventory changes for the in-scope components matter here - the
+      // rest is another component's concern. Collapse the out-of-scope ones to one line.
+      if (_scopeForms?.length) {
+        const inScope = (n) => { const nn = _norm(n); return _scopeForms.some(f => nn === f.nameNorm || nn.includes(f.nameNorm) || f.nameNorm.includes(nn)); };
+        const out = added.filter(n => !inScope(n)).length + removed.filter(n => !inScope(n)).length;
+        added = added.filter(inScope); removed = removed.filter(inScope);
+        if (out) lines.push(C.dim(`component inventory: ${out} change(s) outside ${_scopeNames.join(', ')} - not audited in this scoped run`));
+      }
+      if (added.length) {
+        lines.push(C.red(`❌ ${added.length} DS component(s) not in the structure snapshot: ${added.join(', ')}`));
+        lines.push(C.red('   A new/unmodelled component is unaudited. Run Phase 1 Step 1c to capture it,'));
+        lines.push(C.red('   or list a genuinely-unused one in ds-config.json → knownUnimplementedComponents.'));
+        warn = true;
+      }
+      if (removed.length) {
+        lines.push(C.red(`❌ ${removed.length} snapshot component(s) no longer in the DS: ${removed.join(', ')}`));
+        lines.push(C.red('   Remove them from the snapshot/contract (or restore in Figma).'));
+        warn = true;
+      }
+      if (!added.length && !removed.length) lines.push(`DS component inventory matches the snapshot ✓ (${_liveComponentNames.size} components)`);
+    } else if (_figmaFileVersion) {
+      lines.push(C.dim('component inventory not checked (component list not fetched)'));
+    }
+
+    const warnBeforeAge = warn;   // what fails before the snapshots' age (the component inventory) fails with or without a Figma link
+    // Snapshots refreshed by the Phase 1 Plugin API capture (works on ANY plan). Staleness is an
+    // advisory here; a hard fail comes only from the maxSnapshotAgeDays ceiling below. Parity never
+    // so there is no plan-specific special case - the refresh path is the same everywhere.
+    // age === null has THREE causes: the file is missing, it is unreadable/corrupt, or it is present
+    // but carries no _updated stamp. Say which, so a snapshot that IS on disk isn't mislabeled
+    // "missing" (which sends the developer hunting for a file that is right there).
+    const nullReason = (file) => existsSync(join(ROOT, file))
+      ? 'has no _updated stamp or is unreadable - re-run'
+      : 'missing - run';
+    if (vars === null) {
+      lines.push(C.red(`${SNAP_VARS} ${nullReason(SNAP_VARS)} /rms-design-system-engine Phase 1`)); warn = true;
+    } else if (vars > 24) {
+      lines.push(C.yellow(`⚠️  ${SNAP_VARS} is ${ageWords(vars)} old - refresh with the Phase 1 Plugin API capture`));
+    } else {
+      lines.push(`${SNAP_VARS} ✓ (updated today)`);
+    }
+
+    if (struct === null) {
+      lines.push(C.red(`${SNAP_STRUCT} ${nullReason(SNAP_STRUCT)} /rms-design-system-engine Phase 1`)); warn = true;
+    } else if (struct > 24) {
+      lines.push(C.yellow(`⚠️  ${SNAP_STRUCT} is ${ageWords(struct)} old - refresh with the Phase 1 Step 1c Plugin API capture`));
+    } else {
+      lines.push(`${SNAP_STRUCT} ✓ (updated today)`);
+    }
+
+    // Empty-but-fresh guard: a snapshot with no entries makes its consuming gate a
+    // silent no-op, which is worse than a stale one - stale data still gets checked.
+    for (const [file, key, consumer] of [
+      [SNAP_VARS, 'color', 'Gate [3] token parity'],
+      [SNAP_STRUCT, 'components', 'Gate [10] component structure'],
+      [SNAP_COMP_PROPS, null, 'Gate [10g] annotations + component properties'],
+      ['bound-tokens.json', null, 'Gate [4] bound-token coverage'],
+      ['component-state-tokens.json', null, 'Gate [11] state coverage'],
+    ]) {
+      if (!existsSync(join(ROOT, file))) continue;
+      const n = snapshotEntryCount(file, key);
+      if (n === 0) {
+        lines.push(C.red(`${file} has 0 entries - ${consumer} is checking nothing. Re-run the Phase 1 capture that writes it.`));
+        warn = true;
+      }
+    }
+
+    // Walk snapshots consumed by Gates [4] (bound-check) and [11]/[6] (state-check,
+    // exemption-check). Refreshed via REST when available, or via the Phase 1 Plugin API
+    // walks otherwise - either path stamps _updated. Staleness is flagged HERE so the
+    // consuming gates can always run at full strength against the committed data.
+    for (const [file, phase] of [['bound-tokens.json', 'bound walk'], ['component-state-tokens.json', 'COMPONENT_SET state walk']]) {
+      if (!existsSync(join(ROOT, file))) continue; // absence hard-fails in the consuming gate (exit 2)
+      const age = snapshotAge(file);
+      if (age === null) {
+        lines.push(C.yellow(`⚠️  ${file} has no _updated stamp - re-run the Phase 1 ${phase} (Plugin API) to start tracking freshness`));
+      } else if (age > 24) {
+        lines.push(C.yellow(`⚠️  ${file} is ${ageWords(age)} old - refresh with the Phase 1 ${phase} (Plugin API)`));
+      } else {
+        lines.push(`${file} ✓ (updated today)`);
+      }
+    }
+
+    // Component-props snapshot drives Gate [3g] (component property parity).
+    // Refreshed via REST on every run when FIGMA_TOKEN is set. Warn if stale.
+    if (compProps === null) {
+      lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} missing - Gate [3g] (component property parity) will be skipped`));
+      warn = true;
+    } else if (compProps > 24) {
+      lines.push(C.yellow(`⚠️  ${SNAP_COMP_PROPS} is ${ageWords(compProps)} old - Gate [3g] may miss new/renamed component properties`));
+      warn = true;
+    } else {
+      lines.push(`${SNAP_COMP_PROPS} ✓ (updated today)`);
+    }
+
+    // Frame-geometry snapshot drives Gate [16] frameGeom sourcing. Refreshed via REST
+    // /nodes (any plan). Warn if stale so container-spacing checks never run against
+    // outdated frame boxes.
+    if (SNAP_FRAME_GEOM) {
+      const fg = snapshotAge(SNAP_FRAME_GEOM);
+      if (fg === null) {
+        lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} missing or unstamped - Gate [16] frameGeom checks will skip`));
+        warn = true;
+      } else if (fg > 24) {
+        lines.push(C.yellow(`⚠️  ${SNAP_FRAME_GEOM} is ${ageWords(fg)} old - frameGeom checks may run against a stale frame`));
+        warn = true;
+      } else {
+        lines.push(`${SNAP_FRAME_GEOM} ✓ (updated today)`);
+      }
+    }
+
+    // The components each product screen uses (Gate [10]): tracked when captured.
+    if (existsSync(join(ROOT, SNAP_SCREEN_COMPONENTS))) {
+      const sc = snapshotAge(SNAP_SCREEN_COMPONENTS);
+      if (sc !== null && sc > 24) { lines.push(C.yellow(`⚠️  ${SNAP_SCREEN_COMPONENTS} is ${ageWords(sc)} old - the screens may use components it does not list`)); warn = true; }
+      else if (sc !== null) lines.push(`${SNAP_SCREEN_COMPONENTS} ✓ (updated today)`);
+    }
+
+    // ── Opt-in escalations (default off → byte-identical for projects that don't set them) ──
+    // Staleness above is a non-failing advisory (the Phase 1 Plugin API capture refreshes on ANY
+    // plan), which is right day-to-day but lets a snapshot drift indefinitely. `maxSnapshotAgeDays`
+    // is a hard ceiling: past it the audit fails - "we literally never refreshed" is a real problem.
+    const maxDays = Number(cfg.maxSnapshotAgeDays);
+    if (Number.isFinite(maxDays) && maxDays > 0) {
+      const ceilingH = maxDays * 24;
+      const ages = [SNAP_VARS, SNAP_STRUCT, SNAP_COMP_PROPS, SNAP_FRAME_GEOM, 'bound-tokens.json', 'component-state-tokens.json']
+        .filter(Boolean).map(f => (existsSync(join(ROOT, f)) ? snapshotAge(f) : null)).filter(a => a != null);
+      const worst = ages.length ? Math.max(...ages) : null;
+      if (worst != null && worst > ceilingH) {
+        lines.push(C.red(`❌ a snapshot is ~${Math.floor(worst / 24)}d old, past the ${maxDays}d ceiling (ds-config → maxSnapshotAgeDays)`));
+        lines.push(C.red('   The Plugin API capture works on any plan - run Phase 1 and commit the refreshed snapshots.'));
+        warn = true;
+      }
+    }
+    // versionLockStrict promotes the whole-file version-mismatch advisory to a hard fail. Off by
+    // default because a version bump is usually an unrelated edit elsewhere in the file; turn it on
+    // for a DS file disciplined enough that any bump warrants a Phase 1 re-run.
+    if (cfg.versionLockStrict && versionMismatch) {
+      lines.push(C.red('❌ versionLockStrict: DS file version differs from the snapshot - re-run Phase 1 to reconcile'));
+      warn = true;
+    }
+    // Set up with no Figma link: nothing can refresh the snapshots, so their age is said, never a failure with no way
+    // out; the checks against Figma compare the code with them as they are.
+    if (cfg.figmaFileKey === '' && warn && !warnBeforeAge) {
+      lines.push(C.yellow('⚠️  No Figma link (figmaFileKey in ds-config.json): nothing can refresh these snapshots, so their age is not a failure. The checks against Figma compare the code with them as they are; add the link to refresh them.'));
+      warn = false;
+    }
+
+    return { pass: !warn, planLimited: false, lines };
+  }
+
+  function computeGate5() {
+    const existing = THEMES.filter(p => existsSync(join(ROOT, p)));
+    if (!existing.length) {
+      // Build mode (a project that starts from Figma): no token CSS yet is the first thing to build, not a failure.
+      if (cfg.build === true) return { pass: true, lines: [C.dim(`🧱 ${THEME_LABEL} not built yet: Gate [3] lists the tokens to write into it`)] };
+      return { pass: false, lines: [C.red(`token CSS not found at ${THEME_LABEL}`)] };
+    }
+    const themeText = readThemeCSS();
+    const declared  = [...new Set(
+      [...themeText.matchAll(/--([a-zA-Z][a-zA-Z0-9-]*)\s*:/g)].map(m => '--' + m[1])
+    )];
+    const allSrc = allSourceFiles().map(f => {
+      try { return readFileSync(f, 'utf8'); } catch { return ''; }
+    }).join('\n');
+    // A var is used if it appears in a var() reference, whether bare `var(--x)`, with
+    // surrounding whitespace `var( --x )`, or with a fallback `var(--x, …)`. A plain
+    // substring check for `var(--x)` misses the whitespace and fallback forms and would
+    // report a used token as unused.
+    const usedInVar = (v) => new RegExp(`var\\(\\s*${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[,)]`).test(allSrc);
+    // In a Tailwind project a theme variable is used through its utility too (bg-action-primary, rounded-control).
+    const tw = cfg.tailwind !== false && usesTailwind(themeText, ROOT);
+    const unused = declared.filter(v => !KNOWN_UNUSED.has(v) && !usedInVar(v) && !(tw && usedByUtility(v, allSrc)));
+
+    // Undeclared vars: every fallback-less var(--x) used anywhere must be declared somewhere -
+    // theme.css, a plugin <style> block, or JS setProperty. A var() referencing a renamed or
+    // deleted variable silently resolves to nothing (e.g. a rename in theme.css orphans plugin
+    // usages with no visual error). Usages WITH a fallback are self-documenting and skipped.
+    const declaredAll = new Set([
+      ...[...allSrc.matchAll(/--([a-zA-Z][a-zA-Z0-9-]*)\s*:/g)].map(m => '--' + m[1]),
+      ...[...allSrc.matchAll(/setProperty\(\s*['"](--[a-zA-Z][a-zA-Z0-9-]*)['"]/g)].map(m => m[1]),
+    ]);
+    const usedNoFallback = [...new Set(
+      [...allSrc.matchAll(/var\(\s*(--[a-zA-Z][a-zA-Z0-9-]*)\s*\)/g)].map(m => m[1])
+    )];
+    const undeclared = usedNoFallback.filter(v => !declaredAll.has(v));
+
+    // ── Dead CSS classes ──────────────────────────────────────────────────────
+    // Unused VARIABLES were checked; unused RULES were not. A whole class can be a
+    // stale copy of a DS component - styled, maintained, resized during refactors -
+    // while nothing on screen has ever carried it. Found exactly that in a real
+    // project only because someone asked "where does this render?".
+    //
+    // Method: a class is "used" if its name appears anywhere OUTSIDE a stylesheet.
+    // Stripping the CSS from every file leaves markup, JS strings and template
+    // literals - which is where a class legitimately gets applied. A definition that
+    // never shows up there is styling nothing.
+    //
+    // Advisory by default: class names are routinely composed at runtime
+    // ('tier-' + level), and a heuristic that blocks a build on a guess gets muted.
+    // Set ds-config.json → deadCssStrict:true to enforce.
+    const deadCssExempt = new Set(cfg.knownDeadCssExceptions ?? []);
+    const defined = new Map();  // class -> first file it is defined in
+    const usageParts = [];
+
+    // USAGE is searched far more widely than the hardcoded-value scan. scanExcludeDirs
+    // legitimately skips demo pages and drafts - full of literals nobody wants flagged -
+    // but a class those pages apply is emphatically not dead. The contract file counts
+    // too: a rendered assertion targeting a selector means deleting the rule breaks the
+    // audit. Narrowing usage to the scan set produces confident false positives; on the
+    // project this was built for it wrongly condemned classes used by a style guide.
+    const usageOnlyFiles = [];
+    const ENGINE_FILES = new Set(['history', 'checkResult', 'baseline', 'agreed', 'kept'].map((k) => PROJECT[k].now));
+    (function walkAll(dir) {
+      let entries;
+      try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        // The engine's own output (its folders and the records it writes) is never usage: a finding that names a class
+        // would make that class "used" on the next run.
+        if (/^(node_modules|\.git|dist|build|coverage)$/.test(e.name) || ENGINE_DIRS.includes(e.name) || ENGINE_FILES.has(e.name)) continue;
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walkAll(full);
+        else if (/\.(html|js|mjs|cjs|jsx|ts|tsx|vue|svelte|json|md)$/.test(e.name)) usageOnlyFiles.push(full);
+      }
+    })(ROOT);
+    for (const root of codeRoots(ROOT, cfg).slice(1)) (function walkAll(dir) {
+      let entries;
+      try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (/^(node_modules|\.git|dist|build|coverage)$/.test(e.name) || e.name.startsWith('.')) continue;
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walkAll(full);
+        else if (/\.(html|js|mjs|cjs|jsx|ts|tsx|vue|svelte|json|md)$/.test(e.name)) usageOnlyFiles.push(full);
+      }
+    })(root);
+
+    for (const f of allSourceFiles()) {
+      let text;
+      try { text = readFileSync(f, 'utf8'); } catch { continue; }
+      const rel = relative(ROOT, f);
+      // The stylesheet portion: a .css file entirely, or each <style> block in HTML.
+      const cssChunks = /\.(css|scss)$/.test(f)
+        ? [text]
+        : [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]);
+      const chunkStarts = /\.(css|scss)$/.test(f)
+        ? [0]
+        : [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m.index + m[0].indexOf(m[1]));
+      cssChunks.forEach((chunk, ci) => {
+        // Blank comments first (same length, so line numbers hold): a class named in prose
+        // ("replaces the former .infoBadge") is documentation, not a rule, and counting it as a
+        // definition reports it dead forever. Only real selectors should register as defined.
+        const noComments = chunk.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+        // Selector position only: a class token that precedes a combinator, comma or
+        // the opening brace of a rule. Avoids matching '.foo' inside a value or URL.
+        for (const m of noComments.matchAll(/(^|[\s,>+~(])\.(-?[_a-zA-Z][\w-]*)(?=[\s,>+~){:.\[]|$)/gm)) {
+          if (!defined.has(m[2])) defined.set(m[2], `${rel}:${text.slice(0, chunkStarts[ci] + m.index + m[1].length).split('\n').length}`);
+        }
+      });
+      // Everything that is not a stylesheet is potential usage.
+      let rest = text;
+      for (const chunk of cssChunks) rest = rest.replace(chunk, ' ');
+      usageParts.push(rest);
+    }
+    // Second pass over the wider set, for files the scan set excludes.
+    const alreadyScanned = new Set(allSourceFiles());
+    for (const f of usageOnlyFiles) {
+      if (alreadyScanned.has(f)) continue;
+      let text;
+      try { text = readFileSync(f, 'utf8'); } catch { continue; }
+      const cssChunks = /\.(css|scss)$/.test(f)
+        ? [text]
+        : [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]);
+      let rest = text;
+      for (const chunk of cssChunks) rest = rest.replace(chunk, ' ');
+      usageParts.push(rest);
+    }
+    const usageCorpus = usageParts.join('\n');
+    // Class names composed at runtime legitimise the whole family. The prefix is
+    // rarely a standalone literal - it is the tail of a longer string, as in
+    //   '<div class="menuList result-item t-' + iss.type + '">'
+    // so take the trailing name-ish fragment of any string spliced with + or ${…}.
+    const dynamicPrefixes = extractDynamicClassPrefixes(usageCorpus);
+    const deadClasses = [...defined.entries()]
+      .filter(([c]) => !deadCssExempt.has(c))
+      .filter(([c]) => !new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(usageCorpus))
+      .filter(([c]) => !dynamicPrefixes.some(p => c.startsWith(p)))
+      .map(([c, f]) => `.${c}  (${f})`);
+
+    const deadStrict = cfg.deadCssStrict === true;
+    // Build mode: tokens are declared before the components that use them are built, so an unused one is expected.
+    const unusedBlocks = unused.length > 0 && cfg.build !== true;
+    const pass   = !unusedBlocks && undeclared.length === 0 && (!deadStrict || deadClasses.length === 0);
+    const scanned = allSourceFiles().length;
+    const lines = [];
+    lines.push(unused.length === 0
+      ? `✅ 0 unused vars  (scanned ${scanned} files; ${KNOWN_UNUSED.size} known-unused exempted)`
+      : unusedBlocks ? `❌ ${unused.length} unused (scanned ${scanned} files): ${unused.join(', ')}`
+      : `🧱 ${unused.length} token(s) not used yet (build mode: used once the components are built)`);
+    lines.push(undeclared.length === 0
+      ? `✅ 0 undeclared vars  (every fallback-less var() resolves to a declaration)`
+      : `❌ ${undeclared.length} undeclared var() usage(s) - renamed/deleted vars still referenced: ${undeclared.join(', ')}`);
+    if (deadClasses.length === 0) {
+      lines.push('✅ 0 dead CSS classes  (every rule matches something in the markup)');
+    } else {
+      lines.push((deadStrict ? C.red : C.yellow)(
+        `${deadStrict ? '❌' : '⚠️ '} ${deadClasses.length} CSS class(es) defined but never applied:`));
+      for (const d of deadClasses.slice(0, 15)) lines.push(C.dim(`     ${d}`));
+      lines.push(...reportFull('dead-css-classes', deadClasses, 15));
+      lines.push(C.dim('     Delete them, or add to ds-config.json → knownDeadCssExceptions.'));
+    }
+    return { pass, lines };
+  }
+
+  function computeGate6() {
+    // Scan all source files for hardcoded literal values in CSS rules - property-agnostic.
+    // Any numeric (px/rem/em/vh/vw/%) or hex value outside a :root/var declaration is a violation.
+    // Use var() for every DS-token-backed value. Document intentional layout math
+    // (100%, 50%, positioning zeros) in ds-config.json → knownHardcodedExceptions
+    // as { file, pattern } objects or plain substring strings.
+    // gate6ExcludeDirs allows scoping Gate [6] to DS package files only, excluding app consumers.
+    const g6ExcludeDirs = new Set(cfg.gate6ExcludeDirs ?? []);
+    // Test files legitimately contain literal values that are NOT CSS - hex-like strings in
+    // assertions, colour codes in fixtures, regex patterns (e.g. /PANTONE#20485#20C/). They are
+    // never UI source, so the hardcoded-value scan skips them; otherwise a test string reads as
+    // a stray hardcoded colour. (This filter is scoped to the hardcoded scan, not var-usage.)
+    const isTestFile = (rel) =>
+      /(?:^|\/)(?:test|tests|__tests__|__mocks__|spec|e2e)\//.test(rel) ||
+      /\.(?:test|spec)\.[jt]sx?$/.test(rel);
+    const scanTargets = allSourceFiles().filter(f => {
+      const rel = relative(ROOT, f).replace(/\\/g, '/');
+      if (isTestFile(rel)) return false;
+      if (g6ExcludeDirs.size > 0 && rel.split('/').some(seg => g6ExcludeDirs.has(seg))) return false;
+      return true;
+    });
+    const scanArgs    = ['-n', '-E'];
+
+    // ── Block-comment resolution ───────────────────────────────────────────────
+    // grep hands back `file:line:text`, which carries no comment state. Re-scan the
+    // file once, tracking /* … */ across lines, and record which line numbers sit
+    // inside a comment. Language-agnostic: /* … */ means the same in CSS, JS and
+    // the <style>/<script> blocks of an HTML file, which is everything we scan.
+    // String literals containing "/*" are not special-cased - a false "inside
+    // comment" only ever suppresses a finding, and a hardcoded colour hidden in
+    // such a string is caught by the quoted-hex rule below.
+    const _commentLines = new Map();
+    function insideBlockComment(hitLine) {
+      const m = /^(.+?):(\d+):/.exec(hitLine);
+      if (!m) return false;
+      const file = m[1], lineNo = Number(m[2]);
+      let marks = _commentLines.get(file);
+      if (!marks) {
+        marks = new Set();
+        let src;
+        try { src = readFileSync(file, 'utf8'); } catch { _commentLines.set(file, marks); return false; }
+        // Track BOTH comment syntaxes: /* … */ (CSS/JS/<style>/<script>) and <!-- … -->
+        // (HTML source files - ui.src.html etc.). A px/hex literal written inside an HTML
+        // comment ("bare actionBar: 48px, padding/m") is prose, not a declaration, exactly
+        // like the /* … */ case. A stray "<!--" inside a string can only ever SUPPRESS a
+        // finding (never invent one), same safety argument as the /* rule.
+        let openC = false, openH = false;
+        src.split('\n').forEach((text, idx) => {
+          let i = 0, sawCode = false; const startedOpen = openC || openH;
+          while (i < text.length) {
+            if (!openC && !openH && text.startsWith('/*', i))   { openC = true; i += 2; continue; }
+            if (openC && text.startsWith('*/', i))              { openC = false; i += 2; continue; }
+            if (!openC && !openH && text.startsWith('<!--', i)) { openH = true; i += 4; continue; }
+            if (openH && text.startsWith('-->', i))             { openH = false; i += 3; continue; }
+            if (!openC && !openH && text[i].trim()) sawCode = true;
+            i += 1;
+          }
+          // Inside for the whole line, or a continuation that closes with no code after.
+          if ((startedOpen || openC || openH) && !sawCode) marks.add(idx + 1);
+        });
+        _commentLines.set(file, marks);
+      }
+      return marks.has(lineNo);
+    }
+
+    // ── Focus rings ─────────────────────────────────────────────────────────────
+    // An outline drawn in a :focus rule is a focus ring: code draws it, and Figma has no
+    // outline to compare it with. Its lengths (outline: 2px, outline-offset: 2px) are
+    // compared with Figma like any literal; the ones with no match are listed apart,
+    // not counted as drift. A colour in the ring (a hex) is still checked, so such a line
+    // is never set apart. The rule's selector is read from the line itself (a one-line
+    // rule) or from the file, the nearest open { above the line.
+    const _fileText = new Map();
+    const fileText = (file) => {
+      if (!_fileText.has(file)) { let t = ''; try { t = readFileSync(file, 'utf8'); } catch { /* unreadable */ } _fileText.set(file, t); }
+      return _fileText.get(file);
+    };
+    function enclosingSelector(file, lineNo) {
+      const src = fileText(file).replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+      const lines = src.split('\n');
+      const upTo = lines.slice(0, lineNo - 1).join('\n');
+      let depth = 0;
+      for (let i = upTo.length - 1; i >= 0; i--) {
+        if (upTo[i] === '}') depth++;
+        else if (upTo[i] === '{') {
+          if (depth === 0) { const head = upTo.slice(0, i); const from = Math.max(head.lastIndexOf('}'), head.lastIndexOf('{'), head.lastIndexOf(';')); return head.slice(from + 1).trim(); }
+          depth--;
+        }
+      }
+      return '';
+    }
+    function isFocusRing(hitLine) {
+      const m = /^(.+?):(\d+):(.*)$/.exec(hitLine);
+      if (!m) return false;
+      const code = m[3].replace(/\/\*[^*]*\*\//g, '');
+      if (/#[0-9a-fA-F]{3,8}\b/.test(code)) return false;
+      const brace = code.lastIndexOf('{');
+      const selector = brace >= 0 ? code.slice(0, brace) : enclosingSelector(m[1], Number(m[2]));
+      if (!/:focus(-visible|-within)?\b/.test(selector)) return false;
+      const decls = (brace >= 0 ? code.slice(brace + 1) : code).split(';').map((d) => d.replace(/[{}]/g, '').trim()).filter(Boolean);
+      const withLength = decls.filter((d) => /\d(px|rem|em)\b/.test(d));
+      return withLength.length > 0 && withLength.every((d) => /^outline(-offset|-width)?\s*:/i.test(d));
+    }
+
+    // Shared legitimacy filter
+    function isLegitimate(line) {
+      // A literal written INSIDE a /* … */ block is prose, not a declaration. The
+      // per-line strips below only see a comment that opens and closes on the same
+      // line, so an interior line of a multi-line comment ("#ffffff light, #171717
+      // dark") used to register as a hardcoded colour. Resolve the real comment
+      // state from the file itself.
+      if (insideBlockComment(line)) return true;
+      const codePart = line.replace(/^[^:]+:\d+:\s*/, '');
+      // CSS variable declarations (--name: value) - catches inline `:root { --var: #hex; }` too
+      if (/--[a-zA-Z][\w-]*\s*:/.test(codePart)) return true;
+      // Single-line JS/CSS comments
+      if (/^\s*\/\//.test(codePart)) return true;
+      // JSDoc / block-comment continuation lines (` * blah`)
+      if (/^\s*\*/.test(codePart)) return true;
+      // A media, container or supports condition (a breakpoint width) is when a rule applies, not a value it sets
+      if (/^\s*@(media|container|supports)\b/.test(codePart)) return true;
+      const stripped = codePart.replace(/\/\*[^*]*\*\//g, '');
+      // Value wrapped in quotes/backticks → JS/Vue string, not a real CSS rule
+      if (/[`"'][^`"']*:\s*[^`"']*[`"']/.test(codePart)) return true;
+      // Standalone quoted hex string (fallback `|| '#hex'` or canvas `fillStyle = "#hex"`)
+      if (/[`"']#[0-9a-fA-F]{3,8}[`"']/.test(codePart)) return true;
+      // HTML inline style attribute - value is in HTML, not a CSS rule
+      if (/\bstyle\s*=\s*["'`{]/.test(codePart)) return true;
+      // JS innerHTML / insertAdjacentHTML / template literal building HTML
+      if (/innerHTML\s*[+=]|insertAdjacentHTML/.test(codePart)) return true;
+      // Known exceptions from ds-config.json. Record which ones actually fire so the
+      // list itself can be audited - an exemption nobody can see is how drift hides.
+      const hitIdx = KNOWN_FS_EXCEPTS.findIndex(e => {
+        if (typeof e === 'string') return line.includes(e);
+        return (!e.file || line.includes(e.file)) &&
+               (!e.pattern || new RegExp(e.pattern).test(stripped));
+      });
+      if (hitIdx !== -1) { _exceptHits.add(hitIdx); return true; }
+      return false;
+    }
+
+    // Pass 1 - hex colors (any property, any file)
+    const hexR    = grepFiles([...scanArgs, '#[0-9a-fA-F]{3,8}\\b'], scanTargets);
+    const hexHits = (hexR.stdout || '').split('\n').filter(l => {
+      if (!l.trim() || isLegitimate(l)) return false;
+      const code = l.replace(/^[^:]+:\d+:\s*/, '').replace(/\/\*[^*]*\*\//g, '');
+      return /#[0-9a-fA-F]{3,8}\b/.test(code);
+    });
+
+    // Pass 2 - numeric literals with units (all properties: padding, radius, height, gap, etc.)
+    const numR    = grepFiles([...scanArgs,
+      ':\\s*-?[0-9]+(\\.[0-9]+)?(px|rem|em|%|vh|vw|vmin|vmax|ch|ex)\\b',
+    ], scanTargets);
+    const numHits = (numR.stdout || '').split('\n').filter(l => {
+      if (!l.trim() || isLegitimate(l)) return false;
+      const code = l.replace(/^[^:]+:\d+:\s*/, '').replace(/\/\*[^*]*\*\//g, '');
+      return /:\s*-?[0-9]+(\.[0-9]+)?(px|rem|em|%|vh|vw|vmin|vmax|ch|ex)\b/.test(code);
+    });
+
+    // Pass 2b - a length literal that appears AFTER a var() in the same value. Pass 2
+    // only anchors to the colon, so a magic literal buried mid-shorthand slips through
+    // (e.g. `padding: var(--x) var(--x) 7px var(--x)` - the over-tall-divider bug). A
+    // shorthand that mixes DS tokens with a raw literal is almost always a bug: the
+    // literal should be a token too. Length units only (px/rem/em) - a `var(--x, 9px)`
+    // fallback stays inside the parens and is not matched.
+    const mixR    = grepFiles([...scanArgs,
+      ':[[:space:]]*[^;]*var\\([^;]*\\)[^;]*[0-9]+(\\.[0-9]+)?(px|rem|em)\\b',
+    ], scanTargets);
+    const mixHits = (mixR.stdout || '').split('\n').filter(l => {
+      if (!l.trim() || isLegitimate(l)) return false;
+      const code = l.replace(/^[^:]+:\d+:\s*/, '').replace(/\/\*[^*]*\*\//g, '');
+      return /:\s*[^;]*var\([^;]*\)[^;]*\b[0-9]+(\.[0-9]+)?(px|rem|em)\b/.test(code);
+    });
+
+    // Pass 3 - layout anti-patterns across ALL files (gate6ExcludeDirs does NOT apply here).
+    // These viewport-unit rules cause scrollbar clipping and must never appear in any file.
+    const allFiles = allSourceFiles();
+    const vwR = grepFiles(['-n', '-E', ':\\s*100vw\\b|calc\\([^)]*100vw'], allFiles);
+    const vwHits = (vwR.stdout || '').split('\n').filter(l => {
+      if (!l.trim()) return false;
+      const code = l.replace(/^[^:]+:\d+:\s*/, '');
+      // Allow inside comments or var declarations
+      if (/--[a-zA-Z][\w-]*\s*:/.test(code)) return false;
+      if (/^\s*(\/\/|\*)/.test(code)) return false;
+      if (/[`"'][^`"']*:\s*[^`"']*[`"']/.test(code)) return false;
+      if (/innerHTML\s*[+=]|insertAdjacentHTML/.test(code)) return false;
+      if (markExceptHit(KNOWN_FS_EXCEPTS.findIndex(e => {
+        if (typeof e === 'string') return l.includes(e);
+        const stripped = code.replace(/\/\*[^*]*\*\//g, '');
+        return (!e.file || l.includes(e.file)) && (!e.pattern || new RegExp(e.pattern).test(stripped));
+      }))) return false;
+      return true;
+    });
+
+    // Pass 4 - hand-drawn SVG icons via CSS background-image (gate6ExcludeDirs does NOT apply here).
+    // A `data:image/svg+xml` background-image with a literal or %-encoded color is a hand-drawn
+    // icon bypassing the DS icon sprite (`<use href="#icon-X">`) and its `currentColor`/var() token
+    // binding entirely - invisible to gates [13]/[15] since it's not markup, just a CSS string.
+    // Legitimate uses (e.g. native <select> arrows, which cannot host inline <svg><use> markup)
+    // must be documented in ds-config.json → knownHardcodedExceptions.
+    const svgUriR = grepFiles(['-n', '-E', 'data:image/svg\\+xml'], allFiles);
+    const svgUriHits = (svgUriR.stdout || '').split('\n').filter(l => {
+      if (!l.trim()) return false;
+      const code = l.replace(/^[^:]+:\d+:\s*/, '');
+      const hasHardcodedColor = /%23[0-9a-fA-F]{3,8}|#[0-9a-fA-F]{3,8}\b|stroke=(%27|')(?!currentColor)[^%27'#]+|fill=(%27|')(?!currentColor|none)[^%27'#]+/.test(code);
+      if (!hasHardcodedColor) return false;
+      if (markExceptHit(KNOWN_FS_EXCEPTS.findIndex(e => {
+        if (typeof e === 'string') return l.includes(e);
+        return (!e.file || l.includes(e.file)) && (!e.pattern || new RegExp(e.pattern).test(code));
+      }))) return false;
+      return true;
+    });
+
+    // Pass 5 - hardcoded box-shadow colors via rgba() (gate6ExcludeDirs does NOT apply).
+    // A box-shadow with a literal rgba() bypasses DS effect styles / color tokens.
+    // Document intentional shadows in ds-config.json → knownHardcodedExceptions.
+    const shadowR    = grepFiles(['-n', '-E', 'box-shadow\\s*:.*rgba\\s*\\('], allFiles);
+    const shadowHits = (shadowR.stdout || '').split('\n').filter(l => {
+      if (!l.trim() || insideBlockComment(l)) return false;
+      const code    = l.replace(/^[^:]+:\d+:\s*/, '');
+      const stripped = code.replace(/\/\*[^*]*\*\//g, '');
+      if (/--[a-zA-Z][\w-]*\s*:/.test(code)) return false;
+      if (/^\s*(\/\/|\*)/.test(code)) return false;
+      if (/[`"'][^`"']*:\s*[^`"']*[`"']/.test(code)) return false;
+      if (/innerHTML\s*[+=]|insertAdjacentHTML/.test(code)) return false;
+      if (markExceptHit(KNOWN_FS_EXCEPTS.findIndex(e => {
+        if (typeof e === 'string') return l.includes(e);
+        return (!e.file || l.includes(e.file)) && (!e.pattern || new RegExp(e.pattern).test(stripped));
+      }))) return false;
+      return true;
+    });
+
+    const hits = [...new Set([...hexHits, ...numHits, ...mixHits, ...vwHits, ...svgUriHits, ...shadowHits])];
+
+    // ── Parity-aware suppression (per-component) ───────────────────────────────
+    // This is a PARITY skill, not a style linter: it does not exist to push var()
+    // over literals. A hardcoded value is only a divergence when it CONTRADICTS the
+    // Figma side. If Figma uses the same value ON THAT COMPONENT, code that hardcodes
+    // that value has 100% parity - not an error, whether or not a token backs it.
+    //
+    // Scoping is PER COMPONENT, not global: component-values.snapshot.json holds, for
+    // each component, every raw geometry number and colour swept from ALL its nodes
+    // (all variants, all descendants, hidden included). A file's literals are checked
+    // against the component that file belongs to - attributed agnostically by which
+    // component's base selector the file contains (so Primary.vue, which carries
+    // `.buttonPrimary`, is scoped to ButtonPrimary's swept values). So `.icon{width:24px}`
+    // passes only because ButtonPrimary's own icon node is 24px in Figma - a stray 24px
+    // that belongs to some OTHER component no longer excuses it.
+    //
+    // FALLBACK: when component-values.snapshot.json is absent, or a file matches no
+    // component, we fall back to the global set (resolved token colours across every
+    // mode + all sizing/typography numerics + captured structural geometry). This keeps
+    // projects that have not captured the per-component sweep working, just coarser.
+    // `100vw` is never suppressed - a scrollbar-clipping rendering bug, not a value.
+    const normHex = (raw) => {
+      const m = /#?([0-9a-fA-F]{3,8})\b/.exec(String(raw).trim());
+      if (!m) return null;
+      let h = m[1].toLowerCase();
+      if (h.length === 3) h = h.split('').map(c => c + c).join('');   // #abc → #aabbcc
+      if (h.length === 4) h = h.split('').map(c => c + c).join('');   // #abcd → #aabbccdd
+      return h.slice(0, 6);                                            // compare RGB, ignore alpha
+    };
+    const addNumTo = (set, raw) => {
+      const s = String(raw).trim();
+      if (!/^-?\d/.test(s)) return;
+      const n = parseFloat(s);
+      if (Number.isFinite(n)) set.add(n);
+    };
+    // Global fallback sets.
+    const figmaNums   = new Set([0]);   // 0 is dimensionless - parity everywhere
+    const figmaColors = new Set();
+    try {
+      const snap = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8'));
+      for (const raw of Object.values(snap.sizing ?? {})) addNumTo(figmaNums, raw);
+      for (const scale of Object.values(snap.typography ?? {})) for (const raw of Object.values(scale ?? {})) addNumTo(figmaNums, raw);
+      for (const modeMap of Object.values(snap.color ?? {})) for (const hex of Object.values(modeMap ?? {})) { const h = normHex(hex); if (h) figmaColors.add(h); }
+    } catch { /* no vars snapshot - global set stays minimal */ }
+    try {
+      const struct = JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8'));
+      const walkNums = (o) => {
+        if (o == null) return;
+        if (typeof o === 'number') { figmaNums.add(o); return; }
+        // A colour a component paints raw (no variable bound) is still Figma's value.
+        if (typeof o === 'string') { if (/^#[0-9a-f]{3,8}$/i.test(o)) { const h = normHex(o); if (h) figmaColors.add(h); } else addNumTo(figmaNums, o); return; }
+        if (typeof o === 'object') for (const v of Object.values(o)) walkNums(v);
+      };
+      walkNums(struct.components ?? struct);
+    } catch { /* no structure snapshot - skip geometry values */ }
+
+    // Per-component sweep sets (preferred when present).
+    let compValues = null;   // { CompName: { nums:Set<number>, colors:Set<string> } }
+    try {
+      const raw = JSON.parse(readFileSync(join(ROOT, 'component-values.snapshot.json'), 'utf8'));
+      compValues = {};
+      for (const [name, v] of Object.entries(raw)) {
+        if (name.startsWith('_') || !v || typeof v !== 'object') continue;
+        const nums = new Set([0]); for (const n of v.nums ?? []) addNumTo(nums, n);
+        const colors = new Set();  for (const c of v.colors ?? []) { const h = normHex(c); if (h) colors.add(h); }
+        compValues[name] = { nums, colors };
+      }
+      if (!Object.keys(compValues).length) compValues = null;
+    } catch { /* no per-component snapshot - use global fallback */ }
+
+    // Attribute a file to component(s) by which component base selector it contains.
+    // Agnostic: base selector comes from cfg.componentSelectors or the DS naming
+    // convention (lowercase first letter), then both sides are normalised (strip the
+    // leading . / #, drop non-alphanumerics, lowercase) so `.button-primary` in a Vue
+    // <style> matches the convention's `.buttonPrimary`.
+    const componentSelectors = cfg.componentSelectors ?? {};
+    const baseSelectorNorm = (name) => {
+      const sel = componentSelectors[name] ?? ('.' + name.charAt(0).toLowerCase() + name.slice(1));
+      return sel.replace(/^[.#]/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    };
+    const _fileNorm = new Map();
+    const fileNormText = (file) => {
+      if (_fileNorm.has(file)) return _fileNorm.get(file);
+      let t = '';
+      try { t = readFileSync(file, 'utf8').toLowerCase().replace(/[^a-z0-9]/g, ''); } catch { /* unreadable */ }
+      _fileNorm.set(file, t);
+      return t;
+    };
+    const _fileComps = new Map();
+    const componentsForFile = (file) => {
+      if (!compValues || !file) return [];
+      if (_fileComps.has(file)) return _fileComps.get(file);
+      const norm = fileNormText(file);
+      const matched = [];
+      for (const name of Object.keys(compValues)) {
+        const bs = baseSelectorNorm(name);
+        if (bs.length >= 4 && norm.includes(bs)) matched.push(name);
+      }
+      _fileComps.set(file, matched);
+      return matched;
+    };
+    // Resolve the value sets a hit is checked against: the union of its file's
+    // component sweeps when attributable, else the global fallback.
+    const scopedSets = (hitLine) => {
+      const file = /^([^:]+):\d+:/.exec(hitLine)?.[1];
+      const comps = componentsForFile(file);
+      if (comps.length) {
+        const nums = new Set([0]), colors = new Set();
+        for (const c of comps) { for (const n of compValues[c].nums) nums.add(n); for (const h of compValues[c].colors) colors.add(h); }
+        return { nums, colors, scope: comps.join('+') };
+      }
+      return { nums: figmaNums, colors: figmaColors, scope: compValues ? 'global (file unmapped)' : 'global' };
+    };
+
+    const matchesFigmaValue = (lit, nums, colors) => {
+      const hx = /#[0-9a-fA-F]{3,8}\b/.exec(lit);
+      if (hx) { const h = normHex(hx[0]); return h != null && colors.has(h); }
+      const nm = /^(-?\d+(?:\.\d+)?)(px|rem|em|%|vh|vw|vmin|vmax|ch|ex)?$/.exec(lit.trim());
+      if (!nm) return false;
+      const n = parseFloat(nm[1]); const unit = nm[2] || 'px';
+      if (unit === 'px') return nums.has(n);
+      if (unit === 'rem' || unit === 'em') return nums.has(n * 16) || nums.has(n);
+      return false;   // %, vh, vw, … are layout, not Figma token values
+    };
+    // Every literal in a hit must have a Figma counterpart (in that component's scope).
+    const hitMatchesFigma = (hitLine) => {
+      const code = hitLine.replace(/^[^:]+:\d+:\s*/, '').replace(/\/\*[^*]*\*\//g, '')
+        .replace(/var\([^)]*\)/g, '');   // ignore values inside var(--x, fallback) - self-documenting
+      const literals = [];
+      for (const m of code.matchAll(/#[0-9a-fA-F]{3,8}\b/g)) literals.push(m[0]);
+      for (const m of code.matchAll(/(?<![\w.-])(-?\d+(?:\.\d+)?)(px|rem|em|%|vh|vw|vmin|vmax|ch|ex)\b/g)) literals.push(m[1] + m[2]);
+      if (!literals.length) return false;   // nothing comparable (e.g. rgba() shadow) → keep as-is
+      const { nums, colors } = scopedSets(hitLine);
+      return literals.every(l => matchesFigmaValue(l, nums, colors));
+    };
+    const _alwaysKeep = new Set(vwHits);   // 100vw anti-pattern is a rendering bug, never value-parity
+    const divergent = [], matchedFigma = [], focusRings = [];
+    for (const h of hits) {
+      if (!_alwaysKeep.has(h) && hitMatchesFigma(h)) matchedFigma.push(h);
+      else if (!_alwaysKeep.has(h) && isFocusRing(h)) focusRings.push(h);
+      else divergent.push(h);
+    }
+
+    // ── Audit the exception list itself ──────────────────────────────────────
+    // Every other exemption list in this engine is validated; this one was only ever
+    // read. Two ways it rots, both of which hide real drift indefinitely:
+    //
+    //   STALE - the code it excused is gone, so the entry now silently pre-approves
+    //           whatever similar value appears next.
+    //   BROAD - a bare substring like "gap: 6px" exempts that value in EVERY file,
+    //           including the design-system base. Scoping it to a file or anchoring
+    //           the pattern keeps the exemption to the case a human actually reviewed.
+    const exceptNotes = [];
+    const stale = KNOWN_FS_EXCEPTS
+      .map((e, i) => [e, i])
+      .filter(([, i]) => !_exceptHits.has(i))
+      .map(([e]) => (typeof e === 'string' ? e : (e.pattern ?? e.file ?? JSON.stringify(e))));
+    // A bare string with no file scope and no anchor matches anywhere in the repo.
+    const broad = KNOWN_FS_EXCEPTS.filter(e => typeof e === 'string' && /^[a-z-]+\s*:/.test(e));
+
+    if (stale.length) {
+      exceptNotes.push(C.yellow(`⚠️  ${stale.length} unused exception(s) in knownHardcodedExceptions - the code they excused is gone:`));
+      for (const e of stale.slice(0, 20)) exceptNotes.push(C.dim(`     ${e}`));
+      exceptNotes.push(...reportFull('stale-exceptions', stale, 20));
+      exceptNotes.push(C.dim('     Remove them, or they pre-approve the next value that looks like this.'));
+    }
+    if (broad.length) {
+      exceptNotes.push(C.yellow(`⚠️  ${broad.length} exception(s) apply repo-wide (bare substring, no file scope):`));
+      for (const e of broad.slice(0, 8)) exceptNotes.push(C.dim(`     "${e}"`));
+      exceptNotes.push(...reportFull('broad-exceptions', broad, 8));
+      exceptNotes.push(C.dim('     Prefer { file, pattern } so the exemption covers only the reviewed case.'));
+    }
+
+    // ── Suggest the nearest DS step for each off-scale spacing literal ───────
+    // The gate already knows the literal and the DS scale; making the reader look up
+    // every number by hand turns a mechanical fix into an investigation. Suggest only -
+    // spacing is a design decision, and "nearest" is not always "right".
+    let dsSteps = [];
+    try {
+      const snapSizing = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')).sizing ?? {};
+      const byValue = new Map();
+      for (const [name, raw] of Object.entries(snapSizing)) {
+        const n = parseFloat(raw);
+        if (!Number.isFinite(n) || n === 0) continue;
+        if (!byValue.has(n)) byValue.set(n, []);
+        byValue.get(n).push(name);
+      }
+      dsSteps = [...byValue.entries()].sort((a, b) => a[0] - b[0]);
+    } catch { /* no snapshot - skip suggestions entirely */ }
+
+    const SPACING_PROP = /(?:^|[;{\s])(padding|margin|gap|row-gap|column-gap|inset|border-radius)[a-z-]*\s*:/i;
+    // Only offer tokens from the SCALE families. A component dimension that happens to
+    // be 6px is not a spacing step, and suggesting it invites a padding bound to an
+    // unrelated component's height. Families are matched by token-name prefix, so a DS
+    // that names them differently simply gets no suggestion rather than a wrong one.
+    const FAMILY = { radius: /^radii\//i, space: /^(gap|padding)\//i };
+    function stepsFor(isRadius) {
+      const re = isRadius ? FAMILY.radius : FAMILY.space;
+      return dsSteps
+        .map(([v, names]) => [v, names.filter(n => re.test(n))])
+        .filter(([, names]) => names.length);
+    }
+    function suggest(line) {
+      if (!dsSteps.length || !SPACING_PROP.test(line)) return null;
+      // Per DECLARATION, not per line: a single-line rule can hold both a padding and
+      // a border-radius, and choosing one family for the whole line offers radius
+      // steps for the padding - a confidently wrong answer.
+      const parts = [];
+      const seen = new Set();
+      for (const m of line.matchAll(/([a-z-]+)\s*:\s*([^;{}]+)/gi)) {
+        const prop = m[1].toLowerCase(), value = m[2];
+        if (!/^(padding|margin|gap|row-gap|column-gap|inset|border-radius)/.test(prop)) continue;
+        const steps = stepsFor(prop === 'border-radius');
+        if (!steps.length) continue;
+        for (const nm of value.matchAll(/(?<![\w.-])(\d+(?:\.\d+)?)px/g)) {
+          const n = parseFloat(nm[1]);
+          if (n === 0 || steps.some(([v]) => v === n)) continue;
+          const key = prop + n;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const below = [...steps].reverse().find(([v]) => v < n);
+          const above = steps.find(([v]) => v > n);
+          // Name the token from the matching family where one exists: suggesting
+          // gap/s for a padding is technically the right number under the wrong name.
+          const famRe = prop.startsWith('padding') ? /^padding\//i
+                      : prop.startsWith('gap') || prop.endsWith('gap') ? /^gap\//i
+                      : null;
+          const pick = names => (famRe && names.find(x => famRe.test(x))) || names[0];
+          const opts = [below, above].filter(Boolean).map(([v, names]) => `${v}px (${pick(names)})`);
+          if (opts.length) parts.push(`${prop} ${n}px → ${opts.join(' or ')}`);
+        }
+      }
+      return parts.length ? C.dim(`       ↳ ${parts.join(';  ')}`) : null;
+    }
+
+    // Each one says where it is and which value has no Figma value, so the summary can carry it as it is.
+    function offending(h) {
+      const m = /^(.*?):(\d+):(.*)$/.exec(h);
+      if (!m) return h;
+      const where = `${m[1].replace(ROOT + '/', '')}:${m[2]}`, rule = m[3].replace(/\/\*[^*]*\*\//g, '');
+      const { nums, colors } = scopedSets(h);
+      // The declarations holding a literal the same matcher finds in no Figma value.
+      const decls = [...rule.matchAll(/([a-z-]+)\s*:\s*([^;{}]+)/gi)].filter(([, , v]) => {
+        const bare = v.replace(/var\([^)]*\)/g, '');
+        const lits = [...bare.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((x) => x[0]).concat([...bare.matchAll(/(?<![\w.-])(-?\d+(?:\.\d+)?)(px|rem|em|%|vh|vw|vmin|vmax|ch|ex)\b/g)].map((x) => x[1] + x[2]));
+        return lits.some((l) => !matchesFigmaValue(l, nums, colors));
+      }).map(([, p, v]) => `${p}: ${v.trim()}`);
+      return `${where} ${decls.length ? `${decls.join('; ')} (no Figma value)` : rule.trim().slice(0, 140)}`;
+    }
+    const hitLines = [];
+    for (const h of divergent.slice(0, 20)) {
+      hitLines.push(`  ❌ ${offending(h)}`);
+      const s2 = suggest(h);
+      if (s2) hitLines.push(s2);
+    }
+
+    // Literals that match a Figma value are parity, not failures - report them as info
+    // so they stay visible (and auditable) without turning the gate red.
+    const matchNotes = [];
+    if (matchedFigma.length) {
+      const mode = compValues ? 'per-component sweep' : 'global snapshot values';
+      matchNotes.push(C.dim(`ℹ️  ${matchedFigma.length} hardcoded literal(s) match the Figma value - parity OK, not failed (${mode}):`));
+      for (const h of matchedFigma.slice(0, 20)) matchNotes.push(C.dim(`     [${scopedSets(h).scope}] ${h.replace(ROOT + '/', '')}`));
+      matchNotes.push(...reportFull('hardcoded-matches-figma', matchedFigma, 20));
+    }
+    if (focusRings.length) {
+      matchNotes.push(C.dim(`ℹ️  ${focusRings.length} focus ring literal(s) set apart - an outline in a :focus rule has no Figma value to compare with, not failed:`));
+      for (const h of focusRings.slice(0, 20)) matchNotes.push(C.dim(`     ${h.replace(ROOT + '/', '')}`));
+    }
+
+    const pass  = divergent.length === 0;
+    return {
+      pass,
+      lines: [
+        ...(pass ? ['✅ Clean - no literal diverges from Figma'] : [`❌ ${divergent.length} literal(s) with no matching Figma value:`, ...hitLines, ...reportFull('hardcoded-values', divergent, 20)]),
+        ...matchNotes,
+        ...exceptNotes,
+      ],
+    };
+  }
+
+  function computeGate7() {
+    if (!PLUGINS.length) {
+      return { pass: true, lines: ['⏭ No plugins configured in ds-config.json - skipped'] };
+    }
+    if (process.env.CI) {
+      return { pass: true, lines: ['⏭ Build freshness skipped on CI (mtime unreliable after fresh clone)'] };
+    }
+    // Source is the configured pluginCSS (e.g. …/ui.src.html); the build drops `.src`.
+    // Fall back to the apps/<name>/ layout only when pluginCSS isn't configured.
+    const products = PLUGINS.map((p, i) => {
+      const src = join(ROOT, PLUGIN_CSS[i] ?? `apps/${p}/ui.src.html`);
+      return { name: p, src, out: src.replace(/\.src\.html$/, '.html') };
+    });
+    // A newer date with the content the build was made from (a checkout, a save with nothing new) is not stale.
+    const { stale, datesOnly } = buildFreshness({ products, themes: THEMES.map(p => join(ROOT, p)), recordFile: buildRecordPath(ROOT, OUT_DIR) });
+    const pass = stale.length === 0;
+    const moved = datesOnly.length ? [`ℹ Newer dates, same content as their build: ${datesOnly.join(', ')}`] : [];
+    return {
+      pass,
+      lines: pass
+        ? ['✅ All outputs current', ...moved]
+        : [`❌ Stale - rebuild: ${stale.join(', ')}`, ...moved],
+    };
+  }
+
+  // ── A design.json newer than the snapshots: the person ran `figma-cli snapshot`, so read it first ──
+  let _figmaCliRead = null;
+  try {
+    const src = await import('./figma-source.mjs');
+    const route = await src.chooseFigmaSource(ROOT, cfg, { which: () => null });   // only the file here: figma-cli itself runs on --refresh-figma
+    if (route.route === 'design-json') { _figmaCliRead = await src.importDesign(ROOT, cfg, route.file); console.log(C.dim(`ℹ️  ${src.importLine(_figmaCliRead)}`)); }
+  } catch (e) { console.log(C.yellow(`⚠️  design.json not read: ${e.message}`)); }
+
+  // ── Refresh Figma snapshots (requires FIGMA_TOKEN) ───────────────────────────
+  const figmaToken   = process.env.FIGMA_TOKEN;
+  const figmaFileKey = cfg.figmaFileKey;
+  if (figmaToken && figmaFileKey) {
+    // These refreshers write independent files via REST /nodes and /components - endpoints that
+    // work on ANY plan. Bound-token and state snapshots are deliberately NOT refreshed here: they
+    // come from the Phase 1 Plugin API capture (works on any plan) and are committed. Run with BOUNDED
+    // concurrency (not all-at-once Promise.all): capping the peak in-flight count keeps Phase 1
+    // from bursting the Figma API into a 429 storm. Tune with FIGMA_REFRESH_CONCURRENCY.
+    const FIGMA_REFRESH_CONCURRENCY = Math.max(1, parseInt(process.env.FIGMA_REFRESH_CONCURRENCY, 10) || 3);
+    // A call budget: a Figma seat has a daily or monthly quota. The file's version is read first
+    // (one call); when it and what the refresh reads (the config, the engine) are the same as at the last
+    // complete refresh, and its snapshots are all still there, the rest is skipped.
+    await fetchFigmaFileVersion(figmaFileKey, figmaToken);
+    const iconFile = (cfg.iconLibraryFileKey || cfg.icons?.libraryFileKey)
+      ? (cfg.paths?.snapshotIcons && resolve(ROOT, cfg.paths.snapshotIcons) === join(ROOT, 'figma-icons.snapshot.json') ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json') : null;
+    const refreshFiles = [SNAP_COMP_PROPS, 'component-values.snapshot.json', iconFile, SNAP_FRAME_GEOM, 'figma-screens.snapshot.json', SNAP_SCREEN_COMPONENTS, 'figma-templates.snapshot.json'].filter(Boolean);
+    const stampPath = join(ROOT, OUT_DIR, 'figma-refresh.json');
+    let engineHash = ''; try { engineHash = createHash('sha1').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'); } catch { /* keyed on the config alone */ }
+    const refreshKey = createHash('sha1').update(JSON.stringify([figmaFileKey, cfg.figma?.componentsPage ?? cfg.componentsPage, cfg.iconLibraryFileKey, cfg.icons, cfg.frames, cfg.screens, cfg.templates, cfg.paths, engineHash])).digest('hex');
+    let stamp = null; try { stamp = JSON.parse(readFileSync(stampPath, 'utf8')); } catch { /* first refresh */ }
+    const forced = process.env.FIGMA_REFRESH === 'force';
+    if (!forced && unchangedSince(stamp, _figmaFileVersion, refreshKey, (f) => existsSync(join(ROOT, f)))) {
+      _figmaReason = stamp.reason ?? null;
+      if (Array.isArray(stamp.inventory)) _liveComponentNames = new Set(stamp.inventory);
+      console.log(`ℹ️  ${budgetLine(figmaFetch.stats, { skipped: { version: stamp.version, at: stamp.at } })}`);
+    } else {
+    await runPool([
+      async () => { const { figmaReason } = await import('./change-reason.mjs'); _figmaReason = await figmaReason(figmaFileKey, figmaToken, { fetchImpl: figmaFetch }); },
+      () => fetchComponentInventory(figmaFileKey, figmaToken, cfg.figma?.componentsPage ?? cfg.componentsPage),
+      () => refreshComponentProps(figmaFileKey, figmaToken, join(ROOT, SNAP_COMP_PROPS)),
+      () => refreshComponentValues(figmaFileKey, figmaToken, join(ROOT, 'component-values.snapshot.json')),
+      // The inventory (a list of names) never overwrites the icon path data the icon gate reads:
+      // when paths.snapshotIcons is this same file, the inventory gets its own file (iconFile).
+      () => iconFile ? refreshIcons(cfg.iconLibraryFileKey ?? cfg.icons.libraryFileKey, figmaToken, join(ROOT, iconFile), cfg.icons ?? {}) : Promise.resolve(),
+      () => SNAP_FRAME_GEOM ? refreshFrameGeometry(figmaFileKey, cfg.frames ?? [], figmaToken, join(ROOT, SNAP_FRAME_GEOM)) : Promise.resolve(),
+      () => refreshScreenElements(figmaFileKey, cfg.screens ?? cfg.frames ?? [], figmaToken, join(ROOT, 'figma-screens.snapshot.json')),
+      () => refreshTemplateComposition(figmaFileKey, cfg.templates ?? [], figmaToken, join(ROOT, 'figma-templates.snapshot.json')),
+      () => refreshScreenComponents(figmaFileKey, [...(cfg.frames ?? []), ...(cfg.screens ?? [])], figmaToken, join(ROOT, SNAP_SCREEN_COMPONENTS)),
+    ], FIGMA_REFRESH_CONCURRENCY);
+    const st = figmaFetch.stats;
+    console.log(st.limit ? C.yellow(`⏸  ${budgetLine(st)}`) : `ℹ️  ${budgetLine(st)}`);
+    // Only a complete refresh is remembered: one failed call and the next run refreshes again.
+    if (!st.failed && !st.limit && _figmaFileVersion) {
+      try {
+        mkdirSync(dirname(stampPath), { recursive: true });
+        writeFileSync(stampPath, JSON.stringify({ version: _figmaFileVersion, key: refreshKey, at: new Date().toISOString().slice(0, 10),
+          files: refreshFiles.filter((f) => existsSync(join(ROOT, f))), reason: _figmaReason, inventory: _liveComponentNames ? [..._liveComponentNames] : null }, null, 2) + '\n');
+      } catch { /* best-effort: the next run refreshes */ }
+    }
+    }
+  }
+
+  // ── Run gates ─────────────────────────────────────────────────────────────────
+  const gates  = [];
+  let anyFail  = false;
+
+  // ── Component scope (from --component) ────────────────────────────────────────
+  // Merge CLI names with an optional ds-config default, then build matchers: the
+  // normalised component name (strips non-alphanumerics, lowercase) and its base
+  // selector (so `.button-primary` in a Vue <style> matches `ButtonPrimary`).
+  const _norm  = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const _selOf = (name) => cfg.componentSelectors?.[name] ?? ('.' + name.charAt(0).toLowerCase() + name.slice(1));
+  const _chosenNames = [...new Set([...SCOPE_COMPONENTS, ...(cfg.scopeComponents ?? []), ...(cfg.scopeComponent ? [cfg.scopeComponent] : [])])];
+
+  // A component contains other DS components (a button may hold an icon, a card a badge),
+  // and those must be verified too - auditing the parent without its children is a false
+  // pass. So expand the chosen set transitively, in one direction: a component in scope pulls
+  // in the components ITS OWN source file uses. A file is a component's source when
+  // ds-config.json → componentFiles says so, when the shared pairing pairs it with the component (component-pairing.mjs:
+  // switches/General.vue → switch), or when its name ends with the component's name
+  // (HbIconButton.vue → iconButton, the longest name; Chip/index.tsx → chip). A page that shows
+  // several components, the central theme CSS, or any file mentioning many components is no
+  // component's source, so it never joins them. A name inside a longer one (button inside
+  // iconButton) is not a mention of it.
+  const _autoAdded = [];
+  const _scopeNames = [..._chosenNames];
+  let _mentionsIn = null;   // text → the component names it mentions, longest first; set when scoped
+  if (_chosenNames.length) {
+    let universe = [];
+    try { universe.push(...Object.keys(JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8')).components ?? {})); } catch { /* no struct snapshot */ }
+    universe.push(...Object.keys(cfg.componentSelectors ?? {}));
+    if (_liveComponentNames) universe.push(..._liveComponentNames);
+    universe.push(..._chosenNames);
+    universe = [...new Set(universe)];
+    const uForms = universe.map(n => ({ name: n, nameNorm: _norm(n), selNorm: _norm(_selOf(n)) }))
+      .sort((a, b) => b.nameNorm.length - a.nameNorm.length);
+    _mentionsIn = (text) => {
+      let t = _norm(text);
+      const out = [];
+      for (const fm of uForms) {
+        const keys = [fm.nameNorm, fm.selNorm.length >= 4 ? fm.selNorm : ''].filter(Boolean).sort((a, b) => b.length - a.length);
+        if (!keys.some(k => t.includes(k))) continue;
+        out.push(fm.name);
+        for (const k of keys) t = t.split(k).join('#');
+      }
+      return out;
+    };
+    const themeSet = new Set([cfg.paths?.themeCSS].flat().filter(Boolean).map(p => join(ROOT, p)));
+    const maxNest  = cfg.scopeMaxNestPerFile ?? 8;
+    const declared = new Map();
+    for (const [name, p] of Object.entries(cfg.componentFiles ?? {})) for (const f of [p].flat()) declared.set(join(ROOT, f), name);
+    let _pairing = null;
+    try { _pairing = (await (await import('./component-locator.mjs')).loadLocator(ROOT, cfg)).pairing(); } catch { /* the names alone */ }
+    const ownerOf = (f) => {
+      if (declared.has(f)) return declared.get(f);
+      const paired = _pairing?.ownersOf(f).find((n) => universe.includes(n));
+      if (paired) return paired;
+      const parts = relative(ROOT, f).replace(/\\/g, '/').split('/');
+      let base = parts.at(-1).replace(/\.[^.]+$/, '');
+      if (/^index$/i.test(base) && parts.length > 1) base = parts.at(-2);
+      const b = _norm(base);
+      return uForms.find(fm => fm.nameNorm.length >= 3 && b.endsWith(fm.nameNorm))?.name ?? null;
+    };
+    // Per component, the components its own source files use.
+    const children = new Map();
+    for (const f of allSourceFiles()) {
+      if (themeSet.has(f)) continue;                       // central token file → not component-specific
+      const owner = ownerOf(f);
+      if (!owner) continue;                                // a page or a shared file joins nothing
+      let t = ''; try { t = readFileSync(f, 'utf8'); } catch { continue; }
+      // A native element (<button>, type="button") is not the DS component of that name.
+      t = t.replace(/<\/?[a-z]+(?![\w-])/g, ' ').replace(/\btype\s*=\s*["'][a-z]+["']/g, ' ');
+      const used = _mentionsIn(t).filter(c => c !== owner);
+      if (!used.length || used.length > maxNest) continue;   // skip aggregates
+      children.set(owner, new Set([...(children.get(owner) ?? []), ...used]));
+    }
+    const inScope = new Set(_chosenNames);
+    for (const queue = [..._chosenNames]; queue.length; ) {
+      for (const c of children.get(queue.shift()) ?? []) if (!inScope.has(c)) { inScope.add(c); _autoAdded.push(c); queue.push(c); }
+    }
+    _scopeNames.length = 0; _scopeNames.push(...inScope);
+  }
+  // A component asked for that is in neither the Figma data nor the code (no file named for it, no element with its
+  // class): nothing about it can be checked, and the run says so rather than passing it.
+  const _foundNowhere = [];
+  if (_chosenNames.length) {
+    const known = new Set();
+    for (const f of [SNAP_STRUCT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json']) {
+      try { const j = JSON.parse(readFileSync(join(ROOT, f), 'utf8')); for (const k of Object.keys(j.components ?? j)) if (!k.startsWith('_')) known.add(_norm(k)); } catch { /* not captured */ }
+    }
+    const files = allSourceFiles();
+    const bases = files.map((f) => { const parts = relative(ROOT, f).replace(/\\/g, '/').split('/'); let b = parts.at(-1).replace(/\.[^.]+$/, ''); if (/^index$/i.test(b) && parts.length > 1) b = parts.at(-2); return _norm(b); });
+    let classes = null;
+    const classSet = () => classes ??= new Set([...files, ...[cfg.paths?.themeCSS].flat().filter((p) => p && !/^https?:/.test(p)).map((p) => join(ROOT, p))].flatMap((f) => {
+      let t = ''; try { t = readFileSync(f, 'utf8'); } catch { return []; }
+      return [...t.matchAll(/(?:^|[\s,{>+~(])\.(-?[A-Za-z_][\w-]*)|class(?:Name)?\s*=\s*["'`]([^"'`]*)["'`]/g)].flatMap((m) => (m[1] ? [m[1]] : m[2].split(/\s+/)));
+    }).map(_norm));
+    for (const n of _chosenNames) {
+      const k = _norm(n);
+      if (known.has(k) || cfg.componentSelectors?.[n] || cfg.componentFiles?.[n] || (k.length >= 3 && bases.some((b) => b.endsWith(k))) || classSet().has(k) || classSet().has(_norm(_selOf(n)))) continue;
+      _foundNowhere.push(n);
+    }
+    if (_foundNowhere.length) console.log(C.yellow(`\n⚠️  ${_foundNowhere.join(', ')}: in neither the Figma data nor the code (no file named for ${_foundNowhere.length === 1 ? 'it' : 'them'}, no element with ${_foundNowhere.length === 1 ? 'its' : 'their'} class), so nothing about ${_foundNowhere.length === 1 ? 'it' : 'them'} was checked.`));
+  }
+  const _scopeForms = _scopeNames.map(name => ({
+    name,
+    nameNorm: _norm(name),
+    selNorm:  _norm(_selOf(name)),
+  }));
+  const _fileScopeCache = new Map();
+  function _fileHasScope(file) {
+    if (_fileScopeCache.has(file)) return _fileScopeCache.get(file);
+    let t = '';
+    try { t = readFileSync(file, 'utf8').toLowerCase().replace(/[^a-z0-9]/g, ''); } catch { /* unreadable */ }
+    const has = _scopeForms.some(f => (f.nameNorm && t.includes(f.nameNorm)) || (f.selNorm.length >= 4 && t.includes(f.selNorm)));
+    _fileScopeCache.set(file, has);
+    return has;
+  }
+  const _ANSI    = /\x1b\[[0-9;]*m/g;
+  const _FILE_RE = /([\w./-]+\.(?:vue|css|scss|less|ts|tsx|js|jsx|html))(?::\d+)?/i;
+  function _lineInScope(plain) {
+    // A line that names components belongs to them; one that names none (a token, a shared rule) belongs
+    // to the scope when the file it points at mentions a component in scope.
+    const named = _mentionsIn(plain);
+    if (named.length) return named.some(c => _scopeNames.includes(c));
+    const fm = _FILE_RE.exec(plain);
+    if (fm) { const f = fm[1]; if (_fileHasScope(join(ROOT, f)) || _fileHasScope(f)) return true; }
+    return false;
+  }
+  // Filter one gate's output to the chosen components. Per-item findings are INDENTED
+  // (every gate formats sub-items that way); flush-left lines are headers/counts/prose
+  // and are always kept. Drop indented items that belong to another component, and flip
+  // a gate to pass only when we actually removed out-of-scope items and none of the
+  // in-scope items still fail - so a real in-scope failure or a header-only failure stays red.
+  function scopeFilter(result) {
+    if (!_scopeForms.length) return result;
+    const kept = [], dropped = [];
+    let keptItemFail = false;
+    for (const line of result.lines || []) {
+      const plain  = String(line).replace(_ANSI, '');
+      const isItem = /^\s+\S/.test(plain);
+      if (isItem && !_lineInScope(plain)) { dropped.push(line); continue; }
+      kept.push(line);
+      if (isItem && /🚨|❌/.test(plain)) keptItemFail = true;
+    }
+    const lines = [...kept];
+    if (dropped.length) lines.push(C.dim(`   … ${dropped.length} finding(s) outside ${_scopeNames.join(', ')} - not audited in this scoped run`));
+    let pass = result.pass;
+    if (!result.pass && !result.planLimited && !keptItemFail && dropped.length > 0) {
+      pass = true;
+      lines.push(C.dim(`   ↳ all failing items were outside ${_scopeNames.join(', ')}; gate passes for this scoped run`));
+    }
+    return { ...result, pass, lines };
+  }
+
+  // The gate scripts tag their lines with their own old numbers ("[15] No snapshot found", "Gate [17] skipped");
+  // the report numbers its gates 1 to 25, so a line never carries another number.
+  const legacyFree = (l) => (typeof l !== 'string' ? l : l
+    .replace(/Gate \[\d+[a-z]?\] skipped/g, 'skipped')
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*)⏭\s+⏭/u, '$1⏭')                      // one skip mark, not two
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*(?:✅|❌|⚠️|ℹ️|⏭|🚧)\s+)\[(?:\d+[a-z]?|[a-z][a-z-]*)\]\s+/u, '$1')   // a script's own tag: [15], [docs-truth]
+    .replace(/^((?:\s|\x1b\[[0-9;]*m)*)✅(\s+.*\bskipped\b)/u, '$1⏭$2'));                         // skipped is not a pass
+  // A warning or failure count of zero ("⚠️  NEW SKIP  0", "❌ FAIL  0") says nothing: it is left out.
+  const zeroCount = (l) => typeof l === 'string' && /^(?:\s|\x1b\[[0-9;]*m)*(?:⚠️|❌)\s+[A-Z][A-Z ?-]*?\s+0(?:\/0)?(?:\s|\x1b|$)/u.test(l);
+  function addGate(label, result) {
+    const r = scopeFilter(result);
+    if (Array.isArray(r.lines)) r.lines = r.lines.map(legacyFree).filter((l) => !zeroCount(l));
+    // A check whose every part was skipped read nothing: it is not run, never a pass. Its first skip says why.
+    const said = (r.lines ?? []).map((l) => String(l).replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean);
+    if (r.pass && !r.planLimited && !r.notRun && said.some((l) => /^⏭/.test(l)) && !said.some((l) => /^(✅|❌|⚠️|📸)/.test(l) || /[✓✗]/.test(l))) {
+      r.planLimited = true; r.readNothing = true;
+      r.notRun = said.find((l) => /^⏭/.test(l)).replace(/^⏭\s*(SKIPPED\s*-\s*)?/i, '').replace(/\s*[-—]\s*skipped\.?$/i, '').trim();
+    }
+    // planLimited gates are neutral - they don't block the audit
+    if (!r.pass && !r.planLimited) anyFail = true;
+    gates.push({ n: gates.length + 1, label, ...r });
+  }
+
+  // Inline gates - compute upfront so they can be combined
+  const _g1 = computeGate1();
+  const _g5 = computeGate5();
+  const _g6 = computeGate6();
+  const _g7 = computeGate7();
+
+  // Accessibility gate args: forward the --component scope and --a11y verbosity so the
+  // audit's a11y advisory covers the same components the user scoped the run to.
+  const A11Y_JSON = join(ROOT, OUT_DIR, 'a11y.json');
+  try { unlinkSync(A11Y_JSON); } catch { /* not there */ }
+  // Building a component: every accessibility line is listed element by element, as it is part of building it.
+  // axe-core's rules and the hover, focus and pressed states run in every accessibility check: --no-axe, --no-states leave one out.
+  // The accessibility check keeps its own time: it grows with the pages and the style guide's components, and a check
+  // stopped by it keeps what it found. Killed at a gate's limit, it kept nothing, and the style guide never had its results.
+  // So the gate waits for it, a little past the longest it may take; inside a git hook a commit never waits past the
+  // gate's limit, and the check is given that limit as its own.
+  const hookRun = !!process.env.GIT_INDEX_FILE || process.argv.includes('--hook');
+  const { LIMIT_CAP_SEC: A11Y_CAP_SEC } = await import('./a11y-check.mjs');
+  const a11yWaitMs = hookRun ? GATE_TIMEOUT_MS : Math.max(GATE_TIMEOUT_MS, ((Number(cfg.a11y?.timeoutSec) || A11Y_CAP_SEC) + 180) * 1000);
+  const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []),
+    ...['--no-axe', '--no-states'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_JSON,
+    ...(hookRun ? ['--time-limit', String(Math.max(10, GATE_TIMEOUT_MS / 1000 - 90))] : [])];
+
+  // Code capture: the code side read once per run (code-capture.mjs), the mirror of the Figma
+  // capture. Cached by content, so an unchanged project reuses it at once. Gates that need facts
+  // only the capture has (the browser reading, rendered nesting) read the snapshot, and Gate [18]
+  // reports its coverage. ds-config.json → codeReading.capture: "off" skips it. Never fails the audit.
+  // Inside a git hook (pre-commit sets GIT_INDEX_FILE; pass --hook from any other hook) the capture
+  // is static only, so a commit never waits for the browser; codeReading.hookBrowser: true opts in.
+  if (cfg.codeReading?.capture !== 'off') {
+    const inHook = !!process.env.GIT_INDEX_FILE || process.argv.includes('--hook');
+    // A time limit (codeReading.timeoutSec, default 120): past it the gates start with their own
+    // readings, and a snapshot that no longer matches the code is ignored by every gate anyway.
+    const budget = Math.max(10, Number(cfg.codeReading?.timeoutSec) || 120) * 1000;
+    try {
+      const { captureCode } = await import('./code-capture.mjs');
+      let timer;
+      await Promise.race([
+        captureCode(ROOT, cfg, { browser: !inHook || cfg.codeReading?.hookBrowser === true }),
+        new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('capture time limit')), budget); timer.unref?.(); }),
+      ]).finally(() => clearTimeout(timer));
+    } catch (e) { /* the gates keep their own readings; Gate [17] says the capture is missing */ }
+  }
+
+  // Result files some gates write for the report tables. Removed first, so a gate that stops early
+  // leaves no table rather than the previous run's rows.
+  for (const f of ['component-prop-result.json', PROJECT.checkResult.now]) { try { unlinkSync(join(ROOT, f)); } catch { /* not there */ } }
+
+  // Subprocess gates. The file-reading gates launch concurrently. The two browser gates each start a
+  // Chrome, so they run one after the other, beside the rest: two browsers competing with thirty
+  // processes for the CPU is what makes a slow machine time out.
+  const browserGates = (async () => [await runScriptAsync('rendered-check.mjs'), !ONLY || ONLY.a11y ? await runScriptAsync('a11y-check.mjs', a11yArgs, a11yWaitMs) : null])();
+  const [rParity, rStructure, rBound, rIsolation, rVisual, rState, rExemption, rMode, rNaming, rPseudo, rIcon, rStateBinding, rStateVar, rIconSlot, rComponentSlot, rFormControl, rHtmlStructure, rTransition, rIconFreshness, rCoverage, rMotion, rEffect, rContainment, rCompProp, rCompose, rTemplateCompose, rStateOpacity, rIconInv, rScreenEl, rDocsTruth, rReimpl, rCase] = await Promise.all([
+    runScriptAsync('parity-check.mjs', ['--json']),
+    runScriptAsync('structure-check.mjs'),
+    runScriptAsync('bound-check.mjs'),
+    runScriptAsync('subcomponent-isolation-check.mjs'),
+    runScriptAsync('visual-regression-check.mjs'),
+    runScriptAsync('state-check.mjs'),
+    runScriptAsync('exemption-check.mjs'),
+    runScriptAsync('mode-completeness-check.mjs'),
+    runScriptAsync('naming-check.mjs'),
+    runScriptAsync('pseudo-element-check.mjs'),
+    runScriptAsync('icon-check.mjs'),
+    runScriptAsync('state-binding-check.mjs'),
+    runScriptAsync('component-selector-check.mjs'),
+    runScriptAsync('icon-slot-check.mjs'),
+    runScriptAsync('component-slot-check.mjs'),
+    runScriptAsync('form-control-check.mjs'),
+    runScriptAsync('html-structure-check.mjs'),
+    runScriptAsync('transition-check.mjs'),
+    runScriptAsync('icon-freshness-check.mjs'),
+    runScriptAsync('coverage-check.mjs'),
+    runScriptAsync('motion-check.mjs'),
+    runScriptAsync('effect-check.mjs'),
+    runScriptAsync('container-containment-check.mjs'),
+    runScriptAsync('component-prop-check.mjs'),
+    runScriptAsync('component-composition-check.mjs'),
+    runScriptAsync('template-composition-check.mjs'),
+    runScriptAsync('state-opacity-check.mjs'),
+    runScriptAsync('icon-inventory-check.mjs'),
+    runScriptAsync('screen-element-check.mjs'),
+    runScriptAsync('docs-truth-check.mjs'),
+    runScriptAsync('reimplementation-check.mjs'),
+    runScriptAsync('case-check.mjs'),
+  ]);
+  const [rRendered, rA11y] = await browserGates;
+
+  // Accessibility: advisory by default; a11yStrict promotes any finding to a hard fail.
+  // Set the fail flag BEFORE the gate summary so the verdict stays consistent; the a11y detail
+  // prints in the advisory section further below (or a clean ⏭ when there is no browser).
+  if (cfg.a11yStrict === true && rA11y && rA11y.status === 1) anyFail = true;
+
+  // ── Freshness ─────────────────────────────────────────────────────────────────
+  addGate('Data is up to date  (Figma snapshots & build output are current)',
+    combineGates(_g1, _g7));
+  addGate('Figma frame unchanged  (live frame vs saved reference screenshot)',
+    parseGate9(rVisual));
+
+  // ── Token integrity ───────────────────────────────────────────────────────────
+  addGate('Token values  (color · sizing · typography · breakpoints · text)',
+    parseGate2(rParity));
+  addGate('Tokens used in screens exist in CSS  (every token bound in a DS screen has a CSS variable)',
+    parseGate4(rBound));
+  addGate('Every mode is covered  (tokens adapt across light/dark and all configured modes)',
+    parseGeneric(rMode, S['mode-completeness-check.mjs']));
+  addGate('Exception lists are valid  (no stale or overly broad entries)',
+    parseGeneric(rExemption, S['exemption-check.mjs']));
+  addGate('No invented CSS variables  (every CSS variable traces back to a Figma token)',
+    parseGeneric(rNaming, S['naming-check.mjs']));
+  addGate('Docs tell the truth  (a style guide / DS doc references only tokens & vars that exist)',
+    parseGeneric(rDocsTruth, S['docs-truth-check.mjs']));
+  addGate('No invented text casing  (no text-transform the DS/Figma does not define)',
+    parseGeneric(rCase, S['case-check.mjs']));
+  // Local reimplementation: a screen that hand-builds a DS component (a locally-styled <button>)
+  // instead of using it. Opt-in via ds-config.json → reimplementationSurfaces[]; advisory unless
+  // reimplementationStrict. code → Figma direction, complements the naming/docs anti-invention gates.
+  addGate('No hand-built DS components  (screens use the DS component, not a local look-alike)',
+    parseGeneric(rReimpl, S['reimplementation-check.mjs']));
+
+  // ── CSS quality ───────────────────────────────────────────────────────────────
+  addGate('Clean CSS  (no unused variables · no values that contradict Figma · safe containment)',
+    combineGates(_g5, _g6, parseGeneric(rContainment, S['container-containment-check.mjs'])));
+  addGate('Nested components keep their own styles  (no parent rule overrides a child component)',
+    parseGate8(rIsolation));
+
+  // ── Structure ─────────────────────────────────────────────────────────────────
+  addGate('Structure  (height · spacing · base-rule variable bindings)',
+    parseGate3(rStructure));
+  addGate('All states are built  (each state implemented · correct selector · variable in the right rule)',
+    combineGates(parseGeneric(rState, S['state-check.mjs']), parseGeneric(rStateBinding, S['state-binding-check.mjs']), parseGeneric(rStateVar, /CORRECT|MISMATCH/), parseGeneric(rStateOpacity, S['state-opacity-check.mjs'])));
+  // The component-prop and composition gates only make sense for a component FRAMEWORK codebase
+  // (Vue/React with declared props and instance nesting). A DS *consumer* that implements the
+  // components as CSS classes + markup (a plain-HTML plugin, say) has no prop-components for them
+  // to match, so every DS component reports "no code file" and the gates hard-fail the whole run
+  // for a codebase they don't apply to. Let such a project opt out with
+  // `ds-config.json → frameworkComponents: false`; the gates then SKIP (neutral, like the opt-in
+  // motion/effect gates) instead of failing. Composition also skips when its snapshot was never
+  // captured (opt-in, exit 2) rather than counting as a failure.
+  const parseComponentFrameworkGate = (r, re) => {
+    const skip = frameworkGateSkipReason(cfg.frameworkComponents, r.status);
+    return skip ? { pass: true, planLimited: true, why: skip, lines: [C.yellow('⏭ SKIPPED - ' + skip)] } : parseGeneric(r, re);
+  };
+  // frameworkComponents:false + htmlRealization → the prop check runs in HTML-realization mode
+  // (each Figma property must map to a code artifact) instead of being skipped. Parse its output
+  // rather than collapsing the gate to SKIPPED.
+  addGate('Component props match Figma  (names, defaults, variant options & slots vs code)',
+    (cfg.frameworkComponents === false && cfg.htmlRealization)
+      ? parseGeneric(rCompProp, /REALIZED|UNREALIZED|UNMAPPED|VIA STATE|named differently from the rest/)
+      : parseComponentFrameworkGate(rCompProp, /OK|MISSING|NAME|VALUE|SLOT|NO FILE|RENAME|named differently from the rest/));
+  addGate('Sub-components match Figma  (the sub-components Figma nests are the ones the code uses)',
+    (cfg.frameworkComponents === false && cfg.htmlRealization)
+      ? parseGeneric(rCompose, /OK|MISSING|SKIP/)
+      : parseComponentFrameworkGate(rCompose, /OK|MISSING|NO FILE|EXTRA/));
+  // Template / page composition: one level ABOVE the component - does each template frame's code
+  // compose the components Figma composes? Opt-in via ds-config.json → templates[]; a no-op PASS
+  // otherwise. MISSING is advisory unless templateCompositionStrict; NO FILE always fails.
+  addGate('Templates compose the right components  (each template/page uses the components Figma composes)',
+    parseGeneric(rTemplateCompose, S['template-composition-check.mjs']));
+
+  // ── Markup ────────────────────────────────────────────────────────────────────
+  addGate('Markup  (ids · component classes · icon references · every DS screen control is built)',
+    combineGates(parseGeneric(rHtmlStructure, S['html-structure-check.mjs']), parseGeneric(rScreenEl, S['screen-element-check.mjs'])));
+  addGate('Required pieces are in place  (icon slots · component slots · form controls)',
+    combineGates(parseGeneric(rIconSlot, S['icon-slot-check.mjs']), parseGeneric(rComponentSlot, S['component-slot-check.mjs']), parseGeneric(rFormControl, S['form-control-check.mjs'])));
+  addGate('Icons  (symbol markup · path data · live Figma check · every Figma icon is in the code)',
+    combineGates(parseGeneric(rPseudo, S['pseudo-element-check.mjs']), parseGeneric(rIcon, S['icon-check.mjs']), parseGeneric(rIconFreshness, S['icon-freshness-check.mjs']), parseGeneric(rIconInv, S['icon-inventory-check.mjs'])));
+
+  // ── Animation & motion (Motion / Shadows are opt-in - no-op unless configured) ──
+  addGate('Transitions  (duration · easing · property per DS selector)',
+    parseGeneric(rTransition, S['transition-check.mjs']));
+  addGate('Motion  (easing & duration variables → CSS)',
+    parseGeneric(rMotion, S['motion-check.mjs']));
+  addGate('Shadows  (Figma effect styles → CSS box-shadow)',
+    parseGeneric(rEffect, S['effect-check.mjs']));
+
+  // ── Rendered output & self-check ────────────────────────────────────────────────
+  addGate('Renders correctly in a browser  (real computed styles vs the DS spec)',
+    parseGeneric(rRendered, S['rendered-check.mjs']));
+  addGate('What this audit actually checked  (which DS components & states are covered)',
+    parseGeneric(rCoverage, S['coverage-check.mjs']));
+
+  // --only: the gates the person asked for, under their own numbers; the rest neither shown nor counted.
+  if (ONLY) {
+    const keep = gates.filter((g) => ONLY.gates.has(g.n));
+    gates.length = 0;
+    gates.push(...keep);
+    anyFail = keep.some((g) => !g.pass && !g.planLimited) || (ONLY.a11y && cfg.a11yStrict === true && !!rA11y && rA11y.status === 1);
+  }
+
+  // ── Kept on purpose (kept.mjs): the differences the team decided to keep never fail the run ──
+  const _keptDecisions = readKept(ROOT);
+  const _keptInGates = keepInGates(gates, _keptDecisions);
+  if (_keptInGates.length) anyFail = gates.some((g) => !g.pass && !g.planLimited) || ((!ONLY || ONLY.a11y) && cfg.a11yStrict === true && !!rA11y && rA11y.status === 1);
+
+  // ── Adoption baseline / ratchet (feature #2) ────────────────────────────────────
+  // Let a real (imperfect) codebase adopt the audit without either a wall of red or turning gates
+  // off. The baseline records today's failing gates as ACCEPTED DEBT: they no longer fail the run,
+  // but any gate NOT in the baseline that fails is a real regression and still fails. Debt only
+  // ratchets down. Gate-level, deterministic, opt-in. Off by default (no file, no baseline).
+  //   node audit.mjs --baseline   → capture the current failing gates as the baseline (commit it)
+  //   node audit.mjs --baseline --findings → the same, per ❌ line (each finding accepted on its own)
+  //   node audit.mjs              → enforce: debt is tolerated, regressions fail, ratchets surfaced
+  //   --no-baseline / ds-config baseline.enabled:false → ignore any baseline file
+  const BASELINE_OFF  = process.argv.includes('--no-baseline') || cfg.baseline?.enabled === false;
+  const BASELINE_PATH = join(ROOT, cfg.baseline?.path ?? newPath('baseline'));
+  const BASELINE_READ = join(ROOT, cfg.baseline?.path ?? projectPath(ROOT, 'baseline'));
+  let baselineInfo = null;
+  if (!BASELINE_OFF && process.argv.includes('--baseline')) {
+    // --match <words>: only the findings that name them (the radius, not the rest), added to the file.
+    const mi = process.argv.indexOf('--match');
+    const match = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : null;
+    const perFinding = process.argv.includes('--findings') || !!match?.length;
+    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0, match, from: BASELINE_READ });
+    baselineInfo = { mode: 'write', written, path: BASELINE_PATH, perFinding };
+    anyFail = false;   // capturing the baseline is not a failing run
+  } else if (!BASELINE_OFF) {
+    const baseLabels = loadBaselineLabels(BASELINE_READ);
+    if (baseLabels) {
+      // With --only, the accepted debt of the gates that did not run is neither stale nor fixed: it is left out.
+      const inRun = (label) => !ONLY || gates.some((g) => g.label === label);
+      const inRunKey = (k) => !ONLY || gates.some((g) => String(k).startsWith(`${g.label.replace(/\s{2}\(.*$/, '').trim()} :: `));
+      const accepted = loadBaselineFindings(BASELINE_READ);
+      const cls = classifyBaseline(gates, baseLabels.filter(inRun), accepted ? accepted.filter(inRunKey) : accepted);
+      baselineInfo = { mode: 'enforce', ...cls };
+      // Re-derive the verdict: accepted debt no longer fails; only regressions do. Preserve the
+      // one non-gate contribution (a11yStrict, folded into anyFail above).
+      const a11yHardFail = cfg.a11yStrict === true && rA11y && rA11y.status === 1;
+      anyFail = a11yHardFail || cls.gateFail;
+      const debtSet = new Set(cls.debt);
+      for (const g of gates) if (debtSet.has(g.label) && !g.pass && !g.planLimited) g.baselined = true;
+    }
+  }
+
+  // Everything the report prints from here is also kept, so the next run can say what changed.
+  const _reportLines = [];
+  const _log = console.log;
+  let _mute = false;
+  console.log = (...a) => { if (_mute) return; _reportLines.push(a.map(String).join(' ')); _log(...a); };
+  // --only: a section of the report shows only when its part was asked for (the system's advice, or accessibility).
+  const _section = (part) => { _mute = !!ONLY && !(part === 'a11y' ? ONLY.a11y : ONLY.parity); };
+  const _a11yCount = { static: null };
+
+  // ── Final report ──────────────────────────────────────────────────────────────
+  console.log('\n' + C.bold('─'.repeat(WIDTH)));
+  console.log(C.bold(`  PARITY AUDIT  ·  ${today}`));
+  if (_scopeNames.length) {
+    console.log(C.bold(C.yellow(`  SCOPED TO: ${_chosenNames.join(', ')}`)));
+    if (_autoAdded.length) console.log(C.dim(`  + nested components pulled in: ${[...new Set(_autoAdded)].join(', ')}`));
+    console.log(C.dim('  Findings outside these components are hidden and do not fail the run.'));
+  }
+  if (ONLY) {
+    console.log(C.bold(C.yellow(`  ONLY: ${onlyWords(ONLY, ONLY_LABELS)}`)));
+    console.log(C.dim('  Nothing else was checked in this run. Run without --only for the whole system.'));
+  }
+  console.log(C.bold('─'.repeat(WIDTH)) + '\n');
+
+  const planLimitedGates = [];
+  gates.forEach((g, i) => {
+    let icon;
+    if (g.planLimited) { icon = C.yellow('⏭ '); planLimitedGates.push(g.n); }
+    else if (g.baselined) icon = C.yellow('⚠️ ');
+    else icon = g.pass ? C.green('✅') : C.red('❌');
+    console.log(`${icon}  [${g.n}] ${C.bold(g.label)}`);
+    if (g.baselined) console.log(C.yellow('       baselined - accepted adoption debt (not a regression). Fix it, then re-run --baseline to lock it in.'));
+    // A zero count on a fail line ("❌ FAIL  0") says nothing failed: it is left out.
+    for (const line of g.lines || []) if (!ZERO_FAIL.test(String(line).replace(/\x1b\[[0-9;]*m/g, '').trim())) console.log(`       ${line}`);
+    console.log();
+  });
+
+  // ── PARITY (Figma ↔ code): the two true-parity tables (variables + props) ──────
+  // Rendered DIRECTLY from the gates' structured result JSON, not from their `lines`
+  // (the per-gate line pipeline trims/filters and would mangle column alignment).
+  (function printParity() {
+    const read = (f) => { try { return JSON.parse(readFileSync(join(ROOT, f), 'utf8')); } catch { return null; } };
+    const ANSI = /\x1b\[[0-9;]*m/g;
+    const w = (s) => String(s ?? '').replace(ANSI, '').length;
+    const table = (headers, rows, cap = 60) => {   // rows: { cells: string[], ok: boolean }
+      const shown = rows.slice(0, cap);
+      const cols = headers.map((h, i) => Math.max(w(h), ...shown.map(r => w(r.cells[i]))));
+      const out = ['  ' + C.dim(headers.map((h, i) => h.padEnd(cols[i])).join('  '))];
+      for (const r of shown)
+        out.push('  ' + r.cells.map((c, i) => String(c ?? '').padEnd(cols[i])).join('  ') + '  ' + (r.ok ? C.green('✓') : C.red('✗')));
+      if (rows.length > cap) out.push(C.dim(`  … ${rows.length - cap} more`));
+      return out;
+    };
+
+    // A props gate the project opted out of (frameworkComponents:false) shows no props table.
+    const propsSkipped = cfg.frameworkComponents === false && !cfg.htmlRealization;
+    const shown = (name) => !ONLY || gates.some((g) => g.label.startsWith(name));
+    const props  = propsSkipped || !shown('Component props match Figma') ? null : read('component-prop-result.json');
+    const parity = shown('Token values') ? read(PROJECT.checkResult.now) : null;
+    if (!props && !(parity?.fail?.length || parity?.aliasFail?.length || parity?.passList?.length)) return;
+
+    console.log(C.bold('─'.repeat(WIDTH)));
+    console.log(C.bold('  PARITY  ·  Figma ↔ code'));
+    console.log(C.bold('─'.repeat(WIDTH)));
+
+    if (props?.rows?.length) {
+      console.log('\n  ' + C.bold('PROPS') + C.dim('  (component properties)'));
+      const rows = props.rows.map(r => ({
+        cells: [(r.component ? r.component + '/' : '') + r.figmaProp, r.figmaValue, r.codeProp, r.codeValue],
+        ok: r.status === 'match',
+      }));
+      for (const l of table(['FIGMA PROP', 'FIGMA VALUE', 'CODE PROP', 'CODE VALUE'], rows)) console.log(l);
+      console.log(C.dim(`  ✓ ${props.summary?.match ?? 0} match   ✗ ${props.summary?.diverged ?? 0} diverge`));
+    } else if (props) {
+      // Empty snapshot: not a pass, just nothing captured.
+      console.log('\n  ' + C.bold('PROPS') + C.dim('  (component properties)'));
+      console.log('  ' + C.yellow('not verified - the props snapshot is empty (capture it via the Figma plugin)'));
+    }
+
+    if (parity) {
+      const vRows = [];
+      for (const f of parity.fail ?? [])
+        vRows.push({ cells: [f.token ?? '', f.mode ?? '-', f.figma ?? '(bound)', f.css ?? 'not in code'], ok: false });
+      for (const a of parity.aliasFail ?? [])
+        vRows.push({ cells: [a.token ?? '', a.mode ?? '-', (a.figmaChain ?? []).join(' → '), (a.cssChain ?? []).join(' → ') || 'hardcoded'], ok: false });
+      const matchCount = (parity.passList ?? []).length;
+      if (vRows.length || matchCount) {
+        console.log('\n  ' + C.bold('VARIABLES') + C.dim('  (design tokens)'));
+        if (vRows.length) for (const l of table(['VARIABLE', 'MODE', 'FIGMA', 'CODE'], vRows)) console.log(l);
+        console.log(C.dim(`  ✓ ${matchCount} match   ✗ ${vRows.length} diverge`));
+      }
+    }
+    console.log();
+  })();
+
+  // ── Summary table ─────────────────────────────────────────────────────────────
+  // Plain-English gate names for the summary table. MUST stay 1:1 with the addGate() calls above,
+  // in the same order (sync-docs.mjs asserts GATE_PLAIN.length === the gate count, so a drift fails
+  // the docs check instead of silently shifting the labels).
+  const GATE_PLAIN = [
+    // Up to date
+    'Data is up to date',
+    'Figma frame unchanged',
+    // Token integrity
+    'Token values match Figma',
+    'Tokens used in screens exist in CSS',
+    'Every mode is covered',
+    'Exception lists are valid',
+    'No invented CSS variables',
+    'Docs tell the truth',
+    'No invented text casing',
+    'No hand-built DS components',
+    // Clean CSS
+    'Clean CSS',
+    'Nested components keep their own styles',
+    // Structure
+    'Structure matches (height, spacing, corners)',
+    'All states are built',
+    'Component props match Figma',
+    'Sub-components match Figma',
+    'Templates compose the right components',
+    // Markup
+    'Markup matches',
+    'Required pieces are in place',
+    'Icons match Figma',
+    // Animation & motion (Motion / Shadows opt-in)
+    'Transitions match',
+    'Motion matches (when defined)',
+    'Shadows match (when defined)',
+    // Rendered output & self-check
+    'Renders correctly in a browser',
+    'What this audit actually checked',
+  ];
+  const COL1 = 6, COL2 = 52;
+  const tRow = (num, label, result) => {
+    const icon = result === 'plan' || result === 'notrun' ? C.yellow('⏭') : result === 'debt' ? C.yellow('⚠️') : result ? C.green('✅') : C.red('❌');
+    const status = result === 'notrun' ? C.yellow('Not run') : result === 'plan' ? C.yellow('Skipped') : result === 'debt' ? C.yellow('Debt') : result ? C.green('Pass') : C.red('Fail');
+    const n = `[${num}]`.padEnd(COL1);
+    const l = label.length > COL2 ? label.slice(0, COL2 - 1) + '…' : label.padEnd(COL2);
+    return `  ${icon}  ${n}${l}${status}`;
+  };
+  if (gates.length) {
+    console.log(C.bold('─'.repeat(WIDTH)));
+    console.log(C.bold('  GATE SUMMARY'));
+    console.log(C.bold('─'.repeat(WIDTH)));
+  }
+  gates.forEach((g) => {
+    const result = g.notRun ? 'notrun' : g.planLimited ? 'plan' : g.baselined ? 'debt' : g.pass;
+    const plainLabel = GATE_PLAIN[g.n - 1] ?? g.label;
+    console.log(tRow(g.n, plainLabel, result));
+    if (g.notRun) console.log(C.yellow(`         Not verified: ${g.notRun}`));
+    else if (g.why) console.log(C.yellow(`         ${g.why}`));
+    else if (g.planLimited) {
+      console.log(C.yellow(`         Data was not auto-refreshed from the Figma API; ran against the committed snapshots.`));
+    }
+  });
+  console.log();
+
+  // ── Honesty legend ────────────────────────────────────────────────────
+  // Say plainly what is verified vs merely reported, and scope the claim to what was actually
+  // checked (from the coverage gate), so the report never over-claims. Wording only, no new checks.
+  {
+    const cov = (rCoverage?.stdout || '').match(/MODELLED\s+(\d+)\/(\d+)/);
+    const total = ONLY ? ONLY_LABELS.length : gates.length;
+    const scope = cov && gates.some((g) => g.n === total) ? `checked ${cov[1]} of ${cov[2]} DS components` : null;
+    if (gates.length) console.log(C.dim(`  [verified] the ${gates.length} gate${gates.length === 1 ? '' : 's'} above ${gates.length === 1 ? 'is' : 'are'} mechanically checked against Figma${scope ? `; ${scope} (see gate ${total})` : ''}.`));
+    console.log(C.dim('  [reported] the advisory notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail.'));
+    console.log();
+  }
+
+  // ── Adoption baseline verdict (feature #2) ──────────────────────────────────
+  if (baselineInfo?.mode === 'write') {
+    console.log('─'.repeat(WIDTH));
+    const n = baselineInfo.written.length;
+    const what = baselineInfo.perFinding ? `failing finding${n === 1 ? '' : 's'}` : `failing gate${n === 1 ? '' : 's'}`;
+    console.log(C.yellow(`\n  📌 BASELINE CAPTURED - ${n} ${what} recorded as accepted debt in ${relative(ROOT, baselineInfo.path) || newPath('baseline')}.`));
+    if (n) for (const l of baselineInfo.written) console.log(C.yellow(`       • ${l}`));
+    console.log(C.dim(baselineInfo.perFinding
+      ? '       Commit this file. From now on these findings are tolerated; any OTHER ❌ line, or a listed one whose value changed, is a regression.'
+      : '       Commit this file. From now on these gates are tolerated; any OTHER gate that fails is a regression.'));
+    console.log();
+  } else if (baselineInfo?.mode === 'enforce') {
+    console.log('─'.repeat(WIDTH));
+    const { debt, regressions, ratcheted, stale } = baselineInfo;
+    console.log(C.bold(`\n  📌 ADOPTION BASELINE  ·  ${debt.length} debt · ${regressions.length} regression${regressions.length === 1 ? '' : 's'} · ${ratcheted.length} ready to ratchet`));
+    if (regressions.length) { console.log(C.red('     Regressions (not baselined - these FAIL the run):')); for (const l of regressions) console.log(C.red(`       ❌ ${l}`)); }
+    if (ratcheted.length)   { console.log(C.green('     Fixed since the baseline - re-run --baseline to lock in (they can no longer regress silently):')); for (const l of ratcheted) console.log(C.green(`       ✅ ${l}`)); }
+    if (stale.length)       { console.log(C.dim('     Stale baseline entries (no matching gate - prune them):')); for (const l of stale) console.log(C.dim(`       · ${l}`)); }
+    const { newFindings = [], fixedFindings = [], acceptedFindings = 0 } = baselineInfo;
+    if (acceptedFindings) console.log(`     Accepted findings  ${acceptedFindings - fixedFindings.length} still present · ${fixedFindings.length} fixed · ${newFindings.length} new`);
+    if (newFindings.length)   { console.log(C.red('     New findings (not accepted - these FAIL the run):')); for (const l of newFindings) console.log(C.red(`       ❌ ${l}`)); }
+    if (fixedFindings.length) { console.log(C.green('     Accepted findings now fixed - re-run --baseline --findings to drop them:')); for (const l of fixedFindings) console.log(C.green(`       ✅ ${l}`)); }
+    console.log();
+  }
+
+  console.log('─'.repeat(WIDTH));
+  if (anyFail) {
+    console.log(C.bold(C.red(`\n  AUDIT FAILED - not in parity: see the ❌ lines above (fix them only when the person asks)${ONLY ? `. Only ${onlyWords(ONLY, ONLY_LABELS)} ran` : ''}\n`)));
+  } else if (baselineInfo?.mode === 'enforce' && baselineInfo.debt.length) {
+    console.log(C.bold(C.yellow('\n  NO REGRESSIONS ✅  (adoption debt remains - see baseline above)\n')));
+  } else {
+    const nr = gates.filter((g) => g.notRun).length;
+    if (ONLY && !gates.length) console.log(C.bold('\n  ONLY THE ACCESSIBILITY CHECK RAN - its findings are under ♿ below (advice; a11yStrict makes them fail)\n'));
+    else if (ONLY) console.log(C.bold(C.green(`\n  EVERY CHECK ASKED FOR PASSES ✅  (only ${onlyWords(ONLY, ONLY_LABELS)}${nr ? `; ${nr} not verified - see ⏭` : ''})\n`)));
+    else console.log(C.bold(C.green(nr ? `\n  EVERY GATE THAT RAN PASSES ✅  (${nr} not verified - see ⏭)\n` : '\n  ALL GATES PASS ✅\n')));
+  }
+  const gateNo = (n) => gates.find((g) => g.n === n);
+  const refreshLimited = planLimitedGates.filter((n) => !gateNo(n).notRun && !gateNo(n).why);
+  if (refreshLimited.length) {
+    console.log(C.yellow('  ⏭  DATA NOT AUTO-REFRESHED - what this means:\n'));
+    for (const n of refreshLimited) {
+      const notes = [`Gate [${n}] ran against committed data; the live auto-refresh from Figma was not available this run.`];
+      console.log(C.yellow(`  [${n}] ${gateNo(n).label}`));
+      for (const line of notes) console.log(C.yellow(`      ${line}`));
+      console.log();
+    }
+  }
+  console.log('─'.repeat(WIDTH) + '\n');
+
+  // ── Write parity history ──────────────────────────────────────────────────────
+  const histPath = join(ROOT, newPath('history'));
+  let hist = [];
+  if (!ONLY) {
+  try { hist = JSON.parse(readFileSync(join(ROOT, projectPath(ROOT, 'history')), 'utf8')); } catch {}
+  hist.push({
+    date:        today,
+    timestamp:   new Date().toISOString(),
+    pass:        gates.filter(g => g.pass && !g.planLimited).length,
+    planLimited: gates.filter(g => g.planLimited).length,
+    fail:        gates.filter(g => !g.pass && !g.planLimited).length,
+    total:       gates.length,
+    gates:       gates.map(g => ({ label: g.label, pass: g.pass, planLimited: g.planLimited ?? false })),
+  });
+  if (hist.length > 100) hist = hist.slice(-100);
+  try { writeFileSync(histPath, JSON.stringify(hist, null, 2) + '\n'); } catch {}
+  }
+
+  // AI-readiness scorecard accumulates a few run signals as the advisory blocks below compute
+  // them, then prints one R/Y/G summary at the end. Declared here, before the first writer.
+  const _sc = { exempt: 0, contracts: null };
+
+  // ── Exemption debt (advisory, never a gate) ─────────────────────────────────
+  _section('advice');
+  // Every exemption / escape-hatch is a deliberate bypass — usually a missing token or a
+  // real gap, not a free pass. Surface them each run so they stay visible and trend down,
+  // never affecting pass/fail. Agnostic: any ds-config.json key matching /exempt|exception/i
+  // that holds an array counts as an exemption list. Quiet by default (totals only); pass
+  // --exemption-debt to list every entry.
+  {
+    const debtLists = [];
+    const walkDebt = (o, path) => {
+      if (!o || typeof o !== 'object') return;
+      for (const k of Object.keys(o)) {
+        const v = o[k];
+        const p = path ? `${path}.${k}` : k;
+        if (/exempt|exception/i.test(k) && Array.isArray(v)) { if (v.length) debtLists.push({ key: p, entries: v }); }
+        else if (v && typeof v === 'object' && !Array.isArray(v)) walkDebt(v, p);
+      }
+    };
+    walkDebt(cfg, '');
+    const debtTotal = debtLists.reduce((n, l) => n + l.entries.length, 0);
+    _sc.exempt = debtTotal;
+    if (debtTotal) {
+      const detail = process.argv.includes('--exemption-debt');
+      // (decision legibility). An exemption entry may be a bare string or an object carrying
+      // optional legibility fields: status ('permanent' | 'temporary'), owner, and reviewBy (a date
+      // or a trigger), alongside the existing rationale (_note / note / reason). An entry is LEGIBLE
+      // when a non-participant can see WHY it exists and WHO owns it: a rationale AND an owner or a
+      // status. Advisory only. Missing legibility never fails; it just surfaces so temporary bypasses
+      // get cleared and permanent ones stay accountable.
+      const legOf = (e) => {
+        if (!e || typeof e !== 'object') return { status: null, owner: null, reviewBy: null, rationale: null, legible: false };
+        const status = typeof e.status === 'string' ? e.status.toLowerCase() : null;
+        const owner = e.owner ?? null;
+        const reviewBy = e.reviewBy ?? e.review ?? e.reviewWhen ?? null;
+        const rationale = e._note ?? e.note ?? e.reason ?? null;
+        return { status, owner, reviewBy, rationale, legible: !!(rationale && (owner || status)) };
+      };
+      const flat = debtLists.flatMap((l) => l.entries.map(legOf));
+      const temp = flat.filter((x) => x.status === 'temporary').length;
+      const perm = flat.filter((x) => x.status === 'permanent').length;
+      const noStatus = flat.filter((x) => !x.status).length;
+      const notLegible = flat.filter((x) => !x.legible).length;
+      console.log(C.yellow(`\n⚠️  Exemption debt: ${debtTotal} bypass(es) across ${debtLists.length} list(s). Each is a deliberate exception to review (a missing token or a real gap), not a silent pass.`));
+      console.log(C.yellow(`     legibility: ${temp} temporary · ${perm} permanent · ${noStatus} unspecified · ${notLegible} not legible (no rationale/owner/status)`));
+      for (const l of debtLists) {
+        console.log(C.yellow(`     ${l.key}: ${l.entries.length}`));
+        if (detail) {
+          for (const e of l.entries) {
+            const m = legOf(e);
+            const label = typeof e === 'string' ? e : (e.pattern ?? e.file ?? e.token ?? e.name ?? JSON.stringify(e));
+            const tags = [m.status && `status:${m.status}`, m.owner && `owner:${m.owner}`, m.reviewBy && `review:${m.reviewBy}`, !m.legible && 'not-legible'].filter(Boolean).join('  ');
+            console.log(`       · ${label}${tags ? '   ' + C.dim(`[${tags}]`) : ''}`);
+          }
+        }
+      }
+      console.log(detail
+        ? C.yellow('   Clear a temporary one by adding the missing token / building the control; give each a rationale + owner (and status) so it stays legible.')
+        : '   Run with --exemption-debt to list them (with status / owner / review).');
+    }
+  }
+
+  // ── Values written by hand (advisory here): the census of the project's styles in totals ──
+  // --census lists each line with the token to use and keeps the baseline; here, only how many and where most.
+  _section('advice');
+  if (cfg.census !== false && !_scopeNames.length) try {
+    const rc = await import('./raw-census.mjs');
+    const census = rc.censusOf(ROOT, cfg), against = rc.censusAgainst(census, rc.readCensusBaseline(ROOT));
+    if (census.files.length) {
+      const top = census.files[0], kinds = Object.entries(census.byKind).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ');
+      console.log(C.yellow(`\n🧮 Values written by hand in the styles: ${census.errors} error${census.errors === 1 ? '' : 's'}, ${census.warnings} warning${census.warnings === 1 ? '' : 's'} in ${census.files.length} file${census.files.length === 1 ? '' : 's'} (${kinds}); the most in ${top.file} (${top.errors} error${top.errors === 1 ? '' : 's'}, ${top.warnings} warning${top.warnings === 1 ? '' : 's'}).`));
+      if (against.grew.length) console.log(C.yellow(`   More than the baseline (${rc.CENSUS_FILE}) in ${against.grew.map((g) => `${g.file} (${g.was} → ${g.now})`).join(', ')}.`));
+      console.log(C.yellow(`   rms-design-system-engine --census lists each one with the token to use${against.first ? ', and keeps the count so it only falls' : ''}.`));
+    }
+  } catch { /* the census reads the project's styles; nothing to read */ }
+
+  // ── Code → design drift (advisory, never a gate) ───────────────────────
+  _section('advice');
+  // A diagnostic layer must work BOTH directions. The parity is design → code; this surfaces
+  // the reverse: props that exist in CODE but not in Figma, so code-ahead-of-design is visible and
+  // can be synced back to the design (or documented). Reuses the component-prop gate's already
+  // captured rows: status 'extra' = a code prop with no Figma property; 'rename' = a likely match to
+  // document. The engine only SURFACES the drift; the designer decides. Never affects pass/fail. Run
+  // with --code-drift to list every item.
+  {
+    let propRes = null;
+    if (!(cfg.frameworkComponents === false && !cfg.htmlRealization)) { try { propRes = JSON.parse(readFileSync(join(ROOT, 'component-prop-result.json'), 'utf8')); } catch { /* optional */ } }
+    const propRows = Array.isArray(propRes?.rows) ? propRes.rows : [];
+    const extra = propRows.filter((r) => r.status === 'extra');
+    const rename = propRows.filter((r) => r.status === 'rename');
+    if (extra.length || rename.length) {
+      const detail = process.argv.includes('--code-drift');
+      const byComp = new Map();
+      for (const r of extra) { if (!byComp.has(r.component)) byComp.set(r.component, []); byComp.get(r.component).push(r.codeProp); }
+      console.log(C.yellow(`\nℹ️  Code → design drift: ${extra.length} code prop(s)${rename.length ? ` and ${rename.length} likely rename(s)` : ''} exist in code but not in Figma. Decide whether to sync them back to the design or document them. Advisory only.`));
+      for (const [comp, props] of byComp) {
+        console.log(C.yellow(`     ${comp}: ${props.length}` + (detail ? C.dim(`  (${props.join(', ')})`) : '')));
+      }
+      if (detail && rename.length) {
+        console.log(C.yellow('   likely renames (Figma prop ~ code prop):'));
+        for (const r of rename) console.log(`       · ${r.component}: Figma "${r.figmaProp}" ~ code "${r.codeProp}"`);
+      }
+      if (!detail) console.log('   Run with --code-drift to list them.');
+    }
+  }
+
+  // ── List duplication / single-source-of-truth (advisory) ───────────────
+  _section('advice');
+  // A DS list copied by hand into an agent-instruction file, a skill, or a doc drifts into a stale
+  // parallel truth - exactly what makes an agent hallucinate. The engine already generates the
+  // authoritative index (llms.txt + contracts); this flags hand-maintained surfaces that restate a
+  // CLUSTER of DS names so they can reference the generated index instead of keeping a copy. Opt-in,
+  // never fails: runs only on surfaces the project declares in ds-config duplication.surfaces
+  // (generated surfaces like the styleguide are NOT listed - showing every component is their job).
+  {
+    const dupSurfaces = (cfg.duplication?.surfaces ?? []).flat().filter(Boolean);
+    // Agent instruction files are found on their own: a list copied into AGENTS.md is the classic case.
+    let found = [];
+    if (cfg.steering !== false) {
+      try { const { findSteeringFiles } = await import('./steering-check.mjs'); found = findSteeringFiles(ROOT, { skip: [cfg.contracts?.out ?? 'contracts', 'node_modules', ...ENGINE_DIRS] }).filter((f) => !dupSurfaces.includes(f.file)); } catch { /* declared surfaces still run */ }
+    }
+    if (dupSurfaces.length || found.length) {
+      const { duplicationFindings } = await import('./duplication-check.mjs');
+      // DS truth: component names from the structure snapshot, token names from the vars snapshot.
+      let componentNames = [], tokenNames = [];
+      try {
+        const st = JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8'));
+        componentNames = Object.keys(st.components || st || {}).filter((k) => !k.startsWith('_'));
+      } catch { /* no structure snapshot - components skipped */ }
+      try {
+        const vs = JSON.parse(readFileSync(cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : join(ROOT, 'figma-vars.snapshot.json'), 'utf8'));
+        const tk = new Set();
+        for (const mode of Object.values(vs.color || {})) for (const k of Object.keys(mode)) tk.add(k);
+        for (const k of Object.keys(vs.sizing || {})) tk.add(k);
+        for (const k of styleNames(vs.typography || {})) tk.add('typography/' + k);
+        tokenNames = [...tk];
+      } catch { /* no vars snapshot - tokens skipped */ }
+      const surfaces = [];
+      for (const p of dupSurfaces) {
+        if (/^https?:\/\//.test(p)) continue;
+        try { surfaces.push({ name: p, text: readFileSync(join(ROOT, p), 'utf8') }); }
+        catch { console.log(C.dim(`     (duplication) surface not found, skipped: ${p}`)); }
+      }
+      for (const f of found) surfaces.push({ name: f.file, text: f.text });
+      const minCluster = Number.isFinite(cfg.duplication?.minCluster) ? cfg.duplication.minCluster : 5;
+      let findings = [], parallel = [];
+      try { ({ findings, parallel } = duplicationFindings({ surfaces, componentNames, tokenNames, minCluster })); }
+      catch (e) { console.log(C.dim(`     (duplication) check skipped: ${e.message}`)); }
+      if (findings.length) {
+        const detail = process.argv.includes('--duplication');
+        console.log(C.yellow(`\nℹ️  List duplication: ${findings.length} hand-maintained surface list(s) restate the DS. A copied list drifts - keep one home (the generated llms.txt/contracts) and reference it. Advisory.`));
+        for (const f of findings) {
+          console.log(C.yellow(`     ${f.surface}: restates ${f.count}/${f.total} ${f.kind}`) + (detail ? C.dim(`  (${f.matched.slice(0, 20).join(', ')}${f.matched.length > 20 ? ', …' : ''})`) : ''));
+        }
+        for (const p of parallel) console.log(C.yellow(`     ⚠️  parallel truths: ${p.kind} list duplicated across ${p.surfaces.join(', ')} - these WILL diverge`));
+        if (!detail) console.log('   Run with --duplication to list the names.');
+      }
+    }
+  }
+
+  // ── Accessibility (advisory) ───────────────────────────────────────────
+  _section('a11y');
+  // Relay the a11y gate's own report (WCAG AA contrast · accessible name/role · visible focus,
+  // from the render). Advisory: a11yStrict already folded a failure into anyFail above; here we
+  // just surface the detail (or a clean ⏭ when no browser). Run with --a11y to list every finding.
+  if (rA11y && (rA11y.stdout || '').trim() && (!ONLY || ONLY.a11y)) {
+    process.stdout.write(rA11y.stdout.replace(/\s+$/, '') + '\n');
+    _reportLines.push(rA11y.stdout);
+  }
+
+  // ── Token layering (agnostic, descriptive — never a gate) ───────────────────
+  _section('advice');
+  // No tier model is imposed: DSes tier differently or not at all. We only measure THIS DS's own
+  // aliasing rate, and when references are clearly its norm (>=80% of color tokens alias), we
+  // surface the few tokens that hold a raw value instead — a likely missed reference. A DS that
+  // does not alias much is flagged nothing. Advisory only, never affects pass/fail.
+  {
+    const vPath = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : join(ROOT, 'figma-vars.snapshot.json');
+    let vsnap = null; try { vsnap = JSON.parse(readFileSync(vPath, 'utf8')); } catch {}
+    if (vsnap && vsnap.color && typeof vsnap.color === 'object') {
+      const outlierSet = new Set();
+      let bestRate = 0;
+      for (const mode of Object.keys(vsnap.color)) {
+        const tokens = Object.keys(vsnap.color[mode] || {});
+        if (tokens.length < 8) continue;                              // too few to infer a norm
+        const aliases = vsnap.aliases?.[mode] || {};
+        const deliberate = new Set(cfg.knownRawTokens ?? []);        // a literal the team keeps on purpose
+        const raw = tokens.filter((t) => !(t in aliases));            // references nothing → raw literal
+        const aliasRate = (tokens.length - raw.length) / tokens.length;
+        if (aliasRate >= 0.8 && raw.length && raw.length < tokens.length) {
+          bestRate = Math.max(bestRate, aliasRate);
+          for (const t of raw) if (!deliberate.has(t)) outlierSet.add(t);
+        }
+      }
+      if (outlierSet.size) {
+        const all = [...outlierSet];
+        console.log(C.yellow(`\nℹ️  Token layering: this DS references tokens ${Math.round(bestRate * 100)}% of the time, but ${all.length} color token(s) hold a raw value instead — likely a missed reference (or a deliberate literal). Advisory only.`));
+        for (const t of all.slice(0, 20)) console.log(`     · ${t}`);
+        if (all.length > 20) console.log(`     … ${all.length - 20} more`);
+      }
+    }
+  }
+
+  // ── Token contrast (advisory, no browser) ────────────────────────
+  _section('a11y');
+  // Computes WCAG contrast from the DS's own token values, PER mode, and flags any text/bg pair below
+  // AA. Pairs come from two places: DERIVED from the token names by convention (a component's
+  // text/label/icon token paired with the background sharing its state/variant qualifier; on by
+  // default, opt out with a11y.derivePairs:false) and/or DECLARED in ds-config a11y.tokenPairs.
+  // Complements the render a11y gate (works in CI without Chrome). Advisory; never fails, never imposed.
+  {
+    try {
+      const vPath = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : join(ROOT, 'figma-vars.snapshot.json');
+      const vsnap = JSON.parse(readFileSync(vPath, 'utf8'));
+      const modes = Object.keys(vsnap.color || {});
+      const authored = Array.isArray(cfg.a11y?.tokenPairs) ? cfg.a11y.tokenPairs : [];
+      let derived = [];
+      if (cfg.a11y?.derivePairs !== false && modes.length) {
+        const { deriveContrastPairs } = await import('./pair-derive.mjs');
+        derived = deriveContrastPairs([...new Set(modes.flatMap((m) => Object.keys(vsnap.color[m] || {})))], { boundaries: cfg.a11y?.nonTextPairs === true });   // every mode's names
+      }
+      // What Figma draws (the structure snapshot's drawnOn) corrects the names: a derived pair Figma never draws
+      // together is dropped, and each text Figma draws on a background token is paired with it.
+      let apart = [], nDrawn = 0;
+      try {
+        const sPath = join(ROOT, cfg.paths?.snapshotStructure || 'figma-structure.snapshot.json');
+        if (existsSync(sPath)) {
+          const st = JSON.parse(readFileSync(sPath, 'utf8'));
+          const { applyDrawnOn } = await import('./pair-derive.mjs');
+          const r = applyDrawnOn(derived, st.components ?? st);
+          derived = r.pairs; apart = r.apart; nDrawn = r.added;
+        }
+      } catch { /* no structure snapshot: the names alone */ }
+      // Merge + dedupe by text|bg; an authored pair wins over a derived one with the same endpoints.
+      const seen = new Set(); const pairs = []; let nAuthored = 0, nDerived = 0;
+      for (const [src, list] of [['authored', authored], ['derived', derived]]) {
+        for (const p of list) {
+          if (!p || !p.text || !p.bg) continue;
+          const key = `${p.text}|${p.bg}`; if (seen.has(key)) continue; seen.add(key);
+          pairs.push(p); if (src === 'authored') nAuthored++; else nDerived++;
+        }
+      }
+      if (pairs.length) {
+        const { tokenContrastFindings, tintedVars } = await import('./contrast-check.mjs');
+        const all = [];
+        const same = new Set();
+        let anyChecked = 0;
+        // A background the code paints as a tint (color-mix, opacity) is measured as rendered only.
+        let tinted = () => false;
+        try {
+          const { readFreshSnapshot } = await import('./code-capture.mjs');
+          const { colorVarOf, loadParityMaps } = await import('./capture-compare.mjs');
+          const { resolveNamingSpec } = await import('./naming-convention.mjs');
+          const cap = await readFreshSnapshot(ROOT, cfg);
+          const tv = tintedVars(cap);
+          const spec = resolveNamingSpec(cfg), maps = await loadParityMaps(ROOT, cfg);
+          if (tv.size) tinted = (t) => { const v = colorVarOf(t, spec, maps); return !!v && tv.has(v); };
+        } catch { /* no fresh capture: compare the tokens as they are */ }
+        for (const mode of modes) {
+          const resolve = (t) => vsnap.color[mode]?.[t] ?? vsnap.color[mode]?.[`${t}/color`] ?? null;
+          const { findings, checked, sameColour } = tokenContrastFindings(pairs, resolve, { tinted });
+          anyChecked += checked;
+          for (const f of findings) all.push({ ...f, mode });
+          for (const f of sameColour) same.add(f.name);
+        }
+        const provenance = `${nDerived - nDrawn} derived from token names${nDrawn ? ` + ${nDrawn} drawn together in Figma` : ''}${nAuthored ? ` + ${nAuthored} declared` : ''}`;
+        if (all.length) {
+          // Where each text token is declared in code, from the code capture when it is fresh.
+          let whereOf = () => null;
+          try {
+            const { readFreshSnapshot } = await import('./code-capture.mjs');
+            const { colorVarOf, loadParityMaps } = await import('./capture-compare.mjs');
+            const { resolveNamingSpec } = await import('./naming-convention.mjs');
+            const cap = await readFreshSnapshot(ROOT, cfg);
+            const spec = resolveNamingSpec(cfg), maps = await loadParityMaps(ROOT, cfg);
+            if (cap) whereOf = (t) => { const v = colorVarOf(t, spec, maps); return v && cap.tokens?.[v]?.declaredAt ? `${v} · ${cap.tokens[v].declaredAt}` : null; };
+          } catch { /* locations are a convenience */ }
+          console.log(C.yellow(`\n⚠️  Token contrast: ${all.length} pair(s) below WCAG AA (${provenance}, per mode).`));
+          const { codeReason, reasonLine, prefetchReasons } = await import('./change-reason.mjs');
+          prefetchReasons(ROOT, all.slice(0, 20).map((f) => whereOf(f.text)?.split(' · ')[1]));
+          for (const f of all.slice(0, 20)) {
+            const w = whereOf(f.text);
+            console.log(C.yellow(`     [${f.mode}] ${f.name}: ${f.ratio}:1 (needs ${f.threshold}:1)  ${f.textHex} on ${f.bgHex}${w ? `  (${w})` : ''}`));
+            const why = w ? reasonLine(codeReason(ROOT, w.split(' · ')[1])) : null;
+            if (why) console.log(C.dim(`        ↳ ${why}`));
+          }
+          console.log('   Advisory: pairs are derived from the token-name convention and/or declared in ds-config → a11y.tokenPairs; the engine only surfaces the math.');
+        } else if (anyChecked) {
+          console.log(`\nℹ️  Token contrast: all pairs meet WCAG AA across ${modes.length} mode(s) (${provenance}).`);
+        }
+        if (apart.length) {
+          console.log(`\nℹ️  Token contrast: ${apart.length} pair(s) from the token names left out - Figma never draws that text on that background, so the pair is not a real one.`);
+          for (const p of apart.slice(0, 10)) console.log(`     · ${p.text} on ${p.bg}`);
+          if (apart.length > 10) console.log(`     … ${apart.length - 10} more`);
+        }
+        if (same.size) {
+          console.log(`\nℹ️  Token contrast: ${same.size} pair(s) not comparable - the component draws the background as a tint (opacity or color-mix), or the text and background tokens are the same colour. The rendered state contrast measures them.`);
+          for (const n of [...same].slice(0, 10)) console.log(`     · ${n}`);
+          if (same.size > 10) console.log(`     … ${same.size - 10} more`);
+        }
+      }
+    } catch { /* advisory: never fails */ }
+    // State contrast from the code capture: each component's text in every mode and every state the
+    // capture produced (hover, selected, error…), no extra browser run. Advisory.
+    try {
+      const { readFreshSnapshot } = await import('./code-capture.mjs');
+      const cap = await readFreshSnapshot(ROOT, cfg);
+      if (cap) {
+        const { stateContrastFindings } = await import('./contrast-check.mjs');
+        // The system's surfaces in each mode (ds-config a11y.surfaces names them, else every Figma colour
+        // token with /surface/ in its name): a tinted background is measured over each one.
+        const surfaces = {};
+        try {
+          const vPath = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : join(ROOT, 'figma-vars.snapshot.json');
+          const vs = JSON.parse(readFileSync(vPath, 'utf8')).color || {};
+          const named = Array.isArray(cfg.a11y?.surfaces) ? cfg.a11y.surfaces : null;
+          for (const [m, toks] of Object.entries(vs)) surfaces[m] = Object.entries(toks).filter(([t]) => (named ? named.includes(t) : /\/surface\//.test(t))).map(([, v]) => v).filter(Boolean);
+        } catch { /* no snapshot: the captured backdrop alone */ }
+        const { findings, checked } = stateContrastFindings(cap, cfg, { surfaces });
+        if (findings.length) {
+          console.log(C.yellow(`\n⚠️  State contrast: ${findings.length} component state(s) below WCAG AA, as rendered (${checked} checked; disabled states exempt).`));
+          const { colorHex } = await import('./css-values.mjs');
+          const hex = (v, name) => `${colorHex(v) ?? v}${name ? ` (${name})` : ''}`;
+          const { codeReason, reasonLine, prefetchReasons } = await import('./change-reason.mjs');
+          prefetchReasons(ROOT, findings.slice(0, 20).map((f) => f.at));
+          for (const f of findings.slice(0, 20)) {
+            console.log(C.yellow(`     ${f.component} [${f.state} · ${f.mode}]: ${f.ratio}:1 (needs ${f.threshold}:1)  ${hex(f.fg, f.fgVar)} on ${hex(f.bg, f.bgVar)}${f.onSurface ? ` over the surface ${f.onSurface}` : ''}${f.at ? `  (${f.at})` : ''}`));
+            const why = f.at ? reasonLine(codeReason(ROOT, f.at)) : null;
+            if (why) console.log(C.dim(`        ↳ ${why}`));
+          }
+          if (findings.length > 20) console.log(`     … ${findings.length - 20} more`);
+          const { figmaLinker } = await import('./figma-link.mjs');
+          const linkFor = figmaLinker(ROOT, cfg);
+          for (const comp of [...new Set(findings.slice(0, 20).map((f) => f.component))]) { const u = linkFor(comp); if (u) console.log(`     🔗 ${comp} in Figma: ${u}`); }
+        } else if (checked) console.log(`\nℹ️  State contrast: every rendered component state meets WCAG AA (${checked} checked; disabled states exempt).`);
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Token tiers (I10b, project-DECLARED, advisory) ──────────────────────────
+  _section('advice');
+  // Runs ONLY when ds-config.json declares `tiers` (never imposes a tier model). Classifies each
+  // token by the project's own regexes and flags a token that aliases a token in a tier its
+  // `mayReference` list does not allow, and, when the tiers carry a `layer`, one that skips a layer or
+  // points back at a later one. Advisory: surfaces cross-tier references, never fails.
+  {
+    const tiers = Array.isArray(cfg.tiers) ? cfg.tiers.filter((t) => t && t.name && t.match != null) : [];
+    if (tiers.length) {
+      try {
+        const { checkTiers } = await import('./tier-check.mjs');
+        const vPath = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : join(ROOT, 'figma-vars.snapshot.json');
+        const vsnap = JSON.parse(readFileSync(vPath, 'utf8'));
+        const tokenSet = new Set();
+        const aliasMap = new Map();   // token path -> Set(referenced token paths)
+        const kinds = new Map();      // token path -> its kind, for a tier that says what it holds
+        for (const [key, kind] of [['sizing', 'sizing'], ['typography', 'typography'], ['strings', 'string'], ['booleans', 'boolean']]) {
+          for (const k of Object.keys(vsnap[key] || {})) if (!k.startsWith('_')) { tokenSet.add(k); kinds.set(k, kind); }
+        }
+        for (const mode of Object.keys(vsnap.color || {})) {
+          for (const k of Object.keys(vsnap.color[mode] || {})) { tokenSet.add(k.replace(/\/color$/, '')); kinds.set(k.replace(/\/color$/, ''), 'color'); }
+          for (const [tok, target] of Object.entries(vsnap.aliases?.[mode] || {})) {
+            const key = tok.replace(/\/color$/, '');
+            if (!aliasMap.has(key)) aliasMap.set(key, new Set());
+            // The token it aliases, not the rest of the chain: a component token that aliases a semantic one
+            // reaches a primitive through it, and that is the layering asked for.
+            const ref = Array.isArray(target) ? target[0] : target;
+            if (ref) aliasMap.get(key).add(String(ref).replace(/\/color$/, ''));
+          }
+        }
+        const { violations, classified } = checkTiers([...tokenSet], (t) => [...(aliasMap.get(t) || [])], tiers, (t) => kinds.get(t) ?? null);
+        const summary = Object.entries(classified).map(([n, c]) => `${n}:${c}`).join(' · ') || 'none classified';
+        if (violations.length) {
+          console.log(C.yellow(`\n⚠️  Token tiers (declared): ${violations.length} cross-tier reference(s) the project's rules disallow. [${summary}]`));
+          for (const v of violations.slice(0, 20)) console.log(C.yellow(v.kind === 'kind' ? `     · ${v.token}: ${v.reason}` : `     · ${v.token} (${v.tier}) → ${v.ref} (${v.refTier})${v.kind ? `: ${v.reason}` : ''}`));
+          if (violations.length > 20) console.log(`     … ${violations.length - 20} more`);
+          console.log('   Advisory: the tiers are yours (ds-config → tiers); the engine only surfaces the crossings.');
+        } else {
+          console.log(`\nℹ️  Token tiers (declared): all ${tokenSet.size} tokens respect the declared tier references. [${summary}]`);
+        }
+      } catch { /* advisory: never fails the audit */ }
+    }
+  }
+
+  // ── System health (advisory) ──────────────────────────────────────────────────
+  _section('advice');
+  // What keeps the system healthy as it grows (system-advice.mjs): modes set below a product's root, two themes in
+  // one product, semantic tokens with no description, Storybook preview rules that style a component,
+  // near-duplicate components, tokens named by look. Advice only; "systemHealth": false turns it off.
+  if (cfg.systemHealth !== false && !ONLY) {
+    try {
+      const sa = await import('./system-advice.mjs');
+      const { ENGINE_DIRS } = await import('./names.mjs');
+      const SKIP = new Set(['node_modules', 'dist', 'build', 'coverage', '.git', '.next', 'out', ...ENGINE_DIRS.map((d) => d.split('/')[0])]);
+      const walk = (dir, test, out = []) => {
+        let list = [];
+        try { list = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+        for (const e of list) {
+          const p = join(dir, e.name);
+          if (e.isDirectory()) { if (!SKIP.has(e.name) && !(e.name.startsWith('.') && e.name !== '.storybook') && !/apps[\/]style-?guide$/.test(p)) walk(p, test, out); }
+          else if (test(p)) out.push(p);
+        }
+        return out;
+      };
+      const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return ''; } };
+      const theme = readThemeCSS();
+      let vsnap = {};
+      try { vsnap = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')); } catch { /* no vars snapshot */ }
+      const prefix = cfg.figma?.primitivePrefix ?? 'primitives/';
+      const roots = codeRoots(ROOT, cfg);
+      const products = roots.slice(1);
+      const ui = (p) => /\.(html?|jsx|tsx|js|ts|mjs|vue|svelte|css|scss|less)$/i.test(p) && !/\.(test|spec|stories)\./.test(p) && !/\.min\./.test(p);
+      const files = (dir) => walk(dir, ui).map((f) => ({ file: relative(ROOT, f), text: read(f) }));
+      const productFiles = Object.fromEntries(products.map((d) => [relative(ROOT, d), files(d)]));
+      const names = [...new Set([...Object.keys(JSON.parse(read(join(ROOT, SNAP_STRUCT)) || '{}').components ?? {})])].filter((n) => !n.startsWith('_'));
+      const classes = Object.fromEntries(names.map((n) => [n, cfg.componentSelectors?.[n] ?? `.${n.charAt(0).toLowerCase()}${n.slice(1)}`]));
+      const colourNames = [...new Set(Object.values(vsnap.color ?? {}).flatMap((m) => Object.keys(m ?? {})))];
+      const lines = [];
+      const modes = sa.modesBelowRoot(Object.values(productFiles).flat(), sa.modeAttributes(theme));
+      if (modes.length) { lines.push(`${modes.length} mode${modes.length === 1 ? '' : 's'} set below a product's root, so part of its page draws in another mode (set it on <html> or <body>):`); for (const m of modes.slice(0, 8)) lines.push(`   · ${m.file}:${m.line}  ${m.attr} on ${m.on}`); }
+      const two = sa.productsWithTwoThemes(productFiles, [cfg.paths?.themeCSS ?? []].flat());
+      for (const t of two) lines.push(`${t.product} brings in two themes (${t.themes.join(', ')}); one overrides the other by load order. Bring in one (${t.files.join(', ')}).`);
+      const ud = sa.undescribedTokens(vsnap, { primitivePrefix: prefix });
+      if (ud.missing.length) lines.push(`${ud.missing.length} of ${ud.total} semantic tokens have no description in Figma (${ud.missing.slice(0, 5).join(', ')}${ud.missing.length > 5 ? ', …' : ''}): what a token is for is what an agent reads to pick it.`);
+      const sb = sa.catalogueOnlyPatches(roots.flatMap((r) => walk(join(r, '.storybook'), (p) => /\.(css|scss|less|html)$/i.test(p))).map((f) => ({ file: relative(ROOT, f), text: read(f) })), classes);
+      if (sb.length) { lines.push(`${sb.length} Storybook preview rule${sb.length === 1 ? '' : 's'} style a component, so the catalogue shows it right while products draw it as the code does (fix the component):`); for (const f of sb.slice(0, 8)) lines.push(`   · ${f.file}:${f.line}  ${f.selector} (${f.component})`); }
+      const near = sa.nearDuplicateComponents(theme, classes);
+      for (const n of near.slice(0, 8)) lines.push(`${n.a} and ${n.b} are nearly the same (${n.same} of ${n.of} declarations): one may be a variant of the other.`);
+      // A product's near-copy of one of the system's components: a decision, not a drift.
+      const { rootOf } = await import('./migrations.mjs');
+      const sheets = (await import('./code-roots.mjs')).sourceFiles(ROOT, cfg).filter((f) => rootOf(f.file) === '.' && /\.(css|scss|less)$/i.test(f.file)).map((f) => f.text);
+      const copies = sa.productCopies(productFiles, [theme, ...sheets].join('\n'), classes);
+      if (copies.length) { lines.push(`${copies.length} class${copies.length === 1 ? ' in the products nearly copies' : 'es in the products nearly copy'} a system component. For each, decide: use the component (with a new option if it needs one), or add the new one to the system on purpose:`); for (const x of copies.slice(0, 8)) lines.push(`   · ${x.file}:${x.line}  .${x.cls} is nearly ${x.like} (${x.same} of ${x.of} declarations alike${x.differ.length ? `; differs in ${x.differ.slice(0, 4).join(', ')}` : ''})`); }
+      // A token named after a product or a brand, its components' own tokens aside.
+      const branded = sa.brandNamedTokens(sa.tokenNames(vsnap), { brands: (await import('./code-roots.mjs')).brandNames(ROOT, cfg), components: names });
+      if (branded.length) { lines.push(`${branded.length} token${branded.length === 1 ? ' is' : 's are'} named after a product or brand, a name that stops making sense when a second one uses the system (rename each to the role it plays):`); for (const x of branded.slice(0, 8)) lines.push(`   · ${x.name} (${x.brand})`); }
+      // Aliases to a removed token: in Figma (what the capture recorded), and in the code (a var() with a fallback whose
+      // token is declared nowhere), each with the commit that removed it when the history has one.
+      const broken = sa.brokenFigmaAliases(vsnap);
+      if (broken.length) { lines.push(`${broken.length} Figma variable${broken.length === 1 ? ' points' : 's point'} at a variable no longer in the file (point each at the one that replaced it):`); for (const x of broken.slice(0, 8)) lines.push(`   · ${x.name}${x.mode ? ` (${x.mode})` : ''} → ${x.target ?? 'a removed variable'}`); }
+      let asked = 0;
+      const removed = (t) => {
+        if (asked++ >= 30) return null;
+        const r = spawnSync('git', ['log', `-S${t}:`, '-1', '--format=%h %as'], { cwd: ROOT, encoding: 'utf8', timeout: 5000 });
+        const [sha, date] = String(r.stdout ?? '').trim().split(' ');
+        return r.status === 0 && sha ? { sha, date } : null;
+      };
+      const allFiles = (await import('./code-roots.mjs')).sourceFiles(ROOT, cfg);
+      const dangling = sa.danglingCodeAliases(allFiles, { removed });
+      if (dangling.length) { lines.push(`${dangling.length} token${dangling.length === 1 ? '' : 's'} in the code point at a token declared nowhere, so only the fallback shows (point each at the token that replaced it):`); for (const x of dangling.slice(0, 8)) lines.push(`   · ${x.file}:${x.line}  ${x.token ? `${x.token} → ` : ''}${x.target}${x.removed ? ` (removed in ${x.removed.sha}, ${x.removed.date})` : ''}`); }
+      const look = sa.namedByLook([...colourNames, ...Object.keys(vsnap.sizing ?? {})], { primitivePrefix: prefix });
+      if (look.length) lines.push(`${look.length} semantic token${look.length === 1 ? ' is' : 's are'} named by look rather than role (${look.slice(0, 5).map((x) => x.name).join(', ')}${look.length > 5 ? ', …' : ''}): agents then pick them by appearance.`);
+      if (lines.length) {
+        console.log(C.yellow(`\n🧭 System health: ${lines.filter((l) => !/^   ·/.test(l)).length} thing${lines.filter((l) => !/^   ·/.test(l)).length === 1 ? '' : 's'} to keep the system healthy as it grows. Advisory.`));
+        for (const l of lines) console.log(C.yellow(`     ${l}`));
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Every combination of modes (advisory) ──────────────────────────────────
+  _section('advice');
+  // Each switch is checked on its own by the gates; this turns every combination on at once (Dark on a phone), in the
+  // browser, and lists what goes wrong only together: a token Figma has one value for and the code another, and a text
+  // and background pair that passes with each switch alone and fails together. "modeCombinations": false turns it off.
+  if (cfg.modeCombinations !== false && !ONLY && !NO_FIGMA) {
+    try {
+      const mc = await import('./mode-combos.mjs');
+      const pairs = await mc.projectPairs(ROOT, cfg);
+      const r = await mc.modeCombinations(ROOT, cfg, { pairs });
+      mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+      writeFileSync(join(ROOT, OUT_DIR, 'mode-combinations.json'), JSON.stringify({ at: new Date().toISOString(), combos: r.combos ?? 0, axes: (r.axes ?? []).map((a) => ({ name: a.name, modes: a.modes.map((m) => m.name) })), findings: r.findings ?? [], contrast: r.contrast ?? [], ...(r.why ? { why: r.why } : {}) }, null, 1) + '\n');
+      const n = (r.findings?.length ?? 0) + (r.contrast?.length ?? 0);
+      if (n) {
+        console.log(C.yellow(`\n🎛  Every combination of modes: ${n} thing${n === 1 ? '' : 's'} wrong only when ${r.axes.map((a) => a.name).join(' and ')} are switched together (each switch alone is right). Advisory.`));
+        for (const f of (r.findings ?? []).slice(0, 12)) console.log(C.yellow(`     ${f.combo}: ${f.cssVar} is ${f.got}, Figma ${f.want} (${f.token}; right in ${f.alone})`));
+        for (const f of (r.contrast ?? []).slice(0, 8)) console.log(C.yellow(`     ${f.combo}: ${f.name} reads ${f.ratio}:1 (needs ${f.need}:1)`));
+      } else if (r.combos > 1) console.log(`\nℹ️  Every combination of modes: all ${r.combos} combinations of ${r.axes.map((a) => `${a.name} (${a.modes.map((m) => m.name).join(', ')})`).join(' and ')} resolve as Figma has them.`);
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Motion against Figma (advisory) ─────────────────────────────────────────
+  _section('advice');
+  // Where Figma animates a change between variants (its prototype's transitions, --figma-motion), the code's transition
+  // into that state: none, another duration, another curve. And how each component moves on its own: a loop (a
+  // spinner turning), its opening and its closing, Figma's Motion keyframes and overlays against the code's animations,
+  // and the code's motion Figma has none of. Runs once the motion snapshot exists.
+  if (!ONLY && !NO_FIGMA) {
+    try {
+      const { projectMotion } = await import('./motion-parity.mjs');
+      const r = await projectMotion(ROOT, cfg);
+      if (r) {
+        mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+        writeFileSync(join(ROOT, OUT_DIR, 'motion.json'), JSON.stringify({ at: new Date().toISOString(), compared: r.compared, findings: r.findings }, null, 1) + '\n');
+        if (r.findings.length) {
+          console.log(C.yellow(`\n🎞  Motion against Figma: ${r.findings.length} change${r.findings.length === 1 ? '' : 's'} the code animates otherwise than Figma (its prototype, its Motion keyframes). Advisory.`));
+          for (const f of r.findings.slice(0, 12)) console.log(C.yellow(`     ${f.message}`));
+        } else if (r.compared) console.log(`\nℹ️  Motion against Figma: the ${r.compared} motion${r.compared === 1 ? '' : 's'} Figma has (its prototype's transitions and overlays, its Motion keyframes) move the same in the code.`);
+        if (!r.motionRead) console.log(C.dim(`     Figma's Motion keyframes and overlays (a spinner's turn, a panel opening and closing) are not read yet: capture again with --figma-motion.`));
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Effects against Figma (advisory) ─────────────────────────────────────────
+  _section('advice');
+  // Each component's shadows, blurs, gradient or image fill, clipping and blend mode (--figma-effects), against its own
+  // rule in the code and its parts of the same name. Runs once the effects snapshot exists.
+  if (!ONLY && !NO_FIGMA) {
+    try {
+      const { projectEffects } = await import('./effects-parity.mjs');
+      const r = await projectEffects(ROOT, cfg);
+      if (r) {
+        mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+        writeFileSync(join(ROOT, OUT_DIR, 'effects.json'), JSON.stringify({ at: new Date().toISOString(), compared: r.compared, findings: r.findings }, null, 1) + '\n');
+        if (r.findings.length) {
+          console.log(C.yellow(`\n🌫  Effects against Figma: ${r.findings.length} shadow, blur, fill, clipping or blending difference${r.findings.length === 1 ? '' : 's'}. Advisory.`));
+          for (const f of r.findings.slice(0, 12)) console.log(C.yellow(`     ${f.message}`));
+        } else if (r.compared) console.log(`\nℹ️  Effects against Figma: the ${r.compared} component${r.compared === 1 ? '' : 's'} read draw their shadows, blurs, fills, clipping and blending as Figma does.`);
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Product screens against their Figma frames (advisory) ──────────────────
+  _section('advice');
+  // Each product's own page opened at the size and colour mode of each screen designed for it (the screen capture), its
+  // system components compared with the screen's: which and how many, their order, the space between neighbours and
+  // their alignment. Runs once the screen capture exists; "screenParity": false turns it off.
+  if (cfg.screenParity !== false && !ONLY && !NO_FIGMA) {
+    try {
+      const { projectScreens } = await import('./screen-parity.mjs');
+      const r = await projectScreens(ROOT, cfg);
+      if (r) {
+        mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+        writeFileSync(join(ROOT, OUT_DIR, 'screens.json'), JSON.stringify({ at: new Date().toISOString(), ...r }, null, 1) + '\n');
+        const n = r.screens.reduce((k, x) => k + x.findings.length, 0);
+        if (n) {
+          console.log(C.yellow(`\n🖼  Product screens against Figma: ${n} place${n === 1 ? '' : 's'} where a product's page is laid out otherwise than its designed screen. Advisory.`));
+          for (const sc of r.screens.filter((x) => x.findings.length)) { console.log(C.yellow(`     ${sc.product} (${sc.page}) against "${sc.name}"${sc.width ? ` at ${sc.width}px` : ''}:`)); for (const f of sc.findings.slice(0, 8)) console.log(C.yellow(`       · ${f.message}`)); }
+        } else if (r.screens.length) console.log(`\nℹ️  Product screens against Figma: ${r.screens.length} designed screen${r.screens.length === 1 ? '' : 's'} match${r.screens.length === 1 ? 'es' : ''} the product's page (which components, their order, spacing and alignment).`);
+        if (r.notCompared.length) console.log(`   Not compared: ${r.notCompared.join('; ')}.`);
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Right-to-left (opt-in: ds-config rtl: true, advisory) ────────────────────
+  _section('advice');
+  // Physical properties that would not mirror in a right-to-left language, with the logical
+  // property to use. Symmetric values mirror trivially and are not listed.
+  if (cfg.rtl === true) {
+    try {
+      const { loadCssSources } = await import('./css-source.mjs');
+      const { rtlFindings } = await import('./rtl-check.mjs');
+      const { files } = loadCssSources(ROOT, [cfg.paths?.themeCSS, ...(cfg.paths?.pluginCSS ?? [])].filter(Boolean));
+      const rtl = rtlFindings(files);
+      if (rtl.length) {
+        console.log(C.yellow(`\n⚠️  Right-to-left: ${rtl.length} declaration(s) would not mirror in a right-to-left language. Advisory.`));
+        for (const f of rtl.slice(0, 20)) console.log(C.yellow(`     ${f.selector}  ${f.property}  (${f.at})  → ${f.use}`));
+        if (rtl.length > 20) console.log(`     … ${rtl.length - 20} more`);
+      } else console.log('\nℹ️  Right-to-left: every side-specific declaration mirrors (logical properties or symmetric values).');
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── Closed vocabulary / raw containers (project-DECLARED, advisory) ────
+  _section('advice');
+  // Runs only when ds-config declares `closedVocab: { bannedTags, surfaces, suggest? }`. Counts the raw
+  // container tags the project chose to ban, in its declared surfaces. Advisory: surfaces the count so a
+  // "typed primitive, not a raw div" convention can trend down; never fails, never imposed.
+  {
+    const cv = cfg.closedVocab;
+    if (cv && Array.isArray(cv.bannedTags) && cv.bannedTags.length && Array.isArray(cv.surfaces) && cv.surfaces.length) {
+      try {
+        const { scanBannedContainers } = await import('./vocab-check.mjs');
+        const totals = {};
+        for (const rel of cv.surfaces) {
+          const abs = join(ROOT, rel); if (!existsSync(abs)) continue;
+          let txt; try { txt = readFileSync(abs, 'utf8'); } catch { continue; }
+          for (const [t, n] of Object.entries(scanBannedContainers(txt, cv.bannedTags))) totals[t] = (totals[t] || 0) + n;
+        }
+        const total = Object.values(totals).reduce((a, b) => a + b, 0);
+        if (total) {
+          console.log(C.yellow(`\n⚠️  Closed vocabulary (declared): ${total} raw container(s) across ${cv.surfaces.length} surface(s)${cv.suggest ? ` — ${cv.suggest}` : ' — prefer the DS primitive'}.`));
+          for (const [t, n] of Object.entries(totals)) console.log(C.yellow(`     <${t}>: ${n}`));
+          console.log('   Advisory: you declared these bans (ds-config → closedVocab); the engine only surfaces them.');
+        }
+      } catch { /* advisory: never fails */ }
+    }
+  }
+
+  // ── Multi-brand token coverage (advisory) ───────────────────────────────
+  _section('advice');
+  // Brands come from resolveBrands (declared > a captured collections manifest that marks a brand
+  // collection > none-with-a-suggestion). Plan-agnostic: it reads the snapshot the any-plan capture
+  // wrote; an Enterprise file with extended collections just yields a richer manifest to exploit. For a
+  // multi-brand DS every brand should define the SAME token set; a token in some brands but missing in
+  // others is a hole an agent can't fill for the missing brand. Advisory; never fails, never imposed.
+  {
+    try {
+      const { brandCoverage, resolveBrands } = await import('./brand-check.mjs');
+      const vPath = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : join(ROOT, 'figma-vars.snapshot.json');
+      let vsnap = null; try { vsnap = JSON.parse(readFileSync(vPath, 'utf8')); } catch { /* no snapshot */ }
+      if (vsnap) {
+        const { brands, source, suggest } = resolveBrands(cfg, vsnap);
+        if (brands && brands.length >= 2) {
+          const colorByBrand = {};
+          for (const b of brands) colorByBrand[b] = new Set(Object.keys(vsnap.color?.[b] || {}).map((k) => k.replace(/\/color$/, '')));
+          const { tokenUniverse, missing } = brandCoverage(colorByBrand);
+          const holes = Object.keys(missing);
+          const via = source === 'declared' ? '' : ` (from ${source})`;
+          if (holes.length) {
+            console.log(C.yellow(`\n⚠️  Multi-brand coverage${via}: ${holes.length}/${tokenUniverse} token(s) defined in some brands but missing in others (${brands.join(', ')}).`));
+            for (const t of holes.slice(0, 20)) console.log(C.yellow(`     ${t} — missing in ${missing[t].join(', ')}`));
+            if (holes.length > 20) console.log(`     … ${holes.length - 20} more`);
+            console.log('   Advisory: every brand should define the same token set; the engine only surfaces the gaps.');
+          } else if (tokenUniverse) {
+            console.log(`\nℹ️  Multi-brand coverage${via}: all ${tokenUniverse} tokens are defined across every brand (${brands.join(', ')}).`);
+          }
+        } else if (suggest && suggest.length) {
+          // Detected candidate multi-mode collections in the capture but no declared brands: nudge,
+          // never assume (modes may be theme/density/locale, not brands).
+          console.log(C.yellow(`\nℹ️  Multi-brand: detected ${suggest.length} multi-mode collection(s) in the capture. If any are brands, declare them in ds-config → brands[] to check cross-brand coverage:`));
+          for (const s of suggest.slice(0, 8)) console.log(`     ${s.name}: ${s.modes.join(', ')}`);
+        }
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
+  // ── External guidelines: optional live capture (Phase-1-style) ──────────────
+  _section('advice');
+  // Links in ds-config.json → guidelines.source (committed, NOT secret) are fetched and WRITTEN to their
+  // committed files BEFORE intent-gen reads them, so the written guidelines reach the design intent.
+  //   • notion: one page → guidelines.sources[0]              (token: NOTION_TOKEN in .env)
+  //   • gitlab: one or several wiki pages / Markdown files    (token: GITLAB_TOKEN in .env, only ever
+  //             sent to gitlab.com or GITLAB_HOST; public projects need none), each to its own file
+  // Degrade-safe: no token / no access / network / rate limit -> keep the committed file, never fail the
+  // audit. Tokens are read inside the fetchers and never logged.
+  {
+    const jobs = [];
+    try {
+      const { gitlabTargets, notionTargets } = await import('./intent-gen.mjs');
+      for (const t of notionTargets(cfg)) {
+        jobs.push({ provider: 'Notion', file: t.file, fetch: async () => (await import('./notion-fetch.mjs')).fetchNotionMarkdown(t.url, {}),
+          missing: `Set NOTION_TOKEN in .env and share the page with the integration, or commit an export.` });
+      }
+      for (const t of gitlabTargets(cfg)) {
+        jobs.push({ provider: 'GitLab', file: t.file, fetch: async () => (await import('./gitlab-fetch.mjs')).fetchGitlabMarkdown(t.url, {}),
+          missing: `Check the link, put GITLAB_TOKEN (read_api) in .env for a private project, and GITLAB_HOST for a company GitLab, or commit the page as ${t.file}.` });
+      }
+    } catch { /* no GitLab config */ }
+    for (const j of jobs) {
+      try {
+        const md = await j.fetch();
+        const target = join(ROOT, j.file);
+        if (md && md.trim()) {
+          const prevMd = existsSync(target) ? readFileSync(target, 'utf8') : '';
+          if (md !== prevMd) {
+            mkdirSync(dirname(target), { recursive: true });
+            writeFileSync(target, md);
+            console.log(`\n🔗 Guidelines refreshed from ${j.provider} → ${j.file}`);
+          }
+        } else if (!existsSync(target)) {
+          console.log(C.yellow(`\n⚠️  Guidelines: could not fetch from ${j.provider} and no committed ${j.file} exists. ${j.missing}`));
+        }
+      } catch { /* degrade: keep whatever is committed */ }
+    }
+  }
+
+  // ── Design-intent (adopt-aware OUTPUT, not a gate) ──────────────────────────
+  _section('advice');
+  // Aggregates this project's Figma annotations + code notes + facts + usage into
+  // one private, merge-aware design-intent.json. Never affects pass/fail. This is
+  // an AGNOSTIC engine, so the default adapts to the project instead of forcing a
+  // file on everyone: it auto-generates only when the project has ADOPTED the layer
+  // — an existing design-intent.json, a `docs.out` path, or `docs.auto: true` in
+  // ds-config.json — or when this run passes --docs/--intent. A zero-signal project
+  // gets no surprise private file. Force off with --no-docs or docs.auto: false.
+  // Once adopted it stays fresh every run (like the contracts). Private → gitignored.
+  const docsForced = process.argv.includes('--docs') || process.argv.includes('--intent');
+  const docsOff    = process.argv.includes('--no-docs') || cfg.docs?.auto === false;
+  const structSnap = join(ROOT, cfg.paths?.snapshotStructure || 'figma-structure.snapshot.json');
+  const themeCss0  = Array.isArray(cfg.paths?.themeCSS) ? cfg.paths.themeCSS[0] : cfg.paths?.themeCSS;
+  const intentOut  = cfg.docs?.out
+    ? join(ROOT, cfg.docs.out)
+    : join(themeCss0 ? dirname(join(ROOT, themeCss0)) : ROOT, 'design-intent.json');
+  const docsAdopted = docsForced || cfg.docs?.auto === true || !!cfg.docs?.out || existsSync(intentOut);
+  if (!docsOff && docsAdopted && existsSync(structSnap)) {
+    try {
+      const { generateIntent } = await import('./intent-gen.mjs');
+      const r = await generateIntent(ROOT, cfg, {});
+      const glNote = r.guidelineSources ? ` · ${r.withGuidelines}/${r.components} w/ external guidelines (${r.guidelineSources} source${r.guidelineSources === 1 ? '' : 's'})` : '';
+      console.log(`\n📓 Design intent → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · ${r.withDesign} w/ Figma notes · ${r.withCode} w/ code notes · ${r.authoredKept} authored kept${glNote})`);
+    } catch (e) {
+      console.log(C.yellow('\n⚠️  design-intent generation failed (never fails the audit): ' + e.message));
+    }
+    // Living style guide — heavier artifact, kept OPT-IN: only on explicit --docs
+    // (or ds-config.json → styleguide.auto), from the project's template or, without one,
+    // the engine's. It reads the design-intent just written above. (`showroom` is the
+    // older name of the same config block and is still read.)
+    const sgCfg = cfg.styleguide ?? cfg.showroom;
+    if (docsForced || sgCfg?.auto) {
+      try {
+        const { generateStyleguide } = await import('./styleguide-gen.mjs');
+        const r = await generateStyleguide(ROOT, cfg.styleguide || !sgCfg ? cfg : { ...cfg, styleguide: sgCfg }, {});
+        console.log(r.kept ? `🖼  ${r.kept}` : `🖼  Styleguide → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · filled ${r.filled.join(', ')})`);
+      } catch (e) {
+        console.log(C.yellow('\n⚠️  styleguide generation failed (never fails the audit): ' + e.message));
+      }
+    }
+  }
+
+  // ── Standard contract artifacts (auto OUTPUT, not a gate) ────────────────────
+  _section('advice');
+  // Emits the DTCG token dictionary + per-component *.contract.json (standard schema)
+  // + contract.schema.json from the just-audited snapshots. Captured fields refresh
+  // each run; authored fields are preserved (merge-aware). NO gate reads these — they
+  // never affect pass/fail, and the files stay LOCAL (a .gitignore is dropped beside
+  // them). ON by default so the contract never goes stale — it emits whenever there is
+  // a vars snapshot to read (freshness gate). Opt out per-run with --no-contracts, or
+  // per-project with ds-config.json → contracts.auto: false.
+  const varsSnap = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : null;
+  const contractsOff = process.argv.includes('--no-contracts') || cfg.contracts?.auto === false;
+  if (!contractsOff && varsSnap && existsSync(varsSnap)) {
+    try {
+      const { generateContracts } = await import('./contract-gen.mjs');
+      const r = await generateContracts(ROOT, cfg, {});
+      const issues = r.invalid.length ? ` · ⚠️ ${r.invalid.length} schema issue(s)` : '';
+      console.log(r.kept ? `\n📐 ${r.kept}` : `\n📐 Contracts → ${r.outDir.replace(ROOT + '/', '')}  (${r.components.length} component${r.components.length === 1 ? '' : 's'} · ${r.tokenCount} DTCG tokens${issues})`);
+      if (r.propTypesOut) console.log(`ℹ️  Figma prop types → ${r.propTypesOut.replace(ROOT + '/', '')}: type a component's props with its <Name>FigmaProps so tsc shows prop drift.`);
+      if (r.authoredIssues?.length) {
+        console.log(C.yellow(`⚠️  contract.authored.json has ${r.authoredIssues.length} issue(s) — the malformed binding(s) below are ignored until fixed:`));
+        for (const i of r.authoredIssues.slice(0, 20)) console.log(C.yellow(`     · ${i}`));
+      }
+      if (r.droppedTokens?.length) {
+        console.log(C.yellow(`⚠️  ${r.droppedTokens.length} token(s) dropped from the DTCG dictionary — a name collides with another token's path (a leaf vs a group), so it was not emitted:`));
+        for (const t of r.droppedTokens.slice(0, 20)) console.log(C.yellow(`     · ${t}`));
+      }
+      // Change detection (advisory, never fails the audit): breaking vs additive contract
+      // changes since the last run, newly-deprecated tokens, and undefined token references.
+      const breaks  = (r.breaking || []).filter((c) => c.level === 'breaking');
+      const deprecs = (r.breaking || []).filter((c) => c.level === 'deprecation');
+      const additiveN = (r.breaking || []).filter((c) => c.level === 'additive').length;
+      if (breaks.length) {
+        console.log(C.yellow(`⚠️  ${breaks.length} breaking contract change(s) since the last run:`));
+        for (const c of breaks.slice(0, 20)) console.log(C.yellow(`     · ${c.msg}${c.consumers ? `  · used by ${c.consumers} component(s) — a shared-contract change` : ''}`));
+      }
+      if (deprecs.length) {
+        console.log(C.yellow(`⚠️  ${deprecs.length} token(s)/component(s) newly deprecated:`));
+        for (const c of deprecs.slice(0, 12)) console.log(C.yellow(`     · ${c.msg}${c.consumers ? `  · used by ${c.consumers} component(s)` : ''}`));
+      }
+      if (additiveN) console.log(`   +${additiveN} additive change(s)`);
+      // Decision status (advisory): which components are current / deprecated / experimental,
+      // and any guidance that still sends an agent to a deprecated one (the "two right answers"
+      // case). Only shown when the DS says something. Never fails. Full list with --status.
+      {
+        const sc = r.statusCounts || {};
+        const si = r.statusIssues || [];
+        const marked = (sc.deprecated || 0) + (sc.experimental || 0);
+        if (marked || si.length) {
+          const bits = [];
+          if (sc.deprecated) bits.push(`${sc.deprecated} deprecated`);
+          if (sc.experimental) bits.push(`${sc.experimental} experimental`);
+          if (sc.current) bits.push(`${sc.current} marked current`);
+          console.log(`ℹ️  Decision status: ${bits.join(' · ') || 'no component marked'}  (llms.txt tells agents which one won and why)`);
+          if (si.length) {
+            console.log(C.yellow(`⚠️  ${si.length} decision(s) an agent would misread:`));
+            const detail = process.argv.includes('--status');
+            for (const f of (detail ? si : si.slice(0, 12))) console.log(C.yellow(`     · ${f.msg}`));
+            if (!detail && si.length > 12) console.log(C.dim('     Run with --status to list them all.'));
+          }
+        }
+      }
+      if (r.undefinedRefs?.length) {
+        console.log(C.yellow(`⚠️  ${r.undefinedRefs.length} undefined token reference(s) — used in a contract but defined nowhere (silent-failure risk):`));
+        for (const u of r.undefinedRefs.slice(0, 20)) console.log(C.yellow(`     · ${u}`));
+      }
+      if (r.typeMismatches?.length) {
+        console.log(C.yellow(`⚠️  ${r.typeMismatches.length} token type mismatch(es) — a token used where a different type is expected:`));
+        for (const t of r.typeMismatches.slice(0, 20)) console.log(C.yellow(`     · ${t}`));
+      }
+      // Prune candidates (advisory): keep the library lean so an agent reads less and mis-picks
+      // less. Deprecated tokens still present, variant axes that do not vary, and single-use
+      // components - each a QUESTION, never a verdict. Never fails. Full list with --prune.
+      {
+        const pr = r.prune || {};
+        const dt = pr.deprecatedTokens || [], dc = pr.deprecatedComponents || [];
+        const sv = pr.singleOptionVariants || [], su = pr.singleUseComponents || [];
+        const st = pr.sameTokens || [], ut = pr.singleUseTokens || [];   // the token budget
+        if (pr.total) {
+          const detail = process.argv.includes('--prune');
+          console.log(C.yellow(`ℹ️  Prune candidates: ${pr.total} (leaner library = cheaper agent context). Advisory - decide keep or drop.`));
+          const bits = [];
+          if (dt.length) bits.push(`${dt.length} deprecated token(s)`);
+          if (dc.length) bits.push(`${dc.length} deprecated component(s)`);
+          if (sv.length) bits.push(`${sv.length} single-option variant(s)`);
+          if (su.length) bits.push(`${su.length} single-use component(s)`);
+          if (st.length) bits.push(`${st.length} group(s) of tokens with the same value written by hand`);
+          if (ut.length) bits.push(`${ut.length} token(s) only one component uses`);
+          console.log(C.dim(`     ${bits.join(' · ')}`));
+          if (detail) {
+            for (const t of dt) console.log(C.yellow(`     · deprecated token: ${t}`));
+            for (const c of dc) console.log(C.yellow(`     · deprecated component: ${c}`));
+            for (const v of sv) console.log(C.yellow(`     · single-option variant: ${v.component}.${v.prop} = "${v.option}" (axis does not vary - inline it?)`));
+            for (const c of su) console.log(C.yellow(`     · single-use component: ${c} (composed by exactly one parent - inline?)`));
+            for (const g of st) console.log(C.yellow(`     · same value written by hand: ${g.join(', ')} (keep one and point the others at it?)`));
+            for (const t of ut) console.log(C.yellow(`     · token only one component uses: ${t} (keep it inside that component?)`));
+          } else {
+            console.log(C.dim('     Run with --prune to list them.'));
+          }
+        }
+      }
+      // Contract completeness (advisory). Reads the just-emitted contracts and reports how
+      // agent-ready they are: how many carry a description, semantics (element/aria), and
+      // whenNotToUse/useInstead guidance, then names the components missing a description (the
+      // field agents lean on most). Advisory only, never fails; a thin field is a gap to author,
+      // not a bug. --contract-completeness lists every component without a description.
+      try {
+        const cfiles = readdirSync(r.outDir).filter((f) => f.endsWith('.contract.json'));
+        const rowsC = [];
+        for (const f of cfiles) {
+          let j = null; try { j = JSON.parse(readFileSync(join(r.outDir, f), 'utf8')); } catch { continue; }
+          const parts = j.anatomy && typeof j.anatomy === 'object' ? Object.values(j.anatomy) : [];
+          const guidance = !!(j.whenNotToUse || j.useInstead) ||
+            parts.some((p) => p && typeof p === 'object' && (p.whenNotToUse || p.useInstead));
+          rowsC.push({
+            name: j.id || f.replace(/\.contract\.json$/, ''),
+            desc: !!(j.description && String(j.description).trim()),
+            sem: !!(j.semantics && typeof j.semantics === 'object' && Object.keys(j.semantics).length),
+            guidance,
+          });
+        }
+        if (rowsC.length) {
+          const n = rowsC.length;
+          const withDesc = rowsC.filter((x) => x.desc).length;
+          const withSem = rowsC.filter((x) => x.sem).length;
+          const withGuid = rowsC.filter((x) => x.guidance).length;
+          _sc.contracts = { n, withDesc, withSem, withGuid };
+          const noDesc = rowsC.filter((x) => !x.desc).map((x) => x.name);
+          console.log(`ℹ️  Contract completeness: ${withDesc}/${n} have a description · ${withSem}/${n} have semantics · ${withGuid}/${n} carry whenNotToUse/useInstead guidance. Advisory only.`);
+          if (noDesc.length) {
+            const detail = process.argv.includes('--contract-completeness');
+            console.log(C.yellow(`     ${noDesc.length} without a description` + (detail ? ':' : ' (run with --contract-completeness to list)')));
+            if (detail) for (const nm of noDesc) console.log(`       · ${nm}`);
+          }
+        }
+      } catch { /* advisory: never fails the audit */ }
+
+      // Code Connect validation (advisory). Code Connect is a DOWNSTREAM artifact - it can be
+      // stale (QBDS: "do NOT seed truth from it"). We NEVER call the plan-gated Code Connect API; we
+      // read only committed *.figma.* files already in the repo and diff their mappings against the
+      // just-emitted contracts, joined by Figma node id. Detected, never imposed: no CC files = no-op
+      // (any-plan projects unchanged). Opt-in file list via ds-config codeConnect.files.
+      try {
+        const declared = (cfg.codeConnect?.files ?? []).flat().filter(Boolean);
+        const ccFiles = declared.length
+          ? declared.map((p) => join(ROOT, p)).filter((p) => existsSync(p))
+          : collectSourceFiles(ROOT).filter((p) => /\.figma\.(t|j)sx?$/.test(p));
+        if (ccFiles.length) {
+          const { parseCodeConnect, codeConnectFindings } = await import('./codeconnect-check.mjs');
+          const contracts = [];
+          for (const f of readdirSync(r.outDir).filter((f) => f.endsWith('.contract.json'))) {
+            try { contracts.push(JSON.parse(readFileSync(join(r.outDir, f), 'utf8'))); } catch { /* skip */ }
+          }
+          const entries = [];
+          for (const f of ccFiles) {
+            try { for (const e of parseCodeConnect(readFileSync(f, 'utf8'))) entries.push({ ...e, file: relative(ROOT, f) }); } catch { /* skip unreadable */ }
+          }
+          const { findings, checked, matched } = codeConnectFindings(entries, contracts);
+          const stale = findings.filter((f) => f.kind !== 'no-contract');
+          const noContract = findings.filter((f) => f.kind === 'no-contract');
+          if (findings.length) {
+            const detail = process.argv.includes('--code-connect');
+            console.log(C.yellow(`ℹ️  Code Connect: ${stale.length} stale/invalid mapping(s)${noContract.length ? ` · ${noContract.length} mapping(s) with no matching contract` : ''} across ${checked} connect(s) (${matched} matched a contract). Code Connect is downstream - fix the mapping, not the contract. Advisory.`));
+            if (detail) {
+              for (const f of stale) console.log(C.yellow(f.kind === 'unknown-prop'
+                ? `     · ${f.component}: prop "${f.figmaProp}" is not in the contract (renamed or removed?)`
+                : `     · ${f.component}: option "${f.option}" for "${f.figmaProp}" is not in the contract`));
+              for (const f of noContract) console.log(C.dim(`     · ${f.component}: node ${f.nodeId || '?'} has no emitted contract (out of scope, or a stale connect)`));
+            } else {
+              console.log(C.dim('     Run with --code-connect to list them.'));
+            }
+          } else if (matched) {
+            console.log(C.dim(`ℹ️  Code Connect: ${matched} mapping(s) agree with the contract.`));
+          }
+        }
+      } catch { /* advisory: never fails the audit */ }
+    } catch (e) {
+      console.log(C.yellow('\n⚠️  contracts: generation failed (never fails the audit): ' + e.message));
+    }
+  }
+
+  // ── Accessibility from the code, no browser (advisory) ──────────────────
+  _section('a11y');
+  // Always runs, with or without a page to open: names, focus styles, keyboard and aria mistakes read from the
+  // markup and the CSS. The browser check below deepens it when it can run. Off with ds-config "a11yStatic": false.
+  if (cfg.a11yStatic !== false) {
+    try {
+      const { staticA11y } = await import('./a11y-static.mjs');
+      const whole = staticA11y(ROOT);
+      const { files } = whole;
+      // Scoped to components: only the findings about them. A finding is the component's when the element or rule it
+      // points at carries the component's class (class="button-primary", .button-primary {), or when it is inside the
+      // component's own file, the one whose first element carries that class. A page that only uses the component, or
+      // styles it among other things, keeps its other findings (a scoped run once listed every page's as the component's).
+      const ownFiles = new Set();
+      let _isScopeFinding = () => true;
+      if (_scopeForms.length) {
+        const texts = new Map();
+        const textOf = (rel) => { if (!texts.has(rel)) { let t = ''; try { t = readFileSync(join(ROOT, rel), 'utf8'); } catch { /* unreadable */ } texts.set(rel, t); } return texts.get(rel); };
+        const classesIn = (str) => {
+          const out = new Set();
+          for (const m of String(str).matchAll(/\bclass(?:Name)?\s*=\s*["'`]([^"'`]*)["'`]/g)) for (const c of m[1].split(/\s+/)) out.add(_norm(c));
+          for (const m of String(str).matchAll(/(?:^|[\s,>+~(])\.(-?[A-Za-z_][\w-]*)/gm)) out.add(_norm(m[1]));
+          return out;
+        };
+        const isScope = (cls) => _scopeForms.some((f) => cls.has(f.nameNorm) || cls.has(f.selNorm));
+        // The opening tag or rule head a finding points at: from its line to the first > or {.
+        const at = (rel, line) => { const rest = textOf(rel).split('\n').slice(Math.max(0, line - 1), line + 11).join('\n'); return rest.slice(0, (rest.search(/[>{]/) + 1) || rest.length); };
+        for (const rel of new Set(whole.findings.map((f) => f.file))) {
+          const first = /^\s*(?:<template[^>]*>\s*)?(<[A-Za-z][^>]*>)/.exec(textOf(rel).replace(/<!--[\s\S]*?-->/g, ''));
+          if (first && isScope(classesIn(first[1]))) ownFiles.add(rel);
+        }
+        _isScopeFinding = (f) => ownFiles.has(f.file) || isScope(classesIn(at(f.file, f.line))) || _mentionsIn(f.desc).some((c) => _scopeNames.includes(c));
+      }
+      const findings = whole.findings.filter(_isScopeFinding);
+      const outside = whole.findings.length - findings.length;
+      _a11yCount.static = findings.length;
+      if (findings.length) {
+        const count = (k) => findings.filter((f) => f.kind === k).length;
+        const parts = [['name', 'with no accessible name'], ['focus', 'focus outline removed and not put back'], ['keyboard', 'keyboard'], ['aria', 'aria'],
+          ['language', 'page with no language'], ['heading', 'page with no main heading or several'], ['zoom', 'zoom blocked'], ['motion', 'animation with no reduced-motion alternative'],
+          ['shortcut', 'single-key shortcut'], ['timing', 'closes on a short timer'], ['gesture', 'needs two fingers'], ['motionact', 'works by moving the device']].filter(([k]) => count(k)).map(([k, w]) => `${count(k)} ${w}`);
+        console.log(C.yellow(`\n♿ Accessibility from the code (no browser needed): ${findings.length} finding${findings.length === 1 ? '' : 's'} in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'} (${parts.join(' · ')}). Advisory.`));
+        const all = process.argv.includes('--a11y');
+        for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${f.file}:${f.line}  ${f.desc}`));
+        if (!all && findings.length > 15) console.log(`     and ${findings.length - 15} more; run with --a11y to list them all.`);
+      } else if (files.markup || files.styles) {
+        console.log(_scopeForms.length
+          ? C.green(`\n♿ Accessibility from the code (no browser needed): nothing found for ${_scopeNames.join(', ')} in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'}.`)
+          : C.green(`\n♿ Accessibility from the code (no browser needed): nothing found in ${files.markup} markup and ${files.styles} style file${files.styles === 1 ? '' : 's'}.`));
+      }
+      if (outside) console.log(C.dim(`   … ${outside} finding(s) outside ${_scopeNames.join(', ')} - not audited in this scoped run`));
+    } catch (e) { console.log(C.dim(`ℹ️  Accessibility from the code not checked: ${e.message}`)); }
+  }
+
+  // ── Agent instruction files tell the truth (advisory) ──────────────────
+  _section('advice');
+  // AGENTS.md, CLAUDE.md, DESIGN.md, Cursor/Copilot rules and skills state design-system names from memory;
+  // a wrong one makes every agent that reads it build the wrong thing. Each name they state is checked against
+  // the catalog, the code API, the declared CSS variables and the tokens. Off with ds-config "steering": false.
+  if (cfg.steering !== false) {
+    try {
+      const { findSteeringFiles, steeringTruth, steeringFindings, steeringLine, mandateOf } = await import('./steering-check.mjs');
+      const contractsDir = cfg.contracts?.out ?? 'contracts';
+      const files = findSteeringFiles(ROOT, { skip: [contractsDir, 'node_modules', ...ENGINE_DIRS] });
+      if (files.length) {
+        const readJson = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+        const catalog = readJson(join(contractsDir, 'catalog.json'));
+        const api = readJson(codeSnapshotPath(cfg)).api ?? {};
+        const cssVars = [...new Set([...readThemeCSS().matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))];
+        const tokenNames = [];
+        try {
+          const vs = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8'));
+          for (const mode of Object.values(vs.color || {})) for (const k of Object.keys(mode)) tokenNames.push(k);
+          for (const k of Object.keys(vs.sizing || {})) tokenNames.push(k);
+        } catch { /* no vars snapshot: token paths are not checked */ }
+        const truth = steeringTruth({ catalog, api, cssVars, tokenNames: [...new Set(tokenNames)] });
+        const found = files.flatMap((f) => steeringFindings(f.text, truth).map((x) => steeringLine(f.file, x)));
+        const names = files.map((f) => f.file).join(', ');
+        if (found.length) {
+          console.log(C.yellow(`\n🧭 Agent instruction files: ${found.length} design-system name${found.length === 1 ? '' : 's'} that do${found.length === 1 ? 'es' : ''} not exist (${names}). An agent that reads them builds the wrong thing: fix the line, or point the file at ${contractsDir}/llms.txt instead of restating names. Advisory.`));
+          for (const l of found.slice(0, 20)) console.log(C.yellow(`     ${l}`));
+          if (found.length > 20) console.log(C.yellow(`     and ${found.length - 20} more`));
+        } else {
+          console.log(C.green(`\n🧭 Agent instruction files (${names}): every design-system name they state exists.`));
+        }
+        // a file about the design system that only says what not to use.
+        const forbidOnly = files.filter((f) => mandateOf(f.text, truth.components).onlyForbids).map((f) => f.file);
+        if (forbidOnly.length) console.log(C.yellow(`     ${forbidOnly.join(', ')} ${forbidOnly.length === 1 ? 'says' : 'say'} what not to use, never what to use. One sentence saying the design system is installed and its components are the ones to use moved most generations onto it in a public benchmark (16 of 57 → 43 of 55): add it, or point the file at ${contractsDir}/llms.txt. Advisory.`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Agent instruction files not checked: ${e.message}`)); }
+  }
+
+  // ── The Figma file's own hygiene (advisory) ──────────────────────────────
+  _section('advice');
+  // Values with no variable or style, detached instances, variants with no auto layout, components with no
+  // description, variables bound outside their scope or left on all scopes: read from the hygiene record the
+  // component-values sweep writes and the vars snapshot's variableScopes. For whoever keeps the Figma
+  // file; the parity never changes Figma. Silent until the sweep carries the record. Off with "figmaHygiene": false.
+  if (cfg.figmaHygiene !== false) {
+    try {
+      const { hygieneBlock, hygieneScore, hygieneFindings } = await import('./figma-hygiene.mjs');
+      const values = JSON.parse(readFileSync(join(ROOT, 'component-values.snapshot.json'), 'utf8'));
+      const only = _scopeNames.length ? _scopeNames : null;
+      // Each variable's scopes, when the Figma capture recorded them.
+      let scopes = null;
+      try { scopes = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')).variableScopes ?? null; } catch { /* no vars snapshot */ }
+      const lines = hygieneBlock(values, { only, scopes, all: process.argv.includes('--hygiene') });
+      if (lines.length) {
+        const clean = !hygieneFindings(values, { only, scopes }).length;
+        console.log((clean ? C.green : C.yellow)(`\n${lines[0]}`));
+        for (const l of lines.slice(1)) console.log(C.yellow(l));
+        _sc.hygiene = hygieneScore(values, { only, scopes });
+      }
+    } catch { /* no component-values.snapshot.json: nothing to read */ }
+  }
+
+  // ── Accessibility the design owes (design-a11y.mjs, advisory) ─────────────────
+  // An interactive component with no focus state, an error state with no message, a control under 24px: read from
+  // the props and structure snapshots, for whoever keeps the Figma file. Off with "designA11y": false. Part of
+  // accessibility, so --only accessibility shows it.
+  _section('a11y');
+  if (cfg.designA11y !== false && (!ONLY || ONLY.a11y)) {
+    try {
+      const { designA11yFindings, designA11yBlock } = await import('./design-a11y.mjs');
+      const props = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8'));
+      let struct = {};
+      try { struct = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {}; } catch { /* heights unknown */ }
+      const lines = designA11yBlock(designA11yFindings(props, struct, { only: _scopeNames.length ? _scopeNames : null }));
+      if (lines.length) { console.log(C.yellow(`\n${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(l)); }
+    } catch { /* no props snapshot: nothing to read */ }
+    // The designed screens themselves, once read (--figma-a11y): each text and lone icon against what is behind it, a
+    // control under 24 by 24. A run scoped to some components leaves the screens to the full one.
+    if (!_scopeNames.length) try {
+      const sa = await import('./screen-a11y.mjs');
+      const snap = JSON.parse(readFileSync(join(ROOT, cfg.paths?.screenA11y ?? join(dirname(cfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json'), 'figma-screen-a11y.snapshot.json')), 'utf8'));
+      const { annotatedRole } = await import('./design-a11y.mjs');
+      let props = {};
+      try { props = JSON.parse(readFileSync(join(ROOT, cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json'), 'utf8')); } catch { /* roles from names */ }
+      const roles = Object.fromEntries(Object.entries(props).filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object').map(([k, v]) => [k, annotatedRole(v)]).filter(([, r]) => r));
+      const lines = sa.screenA11yLines(sa.screenA11yFindings(snap, { roles }), { screens: (snap.screens ?? []).length });
+      if (lines.length) { console.log(C.yellow(`\n${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(l)); }
+    } catch { /* the screens not read for accessibility yet (--figma-a11y) */ }
+  }
+
+  // ── A workaround built around a component is a missing API (advisory) ────
+  _section('advice');
+  // A screen's own control laid over a design-system component (a clear button over a field, actions over a
+  // row) is reported to the design-system side: the component is missing a slot or prop, the screen is not
+  // wrong. Off with "workarounds": false.
+  if (cfg.workarounds !== false) {
+    try {
+      const { projectWorkarounds, workaroundLines } = await import('./workaround-check.mjs');
+      const { loadLocator } = await import('./component-locator.mjs');
+      const loc = await loadLocator(ROOT, cfg);
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(cfg.componentSelectors ?? {})])];
+      let found = projectWorkarounds(ROOT, { names, classFor: loc.classFor, componentFiles: cfg.componentFiles ?? {}, excludeDirs: cfg.scanExcludeDirs ?? [], excludeFiles: cfg.scanExcludeFilenames ?? [] });
+      if (_scopeNames.length) found = found.filter((f) => f.host.kind !== 'component' || _scopeNames.includes(f.host.name));
+      const lines = workaroundLines(found);
+      if (lines.length) {
+        console.log(C.yellow(`\n🧩 Built around a component: ${lines.length} place${lines.length === 1 ? '' : 's'} where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.`));
+        for (const l of lines) console.log(C.yellow(`     ${l}`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Workarounds around components not checked: ${e.message}`)); }
+  }
+
+  // ── A primitive written by hand (advisory) ─────────────────────────────
+  _section('advice');
+  // A plain element styled as a primitive the owner declared in "primitives" (a <span> with the body text style
+  // and the secondary colour is <Text size="medium" color="secondary">). No token check sees it, its values are
+  // the system's own. Only with a declared table.
+  if (Array.isArray(cfg.primitives) && cfg.primitives.length) {
+    try {
+      const { projectPrimitives, primitiveLine } = await import('./primitives.mjs');
+      const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+      let found = projectPrimitives(ROOT, cfg);
+      if (_scopeNames.length) found = found.filter((f) => _scopeNames.some((n) => norm(n) === norm(f.primitive.component)));
+      if (found.length) {
+        console.log(C.yellow(`\n🧩 Primitives written by hand: ${found.length} plain element${found.length === 1 ? '' : 's'} styled as a primitive the design system has (primitives in ds-config.json). Use the component. Advisory.`));
+        for (const f of found.slice(0, 20)) console.log(C.yellow(`     ${primitiveLine(f, f.file)}`));
+        if (found.length > 20) console.log(C.yellow(`     and ${found.length - 20} more`));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Primitives written by hand not checked: ${e.message}`)); }
+  }
+
+  // ── Tailwind arbitrary values (advisory) ────────────────────────────────
+  _section('advice');
+  // rounded-[4px], bg-[#ff00aa]: a literal written into a class name, where no CSS rule and no literal check
+  // sees it. Each is compared with the project's own @theme: the utility to write when a theme value is the
+  // same, or "not a design-system value". Only in a project that uses Tailwind. Off with "tailwind": false.
+  if (cfg.tailwind !== false) {
+    try {
+      const { projectArbitrary, arbitraryLine } = await import('./tailwind-check.mjs');
+      const { tailwind, findings } = projectArbitrary(ROOT, readThemeCSS());
+      // Each component's own classes against what Figma states for it: height, padding, corner, colours.
+      if (tailwind) {
+        const { utilityFindings, utilityLine, themeValues, spacingBase } = await import('./tailwind-check.mjs');
+        const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
+        const spec = resolveNamingSpec(cfg);
+        const themeCss = readThemeCSS();
+        let structure = {}, sizing = {};
+        try { structure = JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8')).components ?? {}; } catch { /* no structure snapshot */ }
+        try { sizing = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')).sizing ?? {}; } catch { /* no sizing */ }
+        if (_scopeNames.length) structure = Object.fromEntries(Object.entries(structure).filter(([n]) => _scopeNames.includes(n)));
+        const files = {};
+        for (const [n, p] of Object.entries(cfg.componentFiles ?? {})) for (const f of [p].flat()) { try { files[n] = (files[n] ?? '') + readFileSync(join(ROOT, f), 'utf8'); } catch { /* missing file */ } }
+        const diffs = utilityFindings({ structure, files, theme: themeValues(themeCss), base: spacingBase(themeCss), varOf: (tok, raw) => tokenToVar(tok, spec, { raw }), sizing });
+        const read = Object.keys(structure).filter((n) => files[n]).length;
+        if (diffs.length) {
+          console.log(C.yellow(`\n🎯 Tailwind classes against Figma: ${diffs.length} measure${diffs.length === 1 ? '' : 's'} in ${read} component${read === 1 ? '' : 's'} ${diffs.length === 1 ? 'differs' : 'differ'} from what Figma states. Advisory.`));
+          for (const d of diffs) console.log(C.yellow(`     ${utilityLine(d)}`));
+        } else if (read) {
+          console.log(C.green(`\n🎯 Tailwind classes against Figma: height, padding, corner and colours match in ${read} component${read === 1 ? '' : 's'}.`));
+        }
+      }
+      if (tailwind && findings.length) {
+        const fixable = findings.filter((f) => f.fix).length;
+        console.log(C.yellow(`\n🎯 Tailwind arbitrary values: ${findings.length} class${findings.length === 1 ? '' : 'es'} with a value in brackets, outside the theme (${fixable} the theme already has: write its utility). Advisory.`));
+        const all = process.argv.includes('--tailwind');
+        for (const f of findings.slice(0, all ? findings.length : 15)) console.log(C.yellow(`     ${arbitraryLine(f.file, f)}`));
+        if (!all && findings.length > 15) console.log(`     and ${findings.length - 15} more; run with --tailwind to list them all.`);
+      } else if (tailwind) {
+        console.log(C.green('\n🎯 Tailwind arbitrary values: none; every class uses the theme.'));
+      }
+    } catch (e) { console.log(C.dim(`ℹ️  Tailwind arbitrary values not checked: ${e.message}`)); }
+  }
+
+  // ── AI-readiness scorecard (advisory, never a gate) ────────────────────
+  _section('advice');
+  // A running R/Y/G measure across a few axes, aggregated from signals this run already produced.
+  // Not a grade and it never blocks - a trend you watch move over time.
+  {
+    const dot = (st) => st === 'g' ? C.green('●') : st === 'y' ? C.yellow('●') : C.red('●');
+    const band = (p, hi, mid) => p == null ? 'y' : (p >= hi ? 'g' : p >= mid ? 'y' : 'r');
+    const rows = [];
+
+    const passN = gates.filter((g) => g.pass && !g.planLimited).length;
+    const totalN = gates.length;
+    rows.push([anyFail ? 'r' : (passN < totalN ? 'y' : 'g'), 'Gate health', `${passN}/${totalN} gates pass`]);
+
+    const cov = (rCoverage?.stdout || '').match(/MODELLED\s+(\d+)\/(\d+)/);
+    if (cov && +cov[2]) {
+      const p = Math.round((+cov[1] / +cov[2]) * 100);
+      rows.push([band(p, 90, 70), 'Coverage', `${cov[1]}/${cov[2]} components modelled (${p}%)  ·  exemption debt ${_sc.exempt}`]);
+    } else {
+      rows.push(['y', 'Coverage', `exemption debt ${_sc.exempt}`]);
+    }
+
+    if (_sc.contracts && _sc.contracts.n) {
+      const c = _sc.contracts;
+      const dp = Math.round((c.withDesc / c.n) * 100);
+      const gp = Math.round((c.withGuid / c.n) * 100);
+      rows.push([band(dp, 90, 60), 'Documentation', `${c.withDesc}/${c.n} contracts have a description (${dp}%)`]);
+      rows.push([band(gp, 60, 20), 'AI guidance', `${c.withGuid}/${c.n} carry whenNotToUse/useInstead (${gp}%)`]);
+    }
+
+    if (_sc.hygiene?.n) {
+      const h = _sc.hygiene, hp = Math.round((h.clean / h.n) * 100);
+      rows.push([band(hp, 90, 60), 'Figma hygiene', `${h.clean}/${h.n} components with every value bound, auto layout and a description (${hp}%)`]);
+    }
+
+    console.log('\n' + C.bold('  AI-READINESS SCORECARD') + C.dim('  (advisory - a running measure, never blocks)'));
+    for (const [st, label, detail] of rows) console.log(`  ${dot(st)} ${label.padEnd(16)} ${C.dim(detail)}`);
+  }
+
+  // ── What both sides last agreed on ────────────────────────────────────────
+  _section('advice');
+  // Every fact that matches this run is recorded in design-system-engine-agreed.json (committed), so a later
+  // difference can say which side moved. Never written inside a git hook: a commit must not change a
+  // file it did not stage.
+  try {
+    const { readFreshSnapshot } = await import('./code-capture.mjs');
+    const cap = await readFreshSnapshot(ROOT, cfg);
+    if (cap) {
+      const cc = await import('./capture-compare.mjs');
+      const { loadAgreed, classify, recordAgreed, AGREED_FILE, churn, leaders, leadersLine } = await import('./agreed.mjs');
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const vars = readJ(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
+      const structure = readJ(SNAP_STRUCT).components ?? {};
+      const maps = await cc.loadParityMaps(ROOT, cfg);
+      const facts = [
+        ...(cc.compareTokens(cap, vars, cfg, maps).facts ?? []),
+        ...(cap._sources?.browser ? (cc.compareComponents(cap, structure, vars, cfg, maps).facts ?? []) : []),
+        ...(cc.compareBreakpoints(cap, structure, vars).facts ?? []),
+      ];
+      const agreed = loadAgreed(ROOT);
+      const moved = { 'figma-moved': 0, 'code-moved': 0, 'both-moved': 0, unknown: 0 };
+      for (const f of facts) if (!f.same) moved[classify(f, agreed)]++;
+      const inHook = !!process.env.GIT_INDEX_FILE || process.argv.includes('--hook');
+      const rec = inHook ? { recorded: facts.filter((f) => f.same).length, changed: false } : recordAgreed(ROOT, facts);
+      const diff = facts.length - rec.recorded;
+      if (facts.length) {
+        console.log(`\nℹ️  Agreed values: ${rec.recorded} of ${facts.length} compared facts agree${inHook ? '' : ` (recorded in ${AGREED_FILE}${rec.changed ? ', updated' : ''})`}.` +
+          (diff ? ` Of the ${diff} that differ: ${moved['figma-moved']} Figma moved · ${moved['code-moved']} code moved · ${moved['both-moved']} both moved · ${moved.unknown} with no earlier agreement.` : ''));
+      }
+      // Changes that keep bouncing and who moves first, from the recorded moves.
+      const history = rec.agreed ?? loadAgreed(ROOT);
+      const bouncing = churn(history);
+      if (bouncing.length) {
+        console.log(`\n⚠️  No clear owner: ${bouncing.length} fact${bouncing.length === 1 ? '' : 's'} keep${bouncing.length === 1 ? 's' : ''} switching sides (3 or more times in the last 10 changes). Decide which side owns ${bouncing.length === 1 ? 'it' : 'them'}.`);
+        for (const b of bouncing.slice(0, 10)) console.log(`     ${b.key}  (${b.sides.join(', ')})`);
+      }
+      const lead = leaders(history);
+      if (Object.keys(lead).length) console.log(`\nℹ️  Who moved first (last 30 days, descriptive): ${leadersLine(lead)}.`);
+    }
+  } catch { /* the record is a convenience: it never breaks the run */ }
+
+  // ── Why the design changed (Figma side of) ─────────────────────────────────
+  _section('advice');
+  // Figma keeps versions per file, not per node: one line with the latest named version.
+  if (_figmaReason) {
+    const { figmaReasonLine } = await import('./change-reason.mjs');
+    console.log(`\nℹ️  ${figmaReasonLine(_figmaReason)}`);
+  }
+
+  // ── Since the last run ───────────────────────────────────────────────────────
+  // The findings this run printed, against the ones the last run with the same scope printed.
+  console.log = _log;
+  let _burndownLines = [], _burndownNext = null, _keptNow = null;
+  if (!ONLY) try {
+    const { collectFindings, diffFindings, diffReport, burndown, burndownLines, componentOf } = await import('./run-diff.mjs');
+    const ledgerPath = join(ROOT, OUT_DIR, 'last-findings.json');
+    let ledger = {};
+    try { ledger = JSON.parse(readFileSync(ledgerPath, 'utf8')); } catch { /* first run */ }
+    const scopeKey = _scopeNames.slice().sort().join(',') || '(all)';
+    const now = collectFindings(_reportLines);
+    // Accessibility, element by element (the report shows counts): from the check's structured result.
+    try {
+      const a = JSON.parse(readFileSync(A11Y_JSON, 'utf8'));
+      for (const i of a.issues ?? []) now.push(`Accessibility :: ${i.issue} ${i.selector ?? ''}${i.theme ? ` (${i.theme})` : ''}${i.contrast != null ? ` ${i.contrast}:1` : ''}`);
+    } catch { /* no browser this run: nothing to add */ }
+    // Kept on purpose: a kept difference is neither open nor new; the decisions not found this run are said.
+    const _keptRest = matchKept(_keptDecisions, now);
+    now.length = 0; now.push(..._keptRest.open);
+    _keptNow = keptState(_keptDecisions, [..._keptInGates, ..._keptRest.kept]);
+    const _keptLines = keptReport(_scopeNames.length ? { ..._keptNow, gone: [] } : _keptNow);
+    if (_keptLines.length) { console.log(''); for (const l of _keptLines) console.log(l); }
+    const prev = ledger.scopes?.[scopeKey];
+    if (!prev) console.log(C.dim(`\nℹ️  Since the last run: this is the first recorded run${_scopeNames.length ? ' for this scope' : ''}; the next one lists what is new, gone or changed.`));
+    else {
+      const d = diffFindings(prev.findings ?? [], now);
+      const n = d.added.length + d.gone.length + d.changed.length;
+      const when = String(prev.at ?? '').replace('T', ' ').slice(0, 16);
+      if (!n) console.log(`\nℹ️  Since the last run (${when}): nothing new, nothing gone.`);
+      else {
+        console.log((d.added.length ? C.yellow : (s) => s)(`\n${d.added.length ? '⚠️ ' : 'ℹ️ '} Since the last run (${when}): ${d.added.length} new · ${d.gone.length} gone · ${d.changed.length} changed`));
+        for (const l of diffReport(d)) console.log(l);
+      }
+    }
+    // Burndown: the same findings per component, most first, with the next one to work on.
+    try {
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
+      // A scoped run counts only its own components (an advisory block about another one is not its work).
+      const mine = (list) => (list && _scopeNames.length ? list.filter((f) => { const c = componentOf(f, names); return !c || _scopeNames.includes(c); }) : list);
+      const bd = burndown(mine(now), names, mine(prev?.findings ?? null));
+      const lines = burndownLines(bd, { scoped: _scopeNames.length > 0 });
+      _burndownLines = lines; _burndownNext = bd.rows[0]?.name ?? null;
+      if (lines.length) console.log(`\n📉 ${lines.join('\n')}`);
+    } catch { /* a convenience */ }
+    // The one list of differences between Figma and the code, for people, the style guide and the agent.
+    if (!_scopeNames.length) try {
+      const { differences, differencesMarkdown } = await import('./run-diff.mjs');
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
+      const d = differences(now, names, prev?.findings ?? null);
+      // What the team decided to keep, with why, who and when: listed apart, never open.
+      if (_keptNow) {
+        const item = (k) => ({ component: k.component ?? null, check: k.check, what: k.what, reason: k.reason, by: k.by ?? null, at: k.at ?? null, ...(k.truth ? { truth: k.truth } : {}), ...(k.review ? { review: k.review } : {}) });
+        d.kept = _keptNow.kept.map((k) => ({ ...item(k), ...(_keptNow.due.includes(k) ? { due: true } : {}) }));
+        d.keptGone = _keptNow.gone.map(item);
+      }
+      // The checks that did not run: a difference there would not show, so the list says so rather than look clean.
+      const plain = (l) => String(l ?? '').replace(/\x1b\[[0-9;]*m/g, '').trim();
+      d.notChecked = gates.filter((g) => g.notRun || g.planLimited || (g.pass && (g.lines ?? []).map(plain).filter(Boolean).length && (g.lines ?? []).map(plain).filter(Boolean).every((l) => /^⏭/.test(l))))
+        .map((g) => ({ check: g.label.replace(/\s{2,}\(.*\)\s*$/, ''), why: ((g.lines ?? []).map(plain).find(Boolean) ?? 'not run').replace(/^⏭\s*/, '').replace(/^(skipped|SKIPPED)\b\s*[-:–—]?\s*/, '').replace(/\s*[-–—]\s*skipped\.?$/i, '').replace(/\.?\s*skipped\.?$/i, '').replace(/\s*\([^()]*\)\s*$/, '').replace(/\.$/, '') }));
+      const hbDir = join(dirname(codeSnapshotPath(cfg)), 'handback');
+      const hb = (f) => (existsSync(join(ROOT, hbDir, f)) ? join(hbDir, f) : null);
+      mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+      writeFileSync(join(ROOT, OUT_DIR, 'differences.json'), JSON.stringify({ at: new Date().toISOString(), ...d }, null, 1) + '\n');
+      // The model behind it: each gate's verdict with its rule in plain words, and every finding as one record.
+      try {
+        const { findingRecords, gateRecords } = await import('./run-diff.mjs');
+        let plainNames = []; try { plainNames = GATE_PLAIN; } catch { /* not in reach */ }
+        const gr = gateRecords(gates, plainNames);
+        const rules = Object.fromEntries(gr.filter((g) => g.rule).map((g) => [g.check, g.rule]));
+        const records = findingRecords(now, names, { prev: prev?.findings ?? null, rules, failing: gr.filter((g) => g.verdict === 'fails').map((g) => g.check) });
+        writeFileSync(join(ROOT, OUT_DIR, 'findings.json'), JSON.stringify({ at: new Date().toISOString(), gates: gr, findings: records }, null, 1) + '\n');
+      } catch { /* a convenience */ }
+      // Where each component lives, from the catalog this run wrote: its heading in the list says so.
+      let livesIn = {};
+      try { livesIn = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(ROOT, cfg.contracts?.out ?? 'contracts', 'catalog.json'), 'utf8')).components ?? {}).filter(([, e]) => e.livesIn).map(([n, e]) => [n, e.livesIn])); } catch { /* no catalog this run */ }
+      writeFileSync(join(ROOT, OUT_DIR, 'differences.md'), differencesMarkdown(d, { at: new Date().toISOString().slice(0, 16).replace('T', ' '), handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, livesIn }));
+      console.log(`\n📋 Differences between Figma and the code: ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list → ${OUT_DIR}/differences.md`);
+    } catch { /* a convenience */ }
+    // The components only the code has: what to build in Figma, with their props and the tokens their styles use.
+    if (!_scopeNames.length && !NO_FIGMA) try {
+      const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+      const figmaNames = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_'));
+      if (figmaNames.length) {
+        const { codeComponents, textReader, textComponentApi } = await import('./component-source.mjs');
+        const { componentTokens } = await import('./styleguide-data.mjs');
+        const { loadLocator } = await import('./component-locator.mjs');
+        const { figmaToBuild } = await import('./handback.mjs');
+        const locator = await loadLocator(ROOT, cfg);
+        const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const known = new Set(figmaNames.map(squash)), classes = new Set(figmaNames.map((n) => String(locator.classFor(n) ?? '').replace(/^\./, '')).filter(Boolean));
+        const read = textReader(), css = readThemeCSS() + '\n' + [cfg.paths?.pluginCSS ?? []].flat().map((p) => { try { return readFileSync(join(ROOT, p), 'utf8'); } catch { return ''; } }).join('\n');
+        // Which file is each Figma component: the shared pairing (component-pairing.mjs). A file paired with one, or
+        // proposed for one, is not the code's alone.
+        const pairing = locator.pairing();
+        const only = codeComponents(ROOT, cfg, read).filter((k) => (!pairing?.inLibrary || pairing.inLibrary(join(ROOT, k.file))) && !pairing?.claimed(join(ROOT, k.file)) && !classes.has(k.cls) && !known.has(squash(k.name))).map((k) => {
+          const api = textComponentApi(join(ROOT, k.file), read(join(ROOT, k.file)));
+          const props = Object.entries(api?.props ?? {}).map(([name, d]) => ({ name, ...(d.options ? { options: [...d.options] } : {}), ...(d.default != null ? { default: String(d.default) } : {}), ...(d.required ? { required: true } : {}) }));
+          return { name: k.name, file: k.file, props, tokens: componentTokens(css, k.cls) };
+        });
+        const md = figmaToBuild(only);
+        if (md) {
+          const dir = join(dirname(codeSnapshotPath(cfg)), 'handback');
+          mkdirSync(join(ROOT, dir), { recursive: true });
+          writeFileSync(join(ROOT, dir, 'figma-to-build.md'), md);
+          console.log(`\n🧱 ${only.length} component${only.length === 1 ? '' : 's'} only in code: what to build in Figma, with the props and tokens of each → ${join(dir, 'figma-to-build.md')}`);
+        }
+        // A pair on one sign only is a proposal, never applied; a component only in Figma with files near its name names
+        // them. Each is the person's to confirm, or to pin in ds-config.json → componentFiles (the style guide's Tasks too).
+        if (pairing) {
+          const { pairingTasks } = await import('./component-pairing.mjs');
+          const { inProgressNames } = await import('./in-progress.mjs');
+          const tasks = pairingTasks(pairing, { ROOT, skip: new Set(await inProgressNames(ROOT, cfg)) });
+          if (tasks.length) {
+            const n = (k) => tasks.filter((t) => t.kind === k).length;
+            const said = [n('proposed') ? `${n('proposed')} on one sign only` : '', n('ambiguous') ? `${n('ambiguous')} fitting several files` : '', n('none') ? `${n('none')} only in Figma with files near ${n('none') === 1 ? 'its' : 'their'} name` : ''].filter(Boolean).join(', ');
+            console.log(`\n🔗 Which file is each Figma component: ${said}. Not paired until you confirm it, or pin it in ds-config.json → componentFiles.`);
+            for (const t of tasks.slice(0, 12)) console.log(`   · ${t.say}`);
+            if (tasks.length > 12) console.log(`   · and ${tasks.length - 12} more (the style guide's Status page lists every one)`);
+          }
+        }
+      }
+    } catch { /* a convenience */ }
+    // A token renamed in Figma that the code still writes by its old name: one line pointing at the sweep.
+    if (!_scopeNames.length && !NO_FIGMA) try {
+      const rs = await import('./rename-sweep.mjs');
+      const prevRead = rs.previousSnapshot(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
+      if (prevRead) {
+        const { resolveNamingSpec } = await import('./naming-convention.mjs');
+        const { sourceFiles } = await import('./code-roots.mjs');
+        const nowVars = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8'));
+        const sw = rs.renameSweep({ prev: prevRead.vars, next: nowVars, spec: resolveNamingSpec(cfg), files: sourceFiles(ROOT, cfg), themes: [cfg.paths?.themeCSS ?? []].flat() });
+        if (sw.renames.length) console.log(`\n🔁 ${sw.renames.length} token${sw.renames.length === 1 ? '' : 's'} renamed in Figma that the code still writes by the old name (${sw.renames.slice(0, 3).map((r) => `${r.from} → ${r.to}`).join(', ')}${sw.renames.length > 3 ? ', …' : ''}): rms-design-system-engine --rename-sweep writes one change for every use.`);
+      }
+    } catch { /* a convenience */ }
+    // What the system retired that is still in use: a deprecated component or token, or an old name a rename
+    // kept, with what replaces it and every file and line, product by product, and a patch for each token swap.
+    if (!_scopeNames.length) try {
+      const mg = await import('./migrations.mjs');
+      const { steps, patches } = await mg.projectMigrations(ROOT, cfg);
+      const dir = join(dirname(codeSnapshotPath(cfg)), 'handback');
+      for (const f of (() => { try { return readdirSync(join(ROOT, dir)); } catch { return []; } })()) if (/^migrations(-[\w.-]+)?\.(md|diff)$/.test(f)) unlinkSync(join(ROOT, dir, f));   // only what is still open
+      if (steps.length) {
+        mkdirSync(join(ROOT, dir), { recursive: true });
+        for (const p of patches) { p.file = join(dir, p.root === '.' ? 'migrations.diff' : `migrations-${basename(p.root)}.diff`); writeFileSync(join(ROOT, p.file), p.diff); }
+        writeFileSync(join(ROOT, dir, 'migrations.md'), mg.migrationsMarkdown(steps, patches));
+        const uses = steps.reduce((k, s) => k + s.count, 0);
+        console.log(`\n🚚 ${steps.length} retired component${steps.length === 1 ? '' : 's'} or token${steps.length === 1 ? '' : 's'} still used in ${uses} place${uses === 1 ? '' : 's'} (${steps.slice(0, 3).map((s) => s.kind === 'component' ? s.name : s.from).join(', ')}${steps.length > 3 ? ', …' : ''}): what replaces each and every place → ${join(dir, 'migrations.md')}`);
+      }
+    } catch { /* a convenience */ }
+    ledger.scopes = { ...(ledger.scopes ?? {}), [scopeKey]: { at: new Date().toISOString(), findings: now } };
+    mkdirSync(dirname(ledgerPath), { recursive: true });
+    writeFileSync(ledgerPath, JSON.stringify(ledger, null, 1) + '\n');
+  } catch { /* the comparison is a convenience: it never breaks the run */ }
+
+  // ── What to say, and what to do next ─────────────────────────────────────
+  // The plain result to relay in the chat as is, and one NEXT line with the exact command, so an agent
+  // relays the engine's words instead of its own reading. Also kept for `--summary`.
+  try {
+    const { nextStep, buildSummary, measuredLines } = await import('./next-step.mjs');
+    const outDir = dirname(codeSnapshotPath(cfg));
+    const hb = (f) => (existsSync(join(ROOT, outDir, 'handback', f)) ? join(outDir, 'handback', f) : null);
+    const failing = gates.filter((g) => !g.pass && !g.planLimited && !g.baselined);
+    const written = baselineInfo?.mode === 'write' ? { count: baselineInfo.written.length, file: relative(ROOT, baselineInfo.path) || newPath('baseline') } : null;
+    // Build mode: what Figma has and the code does not yet, in order (tokens first), never a failure.
+    let toBuild = null, toBuildLine = null;
+    if (cfg.build === true) {
+      const { componentsToBuild, tokensToBuildCount, buildLine, TOKENS_TO_BUILD } = await import('./build-list.mjs');
+      toBuild = { tokens: tokensToBuildCount(ROOT), file: TOKENS_TO_BUILD, theme: [cfg.paths?.themeCSS].flat()[0], components: await componentsToBuild(ROOT, cfg) };
+      toBuildLine = buildLine(toBuild);
+      if (toBuildLine) console.log(`\n${toBuildLine}`);
+    }
+    let a11yFound = null;
+    try { a11yFound = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
+    // A Figma file set up, and no Figma data readable (nothing captured yet): nothing was compared with Figma, so the
+    // run never reads as parity, and the capture comes first.
+    const readable = (file) => { try { JSON.parse(readFileSync(join(ROOT, file), 'utf8')); return true; } catch { return false; } };
+    const noSnapshot = !NO_FIGMA && !_figmaCliRead && ![SNAP_VARS, SNAP_STRUCT, cfg.paths?.compPropsSnapshot].filter(Boolean).some(readable);
+    const next = nextStep({ failing, baselineWritten: written, toBuild, scope: _chosenNames.length && _scopeNames.length ? _chosenNames : [], handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, burndownNext: _burndownNext, build: cfg.build === true, a11y: a11yFound, measured: measuredLines(gates).length, noFigma: NO_FIGMA, noSnapshot, foundNowhere: _foundNowhere });
+    const verdict = written ? 'baseline' : anyFail ? 'failed' : baselineInfo?.mode === 'enforce' && baselineInfo.debt.length ? 'debt' : 'pass';
+    const { dataStateLine } = await import('./next-step.mjs');
+    const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
+    const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, noLink: cfg.figmaFileKey === '', snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file), readable: readable(file) })) });
+    let a11yIssues = null;
+    try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
+    const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues, why: (rA11y?.stdout ?? '').match(/⏭\s+\[a11y\]\s+(.+)/)?.[1]?.replace(/\.$/, '') ?? null } : null } : null;
+    // The verification headline, for a full run: each component passing, drifting or not checked, from this
+    // run's differences and, when it measured in a browser, this run's census.
+    let headline = null;
+    if (!ONLY && !_scopeNames.length) try {
+      const { verification, verificationLine } = await import('./run-diff.mjs');
+      const started = Date.now() - process.uptime() * 1000;
+      const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
+      if (new Date(d.at).getTime() >= started) {
+        const cPath = join(ROOT, outDir, 'census.json');
+        const census = existsSync(cPath) && statSync(cPath).mtimeMs >= started ? JSON.parse(readFileSync(cPath, 'utf8')) : null;
+        const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
+        const names = [...new Set([...Object.keys(readJ(SNAP_STRUCT).components ?? {}), ...Object.keys(readJ(SNAP_COMP_PROPS))])].filter((n) => !n.startsWith('_') && n.length > 2);
+        headline = verificationLine(verification(names, d, census));
+      }
+    } catch { /* no differences written this run */ }
+    // Is the Figma file reliable enough to compare: said with the state of the Figma data, before what failed.
+    let figmaTrust = null;
+    if (!NO_FIGMA && cfg.figmaHygiene !== false) try {
+      const { reliability, reliabilityLine } = await import('./figma-hygiene.mjs');
+      figmaTrust = reliabilityLine(reliability(JSON.parse(readFileSync(join(ROOT, 'component-values.snapshot.json'), 'utf8')), { only: _scopeNames.length ? _scopeNames : null }));
+    } catch { /* no component-values.snapshot.json */ }
+    let summary = buildSummary({ verdict, gates, baselineWritten: written, scope: _scopeNames.length ? _chosenNames : [], burndown: _burndownLines, next, notRun: gates.filter((g) => g.notRun).length, data, only, toBuild: toBuildLine, noSnapshot, foundNowhere: _foundNowhere, headline, figma: figmaTrust });
+    mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+    // Where every difference is listed (written by a full audit above), so the chat always says where to look.
+    let diffLine = '';
+    try { const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8')); if (!ONLY && !_scopeNames.length && d.total) diffLine = `\nEvery difference between Figma and the code, ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list: ${OUT_DIR}/differences.md\n`; } catch { /* none written */ }
+    // The accessibility verdict and its problems, kind by kind, so the chat carries the result and not only a count.
+    let a11yBlock = '';
+    try { const { a11ySummaryLines } = await import('./a11y-check.mjs'); const l = a11ySummaryLines(JSON.parse(readFileSync(A11Y_JSON, 'utf8'))); if (l.length) a11yBlock = `\n${l.join('\n')}\n`; } catch { /* no browser this run */ }
+    // Which code was checked, when it was read from GitLab: the commit, so the result is never taken for another one.
+    const codeLine = GITLAB_SOURCE ? `\nCode checked: GitLab ${GITLAB_SOURCE.path} @ ${GITLAB_SOURCE.ref} ${GITLAB_SOURCE.sha.slice(0, 8)}${GITLAB_SOURCE.committedAt ? ` (${GITLAB_SOURCE.committedAt.slice(0, 10)})` : ''}${GITLAB_SOURCE.stale ? ' - GitLab was not reached, so this is the copy of that commit' : ''}\n` : '';
+    summary = summary.replace(/\n(NEXT:)/, `${codeLine}${a11yBlock}${diffLine}\n$1`);
+    writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
+    console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);
+  } catch { /* the full report above still stands */ }
+
+  // Passive, throttled "you're behind" nudge - at most once/day, best-effort, never
+  // blocks or errors a run. Explicit checks: `node scripts/audit.mjs --version`.
+  try {
+    const stamp = join(HOME, '.claude', '.rms-design-system-engine-update-check');
+    const now = Date.now();
+    let last = 0;
+    try { last = Number(readFileSync(stamp, 'utf8').trim()) || 0; } catch { /* first run */ }
+    if (now - last > 24 * 3600 * 1000) {
+      const res = checkForUpdate({ quiet: true });
+      try { mkdirSync(dirname(stamp), { recursive: true }); writeFileSync(stamp, String(now)); } catch { /* cache is optional */ }
+      if (res?.behind) {
+        console.log(C.yellow('\n⚠️  A newer version of the engine is available - run: rms-design-system-engine --update (it did not update itself: local changes, another branch, or DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1)'));
+      }
+    }
+  } catch { /* a version nudge must never break the audit */ }
+
+  process.exit(anyFail ? 1 : 0);
+})().catch((e) => {
+  // Anything the per-gate guards did not catch ends the run with one clear line, never a stack
+  // trace alone, and never a pass.
+  console.error(`\n❌ The audit stopped: ${e?.message ?? e}`);
+  if (envVar(process.env, 'DEBUG')) console.error(e?.stack ?? '');
+  process.exit(1);
+});

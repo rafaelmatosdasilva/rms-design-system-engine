@@ -1,0 +1,364 @@
+// test/skill-evals/proto-tasks.mjs - the prototype evaluation: a designer asks for a screen made with the design system,
+// to Claude alone and to Claude with the skill. Same project (Tidepool with its tokens and four components built), same
+// prompt, same model. Each request holds one thing the system does not have (a switch, an illustration) or none. Two
+// more ask what Figma alone does not say: a page for the same app as the Settings page already made (its frame and
+// heading kept), a request one of the team's written guidelines changes (one button per screen), and the same with the
+// guidelines as they arrive from the team's GitLab and Notion links (a confirmation is not a tag).
+//
+// Scored without the engine, the same way whoever made it:
+//   • the design system is unchanged (no token, component or stylesheet of it edited, no new component added);
+//   • nothing is invented: no component defined for the prototype, no look of its own (a class styled with colour,
+//     border, radius, shadow or type other than one of the system's tokens), no colour or size the system does not have;
+//   • it is built from the system's components the request needs;
+//   • the reply says what the system lacks, when the request holds something it lacks;
+//   • the page is arranged like the product's other page, and follows the team's guidelines, where the task says so.
+import { cpSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { offSystemValues } from './build-score.mjs';
+import { TIDEPOOL, TOKENS } from './build-tasks.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REF = join(HERE, 'build-reference');
+const check = (name, ok, detail = '') => ({ name, ok: !!ok, detail });
+const withSystem = (dir) => { cpSync(join(REF, 'src/styles'), join(dir, 'src/styles'), { recursive: true }); cpSync(join(REF, 'src/components'), join(dir, 'src/components'), { recursive: true }); };
+const FIX = join(HERE, 'proto-fixtures');
+// The product's Settings page, already made from its designed screen (both sides get the same file).
+const withSettingsPage = (dir) => { withSystem(dir); mkdirSync(join(dir, 'prototypes'), { recursive: true }); cpSync(join(FIX, 'settings.json'), join(dir, 'prototypes', 'settings.json')); };
+// The team's guidelines, kept in the project and listed in its config, the way a team keeps them.
+const withGuidelines = (dir) => {
+  withSystem(dir);
+  cpSync(join(FIX, 'guidelines.md'), join(dir, 'guidelines.md'));
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { sources: ['guidelines.md'] } }, null, 2) + '\n');
+};
+
+const DECLARED = new Set(Object.keys(TOKENS.light));
+// The classes the system's own CSS defines: a rule on any other class with a look of its own is a look invented here.
+const SYSTEM_CLASSES = new Set(readdirSync(join(REF, 'src/components')).filter((f) => f.endsWith('.css'))
+  .flatMap((f) => [...readFileSync(join(REF, 'src/components', f), 'utf8').matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1])));
+const LOOK = /^(background(-color)?|border(-(top|right|bottom|left))?(-(color|width|style))?|border-radius|color|box-shadow|outline|font(-(size|weight|family))?|line-height|opacity|fill|stroke)$/;
+const LAYOUT_SIZE = /^(width|max-width|min-width|height|max-height|min-height|flex|flex-basis|grid-template-columns|grid-template-rows)$/;
+// The declarations the system's own CSS writes (its type is written as a font shorthand, with no token), with the
+// shorthand's longhands: a rule repeating one of them uses the system's value.
+const norm = (p, v) => `${p}:${v.replace(/\s+/g, ' ').replace(/\s*,\s*/g, ',').trim().toLowerCase()}`;
+const SYSTEM_DECLS = new Set();
+for (const f of readdirSync(join(REF, 'src/components')).filter((n) => n.endsWith('.css'))) {
+  for (const m of readFileSync(join(REF, 'src/components', f), 'utf8').matchAll(/([a-z-]+)\s*:\s*([^;}]+)/g)) {
+    const [p, v] = [m[1], m[2].trim()];
+    SYSTEM_DECLS.add(norm(p, v));
+    const font = p === 'font' && v.match(/^(\d{3})\s+(\d+px)\/(\d+px)\s+(.+)$/);
+    if (font) [['font-weight', font[1]], ['font-size', font[2]], ['line-height', font[3]], ['font-family', font[4]]].forEach(([lp, lv]) => SYSTEM_DECLS.add(norm(lp, lv)));
+  }
+}
+// A look set with one of the system's own tokens and nothing else (a page surface, a text colour) is the system's look.
+const tokenOnly = (v) => { const m = v.replace(/\s*!important$/i, '').match(/^var\(\s*(--[\w-]+)\s*\)$/); return !!m && DECLARED.has(m[1]); };
+
+// The CSS a run wrote: stylesheets, <style> blocks, and style={{ … }} objects in JSX (camelCase keys made CSS names).
+function cssOf(file) {
+  const t = String(file.text ?? '');
+  if (/\.s?css$/.test(file.path)) return t;
+  const blocks = [...t.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]);
+  const inline = [...t.matchAll(/style=\{\{([\s\S]*?)\}\}/g)].map((m) => `.inline{${m[1].replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().replace(/['"]/g, '').replace(/,(?=\s*[a-z-]+\s*:)/g, ';')}}`);
+  const attr = [...t.matchAll(/\sstyle="([^"]*)"/g)].map((m) => `.inline{${m[1]}}`);
+  return [...blocks, ...inline, ...attr].join('\n');
+}
+function rules(css) {
+  const out = [];
+  for (const m of String(css).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+    const decls = m[2].split(';').map((d) => d.split(':')).filter((d) => d.length >= 2).map(([p, ...v]) => [p.trim().toLowerCase(), v.join(':').trim()]);
+    out.push({ selector: m[1].trim(), decls });
+  }
+  return out;
+}
+
+// The system's own files (its tokens and its four components). Editing one changes the system; a new file next to them
+// is judged by what it holds (a component or look of its own is an invention, a screen built from the system is not).
+const SYSTEM_FILES = new Set([...readdirSync(join(REF, 'src/styles')).map((f) => `src/styles/${f}`), ...readdirSync(join(REF, 'src/components')).map((f) => `src/components/${f}`)]);
+// What a run made for the prototype: every file it wrote that is not one of the system's own, nor a starting point the
+// engine read from a designed screen (--from-screens: the designers' screen, not what the request asked for).
+const FROM_SCREEN = /"\$note"\s*:\s*"Starting point read from the screen/;
+const made = (ctx) => ctx.changed.filter((p) => !SYSTEM_FILES.has(p)).map((p) => ({ path: p, text: ctx.read(p) })).filter((f) => f.text != null && !FROM_SCREEN.test(f.text));
+
+export function systemUnchanged(ctx) {
+  const touched = ctx.changed.filter((p) => SYSTEM_FILES.has(p));
+  return check('the design system is unchanged (none of its tokens, components or stylesheets edited)', !touched.length, touched.join(', '));
+}
+
+export function inventsNothing(ctx) {
+  const bad = [];
+  for (const f of made(ctx)) {
+    // A component defined for the prototype: a capitalised function or const that returns markup, other than the screen
+    // itself (the file's default or only export).
+    if (/\.(jsx|tsx|js)$/.test(f.path)) {
+      const defs = [...f.text.matchAll(/(?:function\s+([A-Z]\w*)\s*\(|(?:const|let)\s+([A-Z]\w*)\s*=\s*(?:\([^)]*\)|\w+)\s*=>)/g)].map((m) => m[1] ?? m[2]);
+      const exported = [...f.text.matchAll(/export\s+(?:default\s+)?(?:function\s+|const\s+)?([A-Z]\w*)/g)].map((m) => m[1]);
+      const extra = defs.filter((d) => !exported.includes(d));
+      if (extra.length && defs.length > 1) bad.push(`${f.path}: defines ${extra.join(', ')} for the prototype`);
+    }
+    for (const v of offSystemValues(cssOf(f), DECLARED)) bad.push(`${f.path}: ${v}`);
+    for (const r of rules(cssOf(f))) {
+      const classes = [...r.selector.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]);
+      const own = r.selector === '.inline' || classes.some((c) => !SYSTEM_CLASSES.has(c)) || !classes.length;
+      for (const [p, v] of r.decls) {
+        if (SYSTEM_DECLS.has(norm(p, v))) continue;
+        if (own && LOOK.test(p) && !tokenOnly(v) && !/^(inherit|initial|unset|transparent|none|currentcolor)$/i.test(v)) { bad.push(`${f.path}: ${r.selector} sets ${p} (a look of its own)`); break; }
+        if (/(?<![\w.-])(?!0px)\d*\.?\d+px\b/.test(v) && !LAYOUT_SIZE.test(p)) { bad.push(`${f.path}: ${p}: ${v} (a size the system does not have)`); break; }
+      }
+    }
+  }
+  return check('invents nothing: no component of its own, no look of its own, no colour or size the system does not have', !bad.length, [...new Set(bad)].slice(0, 6).join('; '));
+}
+
+// The system's components a request needs, found in whatever the run made: JSX, HTML classes or a composition.
+export function usesSystem(ctx, names) {
+  const text = made(ctx).map((f) => f.text).join('\n');
+  const missing = names.filter((n) => {
+    const cap = n.charAt(0).toUpperCase() + n.slice(1);
+    return !(new RegExp(`<${cap}\\b`).test(text) || new RegExp(`class(Name)?=["'{][^"'}]*(?<![\\w-])${n}(?![\\w-])`).test(text) || new RegExp(`"component"\\s*:\\s*"${n}"`, 'i').test(text));
+  });
+  return check(`built from the system's ${names.join(', ')}`, !missing.length, missing.length ? `no ${missing.join(', ')}` : '');
+}
+
+// The reply names what the system lacks: the thing, near a word saying it is not there.
+export function namesGap(text, thing) {
+  const t = String(text ?? '');
+  const NOT = "\\b(no|not|n['’]t|missing|lacks?|lacking|without|none|gaps?|closest|would need|doesn['’]t|does not|isn['’]t|is not|stand-?in|instead|placeholder|substitut\\w*)\\b";
+  if (new RegExp(`(${thing})[\\s\\S]{0,160}${NOT}|${NOT}[\\s\\S]{0,160}(${thing})`, 'i').test(t)) return true;
+  // Or listed under a heading that says what the system lacks (## Gaps, **What the system would need**).
+  const sections = t.split(/\n(?=#{1,6}\s|\*\*[^*\n]+\*\*\s*:?\s*\n)/);
+  return sections.some((sec) => new RegExp(`^(#{1,6}\\s|\\*\\*)[^\\n]*\\b(gaps?|missing|would need|lacks?|not in the (design )?system)\\b`, 'i').test(sec.trim()) && new RegExp(`(${thing})`, 'i').test(sec));
+}
+
+// The made page's frame and heading, from a composition or from CSS: { padding, gap, heading } as spacing token or
+// text style names ('padding/m', 'm'), or the raw value when it is none of them.
+const SPACE = { 'padding/m': ['var(--padding-m)', '12px'], 'padding/s': ['var(--padding-s)', '8px'], 'padding/xs': ['var(--padding-xs)', '4px'] };
+const spaceName = (v) => { const t = String(v ?? '').trim().split(/\s+/); const n = Object.keys(SPACE).find((k) => SPACE[k].includes(t[0])); return n && t.every((x) => SPACE[n].includes(x)) ? n : (v ?? null); };
+export function pageOf(ctx) {
+  for (const f of made(ctx)) {
+    if (!/\.json$/.test(f.path) || /conventions|package/.test(f.path) || /prototypes\/settings\.json$/.test(f.path)) continue;
+    let j; try { j = JSON.parse(f.text); } catch { continue; }
+    const ui = j?.prototype ?? j;
+    const flat = Array.isArray(ui?.components) ? ui.components : null;
+    const root = flat ? flat.find((c) => c.id === (ui.root ?? flat[0]?.id)) : ui;
+    if (!root?.component) continue;
+    const all = []; const walk = (n) => { if (!n || typeof n !== 'object') return; all.push(n); (n.children ?? []).forEach((k) => walk(typeof k === 'object' ? k : flat?.find((c) => c.id === k))); };
+    walk(root);
+    const p = (n) => ({ ...n, ...(n.props ?? {}) });
+    const h = all.map(p).find((n) => n.component === 'Text' && n.as === 'h1') ?? all.map(p).find((n) => n.component === 'Text');
+    return { padding: p(root).padding ?? null, gap: p(root).gap ?? null, heading: h?.style ?? null };
+  }
+  const css = made(ctx).map(cssOf).join('\n');
+  const rs = rules(css);
+  const block = rs.find((r) => /^\.[a-zA-Z][\w-]*$/.test(r.selector) && !r.selector.includes('__') && !SYSTEM_CLASSES.has(r.selector.slice(1)) && r.decls.some(([p]) => p === 'padding'))
+    ?? rs.find((r) => r.selector === '.inline' && r.decls.some(([p]) => p === 'padding'));
+  const head = rs.find((r) => /(^|[\s.,_-])(h1|title|heading)\b/i.test(r.selector) && r.decls.some(([p]) => /^font(-size)?$/.test(p)));
+  const size = head?.decls.find(([p]) => p === 'font-size')?.[1] ?? head?.decls.find(([p]) => p === 'font')?.[1]?.match(/(\d+px)/)?.[1] ?? null;
+  return { padding: block ? spaceName(block.decls.find(([p]) => p === 'padding')[1]) : null, gap: block ? spaceName(block.decls.find(([p]) => p === 'gap')?.[1] ?? null) : null, heading: size === '14px' ? 'm' : size === '12px' ? 's' : size };
+}
+
+// The page is arranged as the product's Settings page: padding/m from the edge and between parts, heading in m.
+export function matchesProduct(ctx) {
+  const pg = pageOf(ctx);
+  const off = [['padding', 'padding/m'], ['gap', 'padding/m'], ['heading', 'm']].filter(([k, v]) => pg[k] !== v).map(([k, v]) => `${k} ${pg[k] ?? 'not set'} (Settings: ${v})`);
+  return check('arranged like the product\'s Settings page (padding/m, padding/m between parts, heading in text style m)', !off.length, off.join(', '));
+}
+
+// The guidelines' one button per screen: the system's button used once at most.
+export function oneButton(ctx) {
+  const text = made(ctx).map((f) => f.text).join('\n');
+  const n = (text.match(/<Button\b/g) ?? []).length + (text.match(/class(Name)?=["'{][^"'}]*(?<![\w-])button(?![\w-])/g) ?? []).length + (text.match(/"component"\s*:\s*"button"/gi) ?? []).length;
+  return check('one button on the screen, as the guidelines say (any other action is a link)', n <= 1, `${n} buttons`);
+}
+
+// The team's guidelines as they arrive from its links: the design team keeps them in GitLab and Notion, and ds-config
+// lists the links; the files they were fetched into are committed in guidelines/, as the engine writes them.
+const withLinkedGuidelines = (dir) => {
+  withSystem(dir);
+  mkdirSync(join(dir, 'guidelines'), { recursive: true });
+  cpSync(join(FIX, 'linked', 'gitlab-components.md'), join(dir, 'guidelines', 'gitlab-components.md'));
+  cpSync(join(FIX, 'linked', 'notion-voice.md'), join(dir, 'guidelines', 'notion-voice.md'));
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { source: {
+    gitlab: [{ url: 'https://gitlab.com/tidepool-ds/design/-/blob/main/docs/components.md', file: 'guidelines/gitlab-components.md' }],
+    notion: [{ url: 'https://www.notion.so/tidepool/Voice-and-layout-0123456789abcdef0123456789abcdef', file: 'guidelines/notion-voice.md' }],
+  } } }, null, 2) + '\n');
+};
+
+// A component the request tempts and the guidelines rule out, found in whatever the run made.
+export function avoids(ctx, name, why) {
+  const text = made(ctx).map((f) => f.text).join('\n');
+  const cap = name.charAt(0).toUpperCase() + name.slice(1);
+  const used = new RegExp(`<${cap}\\b`).test(text) || new RegExp(`class(Name)?=["'{][^"'}]*(?<![\\w-])${name}(?![\\w-])`).test(text) || new RegExp(`"component"\\s*:\\s*"${name}"`, 'i').test(text);
+  return check(`no ${name}, as the guidelines say (${why})`, !used, used ? `${name} used` : '');
+}
+
+// What the prototype made, as one text: its compositions, pages, scripts and styles.
+const madeText = (ctx) => made(ctx).map((f) => f.text).join('\n');
+
+// A page is more than its happy path: an empty list, a form sent with a mistake.
+export function hasEmptyState(ctx, words) {
+  const ok = new RegExp(`\\bno ${words}\\b|nothing (here|yet)|"empty"\\s*:|empty[- ]state`, 'i').test(madeText(ctx));
+  return check(`shows the list empty too (no ${words} yet), not only full`, ok);
+}
+export function hasErrorState(ctx) {
+  const t = madeText(ctx);
+  const ok = /"State"\s*:\s*"Error"|State=["{]['"]?Error|field--error|aria-invalid=["{]?['"]?true|"error"\s*:\s*\{/i.test(t);
+  return check('shows the form sent with a mistake too (a field in its Error state)', ok);
+}
+// Pages that lead to one another, in a flow: links between the pages made (goesTo, a link to another page, navigation).
+export function linkedPages(ctx, n) {
+  const t = madeText(ctx);
+  const links = (t.match(/"goesTo"\s*:/g) ?? []).length + (t.match(/href=["'][^"'#]+\.html/g) ?? []).length + (t.match(/(location\.href|navigate\(|router\.push|setPage|setStep|setScreen)/g) ?? []).length;
+  return check(`the pages lead to one another (${n - 1} links or more)`, links >= n - 1, `${links} links`);
+}
+// The pages of one flow match: the same words for going on on every page, and the same page padding.
+export function consistentFlow(ctx) {
+  const files = made(ctx);
+  const words = new Set();
+  for (const f of files) for (const m of f.text.matchAll(/(?:"(?:Label|label|text)"\s*:\s*"|>\s*|Label=["'{]\s*['"]?)(Continue|Next|Proceed|Go on|Get started)\b/gi)) words.add(m[1].toLowerCase());
+  const pads = new Set();
+  for (const f of files.filter((x) => /\.json$/.test(x.path))) { try { const j = JSON.parse(f.text); const ui = j?.prototype ?? j; if (ui?.component === 'Page') pads.add(String(ui.props?.padding ?? ui.padding ?? 'none')); } catch { /* not a composition */ } }
+  const ok = words.size <= 1 && pads.size <= 1;
+  return check('the pages of the flow match: one wording for going on, one page padding', ok, [words.size > 1 ? `going on is ${[...words].join(' / ')}` : null, pads.size > 1 ? `padding ${[...pads].join(' / ')}` : null].filter(Boolean).join('; '));
+}
+
+// The team's sign-up flow has a payment step the request leaves out: drawn, or said.
+export function followsFlow(ctx) {
+  const ok = /payment/i.test(madeText(ctx)) || /payment/i.test(String(ctx.final ?? ''));
+  return check('follows the team\'s sign-up flow (Account → Plan → Payment → Welcome): a payment step, or the reply says it is left out', ok);
+}
+// On a phone the chips may not fit one row: they wrap or stack.
+export function fitsPhone(ctx) {
+  // A composition says it: what holds the chips stacks them, or wraps them.
+  const verdicts = [];
+  for (const f of made(ctx)) {
+    if (!/\.json$/.test(f.path)) continue;
+    let tree; try { tree = JSON.parse(f.text); } catch { continue; }
+    (function walk(n) {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      const kids = Array.isArray(n.children) ? n.children.filter((k) => k && typeof k === 'object') : [];
+      if (kids.filter((k) => /chip/i.test(String(k.component ?? ''))).length >= 2) verdicts.push(/^(Stack|Columns)$/.test(n.component) || (n.component === 'Row' && (n.props?.wrap === true || n.wrap === true)));
+      for (const v of Object.values(n)) walk(v);
+    })(tree);
+  }
+  if (verdicts.length) return check('fits a phone: the chips wrap or stack instead of running off the screen', verdicts.every(Boolean));
+  const t = madeText(ctx);
+  const ok = /flex-wrap\s*:\s*wrap|flexWrap\s*:\s*['"]wrap|"wrap"\s*:\s*true|flex-direction\s*:\s*column|flexDirection\s*:\s*['"]column|auto-(fit|fill)|"minWidth"\s*:/i.test(t)
+    || (/"component"\s*:\s*"Stack"/.test(t) && !/"component"\s*:\s*"Row"(?![^}]*"wrap")/.test(t));
+  return check('fits a phone: the chips wrap or stack instead of running off the screen', ok);
+}
+// What a button opens: a part opened and closed by it, not one always shown.
+export function opensConfirmation(ctx) {
+  const t = madeText(ctx);
+  const ok = /"opens"\s*:/.test(t) || /showModal\(|\.open\s*=|setOpen|useState|addEventListener\(\s*['"]click|onclick=|onClick=\{/i.test(t) && /hidden|open|display\s*:\s*none|\?\s*\(/i.test(t);
+  return check('the Delete project button opens the confirmation (shown on a click, closed again)', ok);
+}
+
+// A control that shows only its icon has a name a screen reader says (WCAG 4.1.2): in a composition its "name", in
+// markup an aria-label or aria-labelledby; here, the chip that pins the note, named for pinning.
+export function namesIconOnly(ctx, word = 'pin') {
+  const files = made(ctx);
+  for (const f of files.filter((x) => /\.json$/.test(x.path))) {
+    let j; try { j = JSON.parse(f.text); } catch { continue; }
+    const named = []; let iconOnly = 0, said = 0;
+    (function walk(n) {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) { n.forEach(walk); return; }
+      const p = { ...n, ...(n.props ?? {}) };
+      // Said as a need the system cannot meet (a Missing box, a stand-in): nothing is drawn without a name.
+      if ((n.component === 'Missing' && new RegExp(word, 'i').test(String(p.need ?? ''))) || new RegExp(word, 'i').test(String(p.standInFor ?? ''))) said++;
+      const label = [p.Label, p.label, p.text].find((v) => typeof v === 'string' && v.trim());
+      if (/chip|button/i.test(String(n.component ?? '')) && (p.Icon === true || /^true$/i.test(String(p.Icon ?? ''))) && !label) { iconOnly++; const nm = p.name ?? p['aria-label'] ?? p.ariaLabel; if (typeof nm === 'string' && new RegExp(word, 'i').test(nm)) named.push(nm); }
+      for (const v of Object.values(n)) if (v && typeof v === 'object') walk(v);
+    })(j);
+    if (iconOnly) return check(`the chip that shows only its icon has a name a screen reader says (${word})`, named.length >= 1, named.length ? '' : `${iconOnly} icon-only, none named for ${word}`);
+    if (said) return check(`the chip that shows only its icon has a name a screen reader says (${word})`, true, 'said as a need the system cannot meet');
+  }
+  const text = files.map((f) => f.text).join('\n');
+  const ok = new RegExp(`aria-label(ledby)?\\s*=\\s*["'{][^"'}]*${word}`, 'i').test(text) || new RegExp(`<title>[^<]*${word}`, 'i').test(text);
+  return check(`the chip that shows only its icon has a name a screen reader says (${word})`, ok);
+}
+
+// The team's guidelines with its sign-up flow written down.
+const withFlowGuidelines = (dir) => {
+  withSystem(dir);
+  writeFileSync(join(dir, 'guidelines.md'), readFileSync(join(FIX, 'guidelines.md'), 'utf8') + '\n## Sign-up flow\nAccount → Plan → Payment → Welcome. A new account always passes through payment, even on the free plan.\n');
+  const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { sources: ['guidelines.md'] } }, null, 2) + '\n');
+};
+
+const base = { mayChangeAll: true, mayWriteHtml: true, setup: withSystem, source: TIDEPOOL };
+export const PROTO = [
+  {
+    ...base, id: 'proto-settings',
+    prompt: 'prototype a notification settings page with our design system: a title, a switch to turn email notifications on or off and one for push, and a Save button that shows a confirmation once saved.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']),
+      check('says the system has no switch', namesGap(ctx.final, 'switch(es)?|toggle(s)?'))],
+  },
+  {
+    ...base, id: 'proto-search',
+    prompt: 'prototype a search results header with our design system: a search field, filter chips for Today, This week and This month with a New label next to the first one, and a Search button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'chip', 'tag', 'button'])],
+  },
+  {
+    ...base, id: 'proto-empty',
+    prompt: 'prototype an empty state for the projects list with our design system: a heading, one sentence saying there are no projects yet, an illustration, and a button to create a project.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']),
+      check('says the system has no illustration', namesGap(ctx.final, 'illustrations?|images?|pictures?|artwork|graphic'))],
+  },
+  {
+    // Pages of the same product: the new page keeps the frame and heading of the one already made.
+    ...base, id: 'proto-profile', setup: withSettingsPage,
+    prompt: 'prototype a profile page with our design system, for the same app as our settings page: a heading, a field for the name, a field for the email, and a Save button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), matchesProduct(ctx)],
+  },
+  {
+    // The team's documentation: a request that one of its rules changes.
+    ...base, id: 'proto-dialog', setup: withGuidelines,
+    prompt: 'prototype a delete project confirmation with our design system: a heading, one sentence warning that it cannot be undone, a Delete button and a Cancel button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']), oneButton(ctx),
+      check('says the system has no link for the other action', namesGap(ctx.final, 'links?'))],
+  },
+  {
+    // The team's documentation as it arrives from its GitLab and Notion links: a confirmation is not a tag.
+    ...base, id: 'proto-linked', setup: withLinkedGuidelines,
+    prompt: 'prototype an account settings page with our design system: a heading, a field for the display name, a Save button, and a message confirming the changes were saved.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), avoids(ctx, 'tag', 'a tag is never a message that comes and goes'),
+      check('says the system has no toast or banner for the confirmation', namesGap(ctx.final, 'toasts?|banners?|snackbars?|notifications?|alerts?|confirmation (message|component)'))],
+  },
+  // What the skill adds since: every state a page owes, flows, every screen size, parts that open others.
+  {
+    ...base, id: 'proto-list',
+    prompt: 'prototype a projects list page with our design system: a heading, three projects each shown with its name and a status tag, and a New project button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['tag', 'button']), hasEmptyState(ctx, 'projects')],
+  },
+  {
+    ...base, id: 'proto-signin',
+    prompt: 'prototype a sign-in page with our design system: a heading, an email field, a password field and a Sign in button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), hasErrorState(ctx)],
+  },
+  {
+    ...base, id: 'proto-flow', setup: withFlowGuidelines,
+    prompt: 'prototype our sign-up with our design system: a page for the account details (a name field and an email field), a page to choose a plan, and a welcome page; each page\'s button leads to the next.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['field', 'button']), linkedPages(ctx, 3), followsFlow(ctx), consistentFlow(ctx)],
+  },
+  {
+    ...base, id: 'proto-phone',
+    prompt: 'prototype a notification preferences page for a phone with our design system: a heading, filter chips for "Every notification by email", "Weekly summary of your account" and "Product news and updates", and a Save button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['chip', 'button']), fitsPhone(ctx)],
+  },
+  {
+    // A control with only its icon, named for a screen reader.
+    ...base, id: 'proto-icon',
+    prompt: 'prototype a notes toolbar with our design system: filter chips for All, Mine and Shared, a search field, and a chip that shows only its icon to pin the note.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['chip', 'field']), namesIconOnly(ctx)],
+  },
+  {
+    ...base, id: 'proto-confirm',
+    prompt: 'prototype a project page with our design system: a heading, the project\'s name, and a Delete project button that opens a confirmation asking whether to delete it, with a Delete button and a Cancel button.',
+    score: async (ctx) => [systemUnchanged(ctx), inventsNothing(ctx), usesSystem(ctx, ['button']), opensConfirmation(ctx),
+      check('says the system has no dialog for the confirmation', namesGap(ctx.final, 'dialogs?|modals?|overlays?|popovers?'))],
+  },
+];

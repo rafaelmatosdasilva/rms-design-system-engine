@@ -1,0 +1,18 @@
+{
+  "_updated": "2026-01-01T00:00:00.000Z",
+  "button": {
+    "nums": [1, 6, 8, 12, 14, 20, 36, 96],
+    "colors": ["0a6c74", "ffffff"],
+    "hygiene": { "raw": [], "rawCount": 0, "noAutoLayout": [], "description": true, "detached": [] }
+  },
+  "badge": {
+    "nums": [6, 8, 12, 16, 20, 48],
+    "colors": ["1f7a3a", "5b6470", "b42318"],
+    "hygiene": { "raw": [{ "at": "Tone=Danger/Label", "field": "fill", "value": "#b42318" }], "rawCount": 1, "noAutoLayout": [], "description": true, "detached": [] }
+  },
+  "iconButton": {
+    "nums": [6, 8, 16, 36],
+    "colors": ["15202b"],
+    "hygiene": { "raw": [], "rawCount": 0, "noAutoLayout": ["Default"], "description": false, "detached": ["Default/Glyph"] }
+  }
+}

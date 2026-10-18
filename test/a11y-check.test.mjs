@@ -1,0 +1,330 @@
+// accessibility gate — pure-core unit tests. The CDP/browser path can't run headless in CI,
+// so this pins the real logic: WCAG contrast math, AA thresholds, rgba compositing, colour parsing,
+// and the contrast-finding classifier. Importing a11y-check.mjs launches nothing (main() is guarded).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  parseColor, over, effectiveBg, relLuminance, contrastRatio,
+  isLargeText, aaThreshold, contrastFindings, INTERACTIVE_ROLES,
+  styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
+  iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS, STATE_CLASSES, stateHeard,
+} from '../a11y-check.mjs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+
+test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest first', () => {
+  const s = summarizeAxe([
+    { id: 'color-contrast', help: 'Elements must have sufficient color contrast', impact: 'serious', count: 2, targets: ['.a', '.b'] },
+    { id: 'button-name', help: 'Buttons must have discernible text', impact: 'critical', count: 1, targets: ['button'] },
+    { id: 'color-contrast', help: 'Elements must have sufficient color contrast', impact: 'serious', count: 3, targets: ['.c'] },
+  ]);
+  assert.equal(s.length, 2);
+  assert.equal(s[0].id, 'color-contrast');
+  assert.equal(s[0].count, 5);
+  assert.deepEqual(s[0].targets, ['.a', '.b', '.c']);
+});
+
+test('a state drawn with a class is heard the way the role says it: a selected radio is aria-checked, a step aria-current', () => {
+  const el = (attrs = {}, props = {}) => ({ getAttribute: (a) => (a in attrs ? attrs[a] : null), hasAttribute: (a) => a in attrs, ...props });
+  const sel = STATE_CLASSES.selected;
+  assert.ok(stateHeard(el({ role: 'radio', 'aria-checked': 'true' }), sel), 'a selected radio says checked');
+  assert.ok(stateHeard(el({ 'aria-pressed': 'true' }), sel), 'a selected toggle says pressed');
+  assert.ok(stateHeard(el({ role: 'tab', 'aria-selected': 'true' }), sel));
+  assert.ok(stateHeard(el({ 'aria-current': 'step' }), sel), 'a selected step says current, with any value but false');
+  assert.ok(!stateHeard(el({ 'aria-checked': 'false' }), sel), 'a radio that says it is not checked is not heard as selected');
+  assert.ok(!stateHeard(el({ 'aria-current': 'false' }), sel));
+  assert.ok(!stateHeard(el(), sel), 'nothing said');
+  assert.ok(stateHeard(el({ 'aria-current': 'page' }), STATE_CLASSES.current));
+  assert.ok(stateHeard(el({}, { checked: true }), STATE_CLASSES.checked), 'a checked input');
+  assert.ok(stateHeard(el({ open: '' }), STATE_CLASSES.open), 'an open details or dialog');
+  assert.ok(stateHeard(el({ 'aria-disabled': 'true' }), STATE_CLASSES.disabled) && stateHeard(el({}, { disabled: true }), STATE_CLASSES.disabled));
+  assert.ok(stateHeard(el({ 'aria-checked': 'mixed' }), STATE_CLASSES.indeterminate) && !stateHeard(el({ 'aria-checked': 'true' }), STATE_CLASSES.indeterminate));
+});
+
+// ── Plain-language reporting + machine record ──
+test('[plain] every issue kind has a title/why/fix, and no raw jargon in the guidance', () => {
+  for (const kind of ['contrast', 'hovercontrast', 'name', 'focus', 'focuscontrast', 'ariastate', 'keyboard']) {
+    const g = A11Y_GUIDE[kind];
+    assert.equal(typeof g.title(1), 'string');
+    assert.ok(g.why.length > 10 && g.fix.length > 10);
+    // human copy must not leak internal check names
+    assert.doesNotMatch(g.why + g.fix, /no-focus|state-not-exposed|not-keyboard|cannotCompute/);
+  }
+});
+test('[plain] titles are singular/plural aware', () => {
+  assert.match(A11Y_GUIDE.contrast.title(1), /piece of text is/);
+  assert.match(A11Y_GUIDE.contrast.title(3), /3 pieces of text are/);
+  assert.match(A11Y_GUIDE.focus.title(1), /control does not/);
+  assert.match(A11Y_GUIDE.focus.title(2), /2 controls do not/);
+});
+test('[plain] a11yItemLine reads as a sentence, not a raw selector dump', () => {
+  const c = a11yItemLine('contrast', { theme: 'Light', desc: '.lbl', text: 'Name', ratio: 1.6, threshold: 4.5 });
+  assert.match(c, /the text "Name"/);
+  assert.match(c, /1\.6 out of 21/);
+  assert.match(c, /Light theme/);
+  assert.equal(a11yItemLine('name', { role: 'button' }), 'A button with no label');
+  assert.equal(a11yItemLine('name', { role: 'textbox' }), 'An input field with no label');
+  assert.match(a11yItemLine('focuscontrast', { desc: 'button.x', ratio: 1.5, threshold: 3 }), /focus outline scores 1\.5 out of 21, needs at least 3/);
+  assert.match(a11yItemLine('hovercontrast', { text: 'Save', ratio: 2.2, threshold: 4.5 }), /the text "Save" on hover — its readability score is 2\.2 out of 21/);
+});
+test('[json] a11yFindingRecord carries the exact facts + the fix for a machine', () => {
+  const c = a11yFindingRecord('contrast', { theme: 'Dark', desc: '.err', text: 'Oops', ratio: 2.1, threshold: 4.5 });
+  assert.equal(c.issue, 'contrast');
+  assert.equal(c.selector, '.err');
+  assert.equal(c.contrast, 2.1);
+  assert.equal(c.needs, 4.5);
+  assert.equal(c.theme, 'Dark');
+  assert.ok(c.fix && c.fix.length > 10);
+  const n = a11yFindingRecord('name', { role: 'button', desc: '<button> with no accessible name' });
+  assert.equal(n.role, 'button');
+  assert.ok(n.fix.includes('aria-label'));
+});
+
+const approx = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
+
+// ── styleguideTarget: the generated-styleguide render target ──
+test('[styleguide] returns the target when the file exists (default path)', () => {
+  const t = styleguideTarget({}, '/proj', (p) => p === '/proj/apps/styleguide/index.html');
+  assert.equal(t.label, 'apps/styleguide/index.html');
+  assert.equal(t.styleguide, true);
+  assert.ok(t.url.startsWith('file://'));
+});
+test('[styleguide] null when the file is absent', () => {
+  assert.equal(styleguideTarget({}, '/proj', () => false), null);
+});
+test('[styleguide] honours a custom styleguide.out', () => {
+  const t = styleguideTarget({ styleguide: { out: 'dist/sg.html' } }, '/proj', (p) => p === '/proj/dist/sg.html');
+  assert.equal(t.label, 'dist/sg.html');
+});
+test('[styleguide] opt-out via a11y.styleguide:false', () => {
+  assert.equal(styleguideTarget({ a11y: { styleguide: false } }, '/proj', () => true), null);
+});
+
+test('contrastRatio: black on white is 21, white on white is 1', () => {
+  assert.ok(approx(contrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }), 21));
+  assert.ok(approx(contrastRatio({ r: 255, g: 255, b: 255 }, { r: 255, g: 255, b: 255 }), 1));
+});
+
+test('parseColor handles rgb / rgba / transparent, and the spaces Chrome keeps (oklch, oklab, color(srgb))', () => {
+  assert.deepEqual(parseColor('rgb(0, 0, 0)'), { r: 0, g: 0, b: 0, a: 1 });
+  assert.deepEqual(parseColor('rgba(10, 20, 30, 0.5)'), { r: 10, g: 20, b: 30, a: 0.5 });
+  assert.equal(parseColor('transparent').a, 0);
+  // Chrome reports an oklch() colour as written (Tailwind v4's default): white and black, read, not skipped.
+  const w = parseColor('oklch(1 0 0)'), k = parseColor('oklch(0 0 0 / 0.5)');
+  assert.ok(approx(w.r, 255, 1) && approx(w.g, 255, 1) && approx(w.b, 255, 1) && w.a === 1);
+  assert.ok(approx(k.r, 0, 1) && k.a === 0.5);
+  assert.ok(approx(parseColor('color(srgb 1 0 0)').r, 255, 0.5));
+  assert.equal(parseColor('color(display-p3 1 0 0)'), null);   // not converted → cannot compute
+});
+
+test('contrastFindings reads an oklch text colour and background, and says so when a colour space cannot be read', () => {
+  const grey = contrastFindings([{ desc: 'span', text: 'Hi', color: 'oklch(0.7 0 0)', bgLayers: ['oklch(1 0 0)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.equal(grey.length, 1, 'light grey on white fails 4.5:1');
+  assert.ok(grey[0].ratio < 4.5);
+  const p3 = contrastFindings([{ desc: 'span', text: 'Hi', color: 'color(display-p3 0 0 0)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.equal(p3.length, 1);
+  assert.match(p3[0].cannotCompute, /colour space/);
+  const p3bg = contrastFindings([{ desc: 'span', text: 'Hi', color: 'rgb(0,0,0)', bgLayers: ['color(display-p3 1 1 1)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.match(p3bg[0]?.cannotCompute ?? '', /colour space/);
+});
+
+test('contrastFindings blends see-through text over its background before measuring', () => {
+  // Black at 30% on white draws a light grey (about 2.2:1): it must fail, not read as black's 21:1.
+  const out = contrastFindings([{ desc: 'span.hint', text: 'Hi', color: 'rgba(0, 0, 0, 0.3)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.equal(out.length, 1);
+  assert.ok(out[0].ratio < 3);
+  // Fully transparent text draws nothing: no finding.
+  assert.equal(contrastFindings([{ desc: 'span', text: 'x', color: 'rgba(0,0,0,0)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light').length, 0);
+});
+
+test('effectiveBg composites a translucent element bg over its opaque ancestor', () => {
+  // nearest-first: element bg black@50% over an opaque white ancestor → mid grey
+  const bg = effectiveBg(['rgba(0, 0, 0, 0.5)', 'rgb(255, 255, 255)']);
+  assert.ok(approx(bg.r, 127.5, 0.5) && approx(bg.g, 127.5, 0.5) && approx(bg.b, 127.5, 0.5));
+  // no layers → white canvas default
+  assert.deepEqual(effectiveBg([]), { r: 255, g: 255, b: 255 });
+});
+
+test('isLargeText / aaThreshold follow WCAG (>=24px, or >=18.66px bold)', () => {
+  assert.equal(isLargeText(24, '400'), true);
+  assert.equal(isLargeText(18.66, '700'), true);
+  assert.equal(isLargeText(18, '700'), false);
+  assert.equal(isLargeText(23, '400'), false);
+  assert.equal(isLargeText(19, 'bold'), true);
+  assert.equal(aaThreshold(16, '400'), 4.5);
+  assert.equal(aaThreshold(30, '400'), 3);
+});
+
+test('contrastFindings flags #777 on white as normal-text fail but passes it as large text', () => {
+  const el = (fontSize, fontWeight) => ({ desc: 'span.label', text: 'Hi', color: 'rgb(119,119,119)', bgLayers: ['rgb(255,255,255)'], fontSize, fontWeight, bgImage: false });
+  const normal = contrastFindings([el(16, '400')], 'Light');
+  assert.equal(normal.length, 1);
+  assert.equal(normal[0].threshold, 4.5);
+  assert.ok(normal[0].ratio < 4.5);
+  const large = contrastFindings([el(30, '400')], 'Light');
+  assert.equal(large.length, 0, 'ratio ~4.48 clears the 3:1 large-text bar');
+});
+
+test('contrastFindings reports a gradient/image background as cannot-compute, not a fail', () => {
+  const out = contrastFindings([{ desc: 'div.hero', text: 'X', color: 'rgb(0,0,0)', bgLayers: [], fontSize: 16, fontWeight: '400', bgImage: true }], 'Dark');
+  assert.equal(out.length, 1);
+  assert.equal(out[0].cannotCompute, 'background-image/gradient');
+  assert.equal(out[0].ratio, undefined);
+});
+
+test('a good pair produces no finding', () => {
+  const out = contrastFindings([{ desc: 'p', text: 'ok', color: 'rgb(0,0,0)', bgLayers: ['rgb(255,255,255)'], fontSize: 16, fontWeight: '400', bgImage: false }], 'Light');
+  assert.equal(out.length, 0);
+});
+
+test('INTERACTIVE_ROLES covers the classic controls', () => {
+  for (const r of ['button', 'link', 'textbox', 'checkbox', 'tab']) assert.ok(INTERACTIVE_ROLES.has(r));
+  assert.equal(INTERACTIVE_ROLES.has('paragraph'), false);
+});
+
+test('relLuminance is monotonic (black < grey < white)', () => {
+  assert.ok(relLuminance({ r: 0, g: 0, b: 0 }) < relLuminance({ r: 119, g: 119, b: 119 }));
+  assert.ok(relLuminance({ r: 119, g: 119, b: 119 }) < relLuminance({ r: 255, g: 255, b: 255 }));
+  assert.deepEqual(over({ r: 0, g: 0, b: 0, a: 1 }, { r: 255, g: 255, b: 255 }), { r: 0, g: 0, b: 0 });
+});
+
+test('iconContrastFindings: an icon kept in its light-theme colour on a dark background fails 3:1; one that follows the theme passes', () => {
+  const dark = ['rgb(30, 30, 30)'];
+  const out = iconContrastFindings([
+    { desc: 'button.icon-only', color: 'rgb(40, 40, 40)', bgLayers: dark },
+    { desc: 'button.close', color: 'rgb(240, 240, 240)', bgLayers: dark },
+    { desc: 'button.faded', color: 'rgba(240, 240, 240, 0.1)', bgLayers: dark },
+  ], 'Dark');
+  assert.deepEqual(out.map((f) => [f.desc, f.kind, f.theme, f.threshold]), [['button.icon-only', 'iconcontrast', 'Dark', 3], ['button.faded', 'iconcontrast', 'Dark', 3]]);
+  assert.match(a11yItemLine('iconcontrast', out[0]), /icon scores .* needs at least 3 \(Dark theme\)/);
+  assert.equal(a11yFindingRecord('iconcontrast', out[0]).theme, 'Dark');
+});
+
+test('namedByTitleOnly: the name the browser settled on came from the title', () => {
+  assert.equal(namedByTitleOnly({ name: { value: 'Dark mode', sources: [{ type: 'attribute', attribute: 'aria-labelledby' }, { type: 'attribute', attribute: 'title', value: { value: 'Dark mode' } }] } }), true);
+  assert.equal(namedByTitleOnly({ name: { value: 'Close', sources: [{ type: 'attribute', attribute: 'aria-label', value: { value: 'Close' } }, { type: 'attribute', attribute: 'title', superseded: true, value: { value: 'x' } }] } }), false);
+  assert.equal(namedByTitleOnly({ name: { value: 'Save', sources: [{ type: 'contents', value: { value: 'Save' } }] } }), false);
+  assert.equal(namedByTitleOnly({}), false);
+});
+
+// A mode switch starts the component's own transitions: its colours are read once they settle. A button whose text
+// colour transitions and whose background does not read 1:1 for a moment in the dark mode (a false contrast failure).
+const CHROME = findChrome({ playwright: true });
+test('[modes] after a mode switch the colours are read settled, never halfway through a transition', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'settle-test-'));
+  const page = join(dir, 'p.html');
+  writeFileSync(page, '<!doctype html><style>b{color:#111;background:#fff;transition:color 5s 60s}:root[data-c=dark] b{color:#eee;background:#111}</style><b id="x">Cancel</b>');
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'settle-test-' });
+  try {
+    const { send, close } = await connectCDP(browser.wsUrl);
+    const { sessionId } = await openPage(send, pathToFileURL(page).href);
+    assert.equal(await waitForTrue(send, sessionId, FILE_PAGE_LOADED), true);
+    const read = async () => (await send('Runtime.evaluate', { expression: 'getComputedStyle(document.getElementById("x")).color', returnByValue: true }, sessionId)).result.value;
+    await send('Runtime.evaluate', { expression: 'document.documentElement.setAttribute("data-c", "dark")' }, sessionId);
+    assert.equal(await read(), 'rgb(17, 17, 17)', 'waiting on its transition: the old text colour on the new dark background');
+    await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId);
+    assert.equal(await read(), 'rgb(238, 238, 238)');
+    close();
+  } finally { browser.kill(); }
+});
+
+test('a project whose packages are not installed is told so, not "auto-discovery found nothing"', { timeout: 60000 }, async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join: j, dirname: d } = await import('node:path');
+  const { fileURLToPath: f } = await import('node:url');
+  const dir = mkdtempSync(j(tmpdir(), 'a11y-nopkg-'));
+  writeFileSync(j(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css' } }));
+  writeFileSync(j(dir, 'theme.css'), ':root { --a: #fff; }');
+  writeFileSync(j(dir, 'package.json'), JSON.stringify({ name: 'p', scripts: { serve: 'vite' } }));
+  const r = spawnSync(process.execPath, [j(d(d(f(import.meta.url))), 'a11y-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /the project's packages are not installed \(no node_modules\)|Chrome not found/, r.stdout);
+});
+
+test('a style guide that draws no component is not the page checked: the project\'s own pages are', () => {
+  const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
+  const page = (components) => `<script type="application/json" id="sg-data">${JSON.stringify({ components })}</script>`;
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([])), null);
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => page([{ name: 'chip' }])).styleguide, true);
+  assert.equal(styleguideTarget({}, '/proj', (p) => p === sgPath, () => '<html>a page of its own</html>').styleguide, true, 'a list it cannot read: taken as it is');
+});
+
+test('on the style guide, the rules that a landmark sit at the top of the page are the page\'s, never the component\'s', async () => {
+  const { axeRules, AXE_PAGE_LANDMARKS } = await import('../a11y-check.mjs');
+  assert.ok(AXE_PAGE_LANDMARKS.includes('landmark-complementary-is-top-level'));
+  for (const id of AXE_PAGE_LANDMARKS) assert.deepEqual(axeRules(true)[id], { enabled: false }, id);
+  for (const id of AXE_PAGE_LANDMARKS) assert.equal(axeRules(false)[id], undefined, 'any other page is held to them');
+});
+
+test('a style guide with many components is checked in parts of a few components each, every part drawing only its own', async () => {
+  const { styleguideShares, SHARE_COMPONENTS } = await import('../a11y-check.mjs');
+  const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
+  const names = Array.from({ length: SHARE_COMPONENTS * 2 + 1 }, (_, i) => `c${i}`).concat('table/row');
+  const sg = styleguideTarget({}, '/proj', (p) => p === sgPath, () => `<script type="application/json" id="sg-data">${JSON.stringify({ components: names.map((name) => ({ name })) })}</script>`);
+  assert.deepEqual(sg.names, names);
+  const parts = styleguideShares(sg);
+  assert.equal(parts.length, 3);
+  assert.deepEqual(parts.flatMap((p) => p.only), names, 'every component in one part, once');
+  assert.ok(parts.every((p) => p.label === sg.label && p.styleguide), 'a finding reads the same whichever part found it');
+  assert.equal(parts[2].url, `${sg.url}&only=c${SHARE_COMPONENTS * 2}%2Ctable%2Frow`);
+  assert.equal(parts[0].part, '1 of 3');
+  assert.deepEqual(styleguideShares({ ...sg, names: names.slice(0, 2) }), [{ ...sg, names: names.slice(0, 2) }], 'a small one stays one page');
+  assert.equal(styleguideShares({ label: 'x', url: 'file:///x?all', styleguide: true }).length, 1, 'a list it cannot read: one page');
+});
+
+test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: 30000 }, async () => {
+  const { startDevServer } = await import('../a11y-check.mjs');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join: j } = await import('node:path');
+  const dir = mkdtempSync(j(tmpdir(), 'a11y-serve-'));
+  writeFileSync(j(dir, 'serve.mjs'), "process.stdout.write('  \\x1b[32m➜\\x1b[39m  Local:   \\x1b[36mhttp://localhost:\\x1b[1m5173\\x1b[22m/\\x1b[39m\\n'); setInterval(() => {}, 1000);");
+  const srv = startDevServer(`${process.execPath} serve.mjs`, dir);
+  try { assert.equal(await srv.url, 'http://localhost:5173'); } finally { srv.stop(); }
+});
+
+test('pages from a router in modules with hash history; scoped, the pages that use the component, its own first', async () => {
+  const { discoverRoutes } = await import('../a11y-check.mjs');
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join: j, dirname: d } = await import('node:path');
+  const dir = mkdtempSync(j(tmpdir(), 'routes-'));
+  const put = (rel, text) => { mkdirSync(d(j(dir, rel)), { recursive: true }); writeFileSync(j(dir, rel), text); };
+  put('src/router/router.js', "import { createRouter, createWebHashHistory } from 'vue-router'\nimport buttons from './modules/buttons.js'\nexport default createRouter({ history: createWebHashHistory(), routes: [{ path: '/', component: () => import('@/views/Home.vue') }, ...buttons] })\n");
+  put('src/router/modules/buttons.js', "import ButtonsPrimary from '@/views/buttons/Primary.vue'\nimport ButtonsLink from '@/views/buttons/Link.vue'\nexport default [\n  { path: '/components/buttons/link', name: 'link', component: ButtonsLink },\n  { path: '/components/buttons/primary', name: 'primary', component: ButtonsPrimary },\n  { path: '/components/:id', component: ButtonsLink },\n]\n");
+  put('src/views/Home.vue', '<template><main>home</main></template>');
+  put('src/views/buttons/Primary.vue', '<template><button-primary label="Go" /></template>');
+  put('src/views/buttons/Link.vue', '<template><div><button-link /><button-primary label="Back" /></div></template>');
+  assert.deepEqual(discoverRoutes(dir, 'http://localhost:8080/').sort(), ['http://localhost:8080/#/', 'http://localhost:8080/#/components/buttons/link', 'http://localhost:8080/#/components/buttons/primary'], 'the parameter route left out');
+  assert.deepEqual(discoverRoutes(dir, 'http://localhost:8080', { prefer: ['ButtonPrimary', '.button-primary'] }), ['http://localhost:8080/#/components/buttons/primary', 'http://localhost:8080/#/components/buttons/link']);
+  assert.equal(discoverRoutes(dir, 'http://localhost:8080', { prefer: ['nothingLikeIt'] }).length, 3, 'no page uses it: every page');
+});
+
+test('a component looked for by a class the code never gives an element is said at once, with the classes that hold its name', async () => {
+  const { classInCode, classesLike } = await import('../a11y-check.mjs');
+  const code = '<!-- the modal opens here -->\n<div :class="{ \'modal-overlay\': open }"><div class="modal-wrapper x"><p class="modal-title"></p></div></div>\n<div class="modal-wrapper"></div>\n.card .button-primary { color: red }';
+  assert.equal(classInCode(code, '.modal'), false, 'a word in a comment and a longer class are not .modal');
+  assert.equal(classInCode(code, '.modal-overlay'), true, 'a quoted class a binding adds');
+  assert.equal(classInCode(code, '.modal-wrapper'), true);
+  assert.equal(classInCode(code, '.button-primary'), true, 'a CSS selector');
+  assert.equal(classInCode(code, '.segmented button'), true, 'not one plain class: taken as present');
+  assert.deepEqual(classesLike(code, ['modal']), ['.modal-wrapper', '.modal-title']);
+});
+
+test('[axe] the pinned copy is kept under the home cache and fetched by --fetch-axe, which the install and --update run', async () => {
+  const { axeCachePath, axeCached } = await import('../a11y-check.mjs');
+  const home = mkdtempSync(join(tmpdir(), 'axe-home-'));
+  assert.match(axeCachePath(home), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
+  assert.equal(axeCached(home), null, 'nothing kept yet');
+  mkdirSync(dirname(axeCachePath(home)), { recursive: true });
+  writeFileSync(axeCachePath(home), 'not axe');
+  assert.equal(axeCached(home), null, 'a file that is not the pinned one does not count');
+  assert.match(readFileSync(join(ENGINE, 'install.sh'), 'utf8'), /node "\$CLONE_DIR\/a11y-check\.mjs" --fetch-axe \|\| true/);
+  assert.match(readFileSync(join(ENGINE, 'audit.mjs'), 'utf8'), /'a11y-check\.mjs'\), '--fetch-axe'\]/);
+});

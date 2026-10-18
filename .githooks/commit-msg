@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The commit message is public too: nothing private in it.
+# Install once in this repo: git config core.hooksPath .githooks
+exec node "$(git rev-parse --show-toplevel)/.githooks/private-check.mjs" --message "$1"

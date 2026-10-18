@@ -1,0 +1,91 @@
+{
+  "_note": "Copy this file to your project root as ds-config.json and fill in your values.",
+
+  "figmaFileKey": "YOUR_FILE_KEY",
+  "frames": [
+    { "name": "Screen / Plugin 1", "nodeId": "XXX-YYYYY" },
+    { "name": "Screen / Plugin 2", "nodeId": "XXX-YYYYY" }
+  ],
+
+  "_screens_note": "Optional. Reference SCREENS for the Markup gate (screen element completeness) - detail views / modals whose DS controls must each have a code counterpart. Falls back to frames[] when unset.",
+  "screens": [
+    { "name": "Detail view / Modal", "nodeId": "XXX-YYYYY", "plugin": "plugin-1" }
+  ],
+  "screenElementStrict": false,
+  "knownScreenElementExemptions": [],
+
+  "figma": {
+    "colorCollection": "Color",
+    "sizingCollection": "Sizing",
+    "primitivePrefix": "primitives/",
+
+    "_modes_note": "Define all your DS modes here. cssSelector values: 'root', 'dark-media', 'high-contrast-media', 'class:<name>', 'data:<attr>=<val>'",
+    "modes": [
+      { "name": "Light", "snapshotKey": "light", "cssSelector": "root" },
+      { "name": "Dark",  "snapshotKey": "dark",  "cssSelector": "dark-media" }
+    ],
+
+    "_legacy_note": "OR use the legacy two-mode shorthand (ignored when 'modes' is present):",
+    "_lightMode": "Light",
+    "_darkMode": "Dark"
+  },
+
+  "paths": {
+    "themeCSS": "src/theme.css",
+    "snapshotVars": "src/figma-vars.snapshot.json",
+    "snapshotStructure": "src/figma-structure.snapshot.json",
+    "pluginCSS": [
+      "src/ui.src.html"
+    ],
+    "plugins": []
+  },
+
+  "_rendered_note": "Gate: Renders correctly in a browser. Needs Chrome (or CHROME_PATH) and a built UI in paths.plugins. auto:true generates height checks per component from the snapshot (no hand-typed values); colorScheme sets the default light/dark. Hand-written RENDERED_ASSERTIONS in structure-contract.mjs still work and override.",
+  "rendered": { "auto": false, "colorScheme": "light" },
+
+  "_visual_note": "Directory for stored reference screenshots. Commit this dir to track visual history.",
+  "visualRefs": ".design-system-engine-refs",
+
+  "_webhook_note": "Config for webhook-server.mjs. Run setup-webhook.mjs to register with Figma.",
+  "webhook": {
+    "port": 3456,
+    "secret": "YOUR_WEBHOOK_SECRET"
+  },
+
+  "_guidelines_note": "Optional. Written guidelines for the design intent. sources = committed md/json files. source.notion = one page link (NOTION_TOKEN in .env). source.gitlab = wiki page or Markdown file links, gitlab.com or your own GitLab (GITLAB_TOKEN with read_api in .env for private projects, GITLAB_HOST for a company server).",
+  "guidelines": { "sources": [], "source": { "gitlab": [] } },
+
+  "knownUnusedVars": [],
+  "knownHardcodedExceptions": [],
+
+  "_htmlStructureClasses_note": "Gate: HTML structure. The CSS classes that mark a DS component on an interactive element in your plugin UI HTML (paths.plugins). List your own DS classes here; when omitted, component classes are not fingerprinted (element ids and icon references still are).",
+  "htmlStructureClasses": [],
+
+  "_componentProps_note": "Gate: Component props match Figma. Reads code props from Vue/React and compares to Figma property names. Usually needs no config (components are auto-resolved by base selector or name).",
+  "_componentFiles_note": "Optional: pins a Figma component to its source file (Figma component name -> path) and always wins. The engine pairs each component on its own (its name, its folder and file, a generic file name, its tokens); pin one the audit lists as a proposal to confirm.",
+  "componentFiles": {},
+  "_componentPropAliases_note": "Document intentional renames so they count as matches: Figma property name -> code prop name, per component.",
+  "componentPropAliases": {},
+  "_componentSrcDirs_note": "Optional dirs to scan for .vue/.tsx/.jsx component files (default: src, components, app, lib, packages).",
+  "componentSrcDirs": [],
+  "knownPropExceptions": [],
+  "_knownStateProps_note": "VARIANT properties that are state axes (map to CSS pseudo-classes, verified by Gate 11), not code props. Skipped by the component-props gate.",
+  "knownStateProps": ["State"],
+  "_composition_note": "Gate: Sub-components match Figma. knownCompositionExceptions exempts a parent/child pair (e.g. a sub-component intentionally not used yet).",
+  "knownCompositionExceptions": [],
+
+  "_icons_note": "Gate 14 inventory: every Figma icon has a code symbol. The icon set often lives in a SEPARATE library file with its own structure.",
+  "_iconLibraryFileKey_note": "File key of the Figma icon library (from its URL). With a token, the audit lists its /components on any plan.",
+  "iconLibraryFileKey": "",
+  "_icons_filters_note": "Match the library file's structure: page limits to one page; namePrefix strips a prefix; nameFrom 'last' keeps the last '/'-segment.",
+  "icons": { "page": "", "namePrefix": "", "nameFrom": "" },
+  "_iconSpritePrefix_note": "Prefix your code sprite ids use, e.g. '#icon-arrow-left' -> 'icon-'.",
+  "iconSpritePrefix": "icon-",
+  "knownUnimplementedIcons": [],
+
+  "_more_settings_note": "Optional. codeReading: the code capture (browser 'auto'|'off', capture 'off', timeoutSec, hookBrowser, extra pages, docgen, customElements, storybookIndex). styleguide: the living styleguide template and output (the capture builds its own copy from the template). frameworkComponents:false for markup-and-CSS design systems. gateTimeoutSec: stop a gate that runs longer (default 180). rtl: list declarations that would not mirror right to left. See 'More settings' in the guide.",
+  "codeReading": { "browser": "auto" },
+  "styleguide": { "template": "apps/styleguide/styleguide.template.html", "out": "apps/styleguide/index.html" },
+  "gateTimeoutSec": 180,
+  "rtl": false
+}

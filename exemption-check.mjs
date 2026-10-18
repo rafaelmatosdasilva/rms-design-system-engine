@@ -1,0 +1,272 @@
+// exemption-check.mjs - Gate [11]: verify every entry in EXPLICIT/SKIP_TOKENS/COVERED
+// still exists in the Figma snapshot and maps to a real CSS var with the correct value.
+//
+// Manually-maintained allowlists become stale when Figma renames a token. Stale entries
+// are phantom exemptions - the audit silently "passes" tokens that no longer exist.
+// This gate makes stale entries a hard fail so no hallucination can hide in an allowlist.
+//
+// Checks:
+//   A. EXPLICIT (color): token in snapshot + CSS var declared + value matches Figma
+//   B. SKIP_TOKENS: token still in snapshot (must exist to be worth skipping)
+//   C. COVERED: token in snapshot OR runtime walk data (bound/state)
+//   D. EXPLICIT_SIZING: token in sizing snapshot + CSS var declared + value matches
+//
+// Requires at project root:
+//   ds-config.json   - snapshot path, themeCSS
+//   design-system-engine-map.mjs   - EXPLICIT, SKIP_TOKENS, EXPLICIT_SIZING, COVERED, COVERED_STATE
+//
+// Exit 0 = all exemptions valid.  Exit 1 = stale/broken entry found.
+
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+import { loadModes, buildResolver } from './mode-resolver.mjs';
+import { loadCssSources } from './css-source.mjs';
+import { pathToFileURL } from 'url';
+import { projectPath } from './names.mjs';
+
+const ROOT = process.cwd();
+
+// ── Load ds-config.json ───────────────────────────────────────────────────────
+let cfg = {};
+try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch {
+  console.error('❌ ds-config.json not found.'); process.exit(1);
+}
+const SNAP_VARS  = cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json';
+const THEME_PATHS = [cfg.paths?.themeCSS ?? 'src/theme.css'].flat();
+const THEME_PATH  = THEME_PATHS[0];
+const PLUGIN_CSS = cfg.paths?.pluginCSS    ?? [];
+const PRIM_PFX   = cfg.figma?.primitivePrefix ?? 'primitives/';
+
+// ── Load design-system-engine-map.mjs ───────────────────────────────────────────────────────
+let EXPLICIT = {}, SKIP_TOKENS = new Set();
+let EXPLICIT_SIZING = {}, SIZING_SKIP = new Map();
+let COVERED = new Set(), COVERED_STATE = new Set(), COVERED_PREFIX = [];
+let PMAP = null;   // the imported design-system-engine-map module, reused below (avoids a second dynamic import)
+try {
+  PMAP = await import(pathToFileURL(join(ROOT, projectPath(ROOT, 'map'))).href);
+  const map = PMAP;
+  if (map.EXPLICIT)        EXPLICIT        = map.EXPLICIT;
+  if (map.SKIP_TOKENS)     SKIP_TOKENS     = map.SKIP_TOKENS;
+  if (map.EXPLICIT_SIZING) EXPLICIT_SIZING = map.EXPLICIT_SIZING;
+  if (map.SIZING_SKIP)     SIZING_SKIP     = map.SIZING_SKIP;
+  if (map.COVERED)         COVERED         = map.COVERED;
+  if (map.COVERED_STATE)   COVERED_STATE   = map.COVERED_STATE;
+  if (map.COVERED_PREFIX)  COVERED_PREFIX  = map.COVERED_PREFIX;
+} catch {
+  console.log('⏭  no design-system-engine-map.mjs - no exception list to check.\n');
+  process.exit(0);
+}
+
+// ── Load snapshot ─────────────────────────────────────────────────────────────
+let snap;
+try { snap = JSON.parse(readFileSync(join(ROOT, SNAP_VARS), 'utf8')); } catch {
+  console.log(`⏭  ${SNAP_VARS} not found or unreadable - exemption check skipped`);
+  process.exit(0);
+}
+// Compare colours by canonical hex (expand #rgb/#rgba shorthand) so #fff === #ffffff.
+const _hex = (h) => { let x = String(h).replace(/^#/, '').toLowerCase(); if (x.length === 3 || x.length === 4) x = x.split('').map(c => c + c).join(''); return x; };
+// Token universe = every token in every mode's color map + sizing (mode-agnostic).
+const _modeKeys = loadModes(cfg).map(m => m.snapshotKey);
+const snapTokens = new Set([
+  ..._modeKeys.flatMap(k => Object.keys(snap.color?.[k] ?? {}).map(t => t.replace(/\/color$/, ''))),
+  ...Object.keys(snap.sizing ?? {}),
+]);
+
+// Runtime walk tokens (transient - may be absent; only checked when present).
+// _-prefixed keys are metadata (_updated stamp), not tokens.
+const readTokenKeys = (file) => {
+  if (!existsSync(join(ROOT, file))) return null;
+  const parsed = JSON.parse(readFileSync(join(ROOT, file), 'utf8'));
+  const keys = Array.isArray(parsed) ? parsed : Object.keys(parsed);   // both shapes are valid
+  return new Set(keys.filter(t => !String(t).startsWith('_')));
+};
+const boundTokens = readTokenKeys('bound-tokens.json');
+const stateTokens = readTokenKeys('component-state-tokens.json');
+const runtimeTokens = new Set([...(boundTokens ?? []), ...(stateTokens ?? [])]);
+
+// ── Collect declared CSS vars (all token files merged) ───────────────────────
+const declared = new Set();
+const sources = [...THEME_PATHS, ...PLUGIN_CSS].filter(f => existsSync(join(ROOT, f)));
+for (const f of sources) {
+  const txt = readFileSync(join(ROOT, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of txt.matchAll(/--([a-zA-Z][a-zA-Z0-9-]*)\s*:/g)) declared.add('--' + m[1]);
+}
+
+// Case-insensitive index + component-code usage, so a mapped var declared under a
+// different case, or runtime-injected (its token CSS loaded from a backend at run
+// time, so absent from every static file), is not falsely reported "not declared".
+// Mirrors parity-check. `declared` already spans all scopes (whole-file scan), so
+// component-scoped mappings are covered here without extra work.
+const declaredLower = new Map([...declared].map(n => [n.toLowerCase(), n]));
+const usedVarsLower = new Set();
+(function scanUsedVars() {
+  const dirs = [cfg.componentSrcDirs].flat().filter(Boolean);
+  if (!dirs.length) return;
+  const EXT = /\.(vue|css|scss|sass|less|html|ts|tsx|js|jsx)$/i;
+  const walk = (dir, depth = 0) => {
+    if (depth > 8) return;
+    let entries; try { entries = readdirSync(join(ROOT, dir)); } catch { return; }
+    for (const e of entries) {
+      if (e === 'node_modules' || e === '.git' || e === 'dist') continue;
+      const rel = join(dir, e); let st; try { st = statSync(join(ROOT, rel)); } catch { continue; }
+      if (st.isDirectory()) walk(rel, depth + 1);
+      else if (EXT.test(e) && st.size < 2_000_000) {
+        try { for (const mm of readFileSync(join(ROOT, rel), 'utf8').matchAll(/var\(\s*(--[a-zA-Z][a-zA-Z0-9-]*)/g)) usedVarsLower.add(mm[1].toLowerCase()); } catch {}
+      }
+    }
+  };
+  for (const d of [cfg.componentSrcDirs].flat().filter(Boolean)) walk(d);
+})();
+// How a mapped var is declared: 'declared' (static, returns its real-case name),
+// 'runtime' (used in code but not static), or 'missing' (genuinely absent -> broken).
+function mappedVar(cssVar) {
+  if (declared.has(cssVar)) return { name: cssVar, status: 'declared' };
+  const ci = declaredLower.get(cssVar.toLowerCase());
+  if (ci) return { name: ci, status: 'declared' };
+  if (usedVarsLower.has(cssVar.toLowerCase())) return { name: cssVar, status: 'runtime' };
+  return { name: cssVar, status: 'missing' };
+}
+
+// ── CSS color resolver (shared, N-mode) ───────────────────────────────────────
+// Primitive scale + modes from design-system-engine-map.mjs / ds-config.json - no hardcoded light/dark.
+const NL = PMAP?.NEUTRAL_LIGHT ?? {};
+const ND = PMAP?.NEUTRAL_DARK  ?? {};
+const NEUTRAL_MAPS = PMAP?.NEUTRAL_MAPS ?? null;
+const NEUTRAL_VAR_RE = PMAP?.NEUTRAL_VAR_RE ?? /^--neutral-(\d+)$/;
+const MODES = loadModes(cfg);
+
+// The theme files as sources, local @import followed (css-source.mjs, shared with the code capture).
+const rawCss = loadCssSources(ROOT, THEME_PATHS).files;
+const { resolve, rootVars } = buildResolver(rawCss, MODES, { NL, ND, NEUTRAL_MAPS, NEUTRAL_VAR_RE });
+function resolveScalar(varName, depth = 0) {   // sizing (single-mode) resolver - reuses :root vars
+  if (depth > 8) return null;
+  const raw = rootVars[varName]; if (!raw) return null;
+  const t = raw.trim();
+  const v = t.match(/^var\((--.+?)\)$/);
+  if (v) return resolveScalar(v[1], depth + 1);
+  return t;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function inSnapshot(token) {
+  const t = token.replace(/\/color$/, '');
+  return snapTokens.has(t) || snapTokens.has(t + '/color');
+}
+function inRuntime(token) {
+  const t = token.replace(/\/color$/, '');
+  return runtimeTokens.has(t) || runtimeTokens.has(t + '/color');
+}
+// Tokens that are legitimately absent from the snapshot (Figma-native, plugin-only, etc.)
+// Projects can extend this via ds-config.json → exemptionCheck.alwaysNative
+const NATIVE_PATTERNS = [
+  ...(cfg.exemptionCheck?.alwaysNative ?? []),
+];
+function isKnownNative(token) {
+  if (token.startsWith(PRIM_PFX)) return true;
+  if (COVERED_PREFIX.some(p => token.startsWith(p))) return true;
+  return NATIVE_PATTERNS.some(p => token === p || token.startsWith(p + '/'));
+}
+
+// ── Evaluate ──────────────────────────────────────────────────────────────────
+const STALE = [], BROKEN = [], OK = [];
+
+// A - EXPLICIT (color)
+for (const [token, cssVar] of Object.entries(EXPLICIT)) {
+  if (isKnownNative(token)) { OK.push(`EXPLICIT [native] ${token}`); continue; }
+  if (!inSnapshot(token) && !inRuntime(token)) {
+    STALE.push({ section: 'EXPLICIT', token, reason: 'not in snapshot or runtime walk - token may have been renamed in Figma' });
+    continue;
+  }
+  if (cssVar === null) { OK.push(`EXPLICIT [null-skip] ${token}`); continue; }
+  const mv = mappedVar(cssVar);
+  if (mv.status === 'missing') {
+    BROKEN.push({ section: 'EXPLICIT', token, cssVar, reason: 'mapped CSS var not declared in theme.css' });
+    continue;
+  }
+  if (mv.status === 'runtime') { OK.push(`EXPLICIT [runtime-injected] ${token}`); continue; }
+  const actualVar = mv.name;   // real declared name (handles a differing case)
+  let broke = false;
+  for (const m of MODES) {
+    const mode = m.snapshotKey;
+    const figmaHex = snap.color?.[mode]?.[token] ?? snap.color?.[mode]?.[token + '/color'] ?? null;
+    if (!figmaHex) continue;
+    const cssHex = resolve(actualVar, mode);
+    if (cssHex && _hex(figmaHex) !== _hex(cssHex)) {
+      BROKEN.push({ section: 'EXPLICIT', token, cssVar: actualVar, mode, reason: `value mismatch - Figma: ${figmaHex}, CSS: ${cssHex}` });
+      broke = true;
+    }
+  }
+  if (!broke) OK.push(`EXPLICIT ${token}`);   // a mismatched token belongs only under BROKEN, not also VALID
+}
+
+// B - SKIP_TOKENS
+for (const token of SKIP_TOKENS) {
+  if (isKnownNative(token)) { OK.push(`SKIP [native] ${token}`); continue; }
+  if (!inSnapshot(token)) {
+    STALE.push({ section: 'SKIP_TOKENS', token, reason: 'not in snapshot - token may have been renamed or removed in Figma' });
+  } else {
+    OK.push(`SKIP ${token}`);
+  }
+}
+
+// C - COVERED (union of COVERED + COVERED_STATE)
+const allCovered = new Set([...COVERED, ...COVERED_STATE]);
+for (const token of allCovered) {
+  if (isKnownNative(token)) { OK.push(`COVERED [native] ${token}`); continue; }
+  if (!inSnapshot(token) && !inRuntime(token)) {
+    STALE.push({ section: 'COVERED', token, reason: 'not in snapshot or runtime walk - may be a phantom exemption' });
+  } else {
+    OK.push(`COVERED ${token}`);
+  }
+}
+
+// D - EXPLICIT_SIZING
+for (const [token, cssVar] of Object.entries(EXPLICIT_SIZING)) {
+  if (!snap.sizing?.[token]) {
+    if (!SIZING_SKIP.has(token)) {
+      STALE.push({ section: 'EXPLICIT_SIZING', token, reason: 'not in sizing snapshot - token may have been renamed in Figma' });
+    } else {
+      OK.push(`EXPLICIT_SIZING [skip] ${token}`);
+    }
+    continue;
+  }
+  const mv = mappedVar(cssVar);
+  if (mv.status === 'missing') {
+    BROKEN.push({ section: 'EXPLICIT_SIZING', token, cssVar, reason: 'mapped CSS var not declared' });
+    continue;
+  }
+  if (mv.status === 'runtime') { OK.push(`EXPLICIT_SIZING [runtime-injected] ${token}`); continue; }
+  const actualVar = mv.name;
+  const figmaVal = snap.sizing[token];
+  const cssVal   = resolveScalar(actualVar);
+  if (cssVal && String(figmaVal).trim() !== cssVal.trim()) {
+    BROKEN.push({ section: 'EXPLICIT_SIZING', token, cssVar: actualVar, reason: `value mismatch - Figma: ${figmaVal}, CSS: ${cssVal}` });
+  } else {
+    OK.push(`EXPLICIT_SIZING ${token}`);
+  }
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+console.log(`\n✅ VALID     ${OK.length}`);
+console.log(`🚨 STALE     ${STALE.length}  (phantom exemptions - token no longer in DS)`);
+console.log(`❌ BROKEN    ${BROKEN.length}  (CSS var missing or value mismatch)`);
+
+if (STALE.length) {
+  console.log('\n─── Phantom exemptions (update design-system-engine-map.mjs) ──────────────────');
+  for (const e of STALE) console.log(`  🚨 [${e.section}] ${e.token}\n      ${e.reason}`);
+}
+if (BROKEN.length) {
+  console.log('\n─── Broken mappings (CSS var wrong or missing) ──────────────────');
+  for (const e of BROKEN) {
+    console.log(`  ❌ [${e.section}] ${e.token}${e.cssVar ? ' → ' + e.cssVar : ''}`);
+    console.log(`      ${e.reason}`);
+  }
+}
+
+if (STALE.length === 0 && BROKEN.length === 0) {
+  console.log('\nAll exemption entries are valid and grounded in the current DS snapshot. ✓\n');
+  process.exit(0);
+} else {
+  console.log('');
+  process.exit(1);
+}
