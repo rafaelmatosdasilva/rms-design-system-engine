@@ -3275,23 +3275,31 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (!rows.length) { svg.innerHTML = ''; return; }
       var gap = parseFloat(getComputedStyle(iso).getPropertyValue('--sg-space-xs')) || 4;
       var x0 = Math.max.apply(null, rows.map(function (r) { return r.x; })) + gap * 6;
+      // A layer picked lifts: the names keep the places they have at rest (only the leader lines follow the layer), and
+      // the drawing is not centred again, so nothing moves under the pointer.
+      // A layer is always picked: the places are kept per card size and spread (worked out once for each), never per pick.
+      var restKey = Math.round(box.width) + 'x' + Math.round(box.height) + ':' + (iso.getAttribute('data-state') || '');
+      var focused = iso._rest && iso._rest.key === restKey && !iso._centring;
+      if (focused) x0 = iso._rest.x0;
       // Always in the stack's order, the top layer first, whatever the state lifts.
       rows.sort(function (a, b) { return +b.c.getAttribute('data-z') - +a.c.getAttribute('data-z'); });
       var last = -1e9;
+      var ys = {};
       rows.forEach(function (r) {
-        var y = Math.max(r.y, last + r.h + gap); last = y;
+        var z = r.c.getAttribute('data-z'), y = focused && iso._rest.ys[z] != null ? iso._rest.ys[z] : Math.max(r.y, last + r.h + gap); last = y; ys[z] = y;
         r.c.style.left = f(x0) + 'px'; r.c.style.top = f(y) + 'px';
         var x2 = x0 - 3, mx = Math.max(r.x + 4, x2 - 10);
         out += '<g class="' + (r.c.getAttribute('data-z') === iso.getAttribute('data-focus') ? 'is-on' : '') + '"><polyline points="' + f(r.x) + ',' + f(r.y) + ' ' + f(mx) + ',' + f(r.y) + ' ' + f(x2) + ',' + f(y) + '"/><path d="M' + f(r.x - 4) + ' ' + f(r.y) + 'h8M' + f(r.x) + ' ' + f(r.y - 4) + 'v8"/></g>';
       });
+      if (!focused) iso._rest = { key: restKey, x0: x0, ys: ys };
       // The stack and its names together centred across the card: moved by what the names add on the right.
-      if (!iso._centring) {
+      if (!iso._centring && !focused) {
         var st = iso.querySelector('.sg-bk-dp-stack'), lo = 1e9, hi = -1e9;
         Array.prototype.forEach.call(iso.querySelectorAll('.sg-bk-dp-plane'), function (p) { var q = p.getBoundingClientRect(); lo = Math.min(lo, q.left - box.left); });
         rows.forEach(function (r) { hi = Math.max(hi, r.c.getBoundingClientRect().right - box.left); });
         var dx = box.width / 2 - (lo + hi) / 2;
         var room = box.width - gap * 8, span = hi - lo;
-        if (st && span > room + 1) { iso._fit = Math.max(0.4, (iso._fit || 1) * room / span * 0.96); st.style.scale = iso._fit.toFixed(3); iso._centring = true; dpLeads(iso); iso._centring = false; dpLeads(iso); return; }   /* too wide with its names: smaller, then centred again */
+        if (st && span > room + 1) { iso._fit = Math.max(0.4, (iso._fit || 1) * room / span * 0.96); st.style.scale = iso._fit.toFixed(3); iso._centring = true; dpLeads(iso); iso._centring = false; iso._rest = null; dpLeads(iso); return; }   /* too wide with its names: smaller, then centred again */
         if (st && Math.abs(dx) > 1) { iso._dx = (iso._dx || 0) + dx; st.style.translate = Math.round(iso._dx) + 'px 0'; iso._centring = true; dpLeads(iso); iso._centring = false; return; }
       }
       svg.innerHTML = out;
