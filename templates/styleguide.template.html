@@ -1341,7 +1341,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 [data-sg-scheme="dark"] .sg-bk-dp-scene[data-focus] > i:not(.is-on) { opacity: .15; }
 .sg-bk-dp-scene[data-focus] > i.is-on { outline: calc(var(--bk-line-w, 1px) * 2) solid var(--dp-hue); outline-offset: calc(var(--bk-line-w, 1px) * -2); z-index: 1; }   /* the layer in focus outlined in the hue: a surface as dark as the page still reads as picked */   /* dark surfaces barely part from a dark page: dimmer there */
 .sg-bk-dp-iso { position: relative; display: grid; place-items: center; min-height: 0; perspective: calc(var(--sg-space-xxl) * 60); }   /* the same stack, pulled apart: one plane per height */
-.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.5)) scale(calc(1 - var(--dp-ex, 1.5) * .11)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
+.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move), translate var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.5)) scale(calc(1 - var(--dp-ex, 1.5) * .11)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
 .sg-bk-dp-plane { position: absolute; inset: 0; container-type: size; border-radius: calc(var(--bk-rad, var(--sg-radius)) * var(--dp-k, 1)); transform: translateZ(calc(var(--z) * var(--sg-space-xxl) * var(--dp-ex, 1.5) + var(--dp-pop, 0px))); transition: transform var(--sg-move), opacity var(--sg-move), outline-color var(--sg-move); }
 .sg-bk-dp-iso { background-image: linear-gradient(color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0), linear-gradient(90deg, color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0); background-size: var(--sg-space-xl) var(--sg-space-xl); }   /* a blueprint's faint grid, neutral */
 .sg-bk-dp-idx { opacity: .6; margin-right: var(--sg-space-s); font-variant-numeric: tabular-nums; }   /* each layer's index, as a drawing numbers its parts */
@@ -1508,6 +1508,9 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 .sg-link-pill > .pg-par-status { margin: 0; }
 .sg-tk-table .sg-token-swatch { display: inline-block; vertical-align: middle; flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0 var(--sg-space-s) 0 0; border-radius: var(--sg-radius-s); }   /* one swatch size everywhere in the table, as in Figma */
 .sg-tk-alias > .sg-token-swatch, .sg-tk-name > .sg-token-swatch { margin: 0; }
+/* A colour inside a link pill, wherever the pill is (a table, a panel): the same small circle. */
+.sg-link-pill > .sg-token-swatch { flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0; border-radius: 50%; }
+.sg-tk-facts th[scope="row"] { width: 30%; position: static; font-weight: var(--sg-text-weight); color: var(--sg-muted); }
 .sg-tk-alias > .sg-tk-mark { width: var(--sg-space-l); height: var(--sg-space-l); }
 .sg-tk-table tr[data-token] { cursor: pointer; }   /* the whole row opens the token's details, as a Status row opens its component */
 .sg-tk-table tr[data-token]:hover > td { background: var(--sg-a2); }
@@ -3988,6 +3991,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // name and line in the hue, its shadow's tokens below; a name picked holds it. Still, with reduced motion: the top.
       clearInterval(bkOut._dpTimer);
       var dpIso = bkOut.querySelector('.sg-bk-dp-iso');
+      // Where the stack sits: centred in the view while no layer is in focus; with one, centred in what the layer's text
+      // below leaves, so the text has its room. Measured from the planes as drawn, moved by the difference.
+      var dpPlace = function () {
+        var st = dpIso && dpIso.querySelector('.sg-bk-dp-stack'); if (!st) return;
+        var ir = dpIso.getBoundingClientRect(); if (!ir.height) return;
+        var ps = Array.prototype.map.call(dpIso.querySelectorAll('.sg-bk-dp-plane'), function (x) { return x.getBoundingClientRect(); }).filter(function (r) { return r.height; });
+        if (!ps.length) return;
+        var top = Math.min.apply(null, ps.map(function (r) { return r.top; })), bot = Math.max.apply(null, ps.map(function (r) { return r.bottom; }));
+        var tr = getComputedStyle(st).translate, cur = tr && tr !== 'none' ? parseFloat(tr.split(' ')[1] || '0') || 0 : 0;
+        var spec = dpIso.hasAttribute('data-focus') ? dpIso.querySelector('.sg-bk-dp-spec:not([hidden])') : null;
+        var room = spec ? spec.getBoundingClientRect().height + (parseFloat(getComputedStyle(dpIso).getPropertyValue('--sg-space-l')) || 0) : 0;
+        var want = Math.max(ir.top, ir.top + (ir.height - room - (bot - top)) / 2);   // never cut at the top, where the view is too short for both
+        st.style.translate = '0 ' + Math.round(cur + want - top) + 'px';
+      };
+      if (dpIso && typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { dpPlace(); }).observe(dpIso);
       if (dpIso) {
         var dpFocus = function (z) {
           bkOut._dpFocus = z;
@@ -3997,6 +4015,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           dpIso.querySelectorAll('.sg-bk-dp-spec').forEach(function (t) { t.hidden = +t.getAttribute('data-z') !== z; });
           if (dpSc) { if (z == null || z < 0) dpSc.removeAttribute('data-focus'); else dpSc.setAttribute('data-focus', z); dpSc.querySelectorAll(':scope > i').forEach(function (i) { i.classList.toggle('is-on', +i.getAttribute('data-z') === z); }); }
           dpLeads(dpIso);
+          dpPlace();
         };
         // The preview and the exploded view are one: a surface clicked in either picks its layer in both (the page
         // itself, a click on the preview between its surfaces), and holds it.
@@ -4162,7 +4181,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         r.labels.map(function (l, i) { return tkCell(r, l, i); }).join('') + '</tr></tbody></table></div>';
       var det = m.querySelector('.sg-tk-detail');
       det.innerHTML = sidePanelPage({ crumbs: trailHere(from).concat([r.coll || 'Tokens']).concat(r.path.slice(0, -1)), title: r.path[r.path.length - 1], sub: r.t.figma, body:
-        '<dl class="pg-updated">' + row('What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)) + row('In the code', r.t.var ? '<code>' + esc(r.t.var) + '</code> <button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button>' : '<span class="pg-missing">Not in the code</span>') + row('What it is for', r.t.description ? esc(r.t.description) : '') + '</dl>' +
+        // What it is, in a card's table as every part of a panel is: what it styles, its name in the code, what it is for.
+        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Token</div><table class="pg-par-table sg-tk-facts"><tbody>' + [['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<code>' + esc(r.t.var) + '</code> <button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']].map(function (x) { return '<tr><th scope="row">' + esc(x[0]) + '</th><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Values</div>' + vals + '</div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Used by ' + plural(comps.length, 'component', 'components') + '</div>' + usersTable(comps) + '</div>' });
       // The table's head stuck under the panel's head as the panel scrolls.
