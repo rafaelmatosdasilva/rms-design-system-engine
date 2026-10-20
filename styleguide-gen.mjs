@@ -688,6 +688,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // Its intent-layer page, read from the layer's snapshot itself, so a style guide built on its own (--styleguide)
       // has it without the design intent being written again.
       const ilMod = await import('./intent-layer.mjs');
+      // Read again where it lives first (GitLab): nothing is fetched while its commit has not moved, and when it cannot be
+      // read the copy kept is used and said, never silently.
+      if (hasLayer && !opts.offline) { try { for (const r of await ilMod.syncSources(ROOT, cfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
       const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
       const ilMatch = ilSnap ? ilMod.matchComponents(view.components.map((c) => c.name), ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
       for (const c of view.components) {

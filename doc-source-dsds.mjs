@@ -37,7 +37,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 2;
+export const READER = 3;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -120,6 +120,10 @@ function pointer(obj, frag) {
 
 // The code file an entity names, in any of its extensions ({ "<vendor>": { "sourcePath": "…" } }).
 function codeFileOf(entity) {
+  // DSDS 0.23: the files it is made from (sourceFiles), its component file first.
+  const files = (entity?.sourceFiles ?? []).map((f) => (typeof f === 'string' ? f : f?.file ?? f?.path ?? f?.href ?? '')).filter(Boolean);
+  const code = files.find((f) => /\.(vue|jsx?|tsx?|svelte)$/i.test(f)) ?? null;
+  if (code) return code;
   for (const v of Object.values(entity?.$extensions ?? {})) {
     const p = v && typeof v === 'object' ? (v.sourcePath ?? v.source ?? v.path) : null;
     if (typeof p === 'string' && p.trim()) return p.trim();
@@ -127,11 +131,21 @@ function codeFileOf(entity) {
   return null;
 }
 
+// A rule a page takes from the system's shared ones (DSDS 0.23: refs [{ to: "<shared id>#<item id>" }]): its words.
+function sharedStatement(refs, shared) {
+  for (const r of refs ?? []) {
+    const [sid, iid] = String(r?.to ?? '').split('#');
+    const block = (shared ?? []).find((b) => b?.id === sid);
+    for (const sec of block?.sections ?? []) for (const it of sec?.items ?? []) if (!iid || it?.id === iid) { if (it?.statement) return { text: it.statement, level: it.level ?? null }; }
+  }
+  return { text: '', level: null };
+}
+
 // One entity as the engine reads it. file: its path in the project.
-export function entityView(entity, file, group = '') {
+export function entityView(entity, file, group = '', shared = null) {
   const kind = String(entity?.kind ?? '').trim() || 'entity';
   const view = {
-    kind, layer: layerOf(kind, group), name: String(entity?.name ?? entity?.identifier ?? '').trim(), id: entity?.identifier ?? null,
+    kind, layer: layerOf(kind, group), name: String(entity?.name ?? entity?.identifier ?? entity?.id ?? '').trim(), id: entity?.identifier ?? entity?.id ?? null,
     status: null, file, code: codeFileOf(entity), summary: null,
     purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [],
     facts: [], repeated: 0,   // what was left out: the sections that are facts (by title), the lines repeated on every page
@@ -141,7 +155,15 @@ export function entityView(entity, file, group = '') {
   if (summary) view.summary = summary;
   let statusLine = null;
   const casesPurpose = [];   // a use-cases block's purpose: after what the sections say it is for
-  const blocks = [...(entity?.documentBlocks ?? []), ...(entity?.agentDocumentBlocks ?? [])];
+  // DSDS 0.15 writes documentBlocks; 0.23 writes sections: a section's freeform parts read as 0.15's sections, its
+  // guidelines (a rule each, a shared one through its ref) as a checklist.
+  const v23 = (entity?.sections ?? []).flatMap((x) => {
+    if (!x || typeof x !== 'object') return [];
+    if (x.kind === 'guidelines') return [{ kind: 'checklist', title: x.title, items: (x.items ?? []).map((it) => { const sh = it?.statement ? null : sharedStatement(it?.refs, shared); return { label: it?.statement ?? sh.text, level: it?.level ?? sh?.level ?? null }; }) }];
+    if (x.kind === 'section') return [{ kind: 'sections', items: (x.freeform ?? []).concat(x.body || x.content ? [{ title: x.title, body: x.body ?? x.content }] : []) }];
+    return [x];
+  });
+  const blocks = [...(entity?.documentBlocks ?? []), ...(entity?.agentDocumentBlocks ?? []), ...v23];
   for (const b of blocks) {
     if (!b || typeof b !== 'object') continue;
     if (b.kind === 'sections' || b.kind === 'section') {
@@ -172,7 +194,8 @@ export function entityView(entity, file, group = '') {
   }
   view.purpose.push(...casesPurpose);
   if (desc) view.purpose.push(desc);
-  view.status = statusLine ?? entity?.metadata?.status ?? null;
+  const st = entity?.metadata?.status;
+  view.status = statusLine ?? (st && typeof st === 'object' ? st.status ?? null : st) ?? null;
   return view;
 }
 
@@ -190,6 +213,30 @@ export function readDsds(files, entry = null) {
   };
   const index = entry ? files.get(entry) : null;
   let system = null;
+  // DSDS 0.23: the index has entries (the system's own), shared rules and refs to each page's file; a page file is one
+  // entry ({ kind, id, … }) or several ({ entries: [] }), its group the folder it is in (components, patterns…).
+  if (index && (index.entries || index.refs)) {
+    const shared = index.shared ?? [];
+    const sys = (index.entries ?? []).find((e) => e?.kind === 'system') ?? {};
+    const sections = [];
+    for (const x of sys.sections ?? []) {
+      if (x?.kind === 'guidelines') for (const it of x.items ?? []) { const t = it?.statement ?? sharedStatement(it?.refs, shared).text; if (t) sections.push({ title: x.title ?? 'Guidelines', text: `- ${t}${it?.level ? ` (${it.level})` : ''}` }); }
+      if (x?.kind === 'section') for (const f of x.freeform ?? []) if (f?.title && f?.body) sections.push({ title: String(f.title), text: String(f.body).trim() });
+    }
+    system = { name: sys.name ?? index.name ?? null, version: sys.metadata?.version ?? null, dsds: index.schemaVersion ?? null, sections };
+    const base = posix.dirname(entry);
+    const one = (e, file, group) => { if (e && typeof e === 'object' && e.kind && e.kind !== 'system') { const key = `${file}#${e.id ?? e.name}`; if (!seen.has(key)) { seen.add(key); entities.push(entityView(e, file, group, shared)); } } };
+    for (const r of index.refs ?? []) {
+      const href = typeof r === 'string' ? r : r?.href; if (!href) continue;
+      const file = posix.normalize(posix.join(base, href)), doc = files.get(file);
+      const group = posix.relative(base, file).split('/')[0] ?? '';
+      if (doc?.entries) for (const e of doc.entries) one(e, file, group); else one(doc, file, group);
+    }
+    for (const e of index.entries ?? []) one(e, entry, '');
+    // Pages the index does not list, in the folder it is in: read too.
+    if (!entities.length) for (const [file, doc] of files) if (file !== entry && (doc?.kind || doc?.entries)) { const group = posix.relative(base, file).split('/')[0] ?? ''; if (doc.entries) doc.entries.forEach((e) => one(e, file, group)); else one(doc, file, group); }
+    return { system, entities };
+  }
   if (index) {
     const info = index.systemInfo ?? {};
     const sections = [];
