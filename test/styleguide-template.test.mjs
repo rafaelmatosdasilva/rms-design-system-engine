@@ -570,10 +570,19 @@ test('in the browser: no script error, a control changes the real component, the
       }
       await new Promise((r) => setTimeout(r, 400));
       const at = await run(`(() => { const card = ${pick}; const bars = [...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head, ${sel} .pg-par-sum')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky'); const low = Math.max(0, ...bars.map((e) => e.getBoundingClientRect().bottom)); const own = card.querySelector(':scope > .pg-inspect-head'), head = own ? own.getBoundingClientRect() : { top: low, bottom: low }, th = card.querySelector('thead th'); const probe = document.createElement('div'); probe.style.height = 'var(--sg-stick-gap)'; card.appendChild(probe); const gap = probe.getBoundingClientRect().height; probe.remove(); const r = { card: card.getBoundingClientRect().top < low, head: own ? Math.round(head.top - low - gap) : 0, th: th ? Math.round(th.getBoundingClientRect().top - (own ? head.bottom : low + gap)) : 0 }; document.body.style.paddingBottom = ''; window.scrollTo(0, 0); return r; })()`);
-      // (every stuck head keeps the page's stick gap under what sticks above it, painted with the page)
-      assert.deepEqual(at, { card: true, head: 0, th: 0 }, `${sel}: the card scrolled past the top, its head under the page's bars, the table's head under it`);
+      // (every stuck head keeps the page's stick gap under what sticks above it, painted with the page; and each stuck
+      // bar tucks one pixel under the one above it, so nothing scrolling shows between them, whatever the rounding)
+      assert.equal(at.card, true, `${sel}: the card scrolled past the top`);
+      assert.ok(at.head === 0 || at.head === -1, `${sel}: its head right under the page's bars, at most a pixel under their edge (${at.head})`);
+      assert.equal(at.th, -1, `${sel}: the table's head tucked a pixel under the card's head`);
     };
     await run(`location.hash = '#colors'`); await shownIs('colors'); await headsStick('#colors');
+    // Over tables the lowest stuck bar paints the page's gap under its line (where a table's head will stick); a page
+    // with no table (Identity) never has its content cut short under the line.
+    assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !!e && e.closest('.sg-section').id === 'colors' && e.classList.contains('sg-sticky-band'); })()`), true, 'over tables, the gap under the line');
+    await run(`location.hash = '#brand-kit'`); await shownIs('brand-kit');
+    await run(`window.scrollTo({ top: 1200, behavior: 'instant' })`); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !e || !e.classList.contains('sg-sticky-band'); })()`), true, 'no gap cut under the line on a page with no table');
     await run(`location.hash = '#c-chip/documentation'`); await shownIs('c-chip'); await headsStick('#c-chip');
     // The button as the system's script leaves it, a moment after it is drawn, and its focus ring drawn on ::after.
     await run(`location.hash = '#c-button/accessibility'`); await shownIs('c-button');
