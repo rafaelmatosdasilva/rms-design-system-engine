@@ -685,12 +685,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const left = notesOf(ilNow[c.name] ?? {}, intentText(c.description) || intentText(ilNow[c.name]?.design?.description) || null).left;
         if (left.length) c.notesLeft = left;
       }
+      // Its intent-layer page, read from the layer's snapshot itself, so a style guide built on its own (--styleguide)
+      // has it without the design intent being written again.
+      const ilMod = await import('./intent-layer.mjs');
+      const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
+      const ilMatch = ilSnap ? ilMod.matchComponents(view.components.map((c) => c.name), ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
       for (const c of view.components) {
-        const il = ilNow[c.name]?.intentLayer ?? null;
+        const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
         // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
         // the contract); the For agents page gathers every page of it apart.
         if (!il && hasLayer) c.intentLayer = { none: true };
-        if (il) c.intentLayer = { file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null };
+        if (il) c.intentLayer = { file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null, sections: il.sections ?? null, facts: il.facts ?? null, repeated: il.repeated ?? 0 };
         c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c), intentLayer: il });
       }
     } catch { /* no guidance */ }
@@ -714,13 +719,18 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { facts, props } = gr.readFacts(ROOT, cfg);
       if (Object.keys(facts.components).length) {
         const gl = ingestGuidelines(ROOT, cfg);
-        const rating = gr.rateGuidance(gr.sectionsFrom(gl, facts, gr.figmaWords(props)), facts);
+        // Figma's words and, when there is one, each component's intent-layer page: wherever the team wrote it.
+        const ilm = await import('./intent-layer.mjs');
+        const ilSnap = ilm.readIntentLayer(ROOT, cfg);
+        const words = gr.figmaWords(props);
+        for (const [n, t] of Object.entries(ilm.intentWords(ilSnap, Object.keys(facts.components), ilm.codeFilesOf(ROOT, cfg)))) words[n] = [words[n], t].filter(Boolean).join('\n');
+        const rating = gr.rateGuidance(gr.sectionsFrom(gl, facts, words), facts);
         const last = readJson(join(OUT_DIR, 'guidance-rating.json'));
         const extracted = Object.fromEntries((last?.components ?? []).filter((x) => typeof x.extracted === 'number').map((x) => [x.name, x.extracted]));
         const byName = new Map(rating.components.map((r) => [r.name, r]));
         for (const c of view.components) {
           const r = byName.get(c.name); if (!r) continue;
-          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total }, unknown: r.unknown, add: r.add, from: gl.sources.length ? gl.sources : ['Figma'], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
+          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total }, unknown: r.unknown, add: r.add, from: [...gl.sources, 'Figma', ...(ilSnap ? ['the intent layer'] : [])], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
         }
         view.agentRating = { cls: rating.cls, ready: rating.ready, partial: rating.partial, thin: rating.thin, total: rating.total };
       }

@@ -10,8 +10,9 @@ import { gzipSync } from 'node:zlib';
 import { makeFixture } from './helpers.mjs';
 import {
   intentLayerConfig, layerOf, keyOfTitle, itemsOf, entityView, readDsds, dropBoilerplate, matchComponents,
-  syncIntentLayer, readIntentLayer, componentIntent, useReport, describeSync, short,
+  syncIntentLayer, readIntentLayer, componentIntent, useReport, describeSync, short, intentWords,
 } from '../intent-layer.mjs';
+import { rateGuidance, sectionsFrom } from '../guidance-rating.mjs';
 import { generateIntent } from '../intent-gen.mjs';
 import { guidanceView } from '../styleguide-data.mjs';
 import { buildLlms } from '../contract-gen.mjs';
@@ -344,7 +345,7 @@ test('the prototype context: a component\'s page fills what it is for, the other
 
 test('componentIntent lists only what the page says', () => {
   const v = entityView({ kind: 'component', name: 'X', documentBlocks: [sections([['Intent', 'For x.']])] }, 'a/x.json');
-  assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null });
+  assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null, facts: null, repeated: 0 });
 });
 
 test('Figma\'s and the code\'s notes no agent is given: each with why, what to do and whether to remove it', () => {
@@ -366,4 +367,20 @@ test('Figma\'s and the code\'s notes no agent is given: each with why, what to d
   assert.equal(by.notShown.who, 'code');
   assert.equal(NOTES_SHOWN, 3);
   for (const l of left) assert.ok(l.why && l.fix && l.remove, l.reason);
+});
+
+test('the guidance rating reads a component\'s intent-layer page, so documenting it there counts as much as in Figma', async () => {
+  const { dir, cfg } = await project();
+  const snap = readIntentLayer(dir, cfg);
+  const words = intentWords(snap, COMPONENTS, CODE_FILES);
+  assert.match(words.buttonMain, /^Use the main button for the next step[\s\S]*When to use: At most one main button[\s\S]*When not to use: Do not use it for navigation\./);
+  assert.equal(words.iconOnly, undefined);
+  const facts = { components: Object.fromEntries(COMPONENTS.map((n) => [n, { props: [] }])), tokens: [] };
+  const rated = rateGuidance(sectionsFrom({ sections: [], general: '' }, facts, words), facts).components.find((r) => r.name === 'buttonMain');
+  assert.equal(rated.pieces.whenToUse, true);
+  assert.equal(rated.pieces.whenNotToUse, true);
+  // What was left out of its page travels with it, for the style guide to show.
+  const it = componentIntent(matchComponents(COMPONENTS, snap.entities, CODE_FILES).get('buttonMain'), snap._source);
+  assert.deepEqual(it.facts, ['Tokens Used']);
+  assert.ok(it.repeated > 0);
 });

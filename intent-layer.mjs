@@ -288,7 +288,22 @@ export function componentIntent(e, src) {
     mistakes: list(e.mistakes), limitations: list(e.limitations),
     rules: list(e.rules.map((r) => (r.level ? `${r.text} (${r.level})` : r.text))),
     sections: list(e.sections),
+    // What was left out of its page: the sections that are facts (by title), the lines repeated on every page.
+    facts: list(e.facts ?? []), repeated: e.repeated ?? 0,
   };
+}
+
+// Each component's page as text the guidance rating reads ("When to use: …" lines), so a component documented only in
+// the intent layer is rated on it. names: the components; → { name: text }
+export function intentWords(snap, names, codeFiles = {}) {
+  const out = {};
+  if (!snap) return out;
+  for (const [name, e] of matchComponents(names, snap.entities, codeFiles)) {
+    const lines = [...e.purpose.slice(0, 1), ...e.whenToUse.map((x) => `When to use: ${x}`), ...e.whenNotToUse.map((x) => `When not to use: ${x}`),
+      ...e.mistakes.map((x) => `Common mistake: ${x}`), ...e.limitations.map((x) => `Limitation: ${x}`), ...e.rules.map((r) => r.text), ...e.sections.map((x) => `${x.title}: ${x.text}`)];
+    if (lines.length) out[name] = lines.join('\n');
+  }
+  return out;
 }
 
 // One line of an index: its first sentence, at most n characters.

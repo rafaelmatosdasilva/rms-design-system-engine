@@ -1505,6 +1505,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 /* The For agents page: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
+.sg-il-read > summary { cursor: pointer; color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-il-read[open] > summary { margin-bottom: var(--sg-space-xs); }
 .sg-il-title { margin: var(--sg-space-l) 0 var(--sg-space-s); border: 0; background: none; padding: 0; font-size: var(--sg-m, 1rem); color: var(--sg-text, inherit); }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
@@ -2815,9 +2817,11 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   // Its Documentation, one row for each kind in the table every task shares: what was written (or that it is missing),
   // what to do and who writes it, and its status with where it was written. A component's own Documentation area lists
   // every kind, written or not; the Status page only the ones still to write, under the same numbers.
-  var GUIDE_HINT = 'Write it in Figma, as a line of the component\'s description that starts with its name (When to use: …), ' + (DATA.intentLayer ? 'on its page in the intent layer, under a section with that title, ' : '') + 'or in contract.authored.json under guidance.';
+  // Every place the engine reads it from, any one of them: the page shows each under its source.
+  var GUIDE_HINT = 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, under a section with that title (When to use, When not to use…); ' : '') +
+    'its description in Figma, as a line that starts with that title (When to use: …); the comment above its rule in the code, the same way; or contract.authored.json under guidance.';
   var WRITE_HOW = {
-    'What it is': 'Write it in Figma, as the component\'s description, or as its note in the code.',
+    'What it is': 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer (an Intent or Overview section), ' : '') + 'its description in Figma, or its note in the code.',
     'Do and don\'t': 'Add pictures of the right and the wrong use, in the references folder (do and dont) or as Figma frames named under examples in contract.authored.json.',
     Role: 'Write it in Figma, as an annotation on the component (Role: button), or in contract.authored.json under semantics.'
   };
@@ -2838,12 +2842,13 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   var agentRow = function (c) {
     var a = c.agentRating; if (!a || !AGENT_CLS[a.cls]) return null;
     var got = [['what', 'what it is'], ['whenToUse', 'when to use it'], ['whenNotToUse', 'when not to'], ['role', 'its role'], ['example', 'an example']].filter(function (p) { return (a.pieces || {})[p[0]]; }).map(function (p) { return p[1]; });
-    var written = '<p>' + esc(AGENT_CLS[a.cls][1]) + '. ' + (got.length ? 'An agent can read ' + esc(got.join(', ')) + '.' : 'An agent finds nothing about it yet.') +
+    var written = '<p class="pg-par-val">How much an agent that builds with the system can take from everything written about this component, wherever it is written (' + esc((a.from || []).join(', ')) + '): what it is, when to use it, when not to, its role, an example, and its properties by name.</p>' +
+      '<p>' + esc(AGENT_CLS[a.cls][1]) + '. ' + (got.length ? 'An agent can read ' + esc(got.join(', ')) + '.' : 'An agent finds nothing about it yet.') +
       (a.props && a.props.total ? ' ' + a.props.named + ' of ' + a.props.total + ' properties named.' : '') +
       (typeof a.extracted === 'number' ? ' The extraction test named ' + Math.round(a.extracted * 100) + '% of its options right.' : '') + '</p>' +
       ((a.add || []).length ? '<p class="pg-missing">Add ' + esc(a.add.join('; ')) + '.</p>' : '');
     return { key: c.name + '\u0000doc:agents', area: 'Documentation', kind: 'For agents', written: written,
-      todo: a.cls === 'ready' ? '' : esc('Write it in the component\'s section of your guidelines, headed with its exact name, or in its description in Figma.'), who: a.cls === 'ready' ? '' : WHO.figma,
+      todo: a.cls === 'ready' ? '' : esc('Add what is missing in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, ' : '') + 'its description in Figma, or a section of your guidelines headed with its exact name. It does not have to be Figma: each is read the same way.'), who: a.cls === 'ready' ? '' : WHO.person,
       st: AGENT_CLS[a.cls][0], rel: '', at: DATA.builtAt || null, src: (a.from || []).slice(0, 3) };
   };
   // Its page in the team's intent layer: the link, and its rules (what it is for, when and when not to use it are merged
@@ -2855,8 +2860,16 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       todo: esc('Write its page in the intent layer, named as the component is named in Figma.'), who: WHO.person, st: 'todo', rel: '', at: DATA.builtAt || null, src: [] };
     var said = ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules'].some(function (k) { var v = il[k]; return Array.isArray(v) ? v.length : !!v; });
     var link = il.url ? '<p><a class="sg-uses-link" href="' + esc(il.url) + '" target="_blank" rel="noopener">' + esc(il.file) + '</a></p>' : '<p>' + esc(il.file) + '</p>';
-    var rules = (il.rules || []).length ? '<p class="pg-par-val">Rules</p>' + paras(il.rules) : '';
-    return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + (said ? rules : '<p class="pg-missing">Its page says nothing an agent reads: the For agents page says why.</p>'),
+    // Everything read from its page, as the engine holds it, kind by kind; then what was left out and why.
+    var IL_READ = [['purpose', 'What it is for'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules']];
+    var listOf = function (v) { return Array.isArray(v) ? v : v ? [v] : []; };
+    var n = IL_READ.reduce(function (t, k) { return t + listOf(il[k[0]]).length; }, 0) + listOf(il.sections).length;
+    var body = IL_READ.map(function (k) { var l = listOf(il[k[0]]); return l.length ? '<p class="pg-par-val">' + esc(k[1]) + '</p>' + paras(l) : ''; }).join('') +
+      listOf(il.sections).map(function (x) { return '<p class="pg-par-val">' + esc(x.title) + ' (another section)</p>' + paras([x.text]); }).join('') +
+      (il.status ? '<p class="pg-par-val">Status</p>' + paras([il.status]) : '') +
+      (listOf(il.facts).length || il.repeated ? '<p class="pg-par-val">Left out</p>' + paras([].concat(listOf(il.facts).length ? [listOf(il.facts).join(', ') + ': facts the engine reads from Figma and the code'] : [], il.repeated ? [il.repeated + ' lines the same on every page of its kind'] : [])) : '');
+    var details = '<details class="sg-il-read"><summary>What was read from its page (' + n + (n === 1 ? ' line' : ' lines') + ')</summary>' + body + '</details>';
+    return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + details + (said ? '' : '<p class="pg-missing">Its page says nothing an agent reads: the For agents page says why.</p>'),
       todo: said ? '' : esc('See the For agents page for what to change on its page.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: ['The intent layer (' + il.file + ')'] };
   };
   // Its notes no agent is given (Figma's annotations, the code's notes): each with why, what to do, and whether to remove

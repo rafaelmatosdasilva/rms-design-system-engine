@@ -272,9 +272,17 @@ Where it is used: each component's `intentLayer` in `design-intent.json` (with i
 authored `whenNotToUse` first), and the prototype context (its own `intent` lines per component, its "when not
 to use" lines as never sentences the check holds; each pattern, template, page and flow page as a rule). In the
 style guide each component's Documentation merges it with Figma, the code and the contract, each line under its
-source with a link to its page, plus an Intent layer row (its page, its rules, or no page yet); the **For
+source with a link to its page, plus an Intent layer row: its page, and a What was read from its page you can open
+with every line the engine took from it, kind by kind, its other sections, its status and what was left out and why
+(or, with no page, one to write); the **For
 agents** page lists every page as used, thin or not used, with what the agents get and where, and for each part
 that reaches no agent why, what to change so it does, and whether to remove it. The audit prints the same counts.
+
+The **For agents** row of a component's Documentation rates how much an agent can take from everything written about
+it, wherever it is written (its intent-layer page, its Figma description and annotations, a guidelines section
+headed with its name): what it is, when to use it, when not to, its role, an example and its properties by name.
+Each source is read the same way, so what is missing can be written in whichever the team keeps; nothing has to be
+in Figma. `--guidance-rating` reads the same sources.
 
 The same page does it for Figma and the code: a component's Figma description, its When to use and When not to use
 lines and the contract reach the agents in full, while its notes (Figma annotations, the code's note and the

@@ -661,12 +661,16 @@ if (process.argv.includes('--guidance-rating')) {
   const { facts, props } = gr.readFacts(ROOT, gcfg);
   if (!Object.keys(facts.components).length) { console.log('No Figma components read yet: refresh the Figma data first, then rate the guidance against them.'); process.exit(0); }
   const gl = ingestGuidelines(ROOT, gcfg);
-  const view = gr.sectionsFrom(gl, facts, gr.figmaWords(props));
+  // Figma's words and each component's intent-layer page, when ds-config.json names one.
+  const ilm = await import('./intent-layer.mjs');
+  const words = gr.figmaWords(props);
+  for (const [n, t] of Object.entries(ilm.intentWords(ilm.readIntentLayer(ROOT, gcfg), Object.keys(facts.components), ilm.codeFilesOf(ROOT, gcfg)))) words[n] = [words[n], t].filter(Boolean).join('\n');
+  const view = gr.sectionsFrom(gl, facts, words);
   const rating = gr.rateGuidance(view, facts);
   let extraction = null;
   if (process.argv.includes('--extract')) {
     const qs = gr.extractionQuestions(facts);
-    const text = [gl.general, ...gl.sections.map((x) => `## ${x.heading}\n${x.body}`), ...Object.entries(gr.figmaWords(props)).map(([n, t]) => `## ${n} (Figma)\n${t}`)].filter(Boolean).join('\n\n');
+    const text = [gl.general, ...gl.sections.map((x) => `## ${x.heading}\n${x.body}`), ...Object.entries(words).map(([n, t]) => `## ${n}\n${t}`)].filter(Boolean).join('\n\n');
     if (!qs.length) console.log('No property with options to ask about: the extraction test has nothing to measure.');
     else {
       const asked = gr.askModel(gr.extractionPrompt(text, qs), gcfg.guidelines?.extract?.cmd ?? 'claude -p');
