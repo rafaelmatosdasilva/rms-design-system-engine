@@ -186,7 +186,12 @@ test('in the browser: no script error, a control changes the real component, the
   writeFileSync(join(dir, 'src', 'components', 'system.js'), "new MutationObserver(() => Promise.resolve().then(() => { for (const b of document.querySelectorAll('.button:not([aria-label])')) b.setAttribute('aria-label', 'Save now'); })).observe(document.body, { subtree: true, childList: true });");
   writeFileSync(join(dir, 'src', 'components', 'button.css'), readFileSync(join(dir, 'src', 'components', 'button.css'), 'utf8') + "\n.button { position: relative; }\n.button:focus-visible { outline: none; }\n.button::after { content: ''; position: absolute; inset: -3px; border-radius: inherit; }\n.button:focus-visible::after { outline: 2px solid var(--button-background); }\n");
   const cfg0 = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
-  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'] }));
+  // A module of the team's own, kept outside the system (styleguide.modules): a button beside the Theme choice that opens
+  // a side panel, built with the page's own helpers (window.SG).
+  mkdirSync(join(dir, 'tools', 'demo-module'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'demo-module', 'module.js'), "var bar = SG.themeBar(); bar.insertAdjacentHTML('beforeend', SG.sysButton('button', 'Demo', ' data-demo')); bar.querySelector('[data-demo]').addEventListener('click', function (e) { SG.openPanel({ id: 'demo-panel', title: 'Demo', crumbs: ['Theme'], body: '<p class=\"demo-body\">' + SG.esc('<b>Hello</b>') + '</p>', from: e.currentTarget }); });");
+  writeFileSync(join(dir, 'tools', 'demo-module', 'module.css'), '.demo-body { margin: 0; }');
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'], styleguide: { ...(cfg0.styleguide ?? {}), modules: ['tools/demo-module'] } }));
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
@@ -225,6 +230,12 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await shownIs('status'), 'status', 'the page opens on Status');
     assert.equal(await run(`document.querySelector('.sg-nav a[href="#index"]').hidden`), true, 'the index is not in the menu');
     assert.equal(await run(`!!document.querySelector('a.sg-card[href="#c-chip"] .sg-thumb .chip')`), true, 'the card shows the component itself');
+    // The module's button sits beside the Theme choice (made for it: this system has no brands), and opens its panel.
+    assert.equal(await run(`!!document.querySelector('#mode-controls .sg-brand-ctl [data-demo]') && !!document.querySelector('style[data-sg-module="demo-module"]')`), true, 'a module\'s button and styles are in the page');
+    await run(`document.querySelector('[data-demo]').click()`);
+    assert.deepEqual(await until(`(() => { const p = document.getElementById('demo-panel'); return p && !p.hidden ? [p.querySelector('h1, h2, .sg-panel-title') && p.querySelector('h1, h2, .sg-panel-title').textContent.trim(), p.querySelector('.demo-body').textContent] : null; })()`, Boolean), ['Demo', '<b>Hello</b>'], 'the module\'s panel opens with its title and body, its words escaped');
+    await run(`document.getElementById('demo-panel')._shut()`);
+    assert.equal(await until(`document.getElementById('demo-panel').hidden`, (v) => v === true), true, 'and closes');
     await run(`location.hash = '#c-chip'`);
     assert.equal(await shownIs('c-chip'), 'c-chip');
     await until(`document.querySelectorAll('.pg-preview').length`, (v) => v === 1);
@@ -645,7 +656,8 @@ test('"In use" shows the approved pictures of the system\'s own frames', { timeo
 
 test('the template\'s heading and paragraph rules reach only its own chrome, never a component in a preview', () => {
   const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
-  const css = tpl.slice(tpl.lastIndexOf('<style'), tpl.lastIndexOf('</style>')).replace(/\/\*[\s\S]*?\*\//g, '');
+  // The last <style> tag itself (a word that only starts like one, as a workbook's styleSheet the page writes, is not).
+  const css = tpl.slice([...tpl.matchAll(/<style[\s>]/g)].pop().index, tpl.lastIndexOf('</style>')).replace(/\/\*[\s\S]*?\*\//g, '');
   const top = (sel) => { const out = ['']; let depth = 0; for (const ch of sel) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && !depth) out.push(''); else out[out.length - 1] += ch; } return out.map((x) => x.trim()); };
   const selectors = (css.match(/[^{}]+\{/g) ?? []).flatMap((r) => top(r.slice(0, -1)));
   assert.ok(selectors.length > 50, 'the page\'s own stylesheet is read');

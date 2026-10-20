@@ -5488,15 +5488,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // and what the table only counts (what was read from a page) written out.
   function openRowPanel(id, from) {
     var d = ROW_DETAIL[id]; if (!d) return;
-    var r = d.r, m = document.getElementById('sg-row-panel');
-    if (!m) {
-      m = document.createElement('div'); m.id = 'sg-row-panel'; m.className = 'sg-comp-panel sg-comp-panel--wide'; m.hidden = true;
-      m.innerHTML = '<div class="sg-comp-panel-scrim" data-panel-close></div><div class="sg-comp-panel-box" role="dialog" aria-modal="true" aria-label="Row details" tabindex="-1"><button type="button" class="sg-btn sg-comp-panel-close" data-panel-close aria-label="Close">' + MX_COLLAPSE + '</button><div class="sg-tk-detail sg-row-detail"></div></div>';
-      (document.querySelector('.sg-layout') || document.body).appendChild(m);
-      m._shut = function () { m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
-      m.addEventListener('click', function (e) { if (e.target.closest('[data-panel-close]') || e.target.closest('.sg-row-detail a[href^="#"]')) m._shut(); });
-      m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.isTrusted) { e.stopPropagation(); m._shut(); } });
-    }
+    var r = d.r, m = panelShell('sg-row-panel', 'Row details');
     // Its title: what the row is about, its words alone (a criterion's tip, what it means, stays out of it).
     var tmp = document.createElement('div'); tmp.innerHTML = r.kind ? esc(r.kind) : r.kindHTML || '';
     Array.prototype.forEach.call(tmp.querySelectorAll('.sg-tip, [role="tooltip"], .sg-hidden-text'), function (x) { x.remove(); });
@@ -5541,6 +5533,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var trail = trailHere(from);
     if (comp && trail.indexOf(comp) < 0) trail.push(comp);
     det.innerHTML = sidePanelPage({ crumbs: trail.concat([d.area || 'Task', nr ? 'Task ' + nr : '']), title: title, titleTip: tipNode ? tipNode.outerHTML : '', body: body });
+    panelShow(m, from);
+  }
+  // The side panel from the right a row opens in (and a module's, window.SG.openPanel): its scrim, its close button,
+  // Escape, and the focus given back to what opened it.
+  function panelShell(id, label) {
+    var m = document.getElementById(id); if (m) return m;
+    m = document.createElement('div'); m.id = id; m.className = 'sg-comp-panel sg-comp-panel--wide'; m.hidden = true;
+    m.innerHTML = '<div class="sg-comp-panel-scrim" data-panel-close></div><div class="sg-comp-panel-box" role="dialog" aria-modal="true" aria-label="' + esc(label) + '" tabindex="-1"><button type="button" class="sg-btn sg-comp-panel-close" data-panel-close aria-label="Close">' + MX_COLLAPSE + '</button><div class="sg-tk-detail sg-row-detail"></div></div>';
+    (document.querySelector('.sg-layout') || document.body).appendChild(m);
+    m._shut = function () { m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
+    m.addEventListener('click', function (e) { if (e.target.closest('[data-panel-close]') || e.target.closest('.sg-row-detail a[href^="#"]')) m._shut(); });
+    m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.isTrusted) { e.stopPropagation(); m._shut(); } });
+    return m;
+  }
+  function panelShow(m, from) {
     m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
@@ -8513,10 +8520,31 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   if (skip) { skip.className += ' sg-btn'; skip.addEventListener('click', function (e) { e.preventDefault(); var h = document.getElementById(hashParts().id || homeId()); h = h && h.querySelector('h1, h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus(); } }); }
   window.addEventListener('resize', function () { underTitle(document.getElementById(hashParts().id || homeId())); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { underTitle(document.getElementById(hashParts().id || homeId())); });
+  // What a module (ds-config.json → styleguide.modules, inlined after this script) builds with: the page's own buttons,
+  // selects and side panel, the system's tokens, and the place beside the Theme choice (made when the system has no
+  // brands, so a module's control always has one).
+  window.SG = {
+    esc: esc, sysButton: sysButton, customSelect: customSelect, sidePanelPage: sidePanelPage,
+    tokens: TOKENS, allVars: DATA.allVars || [], brands: BRANDS, title: DATA.title || '',
+    openPanel: function (o) {
+      var m = panelShell(o.id || 'sg-module-panel', o.title || 'Panel');
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: o.crumbs || [], title: o.title || '', body: o.body || '' });
+      panelShow(m, o.from || document.activeElement);
+      if (o.onOpen) o.onOpen(m.querySelector('.sg-panel-body'), m);
+      return { el: m, close: function () { m._shut(); } };
+    },
+    themeBar: function () {
+      var bar = mount && mount.querySelector('.sg-brand-ctl');
+      if (!bar && mount) { bar = document.createElement('div'); bar.className = 'sg-brand-ctl'; mount.appendChild(bar); }
+      return bar || null;
+    },
+    on: function (type, fn) { document.addEventListener(type, fn); }
+  };
   route();
   document.documentElement.classList.add('sg-ready');   // drawn: the page shows, never its empty shell first
 })();
 </script>
 <!--{{SYSTEM_SCRIPTS}}-->
+<!--{{MODULES}}-->
 </body>
 </html>

@@ -30,6 +30,7 @@ import { findIconFolder, folderSymbols } from './icon-folder.mjs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
+import { homedir } from 'os';
 import { OUT_DIR } from './names.mjs';
 
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
@@ -1368,6 +1369,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const systemScripts = () => (Array.isArray(cfg.systemScripts) ? cfg.systemScripts : []).map((p) => {
     try { return `<script data-system-script="${String(p).replace(/"/g, '')}">\n${readFileSync(resolve(ROOT, p), 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`; } catch { return `<!-- systemScripts: ${String(p).replace(/--/g, '')} not found -->`; }
   }).join('\n');
+  // Modules (ds-config.json → styleguide.modules): folders kept outside the system and the engine, each with a module.js
+  // and an optional module.css, inlined last so each builds on the page's own helpers (window.SG): a button, a panel.
+  const modules = () => (Array.isArray(cfg.styleguide?.modules) ? cfg.styleguide.modules : []).map((p) => {
+    const dir = resolve(ROOT, String(p).replace(/^~(?=$|\/)/, homedir()));
+    const read = (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch { return null; } };
+    const js = read('module.js'), css = read('module.css'), name = basename(dir).replace(/[^\w-]/g, '');
+    if (js == null) return '<!-- styleguide.modules: a folder with no module.js -->';
+    return (css ? `<style data-sg-module="${name}">\n${css.replace(/<\/style/gi, '<\\/style')}\n</style>\n` : '') + `<script data-sg-module="${name}">\n${js.replace(/<\/script/gi, '<\\/script')}\n</script>`;
+  }).join('\n');
   // opts.partsOnly: what the page is made of, without writing it (a prototype draws with the same parts).
   if (opts.partsOnly) {
     const componentCss = await componentCSS();
@@ -1384,6 +1394,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     CHROME: () => chromeCSS(),
     ICON_SHEET: () => iconSheet(),
     SYSTEM_SCRIPTS: () => systemScripts(),
+    MODULES: () => modules(),
     // The WCAG 2.2 checks the page runs on every variant (wcag-page.js).
     WCAG_PAGE: async () => (await import('./wcag21.mjs')).WCAG_PAGE_SOURCE.replace(/<\/script/gi, '<\\/script'),
     USAGE: () => JSON.stringify(usageMap(intent)),
