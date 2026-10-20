@@ -5713,9 +5713,10 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     // An area's cell: its state, and when there is something to see, a small arrow that opens the component on that
     // area, filtered to what is to fix (or to decide).
     var areaCell = function (o, x, slug, label) {
-      var see = o.href && x.say !== 'N/A' && (x.fix || x.dec), st = x.fix ? 'todo' : x.dec ? 'check' : '', why = x.why || WHY[x.say];
+      var href = x.href !== undefined ? x.href : o.href;
+      var see = href && x.say !== 'N/A' && (x.fix || x.dec), st = x.st !== undefined ? x.st : x.fix ? 'todo' : x.dec ? 'check' : '', why = x.why || WHY[x.say];
       // An area with something open is a link to it: its state in a link pill, the page's one style for a link in a table.
-      var link = see ? '<button type="button" class="sg-link-pill sg-mx-go--cell" data-open="' + esc(o.href) + '" data-name="' + esc(o.name) + '" data-area="' + slug + '" data-filter="' + st + '" aria-label="Open ' + esc(o.name) + ' on ' + label + ', ' + esc(x.say) + '">' + pill(x.cls, x.say) + LINK_GO + '</button>' : '';
+      var link = see ? '<button type="button" class="sg-link-pill sg-mx-go--cell" data-open="' + esc(href) + '" data-name="' + esc(o.name) + '" data-area="' + slug + '" data-filter="' + st + '" aria-label="Open ' + esc(o.name) + ' on ' + label + ', ' + esc(x.say) + '">' + pill(x.cls, x.say) + LINK_GO + '</button>' : '';
       return '<td' + (see ? ' class="sg-mx-cell-go"' : '') + ' data-fix="' + (x.fix || 0) + '" data-dec="' + (x.dec || 0) + '" data-rank="' + rankOf(x.cls, x.say) + '" data-ok="' + (x.cls === 'match' ? 1 : 0) + '">' +
         (see ? (why ? '<span class="sg-mx-why">' + link + tipHTML(why, 'Why ' + x.say) + '</span>' : link) : why ? tipPill(x.cls, x.say, x.why) : pill(x.cls, x.say)) + '</td>';
     };
@@ -5765,6 +5766,13 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       if (!h.parts) return;
       var all = (h.family ? [] : [h]).concat(h.parts);
       h.par = worst(all.map(function (x) { return x.par; }), true); h.acc = worst(all.map(function (x) { return x.acc; })); h.doc = worst(all.map(function (x) { return x.doc; }));
+      // Each state opens the one that sets it (the part whose state the row shows), on what that one has to fix or
+      // decide, so the page it opens says the same word; one with no page of its own opens nothing.
+      ['par', 'acc', 'doc'].forEach(function (k) {
+        var from = all.reduce(function (m, x) { return x[k] && RANK(x[k]) > RANK(m[k]) ? x : m; }, all[0]);
+        if (!from || !from[k]) return;
+        h[k].href = from.href || null; h[k].st = from[k].fix ? 'todo' : from[k].dec ? 'check' : '';
+      });
       h.fix = all.reduce(function (n, x) { return n + (x.fix || 0); }, 0); h.dec = all.reduce(function (n, x) { return n + (x.dec || 0); }, 0);
       h.untested = all.some(function (x) { return x.untested; }); h.done = !h.fix && !h.dec && !h.untested;
       h.at = all.reduce(function (m, x) { return x.at && (!m || x.at > m) ? x.at : m; }, null);
@@ -5907,8 +5915,9 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     // it to Figma or remove it from the code, is on its Figma side).
     if (c.codeOnly) p = { n: 0, fix: 0, dec: 0 };
     // Match: all its props, tokens and values the same in Figma and the code. Partial: some the same, some not.
-    // Differs: none the same. N/A: only one side has it, or nothing to compare.
-    var par = !p.n ? stateC('none', 'N/A', 0, 0, c.codeOnly ? NA_WHY.codeOnly : NA_WHY.Parity) : !p.fix && !p.dec ? stateC('match', 'Match') : p.n - p.fix - p.dec > 0 ? stateC('figma', 'Partial', p.fix, p.dec) : stateC('differs', 'Differs', p.fix, p.dec);
+    // Differs: none the same, something to fix. N/A: only one side has it, or nothing to compare.
+    // Unsure: nothing known to differ, only things to decide (none the same yet, none different either).
+    var par = !p.n ? stateC('none', 'N/A', 0, 0, c.codeOnly ? NA_WHY.codeOnly : NA_WHY.Parity) : !p.fix && !p.dec ? stateC('match', 'Match') : p.n - p.fix - p.dec > 0 ? stateC('figma', 'Partial', p.fix, p.dec) : !p.fix ? stateC('figma', 'Unsure', 0, p.dec) : stateC('differs', 'Differs', p.fix, p.dec);
     // Pass: nothing to fix or decide. Issues: something to fix. Review: something to decide. Untested: not tried yet.
     var acc = untested ? stateC('none', 'Untested') : a.fix ? stateC('differs', 'Issues', a.fix, a.dec) : a.dec ? stateC('figma', 'Review', 0, a.dec) : a.n ? stateC('match', 'Pass') : stateC('none', 'N/A', 0, 0, NA_WHY.Accessibility);
     // Ready: everything written. Missing: nothing written at all. Partial: anything between, text to check included.
@@ -5984,7 +5993,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     var dT = card('AI-ready Documentation', docP, 'Ready', built.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    pT.how = 'Figma\'s components the code has.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ. Differs: none are the same.';
+    pT.how = 'Figma\'s components the code has.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same.';
     iT.how = 'Every component in Figma.' + SAME + ' Found: matched to its file in the code. Unsure: a file looks like it, still to confirm. Missing: no file found.';
     aT.how = 'Figma\'s components the code has.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
     dT.how = 'Figma\'s components the code has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
