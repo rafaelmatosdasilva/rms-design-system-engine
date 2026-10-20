@@ -1122,6 +1122,8 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
    arrives through its token's variable: a colour as --bk (the words on it as --bk-on), the kit's corners as --bk-rad
    (-s, -l), its hues as --bk-1 and --bk-2. */
 .sg-bk { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
+.sg-bk { --bk-card: color-mix(in srgb, var(--sg-text) 4%, var(--sg-bg)); }   /* one ground for every card that is not a colour sample: the page's own, a step up */
+[data-sg-scheme="dark"] .sg-bk { --sg-line-colour: color-mix(in srgb, var(--sg-text) 18%, var(--sg-bg)); }   /* every edge on the page one solid colour: see-through, it took the colour of what it sat on */
 .sg-bk-hero { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--sg-card-gap); min-height: calc(var(--sg-space-xxl) * 10 + var(--sg-space-s)); }
 .sg-bk-tile { display: flex; flex-direction: column; justify-content: space-between; gap: var(--sg-space-xl); min-height: calc(var(--sg-space-xxl) * 9); padding: var(--sg-space-l); border-radius: var(--bk-rad, var(--sg-radius)); background: var(--bk); color: var(--bk-on); box-shadow: inset 0 0 0 var(--bk-line-w, 1px) var(--sg-line-colour), var(--bk-shadow, 0 0 #0000); }
 .sg-bk-tile--hero { position: relative; overflow: clip; container-type: inline-size; }
@@ -1187,8 +1189,12 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-pers-h { font-size: var(--sg-s); opacity: .75; }
 .sg-bk-pers-key { display: flex; align-items: center; gap: var(--sg-space-xs); }   /* at the foot, on the left: light drawn whole, dark dashed, as thick as the shapes */
 .sg-bk-pers-kl { width: calc(var(--sg-space-xxl) * 2); height: var(--sg-space-s); overflow: visible; } .sg-bk-pers-kl.is-dark { margin-left: var(--sg-space-m); }
-.sg-bk-pers-svg .sg-bk-pers-shape { stroke-width: var(--bk-line-w, 1px); }   /* the theme's own line */
-.sg-bk-pers-kl.is-dark line, .sg-bk-pers-svg .is-dark { stroke-dasharray: max(var(--sg-space-xs), calc(var(--bk-line-w, 1px) * 4)) max(var(--sg-space-xxs), calc(var(--bk-line-w, 1px) * 3)); }   /* the dash grows with the line, so it reads however thick */
+.sg-bk-pers { --pers-w: var(--bk-line-w, 1px); }   /* the brand's own line, however thick: the points, dashes and grid adapt so it still reads */
+.sg-bk .sg-bk-pers-svg.sg-bk-pers-svg :is(line, circle, polygon) { stroke-width: max(1px, calc(var(--pers-w) / 2)); }   /* the grid half as thick as the shapes */
+.sg-bk .sg-bk-pers-svg.sg-bk-pers-svg .sg-bk-pers-shape, .sg-bk .sg-bk-pers-kl.sg-bk-pers-kl line { stroke-width: var(--pers-w); }
+.sg-bk-pers-svg .sg-bk-pers-dot { r: calc(1.5px + var(--pers-w) * 0.9); }   /* the points grow with the line, so they still show on it */
+.sg-bk-pers-svg .sg-bk-pers-ring { stroke-linecap: round; stroke-dasharray: 0 calc(max(1px, var(--pers-w) / 2) * 3); }   /* the balance ring dotted, its gaps as small as the line allows */
+.sg-bk-pers-kl.is-dark line, .sg-bk-pers-svg .is-dark { stroke-dasharray: max(var(--sg-space-xs), calc(var(--pers-w) * 4)) calc(var(--pers-w) * 2); }   /* the dash grows with the line, so it reads however thick */
 .sg-bk-pers-t { margin: 0; font-size: calc(var(--sg-title) * 1.15); line-height: normal; color: var(--sg-text); }
 .sg-bk-pers-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--sg-space-xl); align-items: center; }
 .sg-bk-pers-chart { position: relative; height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1; margin: auto; color: var(--sg-text); }   /* as tall as its row, square: never cut by the tile */
@@ -1376,7 +1382,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-dp-scene[data-focus] > i:not(.is-on), .sg-bk-dp-iso[data-focus] .sg-bk-dp-plane:not(.is-on) { filter: grayscale(1); }   /* what is not in focus turns neutral: no colour pulls the eye from the layer picked */
 .sg-bk-dp-scene[data-focus] > i:not(.is-on) { opacity: .35; }   /* the layer in focus in the exploded view, lit in the preview too */
 [data-sg-scheme="dark"] .sg-bk-dp-scene[data-focus] > i:not(.is-on) { opacity: .15; }
-.sg-bk-dp-scene[data-focus] > i.is-on { outline: calc(var(--bk-line-w, 1px) * 2) solid var(--dp-hue); outline-offset: calc(var(--bk-line-w, 1px) * -2); z-index: 1; }   /* the layer in focus outlined in the hue: a surface as dark as the page still reads as picked */   /* dark surfaces barely part from a dark page: dimmer there */
+.sg-bk-dp-scene[data-focus] > i.is-on { outline: var(--bk-line-w, 1px) solid var(--dp-hue); outline-offset: calc(var(--bk-line-w, 1px) * -1);   /* a highlight in the theme's own border width */ z-index: 1; }   /* the layer in focus outlined in the hue: a surface as dark as the page still reads as picked */   /* dark surfaces barely part from a dark page: dimmer there */
 .sg-bk-dp-iso { position: relative; display: grid; place-items: center; min-height: 0; perspective: calc(var(--sg-space-xxl) * 60); }   /* the same stack, pulled apart: one plane per height */
 .sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.5)) scale(calc(1 - var(--dp-ex, 1.5) * .11)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
 .sg-bk-dp-plane { position: absolute; inset: 0; container-type: size; overflow: clip; border-radius: calc(var(--bk-rad, var(--sg-radius)) * var(--dp-k, 1)); transform: translateZ(calc(var(--z) * var(--sg-space-xxl) * var(--dp-ex, 1.5) + var(--dp-pop, 0px))); transition: transform var(--sg-move), opacity var(--sg-move), outline-color var(--sg-move); }
@@ -1449,7 +1455,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 @media (max-width: 720px) { .sg-bk-hero, .sg-bk-icons { grid-template-columns: 1fr; } .sg-bk-icon-big { border-right: 0; border-bottom: var(--sg-line); } .sg-bk-shape--wide { grid-column: auto; } .sg-bk-ramp-row, .sg-bk-type-row { grid-template-columns: 1fr; } }
 /* Every line in the kit is the brand's border thickness (twice it for an emphasis), at any scale of its drawing. */
 .sg-bk svg:not(.sg-bk-pie) :is(line, path, rect, circle) { vector-effect: non-scaling-stroke; stroke-width: var(--bk-line-w, 1px); }
-.sg-bk svg:not(.sg-bk-pie) .is-strong { stroke-width: calc(var(--bk-line-w, 1px) * 2); }
+.sg-bk svg:not(.sg-bk-pie) .is-strong { stroke-width: var(--bk-line-w, 1px); }   /* a highlight in the theme's own border width, its colour sets it apart */
 /* The Tokens page, as Figma's panel: collections and groups on the left, the table on the right; on a narrow window the
    panel above the table, its groups scrolling in their own box. */
 .sg-tk { display: grid; grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr); gap: var(--sg-card-gap); align-items: start; }   /* the side list and the table, separate cards a card gap apart */
@@ -1791,7 +1797,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Each item of the menu with the page's own mark before it: one for each page of the system and each foundation, one
   // shared by every component. Drawn with lines in the text's colour, never one of the system's icons.
   var NAV_MARK = {
-    'brand-kit': '<path d="M8 1.8a6.2 6.2 0 1 0 0 12.4c1 0 1.3-.8.8-1.5-.5-.8 0-1.7 1-1.7h1.5a3 3 0 0 0 3-3c0-3.4-2.8-6.2-6.3-6.2z"/><circle cx="4.8" cy="7.2" r=".7"/><circle cx="7.6" cy="4.6" r=".7"/><circle cx="10.8" cy="6.2" r=".7"/>',   // a painter's palette
+    'identity': '<path d="M8 1.8a6.2 6.2 0 1 0 0 12.4c1 0 1.3-.8.8-1.5-.5-.8 0-1.7 1-1.7h1.5a3 3 0 0 0 3-3c0-3.4-2.8-6.2-6.3-6.2z"/><circle cx="4.8" cy="7.2" r=".7"/><circle cx="7.6" cy="4.6" r=".7"/><circle cx="10.8" cy="6.2" r=".7"/>',   // a painter's palette
     tokens: '<path d="M8 2 14 5 8 8 2 5Z"/><path d="M2 8l6 3 6-3"/><path d="M2 11l6 3 6-3"/>',
     index: '<rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/>',
     health: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
@@ -3218,8 +3224,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // variable. Drawn again when the brand or mode changes. A part with nothing in the system for it is left out.
   // (the brand kit is drawn when it shows: lazyDraw)
   if (ALL_TOKENS.some(function (t) { return t.modes && t.values; })) {
-    hr(); foundationLink('brand-kit', 'identity');
-    var bk = section('brand-kit', 'Foundations', 'Identity', null);
+    hr(); foundationLink('identity', 'identity');
+    var bk = section('identity', 'Foundations', 'Identity', null);
     var bkOut = document.createElement('div'); bkOut.className = 'sg-bk'; bk.appendChild(bkOut);
     var BK_ALL = ALL_TOKENS.filter(function (t) { return t.modes && t.values; });
     // A colour is any token whose value is one, whatever Figma scopes it to (a ramp scoped to strokes too is still colour).
@@ -3336,6 +3342,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // The brand's values apply where a theme is set: the kit carries the page's own, so it reads the brand chosen.
       var colAxis = AXES.filter(function (a) { return a.colour && a.attr && !a.classes; })[0];
       if (colAxis) { var tv = SGModes.effective(colAxis, document.documentElement); if (tv) bkOut.setAttribute(colAxis.attr, tv); else bkOut.removeAttribute(colAxis.attr); }
+      // The page's layout stays put from theme to theme: its own spacing, read where no theme reaches (the root), so a
+      // theme with more room moves nothing; the theme's spacing shows in its samples (the spacing card, the cards' pads).
+      var rootCs = getComputedStyle(document.documentElement);
+      ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl'].forEach(function (k) { var v = rootCs.getPropertyValue('--sg-space-' + k).trim(); if (v) bkOut.style.setProperty('--sg-space-' + k, v); });
+      ['--sg-card-gap', '--sg-radius'].forEach(function (n) { var v = rootCs.getPropertyValue(n).trim(); if (v) bkOut.style.setProperty(n, v); });
       var html = '';
       var prim = bkCols.filter(isPrim), sem = bkCols.filter(function (t) { return !isPrim(t); });
       // The lightest and darkest from the system's own ramp (its primitives and base colours, the ones a theme restyles),
@@ -3489,14 +3500,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var readOn = function (bg, want, wantCss, min) { if (want && (bkRatio(bg, want) || 0) >= (min || 4.5)) return wantCss; return inkOrPaper(bg); };
       var HUE1 = hero ? bkCss(hero) : ink, HUE2 = second ? bkCss(second) : paper;
       var markOn = function (bg) { return (bkRatio(bg, h2x) || 0) >= 3 ? HUE2 : (bkRatio(bg, h1x) || 0) >= 3 ? HUE1 : readOn(bg); };
-      var bg2x = bkCssHex('var(--sg-bg-2)');
+      var bg2x = bkCssHex('var(--bk-card)');
       var tileCss = function (bg, bgCss, fg) { return 'style="--t-bg:' + esc(bgCss) + ';--t-fg:' + esc(fg) + '"'; };
       var on1 = readOn(h1x, h2x, HUE2, 3), on2 = readOn(h2x, h1x, HUE1), onP = readOn(paper, h1x, HUE1, 3);
       var onIsmall = readOn(ink, paper, PAPER), onPsmall = readOn(paper, ink, INK);
       // The light tiles' ground: the theme's lightest in light, its darkest in dark, so none glares on a dark page; with
       // the hue that reads on it (onG) for a large word, a mark or a line.
       var darkPage = document.documentElement.getAttribute('data-sg-scheme') === 'dark';
-      var GROUND = darkPage ? INK : PAPER, onG = darkPage ? readOn(ink, h1x, HUE1, 3) : onP, groundTile = darkPage ? tileCss(ink, INK, onIsmall) : tileCss(paper, PAPER, onPsmall);
+      // Every card that is not a colour sample stands on one ground (the page's, a step up), so none glares or sinks.
+      var GROUND = 'var(--bk-card)', onG = readOn(bg2x, h1x, HUE1, 3), groundTile = tileCss(bg2x, GROUND, 'var(--sg-muted)');
       var fam = famCss ? 'font-family:' + esc(famCss) + ', system-ui, sans-serif;' : '',   /* a computer without the family still draws a sans */ strong = weights.length ? 'font-weight:' + esc(bkCss(weights[weights.length - 1])) + ';' : '';
       var T = [];   // [classes, attributes, inner]
       var add = function (cls, attrs, inner) { T.push('<div class="sg-bk-t ' + cls + '" ' + attrs + '>' + inner + '</div>'); };
@@ -3518,7 +3530,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // as bars that fill in theirs. Every number is the brand's token.
       // Two accents that read on these tiles' ground (3:1 at least), in any brand and mode: the hues first, then the
       // ramp's ends.
-      var bg2 = 'style="--t-bg:var(--sg-bg-2);--t-fg:var(--sg-muted)"', ac1 = markOn(bg2x);
+      var bg2 = groundTile, ac1 = markOn(bg2x);
       var ac2 = [[HUE2, h2x], [PAPER, paper], [INK, ink], [HUE1, h1x]].filter(function (c) { return c[0] !== ac1 && (bkRatio(bg2x, c[1]) || 0) >= 3; }).map(function (c) { return c[0]; })[0] || readOn(bg2x);
       // Radius and border, read as one: three cards in one language. A line is solid where the component has a border
       // (the theme's width) and dashed where it has none; only the component in focus is in the hue, the rest neutral.
@@ -3671,7 +3683,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       }
       // The durations as bars filling in their own time and easing.
       var DU = [], seenD = {}; MOV.forEach(function (m) { if (!seenD[m.ms]) { seenD[m.ms] = 1; DU.push(m); } }); DU.sort(function (a, b) { return a.ms - b.ms; });
-      if (DU.length) add('w2 h2', tileCss(h1x, HUE1, onC1big), '<b class="sg-bk-dur-title" style="' + fam + strong + '">duration scale</b><div class="sg-bk-durs">' + DU.slice(0, 5).map(function (m, i) {
+      if (DU.length) add('w2 h2', groundTile, '<b class="sg-bk-dur-title" style="' + fam + strong + '">duration scale</b><div class="sg-bk-durs">' + DU.slice(0, 5).map(function (m, i) {
         return '<span>' + m.ms + 'ms</span><i style="background:' + esc(i === DU.length - 1 ? INK : onC1big) + ';animation-duration:' + Math.max(m.ms, 100) + 'ms;animation-timing-function:' + esc(m.ease) + '"></i>';
       }).join('') + '</div><span class="sg-bk-dur-note">' + esc(Object.keys(seenE).concat(DU.map(function (m) { return m.ease; })).filter(function (v, i, a) { return a.indexOf(v) === i; }).slice(0, 3).join('  ·  ')) + '</span>');
       if (CURVES) add('w4 h2', bg2, CURVES);
@@ -3775,7 +3787,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var sep = chTok(/chart-?pie\/separator\/static\/thickness$/i), SHARE = [35, 25, 20, 20, 15].slice(0, slices.length), tot = SHARE.reduce(function (a, b) { return a + b; }, 0), C = 2 * Math.PI * 70, acc = 0;
         var arcs = slices.map(function (t, i) { var len = C * SHARE[i] / tot, a = '<circle cx="100" cy="100" r="70" style="stroke:' + esc(bkCss(t)) + ';stroke-dasharray:' + len.toFixed(1) + ' ' + C.toFixed(1) + ';stroke-dashoffset:' + (-acc).toFixed(1) + ';--i:' + i + '"/>'; acc += len; return a; }).join('');
         var gaps = sep ? slices.map(function (t, i) { var at = SHARE.slice(0, i).reduce(function (x, y) { return x + y; }, 0) / tot * 360; return '<line x1="100" y1="100" x2="190" y2="100" style="stroke:' + esc(INK) + ';stroke-width:' + esc(bkCss(sep, 'px')) + ';transform:rotate(' + at.toFixed(1) + 'deg);--i:' + i + '"/>'; }).join('') : '';
-        addI('w2 h3 sg-bk-ch-pie-t', tileCss(ink, INK, onIsmall), '<span class="sg-bk-geo-note">' + esc(bkShort(slices[0].figma.replace(/\/[^/]+\/[^/]+$/, ''))) + '</span>' +
+        addI('w2 h3 sg-bk-ch-pie-t', groundTile, '<span class="sg-bk-geo-note">' + esc(bkShort(slices[0].figma.replace(/\/[^/]+\/[^/]+$/, ''))) + '</span>' +
           '<div class="sg-bk-ch-ring"><svg viewBox="0 0 200 200" class="sg-bk-pie" data-c="' + C.toFixed(1) + '" aria-hidden="true">' + arcs + gaps + '</svg><b class="sg-bk-ch-mid" style="' + fam + strong + 'color:' + esc(bkCss(slices[0])) + '">' + Math.round(SHARE[0] / tot * 100) + '%</b></div>' +
           '<span class="sg-bk-geo-note">' + (sep ? 'separator ' + bkPx(sep) + 'px  ·  ' : '') + plural(slices.length, 'slice', 'slices') + '</span>');
       }
@@ -3809,14 +3821,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // its largest radius, its durations sliding, its contrast, its icon sizes rolling, its spacing, its values running.
       var NT = [], addN = function (cls, attrs, inner) { NT.push('<div class="sg-bk-t sg-bk-num ' + cls + '" ' + attrs + '>' + inner + '</div>'); };
       var lbl = function (t, side) { return '<span class="sg-bk-num-label' + (side ? ' is-right' : '') + '">' + esc(t) + '</span>'; };
-      addN('w4 h3', tileCss(h1x, HUE1, onC1big), lbl(plural(Object.keys(colls).length, 'collection', 'collections') + ' · tokens') + '<b class="sg-bk-num-xl" style="' + fam + strong + 'color:' + esc(readOn(h1x, ink, INK, 3)) + '" data-bk-count="' + BK_ALL.length + '">' + BK_ALL.length + '</b>');
+      addN('w4 h3', groundTile, lbl(plural(Object.keys(colls).length, 'collection', 'collections') + ' · tokens') + '<b class="sg-bk-num-xl" style="' + fam + strong + 'color:' + esc(onG) + '" data-bk-count="' + BK_ALL.length + '">' + BK_ALL.length + '</b>');
       if (radPos.length) { var rl = radPos[radPos.length - 1]; addN('w2 h2', groundTile, lbl(bkShort(rl.t.figma)) + '<b class="sg-bk-num-l is-right" style="' + fam + strong + 'color:' + esc(onG) + '">' + rl.n + '</b>'); }
       var msList = DU.map(function (m) { return m.ms; });
-      if (msList.length) addN('w2 h1 sg-bk-num-run', tileCss(ink, INK, onIsmall), '<b class="sg-bk-num-slide" style="' + fam + strong + '">' + msList.map(function (v) { return v + '<em style="color:' + esc(markOn(ink)) + '">ms</em>'; }).join(' ') + '</b>');
+      if (msList.length) addN('w2 h1 sg-bk-num-run', groundTile, '<b class="sg-bk-num-slide" style="' + fam + strong + '">' + msList.map(function (v) { return v + '<em style="color:' + esc(onG) + '">ms</em>'; }).join(' ') + '</b>');
       if (hero && second) addN('w2 h2', tileCss(h2x, HUE2, on2), lbl('contrast · ' + second.figma + ' on ' + hero.figma) + '<b class="sg-bk-num-m" style="' + fam + strong + 'color:' + esc(readOn(h2x, h1x, HUE1, 3)) + '">' + (bkRatio(h1x, h2x) || 0).toFixed(1) + '<small>:1</small></b>');
       var izs = mono.length ? Object.keys(sizeCount).map(Number).sort(function (a, b) { return a - b; }).slice(0, 4) : [];
       if (izs.length > 1) addN('w2 h2', bg2, lbl('icon sizes') + '<div class="sg-bk-num-roll" style="' + fam + strong + '"><div style="--n:' + izs.length + '">' + izs.concat([izs[0]]).map(function (z, i) { return '<span' + (i % 2 ? ' style="color:' + esc(ac1) + '"' : '') + '>' + z + '</span>'; }).join('') + '</div></div>');
-      if (GAPS.length) addN('w2 h2', tileCss(h1x, HUE1, onC1big), lbl('spacing · ' + GAPS[0].n + ' → ' + GAPS[GAPS.length - 1].n, true) + '<b class="sg-bk-num-l" style="' + fam + strong + 'color:' + esc(readOn(h1x, ink, INK, 3)) + '">' + GAPS[GAPS.length - 1].n + '</b><b class="sg-bk-num-s" style="' + fam + '">' + GAPS[0].n + '</b>');
+      if (GAPS.length) addN('w2 h2', groundTile, lbl('spacing · ' + GAPS[0].n + ' → ' + GAPS[GAPS.length - 1].n, true) + '<b class="sg-bk-num-l" style="' + fam + strong + 'color:' + esc(onG) + '">' + GAPS[GAPS.length - 1].n + '</b><b class="sg-bk-num-s" style="' + fam + '">' + GAPS[0].n + '</b>');
       var NUMS = '<div class="sg-bk-bento">' + NT.join('') + '</div>';
       // Regular to Display, and the scale: the body style (the regular one nearest 16px) turning into the largest, its
       // cap height, x-height, baseline and line height measured in the brand's own family; every size the brand has,
@@ -4042,7 +4054,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // background, as a page built from those surfaces would be.
         DEPTH = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h5 sg-bk-block sg-bk-dp" style="' + esc(dpCard ? dpCard.line : '') + '" role="img" aria-label="' + esc(dpOn + ' of ' + dpList.length + ' surfaces cast a shadow') + '">' +
           '<div class="sg-bk-dp-scene" style="' + esc((appBgT ? 'background:' + bkCss(appBgT) + ';' : '') + (dpCard ? dpCard.line : '') + '--dp-hue:' + onG + ';') + '">' + dpScene + '</div>' +
-          '<div class="sg-bk-dp-iso" data-state="exploded" data-focus="' + (bkOut._dpFocus != null ? bkOut._dpFocus : 6) + '" style="' + esc((dpCard ? dpCard.line : '') + 'background-color:color-mix(in srgb, var(--sg-bg-2) 50%, var(--sg-bg));--t-fg:var(--sg-text);color:var(--sg-text);--dp-hue:' + onG + ';--bk-hue:' + onG + ';') + '">' +
+          '<div class="sg-bk-dp-iso" data-state="exploded" data-focus="' + (bkOut._dpFocus != null ? bkOut._dpFocus : 6) + '" style="' + esc((dpCard ? dpCard.line : '') + 'background-color:var(--bk-card);--t-fg:var(--sg-text);color:var(--sg-text);--dp-hue:' + onG + ';--bk-hue:' + onG + ';') + '">' +
           '<div class="sg-bk-dp-stack">' + dpPlanes + '</div><svg class="sg-bk-dp-leads" aria-hidden="true"></svg><div class="sg-bk-dp-calls">' + dpCalls + '</div>' +
           dpSpecs + '</div></div></div>';
       }
@@ -4058,6 +4070,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // reads warm or cool (that is mostly what it moves); a vivid primary adds a little intensity; the text's contrast
         // on the app's background reads safe and present when it is the strongest; grounds of pure white (in dark, pure
         // black) read distant.
+        // Warmth by hue: reds, oranges and yellows (around 35°) warm; from 70° away (greens, purples) neutral; blues cool.
+        var warmOf = function (h, sat) { var d = Math.abs(((h - 35) % 360 + 540) % 360 - 180); return cl(1 - (d - 35) / 35) * Math.min(1, sat * 1.4); };
         var mAx = AXES.filter(function (a) { return a.colour && a.attr && !a.classes; })[0];
         var mDark = mAx && mAx.values.filter(function (v) { return v.value && /dark|night/i.test(v.label + ' ' + v.value); })[0], mLight = mAx && mAx.values.filter(function (v) { return v !== mDark; })[0];
         var MODES = mDark && mLight ? [['light', mLight.value || 'light'], ['dark', mDark.value]] : [['', null]];
@@ -4071,7 +4085,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           if (rgb) {
             var mx = Math.max.apply(null, rgb), mn = Math.min.apply(null, rgb), hu = 0; c.sat = mx - mn;
             if (c.sat > 0) { hu = mx === rgb[0] ? ((rgb[1] - rgb[2]) / c.sat) % 6 : mx === rgb[1] ? (rgb[2] - rgb[0]) / c.sat + 2 : (rgb[0] - rgb[1]) / c.sat + 4; hu = (hu * 60 + 360) % 360; }
-            c.hue = hu; c.warmth = Math.cos((hu - 40) * Math.PI / 180) * Math.min(1, c.sat * 1.4); c.vivid = Math.min(1, c.sat * 1.3);
+            c.hue = hu; c.warmth = warmOf(hu, c.sat); c.vivid = Math.min(1, c.sat * 1.3);
+            var g2 = second && second !== hero ? bkRgb(bkHex(second) || '') : null;   // the secondary counts too, a third as much
+            if (g2) { var x2 = Math.max.apply(null, g2), n2 = Math.min.apply(null, g2), d2 = x2 - n2; if (d2 > 0.15) { var hu2 = x2 === g2[0] ? ((g2[1] - g2[2]) / d2) % 6 : x2 === g2[1] ? (g2[2] - g2[0]) / d2 + 2 : (g2[0] - g2[1]) / d2 + 4; c.warmth = c.warmth * 0.7 + warmOf((hu2 * 60 + 360) % 360, d2) * 0.3; } }
           } else { c.sat = 0; c.hue = 0; c.warmth = 0; c.vivid = 0; }
           c.cr = (txT && bgT && bkRatio(bkHex(txT), bkHex(bgT))) || bkRatio(ink, paper) || 12; c.crK = cl((c.cr - 9) / 6);
           var pure = m[0] === 'dark' ? /^0{6}(ff)?$/i : /^f{6}(ff)?$/i;
@@ -4094,7 +4110,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         BK_ALL.forEach(function (t) { var p = t.figma.split('/'), comp = p[1] || ''; if (!/\/radius\/(all|top-?left)$/i.test(t.figma) || !/^(button|chip|tag|badge|checkbox|tab|toggle|switch|input)/i.test(comp) || !H[comp]) return; var r = px(t); if (r != null) ctl.push(Math.min(r, H[comp] / 2)); });
         var radAll = BK_ALL.filter(function (t) { return /radius/i.test(t.figma) && !/display/i.test(t.figma); }).map(px).filter(function (n) { return n != null && n >= 0 && n < 200; });
         var rPx = ctl.length ? med(ctl) : radAll.length ? med(radAll) : 8;
-        var soft = Math.max(0, Math.min(1, (rPx - 2) / 14)), rWarm = cl((rPx - 9) / 7);
+        var soft = Math.max(0, Math.min(1, (rPx - 2) / 14)), rWarm = cl((rPx - 12) / 12);   // warm from about 24px
         // Lines: the border width most tokens follow; over 1px reads graphic, bold, technical, retro.
         var follow = {}; BK_ALL.forEach(function (t) { (t.aliases || []).forEach(function (a) { if (a) follow[a] = (follow[a] || 0) + 1; }); });
         var lineT = BK_ALL.filter(function (t) { return /border|stroke/i.test(t.figma) && !/colou?r|radius|display|appearance/i.test(t.figma) && isPrim(t) && px(t) != null; }).sort(function (a, b) { return (follow[b.figma] || 0) - (follow[a.figma] || 0); })[0];
@@ -4102,11 +4118,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // Shadows: how many are on, how blurred, how dark. A marked one (little blur, dark) reads graphic, technical,
         // retro; a faded one (wide blur, faint) refined; none at all direct, flat, without distraction.
         var shD = BK_ALL.filter(function (t) { return /shadow\/(.*\/)?display$/i.test(t.figma); }), shOn = shD.filter(function (t) { return /^true$/i.test(bkNow(t)); }).length;
-        var share = shD.length ? shOn / shD.length : 0, blur = med(BK_ALL.filter(function (t) { return /shadow\/blur$/i.test(t.figma); }).map(px).filter(function (n) { return n != null; })) || 0;
+        // Prevalence: a shadow counts as much as its component is used across the interface (the screens that hold it),
+        // so a card shadow seen everywhere weighs more than a pop-over's.
+        var norm = function (n) { return String(n || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }, compUse = {};
+        COMPONENTS.forEach(function (c) { compUse[norm(c.name)] = 1 + (c.usage || []).length; });
+        var shW = function (t) { var p = t.figma.split('/'), i = p.map(function (x) { return x.toLowerCase(); }).indexOf('shadow'); return compUse[norm(i > 0 ? p[i - 1] : p[0])] || 1; };
+        var shAll = shD.reduce(function (n, t) { return n + shW(t); }, 0), shOnW = shD.filter(function (t) { return /^true$/i.test(bkNow(t)); }).reduce(function (n, t) { return n + shW(t); }, 0);
+        var share = shAll ? shOnW / shAll : 0, blur = med(BK_ALL.filter(function (t) { return /shadow\/blur$/i.test(t.figma); }).map(px).filter(function (n) { return n != null; })) || 0;
         var alpha = med(BK_ALL.filter(function (t) { return /shadow\/colou?r$/i.test(t.figma); }).map(function (t) { var v = String(bkNow(t)).trim(), m = v.match(/rgba?\(([^)]+)\)/); if (m) { var q = m[1].split(/[\s,\/]+/).filter(Boolean); return q.length > 3 ? parseFloat(q[3]) * (/%/.test(q[3]) ? 0.01 : 1) : 1; } m = v.match(/^#?([0-9a-f]{8})$/i); return m ? parseInt(m[1].slice(6), 16) / 255 : /^#?[0-9a-f]{6}$/i.test(v) ? 1 : null; }).filter(function (n) { return n != null && isFinite(n); }));
         if (alpha == null) alpha = 0.15;
         var marked = share ? (1 - Math.min(1, blur / 16)) * 0.6 + Math.min(1, alpha / 0.35) * 0.4 : 0, faded = share ? 1 - marked : 0;
-        var dim = share * 0.7 + (share ? Math.min(1, blur / 24) * 0.3 : 0), mk = marked * share, fd = faded * share;   // as much as the shadows are on
+        var dim = share * (0.4 + 0.6 * Math.min(1, blur / 24)), mk = marked * share, fd = faded * share;   // as much as the shadows are on
         // Softness is subtlety, not corners alone: round corners, faded shadows, thin type, fine lines. No shadow, heavy
         // type and thick lines keep a round interface from reading soft.
         var shSoft = share ? (faded * 2 - 1) * Math.min(1, share * 2) - (1 - Math.min(1, share * 2)) : -1;
@@ -4122,18 +4144,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var sp = med(BK_ALL.filter(function (t) { return /(^|\/)(spacing|gap|padding)(\/|$)/i.test(t.figma) && !/radius/i.test(t.figma); }).map(px).filter(function (n) { return n != null && n > 0 && n < 200; }));
         var airy = sp ? cl((sp / 12 - 1) * 1.5) : 0;
         var shSay = !shD.length ? 'no shadows in the system' : !shOn ? 'no shadow on' : (marked >= 0.5 ? 'marked' : 'faded') + ' shadows (blur ' + blur + 'px)';
+        // Safe is the standard that commits to nothing: bold choices (thick lines, marked shadows, the heaviest type) are
+        // not safe, so they take back as much of a lean to Safe as they are bold.
+        var boldPick = Math.min(1, thick * 0.45 + mk * 0.45 + Math.max(0, typeW - 0.5) * 0.4), safeCut = function (v) { return v < 0 ? v * (1 - boldPick) : v; };
         var axes = function (c) { return [
           ['Bold', 'Quiet', cl((c.vivid * 2 - 1) * 0.2 + typeW * 0.45 + thick * 0.35 + (shD.length && !shOn ? 0.1 : 0) + mk * 0.15 + c.crK * 0.25), 'weight ' + wMax + ', ' + line + 'px lines', c.say + ', contrast ' + c.cr.toFixed(1) + ':1'],
-          ['Flat', 'Dimensional', cl(1 - 2 * dim), shD.length ? (shOn ? 'shadows on ' + shOn + ' of ' + shD.length + ', blur ' + blur + 'px' : 'no shadow on any of ' + shD.length + ' parts') : 'no shadows in the system', ''],
+          ['Flat', 'Dimensional', cl(1 - 2 * dim), shD.length ? (shOn ? 'shadows on ' + shOn + ' of ' + shD.length + ' parts, ' + Math.round(share * 100) + '% of where they are used, blur ' + blur + 'px' : 'no shadow on any of ' + shD.length + ' parts') : 'no shadows in the system', ''],
           ['Technical', 'Human', cl(kind[1] * 0.4 + (1 - 2 * soft) * 0.25 + thick * 0.25 + typeW * 0.15 + mk * 0.3 - fd * 0.15 + (1 - Math.min(1, share * 2)) * 0.15), (famName || 'its type') + ' (' + kind[0] + '), ' + line + 'px lines, ' + shSay, ''],
           ['Sharp', 'Soft', cl(-((soft * 2 - 1) * 0.25 + shSoft * 0.3 - typeW * 0.2 + (thick ? -thick : 0.3) * 0.25)), rPx + 'px corners, ' + shSay + ', weight ' + wMax + ', ' + line + 'px lines', ''],
           ['Corporate', 'Friendly', cl(-(soft * 2 - 1) * 0.35 - c.warmth * 0.15 + c.blue * 0.2 - (over ? 0.15 : 0) + (c.pure - 0.3) * 0.4 + (c.neutral - 0.5) * 0.3 + palK * 0.15 + c.crK * 0.2), rPx + 'px corners, ' + hueN + (hueN === 1 ? ' hue' : ' hues') + ' in the palette', 'hue ' + Math.round(c.hue) + '°, contrast ' + c.cr.toFixed(1) + ':1, ' + Math.round(c.neutral * 100) + '% of grounds neutral, ' + Math.round(c.pure * 100) + '% pure ' + (c.mode === 'dark' ? 'black' : 'white')],
-          ['Fast', 'Calm', cl(speed * 0.8 + (c.vivid - 0.5) * 0.1 + typeW * 0.15 + (over ? 0.15 : 0) + c.crK * 0.2), (ms ? 'transitions ' + ms + 'ms' + (over ? ', overshoot' : '') : 'no motion tokens') + ', weight ' + wMax, 'contrast ' + c.cr.toFixed(1) + ':1'],
+          ['Fast', 'Calm', cl(speed * 0.6 + (c.vivid - 0.5) * 0.2 + typeW * 0.15 + thick * 0.2 + mk * 0.2 + (over ? 0.15 : 0) + c.crK * 0.2), (ms ? 'transitions ' + ms + 'ms' + (over ? ', overshoot' : '') : 'no motion tokens') + ', weight ' + wMax, 'contrast ' + c.cr.toFixed(1) + ':1'],
           // Premium is elegance: room, thin type, slow motion, faded shadows, hairlines, a softer contrast, quiet colour.
           // Safe is the standard that commits to nothing: the strongest contrast, regular weights and lines, the usual speed.
-          ['Premium', 'Safe', cl(airy * 0.25 - typeW * 0.3 - speed * 0.2 + (thick ? -thick * 0.3 : 0.05) + fd * 0.25 - mk * 0.15 + (0.5 - c.vivid) * 0.1 + (kind[1] === -0.7 || kind[0] === 'geometric sans' ? 0.1 : 0) + (wMin < 400 ? 0.15 : 0) - c.crK * 0.35 - (c.pure - 0.3) * 0.2 - 0.1),
+          ['Premium', 'Safe', safeCut(cl(airy * 0.25 - typeW * 0.3 - speed * 0.2 + (thick ? -thick * 0.3 : 0.05) + fd * 0.25 - mk * 0.15 + (0.5 - c.vivid) * 0.1 + (kind[1] === -0.7 || kind[0] === 'geometric sans' ? 0.1 : 0) + (wMin < 400 ? 0.15 : 0) - c.crK * 0.35 - (c.pure - 0.3) * 0.2 - 0.1)),
             'type ' + wMin + '–' + wMax + (sp ? ', spacing ' + sp + 'px' : '') + (ms ? ', ' + ms + 'ms' : '') + ', ' + shSay, 'contrast ' + c.cr.toFixed(1) + ':1'],
-          ['Warm', 'Cool', cl(c.warmth * 0.7 + rWarm * 0.3), rPx + 'px corners', 'primary hue ' + Math.round(c.hue) + '°']
+          ['Warm', 'Cool', cl(c.warmth * 0.45 + rWarm * 0.3 + shSoft * 0.25), rPx + 'px corners, ' + shSay, 'primary hue ' + Math.round(c.hue) + '°']   // colour helps, but corners and soft shadows warm as much
         ]; };
         var AXM = COL.map(axes), two = AXM.length > 1;
         // Each axis leans as the modes do together; the evidence says each mode's colour where they differ.
@@ -4145,7 +4170,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // The shape: each pole 0.5 ± half its lean (opposites sum to the whole), sixteen points round the circle.
         var n = AX.length, R = 130, C = 170, lab = '', grid = '';
         [1 / 3, 2 / 3, 1].forEach(function (k) { grid += '<circle cx="' + C + '" cy="' + C + '" r="' + (R * k).toFixed(1) + '" fill="none" stroke="currentColor" stroke-opacity=".15"/>'; });
-        grid += '<circle cx="' + C + '" cy="' + C + '" r="' + R / 2 + '" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="3 4"/>';
+        grid += '<circle cx="' + C + '" cy="' + C + '" r="' + R / 2 + '" fill="none" stroke="currentColor" stroke-opacity=".35" class="sg-bk-pers-ring"/>';
         for (var k = 0; k < n; k++) { var a0 = (k * 180 / n - 90) * Math.PI / 180; grid += '<line x1="' + (C + Math.cos(a0) * R).toFixed(1) + '" y1="' + (C + Math.sin(a0) * R).toFixed(1) + '" x2="' + (C - Math.cos(a0) * R).toFixed(1) + '" y2="' + (C - Math.sin(a0) * R).toFixed(1) + '" stroke="currentColor" stroke-opacity=".15"/>'; }
         var ptsOf = function (A) { var p = []; [0, 1].forEach(function (side) { A.forEach(function (ax, k) { var a = ((k * 180 / n) + side * 180 - 90) * Math.PI / 180, str = side ? 0.5 - ax[2] / 2 : 0.5 + ax[2] / 2; p.push([C + Math.cos(a) * R * str, C + Math.sin(a) * R * str]); }); }); return p; };
         [0, 1].forEach(function (side) { AX.forEach(function (ax, k) {
@@ -4154,14 +4179,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           lab += '<span class="sg-bk-pers-l' + (lead ? ' is-lead' : str >= 0.5 ? '' : ' is-faint') + '" style="left:' + lx.toFixed(1) + '%;top:' + ly.toFixed(1) + '%">' + esc(ax[side]) + '</span>';
         }); });
         var poly = function (p, dark) { return '<polygon points="' + p.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '" fill="' + esc(ac1) + '" fill-opacity="' + (dark ? '.06' : '.2') + '" stroke="' + esc(ac1) + '" class="sg-bk-pers-shape' + (dark ? ' is-dark' : '') + '" vector-effect="non-scaling-stroke" stroke-linejoin="round"' + '/>' +
-          (dark ? '' : p.map(function (q) { return '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="2.5" fill="' + esc(ac1) + '"/>'; }).join('')); };
+          (dark ? '' : p.map(function (q) { return '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="2.5" class="sg-bk-pers-dot" fill="' + esc(ac1) + '"/>'; }).join('')); };
         var shape = two ? poly(ptsOf(AXM[1]), true) + poly(ptsOf(AXM[0])) : poly(ptsOf(AXM[0]));
         var keyLine = function (dark) { return '<svg class="sg-bk-pers-kl' + (dark ? ' is-dark' : '') + '" aria-hidden="true"><line x1="0" y1="50%" x2="100%" y2="50%" stroke="' + esc(ac1) + '"/></svg>'; };
         var key = two ? '<div class="sg-bk-pers-h sg-bk-pers-key">' + keyLine() + 'Light' + keyLine(true) + 'Dark</div>' : '';
         // In words: the three strongest leanings, then the next three, said as strongly as they lean.
         var lean = AX.map(function (ax) { return { pole: ax[2] >= 0 ? ax[0] : ax[1], k: Math.abs(ax[2]), why: ax[3] }; }).sort(function (x, y) { return y.k - x.k; });
         var lc = function (w) { return w.toLowerCase(); }, list = function (xs) { return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs.join(''); };
-        var head = list(lean.slice(0, 3).map(function (x, i) { return i ? lc(x.pole) : x.pole; }));
+        // The three strongest, always said in the chart's own order (Bold before Friendly before Warm), so the same three
+        // words read the same in every theme.
+        var order = function (x) { for (var k = 0; k < AX.length; k++) if (AX[k][0] === x.pole || AX[k][1] === x.pole) return k; return 0; };
+        var head = list(lean.slice(0, 3).sort(function (x, y) { return order(x) - order(y); }).map(function (x, i) { return i ? lc(x.pole) : x.pole; }));
         PMAP = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h5 sg-bk-block sg-bk-pers" ' + bg2 + ' role="group" aria-label="Personality">' +
           '<div class="sg-bk-pers-top"><span class="sg-bk-pers-h">Personality</span><span class="sg-bk-pers-h">read from ' + BK_ALL.length + ' tokens' + (two ? ', in light and dark' : '') + '</span></div>' +
           '<p class="sg-bk-pers-t" style="' + fam + strong + 'color:' + esc(ac1) + '">' + esc(head) + '</p>' +
@@ -5963,6 +5991,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A link from when there was a What's new page, or a Documentation (once Coverage) page: where it lives now.
     if (id === 'documentation' || id === 'coverage') return { id: 'status', area: null, slug: 'documentation', q: null };
     if (id === 'overview') return { id: 'index', area: null, slug: '', q: null };   // the index was once Overview
+    if (id === 'brand-kit') id = 'identity';   // Identity was once the brand kit
     if (id === 'todo' || id === 'tasks' || id === 'health') return { id: 'status', area: null, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // the page was once To do, then Tasks and Health
     return { id: id === 'whats-new' ? 'changelog' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
   }
@@ -8476,7 +8505,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var setBrand = function (k) {
       if (k && brandOf(k)) html.setAttribute('data-brand', k); else html.removeAttribute('data-brand');
       try { if (k) localStorage.setItem('sg-brand', k); else localStorage.removeItem('sg-brand'); } catch (e) {}
-      setQuery('brand', k && brandOf(k) ? k : '');
+      setQuery('brand', k && brandOf(k) ? k : 'standard');   // the address always names the theme, the default one too
       redrawAll();
       checkFonts(k);
       try { document.dispatchEvent(new CustomEvent('sg-brand', { detail: k })); } catch (e) {}
@@ -8500,6 +8529,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     bWrap.appendChild(fontNote);
     if (mount) mount.appendChild(bWrap);
     if (kept && brandOf(kept) && bSel.querySelector('option[value="' + kept + '"]')) { bSel.value = kept; setBrand(kept); }
+    else setQuery('brand', 'standard');
     bDrop.sync();
   }
   // The browser's own setting leads until someone picks a mode: when it changes (the computer goes dark at night, the
@@ -8551,6 +8581,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function route() {
     if (!location.hash || /^#(index|overview)$/.test(location.hash)) { if (homeId() !== 'index') history.replaceState(null, '', location.search + '#' + homeId()); }
     else if (/^#(documentation|coverage)$/.test(location.hash)) history.replaceState(null, '', '#status/documentation');   // the address says where it lives now
+    else if (/^#brand-kit([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#identity' + location.hash.replace(/^#brand-kit/, ''));   // Identity was once the brand kit
     else if (/^#(todo|tasks|health)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', '#status' + location.hash.replace(/^#(todo|tasks|health)/, ''));   // the page was once To do, then Tasks and Health
     var at = hashParts(), id = at.id || homeId(), built = !!document.getElementById(id);
     if (!built && BUILDERS[id]) BUILDERS[id]();

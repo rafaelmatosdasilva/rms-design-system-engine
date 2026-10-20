@@ -606,7 +606,7 @@ test('in the browser: no script error, a control changes the real component, the
     const sgTpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
     assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, \.sg-token-card thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over tables, the gap under the line');
     assert.match(sgTpl, /\.sg-sticky-edge\.sg-sticky-band \{ box-shadow:/);
-    await run(`location.hash = '#brand-kit'`); await shownIs('brand-kit');
+    await run(`location.hash = '#brand-kit'`); await shownIs('identity');
     await run(`window.scrollTo({ top: 1200, behavior: 'instant' })`); await new Promise((r) => setTimeout(r, 400));
     assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !e || !e.classList.contains('sg-sticky-band'); })()`), true, 'no gap cut under the line on a page with no table');
     await run(`location.hash = '#c-chip/documentation'`); await shownIs('c-chip'); await headsStick('#c-chip');
@@ -1298,8 +1298,10 @@ test('a Tokens page as Figma keeps them: collections, a tree of groups, the coll
   assert.match(tpl, /var TK_FILTER = \[\['', 'All'\], \['colour', 'Colors'\], \['typography', 'Typography'\], \['spacing', 'Spacing'\], \['radius', 'Radii'\], \['motion', 'Motion'\]\];/);
   // The brand kit: the system at a glance, first of the foundations, every value through its token's variable (the
   // brand and mode chosen show), its words on a colour the secondary hue or black or white, whichever reads.
-  assert.match(tpl, /foundationLink\('brand-kit', 'identity'\)/, 'an identity page (the brand kit) among the foundations');
-  assert.ok(tpl.indexOf("foundationLink('brand-kit'") < tpl.indexOf("foundationLink('tokens'"), 'the brand kit first, before the tokens');
+  assert.match(tpl, /foundationLink\('identity', 'identity'\)/, 'an identity page among the foundations (#brand-kit, its old address, opens it)');
+  assert.ok(tpl.indexOf("foundationLink('identity'") < tpl.indexOf("foundationLink('tokens'"), 'identity first, before the tokens');
+  // Every page's address is its name in the menu: rename one, and its address follows.
+  for (const [, id, label] of tpl.matchAll(/(?:navLink|foundationLink)\('([^']+)', '([^']+)'\)/g)) assert.equal(id, label.replace(/\s+/g, '-'), `the ${label} page's address`);
   assert.match(tpl, /var bkCss = function \(t, unit\) \{[^\n]*var nm = t\.var \|\| [^\n]*'var\(' \+ nm/, 'a value drawn through its variable, Figma\'s value behind it');
   assert.match(tpl, /prefers-reduced-motion: reduce\) \{ \.sg-bk-bento \*/, 'still when the person asks for less motion');
   assert.match(tpl, /class="sg-link-pill sg-tk-alias" data-alias="/, 'an alias as Figma shows it, opening the token it points at');

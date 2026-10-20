@@ -27,7 +27,7 @@ The two poles of an axis always add up to the whole, so a shape reaching towards
 
 **Light and dark.** Colour is read in each colour mode the system has, and each mode draws its own shape: light whole, dark dashed, one over the other. A brand vivid in light and only greys in dark is perceived as both, so the two shapes show where the modes disagree. The title, the list and the leans are the two modes together (their average).
 
-The title names the three strongest leanings. The list beside the chart gives, for each axis:
+The title names the three strongest leanings, always in the chart's own order (Bold before Friendly before Warm), so the same three words read the same in every theme. The list beside the chart gives, for each axis:
 
 - its winning pole and its lean (under 10% is shown as Balanced);
 - what the lean was read from, with each mode's colour where the modes differ.
@@ -123,7 +123,7 @@ The colour signals are read once per colour mode:
 | --- | --- | --- |
 | Hue | the primary colour (the token named primary hue, else brand or primary), per mode | its hue, 0–360° |
 | Saturation | the primary colour, per mode | max − min of its RGB channels, 0–1; vivid = min(1, saturation × 1.3) |
-| Warmth | hue and saturation | cos(hue − 40°) × min(1, saturation × 1.4): reds, oranges and yellows warm, blues cool, greys neither |
+| Warmth | hue and saturation, of the primary and (a third as much) the secondary | 1 within 35° of 35° (reds, oranges, yellows), 0 at 70° away (greens, purples), −1 beyond (blues), × min(1, saturation × 1.4) |
 | Contrast | the main text colour on the app background, per mode | its ratio; its lean = (ratio − 9) ÷ 6, so 9:1 is neutral, 15:1 and over the strongest |
 | Pure grounds | backgrounds, surfaces and containers, per mode | share drawn in pure white (light) or pure black (dark) |
 | Neutral grounds | the same grounds, per mode | share with no tint (RGB channels within 4% of each other) |
@@ -131,14 +131,14 @@ The colour signals are read once per colour mode:
 | Palette | the primitive colours, status colours aside | hue families (30° each) with saturation over 0.25: 2 or fewer → +1, 5 or more → −1, between them a line |
 | Corners | the controls' radius tokens (button, chip, tag, badge, checkbox, tab, toggle, switch, input) | the middle radius in px, a pill counted as half the control's height; else the middle of all radii |
 | Softness | corners | 0 up to 2px, rising to 1 at 16px |
-| Corner warmth | corners | −1 at 2px, 0 at 9px, +1 at 16px and over |
+| Corner warmth | corners | (radius − 12) ÷ 12: 0 at 12px, warm from about 24px |
 | Line | the border width most tokens follow | px; thick = min(1, line − 1) over 1px, else 0 (2px already thick) |
-| Shadows | every shadow display switch | share switched on |
+| Shadows | every shadow display switch | share switched on, each weighed by how much its component is used: 1 + the screens that hold it, so a shadow seen everywhere counts more than a rare one |
 | Blur | every shadow blur | the middle blur, px |
 | Shadow darkness | every shadow colour | its middle alpha (0.15 when none is read) |
 | Marked | blur and darkness | (1 − blur ÷ 16) × 0.6 + min(1, alpha ÷ 0.35) × 0.4; faded = 1 − marked; both × the share of shadows on |
 | Shadow softness | shadows | −1 with none on; else (2 × faded − 1) × min(1, share × 2) − (1 − min(1, share × 2)): few shadows on count as almost none |
-| Depth | shadows and blur | share × 0.7 + min(1, blur ÷ 24) × 0.3 (0 with no shadow on) |
+| Depth | shadows and blur | share × (0.4 + 0.6 × min(1, blur ÷ 24)): a hard shadow with no blur is graphic, not deep |
 | Typeface kind | the family's name | monospace +1, geometric +0.4, grotesque +0.3, humanist −0.4, serif −0.7, rounded −0.9 |
 | Weight | the typography weight tokens | the heaviest, as (heaviest − 500) ÷ 200 (600 already reads heavy); and the lightest |
 | Speed | the duration tokens | (260 − middle duration in ms) ÷ 160; whether an easing overshoots |
@@ -170,14 +170,25 @@ Each lean is clamped to −1…+1, read in each mode, and averaged across the mo
 
   −(2 × softness − 1) × 0.35 − warmth × 0.15 + blue × 0.2 − 0.15 if overshoot + (pure grounds − 0.3) × 0.4 + (neutral grounds − 0.5) × 0.3 + palette × 0.15 + contrast × 0.2
 - **Fast ↔ Calm:**
-  - Fast: short transitions, an overshoot, strong contrast, heavy type.
-  - Calm: long transitions, softer contrast, thin type.
+  - Fast: short transitions, an overshoot, strong contrast, a vivid colour, heavy type, thick lines, marked shadows: an energetic brand is not calm.
+  - Calm: long transitions, softer contrast, thin type, fine lines.
 
-  speed × 0.8 + (vivid − 0.5) × 0.1 + weight × 0.15 + 0.15 if overshoot + contrast × 0.2
-- **Premium ↔ Safe:** elegance against the standard.
+  speed × 0.6 + (vivid − 0.5) × 0.2 + weight × 0.15 + thick × 0.2 + marked × 0.2 + 0.15 if overshoot + contrast × 0.2
+- **Premium ↔ Safe:** elegance against the standard. Bold choices are not safe: a lean to Safe shrinks by how bold the picks are, min(1, thick × 0.45 + marked × 0.45 + (weight − 0.5) × 0.4 when over 0).
   room × 0.25 − weight × 0.3 − speed × 0.2 + (0.05 for hairlines, else −thick × 0.3) + faded × 0.25 − marked × 0.15 + (0.5 − vivid) × 0.1 + 0.1 for a serif or geometric face + 0.15 if the lightest weight is under 400 − contrast × 0.35 − (pure grounds − 0.3) × 0.2 − 0.1
-- **Warm ↔ Cool:** the hue weighs most, the corners add to it.
-  warmth × 0.7 + corner warmth × 0.3
+- **Warm ↔ Cool:** not colour alone. Colour helps, corners and soft shadows warm as much; no shadows or hard ones cool.
+  warmth × 0.45 + corner warmth × 0.3 + shadow softness × 0.25
+
+## The layout stays put
+
+The Identity page keeps every card in the same place from theme to theme, so themes can be compared:
+
+- its spacing is the page's own, never a theme's;
+- every card's edge is drawn inside it, so a thicker line moves nothing;
+- every card that is not a colour sample stands on one ground: the page's background, a step up;
+- edges share one solid colour.
+
+A theme's character shows inside the cards: its colours, corners, line width, type and spacing samples.
 
 ## Changing the reading
 
