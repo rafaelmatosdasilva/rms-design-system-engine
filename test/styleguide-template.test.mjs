@@ -1389,7 +1389,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
     assert.match(tiles[0][1], /^\d+of 2\|components fully matched$/, 'parity counts the components that fully match');
-    assert.match(tiles[1][1], /^\d+of \d+\|components found in code$/, 'the components the code has, of every component');
+    assert.match(tiles[1][1], /^\d+of \d+\|components found in code$/, 'the components the code has, of every component Figma has');
     assert.match(tiles[1][2], /2 found/, 'the table\'s own words: Found, Unsure, Missing');
     assert.match(tiles[2][1], /^\d+of 2\|components that pass$/);
     // Each card counts what its column's filter counts: every row whose state there applies (a component only Figma has

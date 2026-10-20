@@ -6373,18 +6373,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // card's numbers and its filter's are the same.
     var applies = function (pick) { return mx.filter(function (o) { var x = pick(o); return x && x.say !== 'N/A' && x.say !== '–'; }); };
     var parRows = applies(function (o) { return o.par; }), accRows = applies(function (o) { return o.acc; }), docRows = applies(function (o) { return o.doc; });
-    var parP = states(parRows, function (o) { return o.par; }), codeP = states(mx, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
+    var parP = states(parRows, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
     var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; });
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
     var pT = card('Figma × Code Parity', parP, 'Match', parRows.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'));
-    var iT = card('Code Implementation', codeP, 'Found', mx.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'));
+    var iT = card('Code Implementation', codeP, 'Found', figmaRows.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'));
     var aT = card('Accessibility', accP, 'Pass', accRows.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'To review', 'AccessibilityReview'));
     var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
     pT.how = 'Every component Figma and the code both have.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
-    iT.how = 'Every component, in Figma or in the code.' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
+    // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
+    // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.
+    iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
     aT.how = 'Every component the code has: what is not in the code has nothing to try.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
     dT.how = 'Every component, in Figma or in the code.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
@@ -8525,7 +8527,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // brands, so a module's control always has one).
   window.SG = {
     esc: esc, sysButton: sysButton, customSelect: customSelect, sidePanelPage: sidePanelPage,
-    tokens: TOKENS, allVars: DATA.allVars || [], brands: BRANDS, title: DATA.title || '',
+    tokens: TOKENS, allVars: DATA.allVars || [], brands: BRANDS, title: DATA.title || '', components: COMPONENTS,
+    // A component's markup as the page draws it: its first rendering (the code's own), else the markup read from it.
+    markupOf: function (c) { return (c && c.renders && c.renders[0] && c.renders[0].markup) || (c && c.markup) || ''; },
+    // The Showroom's screens, and one drawn in a box as its card draws it (inert, scaled to the box): drawScreen returns
+    // the screen's element and its fit, to call again when the box changes size.
+    axes: AXES,   // the system's modes: each { attr, colour, values: [{ label, value }] }
+    screens: DATA.showroom || [],
+    drawScreen: function (s, box) {
+      if (!s || !s.markup || typeof drawAt !== 'function') return null;
+      var el = document.createElement('div'); el.className = 'sg-showroom sg-showroom-screen'; el.setAttribute('inert', ''); el.innerHTML = s.markup;
+      Array.prototype.forEach.call(el.querySelectorAll('[id]'), function (e) { e.removeAttribute('id'); });
+      box.innerHTML = ''; box.appendChild(el);
+      var fit = drawAt(s, el, box); fit();
+      return { el: el, fit: fit };
+    },
     openPanel: function (o) {
       var m = panelShell(o.id || 'sg-module-panel', o.title || 'Panel');
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: o.crumbs || [], title: o.title || '', body: o.body || '' });
