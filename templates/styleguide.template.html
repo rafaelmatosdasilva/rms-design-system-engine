@@ -2789,7 +2789,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // and badly and its role, each as the team wrote it (Figma, the code, the contract). A kind nobody wrote is said
   // missing, never guessed. A component's Documentation area shows its own; the Documentation page gathers the same
   // cards for every component, the thinnest first, so the first is the next thing to write.
-  var KNOW_FROM = function (from) { return /^Figma/.test(from || '') ? 'Figma' : /^the code$/i.test(from || '') ? 'The code' : /^the intent layer/i.test(from || '') ? 'The intent layer' : /authored|contract/i.test(from || '') ? 'The contract' : from ? 'The last audit' : ''; };
+  // A documentation source is named by its own label: "the intent layer (docs/x.json)" is The intent layer.
+  var KNOW_FROM = function (from) { var src = /^(.+?) \([^()]*\)$/.exec(from || ''); return src && !/authored|contract/i.test(from) ? capital(src[1]) : /^Figma/.test(from || '') ? 'Figma' : /^the code$/i.test(from || '') ? 'The code' : /authored|contract/i.test(from || '') ? 'The contract' : from ? 'The last audit' : ''; };
   // Each kind once, for the Documentation page and each component's Documentation area alike, so the two always show the
   // same things under the same names, in the same order: [name, where it was written (or '' when nobody wrote it), what
   // was written, where in full, what to say when it is missing].
@@ -2807,9 +2808,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var roleFrom = function (a) { return a.roleFrom === 'figma' ? 'Figma' : a.roleFrom === 'contract' ? 'The contract' : 'The code'; };
   var KNOW = [
     // What Figma or the code says it is, then what its intent-layer page says it is for, each under its source.
-    ['What it is', function (c) { return figmaWhat(c) ? 'Figma' : (c.note || '').trim() ? 'The code' : ilWhat(c) ? 'The intent layer' : ''; },
-      function (c) { var own = figmaWhat(c) || (c.note || '').trim(); return paras([own || ilWhat(c)]) + (own && ilWhat(c) ? '<p class="pg-par-val">Also in the intent layer (' + esc(c.intentLayer.file) + '):</p>' + paras([ilWhat(c)]) : ''); },
-      function (c) { var own = figmaWhat(c) ? 'From its Figma description' : (c.note || '').trim() ? 'From the code' : ''; var il = ilWhat(c) ? 'The intent layer (' + c.intentLayer.file + ')' : ''; return [own, il].filter(Boolean).join(' · '); }, 'Not written yet.'],
+    ['What it is', function (c) { return figmaWhat(c) ? 'Figma' : (c.note || '').trim() ? 'The code' : ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') : ''; },
+      function (c) { var own = figmaWhat(c) || (c.note || '').trim(); return paras([own || ilWhat(c)]) + (own && ilWhat(c) ? '<p class="pg-par-val">Also in ' + esc(c.intentLayer.source || 'the intent layer') + ' (' + esc(c.intentLayer.file) + '):</p>' + paras([ilWhat(c)]) : ''); },
+      function (c) { var own = figmaWhat(c) ? 'From its Figma description' : (c.note || '').trim() ? 'From the code' : ''; var il = ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : ''; return [own, il].filter(Boolean).join(' · '); }, 'Not written yet.'],
     guideKind('whenToUse', 'When to use'),
     guideKind('whenNotToUse', 'When not to use'),
     guideKind('mistakes', 'Common mistakes'),
@@ -2877,7 +2878,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var none = said ? '' : '<p class="pg-missing">Its page says nothing an agent reads: the For agents page says why.</p>';
     return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + '<p class="pg-par-val">' + n + (n === 1 ? ' line' : ' lines') + ' read from its page. Open the row to see them.</p>' + none,
       writtenFull: link + '<p class="pg-par-val">What was read from its page (' + n + (n === 1 ? ' line' : ' lines') + ')</p>' + body + none,
-      todo: said ? '' : esc('See the For agents page for what to change on its page.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: ['The intent layer (' + il.file + ')'] };
+      todo: said ? '' : esc('See the For agents page for what to change on its page.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: [capital(il.source || 'the intent layer') + ' (' + il.file + ')'] };
   };
   // Its notes no agent is given (Figma's annotations, the code's notes): each with why, what to do, and whether to remove
   // it; who acts is whoever wrote it.

@@ -11,7 +11,11 @@ import { makeFixture } from './helpers.mjs';
 import {
   intentLayerConfig, layerOf, keyOfTitle, itemsOf, entityView, readDsds, dropBoilerplate, matchComponents,
   syncIntentLayer, readIntentLayer, componentIntent, useReport, describeSync, short, intentWords,
+  addSource, configuredSources, syncSources,
 } from '../intent-layer.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const ENGINE = fileURLToPath(new URL('..', import.meta.url));
 import { rateGuidance, sectionsFrom } from '../guidance-rating.mjs';
 import { generateIntent } from '../intent-gen.mjs';
 import { guidanceView } from '../styleguide-data.mjs';
@@ -143,6 +147,9 @@ test('a DSDS index: its $refs followed, sections sorted by kind, facts and metad
   assert.deepEqual(b.whenNotToUse.slice(-2), ['Do not use it for destructive actions; use the danger button.', 'Do not use it for navigation.']);
   assert.deepEqual(b.rules, [{ text: 'Keep the label visible.', level: 'must' }]);
   assert.deepEqual(b.facts, ['Tokens Used']);
+  // A section whose body only names itself is a placeholder, never guidance.
+  const ph = entityView({ kind: 'component', name: 'X', documentBlocks: [sections([["Do / Don't", "Do / Don't section."], ['Overview', 'Overview section.'], ['Intent', 'A real sentence about sections.']])] }, 'x.json');
+  assert.deepEqual([ph.whenNotToUse, ph.purpose], [[], ['A real sentence about sections.']]);
   assert.deepEqual(b.sections.map((s) => s.title), ['Token Notes']);
   assert.equal(entities.find((e) => e.name === 'Saving').layer, 'patterns');
   // No index: every file with an entity.
@@ -345,7 +352,7 @@ test('the prototype context: a component\'s page fills what it is for, the other
 
 test('componentIntent lists only what the page says', () => {
   const v = entityView({ kind: 'component', name: 'X', documentBlocks: [sections([['Intent', 'For x.']])] }, 'a/x.json');
-  assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null, facts: null, repeated: 0 });
+  assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, source: 'the intent layer', purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null, facts: null, repeated: 0 });
 });
 
 test('Figma\'s and the code\'s notes no agent is given: each with why, what to do and whether to remove it', () => {
@@ -383,4 +390,92 @@ test('the guidance rating reads a component\'s intent-layer page, so documenting
   const it = componentIntent(matchComponents(COMPONENTS, snap.entities, CODE_FILES).get('buttonMain'), snap._source);
   assert.deepEqual(it.facts, ['Tokens Used']);
   assert.ok(it.repeated > 0);
+});
+
+// ── Another documentation source plugs in as an adapter ──────────────────────────────────────────────────────────
+test('a second documentation source is one adapter: its pages reach the design intent, the report and the style guide under its own name', async () => {
+  const { dir, cfg } = await project();
+  const page = (name, extra = {}) => ({ kind: 'component', layer: 'components', name, id: null, status: null, file: `specs/${name}`, url: `https://specs.acme.test/${encodeURIComponent(name)}`, code: null, summary: null,
+    purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], facts: [], repeated: 0, ...extra });
+  const remove = addSource({
+    id: 'acme-specs', label: 'Acme specs', configKey: 'acmeSpecs',
+    configured: (c) => !!c.acmeSpecs,
+    read: () => ({ _source: { url: 'https://specs.acme.test' }, entities: [
+      page('Icon Only', { purpose: ['A button with only an icon.'], whenNotToUse: ['Not without a label for screen readers.'] }),
+      page('Button Main', { purpose: ['From the specs, second to the intent layer.'] }),
+    ] }),
+    sync: async () => ({ ok: true, changed: false }),
+    describe: () => 'Acme specs: up to date',
+  });
+  try {
+    const both = { ...cfg, acmeSpecs: true };
+    assert.deepEqual(configuredSources(both).map((s) => s.id), ['dsds-gitlab', 'acme-specs']);
+    assert.deepEqual((await syncSources(dir, both, { offline: true })).map((x) => x.line.slice(0, 12)), ['⚠️  Intent l', 'Acme specs: ']);
+    const snap = readIntentLayer(dir, both);
+    assert.equal(snap._sources.length, 2);
+    const m = matchComponents(COMPONENTS, snap.entities, CODE_FILES);
+    assert.equal(m.get('iconOnly').source.label, 'Acme specs');                 // a component only the new source documents
+    assert.equal(m.get('buttonMain').source.label, 'the intent layer');         // the first source wins where both do
+    const it = componentIntent(m.get('iconOnly'), snap._source);
+    assert.equal(it.source, 'Acme specs');
+    assert.equal(it.url, 'https://specs.acme.test/Icon%20Only');
+    const g = guidanceView({ intentLayer: it });
+    assert.equal(g.sections.find((s) => s.key === 'whenNotToUse').from, 'Acme specs (specs/Icon Only)');
+    const { intent } = await generateIntent(dir, both, { write: false });
+    assert.equal(intent.components.iconOnly.intentLayer.purpose, 'A button with only an icon.');
+    assert.deepEqual(intent.intentLayer.noPage, []);
+    const rep = useReport(snap, m);
+    assert.equal(rep.pages.find((p) => p.name === 'Icon Only').source, 'Acme specs');
+    assert.equal(rep.pages.find((p) => p.name === 'Icon Only').verdict, 'used');
+  } finally { remove(); }
+  assert.deepEqual(configuredSources({ ...cfg, acmeSpecs: true }).map((s) => s.id), ['dsds-gitlab']);
+});
+
+// ── A system read from its code alone ────────────────────────────────────────────────────────────────────────────
+test('no Figma file: the components are the code\'s, and the intent layer still reaches the design intent, the contracts, llms.txt and the catalog', async () => {
+  const dir = makeFixture({
+    'src/components/buttons/Main.vue': '<template>\n  <button class="acme-main-button" :disabled="disabled">{{ label }}</button>\n</template>\n<script>\nexport default { props: { label: { type: String, default: \'\' }, disabled: { type: Boolean, default: false } } };\n</script>\n',
+    'src/components/chips/Filter.vue': '<template><span class="acme-filter-chip"><slot /></span></template>\n',
+    'src/styles/theme.css': ':root { --acme-space-m: 12px; }\n',
+  });
+  const cfg = { figmaFileKey: '', paths: { themeCSS: 'src/styles/theme.css' }, intentLayer: LINK };
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: fakeGitlab({ files: {
+    ...LAYER,
+    'docs/dsds/components/button-main.dsds.json': comp('button-main', 'Main', 'src/lib/x.vue', [sections([['Intent', 'The next step.'], ['When Not To Use', 'Not for navigation.']])]),
+  } }).fetchImpl });
+  const r = await generateIntent(dir, cfg, {});
+  assert.deepEqual(Object.keys(r.intent.components).sort(), ['Filter', 'Main']);
+  assert.equal(r.intent.components.Main.class, '.acme-main-button');
+  assert.equal(r.intent.components.Main.intentLayer.purpose, 'The next step.');
+  assert.match(r.intent._sources.components, /the code \(no Figma data\)/);
+  const { generateContracts } = await import('../contract-gen.mjs');
+  const c = await generateContracts(dir, cfg, {});
+  assert.deepEqual(c.components.sort(), ['Filter', 'Main']);
+  assert.deepEqual(c.invalid, []);
+  const main = JSON.parse(readFileSync(join(dir, 'contracts', 'Main.contract.json'), 'utf8'));
+  assert.equal(main.description, '');                                            // never a placeholder that says Figma
+  assert.equal(main.intent.purpose, 'The next step.');
+  const cat = JSON.parse(readFileSync(join(dir, 'contracts', 'catalog.json'), 'utf8')).components.Main;
+  assert.equal(cat.selector, '.acme-main-button');
+  assert.deepEqual(Object.keys(cat.props), ['label', 'disabled']);
+  assert.equal(cat.props.disabled.type, 'boolean');
+  const llms = readFileSync(join(dir, 'contracts', 'llms.txt'), 'utf8');
+  assert.match(llms, /from the code alone \(no Figma file\)/);
+  assert.match(llms, /\[Main\]\(\.\/Main\.contract\.json\): · props: label, disabled\n {4}- for: The next step\.\n {4}- avoid: Not for navigation\./);
+});
+
+// ── Setup takes the documentation link ───────────────────────────────────────────────────────────────────────────
+test('setup with a documentation link: a GitLab project is the intent layer, a wiki page a guidelines page; the link is kept even when it cannot be read yet', () => {
+  const run = (link) => {
+    const dir = makeFixture({ 'ds-config.json': { name: 'acme', figmaFileKey: '', paths: { themeCSS: 'theme.css' } }, 'theme.css': ':root{}\n' });
+    const out = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', `--documentation=${link}`], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITLAB_FETCH_TIMEOUT_MS: '1000', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1', GITLAB_TOKEN: '' } });
+    return { out: out.stdout + out.stderr, cfg: JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')) };
+  };
+  const a = run('https://git.acme.test/design/intent');
+  assert.match(a.out, /Documentation for agents: the intent layer/);
+  assert.equal(a.cfg.intentLayer, 'https://git.acme.test/design/intent');
+  const b = run('https://git.acme.test/design/ds/-/wikis/Buttons');
+  assert.match(b.out, /Documentation for agents: a guidelines page/);
+  assert.deepEqual(b.cfg.guidelines.source.gitlab, ['https://git.acme.test/design/ds/-/wikis/Buttons']);
+  assert.equal(b.cfg.intentLayer, undefined);
 });

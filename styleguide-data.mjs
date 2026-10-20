@@ -1424,7 +1424,7 @@ export function guidanceView({ description = '', annotations = [], note = '', au
   for (const [key] of GUIDANCE) add(key, figma[key], 'Figma');
   for (const [key] of GUIDANCE) add(key, code[key], 'the code');
   if (intentLayer) {
-    const where = `the intent layer (${intentLayer.file ?? 'its page'})`;
+    const where = `${intentLayer.source ?? 'the intent layer'} (${intentLayer.file ?? 'its page'})`;   // the source it came from, by its own name
     for (const [key] of GUIDANCE) add(key, (intentLayer[key] ?? []).map(String).filter(Boolean), where, intentLayer.url ?? null);
   }
   for (const [key] of GUIDANCE) {

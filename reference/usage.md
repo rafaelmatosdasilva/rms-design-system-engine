@@ -251,10 +251,19 @@ offline, or a wrong link → the committed file is kept and the audit never fail
 intent layer the same way as any guidelines file: a section headed with a component's name lands in that
 component's `guidelines` in `design-intent.json`, the rest in the global block, as written.
 
+**Documentation sources.** The team's written documentation for agents can come from more than one place. Each
+source is an adapter (`intent-layer.mjs` → `SOURCES`) that reads its own format, read-only, into a snapshot in one
+shape: pages, each with what it is for, when to use it, when not to, common mistakes, limitations, rules, its other
+sections and what was left out. Everything that reads it (the design intent, the contracts, `llms.txt`, the
+prototypes, the style guide and the For agents page) takes only that shape and names each line by its source, so
+another source (a design tool's own specs, another format) is one adapter, nothing else changed. Where two sources
+document one component, the first configured one is its page. The first source is the intent layer below.
+
 **The intent layer, a GitLab project of DSDS pages.** When the team documents why each piece exists and how
 to use it in DSDS (the Design System Documentation Standard: an index `system.dsds.json` whose entity groups
 `$ref` one file per component, foundation, pattern, template or page), `rms-design-system-engine --intent-layer
-<project link>` sets `ds-config.json → intentLayer` and reads it at once. It is **read-only**: the engine only
+<project link>` (or `--init --documentation=<link>`) sets `ds-config.json → intentLayer` and reads it at once. A
+project with no Figma file gets all of it too: its components are the code's own, each with its file's props. It is **read-only**: the engine only
 asks GitLab for the project, its latest commit and one archive (GET, a `read_api` token is enough) and never
 writes to the layer; the only file it writes is its own snapshot in your project. Every run reads it again through the
 GitLab API when the branch's commit moved (one archive of the index's folder, read in memory, no clone), with the

@@ -72,17 +72,11 @@ test('guidelines links, setup and refresh', () => {
   assert.deepEqual(r('here are our guidelines: https://gitlab.com/acme/ds/-/wikis/Buttons and https://acme.notion.site/Chips-123').run,
     ['rms-design-system-engine --guidelines https://gitlab.com/acme/ds/-/wikis/Buttons https://acme.notion.site/Chips-123']);
   const setup = r('set up the parity. Figma is https://www.figma.com/design/AbC123/Tidepool and tokens are in src/theme.css', { hasConfig: false, components: [] });
-
-test('an intent layer\'s GitLab project, on any host, sets the intent layer', () => {
-  const il = r('use this intent layer: https://git.acme.test/design/intent');
-  assert.equal(il.recipe, 'guidelines-links');
-  assert.deepEqual(il.run, ['rms-design-system-engine --intent-layer https://git.acme.test/design/intent']);
-});
   assert.deepEqual([setup.recipe, setup.run], ['first-setup', ["rms-design-system-engine --init --figma-url='https://www.figma.com/design/AbC123/Tidepool' --theme-css='src/theme.css'"]]);
   const noUrl = r('audit the chip', { hasConfig: false, components: [] });
   assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked, and the request after it
-  assert.deepEqual(noUrl.run, ["rms-design-system-engine --init --figma-url='<the Figma link; left out when there is none>' --project='<. for this folder, or the folder or repository link>' --then='audit the chip'"]);
-  assert.equal(noUrl.ask, "where the design system's code is (this folder, another folder on this computer, or a link to its repository on GitHub or GitLab), and the link to its Figma file, if they have one (optional: without it only the code is checked)");
+  assert.deepEqual(noUrl.run, ["rms-design-system-engine --init --figma-url='<the Figma link; left out when there is none>' --project='<. for this folder, or the folder or repository link>' --documentation='<the documentation link; left out when there is none>' --then='audit the chip'"]);
+  assert.equal(noUrl.ask, "where the design system's code is (this folder, another folder on this computer, or a link to its repository on GitHub or GitLab), and the link to its Figma file, if they have one (optional: without it only the code is checked), and a link to its written documentation for agents, if they have one (optional: an intent layer on GitLab, a wiki or Notion page)");
   assert.match(routeText(noUrl, '', 'rms-design-system-engine'), /\nNEXT: before running anything, ask the person, in one message: where the design system's code is/);
   const refresh = route('refresh the Figma snapshots, the design changed yesterday', { ...P, snapshotDate: '2026-03-02' });
   assert.equal(refresh.recipe, 'refresh-figma');
@@ -115,7 +109,7 @@ test('setup takes where the code is and the Figma link from the request, and ask
     assert.match(r(text, none).ask, /^where the design system's code is/, `asked where the code is: ${text}`);
   }
   assert.doesNotMatch(r(`aqui está o figma ${F}`, none).ask, /Figma/, 'a Figma link given is not asked again');
-  assert.equal(r('set up the parity for this folder', none).ask, "the link to the design system's Figma file, if they have one (optional: without it only the code is checked)");
+  assert.equal(r('set up the parity for this folder', none).ask, "the link to the design system's Figma file, if they have one (optional: without it only the code is checked), and a link to its written documentation for agents, if they have one (optional: an intent layer on GitLab, a wiki or Notion page)");
 });
 
 test('what --route prints: the route, the commands, one NEXT line, and the recipe', () => {
@@ -229,4 +223,20 @@ test('a component named loosely is found, and a word several components share is
   for (const text of ['check the text contrast', 'check the icons', 'check everything']) assert.deepEqual([q(text).run, q(text).which], [['rms-design-system-engine'], undefined], text);
   // A name written as the system writes it is unchanged.
   assert.deepEqual(q('run the accessibility on button primary').run, ['rms-design-system-engine --component buttonPrimary --only accessibility']);
+});
+
+test('an intent layer\'s GitLab project, on any host, sets the intent layer', () => {
+  const il = r('use this intent layer: https://git.acme.test/design/intent');
+  assert.equal(il.recipe, 'guidelines-links');
+  assert.deepEqual(il.run, ['rms-design-system-engine --intent-layer https://git.acme.test/design/intent']);
+});
+
+test('setup takes the documentation link from the request, and never asks for it on its own', () => {
+  const none = { hasConfig: false, components: [] };
+  const d = r('set up this folder, and our intent layer is https://git.acme.test/design/intent', none);
+  assert.match(d.run[0], / --documentation='https:\/\/git\.acme\.test\/design\/intent'/);
+  assert.doesNotMatch(d.ask ?? '', /documentation for agents/);
+  const full = r('set up the parity. Figma is https://www.figma.com/design/AbC123/Tidepool and tokens are in src/theme.css', none);
+  assert.equal(full.ask, null);
+  assert.doesNotMatch(full.run[0], /--documentation/);
 });

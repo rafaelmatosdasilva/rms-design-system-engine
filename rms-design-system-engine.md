@@ -156,10 +156,11 @@ node <install-dir>/audit.mjs --init \
   # --figma-url: optional; --figma-source-url='<upstream DS URL>': optional, consumer/branded-fork files
 ```
 
-**Setup asks the person two things before it writes anything: where the code is (this folder,
-another folder, or a link to its repository on GitHub or GitLab) and the link to the Figma file.** The code is required and never
-guessed; the Figma link is optional (without it only the code's own checks run, and nothing is
-compared with Figma). The router asks what the request leaves out, in one message; a setup run
+**Setup asks the person, in one message, before it writes anything: where the code is (this folder,
+another folder, or a link to its repository on GitHub or GitLab), the link to the Figma file, and a link to the
+written documentation for agents (an intent layer on GitLab, a wiki or Notion page).** The code is required and never
+guessed; the Figma link is optional (without it only the code's own checks run, nothing is compared with Figma,
+and the components are the code's own), and so is the documentation link (`--documentation=<link>`). The router asks what the request leaves out, in one message; a setup run
 that does not know where the code is writes nothing, and its NEXT line asks. Pass the answer as
 `--project=<folder or link>` (`.` for this folder; a GitHub link is cloned beside the folder, `owner/repo`
 means GitHub; a GitLab link, gitlab.com or a company's own, is read through GitLab's API, never cloned:

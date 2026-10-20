@@ -152,7 +152,7 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
   const themeCss = Array.isArray(cfg.paths?.themeCSS) ? cfg.paths.themeCSS[0] : cfg.paths?.themeCSS;
   const intentFile = cfg.docs?.out ? resolve(ROOT, cfg.docs.out) : join(themeCss ? dirname(resolve(ROOT, themeCss)) : ROOT, 'design-intent.json');
   const structFile = resolve(ROOT, cfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json');
-  try { if (existsSync(structFile)) intent = (await generateIntent(ROOT, cfg, { write: false })).intent; } catch { /* the catalog alone still says what each component is for */ }
+  try { if (existsSync(structFile) || cfg.figmaFileKey === '') intent = (await generateIntent(ROOT, cfg, { write: false })).intent; } catch { /* the catalog alone still says what each component is for */ }
   if (!intent) intent = readJSON(intentFile);
 
   const figmaDir = dirname(structFile);

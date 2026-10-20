@@ -695,7 +695,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
         // the contract); the For agents page gathers every page of it apart.
         if (!il && hasLayer) c.intentLayer = { none: true };
-        if (il) c.intentLayer = { file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null, sections: il.sections ?? null, facts: il.facts ?? null, repeated: il.repeated ?? 0 };
+        if (il) c.intentLayer = { source: il.source ?? 'the intent layer', file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null, sections: il.sections ?? null, facts: il.facts ?? null, repeated: il.repeated ?? 0 };
         c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c), intentLayer: il });
       }
     } catch { /* no guidance */ }

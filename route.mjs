@@ -451,11 +451,16 @@ const shellQuote = (x) => `'${String(x).replace(/'/g, `'\\''`)}'`;
 function setupRun(t, cmd, { cloud = false, then = true } = {}) {
   const { figma, css, project } = codeAndFigma(t);
   const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or repository link>'}'`;
+  // The written documentation for agents (an intent layer, a wiki or Notion page): optional, one link, named in the request.
+  const docs = (String(t ?? '').match(/\b(?:intent[- ]layer|documentation|docs|guidelines)\b[^\n]{0,40}?(https?:\/\/[^\s)>\]]+)/i) ?? [])[1] ?? null;
   const ask = [!css && !project && whereCode('the design system\'s', cloud),
-    !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
+    !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`,
+  ].filter(Boolean);
+  // Asked with the rest, in the same message, never as a question of its own when nothing else is missing.
+  if (ask.length && !docs) ask.push('a link to its written documentation for agents, if they have one (optional: an intent layer on GitLab, a wiki or Notion page)');
   const request = String(t ?? '').trim().replace(/\s+/g, ' ');
   const after = then && request && !SETUP_ASKED.test(request) ? ` --then=${shellQuote(request.slice(0, 400))}` : '';
-  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}${after}`],
+  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}${docs ? ` --documentation='${docs}'` : ask.length ? ` --documentation='<the documentation link; left out when there is none>'` : ''}${after}`],
     ask: ask.length ? ask.join(', and ') : null };
 }
 

@@ -115,6 +115,7 @@ if (ONLY && process.argv.includes('--baseline')) {
 // drive reliably. Supply the answers as flags instead and setup runs without any
 // prompt:
 //   --project=<folder|git link>   --figma-url=<url|key>   --theme-css=a.css,b.css   --figma-source-url=<url>
+//   --documentation=<link>        the written documentation for agents (an intent layer or a guidelines page), optional
 // Where the code is must be known before anything is written: --project (`.` for this
 // folder), or --theme-css naming its token file here. Without it setup stops and its
 // NEXT line asks the person. The Figma link is optional: without it the checks that
@@ -124,6 +125,9 @@ function _argValue(flag) { const v = _argValues(flag); return v.length ? v[v.len
 const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key');
 const INIT_THEME_CSS      = _argValue('--theme-css');
 const INIT_SOURCE_URL     = _argValue('--figma-source-url');
+// The team's written documentation for agents, optional: a GitLab project of DSDS pages (the intent layer), or a page
+// (a GitLab wiki or Markdown file, a Notion page) of guidelines. One link; which it is comes from the link itself.
+const INIT_DOCS           = _argValue('--documentation');
 // The request setup was reached from (--then='check the button'): carried through setup's questions, and routed again
 // as its last NEXT line, so it is never dropped for a generic first run.
 const INIT_THEN           = _argValue('--then');
@@ -965,7 +969,9 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
   }
   const envDirs = [ROOT, ...(existsSync(join(ROOT, '.gitlab-source.json')) ? [dirname(resolve(ROOT))] : [])];   // a mirror's .env is beside it
   const hostEnv = { ...process.env, GITLAB_HOST: hostEnvFrom(process.env, envDirs) };
-  const p = parseGitlabProject(link, hostEnv);
+  // Named as the intent layer, a link is a GitLab project on any host (the token still goes only where GITLAB_HOST allows).
+  let linkHost = ''; try { linkHost = new URL(link).host; } catch { /* not a link */ }
+  const p = parseGitlabProject(link, hostEnv) ?? (linkHost ? parseGitlabProject(link, { ...hostEnv, GITLAB_HOST: [hostEnv.GITLAB_HOST, linkHost].filter(Boolean).join(',') }) : null);
   if (!p) { console.log(`\n❌ ${link}\n   This is not a GitLab project link (https://<host>/<group>/<project>), so it was not set.`); process.exit(1); }
   const prev = il.intentLayerConfig(conf);
   conf.intentLayer = entry || prev?.entry || (prev && prev.out !== il.DEFAULT_OUT) ? { gitlab: link, ...(entry || prev?.entry ? { entry: entry || prev.entry } : {}), ...(prev && prev.out !== il.DEFAULT_OUT ? { out: prev.out } : {}) } : link;
@@ -1958,7 +1964,7 @@ async function bootstrapConfig() {
   if (INIT_NONINTERACTIVE && !INIT_CODE_GIVEN) {
     console.log(C.yellow('  ⚠️  Setup needs to know where the code is first. Nothing was written.'));
     console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
-    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or repository link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${thenArg}.`);
+    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}${INIT_DOCS ? '' : '; and, if they have it, a link to its written documentation for agents: an intent layer on GitLab, a wiki or Notion page (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or repository link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${INIT_DOCS ? ` --documentation='${INIT_DOCS}'` : ` --documentation='<the documentation link, if they gave one>'`}${thenArg}.`);
     process.exit(2);
   }
   // Told the code is in a folder that has none: the code is somewhere else, or it starts here from Figma. One question.
@@ -1972,7 +1978,7 @@ async function bootstrapConfig() {
     console.log(`NEXT: ask the person for the link to the design system's Figma file, then run the same command with --figma-url='<the Figma link>'.`);
     process.exit(2);
   }
-  let figmaRaw, themeCSS, figmaSourceKey = '', buildMode = INIT_BUILD;
+  let figmaRaw, themeCSS, figmaSourceKey = '', buildMode = INIT_BUILD, docsAns = '';
   // Token values the product loads from hosted stylesheets (given as URLs, or found in its code when no local file
   // declares them): every one is taken, each mode in its own block of one local file, so no mode is left out and
   // nobody is asked which to take (hosted-tokens.mjs).
@@ -2042,6 +2048,7 @@ async function bootstrapConfig() {
         process.exit(r.status ?? 1);
       }
     }
+    if (!INIT_DOCS) docsAns = (await ask('Link to your written documentation for agents (an intent layer on GitLab, a wiki or Notion page), or Enter to skip: ')).trim();
     const themeAns = defaultHint
       ? ((await ask(`Token CSS file(s) [${defaultHint}]: `)).trim() || defaultHint)
       : (await ask(`Token CSS file(s) (e.g. src/styles/theme.css${figmaRaw ? '; leave empty to build them from Figma' : ''}): `)).trim();
@@ -2220,6 +2227,8 @@ async function bootstrapConfig() {
     const others = otherAgents(ROOT);
     if (others.length) console.log(C.dim(`  Agents with no hooks read their own instruction file (${others.join(', ')} here): rms-design-system-engine --agent-rules shows the engine's rules for it, written there once you say yes.`));
   } catch { /* an offer, never a step */ }
+  // The written documentation for agents, when given: set and read now, as --intent-layer or --guidelines would.
+  if (INIT_DOCS || docsAns) addDocumentation(INIT_DOCS || docsAns);
   // The request setup was reached from comes back first: routed now, as the person asked it.
   if (INIT_THEN) console.log(`NEXT: the person asked: "${INIT_THEN}". Setup is done; route that request now: rms-design-system-engine --route '${INIT_THEN.replace(/'/g, `'\\''`)}', and follow what it prints.\n`);
   else console.log(buildMode
@@ -2227,6 +2236,16 @@ async function bootstrapConfig() {
     : 'NEXT: rms-design-system-engine   (the first run: it refreshes the Figma data when it can, then audits)\n');
 
   return generated;
+}
+
+// The team's written documentation for agents, from one link: a GitLab wiki page or Markdown file, or a Notion page, is a
+// guidelines page (--guidelines); any other GitLab project link is the intent layer (--intent-layer). Each command
+// records it in ds-config.json, reads it once and says, in plain words, what it read or the one thing to fix.
+function addDocumentation(link) {
+  const page = /notion\.(so|site)\//i.test(link) || /\/-\/(wikis|blob|raw)\//.test(link);
+  console.log(C.dim(`\n  Documentation for agents: ${page ? 'a guidelines page' : 'the intent layer'} (${link})`));
+  const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), page ? '--guidelines' : '--intent-layer', link], { stdio: 'inherit', cwd: ROOT, env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  return r.status ?? 1;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -2259,6 +2278,8 @@ async function bootstrapConfig() {
         console.log('NEXT: refresh the Figma data, so the snapshots are read from this file (the ones there now were read from the previous one), then run the audit.');
         process.exit(0);
       }
+      // Only the documentation link to add, for a project already set up.
+      if (INIT_DOCS) process.exit(addDocumentation(INIT_DOCS));
       console.log('This project is already set up (ds-config.json); nothing was written.');
       console.log('NEXT: run the audit (rms-design-system-engine), or answer a question with rms-design-system-engine --query <name>. To set it up again from scratch, replacing ds-config.json, add --reconfigure.');
       process.exit(0);
@@ -4925,13 +4946,13 @@ function reportFull(label, items, shown) {
   // Its DSDS pages (why each piece exists, how to use it) are read through the API into their snapshot BEFORE
   // intent-gen, the contracts and the style guide read them. Read again only when the branch's commit moved;
   // GitLab not reachable → the snapshot already there, said from which commit. Never fails the audit.
-  if (cfg.intentLayer) {
-    try {
-      const il = await import('./intent-layer.mjs');
-      const r = await il.syncIntentLayer(ROOT, cfg, { offline: process.argv.includes('--offline') });
-      if (r) console.log('\n' + (r.error ? C.yellow(il.describeSync(r)) : il.describeSync(r)));
-    } catch (e) { console.log(C.yellow('\n⚠️  Intent layer: not read (' + e.message + ')')); }
-  }
+  // Every documentation source the project names (intent-layer.mjs → SOURCES), each read where it lives.
+  let docSources = 0;
+  try {
+    const il = await import('./intent-layer.mjs');
+    docSources = il.configuredSources(cfg).length;
+    for (const { result, line } of await il.syncSources(ROOT, cfg, { offline: process.argv.includes('--offline') })) if (line) console.log('\n' + (result?.error ? C.yellow(line) : line));
+  } catch (e) { console.log(C.yellow('\n⚠️  Documentation sources: not read (' + e.message + ')')); }
 
   // ── Design-intent (adopt-aware OUTPUT, not a gate) ──────────────────────────
   _section('advice');
@@ -4950,8 +4971,8 @@ function reportFull(label, items, shown) {
   const intentOut  = cfg.docs?.out
     ? join(ROOT, cfg.docs.out)
     : join(themeCss0 ? dirname(join(ROOT, themeCss0)) : ROOT, 'design-intent.json');
-  const docsAdopted = docsForced || cfg.docs?.auto === true || !!cfg.docs?.out || !!cfg.intentLayer || existsSync(intentOut);
-  if (!docsOff && docsAdopted && existsSync(structSnap)) {
+  const docsAdopted = docsForced || cfg.docs?.auto === true || !!cfg.docs?.out || docSources > 0 || existsSync(intentOut);
+  if (!docsOff && docsAdopted && (existsSync(structSnap) || NO_FIGMA)) {   // no Figma file: the components are the code's
     try {
       const { generateIntent } = await import('./intent-gen.mjs');
       const r = await generateIntent(ROOT, cfg, {});
@@ -4997,7 +5018,7 @@ function reportFull(label, items, shown) {
   // per-project with ds-config.json → contracts.auto: false.
   const varsSnap = cfg.paths?.snapshotVars ? join(ROOT, cfg.paths.snapshotVars) : null;
   const contractsOff = process.argv.includes('--no-contracts') || cfg.contracts?.auto === false;
-  if (!contractsOff && varsSnap && existsSync(varsSnap)) {
+  if (!contractsOff && ((varsSnap && existsSync(varsSnap)) || NO_FIGMA)) {   // no Figma file: contracts from the code alone
     try {
       const { generateContracts } = await import('./contract-gen.mjs');
       const r = await generateContracts(ROOT, cfg, {});
