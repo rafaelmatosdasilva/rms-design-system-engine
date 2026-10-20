@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { buildStamp, mayWrite } from './stamp.mjs';
+import { motionValue } from './figma-capture.mjs';
 
 export const FIGMA_CLI_FORMAT = 2;   // design.json `version` this reader knows
 
@@ -47,7 +48,8 @@ const isPrivate = (name) => !String(name ?? '').trim() || /^[_.]/.test(String(na
 export function tokensFromDesign(design, tokens = []) {
   const byKey = new Map();
   for (const c of design?.variables ?? []) for (const v of c.variables ?? []) byKey.set(`${c.name}\u0000${v.name}`, v);
-  const shown = (x, before) => {
+  const shown = (x, before, kind) => {
+    if (x != null && (typeof x === 'object' || kind === 'TIMING')) { const mv = motionValue(x, kind); if (mv) return mv; }   // an easing, a timing
     if (x == null || typeof x === 'object') return undefined;   // a value it cannot write: the one kept stands
     if (typeof x === 'number') { const n = Math.round(x * 1000) / 1000, unit = /(%|px)$/.exec(String(before ?? 'px'))?.[1] ?? ''; return n + unit; }
     return typeof x === 'string' && /^#[0-9a-f]{6,8}$/i.test(x) ? x.toLowerCase() : String(x);
@@ -57,7 +59,7 @@ export function tokensFromDesign(design, tokens = []) {
     const values = {}, aliases = {};
     for (const m of Object.keys(t.values ?? {})) {
       const { value, chain } = resolveVar(byKey, t.collection, t.name, m);
-      values[m] = shown(value, t.values[m]) ?? t.values[m];
+      values[m] = shown(value, t.values[m], t.kind) ?? t.values[m];
       if (chain.length) aliases[m] = chain[0];
     }
     const { aliases: _, ...rest } = t;

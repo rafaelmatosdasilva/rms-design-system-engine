@@ -801,7 +801,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       view.tokens.sizing = [];
     }
     // Every variable Figma has, in each of its modes, for the Tokens page (allVariables, styleguide-data.mjs).
-    try { const { allVariables } = await import('./styleguide-data.mjs'); const av = allVariables(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss); if (av.length) view.allVars = av; } catch { /* the page lists the agreed tokens */ }
+    try { const { allVariables } = await import('./styleguide-data.mjs'); const av = allVariables(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss, readJson(cfg.figmaCli?.designJson ?? 'design.json')); if (av.length) view.allVars = av; } catch { /* the page lists the agreed tokens */ }
     // Each token's Figma collection, when the capture kept it (Tokens page); else the page groups by its name's first part.
     {
       const of = (readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {})._collections?.of ?? null;

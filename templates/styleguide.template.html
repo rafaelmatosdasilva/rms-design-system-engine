@@ -1510,7 +1510,9 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 .sg-tk-alias > .sg-token-swatch, .sg-tk-name > .sg-token-swatch { margin: 0; }
 /* A colour inside a link pill, wherever the pill is (a table, a panel): the same small circle. */
 .sg-link-pill > .sg-token-swatch { flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0; border-radius: 50%; }
-.sg-tk-facts th[scope="row"] { width: 30%; position: static; font-weight: var(--sg-text-weight); color: var(--sg-muted); }
+.sg-tk-facts th[scope="row"] { width: 30%; position: static; background: none; font-weight: var(--sg-text-weight); color: var(--sg-muted); }
+.sg-tk-facts tr:last-child > * { border-bottom: 0; }   /* the card's own edge closes it */
+.sg-tk-code-line { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-s); }   /* its name and Copy on one line */
 .sg-tk-alias > .sg-tk-mark { width: var(--sg-space-l); height: var(--sg-space-l); }
 .sg-tk-table tr[data-token] { cursor: pointer; }   /* the whole row opens the token's details, as a Status row opens its component */
 .sg-tk-table tr[data-token]:hover > td { background: var(--sg-a2); }
@@ -2871,6 +2873,23 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
     pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: labels.filter(function (l) { return counts[l[0]]; }).map(function (l) { return { key: l[0], label: l[1], n: counts[l[0]], dot: IL_DOT[l[0]] }; }) });
+    // The review, downloaded: for Excel (a CSV a spreadsheet opens, one row per page) and for Claude (Markdown: what the
+    // table is, how to work through it, then each page with its decision, why and each change), to hand to whoever fixes it.
+    var ilText = function (html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = ' — ' + v.textContent; }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
+    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '' } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilWhy(p)), gets: ilText(ilGets(p)) }; }); };
+    var ilSave = function (name, type, text) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); };
+    var ilBase = String(DATA.title || 'design-system').replace(/[^\w-]+/g, '-').toLowerCase() + '-intent-layer-review';
+    var ilCsv = function () { var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }; var head = ['Decision', 'Page', 'File', 'Link', 'For', 'What to do', 'Why', 'What the agents get']; return '\ufeff' + [head.map(q).join(',')].concat(ilRecords().map(function (r) { return [r.decision, r.page, r.file, r.link, r.forWhat, r.todo, r.why, r.gets].map(q).join(','); })).join('\r\n'); };
+    var ilMd = function () {
+      var recs = ilRecords(), out = ['# Intent layer review: ' + (DATA.title || 'design system'), '', 'A review of every page of the team\'s intent layer' + (ilSrc.url ? ' (' + ilSrc.url + ')' : '') + ', one decision per page, made by the living style guide from the design system\'s components.', '', 'How to work through it:', '- Go decision by decision, in this order; each page says what to do, why, and what the agents get from it now.', '- Name components exactly as written here: they are the design system\'s own names.', '- Change only the pages listed. Keep each page\'s format (its DSDS sections).', '- When a decision looks wrong, say why instead of applying it.', ''];
+      labels.forEach(function (l) { var mine = recs.filter(function (r) { return r.decision === l[1]; }); if (!mine.length) return; out.push('## ' + l[1] + ' (' + mine.length + ')', ''); mine.forEach(function (r) { out.push('### ' + (r.page || r.forWhat)); if (r.file) out.push('- File: `' + r.file + '`' + (r.link ? ' (' + r.link + ')' : '')); if (r.forWhat) out.push('- For: ' + r.forWhat.replace(/\n/g, '; ')); out.push('- What to do: ' + r.todo.replace(/\n/g, '; ')); if (r.why) out.push('- Why: ' + r.why.replace(/\n/g, '; ')); if (r.gets) out.push('- What the agents get now: ' + r.gets.replace(/\n/g, '; ')); out.push(''); }); });
+      return out.join('\n');
+    };
+    var ilHead = ilSec.querySelector(':scope > h2');
+    if (ilHead) { var ilLinks = ilHead.querySelector('.pg-head-links'); if (!ilLinks) { ilHead.classList.add('sg-h2-links'); ilHead.insertAdjacentHTML('beforeend', '<div class="pg-head-links"></div>'); ilLinks = ilHead.querySelector('.pg-head-links'); }
+      ilLinks.insertAdjacentHTML('afterbegin', sysButton('button', 'Download for Excel', ' data-il-export="csv"', null, null, DOWNLOAD_SVG) + sysButton('button', 'Download for Claude', ' data-il-export="md"', null, null, DOWNLOAD_SVG));
+      ilLinks.addEventListener('click', function (e) { var b = e.target.closest('[data-il-export]'); if (!b) return; if (b.getAttribute('data-il-export') === 'csv') ilSave(ilBase + '.csv', 'text/csv;charset=utf-8', ilCsv()); else ilSave(ilBase + '.md', 'text/markdown;charset=utf-8', ilMd()); });
+    }
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
   }
@@ -4113,7 +4132,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         if (t.modes) {
           var idx = t.modes.map(function (m, i) { return i; });
           if (t.modes.every(function (m) { return TK_SCREEN.indexOf(String(m).toLowerCase()) >= 0; })) idx.sort(function (x, y) { return TK_SCREEN.indexOf(String(t.modes[x]).toLowerCase()) - TK_SCREEN.indexOf(String(t.modes[y]).toLowerCase()); });
-          labels = idx.map(function (i) { return t.modes[i]; }); values = idx.map(function (i) { return t.values[i]; }); var aliases = t.aliases ? idx.map(function (i) { return t.aliases[i]; }) : null;
+          labels = idx.map(function (i) { return t.modes[i]; }); values = idx.map(function (i) { return t.values[i]; });
+          var aliases = t.aliases ? idx.map(function (i) { return t.aliases[i]; }) : null;
+          if (labels.length === 1 && /^Mode \d+$/i.test(String(labels[0]))) labels = ['Value'];   // Figma's default name for a collection's only mode: its value, plainly
         } else {
           var modes = t.type === 'colour' ? cm : sm;
           labels = modes.map(function (m) { return m.label; });
@@ -4182,7 +4203,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var det = m.querySelector('.sg-tk-detail');
       det.innerHTML = sidePanelPage({ crumbs: trailHere(from).concat([r.coll || 'Tokens']).concat(r.path.slice(0, -1)), title: r.path[r.path.length - 1], sub: r.t.figma, body:
         // What it is, in a card's table as every part of a panel is: what it styles, its name in the code, what it is for.
-        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Token</div><table class="pg-par-table sg-tk-facts"><tbody>' + [['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<code>' + esc(r.t.var) + '</code> <button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']].map(function (x) { return '<tr><th scope="row">' + esc(x[0]) + '</th><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+        '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Token</div><table class="pg-par-table sg-tk-facts"><tbody>' + [['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<span class="sg-tk-code-line"><code>' + esc(r.t.var) + '</code><button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button></span>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']].map(function (x) { return '<tr><th scope="row">' + esc(x[0]) + '</th><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Values</div>' + vals + '</div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Used by ' + plural(comps.length, 'component', 'components') + '</div>' + usersTable(comps) + '</div>' });
       // The table's head stuck under the panel's head as the panel scrolls.
@@ -4190,6 +4211,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var heads = function () { if (ph && ph.offsetHeight) det.style.setProperty('--sg-panel-head-h', stuckH(ph) + 'px'); if (ch && ch.offsetHeight) det.style.setProperty('--pg-card-head-h', stuckH(ch) + 'px'); };
       m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
       heads();   // measured once shown
+      setTimeout(heads, 300);   // and again once it has slid in and its title has its final lines
+      if (typeof ResizeObserver !== 'undefined' && ph && !ph._sized) { ph._sized = true; new ResizeObserver(heads).observe(ph); }
       requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
       m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
     };

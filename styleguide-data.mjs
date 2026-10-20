@@ -1977,7 +1977,18 @@ export function motionTodos(m, components = []) {
 // boolean, text), its collection when the capture kept it, and its value in each mode Figma gives it.
 // vars: the Figma variables snapshot; css: the system's own CSS (to know which variables the code declares).
 // → [{ figma, var, type, collection, modes: [label], values: [value], aliases?: [the token each mode points at, or null] }]
-export function allVariables(vars = {}, css = '') {
+// A motion token's value as CSS writes it: an easing as cubic-bezier(…), a timing in milliseconds. An easing a capture
+// could only write as "[object Object]" is read from design.json (design: figma-cli's snapshot) when it holds it.
+function motionShown(t, m, v, design) {
+  let x = v;
+  if (x === '[object Object]' && design) {
+    for (const c of design.variables ?? []) if (c.name === t.collection) for (const dv of c.variables ?? []) if (dv.name === t.name) x = dv.values?.[m] ?? x;
+  }
+  if (x && typeof x === 'object') { const b = x.easingFunctionCubicBezier ?? x; if (['x1', 'y1', 'x2', 'y2'].every((k) => typeof b[k] === 'number')) return `cubic-bezier(${[b.x1, b.y1, b.x2, b.y2].map((n) => Math.round(n * 100) / 100).join(', ')})`; return /LINEAR/i.test(x.type ?? '') ? 'linear' : null; }
+  if (t.kind === 'TIMING' && x != null && /^-?[\d.]+$/.test(String(x))) return Math.round(Number(x) * 1000) + 'ms';
+  return x === '[object Object]' ? null : x;
+}
+export function allVariables(vars = {}, css = '', design = null) {
   const declared = new Set((String(css).match(/--[\w-]+(?=\s*:)/g) ?? []));
   const codeVar = (n) => { const v = '--' + String(n).replace(/[\/\s]+/g, '-'); return declared.has(v) ? v : null; };
   // Figma's own tokens, as the capture kept them (figmaTokens): each in its collection, every mode of it, its aliases.
@@ -1991,7 +2002,7 @@ export function allVariables(vars = {}, css = '') {
       const scope = (t.scopes ?? []).join(' '), byScope = SCOPE.find(([re]) => re.test(scope))?.[1];
       const type = /motion/i.test(t.collection ?? '') ? 'motion' : byScope ?? named(t.name) ?? KIND[t.kind] ?? 'number';
       const modes = modesOf.get(t.collection) ?? Object.keys(t.values ?? {});
-      return { figma: t.name, var: codeVar(t.name), type, collection: t.collection, modes, values: modes.map((m) => t.values?.[m] ?? null), ...(t.aliases ? { aliases: modes.map((m) => t.aliases[m] ?? null) } : {}), ...(t.description ? { description: t.description } : {}) };
+      return { figma: t.name, var: codeVar(t.name), type, collection: t.collection, modes, values: modes.map((m) => (t.kind === 'EASING' || t.kind === 'TIMING' ? motionShown(t, m, t.values?.[m] ?? null, design) : t.values?.[m] ?? null)), ...(t.aliases ? { aliases: modes.map((m) => t.aliases[m] ?? null) } : {}), ...(t.description ? { description: t.description } : {}) };
     });
   }
   const of = vars._collections?.of ?? {};
