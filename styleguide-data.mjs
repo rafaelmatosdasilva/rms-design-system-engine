@@ -1901,16 +1901,25 @@ export async function motionTokens(cssText = '', { figmaVars = {}, cfg = {}, fil
 // The motion the code has and Figma has none of: one row of the system's To do, for whoever keeps Figma, since
 // nothing compares the system's motion with Figma until Figma has its variables. m: motionTokens(…).
 // → [{ kind, type, who, say, todo }], none when Figma has motion variables or the code has no motion.
-export function motionTodos(m) {
+export function motionTodos(m, components = []) {
   if (!m || m.figmaHas) return [];
   const d = m.durations ?? [], e = m.easings ?? [];
   if (!d.length && !e.length) return [];
   const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
-  const list = [...d, ...e].map((t) => `${t.var} ${t.value}`);
-  const what = [d.length ? n(d.length, 'duration', 'durations') : '', e.length ? n(e.length, 'easing', 'easings') : ''].filter(Boolean).join(' and ');
-  return [{ kind: 'Motion variables', type: 'Motion, variables', who: 'figma',
-    say: `Figma has no motion variables, while the code has ${what} (${list.slice(0, 6).join(', ')}${list.length > 6 ? `, and ${list.length - 6} more` : ''}). Nothing compares the system's motion with Figma until Figma has them.`,
-    todo: 'Add them in Figma to a variable collection named Motion: each duration a number in milliseconds, each easing its curve as text (cubic-bezier(…) or ease-out), named as the code names them. The next refresh of the Figma data reads them, and the motion page names each one.' }];
+  // Each token goes to the component it is named after (--modal-duration: modal), the longest name that fits; the rest
+  // stay with the system.
+  const sqz = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const names = components.map(String).filter((c) => sqz(c).length >= 3).sort((a, b) => sqz(b).length - sqz(a).length);
+  const owner = (t) => names.find((c) => sqz(t.var).includes(sqz(c))) ?? null;
+  const groups = new Map();
+  for (const [kind, t] of [...d.map((t) => ['d', t]), ...e.map((t) => ['e', t])]) { const o = owner(t); if (!groups.has(o)) groups.set(o, { d: [], e: [] }); groups.get(o)[kind].push(t); }
+  return [...groups].map(([component, g]) => {
+    const list = [...g.d, ...g.e].map((t) => `${t.var} ${t.value}`);
+    const what = [g.d.length ? n(g.d.length, 'duration', 'durations') : '', g.e.length ? n(g.e.length, 'easing', 'easings') : ''].filter(Boolean).join(' and ');
+    return { kind: 'Motion variables', type: 'Motion, variables', who: 'figma', ...(component ? { component, vars: list } : {}),
+      say: `Figma has no motion variables, while the code has ${what}${component ? ` for ${component}` : ''} (${list.slice(0, 6).join(', ')}${list.length > 6 ? `, and ${list.length - 6} more` : ''}). Nothing compares ${component ? 'its' : "the system's"} motion with Figma until Figma has them.`,
+      todo: 'Add them in Figma to a variable collection named Motion: each duration a number in milliseconds, each easing its curve as text (cubic-bezier(…) or ease-out), named as the code names them. The next refresh of the Figma data reads them, and the motion page names each one.' };
+  });
 }
 
 // Every variable Figma has (the captured snapshot), for the style guide's Tokens page: each with its Figma name, the

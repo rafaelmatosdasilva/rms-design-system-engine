@@ -76,10 +76,21 @@ export function missingFamilies(html) {
   for (const m of String(html).matchAll(/<link\b[^>]*href=["']https:\/\/fonts\.googleapis\.com\/css2?\?([^"']+)["']/gi))
     for (const f of unescape(m[1]).matchAll(/family=([^:&]+)/g)) carried.add(decodeURIComponent(f[1].replace(/\+/g, ' ')).toLowerCase());
   const named = new Map();
-  for (const m of css.replace(/@font-face\s*\{[^}]*\}/g, '').matchAll(/(?:^|[;{\s])font-family\s*:\s*([^;}]+)/gi))
+  // A family named through a custom property (font-family: var(--font-family, inter)) is read from where the page
+  // defines it, else from its fallback.
+  const defs = new Map([...css.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)].map((m) => [m[1], m[2].trim()]));
+  const first = (v, depth = 0) => {
+    const x = String(v).replace(/!important/i, '').trim();
+    const ref = /^var\(\s*(--[\w-]+)\s*(?:,\s*([^)]*))?\)/.exec(x);
+    if (ref && depth < 8) return first(defs.get(ref[1]) ?? ref[2] ?? '', depth + 1);
+    return x.split(',')[0].trim().replace(/^['"]|['"]$/g, '').trim();
+  };
+  const decls = [...css.replace(/@font-face\s*\{[^}]*\}/g, '').matchAll(/(?:^|[;{\s])font-family\s*:\s*([^;}]+)/gi)].map((m) => m[1])
+    .concat([...String(html).matchAll(/\sstyle=["'][^"']*?font-family\s*:\s*([^;"']+)/gi)].map((m) => m[1]));
+  for (const d of decls)
     {
       // The family it asks for first: the rest are fallbacks, there for a computer that lacks it.
-      const f = m[1].split(',')[0].replace(/!important/i, '').trim().replace(/^['"]|['"]$/g, '').trim();
+      const f = first(d);
       if (!f || /[()]/.test(f) || GENERIC.test(f) || carried.has(f.toLowerCase())) continue;
       if (!named.has(f.toLowerCase())) named.set(f.toLowerCase(), f);
     }

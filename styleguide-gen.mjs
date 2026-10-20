@@ -547,6 +547,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Each component's height in Figma (its default variant), so the page can read how round a radius is on it (the
     // radius against half the height): the Identity page's shape analysis.
     view.figmaHeights = Object.fromEntries(Object.entries(structSnap).filter(([n, c]) => n && !/^[_.]/.test(n) && Number(c?.h) > 0).map(([n, c]) => [n, Math.round(Number(c.h))]));
+    // Each component's shape as Figma draws it, for systems that name no radius token per component: the radius variable
+    // bound on its frame (or its radius in px) and whether its default variant has a border.
+    view.figmaShapes = Object.fromEntries(Object.entries(structSnap).filter(([n, c]) => n && !/^[_.]/.test(n) && c && typeof c === 'object').map(([n, c]) => [n, {
+      h: Number(c.h) > 0 ? Math.round(Number(c.h)) : null,
+      rVar: typeof c.innerRadiusVar === 'string' ? c.innerRadiusVar : typeof c.radiusVar === 'string' ? c.radiusVar : null,
+      rPx: Number.isFinite(Number(c.radiusPx)) && c.radiusPx !== null ? Number(c.radiusPx) : null,
+      stroke: typeof c.strokeOnDefault === 'boolean' ? c.strokeOnDefault : null,
+    }]));
     for (const c of view.components) {
       const defs = ctx?.propsSnap?.[c.name]?.properties ?? {};
       const slots = Object.entries(defs).filter(([, d]) => d?.type === 'SLOT').map(([k, d]) => {
@@ -1201,7 +1209,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       if (m) m.overview = motionOverview(m.moves ?? [], m);
       if (m) view.motion = m;
       // Motion the code has and Figma has no variables for: a row of the system's To do.
-      const mt = motionTodos(m);
+      const mt = motionTodos(m, view.components.map((c) => c.name));   // each tied to the component its tokens are named after
       if (mt.length) view.systemTodo = [...(view.systemTodo ?? []), ...mt];
     } catch { /* the page builds without it */ }
     // A class a product styles almost as the system styles one of its components: a decision in that component's

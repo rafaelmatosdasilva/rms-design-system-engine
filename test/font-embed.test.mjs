@@ -50,11 +50,18 @@ test('a family the CSS asks for first that nothing loads is found; carried, link
   const html = `<head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&amp;display=swap"></head>
 <style>@font-face { font-family: "acme"; src: url(data:font/woff2;base64,AA) }
 body { font-family: "Open Sans", sans-serif; } code { font-family: SFMono-Regular, "Ubuntu Mono", monospace; }
-h1 { font-family: Inter, sans-serif; } .b { font-family: acme; } .c { font-family: var(--f, x); } .d { font-family: system-ui; }</style>`;
+h1 { font-family: Inter, sans-serif; } .b { font-family: acme; } .c { font-family: var(--f, serif); } .d { font-family: system-ui; }</style>`;
   assert.deepEqual(missingFamilies(html), ['Open Sans']);
   const asked = [];
   const r = await serviceFonts(['Open Sans', 'Private Face'], { fetchText: async (u) => { asked.push(u); if (/Private/.test(u) || /100\.\.900/.test(u)) throw new Error('400'); return '@font-face{}'; } });
   assert.deepEqual(r.found.map((f) => f.family), ['Open Sans']);
   assert.match(r.found[0].url, /family=Open\+Sans:ital,wght@0,200\.\.900/);
   assert.deepEqual(r.missing, [{ family: 'Private Face', why: 'not on the font service' }]);
+});
+
+test('missingFamilies: a family named through a custom property, in a rule or an inline style, is found', async () => {
+  const { missingFamilies } = await import('../font-embed.mjs');
+  assert.deepEqual(missingFamilies('<style>:root { --font-family: Acme Sans; } body { font-family: var(--font-family, serif); }</style>'), ['Acme Sans']);
+  assert.deepEqual(missingFamilies('<b style="font-family:var(--unset, acme grotesk), sans-serif">a</b>'), ['acme grotesk']);
+  assert.deepEqual(missingFamilies('<style>@font-face { font-family: "Acme Sans"; src: url(x); } :root { --f: Acme Sans; } p { font-family: var(--f); }</style>'), []);
 });

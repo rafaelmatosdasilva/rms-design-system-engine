@@ -190,6 +190,8 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-btn[aria-pressed="true"] { --sg-btn-step: 10%; }   /* a switch's words keep the browser's weight, whatever the text around it takes */
 .sg-seg-default { box-sizing: border-box; min-height: var(--sg-control-h); padding: var(--sg-space-xxs); border: var(--sg-line); border-radius: var(--sg-radius); background: transparent; }   /* see-through: on the page, a card or a bar alike */   /* the track on the page's own background */
 .sg-seg-default > button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: var(--sg-space-xs); min-height: 1.5rem; margin: 0; padding: var(--sg-space-xs) var(--sg-space-m); border: 0; border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); background: transparent; color: var(--sg-text-2); font-size: var(--sg-s); line-height: var(--sg-lh); cursor: pointer; white-space: nowrap; }   /* each option at least 24px tall (WCAG 2.5.8) */
+.sg-seg-default > button { height: auto; align-self: stretch; }
+.sg-tabs > .sg-tab { height: auto; min-height: calc(var(--sg-space-xxl) * 1.5); }   /* a tab as tall as its words and padding make it, whatever height a system gives its own buttons */   /* each option fills the control's height, whatever height a system gives its own buttons */
 .sg-seg-default > button:hover { color: var(--sg-text); }
 .sg-seg-default > button[aria-pressed="true"], .sg-seg-default > button.selected { background: var(--sg-seg-on); color: var(--sg-text); }   /* the choice by its fill alone, no ring */
 .sg-seg-default > button:not([aria-pressed="true"]):not(.selected):not(:disabled):hover { background: var(--sg-seg-hover); }   /* an option under the pointer, a step under the chosen one */   /* the choice a clear step lighter than its track */
@@ -271,7 +273,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 
 /* ── Section headings ────────────────────────────────────────────────────── */
 .sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-xxl); }   /* as far from the top as the page's own padding: opening one never scrolls the page */
-.sg-section-badge { display: inline-flex; align-items: center; padding: 0; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-bottom: var(--sg-space-s);   /* 8px to the title on every page */ }
+.sg-section-badge { display: inline-flex; align-items: center; padding: 0; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-bottom: 0;   /* right over the title on every page: the title's own line height is the gap */ }
 /* Above the title that sticks: the title's room reaches up under the tag, so the tag is drawn over it, never cut;
    scrolled away, it passes under the bar at the window's top. */
 .sg-section-badge, .sg-crumb { position: relative; z-index: 17; }   /* the crumb beside the tag too: never clipped by the title's room under it */
@@ -566,7 +568,8 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-searching .sg-main *:not(#sg-search *) { animation-play-state: paused !important; }
 .sg-searching .sg-main > *:not(.sg-controlbar) { pointer-events: none; }   /* the page under the search holds still and does not react */
 .sg-search-flyout > .sg-chips { position: sticky; top: calc(-1 * var(--sg-space-s)); z-index: 1; margin: calc(-1 * var(--sg-space-s)) calc(-1 * var(--sg-space-s)) 0; padding: var(--sg-space-s); background: var(--sg-bg); }   /* what to search in stays in view as the results scroll */
-.sg-search-flyout > .sg-chips.sg-sticky-edge::after { left: 0; right: 0; }   /* its line the flyout's whole width */
+.sg-search-flyout > .sg-chips.sg-sticky-edge::after { left: 0; right: 0; }
+.sg-search-flyout > .sg-chips { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .sg-search-flyout > .sg-chips > * { flex: none; } .sg-search-flyout > .sg-chips::-webkit-scrollbar { display: none; }   /* one row always; on a narrow screen it scrolls sideways */   /* its line the flyout's whole width */
 .sg-search-flyout .sg-results { margin: 0 calc(-1 * var(--sg-space-s)); }
 .sg-results > a { position: relative; }
 .sg-results > a + a { margin-top: var(--sg-space-l); }
@@ -618,6 +621,7 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .spacing-name { color: var(--sg-text-2); font-size: var(--sg-xs); }
 /* Colours, spacing and radii as lists: one card per group, its name as the head, the columns lined up from card to card. */
 .sg-token-cards { display: grid; grid-template-columns: 1fr; gap: var(--sg-card-gap); }
+.sg-token-cards + .sg-token-cards { margin-top: var(--sg-card-gap); }   /* one group of cards under another keeps the same gap as the cards in it */
 .pg-inspect.sg-token-card table { table-layout: fixed; }   /* one rule for every table: the name a fixed share, the modes' columns sharing the rest equally, so the columns line up from one table to the next */
 .pg-inspect.sg-token-card .sg-token-name-col { width: 34%; }
 .pg-inspect.sg-token-card.sg-tk-table .sg-token-name-col { width: clamp(9rem, 20%, 16rem); }   /* a token's own name is the last part of its path, short: the modes' values get the room */
@@ -701,7 +705,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
    is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
 .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow var(--sg-fast); }
-.sg-sticky-edge { box-shadow: none; }
+.sg-sticky-edge { box-shadow: 0 var(--sg-stick-gap) 0 0 var(--sg-bg); }   /* the lowest stuck bar paints the page's gap under its line, so nothing shows sliced right under it */
 /* A bar that sticks spans the content's whole width (into the page's side padding), so nothing shows beside it; once
    stuck, the lowest one has the page's line under it, as wide. */
 :is(.sg-hero > h1, .pg-head, .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head)::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-main-pad, 0px)); right: calc(-1 * var(--sg-main-pad, 0px)); background: var(--sg-bg); z-index: -1; pointer-events: none; }
@@ -773,6 +777,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Above a table, its statuses as chips that show only those rows: a dot, the words and the count badge. */
 .sg-mx-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sg-text); }   /* a long name cut short, whole on hover */
 .sg-matrix th.sg-mx-open-cell, .sg-matrix td.sg-mx-open-cell { width: calc(var(--sg-space-xxl) + var(--sg-space-s)); text-align: right; }
+.sg-matrix :is(td, th).sg-mx-open-cell { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); } .sg-matrix td.sg-mx-open-cell .sg-mx-go { justify-content: flex-end; }   /* its arrow as far from the right edge as the first column's words are from the left */
 .sg-mx-go { display: inline-flex; align-items: center; justify-content: center; flex: none; width: calc(var(--sg-space-xl) + var(--sg-space-xs)); height: calc(var(--sg-space-xl) + var(--sg-space-xs)); margin: 0; padding: 0; border: 0; border-radius: var(--sg-control-radius); background: transparent; color: var(--sg-text-2); cursor: pointer; vertical-align: middle; }   /* an arrow that opens the component */
 .sg-mx-go:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
 .sg-matrix .sg-mx-row.is-link { cursor: pointer; }   /* a row opens the component's page: its own hover and press */
@@ -1283,10 +1288,11 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-tm-svg { flex: 1; width: 100%; min-height: 0; overflow: visible; }   /* as large as its panel allows; its labels kept at the kit's label size (--tm-k, its scale) */
 .sg-bk-tm-svg line { stroke-width: var(--bk-line-w, 1px); vector-effect: non-scaling-stroke; }
 .sg-bk-tm-svg .is-acc { stroke: var(--bk-1); fill: var(--bk-1); }
-.sg-bk-tm-svg .is-mute { stroke: currentColor; fill: currentColor; opacity: .5; }
+.sg-bk-tm-svg .is-mute { stroke: currentColor; fill: currentColor; opacity: .7; }   /* readable in both modes */
 .sg-bk-tm-svg .is-dash { stroke-dasharray: 4 4; }
 .sg-bk-tm-svg text:not(.sg-bk-tm-aa) { font-size: calc(var(--sg-s) / var(--tm-k, 1)); stroke: none; fill: currentColor; }   /* small words in the tile's ink: the hue is for the large letters and the lines */
 .sg-bk-tm-aa { fill: var(--bk-1); }
+.sg-bk-tm::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 var(--bk-line-w, 1px) var(--sg-line-colour); pointer-events: none; }   /* its outline over what fills it to the edge (the bars' panel) */
 .sg-bk-tm-ws { display: flex; flex-wrap: wrap; column-gap: var(--sg-space-l); row-gap: var(--sg-space-xxs); font-size: var(--sg-s); }
 .sg-bk-tm-ws i { font-style: normal; }
 .sg-bk-tm-rows { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--sg-space-s); }
@@ -1519,7 +1525,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-section > .pg-areas ~ .pg-area { padding-top: 0; margin-top: var(--sg-stick-gap); }
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); }
 :is(.pg-par-card, .pg-inspect, .pg-code) { overflow-clip-margin: var(--sg-radius); }   /* room for the gap and the line it paints above itself (a plain length: the browser drops a calc() here) */
-:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-colour), 0 calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg); }   /* its top line, and the gap above it painted with the page */
+:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-colour), 0 calc(-1 * var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 calc(var(--sg-line-width, 1px) * 2) var(--sg-bg); }   /* its top line, and the gap above it painted with the page */
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head)::before,
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:last-child, .pg-inspect-head, .pg-code-head)::after { content: ''; position: absolute; top: calc(-1 * (var(--sg-stick-gap) + var(--sg-line-width, 1px))); width: var(--sg-radius); height: calc(var(--sg-stick-gap) + var(--sg-radius)); pointer-events: none; }   /* the gap above a corner (the card's side line hidden there), then the corner's curve, its edges a little soft so it reads as smooth as the card's own */
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head)::before { left: calc(-1 * var(--sg-line-width, 1px)); background: linear-gradient(var(--sg-bg), var(--sg-bg)) 0 0 / 100% var(--sg-stick-gap) no-repeat, radial-gradient(circle at 100% 100%, transparent calc(var(--sg-radius) - 1.6px), var(--sg-line-colour) calc(var(--sg-radius) - 1px), var(--sg-line-colour) calc(var(--sg-radius) - 0.4px), var(--sg-bg) calc(var(--sg-radius) + 0.2px)) 0 100% / 100% var(--sg-radius) no-repeat; }
@@ -1627,6 +1633,9 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   var COMPONENTS = DATA.components || [];
   // The page is still while the search is open (the loops below skip a beat).
   var sgQuiet = function () { return document.documentElement.classList.contains('sg-searching'); };
+  // The page keeps the root size it loaded with: a system whose own CSS sizes text on a mode attribute (data-color, data-size)
+  // would otherwise shrink or grow every rem on the page when a mode is switched on <html>.
+  document.documentElement.style.fontSize = getComputedStyle(document.documentElement).fontSize;
   // What each component is, as the data gives it, taken before anything is drawn (drawing adds to it): the base of its
   // signature, which says whether accessibility results kept for it still hold (compSig).
   var COMP_DATA = {};
@@ -2130,7 +2139,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   // A control the page draws itself (its segmented control, tooltip, card) is the template's, never the system's work:
   // no task. The system's own gaps are in Parity.
   // What the tokens owe (descriptions to write in Figma, a value written by hand twice, an alias to a removed token).
-  (DATA.systemTodo || []).forEach(function (t) { TODO.push({ who: t.who, comp: null, area: t.area || 'System', type: t.type || 'Tokens, ' + t.kind.toLowerCase(), pairing: t.pairing, match: t.match, say: t.say, todo: t.todo }); });
+  (DATA.systemTodo || []).forEach(function (t) { if (t.component) return;   /* one tied to a component is on that component's page */ TODO.push({ who: t.who, comp: null, area: t.area || 'System', type: t.type || 'Tokens, ' + t.kind.toLowerCase(), pairing: t.pairing, match: t.match, say: t.say, todo: t.todo }); });
   // A component whose file is still to confirm (a proposal, or files near its name) is that decision, not one to build.
   var PAIRING = {}; (DATA.systemTodo || []).forEach(function (t) { if (t.pairing) PAIRING[t.pairing] = true; });
   // A component only the code has, once Figma's components are captured: not on the page, a task each, with its file.
@@ -2990,10 +2999,19 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       // never a component's own colour (a map's water) that keeps one value in every theme; words that need black or
       // white take these, so they follow the theme too.
       var ramp = prim.filter(function (t) { return /^(primitives?|base)\//i.test(t.figma); }); if (!ramp.length) ramp = prim;
+      // A see-through colour (an overlay) is never a ground: only solid ones are ranked.
+      var bkSolid = ramp.filter(function (t) { var h = bkHex(t) || ''; return !/^#[0-9a-f]{8}$/i.test(h) || /ff$/i.test(h); }); if (bkSolid.length) ramp = bkSolid;
       var lightest = ramp.slice().sort(function (a, b) { return (bkLum(bkHex(b)) || 0) - (bkLum(bkHex(a)) || 0); })[0];
       var darkestT = ramp.slice().sort(function (a, b) { return (bkLum(bkHex(a)) || 0) - (bkLum(bkHex(b)) || 0); })[0];
       var ink = darkestT ? bkHex(darkestT) : '#000000', paper = lightest ? bkHex(lightest) : '#ffffff';
       var INK = darkestT ? bkCss(darkestT) : ink, PAPER = lightest ? bkCss(lightest) : paper;
+      // A system with no light-to-dark ramp of its own (its colours all one side): the page's own ground and text, which
+      // always read on each other.
+      if ((bkRatio(ink, paper) || 0) < 4.5) {
+        var bkToHex = function (c) { var m = String(c).match(/[\d.]+/g); return m && m.length >= 3 ? '#' + m.slice(0, 3).map(function (n) { return ('0' + Math.round(+n).toString(16)).slice(-2); }).join('') : null; };
+        var pgBg = bkToHex(bkRead('color', 'var(--sg-bg)')), pgTx = bkToHex(bkRead('color', 'var(--sg-text)'));
+        if (pgBg && pgTx) { var bgDark = (bkLum(pgBg) || 0) < (bkLum(pgTx) || 0); ink = bgDark ? pgBg : pgTx; paper = bgDark ? pgTx : pgBg; INK = bgDark ? 'var(--sg-bg)' : 'var(--sg-text)'; PAPER = bgDark ? 'var(--sg-text)' : 'var(--sg-bg)'; }
+      }
       var inkOrPaper = function (h) { return (bkRatio(h, ink) || 0) >= (bkRatio(h, paper) || 0) ? INK : PAPER; };
       // Words on a colour: the secondary hue when it reads on it (4.5:1 at least, in the brand and mode shown), else black
       // or white, whichever reads better.
@@ -3065,8 +3083,17 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       // role itself), under its full name, the primitive it points at beneath.
       var semOf = function (p) { return bkCols.filter(function (t) { return (t.aliases || []).indexOf(p.figma) >= 0; }).sort(function (a, b) { return a.figma.split('/').length - b.figma.split('/').length; })[0]; };
       var SWATCHES = '';   // placed under the neutral ramp
+      // The system's status colours first (positive, negative, warning, info…), whatever they point at or not: one each,
+      // its shortest name; else the colours that stand alone.
+      var STATUS = /(^|\/)(positive|success|accept|negative|error|danger|warning|alert|caution|pending|info|information|notice)(\/|$)/i, stSeen = {};
+      var ROLE = { positive: 'positive', success: 'positive', accept: 'positive', negative: 'negative', error: 'negative', danger: 'negative', warning: 'warning', alert: 'warning', caution: 'warning', pending: 'pending', info: 'info', information: 'info', notice: 'info' };
+      var ROLES = ['positive', 'negative', 'warning', 'pending', 'info'];
+      var stCols = bkCols.filter(function (t) { return STATUS.test(t.figma) && bkHex(t); }).sort(function (a, b) { return a.figma.split('/').length - b.figma.split('/').length || a.figma.length - b.figma.length; })
+        .filter(function (t) { var k = ROLE[(t.figma.match(STATUS) || [])[2].toLowerCase()]; if (stSeen[k]) return false; stSeen[k] = t; return true; })
+        .sort(function (a, b) { return ROLES.indexOf(ROLE[(a.figma.match(STATUS) || [])[2].toLowerCase()]) - ROLES.indexOf(ROLE[(b.figma.match(STATUS) || [])[2].toLowerCase()]); });
+      if (stCols.length >= 2) alone = stCols.slice(0, 5).map(function (t) { return { figma: t.figma, _self: t }; });   /* one per role, five at most */
       if (alone.length) SWATCHES = '<div class="sg-bk-swatches">' + alone.slice(0, 12).map(function (p) {
-        var t = semOf(p) || p;
+        var t = p._self || semOf(p) || p;
         return '<div class="sg-bk-swatch" title="' + esc(t.figma) + '"><i ' + paint(t) + '></i><span><b>' + esc(t.figma) + '</b>' + esc(bkHex(t).toUpperCase()) + '</span></div>';
       }).join('') + '</div>';
       html = html.replace('%%BK-SW%%', SWATCHES);
@@ -3096,13 +3123,16 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
         };
       }
       // How the system moves: the samples the bento sets moving, each at its own duration and easing.
-      var MOV = [], seenMv = {};
-      ((DATA.motion && DATA.motion.components) || []).forEach(function (m) {
-        var c = m.figma && m.figma.ms ? m.figma : m.code; if (!c || !c.ms) return;
-        var kind = /turn|rotat/i.test(m.what) ? 'turn' : /slide/i.test(m.what) ? 'slide' : /grow|widen|scale/i.test(m.what) ? 'grow' : /fade/i.test(m.what) ? 'fade' : 'slide';
-        var key = kind + c.ms + c.easing; if (seenMv[key] || MOV.length >= 6) return; seenMv[key] = 1;
-        MOV.push({ name: m.component + ' · ' + m.motion, ms: c.ms, ease: c.easing || 'ease', kind: kind });
-      });
+      // Only the system's own motion tokens (its Figma variables, or the custom properties its code declares), never a
+      // value a component writes by hand: each easing with the duration named as it is (modal-easing-out with
+      // modal-duration-out), and every other duration with the system's first easing.
+      var MOV = [], MOT = DATA.motion || {};
+      var mvMs = function (v) { v = String(v).trim(); var n = parseFloat(v); return /ms$/i.test(v) ? n : /s$/i.test(v) ? n * 1000 : n; };
+      var mvStem = function (n) { return String(n).replace(/^--/, '').replace(/duration|easing|ease|timing|curve/ig, '').replace(/[^a-z]/ig, '').toLowerCase(); };
+      var DTK = (MOT.durations || []).map(function (t) { return { name: t.figma || t.var, ms: Math.round(mvMs(t.value)) }; }).filter(function (x) { return x.ms > 0; });
+      var ETK = (MOT.easings || []).map(function (t) { return { name: t.figma || t.var, ease: String(t.value).trim() }; }).filter(function (x) { return x.ease; });
+      ETK.forEach(function (e) { var d = DTK.filter(function (x) { return mvStem(x.name) === mvStem(e.name); })[0] || DTK[Math.floor(DTK.length / 2)]; if (d && MOV.length < 6) MOV.push({ name: String(e.name).replace(/^--/, ''), ms: d.ms, ease: e.ease, kind: /out|exit|close|hide/i.test(e.name) ? 'fade' : 'slide' }); });
+      DTK.forEach(function (d) { if (MOV.length < 6 && !MOV.some(function (m) { return m.ms === d.ms; })) MOV.push({ name: String(d.name).replace(/^--/, ''), ms: d.ms, ease: ETK.length ? ETK[0].ease : 'ease', kind: 'slide' }); });
       BK_ALL.filter(function (t) { return /duration/i.test(t.figma) && parseFloat(bkFig(t)) > 0; }).forEach(function (t) {
         var n = parseFloat(bkFig(t)), ms = Math.round(n < 10 ? n * 1000 : n); if (MOV.length >= 8) return;
         MOV.push({ name: t.figma.split('/').slice(0, -1).join(' · '), ms: ms, ease: 'ease-in-out', kind: 'slide' });
@@ -3124,7 +3154,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       // the hue that reads on it (onG) for a large word, a mark or a line.
       var darkPage = document.documentElement.getAttribute('data-sg-scheme') === 'dark';
       var GROUND = darkPage ? INK : PAPER, onG = darkPage ? readOn(ink, h1x, HUE1, 3) : onP, groundTile = darkPage ? tileCss(ink, INK, onIsmall) : tileCss(paper, PAPER, onPsmall);
-      var fam = famCss ? 'font-family:' + esc(famCss) + ';' : '', strong = weights.length ? 'font-weight:' + esc(bkCss(weights[weights.length - 1])) + ';' : '';
+      var fam = famCss ? 'font-family:' + esc(famCss) + ', system-ui, sans-serif;' : '',   /* a computer without the family still draws a sans */ strong = weights.length ? 'font-weight:' + esc(bkCss(weights[weights.length - 1])) + ';' : '';
       var T = [];   // [classes, attributes, inner]
       var add = function (cls, attrs, inner) { T.push('<div class="sg-bk-t ' + cls + '" ' + attrs + '>' + inner + '</div>'); };
       var onC1big = readOn(h1x, h2x, HUE2, 3);
@@ -3161,27 +3191,39 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
         own.sort(function (a, b) { var r = function (t) { return /(all|top-?left|left-?right)$/i.test(t.figma) ? 0 : 1; }; return r(a) - r(b) || a.figma.length - b.figma.length; });
         return own[0] || null;
       };
-      var RH = DATA.figmaHeights || {}, rlW = lineT ? (bkPx(lineT) || 1) : 1, rlDisp = {}, rlSeq = [];
+      var RH = DATA.figmaHeights || {}, SH = DATA.figmaShapes || {}, rlW = lineT ? (bkPx(lineT) || 1) : 1, rlDisp = {}, rlSeq = [];
       BK_ALL.forEach(function (t) { var m = t.figma.match(/^[^/]+\/([^/]+)\/border\/(?:default\/)?display$/i); if (m && !(m[1] in rlDisp)) { rlDisp[m[1]] = /^true$/i.test(bkNow(t)); rlSeq.push(m[1]); } });
+      // A system with no border switch of its own: each component's border as Figma draws its default variant.
+      if (!rlSeq.length) Object.keys(SH).forEach(function (n) { if (SH[n].stroke != null) { rlDisp[n] = SH[n].stroke; rlSeq.push(n); } });
       var rlExact = function (n) { return new RegExp('^' + String(n).replace(/[^\w-]/g, '') + '$', 'i'); };
-      var rlOf = function (n) { var t = crOf(rlExact(n)); return { name: n, r: t ? (bkPx(t) || 0) : 0, token: t ? String(crEnd(t)).replace(/^(advanced|semantic|base)\//, '') : '', h: RH[n] || 0, on: n in rlDisp ? rlDisp[n] : false }; };
+      // A component's radius: its own radius token where the system names one per component, else the radius variable
+      // Figma binds on its frame (or the radius it draws), whatever the system calls it.
+      var rlVarPx = function (v) { if (!v) return null; var k = String(v).toLowerCase(), t = crBy[k] || BK_ALL.find(function (x) { return x.figma.toLowerCase().replace(/\/(all|value)$/, '') === k; }); return t ? bkPx(t) : null; };
+      var rlOf = function (n) { var t = crOf(rlExact(n)), sh = SH[n] || {}, vp = rlVarPx(sh.rVar), r = t ? (bkPx(t) || 0) : vp != null ? vp : sh.rPx != null ? sh.rPx : 0;
+        return { name: n, r: r, token: t ? String(crEnd(t)).replace(/^(advanced|semantic|base)\//, '') : (sh.rVar || ''), h: RH[n] || sh.h || 0, on: n in rlDisp ? rlDisp[n] : false }; };
       // How many components share each radius, and how many have their border on, for the captions.
-      var rlCount = {}; COMPONENTS.forEach(function (c) { var r = rlOf(c.name).r; rlCount[r] = (rlCount[r] || 0) + 1; });
+      var rlNames = COMPONENTS.map(function (c) { return c.name; }); Object.keys(SH).forEach(function (n) { if (rlNames.indexOf(n) < 0) rlNames.push(n); });
+      var rlCount = {}; rlNames.forEach(function (n) { var r = rlOf(n).r; rlCount[r] = (rlCount[r] || 0) + 1; });
       var rlOnN = rlSeq.filter(function (n) { return rlDisp[n]; }).length, rlAll = rlSeq.length;
-      // The corners people meet most (a card, a button, a toast, a panel, a modal, a side panel, a header, an action bar).
-      var CORNER = [[/^cardPrimary$/i, /^card/i], [/^buttonPrimary$/i, /^button/i], [/^toast$/i], [/^\w*panel$/i], [/^\w*modal$/i, /modal/i], [/side-?panel|panel-?side/i], [/^header/i], [/^action-?bar$/i]];
-      var crList = [];
-      CORNER.forEach(function (k) {
-        var t = crOf(k[0]) || (k[1] ? crOf(k[1]) : null), comp = t ? t.figma.split('/')[1] : (COMPONENTS.find(function (c) { return k[0].test(c.name); }) || {}).name;
-        if (comp && !crList.some(function (c) { return c.name === comp; })) crList.push(rlOf(comp));
-      });
-      // The shapes drawn faint behind the outline: a tag, a button, a card, a modal, nested by size.
-      var KINDS = [/tag|chip|badge/i, /button/i, /card/i, /modal|dialog|sheet|popup/i];
-      var rlGhost = KINDS.map(function (re) {
-        var c = crRad.filter(function (t) { var p = t.figma.split('/'); return re.test(p[1] || '') && /(all|top-?left)$/i.test(p[p.length - 1]) && bkPx(t) > 0; });
-        c.sort(function (x, y) { var px = /primary/i.test(x.figma) ? 0 : 1, py = /primary/i.test(y.figma) ? 0 : 1; return px - py || x.figma.length - y.figma.length; });
-        return c[0] ? rlOf(c[0].figma.split('/')[1]) : null;
-      }).filter(Boolean);
+      // The examples: the system's own components that have a radius, one for each radius and size they come in (a small
+      // pill, a card, a modal…), from the smallest up, eight at most; square ones only when too few are round.
+      var rlBucket = function (h) { return !h ? 0 : h <= 32 ? 1 : h <= 64 ? 2 : h <= 160 ? 3 : 4; };
+      var rlGroups = {}, rlAllOf = rlNames.map(rlOf);
+      rlAllOf.filter(function (c) { return c.r > 0; }).forEach(function (c) { var k = c.r + ':' + rlBucket(c.h), had = rlGroups[k], score = function (x) { return (/primary|default|base/i.test(x.name) ? 0 : 1) * 100 + x.name.length; }; if (!had || score(c) < score(had)) rlGroups[k] = c; });
+      var crList = Object.keys(rlGroups).map(function (k) { return rlGroups[k]; });
+      if (crList.length < 3) rlAllOf.filter(function (c) { return !c.r && c.h; }).forEach(function (c) { if (crList.length < 4 && !crList.some(function (x) { return rlBucket(x.h) === rlBucket(c.h) && x.r === c.r; })) crList.push(c); });
+      // First the surfaces people meet most, whatever the system calls them (a panel, a modal, a toast, a card, a button, a
+      // floating button), each its main one (primary, default, base, or the shortest name), round ones first.
+      var rlMain = function (x) { return (x.r > 0 ? 0 : 1000) + (/primary|default|base/i.test(x.name) ? 0 : 100) + x.name.length; };
+      var rlFirst = [/panel/i, /modal|dialog/i, /toast|snack/i, /card/i, /^(?!.*(float|fab)).*button/i, /float|fab/i].map(function (re) { return rlAllOf.filter(function (c) { return re.test(c.name) && c.h; }).sort(function (x, y) { return rlMain(x) - rlMain(y); })[0]; }).filter(function (c, i, all) { return c && all.indexOf(c) === i; });
+      crList = crList.filter(function (c) { return rlFirst.indexOf(c) < 0 && !rlFirst.some(function (f) { return f.name === c.name; }); });
+      // Then the rest, eight in all, spread across the sizes: one from each size in turn (small, medium, large…).
+      var rlBy = {}; crList.forEach(function (c) { var k = rlBucket(c.h); (rlBy[k] = rlBy[k] || []).push(c); });
+      Object.keys(rlBy).forEach(function (k) { rlBy[k].sort(function (a, b) { return b.r - a.r || (/primary|default|base/i.test(a.name) ? -1 : 1); }); });
+      var rlSpread = rlFirst.slice(0, 8), rlKeys = Object.keys(rlBy).sort();
+      for (var rr = 0; rlSpread.length < 8 && rlKeys.some(function (k) { return rlBy[k][rr]; }); rr++) rlKeys.forEach(function (k) { if (rlBy[k][rr] && rlSpread.length < 8) rlSpread.push(rlBy[k][rr]); });
+      crList = rlSpread.sort(function (a, b) { return (a.h || 999) - (b.h || 999) || a.r - b.r; });
+      var rlGhost = crList;
       // The texture: sixteen tiles, the components in the system's order, the ones in the loop among them, each shape
       // (its roundness, its border on or off) a few times at most.
       var rlRound = function (c) { return c.h ? Math.min(1, c.r / (c.h / 2)) : Math.min(1, c.r / 20); };
@@ -3195,7 +3237,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       if (crList.length >= 3) {
         // Each component in the first card at its height in Figma and its radius, one scale; the widths are set by its
         // kind (Figma fixes none): a bar spans the drawing, a box is square, the rest grow with their height.
-        var W = 360, H = 330, rlTall = Math.max.apply(null, rlGhost.map(function (c) { return c.h; }).concat([1])), DS = Math.min(1.1, (H - 80) / rlTall);
+        var W = 360, H = 330, rlTall = Math.max.apply(null, rlGhost.map(function (c) { return c.h; }).filter(function (h) { return h <= 260; }).concat([1])), DS = Math.min(1.1, (H - 80) / rlTall);   /* one very tall panel does not shrink the rest */
         var rlBox = function (c) { var h = Math.min(Math.max(c.h || 40, 16) * DS, H - 30), w = /header|bar|nav|toast|banner/i.test(c.name) || h >= 150 ? W - 40 : /checkbox|radio|switch|toggle|avatar|icon/i.test(c.name) ? h : Math.min(W - 80, 120 + h * 2);
           return [Math.round((W - w) / 2), Math.round((H - h) / 2), Math.round(w), Math.round(h), Math.round(Math.min(c.r * DS, h / 2) * 10) / 10]; };
         var rlC = {};
@@ -3279,7 +3321,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
             '<line x1="0" y1="100" x2="' + b[0] * 100 + '" y2="' + (1 - b[1]) * 100 + '" class="sg-bk-handle-l"/><line x1="100" y1="0" x2="' + b[2] * 100 + '" y2="' + (1 - b[3]) * 100 + '" class="sg-bk-handle-l"/>' +
             '<path d="' + P + '" class="is-strong" style="fill:none;stroke:' + esc(ac1) + '"/></svg>' +
             '<i class="sg-bk-runner" style="animation-duration:' + dur + 'ms, ' + dur + 'ms;animation-timing-function:linear, ' + esc(e.m.ease) + '"></i>' +
-            '<span class="sg-bk-curve-name"><b>' + esc(e.m.name.split(' · ').slice(-1)[0] + '  ·  ' + e.m.ease) + '</b>cubic-bezier(' + b.join(', ') + ')</span></div>' +
+            '<span class="sg-bk-curve-name"><b>' + esc(e.m.name) + '</b>cubic-bezier(' + b.join(', ') + ')</span></div>' +
             '<div class="sg-bk-curve-axis"><span>0ms</span><span>' + e.m.ms + 'ms</span></div></div>';
         };
         var CURVES = '<div class="sg-bk-curves">' + EZ.map(plot).join('') + '</div>';   // placed after the duration scale, on its right
@@ -3448,6 +3490,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       var near16 = function (list) { return list.slice().sort(function (a, b) { return Math.abs(a.px - 16) - Math.abs(b.px - 16) || a.w - b.w; })[0]; };
       var reg = near16(STY.filter(function (x) { return /regular|body|book|normal/i.test(x.name); })) || near16(STY);
       var disp = STY.slice().sort(function (a, b) { return b.px - a.px || b.w - a.w; })[0];
+      // A small scale whose body style is also its largest (13, 11 and 9px): the next style is the one compared with.
+      if (reg && disp === reg && STY.length > 1) reg = near16(STY.filter(function (x) { return x !== disp; }));
       if (reg && disp && disp !== reg) {
         // The family's own proportions, measured at the display size: its cap height and x-height.
         var famFont = String(bkRead('fontFamily', famCss || 'inherit'));
@@ -3503,7 +3547,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
         // The primary hue on the largest only: large text reads at 3:1, where small text needs 4.5. Each sample set at the
         // breakpoint shown (its size in px), in the weight shown (--tm-w), its other values its own tokens.
         var rows = scale.map(function (x, i) {
-          var css = 'font-size:' + now.px[i] + 'px;font-weight:var(--tm-w, ' + (x.st.weight ? tv(x.st.weight) : x.w) + ');' + (x.st.lh ? 'line-height:' + tv(x.st.lh) + ';' : '') + (x.st.ls ? 'letter-spacing:' + tv(x.st.ls) + ';' : '') + (famCss ? 'font-family:' + famCss + ';' : '') + (i === 0 ? 'color:' + HUE1 + ';' : '');
+          var css = 'font-size:' + now.px[i] + 'px;font-weight:var(--tm-w, ' + (x.st.weight ? tv(x.st.weight) : x.w) + ');' + (x.st.lh ? 'line-height:' + tv(x.st.lh) + ';' : '') + (x.st.ls ? 'letter-spacing:' + tv(x.st.ls) + ';' : '') + (famCss ? 'font-family:' + famCss + ';' : '') + (i === 0 ? 'color:var(--bk-1);' : '');   /* the largest in the tile's accent, which reads on its ground */
           return '<div class="sg-bk-tm-row' + (x === reg ? ' is-reg' : '') + '"><span class="sg-bk-tm-size">' + esc(String(x.name).split('/')[0]) + '  ·  <span class="sg-tm-px">' + now.px[i] + '</span></span><span class="sg-bk-tm-say" style="' + esc(css) + '">' + esc(SAYS[i] || SAYS[SAYS.length - 1]) + '</span></div>';
         }).join('');
         var howOf = function (b) { var r = b.px[regAt] || reg.px; return '<b>' + Math.round(b.px[0] / r * 10) / 10 + '×</b> the size' + (disp.w !== reg.w ? ', <b>' + (disp.w > reg.w ? '+' : '') + (disp.w - reg.w) + '</b> weight' : ''); };
@@ -3517,7 +3561,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
             BPV.map(function (b, j) { return '<s data-bp="' + j + '" style="bottom:' + Math.round(b.px[k] / maxAll * 100) + '%"' + (j === bpAt ? ' hidden' : '') + '></s>'; }).join('') + '</span>'; }).join('') +
           '</div><span class="sg-bk-tm-ends"><span class="sg-tm-min">' + now.px[nS - 1] + '</span><span class="sg-tm-max">' + now.px[0] + '</span></span></div>';
         var tmData = { bp: BPV.map(function (b) { return { px: b.px, lh: b.lh }; }), at: bpAt, max: maxAll, w: WTS, cap: capR, x: xR, F: F, base: BASE, reg: regAt, dw: disp.w - reg.w };
-        MORPH = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h5 sg-bk-block sg-bk-tm" data-weights="' + WTS.join(',') + '" data-tm="' + esc(JSON.stringify(tmData)) + '" ' + groundTile + ' >' + left + mid + bars + '</div></div>';
+        MORPH = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h5 sg-bk-block sg-bk-tm" data-weights="' + WTS.join(',') + '" data-tm="' + esc(JSON.stringify(tmData)) + '" ' + groundTile.replace('style="', 'style="--bk-1:' + esc(markOn(darkPage ? ink : paper)) + ';') + ' >'   /* the letters and guides in a hue that reads on this ground, else its text colour */ + left + mid + bars + '</div></div>';
       }
       // Depth: the system's surfaces, each only its background, its border where it has one and its shadow, lifted only
       // where its own switch is on (a shadow's values do not lift it, its display does). A stacked preview of a page built
@@ -4241,8 +4285,12 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   // shows every row; the Status page only those still to do, under the same numbers.
   function motionIssueRows(c) {
     var at0 = DATA.builtAt || null, val = function (t) { return t ? '<span class="pg-par-val">' + esc(t) + '</span>' : ''; };
+    // The motion tokens the code names after it that Figma has no variables for: one task, for whoever keeps Figma.
+    var varRows = (DATA.systemTodo || []).filter(function (t) { return t.component === c.name && t.kind === 'Motion variables'; }).map(function (t) {
+      return { key: c.name + '\u0000motion:variables', area: 'Motion', kind: 'Variables', kindHTML: esc('Motion variables'), code: '<code>' + esc((t.vars || []).join(', ')) + '</code>', figma: '<span class="pg-par-none">None</span>', todo: esc(t.todo), who: WHO.figma, st: 'todo', rel: PAR_REL.code, at: at0 };
+    });
     var timing = function (m) { return motionTiming(m) + (m.delay ? ', after ' + m.delay + 'ms' : ''); };
-    return (c.moves || []).map(function (r) {
+    return varRows.concat((c.moves || []).map(function (r) {
       var anim = /^(Repeats|Opens|Closes)$/.test(r.when) ? 'an animation' : 'a transition';
       var todo = r.status === 'differs' ? 'Make it ' + r.figma.ms + 'ms, ' + r.figma.easing + ', as Figma has it (' + r.figma.from + ').'
         : r.status === 'figma-none' ? 'Animate it in Figma as the code does (' + r.what + ', ' + r.code.ms + 'ms, ' + r.code.easing + '), on its Motion timeline or in its prototype, or stop it in the code.'
@@ -4253,7 +4301,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
         figma: r.figma ? '<code>' + esc(motionTiming(r.figma)) + '</code>' + val(capital(r.figma.from)) : '<span class="pg-par-none">' + esc(r.status === 'unread' ? 'Not read yet' : 'None') + '</span>',
         todo: esc(todo), who: st === 'todo' ? (r.status === 'figma-none' ? WHO.figma : WHO.code) : '', st: st,
         rel: r.status === 'code-only' ? 'Only in the code' : r.status === 'unread' ? 'Figma not read yet' : r.status === 'figma-none' ? PAR_REL.code : r.status === 'code-none' ? PAR_REL.figma : r.status === 'differs' ? PAR_REL.differs : '', at: at0, unrun: r.status === 'unread' };
-    });
+    }));
   }
   function motionOpen(c) { var n = motionIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
   // Its Motion area: that table under the area's own title, a count of each status above it; what does not move said so.
@@ -5894,10 +5942,11 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     var parP = states(built, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: { found: 'Found', unsure: 'Unsure', missing: 'Missing' }[o.code] }; });
     var accP = states(built, function (o) { return o.acc; }), docP = states(built, function (o) { return o.doc; });
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
-    var pT = card('Figma × Code Parity', parP, 'Match', built.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity'));
+    // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
+    var pT = card('Figma × Code Parity', parP, 'Match', built.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'));
     var iT = card('Code Implementation', codeP, 'Found', figmaRows.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'));
-    var aT = card('Accessibility', accP, 'Pass', built.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility'));
-    var dT = card('AI-ready Documentation', docP, 'Ready', built.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation'));
+    var aT = card('Accessibility', accP, 'Pass', built.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'To review', 'AccessibilityReview'));
+    var dT = card('AI-ready Documentation', docP, 'Ready', built.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
     pT.how = 'Figma\'s components the code has.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ. Differs: none are the same.';
@@ -5909,7 +5958,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';
     if (box._drawn !== html) { box.innerHTML = html; box._drawn = html; }
-    if (!box._go) { box._go = true; box.addEventListener('click', function (e) { var b = e.target.closest('[data-go-area]'); if (b) goTask.apply(null, ({ Implementation: [null, { code: 'Missing' }, 'Code'], Unsure: [null, { code: 'Unsure' }, 'Code'], Parity: ['Parity', { figma: 'Found', code: 'Found', par: 'Differs' }], Accessibility: ['Accessibility', { figma: 'Found', code: 'Found', acc: 'Issues' }], Documentation: ['Documentation', { figma: 'Found', code: 'Found', doc: 'Missing' }] })[b.getAttribute('data-go-area')] || [b.getAttribute('data-go-area')]); }); }
+    if (!box._go) { box._go = true; box.addEventListener('click', function (e) { var b = e.target.closest('[data-go-area]'); if (b) goTask.apply(null, ({ Implementation: [null, { code: 'Missing' }, 'Code'], Unsure: [null, { code: 'Unsure' }, 'Code'], Parity: ['Parity', { figma: 'Found', code: 'Found', par: 'Differs' }], Accessibility: ['Accessibility', { figma: 'Found', code: 'Found', acc: 'Issues' }], Documentation: ['Documentation', { figma: 'Found', code: 'Found', doc: 'Missing' }], ParityPartial: ['Parity', { figma: 'Found', code: 'Found', par: 'Partial' }], AccessibilityReview: ['Accessibility', { figma: 'Found', code: 'Found', acc: 'Review' }], DocumentationPartial: ['Documentation', { figma: 'Found', code: 'Found', doc: 'Partial' }] })[b.getAttribute('data-go-area')] || [b.getAttribute('data-go-area')]); }); }
   }
   // Only the kind chosen, its own tables, and its own count of what is to fix and to check; the numbers stay as they are.
   // Accessibility last: what a browser still has to try is numbered after the rest, so no other number moves.
@@ -6409,8 +6458,10 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         if (AREA_STATE[a[0]]) return { v: a[0], label: a[1], state: states[AREA_STATE[a[0]]] };
-        var f = a[0] === 'motion' ? motionOpen(c) : null, warn = !!(f && f.todo);
-        return { v: a[0], label: a[1], icon: warn ? ALERT_ICON : null, say: warn ? f.say : null };
+        // Motion carries the same dot as the other areas: something to fix, else matched where it moves.
+        var f = a[0] === 'motion' ? motionOpen(c) : null;
+        if (f && f.todo) return { v: a[0], label: a[1], state: { cls: 'differs', say: f.say } };
+        return { v: a[0], label: a[1], state: f && motionIssueRows(c).length ? { cls: 'match', say: 'Match' } : null };
       })) + '</div></div>' +
       // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.
       '<div class="pg-area" data-area="play">' +
