@@ -124,7 +124,8 @@ test('in the browser: with Figma\'s data a component only the code has has its p
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     await waitForTrue(send, sessionId, `!!document.querySelector('#status .sg-matrix')`);
-    assert.equal(await run(`!!document.querySelector('.sg-nav a[href="#c-HbChip"]')`), true, 'in the menu, with a page of its own');
+    // Compared with Figma, a component only the code has is left out of the menu (as one only Figma has); its page opens from Status.
+    assert.equal(await run(`!!document.querySelector('.sg-nav a[href="#c-HbChip"]')`), false, 'not in the menu');
     assert.equal(await run(`!!document.querySelector('#status tr.sg-mx-row.is-link[data-name="HbChip"] .sg-mx-go')`), true, 'its row opens its page');
     assert.equal(await run(`!!document.querySelector('.sg-nav a[href="#c-button"]')`), true, 'Figma\'s components are');
     // A row of the table: in the code, not in Figma; a tip on its Figma cell says what to do.

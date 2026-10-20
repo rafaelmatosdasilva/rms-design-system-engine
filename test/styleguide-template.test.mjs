@@ -215,9 +215,11 @@ test('in the browser: no script error, a control changes the real component, the
     // a busy machine is slower than a quiet one.
     const until = async (expr, ok) => { let v; for (let n = 0; n < 60; n++) { v = await run(expr); if (ok(v)) break; await new Promise((r) => setTimeout(r, 100)); } return v; };
     const shownIs = (id) => until(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`, (v) => v === id);
-    // One view at a time: the overview, with each component's thumbnail, and a component drawn when it is opened.
+    // One view at a time: the page opens on Status (the index stays built, off the menu, each component's thumbnail in
+    // it), and a component is drawn when it is opened.
     assert.equal(await run(`document.querySelectorAll('main > section[id^="c-"]').length`), 0, 'no component drawn before it is opened');
-    assert.equal(await run(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`), 'index');
+    assert.equal(await shownIs('status'), 'status', 'the page opens on Status');
+    assert.equal(await run(`document.querySelector('.sg-nav a[href="#index"]').hidden`), true, 'the index is not in the menu');
     assert.equal(await run(`!!document.querySelector('a.sg-card[href="#c-chip"] .sg-thumb .chip')`), true, 'the card shows the component itself');
     await run(`location.hash = '#c-chip'`);
     assert.equal(await shownIs('c-chip'), 'c-chip');
@@ -252,9 +254,9 @@ test('in the browser: no script error, a control changes the real component, the
     // opened sets them, the controls following.
     assert.equal(await run(`location.hash`), '#c-chip?Size=L');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-actions button')].some((b) => b.textContent === 'Copy link')`), false, 'no Copy link button: the address bar holds the link');
-    await run(`location.hash = '#index'`); await shownIs('index');
+    await run(`location.hash = '#status'`); await shownIs('status');
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'M').click()`);
-    assert.equal(await run(`location.hash`), '#index', 'a view not shown leaves the address alone');
+    assert.equal(await run(`location.hash`), '#status', 'a view not shown leaves the address alone');
     await run(`location.hash = '#c-chip?Size=L&Nope=1'`); await shownIs('c-chip');
     await until(`!!document.querySelector('#c-chip .pg-preview .chip.chip--l')`, (v) => v === true);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').classList.contains('chip--l') + '|' + [...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').getAttribute('aria-pressed')`), 'true|true');
@@ -471,8 +473,8 @@ test('in the browser: no script error, a control changes the real component, the
     // Where it is used is its own area, never a kind of documentation.
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|What is written|What to do|Status|Updated');
     const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:nth-child(2)')].map((d) => d.textContent).sort().join('|')`);
-    assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Its tokens'].sort().join('|'));
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( done)*$/, 'what is to write first, what is written after');
+    assert.equal(kinds, ['For agents', 'What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Its tokens'].sort().join('|'));
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*$/, 'what is to write first, then what is to check, what is written after');
     assert.match(await run(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]').textContent`), /(Not written yet\.|No pictures yet\.)You in Figma.+Missing/);
     assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Partial|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
     assert.match(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet/);
@@ -501,13 +503,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.querySelector('#status .sg-todo-filter, #status .sg-todo-kind')`), false, 'no tabs of kinds');
     // A row's arrow opens the component's own page in a panel over the table (?embed); a cell's arrow opens it on that
     // area, filtered; the X closes it.
-    const panel = await run(`(() => { document.querySelector('#status tr.sg-mx-row[data-name="chip"] .sg-mx-go:not(.sg-mx-go--cell)').click(); const p = document.getElementById('sg-comp-panel'); return [!p.hidden, p.querySelector('.sg-comp-panel-box').getAttribute('aria-label'), p.querySelector('iframe').getAttribute('src'), location.hash]; })()`);
+    const panel = await run(`(() => { document.querySelector('#status tr.sg-mx-row[data-name="chip"] .sg-mx-go:not(.sg-mx-go--cell)').click(); const p = document.getElementById('sg-comp-panel'); return [!p.hidden, p.querySelector('.sg-comp-panel-box').getAttribute('aria-label'), p.querySelector('iframe').getAttribute('data-at'), location.hash]; })()`);
     assert.match(panel[3], /[?&]open=c-chip(&|$)/, 'the address says which component is open');
     assert.deepEqual(panel.slice(0, 2), [true, 'chip']);
     assert.match(panel[2], /[?&]embed#c-chip$/, 'the component\'s own page, alone');
     await run(`document.querySelector('#sg-comp-panel [data-panel-close]').click()`);
-    assert.equal(await until(`document.getElementById('sg-comp-panel').hidden`, (v) => v === true), true, 'the X closes it, once it has slid out');
-    const cellGo = await run(`(() => { const b = document.querySelector('#status .sg-mx-go--cell'); if (!b) return null; b.click(); const src = document.querySelector('#sg-comp-panel iframe').getAttribute('src'); document.querySelector('#sg-comp-panel [data-panel-close]').click(); return src; })()`);
+    assert.equal(await until(`document.getElementById('sg-comp-panel').classList.contains('is-parked')`, (v) => v === true), true, 'the X closes it, once it has slid out (its page kept, out of sight, for the next one)');
+    const cellGo = await run(`(() => { const b = document.querySelector('#status .sg-mx-go--cell'); if (!b) return null; b.click(); const src = document.querySelector('#sg-comp-panel iframe').getAttribute('data-at'); document.querySelector('#sg-comp-panel [data-panel-close]').click(); return src; })()`);
     if (cellGo) assert.match(cellGo, /[?&]embed#c-[^/]+\/(parity|accessibility|documentation)\?st=(todo|check)$/, 'a cell opens its area, filtered');
     assert.equal(await run(`!!document.querySelector('#status .sg-mx-side, #status .sg-mx-split')`), false, 'no side panel');
     assert.equal(await run(`[...document.querySelectorAll('#status tr.sg-mx-row')].every((tr) => ['stFigma', 'stCode', 'stPar', 'stAcc', 'stDoc'].every((k) => tr.dataset[k]))`), true, 'every row carries each column\'s state, for the filters to count');
@@ -554,14 +556,15 @@ test('in the browser: no script error, a control changes the real component, the
       const pick = `[...document.querySelectorAll('${sel} .pg-par-card, ${sel} .pg-inspect')].filter((c) => c.getClientRects().length && c.querySelector('table')).sort((a, b) => b.offsetHeight - a.offsetHeight)[0]`;
       // The card's top just past the bars' bottom once they stick, so its head has the rest of the card to stick in,
       // however short the card is: the bars' bottom read where they stand, the page moved by the difference until it settles.
-      const bars = `[...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky')`;
+      const bars = `[...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head, ${sel} .pg-par-sum')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky')`;
       await run(`(() => { document.body.style.paddingBottom = '3000px'; const card = ${pick}; window.scrollTo({ top: scrollY + card.getBoundingClientRect().top - 200, behavior: 'instant' }); })()`);
       for (let k = 0; k < 4; k++) {
         await new Promise((r) => setTimeout(r, 400));
         await run(`(() => { const card = ${pick}; const low = Math.max(0, ...${bars}.map((e) => e.getBoundingClientRect().bottom)); window.scrollBy({ top: card.getBoundingClientRect().top - low + 10, behavior: 'instant' }); })()`);
       }
       await new Promise((r) => setTimeout(r, 400));
-      const at = await run(`(() => { const card = ${pick}; const bars = [...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky'); const low = Math.max(0, ...bars.map((e) => e.getBoundingClientRect().bottom)); const own = card.querySelector(':scope > .pg-inspect-head'), head = own ? own.getBoundingClientRect() : { top: low, bottom: low }, th = card.querySelector('thead th'); const r = { card: card.getBoundingClientRect().top < low, head: Math.round(head.top - low), th: th ? Math.round(th.getBoundingClientRect().top - head.bottom) : 0 }; document.body.style.paddingBottom = ''; window.scrollTo(0, 0); return r; })()`);
+      const at = await run(`(() => { const card = ${pick}; const bars = [...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head, ${sel} .pg-par-sum')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky'); const low = Math.max(0, ...bars.map((e) => e.getBoundingClientRect().bottom)); const own = card.querySelector(':scope > .pg-inspect-head'), head = own ? own.getBoundingClientRect() : { top: low, bottom: low }, th = card.querySelector('thead th'); const probe = document.createElement('div'); probe.style.height = 'var(--sg-stick-gap)'; card.appendChild(probe); const gap = probe.getBoundingClientRect().height; probe.remove(); const r = { card: card.getBoundingClientRect().top < low, head: own ? Math.round(head.top - low - gap) : 0, th: th ? Math.round(th.getBoundingClientRect().top - (own ? head.bottom : low + gap)) : 0 }; document.body.style.paddingBottom = ''; window.scrollTo(0, 0); return r; })()`);
+      // (every stuck head keeps the page's stick gap under what sticks above it, painted with the page)
       assert.deepEqual(at, { card: true, head: 0, th: 0 }, `${sel}: the card scrolled past the top, its head under the page's bars, the table's head under it`);
     };
     await run(`location.hash = '#colors'`); await shownIs('colors'); await headsStick('#colors');
@@ -730,7 +733,9 @@ test('a text style named in full (s/regular) keeps its name: each value is after
 
 test('the search covers every part of the page and, while it has words, shows what matches in a flyout under the field, by kind', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
-  for (const kind of ['Component', 'Colour', 'Type style', 'Icon', 'Section']) assert.match(tpl, new RegExp("add\\('" + kind));
+  for (const kind of ['Component', 'Colour', 'Type style', 'Icon']) assert.match(tpl, new RegExp("add\\('" + kind));
+  // Only components, tokens and icons are searched: no page, no prop, no task.
+  for (const kind of ['Section', 'Prop of', 'Status']) assert.doesNotMatch(tpl, new RegExp("add\\('" + kind));
   assert.match(tpl, /fly\.hidden = !words\.length; results\.hidden = !words\.length;/);
   assert.match(tpl, /\['components', 'Components'\], \['tokens', 'Tokens'\]/);
   assert.match(tpl, /fly\.appendChild\(results\); sMount\.appendChild\(fly\);/);
@@ -1141,7 +1146,7 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   // The Status page keeps its title at the top as every page does, its filter and counts under it; the head rows under them.
   assert.doesNotMatch(tpl, /#status > h2 \{ position: static; \}/);
   assert.match(tpl, /\.pg-areas, \.sg-section:not\(\.pg-card-section\) > h2, \.sg-size-switch, \.sg-todo-head \{ position: sticky;/);
-  assert.match(tpl, /function todoHeadHeight\(\) \{ underTitle\(document\.getElementById\('status'\)\); \}/);
+  assert.match(tpl, /function todoHeadHeight\(\) \{ if \(route\.last !== undefined\) underTitle\(document\.getElementById\('status'\)\); \}/, 'measured once the router runs, never while the pages are first built');
   // Every table's head sticks under what sticks at the top of its page, a card's head first: one measure for every page.
   assert.match(tpl, /function stickHeight\(sec\) \{[\s\S]*?setProperty\('--pg-areas-h'[\s\S]*?setProperty\('--pg-card-head-h'/);
   assert.match(tpl, /\.pg-inspect \{ border: var\(--sg-line\); border-radius: var\(--sg-radius\); overflow: clip;/, 'a card clips, so its head can stick');
@@ -1245,7 +1250,13 @@ test('a Tokens page as Figma keeps them: collections, a tree of groups, the coll
   assert.match(tpl, /if \(\(DATA\.allVars \|\| \[\]\)\.length\) return DATA\.allVars\.map/, 'every token Figma has, when the snapshot is there');
   assert.match(tpl, /var tkCollOf = function \(t\) \{ return t\.collection \|\| ''; \};/, 'only the collections Figma has, never one made up');
   assert.match(tpl, /var TK_FILTER = \[\['', 'All'\], \['colour', 'Colors'\], \['typography', 'Typography'\], \['spacing', 'Spacing'\], \['radius', 'Radii'\], \['motion', 'Motion'\]\];/);
-  assert.match(tpl, /class="sg-tk-alias" data-alias="/, 'an alias as Figma shows it, opening the token it points at');
+  // The brand kit: the system at a glance, first of the foundations, every value through its token's variable (the
+  // brand and mode chosen show), its words on a colour the secondary hue or black or white, whichever reads.
+  assert.match(tpl, /foundationLink\('brand-kit', 'identity'\)/, 'an identity page (the brand kit) among the foundations');
+  assert.ok(tpl.indexOf("foundationLink('brand-kit'") < tpl.indexOf("foundationLink('tokens'"), 'the brand kit first, before the tokens');
+  assert.match(tpl, /var bkCss = function \(t, unit\) \{[^\n]*var nm = t\.var \|\| [^\n]*'var\(' \+ nm/, 'a value drawn through its variable, Figma\'s value behind it');
+  assert.match(tpl, /prefers-reduced-motion: reduce\) \{ \.sg-bk-bento \*/, 'still when the person asks for less motion');
+  assert.match(tpl, /class="sg-link-pill sg-tk-alias" data-alias="/, 'an alias as Figma shows it, opening the token it points at');
   assert.match(tpl, /sysButton\('button', 'Download all tokens'/);
   assert.match(tpl, /a\.download = 'tokens\.json'/);
 });

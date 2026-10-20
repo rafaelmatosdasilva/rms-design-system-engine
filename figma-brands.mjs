@@ -325,21 +325,24 @@ export function brandsFromCss(files = [], { modes = [] } = {}) {
 
 // A brand's own family embedded in the page, so everyone sees it without having it (a family licensed for that): each
 // font file in the project's fonts folder whose name starts with the family's (Acme-Bold.otf for acme), its weight and
-// style from the rest of its name. files: [{ name, data: Buffer }] → @font-face rules, the files written in as data.
+// style from the rest of its name, one file each (the smallest format the folder has it in: woff2, woff, then ttf or otf).
+// files: [{ name, data: Buffer }] → @font-face rules, the files written in as data.
 const WEIGHTS = [['hairline', 100], ['thin', 100], ['extralight', 200], ['ultralight', 200], ['light', 300], ['book', 400], ['regular', 400], ['normal', 400], ['medium', 500], ['semibold', 600], ['demibold', 600], ['extrabold', 800], ['ultrabold', 800], ['bold', 700], ['black', 900], ['heavy', 900]];
 export function fontFaces(family, files = []) {
   const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
   const fam = sq(family);
   const FORMAT = { woff2: 'woff2', woff: 'woff', otf: 'opentype', ttf: 'truetype' }, MIME = { woff2: 'font/woff2', woff: 'font/woff', otf: 'font/otf', ttf: 'font/ttf' };
-  const out = [];
+  const RANK = { woff2: 0, woff: 1, ttf: 2, otf: 2 };
+  const pick = new Map();
   for (const f of files) {
     const ext = String(f.name).split('.').pop().toLowerCase(), base = sq(String(f.name).replace(/\.[^.]+$/, ''));
     if (!FORMAT[ext] || !base.startsWith(fam)) continue;
     const rest = base.slice(fam.length), italic = /italic|oblique/.test(rest), word = rest.replace(/italic|oblique/g, '');
     const weight = (WEIGHTS.find(([w]) => word === w) ?? WEIGHTS.find(([w]) => word.includes(w)) ?? [null, 400])[1];
-    out.push(`@font-face { font-family: "${family}"; src: url(data:${MIME[ext]};base64,${Buffer.from(f.data).toString('base64')}) format("${FORMAT[ext]}"); font-weight: ${weight}; font-style: ${italic ? 'italic' : 'normal'}; font-display: swap; }`);
+    const key = `${weight} ${italic}`, had = pick.get(key);
+    if (!had || RANK[ext] < RANK[had.ext]) pick.set(key, { f, ext, weight, italic });
   }
-  return out;
+  return [...pick.values()].map(({ f, ext, weight, italic }) => `@font-face { font-family: "${family}"; src: url(data:${MIME[ext]};base64,${Buffer.from(f.data).toString('base64')}) format("${FORMAT[ext]}"); font-weight: ${weight}; font-style: ${italic ? 'italic' : 'normal'}; font-display: swap; }`);
 }
 
 // What a brand is drawn on: the values of the library its collections extend (the system as published in Figma), where

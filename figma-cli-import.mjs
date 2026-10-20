@@ -40,6 +40,31 @@ function resolveVar(byKey, col, name, mode, depth = 0) {
   return { value: next.value, chain: [own.alias, ...next.chain] };
 }
 
+const isPrivate = (name) => !String(name ?? '').trim() || /^[_.]/.test(String(name).replace(/^[^A-Za-z0-9_.]+/, ''));
+
+// The tokens an earlier chunked read kept (figmaTokens), each one design.json holds with its values and links in every
+// mode taken from design.json, written as that read writes them (a size keeps the unit it had there); the rest as kept.
+export function tokensFromDesign(design, tokens = []) {
+  const byKey = new Map();
+  for (const c of design?.variables ?? []) for (const v of c.variables ?? []) byKey.set(`${c.name}\u0000${v.name}`, v);
+  const shown = (x, before) => {
+    if (x == null || typeof x === 'object') return undefined;   // a value it cannot write: the one kept stands
+    if (typeof x === 'number') { const n = Math.round(x * 1000) / 1000, unit = /(%|px)$/.exec(String(before ?? 'px'))?.[1] ?? ''; return n + unit; }
+    return typeof x === 'string' && /^#[0-9a-f]{6,8}$/i.test(x) ? x.toLowerCase() : String(x);
+  };
+  return tokens.map((t) => {
+    if (!byKey.has(`${t.collection}\u0000${t.name}`)) return t;
+    const values = {}, aliases = {};
+    for (const m of Object.keys(t.values ?? {})) {
+      const { value, chain } = resolveVar(byKey, t.collection, t.name, m);
+      values[m] = shown(value, t.values[m]) ?? t.values[m];
+      if (chain.length) aliases[m] = chain[0];
+    }
+    const { aliases: _, ...rest } = t;
+    return { ...rest, values, ...(Object.keys(aliases).length ? { aliases } : {}) };
+  });
+}
+
 // design.json → the vars snapshot's token keys. cfg: ds-config.json (figma.modes, colorCollection, sizingCollection,
 // primitivePrefix), read the way the MCP capture reads them.
 export function varsFromDesign(design, cfg = {}) {
@@ -196,15 +221,21 @@ export function snapshotsFromDesign(design, cfg = {}, existing = {}, now = new D
   const vars = { ...prevVars, _updated: now, _source: source, _modeOrder: t.modeOrder, _collections: t.collections, color: t.color, aliases: t.aliases, otherAliases: t.otherAliases, brokenAliases: t.brokenAliases, sizing: t.sizing, modeVariants: t.modeVariants,
     strings: { ...(prevVars.strings ?? {}), ...t.strings }, booleans: { ...(prevVars.booleans ?? {}), ...t.booleans } };
   for (const k of ['typography', 'breakpoints', 'animation']) vars[k] = prevVars[k] ?? {};
+  // Figma's own tokens an earlier chunked read kept (figmaTokens): each one design.json holds takes its values and
+  // links in every mode from it, the fresher read, so a switch turned on since then (a link replaced by true) shows.
+  if (prevVars.figmaTokens?.tokens?.length) vars.figmaTokens = { ...prevVars.figmaTokens, tokens: tokensFromDesign(design, prevVars.figmaTokens.tokens) };
   // The primitives Figma gives now, else those an earlier capture kept.
   vars.primitives = Object.values(t.primitives ?? {}).some((m) => Object.keys(m).length) ? t.primitives : prevVars.primitives ?? {};
-  const props = { ...(existing.props ?? {}), _updated: now, _source: source };
+  // A name with nothing in it, or starting with _ or . (a status mark in front or not: 🟡 .tableRow), is private to the
+  // file, not part of the system, as the chunked read has it; one an earlier import kept is dropped.
+  const own = ([name]) => name.startsWith('_') || !isPrivate(name);
+  const props = { ...Object.fromEntries(Object.entries(existing.props ?? {}).filter(own)), _updated: now, _source: source };
   const prevStruct = existing.structure ?? {};
-  const components = { ...(prevStruct.components ?? {}) };
+  const components = Object.fromEntries(Object.entries(prevStruct.components ?? {}).filter(own));
   const names = [];
   for (const node of componentNodes(design)) {
     const name = node.n;
-    if (!name || name.startsWith('_') || name.startsWith('.')) continue;   // private components are not part of the system
+    if (isPrivate(name)) continue;
     names.push(name);
     const p = propsFromComponent(node);
     const prevProps = props[name]?.properties ?? {};

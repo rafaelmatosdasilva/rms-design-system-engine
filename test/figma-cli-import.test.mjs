@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { snapshotsFromDesign, varsFromDesign, importFigmaCli } from '../figma-cli-import.mjs';
+import { snapshotsFromDesign, varsFromDesign, importFigmaCli, tokensFromDesign } from '../figma-cli-import.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -92,4 +92,39 @@ test('a variable that points at one no longer in the file is recorded; one into 
   for (const c of d.variables) c.variables = c.variables.filter((x) => x.name !== target);   // the variable it points at, deleted
   v.values = { ...v.values, other: { alias: 'surface/base', collection: 'A shared library' } };   // a library's: left alone
   assert.deepEqual(varsFromDesign(d, tpCfg).brokenAliases.filter((b) => b.name === v.name), [{ name: v.name, mode, target }]);
+});
+
+test('a fresher design.json updates the tokens an earlier chunked read kept: a link replaced by a value shows', () => {
+  const design = { version: 2, variables: [{ name: 'Theme', modes: ['Light', 'Dark'], variables: [
+    { name: 'base/shadow/anyDisplay', type: 'BOOLEAN', values: { Light: false, Dark: false } },
+    { name: 'card/shadow/display', type: 'BOOLEAN', values: { Light: true, Dark: true } },
+    { name: 'card/radius', type: 'FLOAT', values: { Light: { alias: 'base/radius', collection: 'Theme' }, Dark: 12 } },
+    { name: 'base/radius', type: 'FLOAT', values: { Light: 8, Dark: 8 } },
+    { name: 'card/hint', type: 'COLOR', values: { Light: { color: 'x' }, Dark: '#AABBCC' } },
+  ] }] };
+  const kept = [
+    { name: 'card/shadow/display', collection: 'Theme', kind: 'BOOLEAN', values: { Light: 'false', Dark: 'false' }, aliases: { Light: 'base/shadow/anyDisplay', Dark: 'base/shadow/anyDisplay' } },
+    { name: 'card/radius', collection: 'Theme', kind: 'FLOAT', values: { Light: '4px', Dark: '4px' } },
+    { name: 'card/hint', collection: 'Theme', kind: 'COLOR', values: { Light: '#000000', Dark: '#000000' } },
+    { name: 'gone/token', collection: 'Theme', kind: 'BOOLEAN', values: { Light: 'true' } },
+  ];
+  const [display, radius, hint, gone] = tokensFromDesign(design, kept);
+  assert.deepEqual(display, { name: 'card/shadow/display', collection: 'Theme', kind: 'BOOLEAN', values: { Light: 'true', Dark: 'true' } });
+  assert.deepEqual(radius.values, { Light: '8px', Dark: '12px' });
+  assert.deepEqual(radius.aliases, { Light: 'base/radius' });
+  assert.deepEqual(hint.values, { Light: '#000000', Dark: '#aabbcc' }, 'a value it cannot write keeps the one kept');
+  assert.equal(gone, kept[3]);
+  const snap = snapshotsFromDesign(design, {}, { vars: { figmaTokens: { collections: [], tokens: kept } } }, 'T');
+  assert.equal(snap.vars.figmaTokens.tokens[0].values.Light, 'true');
+});
+
+test('a component named blank, or private behind a status mark (🟡 .row), is not part of the system, and one kept is dropped', () => {
+  const comp = (n) => ({ t: 'COMPONENT', n, kids: [] });
+  const design = { version: 2, variables: [], pages: [{ name: 'P', frames: [comp('card'), comp(' '), comp('🟡 .tableRow (deprecated)'), comp('🟡  _old'), comp('🟡 widget/disabled (deprecated)')] }] };
+  const kept = { props: { '🟡 .tableCell (deprecated)': { properties: {} }, keep: { properties: {} } }, structure: { components: { ' ': {}, keep: {} } } };
+  const out = snapshotsFromDesign(design, {}, kept, 'T');
+  const names = Object.keys(out.props).filter((k) => !k.startsWith('_'));
+  assert.ok(names.includes('card') && names.includes('keep') && names.includes('🟡 widget/disabled (deprecated)'));
+  assert.ok(!names.some((n) => !n.trim() || /\.table|_old/.test(n)), names.join(','));
+  assert.deepEqual(Object.keys(out.structure.components).filter((k) => !k.trim()), []);
 });

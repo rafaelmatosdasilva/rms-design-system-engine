@@ -127,12 +127,12 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       // The foundations' motion page: the system's timings in one table, from the fastest, each with its variables, what
       // it is for, who moves so, Figma and what the system could do; the variables no component uses are rows too.
       await run2(`location.hash = '#motion'`); await new Promise((r) => setTimeout(r, 300));
-      const page = JSON.parse(await run2(`JSON.stringify({ heads: [...document.querySelectorAll('#motion thead th')].map((th) => th.textContent).join('|'), rows: [...document.querySelectorAll('#motion tbody tr')].map((tr) => tr.textContent), tables: document.querySelectorAll('#motion table').length, lead: document.querySelector('#motion > p:not(.sg-foundation-lead)').textContent, card: !!document.querySelector('#index a[href="#motion"]') })`));
+      const page = JSON.parse(await run2(`JSON.stringify({ heads: [...document.querySelectorAll('#motion thead th')].map((th) => th.textContent).join('|'), rows: [...document.querySelectorAll('#motion tbody tr')].map((tr) => tr.textContent), tables: document.querySelectorAll('#motion table').length, card: !!document.querySelector('#index a[href="#motion"]') })`));
       assert.equal(page.heads, 'Timing|Tokens|For|Used by|Figma|For the system');
       assert.equal(page.tables, 1, 'one table');
       assert.ok(page.rows.some((r) => /^200ms, ease-outWritten as valuesOpensbuttonNone in Figma.*Written as values: make it a token\.$/.test(r)), JSON.stringify(page.rows));
       assert.ok(page.rows.some((r) => /--motion-quick.*Nothing yetNothing.*No component uses it/.test(r)), JSON.stringify(page.rows));
-      assert.match(page.lead, /don't stop yet when someone asks for less motion/);
+      assert.equal(await run2(`!!document.querySelector('#motion > p')`), false, 'no line under the page title');
       assert.ok(page.card, 'a card on the overview');
       const at = `[...document.querySelectorAll('#motion .sg-motion-dot')].map((d) => Math.round(d.getBoundingClientRect().left - d.parentNode.getBoundingClientRect().left))`;
       assert.ok((await run2(at)).every((x) => x === 0), 'nothing moves until Play');

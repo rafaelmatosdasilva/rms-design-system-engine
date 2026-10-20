@@ -32,6 +32,8 @@ test('each file a symbol: its own viewBox, else its size; the ids it uses inside
   assert.equal(svgToSymbol('a', svg('<path d="M1 1"/>')), '<symbol id="a" viewBox="0 0 24 24"><path d="M1 1"/></symbol>');
   assert.equal(svgToSymbol('b', svg('<rect/>', 'width="16px" height="16"')), '<symbol id="b" viewBox="0 0 16 16"><rect/></symbol>');
   assert.equal(svgToSymbol('c', '<div></div>'), null);
+  // A stroked icon's own painting on its <svg> stays on the symbol: without fill="none" its outlines fill black.
+  assert.equal(svgToSymbol('d', svg('<path d="M1 1" stroke="#000"/>', 'viewBox="0 0 72 72" fill="none" stroke-linecap="round" xmlns:x="y"')), '<symbol id="d" viewBox="0 0 72 72" fill="none" stroke-linecap="round"><path d="M1 1" stroke="#000"/></symbol>');
   const s = svgToSymbol('flag', svg('<defs><clipPath id="clip0"><rect/></clipPath><linearGradient id="g"/></defs><g clip-path="url(#clip0)"><path fill="url(\'#g\')"/><use href="#clip0" xlink:href="#g"/></g>'));
   assert.match(s, /<clipPath id="flag__clip0">/);
   assert.match(s, /clip-path="url\(#flag__clip0\)"/);

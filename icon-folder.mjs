@@ -76,7 +76,11 @@ export function svgToSymbol(id, svg) {
       .replace(new RegExp(`url\\(\\s*(["']?)#${esc}\\1\\s*\\)`, 'g'), `url(#${neu})`)
       .replace(new RegExp(`((?:xlink:)?href\\s*=\\s*["'])#${esc}(["'])`, 'g'), `$1#${neu}$2`);
   }
-  return `<symbol id="${id}"${viewBox ? ` viewBox="${viewBox}"` : ''}>${inner}</symbol>`;
+  // The file's own painting on its <svg> (fill="none" on a stroked icon, its stroke width, caps and joins), kept on the
+  // symbol so every shape inside inherits it as it did in the file: without it a stroked outline fills black.
+  const paint = ['fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'fill-rule', 'clip-rule', 'color']
+    .map((n) => [n, attr(n)]).filter(([, v]) => v != null).map(([n, v]) => ` ${n}="${v}"`).join('');
+  return `<symbol id="${id}"${viewBox ? ` viewBox="${viewBox}"` : ''}${paint}>${inner}</symbol>`;
 }
 
 // One symbol per SVG file in the folder (root-relative), sorted by id: [{ id, file, symbol }].

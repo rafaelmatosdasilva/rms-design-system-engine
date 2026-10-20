@@ -20,6 +20,8 @@ jobs:
       # test/vue-builds.test.mjs).
       - name: Install the Vue build tools the Vue tests use
         run: |
+          # npm 10 (the one Node 22 ships) crashes placing Nuxt's peer dependencies ("reading 'edgesOut'"); npm 11 does not.
+          npm install -g npm@11
           npm install --prefix test/.vue-tools --no-audit --no-fund vite@6 @vitejs/plugin-vue@5 vue@3 sass@1 pinia@3 vue-router@4
           npm install --prefix test/.vue-cli-tools --no-audit --no-fund @vue/cli-service@5 vue@3 sass@1 sass-loader@16
           npm install --prefix test/.nuxt-tools --no-audit --no-fund nuxt@4 vue@3

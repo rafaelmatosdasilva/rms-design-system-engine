@@ -16,7 +16,8 @@ const OK_WORD = /^(?:inherit|initial|unset|revert|none|normal|0|auto|transparent
 
 // The CSS blocks the page itself wrote: every <style> but the one the template marks data-system.
 export function pageOwnCss(html) {
-  return [...String(html).matchAll(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi)].filter((m) => !/\bdata-system\b/i.test(m[1])).map((m) => m[2]).join('\n');
+  return [...String(html).matchAll(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi)].filter((m) => !/\bdata-system\b/i.test(m[1])).map((m) => m[2]).join('\n')
+    .replace(/@font-face\s*\{[^}]*\}/g, '');   // a font file the page carries (its own, written in as data) is not a style it sets
 }
 
 // Every declaration with its selector, @media and nesting flattened: [{ selector, property, value }].
@@ -58,7 +59,7 @@ export function controlClasses(html) {
 // the system lacks (its segmented control, a property's switch, its dropdown, tooltip and card) are drawn only with the page's roles (--sg-*), so they
 // pass when every value is one of those roles, a keyword or a round corner.
 const BOX = /^(background(-color)?|border(-(top|right|bottom|left))?(-(width|style|color))?|border-radius|box-shadow)$/;
-const DEFAULT_CONTROL = /\.(sg-seg-default|pg-switch|sg-select-trigger|sg-tip-btn|sg-tip-bubble|sg-card|sg-nav|sg-chip|sg-chip-menu|sg-tab|sg-tk-item|sg-tk-alias|sg-tk-twist|sg-mx-sort|sg-mx-cell|sg-mx-close|sg-mx-go|sg-btn)(?![\w-])/;
+const DEFAULT_CONTROL = /\.(sg-seg-default|pg-switch|sg-select-trigger|sg-tip-btn|sg-tip-bubble|sg-card|sg-nav|sg-chip|sg-chip-menu|sg-tab|sg-tk-item|sg-tk-alias|sg-link-pill|sg-tk-twist|sg-mx-sort|sg-mx-cell|sg-mx-close|sg-mx-go|sg-btn)(?![\w-])/;
 const ROLES_ONLY = (v) => !v.replace(/var\(--sg-[\w-]+(?:,\s*[^()]*)?\)|calc|max|min|(?<![\w.%-])(?:solid|transparent|none|50%|0px|1px|0)(?![\w.%-])|[\s(),*+-]/g, '');
 function drawsControl(d, classes) {
   if (!BOX.test(d.property) || /^(none|0|0px|transparent|inherit|initial|unset)$/i.test(d.value) || /\.pg-preview\b/.test(d.selector)) return false;

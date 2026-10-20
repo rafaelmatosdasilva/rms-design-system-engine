@@ -126,3 +126,13 @@ test('a link with an opacity to a colour that has one already keeps the inner on
   assert.match(css, /--row-selected: var\(--stepper-active\);/);
   assert.match(css, /--stepper-active: color-mix\(in srgb, var\(--base-primary\) 6%, transparent\);/);
 });
+
+test('fontFaces: one file per weight and style, the smallest format the folder has', async () => {
+  const { fontFaces } = await import('../figma-brands.mjs');
+  const f = (name) => ({ name, data: Buffer.from(name) });
+  const faces = fontFaces('Acme Sans', [f('AcmeSans-Bold.otf'), f('AcmeSans-Bold.woff2'), f('AcmeSans-Bold.ttf'), f('AcmeSans-BoldItalic.otf'), f('AcmeSans-Regular.ttf'), f('AcmeSans-Regular.woff'), f('Other-Bold.woff2')]);
+  assert.equal(faces.length, 3);
+  assert.match(faces[0], /font\/woff2;.*font-weight: 700; font-style: normal/);
+  assert.match(faces[1], /font\/otf;.*font-weight: 700; font-style: italic/);
+  assert.match(faces[2], /font\/woff;.*font-weight: 400; font-style: normal/);
+});

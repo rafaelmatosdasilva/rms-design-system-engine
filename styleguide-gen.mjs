@@ -544,6 +544,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Its slots, as documentation: each one's name and how Figma lets it be filled (empty at first, only its preferred
     // components, at least or at most so many), the preferred components named when the structure snapshot has them.
     const structSnap = readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
+    // Each component's height in Figma (its default variant), so the page can read how round a radius is on it (the
+    // radius against half the height): the Identity page's shape analysis.
+    view.figmaHeights = Object.fromEntries(Object.entries(structSnap).filter(([n, c]) => n && !/^[_.]/.test(n) && Number(c?.h) > 0).map(([n, c]) => [n, Math.round(Number(c.h))]));
     for (const c of view.components) {
       const defs = ctx?.propsSnap?.[c.name]?.properties ?? {};
       const slots = Object.entries(defs).filter(([, d]) => d?.type === 'SLOT').map(([k, d]) => {
@@ -800,7 +803,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // Every Figma variable named after a component (advanced/buttonPromo/shadow/X) is that component's too, the
       // code using it or not.
       const vsnap = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
-      const allNames = [...new Set([...Object.values(vsnap.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...Object.keys(vsnap.sizing ?? {})])];
+      // Every variable Figma has, of every kind: colours (by mode), sizes, and its switches, words, timings and effects.
+      const allNames = [...new Set([...Object.values(vsnap.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...['sizing', 'booleans', 'strings', 'motion', 'effects'].flatMap((k) => Object.keys(vsnap[k] ?? {}))])];
       const sqz = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
       // A token belongs to every component that uses it: in its code, named after it, bound on its Figma component (the
       // structure snapshot names each variable a component's parts use), and what each of those points at (its alias
@@ -813,14 +817,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const chain = new Map();
       for (const m of Object.values(vsnap.aliases ?? {})) for (const [n, to] of Object.entries(m ?? {})) for (const t of to ?? []) if (!String(t).startsWith(prim)) { if (!chain.has(bare(n))) chain.set(bare(n), new Set()); chain.get(bare(n)).add(bare(t)); }
       const tokensOf = (name, extra = []) => {
-        const mine = allNames.filter((n) => { const seg = n.split('/'); return seg.slice(0, 2).some((x) => sqz(x) === sqz(name)); }).map(bare);
+        // Named after it: its name (navigation/TabMobile too, part by part) among the first segments of the token's path.
+        const want = String(name).split('/').map(sqz).filter(Boolean);
+        // Or its family's: a token group its name starts with, at a word (tooltip for tooltipOpen, card for cardTop).
+        const head = String(name).split('/')[0];
+        const family = (g) => g.length >= 4 && head.length > g.length && head.startsWith(g) && /^[A-Z0-9]/.test(head.slice(g.length));
+        const mine = allNames.filter((n) => { const raw = n.split('/'), seg = raw.map(sqz); return [0, 1].some((i) => (want.length && want.every((w, k) => seg[i + k] === w)) || family(raw[i] ?? '')); }).map(bare);
         const set = new Set([...extra, ...mine, ...boundBy(struct[name])].filter(Boolean).map(bare));
         for (const n of [...set]) for (const t of chain.get(n) ?? []) set.add(t);
         return [...set].filter((n) => !n.startsWith(prim)).sort();
       };
-      const used = new Set();
+      const used = new Set(), namesOf = new Map();
       for (const c of view.components) {
         const names = tokensOf(c.name, [...(c.allTokens ?? []).map((t) => t.figma), ...[...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])].map((t) => t.figma)]);
+        namesOf.set(c.name, names);
         names.forEach((n) => used.add(n));
         if (!names.length) continue;
         c.tokenDocs = { total: names.length, described: names.filter(said).map((n) => ({ figma: n, description: said(n) })), missing: names.filter((n) => !said(n)) };
@@ -831,10 +841,29 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const name of Object.keys(struct)) {
         if (onPage.has(name) || name.startsWith('_')) continue;
         const names = tokensOf(name);
+        namesOf.set(name, names);
         names.forEach((n) => used.add(n));
         const missing = names.filter((n) => !said(n));
         if (missing.length) (view.pagelessTokens ??= {})[name] = { total: names.length, missing };
       }
+      // Which components use each token, by its Figma name (without /color): the same reach as above (its code, its name,
+      // its Figma bindings, the aliases), and the primitives those point at too, for the Tokens page's "Used by"; the
+      // Figma components with no page of their own too (listed, unlinked).
+      const chainAll = new Map();
+      for (const m of Object.values(vsnap.aliases ?? {})) for (const [n, to] of Object.entries(m ?? {})) for (const t of to ?? []) { if (!chainAll.has(bare(n))) chainAll.set(bare(n), new Set()); chainAll.get(bare(n)).add(bare(t)); }
+      // The code's own aliases too (--a: var(--b)), sizes and radii among them, which the colour aliases above do not hold.
+      const cssRefs = new Map(), byVar = new Map();
+      for (const m of String(allCss).replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(--[\w-]+)\s*:([^;{}]*)/g)) for (const v of m[2].matchAll(/var\(\s*(--[\w-]+)/g)) { if (!cssRefs.has(m[1])) cssRefs.set(m[1], new Set()); cssRefs.get(m[1]).add(v[1]); }
+      const varOfName = (n) => '--' + String(n).replace(/\//g, '-');
+      for (const n of allNames) { byVar.set(varOfName(n), bare(n)); byVar.set(varOfName(bare(n)), bare(n)); }
+      const next = (n) => { const out = new Set(chainAll.get(n) ?? []); for (const v of [varOfName(n), varOfName(n + '/color')]) for (const r of cssRefs.get(v) ?? []) if (byVar.has(r)) out.add(byVar.get(r)); return out; };
+      const usesBy = {};
+      for (const [cname, cnames] of namesOf) {
+        const set = new Set(cnames), queue = [...set];
+        while (queue.length) for (const t of next(queue.shift())) if (!set.has(t)) { set.add(t); queue.push(t); }
+        for (const n of set) (usesBy[n] ??= []).push(cname);
+      }
+      view.tokenUsesFigma = usesBy;
       // A token the code writes anywhere is used, whichever file writes it and however it spells it (the convention's
       // short name, or the whole path with its /default and /color).
       const { sourceFiles } = await import('./code-roots.mjs');
@@ -948,8 +977,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const fontFiles = []; const walkFonts = (d) => { let ns = []; try { ns = readdirSync(d); } catch { return; } for (const n of ns) { const p = join(d, n); try { if (statSync(p).isDirectory()) walkFonts(p); else if (/\.(woff2?|otf|ttf)$/i.test(n)) fontFiles.push({ name: n, data: readFileSync(p) }); } catch {} } };
         walkFonts(fontDir);
         const families = [...new Set(list.flatMap((b) => fontsOf(b)))];
-        const faces = families.flatMap((f) => fontFaces(f, fontFiles));
-        view.brands = { file: brandSnap._file ?? null, embedded: families.filter((f) => fontFaces(f, fontFiles).length), faces: faces.join('\n'), read: brandSnap._read ?? null, list: list.map((b) => ({ key: b.key, name: b.name, parent: b.parent, own: b.own, overrides: Object.keys(b.overrides).length, fonts: fontsOf(b) })), css, unknown };
+        const facesOf = new Map(families.map((f) => [f, fontFaces(f, fontFiles)]));   // each family's files read once
+        view.brands = { file: brandSnap._file ?? null, embedded: families.filter((f) => facesOf.get(f).length), faces: [...facesOf.values()].flat().join('\n'), read: brandSnap._read ?? null, list: list.map((b) => ({ key: b.key, name: b.name, parent: b.parent, own: b.own, overrides: Object.keys(b.overrides).length, fonts: fontsOf(b) })), css, unknown };
       }
     } catch (e) { view.brandsError = String(e.message).split('\n')[0]; }
     // What the tokens owe, rows of the Status page under The system: descriptions to write in Figma and tokens equal
@@ -1326,6 +1355,20 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const sysName = cfg.name || (() => { try { return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name ?? ''; } catch { return ''; } })();
   if (sysName) html = html.replace(/<title>Living style guide<\/title>/i, `<title>${String(sysName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')} · Living style guide</title>`);
   html = hoistImports(html);
+  // The fonts it links from a font service, written into the page, so it draws in them on any computer (offline, or
+  // behind a firewall that blocks the service); one that cannot be read keeps its link.
+  let fontsEmbedded = null;
+  try {
+    const { embedRemoteFonts, missingFamilies, serviceFonts } = await import('./font-embed.mjs');
+    const cacheDir = join(ROOT, OUT_DIR, 'fonts');
+    // A family the CSS names that nothing loads (the code's own body font, set but never imported) is asked of the font
+    // service too, so the page draws in it everywhere, not only where it happens to be installed.
+    const named = await serviceFonts(missingFamilies(html), { cacheDir });
+    if (named.found.length) { const links = named.found.map((f) => `<link rel="stylesheet" href="${f.url.replace(/&/g, '&amp;')}">`).join('\n'); html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => `${h}\n${links}`) : links + html; }
+    fontsEmbedded = await embedRemoteFonts(html, { cacheDir });
+    fontsEmbedded.missing = named.missing;
+    html = fontsEmbedded.html;
+  } catch { /* the links stay */ }
   // An older run never replaces a page built from newer inputs. The code capture's own copy (opts.out) is always
   // the code as it is now.
   const built = buildStamp(ROOT, { vars: (() => { try { return JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'utf8')); } catch { return null; } })() });
@@ -1334,5 +1377,5 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, (m) => `${stampMeta(built)}\n${m}`) : html.replace(/<head>/i, (m) => `${m}\n${stampMeta(built)}`);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html);
-  return { out: outPath, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, notInFigma: agreedSummary?.notInFigma ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
+  return { out: outPath, fontsEmbedded: fontsEmbedded ? { embedded: fontsEmbedded.embedded.length, kept: fontsEmbedded.kept, missing: fontsEmbedded.missing } : null, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, notInFigma: agreedSummary?.notInFigma ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
 }
