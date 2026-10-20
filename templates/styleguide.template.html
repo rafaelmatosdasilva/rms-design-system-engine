@@ -388,7 +388,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* The page's own info box, for every note it gives (an audit not run yet, a family that differs, what is left off): small
    words beside an info mark, on a quiet surface. A note that asks for something (sg-pending) carries the warning colour
    on its mark and its edge only. */
-.sg-info, .sg-pending { position: relative; display: block; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-tint); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-cell-x); padding-inline-start: calc(var(--sg-cell-x) + 1.15em + var(--sg-space-s)); margin: 0 0 var(--sg-space-l); max-width: 720px; }   /* a table row's room: the same padding as its cells */
+.sg-info, .sg-pending { position: relative; display: block; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-tint); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-cell-x); padding-inline-start: calc(var(--sg-cell-x) + 1.15em + var(--sg-space-s)); margin: 0 0 var(--sg-space-l); max-width: none; }   /* a table row's room: the same padding as its cells; one line while the page has the room */
 .sg-info::before, .sg-pending::before { content: ""; position: absolute; left: var(--sg-cell-x); top: calc(var(--sg-cell-x) + 0.15em); width: 1.15em; height: 1.15em; background: currentColor; -webkit-mask: var(--sg-info-mark) center / contain no-repeat; mask: var(--sg-info-mark) center / contain no-repeat; opacity: 0.8; }
 .sg-pending { border-color: color-mix(in srgb, var(--sg-warning) 45%, var(--sg-bg)); background: color-mix(in srgb, var(--sg-warning) 6%, var(--sg-bg-2)); }   /* a warning: the whole box a touch warm, never a side bar */
 .sg-pending::before { background: var(--sg-warning-ink); opacity: 1; }
@@ -1526,7 +1526,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-section > h2 + :not(.sg-size-switch, .pg-areas, .sg-section-badge), .sg-section > .sg-size-switch + :not(.pg-areas), .sg-section > .pg-areas + :not(.sg-size-switch) { margin-top: var(--sg-stick-gap); }
 .sg-section > .pg-areas ~ .pg-area { padding-top: 0; margin-top: var(--sg-stick-gap); }
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); }
-:is(.pg-par-card, .pg-inspect, .pg-code) { overflow-clip-margin: var(--sg-radius); }   /* room for the gap and the line it paints above itself (a plain length: the browser drops a calc() here) */
+:is(.pg-par-card, .pg-inspect, .pg-code) { overflow-clip-margin: var(--sg-clip-m, var(--sg-radius)); }   /* room for the gap and the line it paints above itself (a plain length: the browser drops a calc() here) */
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid), 0 calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg), var(--sg-strip-l, 0 0 transparent), var(--sg-strip-r, 0 0 transparent); }   /* its top line, and the gap above it painted with the page */
 /* The outer heads' strips reach over the card's own side borders too, so no edge of the card shows above a stuck head
    in a system whose cards carry a real border. */
@@ -1642,6 +1642,9 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   // The page keeps the root size it loaded with: a system whose own CSS sizes text on a mode attribute (data-color, data-size)
   // would otherwise shrink or grow every rem on the page when a mode is switched on <html>.
   document.documentElement.style.fontSize = getComputedStyle(document.documentElement).fontSize;
+  // The room a card lets its stuck head paint past its edge: the page's radius as a plain length, which is all the
+  // browser takes there (a system whose radius is calc(12px + 4px) would otherwise get none, and its card borders show).
+  (function () { var p = document.createElement('div'); p.style.cssText = 'position:absolute;visibility:hidden;width:var(--sg-radius)'; document.body.appendChild(p); var w = p.getBoundingClientRect().width; p.remove(); if (w > 0) document.documentElement.style.setProperty('--sg-clip-m', Math.ceil(w) + 'px'); })();
   // What each component is, as the data gives it, taken before anything is drawn (drawing adds to it): the base of its
   // signature, which says whether accessibility results kept for it still hold (compSig).
   var COMP_DATA = {};
