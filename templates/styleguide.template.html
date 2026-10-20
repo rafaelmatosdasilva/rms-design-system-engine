@@ -1541,6 +1541,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .pg-a11y-item { display: block; }
 .sg-row-detail-body .pg-a11y-item > [class^="pg-par--"]:first-child { display: none; }
 .sg-row-detail-body .pg-par-val { color: var(--sg-text-2); }
+.sg-affects th, .sg-affects td { position: static; white-space: normal; }   /* in a panel's card: a plain table, nothing sticks */
+.sg-affects .pg-par-val { display: block; }
 .sg-row-detail-body > p, .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-xs); }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
@@ -1689,6 +1691,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var COMPONENTS = DATA.components || [];
   // A component the code has only as a CSS class (its class in the stylesheet, no component file, nothing it renders):
   // found, yet with no props to read or try, so its page draws it from Figma's structure.
+  // Where an accessibility finding is, as places of a table (What it affects, in the row's panel), never a run-on list in
+  // a sentence: each place's part, what of it, its element. Carried inside the finding's text as a hidden mark the panel
+  // reads (placesTag), so every source of findings says its places one way.
+  var PLACE_TAG = { button: 'Button', a: 'Link', input: 'Field', select: 'Select', textarea: 'Text field', img: 'Image', svg: 'Icon', path: 'Icon', g: 'Icon', label: 'Label', li: 'List item', ul: 'List', table: 'Table' };
+  function placeOf(desc) {
+    var d = String(desc || ''), m = /^(.*?)\s*\((.*)\)\s*(?:in\s+(.+))?$/.exec(d), own = (m ? m[1] : d.split(' in ')[0]).trim(), what = m ? m[2] : '';
+    var tag = /^<(\w+)>/.exec(own), el = /^(\w+)?[#.]/.exec(own), word = tag ? tag[1] : el && el[1] ? el[1] : '';
+    var cls = /\.([\w-]+)/.exec(own);
+    var part = PLACE_TAG[String(word).toLowerCase()] || (cls ? cls[1].replace(/[-_]+/g, ' ').replace(/^\w/, function (k) { return k.toUpperCase(); }) : '');
+    return { part: part, what: what || (tag ? d.replace(/^<\w+>\s*/, '').split(' in ')[0] : ''), element: tag ? '<' + tag[1] + '>' : own };
+  }
+  function placesTag(list) { list = (list || []).filter(Boolean); return list.length ? '<span class="sg-places" hidden data-places="' + esc(JSON.stringify(list)) + '"></span>' : ''; }
   function cssOnly(c) { return !!c && !c.codeOnly && !(c.api && c.api.file) && !c.source && !c.markup && !(c.renders || []).length; }
   // The page is still while the search is open (the loops below skip a beat).
   var sgQuiet = function () { return document.documentElement.classList.contains('sg-searching'); };
@@ -2252,7 +2266,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   TODO.forEach(function (t) { var n = String(t.figmaOnly || t.pairing || '').trim(); if (n && n.indexOf('/') < 0 && !PARENT_NAME[bareName(n).toLowerCase()]) PARENT_NAME[bareName(n).toLowerCase()] = n; });
   // A component listed in the menu: not a part (its page opens from its parent's), and, when the system is compared
   // with Figma, one both sides have: one only the code has is flagged on Status, as one only Figma has, not listed.
-  function inMenu(c) { return !parentOf(c.name) && !(c.codeOnly && c.codeOnly.figma); }
+  // In the menu: the system's components, one each. A part opens from its parent; one only the code has, or one the code
+  // has only as a CSS class (no component yet), from its Status row.
+  function inMenu(c) { return !parentOf(c.name) && !(c.codeOnly && c.codeOnly.figma) && !cssOnly(c); }
   // A family with no page of its own (navigation: navigation/TabMobile, navigation/TabDesktop…) is one entry in the menu,
   // as it is one row on Status, opening its first member; its members are not listed one by one.
   function menuFamily(c) {
@@ -5329,6 +5345,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // which side is right first), done.
   var STATUS = { todo: ['✕', 'Ready to fix', 'differs'], check: ['!', 'Needs a decision', 'figma'], done: ['✓', 'Done', 'match'], kept: ['≠', 'Kept on purpose', 'none'], none: ['–', 'Not needed', 'none'], skip: ['–', 'Not compared', 'none'] };
   function isOpen(r) { return r.st === 'todo' || r.st === 'check'; }
+  // The one line under a status, the table's and the panel's: what it says, else that it is new, else how it is checked,
+  // with no date (its date is in Last checked): a check a person still has to make says it is still to make.
+  function statusLine(r) {
+    var how = function (x) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, r.st === 'done' ? 'Checked by a person' : 'To check by a person'); };
+    return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || how((r.src || []).filter(Boolean)[0]);
+  }
   function statusHTML(st, sub, area) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(rowWord(st, area)) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
   // what Figma states and what was found, Documentation a kind with what is written, and the rest where it is and what
@@ -5347,7 +5369,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // read); every source is in the row's panel.
     status: function (r) {
       // How it was checked, its date left to the Last checked column (one date per row, never two).
-      var one = (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || String((r.src || []).filter(Boolean)[0] || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser');
+      var one = statusLine(r);
       return '<td>' + statusHTML(r.st, '', r.area) + (one ? '<span class="pg-par-val sg-one-line" title="' + esc(one) + '">' + esc(one) + '</span>' : '') + '</td>';
     }
   };
@@ -5397,13 +5419,34 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var nr = isOpen(r) ? TODO_NO[r.key] : null;
     var comp = String(r.key || '').split('\u0000')[0];
     var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-    var body = colsOf(d.area).filter(function (col) { return ['no', 'kind', 'updated'].indexOf(col[1]) < 0; }).map(function (col) {
+    var body = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; }).map(function (col) {
       var k = col[1];
       if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : ''));   // nothing to do: no card
-      if (k === 'status') return card(col[0], '<p>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel, d.area) + '</p>' + ((r.src || []).filter(Boolean).length ? '<p class="pg-par-val">Where it was read</p>' + r.src.filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') : '') + (r.at ? '<p class="pg-par-val">Last checked ' + esc(when(r.at)) + '</p>' : ''));
+      // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
+      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + card('Where it was read', (r.src || []).filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('')); }
+      if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
     }).join('');
+    // What it affects, for an accessibility check: each place the check found, in a table of what it is (the part, what
+    // of it, its element), the words on it, the state and mode it was seen in, and its measure against what it needs.
+    // What it affects: each place its findings carry (placesTag), in a table of the part, what of it, its element, the
+    // words on it, the state and mode it was seen in, and its measure against what it needs.
+    var hits = [], tmpP = document.createElement('div');
+    tmpP.innerHTML = (r.its || []).map(function (it) { return it.html || ''; }).join('') + (r.code || '');
+    Array.prototype.forEach.call(tmpP.querySelectorAll('.sg-places[data-places]'), function (n) { try { hits = hits.concat(JSON.parse(n.getAttribute('data-places'))); } catch (e) { /* none */ } });
+    var seenP = {}; hits = hits.filter(function (x) { var k = JSON.stringify(x); if (seenP[k]) return false; seenP[k] = 1; return true; });
+    if (hits.length) {
+      var COLS = [['Part', function (x) { return esc(x.part || '') + (x.places > 1 ? '<span class="pg-par-val">' + x.places + ' places</span>' : ''); }],
+        ['What', function (x) { return esc(x.what || ''); }], ['Element', function (x) { return x.element ? '<code>' + esc(x.element) + '</code>' : ''; }],
+        ['Words', function (x) { return x.text ? esc('"' + x.text + '"') : ''; }], ['State', function (x) { return esc(x.state || ''); }],
+        ['Mode', function (x) { return esc(x.mode || ''); }], ['Measured', function (x) { return x.measured ? esc(x.measured) + (x.needs ? '<span class="pg-par-val">needs ' + esc(x.needs) + '</span>' : '') : ''; }],
+        ['In the code', function (x) { return x.where ? '<code>' + esc(x.where) + '</code>' : ''; }]];
+      var used = COLS.filter(function (cc) { return hits.some(function (x) { return cc[1](x); }); });
+      var tbl = '<div class="pg-par-scroll"><table class="pg-par-table sg-affects"><thead><tr>' + used.map(function (cc) { return '<th>' + esc(cc[0]) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        hits.map(function (x) { return '<tr>' + used.map(function (cc) { return '<td>' + cc[1](x) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+      body = '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">What it affects</div>' + tbl + '</div>' + body;
+    }
     var det = m.querySelector('.sg-row-detail');
     var trail = trailHere(from);
     if (comp && trail.indexOf(comp) < 0) trail.push(comp);
@@ -5799,10 +5842,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
       add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? WHO[x.who] || WHO.both : '', x.new);
     });
-    if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '. ' + i.details.join('; ') + '.'), auditOn(ch.at), esc(capital(i.fix))); });
+    if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '.') + placesTag(i.items || i.details.map(placeOf)), auditOn(ch.at), esc(capital(i.fix))); });
     var stat = {};
     (a.static || []).forEach(function (f) { (stat[f.kind] = stat[f.kind] || []).push(f); });
-    Object.keys(stat).forEach(function (k) { add(wcagLabelOf(wcagScOf(k)), 'todo', esc(wcagTitle(k, stat[k].length) + '. ' + stat[k].map(function (f) { return f.file + ':' + f.line + ', ' + f.desc; }).join('; ') + '.'), 'Its code', esc(wcagFix(k, stat[k][0].fix))); });
+    Object.keys(stat).forEach(function (k) { add(wcagLabelOf(wcagScOf(k)), 'todo', esc(wcagTitle(k, stat[k].length) + '.') + placesTag(stat[k].map(function (f) { var p = placeOf(f.desc); p.where = f.file + ':' + f.line; return p; })), 'Its code', esc(wcagFix(k, stat[k][0].fix))); });
     // Its role: what it is and what that role and Figma's notes ask of it (the first duty says what it is).
     if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet.', 'From Figma, once it is annotated', 'In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a class="sg-uses-link" href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role in the form Role: name (Role: dialog, Role: button, Role: list), and its duties are listed here.', WHO.figma);
     // A duty fails when the audit found its own kind of problem (the role's markup, a behaviour, a part, a name, the
@@ -5967,8 +6010,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var mxRows = COMPONENTS.map(function (c) {
       var st = componentStates(c, ALL || !!c.__a11y), all = st.all, untested = st.untested, parC = st.par, accC = st.acc, docC = st.doc, fix = st.fix, dec = st.dec;
-      return mxRow({ name: c.name, figma: !c.codeOnly, code: cssOnly(c) ? 'css' : 'found', par: parC, acc: accC, doc: docC, fix: fix, dec: dec, done: !fix && !dec && !untested, untested: untested, at: latest(all), href: '#' + cid(c.name),
-        codeWhy: c.codeOnly && c.codeOnly.figma ? 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it. Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' : '' });
+      return mxRow({ name: c.name, figma: !c.codeOnly, code: cssOnly(c) ? 'missing' : 'found', nocode: cssOnly(c), par: parC, acc: accC, doc: docC, fix: fix, dec: dec, done: !fix && !dec && !untested, untested: untested, at: latest(all), href: '#' + cid(c.name),
+        codeWhy: cssOnly(c) ? 'The code has only its CSS class' + (c.cls ? ' (.' + c.cls + ')' : '') + ', no component file: it is not a component of the code yet. Build it as one, with the props Figma gives it.' : c.codeOnly && c.codeOnly.figma ? 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it. Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' : '' });
     });
     // A component of Figma's the code may have (a file suggested, or several as likely: Unsure, to confirm), one it has
     // no file for (Missing), or one only the code has (No Figma): its one row, what to do in a tip on its Code cell.
@@ -6198,12 +6241,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var states = function (list, pick) {
       var by = {}, out = [];
       list.forEach(function (o) { var x = pick(o), w = x.say === '–' ? 'N/A' : x.say; if (!by[w]) { by[w] = { cls: BAR[x.cls] || 'none', n: 0, word: w }; out.push(by[w]); } by[w].n++; });
-      return out.sort(function (p, q) { return ORDER_[p.cls] - ORDER_[q.cls] || q.n - p.n; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + (x.word === 'N/A' ? 'with nothing to compare' : x.word.charAt(0).toLowerCase() + x.word.slice(1)) }; });   // N/A said in words: only one side has it, or nothing of this kind to check
+      return out.sort(function (p, q) { return ORDER_[p.cls] - ORDER_[q.cls] || q.n - p.n; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + (x.word === 'N/A' ? 'with nothing to compare' : /^[A-Z]{2}/.test(x.word) ? x.word : x.word.charAt(0).toLowerCase() + x.word.slice(1)) }; });   // N/A said in words: only one side has it, or nothing of this kind to check
     };
     var countOf = function (parts, word) { return (parts.filter(function (x) { return x.word === word; })[0] || { n: 0 }).n; };
     // Each button the same few words, the legend's own: See 141 differs, See 60 missing.
     var nx = function (n, word, area) { return n ? { n: n, area: area, say: 'See ' + n + ' ' + word.toLowerCase() } : null; };
-    var card = function (title, parts, doneWord, outOf, of, next) { return { title: title, big: outOf ? countOf(parts, doneWord) : null, outOf: outOf || null, of: outOf ? of : 'nothing to measure yet', total: outOf, parts: parts, next: next }; };
+    // doneWord: the word that counts as done, or several (Found and CSS only are both in the code).
+    var card = function (title, parts, doneWord, outOf, of, next) { return { title: title, big: outOf ? [].concat(doneWord).reduce(function (t, w) { return t + countOf(parts, w); }, 0) : null, outOf: outOf || null, of: outOf ? of : 'nothing to measure yet', total: outOf, parts: parts, next: next }; };
     var tile = function (o) {
       var tip = o.how ? tipHTML(o.how, 'How ' + o.title + ' is counted') : '';
       var total = o.total || 0, parts = (o.parts || []).filter(function (x) { return x.n > 0; });
@@ -6229,8 +6273,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var dT = card('AI-ready Documentation', docP, 'Ready', built.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    pT.how = 'Figma\'s components the code has.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same.';
-    iT.how = 'Every component in Figma.' + SAME + ' Found: matched to its file in the code. Unsure: a file looks like it, still to confirm. Missing: no file found.';
+    pT.how = 'Figma\'s components the code has.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
+    iT.how = 'Every component in Figma.' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
     aT.how = 'Figma\'s components the code has.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
     dT.how = 'Figma\'s components the code has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
@@ -6736,7 +6780,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
         (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
         // One the code has only as a CSS class: said at its top, so its preview and its missing props read for what they are.
-        (cssOnly(c) ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">CSS only</span><span>' + esc('The code has it only as a CSS class' + (c.cls ? ' (.' + c.cls + ')' : '') + ', with no component file: it has no props to read or try, and its preview is drawn from Figma.') + '</span></p>' : '') +
+        (cssOnly(c) ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Missing in the code</span><span>' + esc('The code has only its CSS class' + (c.cls ? ' (.' + c.cls + ')' : '') + ', no component file: it is not a component of the code yet, so it has no props to read or try, and its preview is drawn from Figma.') + '</span></p>' : '') +
         // Connected by the project's own Code Connect: a badge, its file named on hover.
         // (its status, Code Connect and test coverage open the line of its class, version and last change, below)
         // Retired and still in use: what replaces it and how much still moves, each place a row of the Status page.
@@ -7327,7 +7371,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           w.findings.forEach(function (f) { (byKind[f.kind] = byKind[f.kind] || []).push(f.desc); });
           Object.keys(byKind).forEach(function (k) {
             wkinds[k] = Math.max(wkinds[k] || 0, byKind[k].length);
-            tb.insertAdjacentHTML('beforeend', a11yRow('todo', 'In the browser', esc(wcagTitle(k, byKind[k].length) + ': ' + byKind[k].join('; ') + '. ' + wcagFix(k)), wcagLabelOf(wcagScOf(k)), FROM_PAGE));
+            tb.insertAdjacentHTML('beforeend', a11yRow('todo', 'In the browser', esc(wcagTitle(k, byKind[k].length) + '. ' + wcagFix(k)) + placesTag(byKind[k].map(placeOf)), wcagLabelOf(wcagScOf(k)), FROM_PAGE));
           });
         } catch (e) { /* the rest of the table stands */ }
         // The same check with only the words of its control differing (Tab reaches "Text", Tab reaches "Description")
@@ -7401,7 +7445,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         checking = false;
         order.forEach(function (key) {
           var f = found[key];
-          liveItems.push({ sc: f.sc, label: wcagLabelOf(f.sc), st: 'todo', from: FROM_PAGE, html: esc(wcagTitle(f.kind, 1) + ': ' + f.desc + '. ' + wcagFix(f.kind) + (f.where.length === combos.length ? (combos.length > 1 ? ' In all ' + combos.length + ' variants tried.' : '') : ' In ' + f.where.slice(0, 3).join('; ') + (f.where.length > 3 ? ' and ' + (f.where.length - 3) + ' more' : '') + '.')) });
+          liveItems.push({ sc: f.sc, label: wcagLabelOf(f.sc), st: 'todo', from: FROM_PAGE, html: esc(wcagTitle(f.kind, 1) + '. ' + wcagFix(f.kind) + (f.where.length === combos.length ? (combos.length > 1 ? ' In all ' + combos.length + ' variants tried.' : '') : ' In ' + f.where.slice(0, 3).join('; ') + (f.where.length > 3 ? ' and ' + (f.where.length - 3) + ' more' : '') + '.')) + placesTag([placeOf(f.desc)]) });
         });
         a11yRender(live);
         if (bgRun) { var f = bgRun; bgRun = null; f(); }
@@ -7904,7 +7948,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       refreshers.push(lazyDraw(cardEl, cardEl._refresh));   // redrawn on a brand or mode change while it shows, else when it is opened
       return cardEl;
     };
-    if (inMenu(c)) { navLink(cid(c.name), c.name); if (cssOnly(c)) nav.lastElementChild.insertAdjacentHTML('beforeend', '<span class="sg-nav-tag" title="Only a CSS class in the code: no component file">CSS</span>'); }   // a part has its page, opened from its parent's Parts; one only the code has, its page from Status
+    if (inMenu(c)) navLink(cid(c.name), c.name);   // a part has its page, opened from its parent's Parts; one only the code has, its page from Status
     else { var fam = menuFamily(c); if (fam && !MENU_FAMS[fam]) { MENU_FAMS[fam] = 1; navLink(cid(FAM_FIRST[fam] || c.name), fam); } }
     if (ALL) { if (!ONLY || ONLY.indexOf(c.name) >= 0) BUILDERS[cid(c.name)](); } else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
   });

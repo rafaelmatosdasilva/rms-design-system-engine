@@ -1569,6 +1569,36 @@ const wcagOfLine = (line) => (/error/i.test(line) ? '3.3.1' : '4.1.2');
 // "WCAG 2.1.1 Keyboard (A)": a criterion as the page names it.
 export const wcagLabel = (id) => (!id ? null : WCAG_CRITERIA[id] ? `WCAG ${id} ${WCAG_CRITERIA[id][0]} (${WCAG_CRITERIA[id][1]})` : `WCAG ${id}`);
 
+// What a finding affects, in plain words, from what the check recorded: the part of the component (its label, an icon,
+// a button, the whole component), what of it (its text, its focus ring, its tap area), the words on it, the state and the
+// colour mode it was seen in, and the measure against what it needs. r: a11y.json's issue · cls: the component's class.
+const AFFECTS = { contrast: 'Text colour', hovercontrast: 'Text colour on hover', statecontrast: 'Text colour when focused or pressed', cvdcontrast: 'Text colour for colour-blind readers', iconcontrast: 'Icon colour', focuscontrast: 'Focus ring colour', focus: 'Focus ring', target: 'Tap area', target44: 'Tap area', name: 'Name a screen reader says', semantics: 'Role', keyboard: 'Keyboard use', zoom: 'Zoomed text', reflow: 'Narrow screen', spacing: 'Text spacing', boundary: 'Edge colour', stateedge: 'Edge colour when focused or pressed' };
+const TAG_WORD = { button: 'Button', a: 'Link', input: 'Field', select: 'Select', textarea: 'Text field', img: 'Image', svg: 'Icon', label: 'Label', li: 'List item', ul: 'List', h1: 'Heading', h2: 'Heading', h3: 'Heading', table: 'Table', dialog: 'Dialog' };
+export function affected(r = {}, cls = null) {
+  const sel = String(r.selector ?? '');
+  const [own, inside] = sel.split(' in ');
+  const human = (w) => String(w).replace(/[-_]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, (c) => c.toUpperCase());
+  let part = '';
+  const tag = /^<(\w+)>/.exec(own ?? '');
+  const el = /^(\w+)?((?:\.[\w-]+)+)/.exec(own ?? '');
+  if (tag) part = TAG_WORD[tag[1].toLowerCase()] ?? `<${tag[1]}>`;
+  else if (el) {
+    const classes = el[2].split('.').filter(Boolean);
+    part = cls && classes.includes(cls) ? 'The whole component' : human(classes[0]);
+  } else if (own && /^\w+$/.test(own)) part = TAG_WORD[own.toLowerCase()] ?? human(own);
+  return {
+    part: part || (inside ? 'A part of it' : 'The whole component'),
+    what: AFFECTS[r.issue] ?? null,
+    element: own && !/ with | no /.test(own) ? own.trim() : tag ? `<${tag[1]}>` : null,
+    text: r.text ?? null,
+    state: r.state ?? null,
+    mode: r.theme ?? null,
+    measured: r.contrast != null ? `${r.contrast}:1` : r.size ?? null,
+    needs: r.needs != null ? `${r.needs}:1` : null,
+    places: r.places ?? null,
+  };
+}
+
 // name, cls: the component · role: its role word (Figma's annotation, else the authored contract) · annotations: Figma's
 // notes on it · parts: its part roles ([{ layer, part }]) · exceptions: behaviours the person excused ({ id: reason }) ·
 // result: the last browser check (a11y.json), or null · guide: { kind: { title(n), fix } } (a11y-check.mjs A11Y_GUIDE).
@@ -1605,14 +1635,14 @@ export function a11yView({ name, cls = null, role = null, roleFrom = null, annot
         const k = r.issue + '|' + detail;
         if (seen.has(k)) continue;
         seen.add(k);
-        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail, ...(r.rule ? { wcag: r.wcag ?? null, help: r.help } : {}) });
+        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail, item: affected(r, cls), ...(r.rule ? { wcag: r.wcag ?? null, help: r.help } : {}) });
       }
       // One line per kind of problem: how many, where each is, the fix and the criterion once.
       const issues = [];
       for (const f of found) {
         const same = issues.find((i) => i.kind === f.kind);
-        if (same) { same.details.push(f.detail); continue; }
-        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? f.wcag ?? null, details: [f.detail], ...(f.help ? { help: f.help } : {}) });
+        if (same) { same.details.push(f.detail); same.items.push(f.item); continue; }
+        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? f.wcag ?? null, details: [f.detail], items: [f.item], ...(f.help ? { help: f.help } : {}) });
       }
       // An axe-core rule is said in its own words (its help line).
       for (const i of issues) i.title = guide[i.kind]?.title ? guide[i.kind].title(i.details.length) : i.help ?? i.kind;
