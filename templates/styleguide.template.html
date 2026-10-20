@@ -1437,6 +1437,12 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-panel-head > h2 { margin: 0; font-size: calc(var(--sg-h2) * 1.6); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 .sg-panel-head > .sg-section-badge, .sg-panel-head > .sg-panel-sub { margin: 0; }
 .sg-panel-sub { color: var(--sg-muted); font-size: var(--sg-s); overflow-wrap: anywhere; }
+/* Where a panel sits, each level from the outermost, as a breadcrumb: the page under it, the component, the tab, the task. */
+.sg-panel-crumbs { display: flex; flex-wrap: wrap; align-items: center; margin: 0; color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-panel-crumbs > span + span::before { content: '\203A'; margin: 0 var(--sg-space-xs); color: var(--sg-muted); }
+.sg-panel-crumbs > span:last-child { color: var(--sg-text-2); }
+/* A page shown in a panel says what it is under: the page the panel opened from, before its own group. */
+.sg-section-badge[data-trail]::before { content: attr(data-trail) '\00a0\203A\00a0'; }
 .sg-panel-body { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
 .sg-panel-body .pg-inspect-head { top: calc(var(--sg-panel-head-h, 0px) + var(--sg-stick-gap)); }   /* a card's head a stick gap under the panel's head */
 .sg-panel-body .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-panel-head-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); }   /* its table's head under it */
@@ -1829,8 +1835,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var HAS_PAGE = {}; (DATA.components || []).forEach(function (c) { HAS_PAGE[c.name] = c; });   // a component with a page of its own, linked; one only in Figma, named
   // The side panels' one template, as a component's page is laid out: a head that stays at the panel's top as it scrolls
   // (what it is, its name, its full name or path) and the body under it, cards a card gap apart.
+  // Where a page or a panel sits, from the outermost: the page under a panel holding a component's page (the Status
+  // page), the page or component it was opened from. Read from the page it is in, and from the page around it when it
+  // is itself shown in a panel.
+  function trailHere(from) {
+    var t = [], head = function (sec) { var h = sec && sec.querySelector(':scope > h2, :scope .pg-head h1, :scope .pg-head h2, :scope > h1'); return h ? titleText(h) : ''; };
+    try { if (window.parent && window.parent !== window) { var up = head(window.parent.document.querySelector('.sg-section:not([hidden])')); if (up) t.push(up); } } catch (e) { /* another origin */ }
+    var here = head((from && from.closest && from.closest('.sg-section')) || document.querySelector('.sg-section:not([hidden])'));
+    if (here && t[t.length - 1] !== here) t.push(here);
+    return t;
+  }
+  // A panel's head: where it is (each level, from the outermost), then its title, then what it is in full.
   function sidePanelPage(o) {
-    return '<header class="sg-panel-head">' + (o.badge ? '<p class="sg-section-badge">' + esc(o.badge) + '</p>' : '') + '<h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p class="sg-panel-sub">' + esc(o.sub) + '</p>' : '') + '</header>' +
+    var crumbs = (o.crumbs || []).filter(Boolean);
+    return '<header class="sg-panel-head">' + (crumbs.length ? '<nav class="sg-panel-crumbs" aria-label="Where you are">' + crumbs.map(function (c) { return '<span>' + esc(c) + '</span>'; }).join('') + '</nav>' : o.badge ? '<p class="sg-section-badge">' + esc(o.badge) + '</p>' : '') + '<h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p class="sg-panel-sub">' + esc(o.sub) + '</p>' : '') + '</header>' +
       '<div class="sg-panel-body">' + o.body + '</div>';
   }
   // The components a token is used by, as the Status table shows them: whether Figma and the code have each, and an
@@ -4114,7 +4132,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var vals = '<div class="pg-par-scroll"><table class="pg-par-table sg-tk-vals"><thead><tr>' + r.labels.map(function (l) { return '<th scope="col">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody><tr>' +
         r.labels.map(function (l, i) { return tkCell(r, l, i); }).join('') + '</tr></tbody></table></div>';
       var det = m.querySelector('.sg-tk-detail');
-      det.innerHTML = sidePanelPage({ badge: r.coll || 'Token', title: r.path[r.path.length - 1], sub: r.t.figma, body:
+      det.innerHTML = sidePanelPage({ crumbs: trailHere(from).concat([r.coll || 'Tokens']).concat(r.path.slice(0, -1)), title: r.path[r.path.length - 1], sub: r.t.figma, body:
         '<dl class="pg-updated">' + row('What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)) + row('In the code', r.t.var ? '<code>' + esc(r.t.var) + '</code> <button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button>' : '<span class="pg-missing">Not in the code</span>') + row('What it is for', r.t.description ? esc(r.t.description) : '') + '</dl>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Values</div>' + vals + '</div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Used by ' + plural(comps.length, 'component', 'components') + '</div>' + usersTable(comps) + '</div>' });
@@ -5370,7 +5388,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
     }).join('');
     var det = m.querySelector('.sg-row-detail');
-    det.innerHTML = sidePanelPage({ badge: (d.area || 'Task') + (nr ? ' · Task ' + nr : ''), title: title, sub: comp && comp !== title ? comp : '', body: body });
+    var trail = trailHere(from);
+    if (comp && trail.indexOf(comp) < 0) trail.push(comp);
+    det.innerHTML = sidePanelPage({ crumbs: trail.concat([d.area || 'Task', nr ? 'Task ' + nr : '']), title: title, body: body });
     m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
@@ -5442,7 +5462,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var side = function (x, where) { return x ? '<code>' + (/^--[\w-]+$/.test(x.name) ? usesLink(x.name) : esc(x.name)) + '</code>' + (x.value ? '<span class="pg-par-val">' + esc(x.value) + '</span>' : '') + (where ? '<span class="pg-par-val">' + esc(where) + '</span>' : '') : '<span class="pg-par-none">Not there</span>'; };
     // Where in the code a difference is (its selector and file line), as the audit wrote it.
     var whereOf = function (x) { var m = /\(([^()]*:\d+[^()]*)\)/.exec(String(x.what || '')); return m ? m[1] : ''; };
-    var diffRow = function (x) { return { st: x.who === 'both' ? 'check' : 'todo', who: WHO[x.who] || WHO.both, todo: esc(doWhat(x.todo)), fresh: !!x.new }; };
+    // A mismatch is a difference, flagged as one (Differs), whoever decides which side is right: knowing it differs is
+    // never unsure. Unsure is kept for what is not known yet (a pairing to confirm, a kept difference to look at again).
+    var diffRow = function (x) { return { st: 'todo', who: WHO[x.who] || WHO.both, todo: esc(doWhat(x.todo)), fresh: !!x.new }; };
     // A difference the team decided to keep: its reason, who decided and when; once its review date has come it is to check.
     var kept = c.kept || [], keptUsed = {};
     var keptRow = function (k) {
@@ -5470,14 +5492,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       else if (r.renamed || r.defaultDiffers) {
         // Its name, its default, or both, said in one task: make them the same, in Figma or in the code.
         var said = (r.renamed ? 'Figma names it ' + r.figma.name + ', the code ' + r.code.name + '. ' : '') + (r.defaultDiffers ? 'By default Figma has it ' + r.defaultDiffers.figma + ', the code ' + r.defaultDiffers.code + '. ' : '');
-        row.st = 'check'; row.who = WHO.both; row.todo = esc(said + (r.renamed && r.defaultDiffers ? 'Use one name and one default in both' : r.renamed ? 'Use one name in both' : 'Use one default in both') + ': change it in Figma or in the code.');
+        row.st = 'todo'; row.who = WHO.both; row.todo = esc(said + (r.renamed && r.defaultDiffers ? 'Use one name and one default in both' : r.renamed ? 'Use one name in both' : 'Use one default in both') + ': change it in Figma or in the code.');
       }
       else if (r.status === 'paired') { row.st = 'skip'; row.todo = r.why ? esc(capital(r.why) + '.') : ''; }
       else if (nb) { row.st = 'todo'; row.who = WHO.code; row.todo = esc('Build the ' + nb + ' property of ' + c.name + ' in the code, remove it from Figma, or keep it as a known exception.'); }
-      else if (r.status === 'figma') { row.st = 'check'; row.who = WHO.both; row.todo = esc('Build it in the code, remove it from Figma, or keep it as a known exception.'); }
-      else if (r.status === 'code') { row.st = 'check'; row.who = WHO.both; row.todo = esc('Add it to Figma, remove it from the code, or keep it as a known exception.'); }
+      else if (r.status === 'figma') { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Build it in the code, remove it from Figma, or keep it as a known exception.'); }
+      else if (r.status === 'code') { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Add it to Figma, remove it from the code, or keep it as a known exception.'); }
       else if (r.why) { row.st = 'todo'; row.who = WHO.figma; row.todo = esc(capital(r.why) + '. Take the library update in this Figma file.'); }
-      else { row.st = 'check'; row.who = WHO.both; row.todo = esc('Figma and the code differ here. Decide which one is right, then change the other, or keep it as a known exception.'); }
+      else { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Figma and the code differ here. Decide which one is right, then change the other, or keep it as a known exception.'); }
       out.push(row);
     });
     // What the audit found that is not one of the rows above: a row of its own, under the check that found it.
@@ -6159,7 +6181,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var states = function (list, pick) {
       var by = {}, out = [];
       list.forEach(function (o) { var x = pick(o), w = x.say === '–' ? 'N/A' : x.say; if (!by[w]) { by[w] = { cls: BAR[x.cls] || 'none', n: 0, word: w }; out.push(by[w]); } by[w].n++; });
-      return out.sort(function (p, q) { return ORDER_[p.cls] - ORDER_[q.cls] || q.n - p.n; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + x.word.charAt(0).toLowerCase() + x.word.slice(1) }; });
+      return out.sort(function (p, q) { return ORDER_[p.cls] - ORDER_[q.cls] || q.n - p.n; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + (x.word === 'N/A' ? 'with nothing to compare' : x.word.charAt(0).toLowerCase() + x.word.slice(1)) }; });   // N/A said in words: only one side has it, or nothing of this kind to check
     };
     var countOf = function (parts, word) { return (parts.filter(function (x) { return x.word === word; })[0] || { n: 0 }).n; };
     // Each button the same few words, the legend's own: See 141 differs, See 60 missing.
@@ -6312,7 +6334,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     frame.title = name;
     PANEL_PATH = path.slice(1);
     var w = null; try { w = frame._loaded && frame._base === panelBase() ? frame.contentWindow : null; } catch (e) { w = null; }
-    if (w) { try { w.scrollTo(0, 0); w.location.replace(w.location.pathname + w.location.search + path); } catch (e) { w = null; } }   // the page already there: only its address, no new history entry
+    if (w) { try { if (w.__sgClosePanels) w.__sgClosePanels(); w.scrollTo(0, 0); w.location.replace(w.location.pathname + w.location.search + path); } catch (e) { w = null; } }   // an item opens on its first level: nothing the last one opened inside stays open   // the page already there: only its address, no new history entry
     if (!w) { frame.classList.remove('is-ready'); frame._base = panelBase(); frame._loaded = false; frame.src = frame._base + path; }
     frame.setAttribute('data-at', panelBase() + path);   // the address shown inside, loaded or only routed to
     todoLink();
@@ -6343,8 +6365,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     }
     return m;
   }
+  // Every panel this page holds over itself (a row's, a token's), closed at once: what a component's page opened inside
+  // a panel never opens again with it. A panel's page holding a component's page calls it on the page inside.
+  window.__sgClosePanels = function () {
+    Array.prototype.forEach.call(document.querySelectorAll('.sg-comp-panel:not(#sg-comp-panel)'), function (p) { p._open = false; p.classList.remove('is-open'); p.hidden = true; });
+    if (!(document.getElementById('sg-comp-panel') || {})._open) document.documentElement.classList.remove('sg-panel-open');
+  };
+  var closeInner = function (frame) { try { var w = frame && frame.contentWindow; if (w && w.__sgClosePanels) w.__sgClosePanels(); } catch (e) { /* another origin */ } };
   function closeComponentPanel() {
     var m = document.getElementById('sg-comp-panel'); if (!m || !m._open) return;
+    closeInner(m.querySelector('.sg-comp-panel-frame'));   // the next item opens on its first level only
     m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open');
     PANEL_PATH = null; todoLink();
     setTimeout(function () { if (!m._open) m.classList.add('is-parked'); }, 200);   // after it slides out: parked, its page kept for the next one
@@ -8262,21 +8292,30 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     });
     document.addEventListener('focusin', function (e) { if (e.target.classList && e.target.classList.contains('pg-panel-grip')) say(e.target); });
   })();
-  // Every link inside a table that goes to another page (a component's, a token's group, a commit, the intent layer's
-  // page) is a link pill: its words, then the arrow, the one style for a link in a table (a template rule). Tables the
-  // system draws itself (a preview, a Showroom screen) are its own and left as they are.
+  // Every link inside a table to another page of the guide (a component's, a token's) is a link pill: its words, then the
+  // arrow, the one style for moving around the guide in a table (a template rule); several in a cell sit side by side,
+  // no comma between them. A link out of the guide (a commit, the intent layer's page on GitLab) stays an underlined
+  // link. Tables the system draws itself (a preview, a Showroom screen) are its own and left as they are.
   var PILL_SKIP = '.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom, thead, .sg-tip';
   function pillLinks(root) {
-    Array.prototype.forEach.call((root || document).querySelectorAll('table a[href]:not(.sg-link-pill):not(.sg-card):not(.sg-mx-go)'), function (a) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('table a[href^="#"]:not(.sg-link-pill):not(.sg-card):not(.sg-mx-go)'), function (a) {
       if (a.closest(PILL_SKIP) || a.closest('.sg-link-pill')) return;
       a.classList.add('sg-link-pill', 'sg-link-pill--table');
       if (!a.title) a.title = a.textContent.trim();   // its whole name on hover, when the pill cuts it short
       if (!a.querySelector(':scope > .sg-link-words')) { var w = document.createElement('span'); w.className = 'sg-link-words'; while (a.firstChild) w.appendChild(a.firstChild); a.appendChild(w); }
       a.insertAdjacentHTML('beforeend', LINK_GO);
+      // The comma between two pills goes: the pills stand apart by themselves.
+      var prev = a.previousSibling;
+      if (prev && prev.nodeType === 3 && /^\s*,\s*$/.test(prev.nodeValue) && prev.previousSibling && prev.previousSibling.classList && prev.previousSibling.classList.contains('sg-link-pill--table')) prev.nodeValue = ' ';
+      var next = a.nextSibling;
+      if (next && next.nodeType === 3 && /^\s*,\s*$/.test(next.nodeValue) && next.nextSibling && next.nextSibling.nodeName === 'A' && /^#/.test(next.nextSibling.getAttribute('href') || '')) next.nodeValue = ' ';
     });
   }
   (function () {
-    var queued = false, run = function () { queued = false; pillLinks(document); };
+    // A page shown in a panel (a component's, opened from the Status page): its badge says the page under the panel first.
+    var under = (function () { try { if (window.parent && window.parent !== window) { var ps = window.parent.document.querySelector('.sg-section:not([hidden])'), h = ps && ps.querySelector(':scope > h2'); return h ? titleText(h) : ''; } } catch (e) { /* another origin */ } return ''; })();
+    var markUnder = function () { if (under) Array.prototype.forEach.call(document.querySelectorAll('.sg-section-badge:not([data-trail])'), function (b) { if (!b.closest('.sg-panel-head')) b.setAttribute('data-trail', under); }); };
+    var queued = false, run = function () { queued = false; pillLinks(document); markUnder(); };
     run();
     if (typeof MutationObserver !== 'undefined') new MutationObserver(function () { if (!queued) { queued = true; setTimeout(run, 0); } }).observe(document.querySelector('.sg-layout') || document.body, { childList: true, subtree: true });
   })();
