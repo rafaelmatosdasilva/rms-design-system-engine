@@ -4984,7 +4984,7 @@ function reportFull(label, items, shown) {
         try {
           const il = await import('./intent-layer.mjs');
           const snap = il.readIntentLayer(ROOT, cfg);
-          const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)), { names: Object.keys(r.intent.components), codeExists: (f) => existsSync(resolve(ROOT, f)) });
+          const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)), { names: Object.keys(r.intent.components), codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, cfg) });
           const todo = il.ACTIONS.filter(([k]) => !['keep', 'improve'].includes(k) && rep.actions[k]).map(([k, label]) => `${rep.actions[k]} ${label.toLowerCase()}`);
           console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${todo.length ? `\n   To do in the intent layer: ${todo.join(', ')} (each page with why and what to change: the style guide's Intent layer page, --docs)` : ''}`);
         } catch { /* the line above already says how many pages */ }

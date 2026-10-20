@@ -707,9 +707,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         // The components the agents get (the design intent's: Figma's, or with no Figma data the code's), not only the
         // ones this page shows, so the page and the audit judge each page alike.
         const names = il.systemNames(ROOT, cfg);
-        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)) });
+        const from = il.namesFrom(ROOT, cfg);
+        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from });
         const src = snap._source ?? {};
-        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, repeated: snap.boilerplate ?? 0, pages: report.pages,
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages,
           noPage: names.filter((n) => !report.pages.some((p) => p.component === n)) };
       }
     } catch { /* no intent layer */ }

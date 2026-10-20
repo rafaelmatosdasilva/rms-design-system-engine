@@ -2793,7 +2793,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var labelOf = function (k) { var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
     var decisionCell = function (k) { return '<span class="pg-par-status pg-par--' + IL_DOT[k] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'; };
     var rowHTML = function (p) {
-      if (p.missingFor) return '<tr data-chip="missing"><td>' + decisionCell('missing') + '</td><td><span class="pg-missing">No page</span></td><td><a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a></td><td><p class="sg-il-line"><strong>Write its page in the intent layer, named as the component is named in Figma.</strong></p></td><td><p class="sg-il-line">No page names this component, by name or by code file.</p></td><td><p class="pg-missing">Nothing.</p></td></tr>';
+      if (p.missingFor) return '<tr data-chip="missing"><td>' + decisionCell('missing') + '</td><td><span class="pg-missing">No page</span></td><td><a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a></td><td><p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p></td><td><p class="sg-il-line">No page names this component, by name or by code file.</p></td><td><p class="pg-missing">Nothing.</p></td></tr>';
       return '<tr data-chip="' + esc(p.action) + '"><td>' + decisionCell(p.action) + '</td><td>' + ilLink(p) + '</td><td>' + ilFor(p) + '</td><td>' + ilTodo(p) + '</td><td>' + ilWhy(p) + '</td><td>' + ilGets(p) + '</td></tr>';
     };
     var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
@@ -2891,7 +2891,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var intentRow = function (c) {
     var il = c.intentLayer; if (!il) return null;
     if (il.none) return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: '<p class="pg-missing">No page names it.</p>',
-      todo: esc('Write its page in the intent layer, named as the component is named in Figma.'), who: WHO.person, st: 'todo', rel: '', at: DATA.builtAt || null, src: [] };
+      todo: esc('Write its page in the intent layer, titled ' + c.name + ', as ' + ((DATA.intentLayer || {}).namesFrom || 'Figma') + ' names it.'), who: WHO.person, st: 'todo', rel: '', at: DATA.builtAt || null, src: [] };
     var said = ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules'].some(function (k) { var v = il[k]; return Array.isArray(v) ? v.length : !!v; });
     var link = il.url ? '<p><a class="sg-uses-link" href="' + esc(il.url) + '" target="_blank" rel="noopener">' + esc(il.file) + '</a></p>' : '<p>' + esc(il.file) + '</p>';
     // Everything read from its page, as the engine holds it, kind by kind; then what was left out and why.

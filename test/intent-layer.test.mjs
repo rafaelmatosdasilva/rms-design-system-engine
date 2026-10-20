@@ -11,7 +11,7 @@ import { makeFixture } from './helpers.mjs';
 import {
   intentLayerConfig, layerOf, keyOfTitle, itemsOf, entityView, readDsds, dropBoilerplate, matchComponents,
   syncIntentLayer, readIntentLayer, componentIntent, useReport, describeSync, short, intentWords,
-  addSource, configuredSources, syncSources, systemNames,
+  addSource, configuredSources, syncSources, systemNames, namesFrom,
 } from '../intent-layer.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -309,7 +309,7 @@ test('the usage report: what reaches the agents and where, what does not and why
   assert.equal(page('Toast General').verdict, 'not used');          // only filler
   assert.equal(page('Ghost Widget').verdict, 'not used');
   assert.match(page('Ghost Widget').notUsed[0].why, /matches no component/);
-  assert.match(page('Ghost Widget').notUsed[0].fix, /as the component is named in Figma/);
+  assert.match(page('Ghost Widget').notUsed[0].fix, /as its component is named in Figma/);
   assert.equal(page('Ghost Widget').notUsed.length, 1);              // nothing else matters until it is named
   assert.equal(page('Saving').verdict, 'used');                     // a pattern: what it is for and its rules
   assert.ok(page('Saving').gets.some((g) => /other sections/.test(g.what) && g.to[0].startsWith('the prototype context')));
@@ -556,4 +556,17 @@ test('a rename never goes to a part of a component: its page moves to the parent
   assert.deepEqual([at('Grid Header Base').action, at('Grid Header Base').notUsed[0].reason], ['move', 'subPart']);
   assert.match(at('Grid Header Base').todo[0], /^Move what is true of grid\/Header and not yet on Grid General \(grid\/general\.json\) there/);
   assert.deepEqual([at('List Row Base').action, at('List Row Base').notUsed[0].reason], ['delete', 'subPartAlone']);   // list has no page at all
+});
+
+test('the advice names the component as the system does: Figma\'s name, or the code\'s with no Figma file', () => {
+  const pg = { kind: 'component', layer: 'components', name: 'Panel General', id: null, status: null, file: 'p.json', url: null, code: null, summary: null,
+    purpose: ['Group one subject.'], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], facts: [], repeated: 0 };
+  const names = ['Panel'];
+  const code = useReport({ _source: {}, entities: [pg] }, matchComponents(names, [pg], {}), { names, from: 'the code' });
+  assert.equal(code.pages[0].todo[0], 'Rename this page to Panel, the component\'s name in the code.');
+  const odd = { ...pg, name: 'Mystery Thing' };
+  assert.match(useReport({ _source: {}, entities: [odd] }, new Map(), { names, from: 'the code' }).pages[0].todo[0], /named in the code \(its file's name/);
+  assert.match(useReport({ _source: {}, entities: [odd] }, new Map(), { names, from: 'Figma' }).pages[0].todo[0], /named in Figma/);
+  assert.equal(namesFrom(makeFixture({}), {}), 'the code');
+  assert.equal(namesFrom(makeFixture({ 'figma-structure.snapshot.json': { components: { panel: {} } } }), {}), 'Figma');
 });

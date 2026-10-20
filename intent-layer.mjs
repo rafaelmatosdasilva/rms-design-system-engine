@@ -82,6 +82,11 @@ export function matchComponents(names, entities, codeFiles = {}) {
 
 // The components the agents get, as the design intent has them: Figma's (its structure snapshot), else, with no
 // Figma data, the code's own. Read from the sources, never from a saved design-intent.json that may not be there.
+// Where those names come from, said in the advice: 'Figma', or 'the code' for a system with no Figma data.
+export function namesFrom(ROOT, cfg = {}) {
+  try { if (Object.keys(JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotStructure || 'figma-structure.snapshot.json'), 'utf8'))?.components ?? {}).length) return 'Figma'; } catch { /* none */ }
+  return 'the code';
+}
 export function systemNames(ROOT, cfg = {}) {
   try {
     const s = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotStructure || 'figma-structure.snapshot.json'), 'utf8'));
@@ -170,7 +175,7 @@ export const REACH = {
 export const NOT_USED = {
   noComponent: {
     why: 'Its name matches no component of the system, nor does the code file it names, so the engine cannot tell which component it is about.',
-    fix: 'Name the page as the component is named in Figma (or point it at the component\'s code file). If the component is not in Figma yet, add it there.',
+    fix: 'Name the page as the system names the component (Figma\'s name, or the code\'s with no Figma file), or point it at the component\'s code file.',
     remove: 'Only if the component no longer exists. Otherwise keep it: once it is named, the whole page reaches the agents.',
   },
   unknownTitle: {
@@ -210,7 +215,7 @@ const KIND_WORDS = { purpose: 'what it is for', whenToUse: 'when to use', whenNo
 //   not used: nothing of it reaches them
 // matched: Map(component → entity) from matchComponents. → { pages: [...], counts: { used, thin, notUsed } }
 // opts: { names: the system's components, codeExists(file): is that code file in the project }.
-export function useReport(snap, matched = new Map(), { names = [], codeExists = null } = {}) {
+export function useReport(snap, matched = new Map(), { names = [], codeExists = null, from = 'Figma' } = {}) {
   const forEntity = new Map([...matched].map(([n, e]) => [e, n]));
   const pages = [];
   for (const e of snap?.entities ?? []) {
@@ -219,7 +224,7 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     const reach = comp ? REACH.components : REACH.other;
     const gets = [], notUsed = [];
     if (comp && !component) {
-      notUsed.push({ what: 'the whole page', ...orphanAdvice(e, { entities: snap.entities, forEntity, names, codeExists }) });
+      notUsed.push({ what: 'the whole page', ...orphanAdvice(e, { entities: snap.entities, forEntity, names, codeExists, from }) });
     } else {
       for (const k of ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules']) {
         const n = (e[k] ?? []).length; if (!n) continue;
@@ -294,7 +299,8 @@ const linesOf = (e) => [...e.purpose, ...e.whenToUse, ...e.whenNotToUse, ...e.mi
 const wordsOfName = (n) => String(n ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 const shares = (a, b) => { const B = new Set(b); return a.length ? a.filter((x) => B.has(x)).length / a.length : 0; };
 const pageOf = (x) => `${x.name} (${x.file})`;
-export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = [], codeExists = null } = {}) {
+// from: where the system's component names come from ('Figma', or 'the code' with no Figma data), as the advice says it.
+export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = [], codeExists = null, from = 'Figma' } = {}) {
   const say = (reason, why, fix, remove) => ({ reason, why, fix, remove });
   const mine = linesOf(e);
   if (!mine.length) return say('emptyPage', 'It names no component of the system and, once the lines written on every page alike and the facts the engine reads from Figma and the code are left out, says nothing of its own.',
@@ -324,7 +330,7 @@ export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = 
         ? say('subPart', `It is about ${target}, a part of ${parentName}, not a component agents place on its own.${twinNote}`, `Move what is true of ${target} and not yet on ${pageOf(parentPage)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.')
         : say('subPartAlone', `It is about ${target}, a part of ${parentName}, not a component agents place on its own, and no page documents ${parentName}.${twinNote}`, 'Delete this page, or, if what it says matters, make it the page of ' + parentName + ' first.', 'Yes.');
     }
-    return say('rename', `It names no component of the system as Figma names it; ${target} is that component, under its own name, and no page documents ${target} yet.${twinNote}`, `Rename this page to ${target}, the component's name in Figma.`, 'No.');
+    return say('rename', `It names no component of the system as ${from} names it; ${target} is that component, under its own name, and no page documents ${target} yet.${twinNote}`, `Rename this page to ${target}, the component's name in ${from}.`, 'No.');
   }
   // A part of a component: its code file beside that component's, and its name (or its file's) holding the component's
   // name (PointListItem beside pointList). Its page belongs in that component's page.
@@ -336,15 +342,17 @@ export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = 
     const said = shares(mine, linesOf(parent));
     const short = e.code.split('/').pop();
     return said >= 0.8
-      ? say('partSaid', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in Figma, and its page already says what this one says.${twinNote}`, 'Delete this page.', 'Yes.')
-      : say('part', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in Figma, so no agent is given this page.${twinNote}`,
+      ? say('partSaid', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in ${from}, and its page already says what this one says.${twinNote}`, 'Delete this page.', 'Yes.')
+      : say('part', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in ${from}, so no agent is given this page.${twinNote}`,
         `Move what is true of this part and not yet on ${pageOf(parent)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.');
   }
   // The same words as a component's page.
   const copy = others.find((x) => forEntity.has(x) && shares(mine, linesOf(x)) >= 0.8);
   if (copy) return say('copy', `It names no component of the system, and what it says is on the page of ${forEntity.get(copy)} (${copy.file}).${twinNote}`, 'Delete this page.', 'Yes.');
   return say('noComponent', `Its name matches no component of the system, nor does the code file it names, so no agent is given it.${twinNote}`,
-    'Name it as the component is named in Figma. If the component is not in Figma yet, add it there; if it is not meant to be used, delete this page.', 'Only if the component is not meant to be used.');
+    from === 'Figma'
+      ? 'Name it as its component is named in Figma (the names are in the Components list of the style guide). If the component is not in Figma yet, add it there; if it is not meant to be used, delete this page.'
+      : 'Name it as its component is named in the code (its file\'s name, as in the Components list of the style guide). If no component in the code is the one it describes, delete this page.', 'Only if the component is not meant to be used.');
 }
 
 // One line for the person, from a source's sync result (the DSDS adapter's words, the default).
