@@ -200,10 +200,10 @@ export function hiddenLayers(overrides, mode, { names = [], standard = () => nul
   const out = new Map();
   const off = (x) => x === false || x === 'false';
   for (const [v, by] of Object.entries(overrides ?? {})) {
-    if (!/\/(display|anyDisplay)$/.test(v) || !by || !Object.prototype.hasOwnProperty.call(by, mode) || !off(by[mode])) continue;
+    if (!/\/\w*[dD]isplay$/.test(v) || !by || !Object.prototype.hasOwnProperty.call(by, mode) || !off(by[mode])) continue;
     const group = v.replace(/\/[^/]+$/, '') + '/';
     for (const n of names) {
-      if (!n.startsWith(group) || /\/(display|anyDisplay)$/.test(n)) continue;
+      if (!n.startsWith(group) || /\/\w*[dD]isplay$/.test(n)) continue;
       const last = n.slice(n.lastIndexOf('/') + 1);
       if (OFF_COLOUR.test(last)) out.set(n, 'transparent');
       else if (OFF_SIZE.test(last)) out.set(n, 0);
@@ -369,7 +369,7 @@ export function onLibrary(snap, codeValue) {
         if (c.overrides[n] && Object.prototype.hasOwnProperty.call(c.overrides[n], m)) continue;
         // A layer's display switch: the code has no variable for it, so the library's own always joins (what it hides
         // stays hidden in every brand, unless a brand turns it on).
-        if (/\/(display|anyDisplay)$/.test(n) && (v === false || v === true || v === 'false' || v === 'true')) { (c.overrides[n] ??= {})[m] = v; continue; }
+        if (/\/\w*[dD]isplay$/.test(n) && (v === false || v === true || v === 'false' || v === 'true')) { (c.overrides[n] ??= {})[m] = v; continue; }
         const code = codeValue(n, m);
         if (code == null) continue;
         const want = lit(n, m);

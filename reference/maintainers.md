@@ -14,13 +14,43 @@ person's name (an author credited as a source, an invented reviewer: write a rol
 anything of the private backlog (its name, its items, its item codes). An idea taken from an article is credited
 generically ("a published article").
 
-- `.githooks/pre-commit` runs `.githooks/private-check.mjs --staged` on the lines a commit adds, and `.githooks/commit-msg`
-  runs it on the message; both refuse the commit and name the file and line. Turn them on once per clone:
-  `git config core.hooksPath .githooks`. Never commit with `--no-verify`.
-- `test/no-testbed-names.test.mjs` runs the same check on the whole repository with the suite
-  (`node .githooks/private-check.mjs --records` also reads the evaluation records).
-- A private name the check should know goes into its list as a hash (the first 16 hex characters of its SHA-256, words
-  lowercased and joined with nothing), never as text.
+Examples use invented, generic names only (Acme, Northwind, cardTile, headerQuokka): never a name taken from a project
+the engine worked on, even one that reads as generic.
+
+Five layers refuse anything private, each catching what the one before may miss:
+
+1. **The commit hooks.** `.githooks/pre-commit` runs `.githooks/private-check.mjs --staged` on the lines and files a
+   commit adds, and `.githooks/commit-msg` on its message; both refuse the commit and name the file and line.
+2. **The push hook.** `.githooks/pre-push` checks every commit a push sends, whole: its message, its author and
+   committer (a no-reply address only), the lines and files it adds. It catches a commit made before a name was known
+   or past the commit hooks. Turn the hooks on once per clone: `git config core.hooksPath .githooks`. Never use
+   `--no-verify`.
+3. **The names of the projects on this computer.** `.githooks/private-terms.mjs` reads, from each project the engine
+   ran on, the names its people chose (components, properties and options, token paths, modes, brands, fonts,
+   pages, icons) and its own (project, package, repository, hosts, Figma keys), and keeps them on this computer only
+   (`~/.config/rms-engine/`, or `RMS_PRIVATE_TERMS_DIR`), never in the repository. Every check refuses them, so a new
+   client is covered from its first run, unasked. Plain words, CSS words and names every system writes
+   (buttonPrimary) are never a project's. A project is remembered when the engine runs on it from a checkout with
+   the hooks on; `node .githooks/private-terms.mjs --scan <folder>` remembers the ones already there,
+   `--review` lists the names the engine's files already carry, and `--allow <name>` marks one as the engine's own
+   (only a generic one: rename anything specific).
+4. **The patterns.** Whatever the project: a Figma file key (other than the placeholder, the owner's public board
+   and the fictional fixture's), a company host (gitlab.…, jira.…, \*.internal, a private IP), a path on someone's
+   computer (/Users/name, /home/name, C:\\Users\\name; placeholders such as /Users/me are fine), a secret (figd\_,
+   ghp\_, github\_pat\_, glpat-, sk-, AKIA…, xox…-, a private key), a font file anywhere, an image, a document or an
+   archive outside `test/fixtures/`, and a JSON copied from a Figma file (20 node ids or more) outside it.
+5. **GitHub.** The `Privacy` workflow (`.github/workflows/privacy.yml`) runs the same check on every commit a push or
+   a pull request brings, and on a pull request's title and description; the `main` ruleset requires it before
+   anything merges. GitHub's secret scanning and push protection are on.
+
+- `test/no-testbed-names.test.mjs` runs the check on the whole repository with the suite and plants one case of each
+  kind (`node .githooks/private-check.mjs --records` also reads the evaluation records).
+- A private name the hashed list should know (a client's own name, the backlog's) goes in as a hash (the first 16 hex
+  characters of its SHA-256, lowercased and joined with nothing), never as text; a short one goes into
+  `FORBIDDEN_WORDS`, matched as a whole word only.
+- If something private ever reaches GitHub anyway: rewrite the history (git filter-repo), and, if a pull request
+  carries it, recreate the repository and keep the old one private and archived (pull requests keep their commits
+  forever). Never delete an archive.
 
 ## Engine Evolution - closing the loop on every miss
 

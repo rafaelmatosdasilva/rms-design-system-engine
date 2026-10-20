@@ -9,16 +9,29 @@
 //   - an email address that is not a placeholder (example.com and the like) or a no-reply address;
 //   - an item code of the private backlog (a capital letter and digits, in brackets, after "idea", or opening a
 //     comment or a test name);
-//   - a person credited as a source (a first and last name after "by", or before an article's title).
+//   - a person credited as a source (a first and last name after "by", or before an article's title);
+//   - a name of a project the engine worked on, read from that project on this computer and kept outside the
+//     repository (private-terms.mjs): its components, tokens, brands, fonts, repository and hosts;
+//   - a Figma file key other than the placeholders and the public ones below;
+//   - a company's own host (gitlab.company.com, jira.…, *.internal, a private IP address);
+//   - a path on someone's computer (/Users/name/…, /home/name/…, C:\Users\name\…);
+//   - a secret: an access token or key (figd_, ghp_, github_pat_, sk-…, AKIA…, xox…-, a private key);
+//   - a private file: a font anywhere, an image, a document or an archive outside test/fixtures/, and data copied
+//     from a Figma file (a JSON with many node ids) outside test/fixtures/;
+//   - a commit whose author or committer address is not a no-reply or placeholder one.
 //
 //   node .githooks/private-check.mjs                 every file of the repository (--records: the eval records too)
-//   node .githooks/private-check.mjs --staged        the lines a commit adds (the pre-commit hook)
+//   node .githooks/private-check.mjs --staged        the lines and files a commit adds (the pre-commit hook)
 //   node .githooks/private-check.mjs --message FILE  a commit message (the commit-msg hook)
+//   node .githooks/private-check.mjs --push          every commit a push sends, its refs read from stdin (pre-push)
+//   node .githooks/private-check.mjs --range A..B    every commit in a range (CI; A of zeros: all of B's history)
+//   node .githooks/private-check.mjs --text FILE     any text (a pull request's title and description, in CI)
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { localTerms, PUBLIC_HOST } from './private-terms.mjs';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -114,6 +127,53 @@ function firstNames(text) {
   return out;
 }
 
+// ── Patterns: what leaks without naming anyone ─────────────────────────────────────────────────────────────────
+// The Figma files that may be named: a placeholder, the owner's public board, the fictional fixture's file.
+const FIGMA_OK = new Set(['AbCdEf123456XyZ', 'W5UEjkrLv5t4fqsGPQWqk8', 'b0LpOCBsaRgo8lUqbkQNaY']);
+function figmaKeys(text) {
+  const out = [];
+  for (const m of text.matchAll(/figma\.com\/(?:design|file|board|proto|make|slides|deck)\/([A-Za-z0-9]{15,})/g)) if (!FIGMA_OK.has(m[1])) out.push(m[1]);
+  for (const m of text.matchAll(/["']?(?:figma)?[Ff]ile_?[Kk]ey["']?\s*[:=]\s*["']([A-Za-z0-9]{15,})["']/g)) if (!FIGMA_OK.has(m[1])) out.push(m[1]);
+  return [...new Set(out)];
+}
+// A placeholder host: example, test, invalid and localhost, and the invented companies of the examples.
+const PLACEHOLDER_HOST = /(^|\.)(example|test|invalid|localhost|local\.test)$|(^|\.)(acme|northwind|tidal|tidepool|contoso|fabrikam|your-host|yourcompany|company)(\.[a-z]+)*$/i;
+const INTERNAL_PREFIX = /^(gitlab|git|scm|svn|jira|confluence|wiki|intranet|intra|portal|artifactory|nexus|sonar|sonarqube|jenkins|ci|build|vpn|sso|auth|login|idp|grafana|kibana|vault|registry|docker|harbor|teamcity|bamboo|redmine|youtrack|sharepoint|teams)\./i;
+const INTERNAL_TLD = /\.(internal|local|lan|corp|intra|intranet|home|priv|private|localdomain)$/i;
+const PRIVATE_IP = /^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|169\.254\.\d+\.\d+)$/;
+function internalHosts(text) {
+  const out = [];
+  for (const m of text.matchAll(/(?:https?:\/\/|git@|ssh:\/\/(?:[\w.-]+@)?|\bwww\.)([a-z0-9][a-z0-9.-]*[a-z0-9])(?=[:/\s"'`)\]>]|$)/gi)) {
+    const h = m[1].toLowerCase();
+    if (PUBLIC_HOST.test(h) || PLACEHOLDER_HOST.test(h) || /^(127\.|0\.0\.0\.0|localhost)/.test(h)) continue;
+    if (INTERNAL_PREFIX.test(h) || INTERNAL_TLD.test(h) || PRIVATE_IP.test(h) || /\.atlassian\.net$|\.slack\.com$|\.sharepoint\.com$|\.service-now\.com$/.test(h)) out.push(h);
+  }
+  for (const m of text.matchAll(/\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b/g)) out.push(m[1]);
+  return [...new Set(out)];
+}
+// A path on someone's computer. A placeholder user (me, you, user, name, a, runner…) is fine.
+const PLACEHOLDER_USER = /^(me|a|b|you|user|users|name|username|runner|demo|example|someone|dev|developer|<[^>]*>|\$\w+|\$\{[^}]*\}|\{[^}]*\}|\*|\.\.\.)$/i;
+function localPaths(text) {
+  const out = [];
+  const user = (u) => u.replace(/[,;:.!?]+$/, '');
+  for (const m of text.matchAll(/(?:^|[^\w.])\/(Users|home)\/([^\s/"'`)\]\\]+)/g)) if (!PLACEHOLDER_USER.test(user(m[2]))) out.push(`/${m[1]}/${user(m[2])}/`);
+  for (const m of text.matchAll(/\b[A-Za-z]:\\{1,2}Users\\{1,2}([^\s\\"'`]+)/g)) if (!PLACEHOLDER_USER.test(user(m[1]))) out.push(`C:\\Users\\${user(m[1])}\\`);
+  for (const m of text.matchAll(/-Users-([A-Za-z][\w.]*)-/g)) if (!PLACEHOLDER_USER.test(m[1])) out.push(`-Users-${m[1]}-`);
+  return [...new Set(out)];
+}
+// A secret: the forms of the tokens and keys of the services the engine meets.
+const SECRETS = [
+  /\bfigd_[A-Za-z0-9_-]{20,}/g, /\bgh[pousr]_[A-Za-z0-9]{30,}/g, /\bgithub_pat_[A-Za-z0-9_]{30,}/g, /\bglpat-[A-Za-z0-9_-]{20,}/g,
+  /\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}/g, /\bAKIA[0-9A-Z]{16}\b/g, /\bxox[abprs]-[A-Za-z0-9-]{10,}/g, /\bAIza[0-9A-Za-z_-]{35}\b/g,
+  /\bntn_[A-Za-z0-9]{30,}/g, /\bsecret_[A-Za-z0-9]{40,}/g, /-----BEGIN [A-Z ]*PRIVATE KEY-----/g,
+  /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+];
+function secrets(text) {
+  const out = [];
+  for (const re of SECRETS) for (const m of text.matchAll(re)) out.push(m[0].slice(0, 8) + '…');
+  return [...new Set(out)];
+}
+
 // Every private thing in a text: [{ kind, what }], `what` withheld for the hashed names (naming them would leak them).
 export function privateFindings(text, { names = true } = {}) {
   const out = [];
@@ -122,6 +182,11 @@ export function privateFindings(text, { names = true } = {}) {
   for (const w of personalEmails(text)) out.push({ kind: 'email address', what: w });
   for (const w of backlogCodes(text)) out.push({ kind: 'backlog item code', what: w });
   for (const w of credits(text)) out.push({ kind: 'a person credited', what: w });
+  if (names) for (const h of localTerms().find(text)) out.push({ kind: 'a project\'s own name', what: `${h.term} (from ${h.from})` });
+  for (const w of figmaKeys(text)) out.push({ kind: 'Figma file key', what: w });
+  for (const w of internalHosts(text)) out.push({ kind: 'a company host', what: w });
+  for (const w of localPaths(text)) out.push({ kind: 'a path on someone\'s computer', what: w });
+  for (const w of secrets(text)) out.push({ kind: 'a secret', what: w });
   return out;
 }
 
@@ -147,19 +212,80 @@ export function repoFindings({ records = false } = {}) {
   return out;
 }
 
-// The lines a commit adds, read from the staged diff, with the file and line each lands on.
-export function stagedFindings() {
+// The lines a diff adds, with the file and line each lands on. The eval records (agents' replies word for word) are
+// checked for names, secrets and paths only: they quote the engine's own examples.
+function diffFindings(diff, at = '') {
   const out = [];
   let file = '', line = 0;
-  for (const l of git(['diff', '--cached', '--unified=0', '--no-color', '--no-ext-diff']).split('\n')) {
+  for (const l of diff.split('\n')) {
     if (l.startsWith('+++ ')) { file = l.replace(/^\+\+\+ (b\/)?/, ''); continue; }
     const h = l.match(/^@@ -\S+ \+(\d+)/); if (h) { line = Number(h[1]); continue; }
     if (l.startsWith('+')) {
       const text = l.slice(1);
-      const found = RECORD.test(file) ? (forbiddenHits(text) ? [{ kind: 'private name', what: '' }] : []) : privateFindings(text);
-      for (const x of found) out.push({ file, line, ...x });
+      const found = RECORD.test(file)
+        ? [...(forbiddenHits(text) ? [{ kind: 'private name', what: '' }] : []), ...secrets(text).map((w) => ({ kind: 'a secret', what: w })), ...localPaths(text).map((w) => ({ kind: 'a path on someone\'s computer', what: w }))]
+        : privateFindings(text);
+      for (const x of found) out.push({ file: at + file, line, ...x });
       line++;
     }
+  }
+  return out;
+}
+
+// What a file is, whatever it says: a font anywhere; an image, a document or an archive outside the fictional
+// fixtures; data copied from a Figma file (a JSON with many node ids) outside them; and its own name.
+const FIXTURE = /^test\/fixtures\//;
+const FONT = /\.(otf|ttf|woff2?|eot)$/i;
+const BINARY = /\.(png|jpe?g|gif|webp|avif|bmp|tiff?|heic|ico|svg|pdf|fig|sketch|xd|psd|ai|zip|tgz|gz|bundle|7z|rar|mp4|mov|webm|docx?|xlsx?|pptx?|key|numbers|pages)$/i;
+export function fileFindings(file, readText = () => '', at = '') {
+  const out = [];
+  const say = (kind, what) => out.push({ file: at + file, line: 0, kind, what });
+  if (FONT.test(file)) say('a font file', 'fonts are licensed: never in the repository');
+  else if (BINARY.test(file) && !FIXTURE.test(file)) say('a private file', 'an image, a document or an archive belongs in test/fixtures/ only, and only an invented one');
+  else if (/\.json$/i.test(file) && !FIXTURE.test(file) && !RECORD.test(file)) {
+    let t = ''; try { t = readText(); } catch { /* deleted */ }
+    const ids = (t.match(/"\d+:\d+"/g) || []).length;
+    if (ids >= 20) say('data copied from a Figma file', `${ids} node ids: a fixture is invented and lives in test/fixtures/`);
+  }
+  for (const x of privateFindings(file)) out.push({ file: at + file, line: 0, kind: 'its name: ' + x.kind, what: x.what });
+  return out;
+}
+
+// The lines and files a commit adds, read from the staged diff.
+export function stagedFindings() {
+  const out = diffFindings(git(['diff', '--cached', '--unified=0', '--no-color', '--no-ext-diff']));
+  for (const f of git(['diff', '--cached', '--name-only', '--diff-filter=ACMR']).split('\n').filter(Boolean)) out.push(...fileFindings(f, () => git(['show', `:${f}`])));
+  return out;
+}
+
+// A commit as a push or CI sees it: its message, its author and committer, the lines and files it adds.
+const SAFE_ADDRESS = (e) => /(^|[.+])no-?reply@|@users\.noreply\.github\.com$|^noreply@/i.test(e) || PLACEHOLDER_DOMAIN.test(e.split('@')[1] ?? '');
+export function commitFindings(sha) {
+  const at = sha.slice(0, 7) + ' ';
+  const out = messageFindings(git(['log', '-1', '--format=%B', sha])).map((x) => ({ file: at + 'its message', line: 0, ...x }));
+  for (const e of new Set(git(['log', '-1', '--format=%ae%n%ce', sha]).split('\n').filter(Boolean))) if (!SAFE_ADDRESS(e)) out.push({ file: at + 'its author', line: 0, kind: 'a personal address', what: `${e} (use the no-reply address: git config user.email <id>+<user>@users.noreply.github.com)` });
+  out.push(...diffFindings(git(['show', '--format=', '--unified=0', '--no-color', '--no-ext-diff', '--root', sha]), at));
+  for (const f of git(['show', '--format=', '--name-only', '--diff-filter=ACMR', '--root', sha]).split('\n').filter(Boolean)) out.push(...fileFindings(f, () => git(['show', `${sha}:${f}`]), at));
+  return out;
+}
+const ZERO = /^0+$/;
+// Every commit in a range (A..B; A empty or zeros: all of B's history).
+export function rangeFindings(range) {
+  const [a, b] = range.includes('..') ? range.split('..') : ['', range];
+  // A start this clone does not have (a force-pushed branch's old tip) checks all of B's history.
+  const known = a && !ZERO.test(a) && (() => { try { execFileSync('git', ['cat-file', '-e', `${a}^{commit}`], { cwd: ROOT, stdio: 'ignore' }); return true; } catch { return false; } })();
+  const shas = git(['rev-list', ...(known ? [`${a}..${b}`] : [b])]).split('\n').filter(Boolean);
+  return shas.flatMap(commitFindings);
+}
+// What a push sends: for each ref, the commits the remote does not have yet, and the ref's own name.
+export function pushFindings(stdin) {
+  const out = [];
+  for (const l of String(stdin).split('\n').filter(Boolean)) {
+    const [lref, lsha, rref, rsha] = l.split(/\s+/);
+    if (!lsha || ZERO.test(lsha)) continue;
+    for (const x of privateFindings(`${lref} ${rref}`)) out.push({ file: 'the branch or tag name', line: 0, ...x });
+    const shas = git(['rev-list', lsha, ...(rsha && !ZERO.test(rsha) ? [`^${rsha}`] : ['--not', '--remotes'])]).split('\n').filter(Boolean);
+    for (const s of shas) out.push(...commitFindings(s));
   }
   return out;
 }
@@ -171,11 +297,17 @@ export function messageFindings(text) {
 if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])) {
   const args = process.argv.slice(2);
   const at = args.indexOf('--message');
+  const arg = (f) => args[args.indexOf(f) + 1];
   const found = at >= 0 ? messageFindings(readFileSync(args[at + 1], 'utf8')).map((x) => ({ file: 'the commit message', line: 0, ...x }))
-    : args.includes('--staged') ? stagedFindings() : repoFindings({ records: args.includes('--records') });
+    : args.includes('--staged') ? stagedFindings()
+    : args.includes('--push') ? pushFindings(readFileSync(0, 'utf8'))
+    : args.includes('--range') ? rangeFindings(arg('--range'))
+    : args.includes('--text') ? privateFindings(readFileSync(arg('--text'), 'utf8')).map((x) => ({ file: 'the text', line: 0, ...x }))
+    : repoFindings({ records: args.includes('--records') });
   if (!found.length) process.exit(0);
   console.error('Refused: this repository is public, and this carries something private.');
   for (const x of found) console.error(`  ${x.file}${x.line ? ':' + x.line : ''}  ${x.kind}${x.what ? ': ' + x.what : ''}`);
-  console.error('Say it generically (a role, a placeholder address, "a published article"), and leave the backlog out.');
+  console.error('Say it generically: an invented name (Acme, cardTile), a role, a placeholder address or path, "a published article"; leave the backlog out.');
+  console.error('A name that is the engine\'s own and only looks like a project\'s: node .githooks/private-terms.mjs --allow <name>.');
   process.exit(1);
 }

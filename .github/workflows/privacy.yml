@@ -1,0 +1,40 @@
+name: Privacy
+
+# The last gate: nothing private reaches this public repository, whatever got past the hooks on a computer. Every
+# commit a push or a pull request brings is checked whole (its message, its author, the lines and files it adds), and
+# a pull request's title and description too. The `main` ruleset requires this check before anything merges.
+on:
+  push:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Every commit this brings
+        shell: bash
+        env:
+          BEFORE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          AFTER: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: node .githooks/private-check.mjs --range "$BEFORE..$AFTER"
+      - name: The pull request's title and description
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n\n%s\n' "$TITLE" "$BODY" > "$RUNNER_TEMP/pr.txt"
+          node .githooks/private-check.mjs --text "$RUNNER_TEMP/pr.txt"
+      - name: The whole repository as it is now
+        run: node .githooks/private-check.mjs --records

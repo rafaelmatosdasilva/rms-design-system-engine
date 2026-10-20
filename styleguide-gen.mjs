@@ -952,7 +952,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           return { attr: a.attr, baseValue: root.value || null, modes: a.values.map((v) => ({ name: v.label, key: keyOfMode(v.label), attr: v === root ? null : a.attr, value: v.value })) };
         });
         // A number Figma keeps without a unit is a size in pixels, unless it is a weight, an opacity or a ratio.
-        const unit = (v, name) => (typeof v === 'number' ? (/^(\w*weight|opacity|appearance|alpha|ratio|z-?index|scale|flex\w*|order|count|display|anyDisplay)$/i.test(String(name).split('/').pop()) ? String(v) : `${v}px`) : typeof v === 'boolean' ? String(v) : v);
+        const unit = (v, name) => (typeof v === 'number' ? (/^(\w*weight|opacity|appearance|alpha|ratio|z-?index|scale|flex\w*|order|count|\w*display)$/i.test(String(name).split('/').pop()) ? String(v) : `${v}px`) : typeof v === 'boolean' ? String(v) : v);
         const scope = '.sg-layout, .pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom, .type-list, .sg-type-family, .sg-overlay-host';   // .sg-layout: the guide around them takes the brand's colours, corners and family too (the page re-maps those roles)
         // The system's own variables (each group's parts) and its value of one in a mode, so a layer a brand switches off
         // (a border's or a shadow's display set to false) draws nothing.

@@ -5,7 +5,8 @@
 // later run there goes to the same project without being told again.
 // Imported for its effect, before anything reads the working folder.
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
-import { join, resolve, basename } from 'path';
+import { join, resolve, basename, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { spawnSync } from 'child_process';
 import { parseGitlabProject, syncGitlab, projectFromState, describe, hostEnvFrom, STATE_FILE } from './gitlab-source.mjs';
@@ -86,3 +87,12 @@ if (asked) {
   const gl = projectFromState(PROJECT_FROM);
   if (gl) await fromGitlab(gl, PROJECT_FROM);
 }
+// On the engine's own maintainers' computers (its checkout runs the privacy hooks), the project is remembered, so the
+// privacy check refuses its names from now on (.githooks/private-terms.mjs). Nothing is written anywhere else.
+try {
+  const engine = dirname(fileURLToPath(import.meta.url));
+  if (/hooksPath\s*=\s*\.githooks/.test(readFileSync(join(engine, '.git', 'config'), 'utf8'))) {
+    const { rememberProject } = await import('./.githooks/private-terms.mjs');
+    rememberProject(process.cwd()); rememberProject(PROJECT_FROM);
+  }
+} catch { /* not a maintainer's checkout */ }

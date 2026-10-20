@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Before every push: every commit it sends, checked whole (its message, its author, the lines and files it adds), so
+# a commit made before a private name was known, or past the commit hooks (--no-verify), never reaches GitHub.
+# Install once in this repo: git config core.hooksPath .githooks
+exec node "$(git rev-parse --show-toplevel)/.githooks/private-check.mjs" --push
