@@ -110,6 +110,10 @@
    buttons and table cells content-box, and a component's padding counts on that). */
 .sg-page, .sg-page :where(*:not(:is(.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom) *)), .sg-page :where(*:not(:is(.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom) *))::before, .sg-page :where(*:not(:is(.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom) *))::after { box-sizing: border-box; }
 .sg-page { margin: 0; }
+/* The page's own buttons (a list's rows, a menu's options, its tabs) as tall as their words and padding make them, the
+   same in every system: a system's own button height (button { height: 24px }) is for its components, never the page's.
+   It weighs one class, so a rule of the page's that gives a button its height still wins. */
+:where(button)[class*="sg-"], :where(button)[class*="pg-"] { height: auto; }
 /* Only the page's own headings and paragraphs: a rule that reached into a preview would restyle the component. */
 :where(.sg-sidebar-header, .sg-hero, .sg-section, .sg-subsection, .sg-card, .pg-header, .pg-head, .sg-screens) > :where(h1, h2, h3, p, figure) { margin: 0; }
 /* The page's text (font, size, weight, line height, colour) is the system's own: its body rule, which the components
@@ -1473,6 +1477,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-tk-crumb:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-link-pill { display: inline-flex; align-items: center; gap: var(--sg-space-s); max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; overflow-wrap: break-word; word-break: normal; cursor: pointer; text-decoration: none; }   /* anything that opens something else, in a table: its words in a pill, an arrow after them (a token's alias, a component's area) */
 .sg-link-pill:hover { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
+/* A pill's words on one line, cut short with an ellipsis when they do not fit: its whole name shows on hover (its title). */
+.sg-link-pill > .sg-link-words { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sg-link-pill:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-link-pill > .sg-link-go { flex: none; width: var(--sg-mark); height: var(--sg-mark); color: var(--sg-muted); }
 .sg-link-pill:hover > .sg-link-go { color: var(--sg-text); }
@@ -4018,7 +4024,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       var v = tkBrandValue(r, label) || r.values[at], al = r.aliases && r.aliases[at];
       v = v == null ? '' : String(v);
       var sw = /^(#[0-9a-f]{3,8}|rgba?\(.+\))$/i.test(v) ? '<span class="sg-token-swatch" style="background:' + esc(v) + '"></span>' : '';
-      if (al) return '<td class="sg-token-value"' + (attrs || '') + '><button type="button" class="sg-link-pill sg-tk-alias" data-alias="' + esc(al) + '" title="' + esc(v) + '">' + (sw || '<span class="sg-tk-mark" aria-hidden="true">' + (TK_MARK[tkKind(r)] || '') + '</span>') + '<span>' + esc(al).replace(/\//g, '/<wbr>') + '</span>' + TK_GO + '</button></td>';
+      if (al) return '<td class="sg-token-value"' + (attrs || '') + '><button type="button" class="sg-link-pill sg-tk-alias" data-alias="' + esc(al) + '" title="' + esc(al + (v ? '\n' + v : '')) + '">' + (sw || '<span class="sg-tk-mark" aria-hidden="true">' + (TK_MARK[tkKind(r)] || '') + '</span>') + '<span class="sg-link-words">' + esc(al) + '</span>' + TK_GO + '</button></td>';
       return '<td class="sg-token-value"' + (attrs || '') + '>' + (sw ? sw + ' ' : '') + esc(v) + '</td>';
     };
     var tkBrandValue = function (r, label) {
