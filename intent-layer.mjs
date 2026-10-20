@@ -242,10 +242,10 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
 }
 
 // ── One decision per page, and the changes it takes ─────────────────────────────────────────────────────────────────
-// What the team does with each page, most urgent first, said as an instruction: [key, the decision].
+// What the team does with each page, most urgent first, in one word (its row says each change): [key, the decision].
 export const ACTIONS = [
-  ['delete', 'Delete it'], ['move', 'Move it, then delete it'], ['rename', 'Rename it'], ['name', 'Name it as in Figma'],
-  ['write', 'Write it'], ['complete', 'Complete it'], ['tidy', 'Keep it, tidy it'], ['keep', 'Keep it'],
+  ['delete', 'Delete'], ['move', 'Move'], ['rename', 'Rename'], ['name', 'Name'],
+  ['write', 'Write'], ['improve', 'Improve'], ['keep', 'Keep'],
 ];
 const ORPHAN_ACTION = { emptyPage: 'delete', codeGone: 'delete', partSaid: 'delete', copy: 'delete', part: 'move', rename: 'rename', noComponent: 'name' };
 // → { action, decision, todo: [each change, as an instruction] }
@@ -265,7 +265,9 @@ function decide(page, e, { comp, has }) {
     if (n.reason === 'repeated') todo.push(`Remove the ${n.what.replace(/ repeated lines?$/, '')} lines written on every page alike, in whatever writes them.`);
     if (n.reason === 'morePurpose') todo.push('Put the sentence that matters most first in what it is for: agents read that one.');
   }
-  const action = page.verdict === 'not used' ? 'write' : page.verdict === 'thin' ? 'complete' : todo.length ? 'tidy' : 'keep';
+  // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
+  // retitle or remove); keep it only when there is nothing to change.
+  const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';
   return { action, decision: label(action), todo };
 }
 

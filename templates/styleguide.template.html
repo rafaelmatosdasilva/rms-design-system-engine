@@ -1505,6 +1505,9 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 /* The Intent layer and For agents pages: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
+/* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
+.sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
+.sg-h2-links > .pg-head-links { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); }
 /* Each task row opens in full in the side panel: a long cell shows its first lines, faded, in the table. */
 tr.sg-row-open { cursor: pointer; }
 tr.sg-row-open:hover > td { background: var(--sg-a3); }
@@ -2747,9 +2750,31 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
   var leftHTML = function (list) { return list.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what || n.text)) + '</strong>' + (n.from ? '<span class="pg-par-val">' + esc(capital(n.from)) + '</span>' : '') + '</p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join(''); };
-  // Intent layer: a review of every page of the team's intent layer, each with one decision (delete it, move it then
-  // delete it, rename it, name it as Figma does, write it, complete it, tidy it, keep it), why, and each change it takes.
-  // The most urgent decisions first; then the components no page is written for.
+  // A page's head, the same on every page that has one: its title stays at the top (the template's sticky title), what
+  // it links to at its top right, and its chips in the bar that sticks under the title with the template's spacing (as
+  // the Status page's). chips: [{ key, label, n, dot }] (dot: the status kind its colour comes from: differs, figma,
+  // match, none), All first; a click shows only the table rows with that key (data-chip on each row). One table per
+  // page: the chips filter its rows, never split it.
+  function pageBar(sec, o) {
+    var h = sec.querySelector(':scope > h2');
+    if (h && (o.links || []).length) { h.classList.add('sg-h2-links'); h.insertAdjacentHTML('beforeend', headLinksHTML(o.links)); }
+    if (!(o.chips || []).length) return null;
+    var total = o.chips.reduce(function (t, c) { return t + c.n; }, 0);
+    var chip = function (k, label, n, dot) { return '<button type="button" class="sg-chip" data-chip="' + esc(k) + '" aria-pressed="' + (k === 'all') + '">' + (dot ? '<span class="pg-par-status pg-par--' + esc(dot) + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' : '') + esc(label) + countHTML(n) + '</button>'; };
+    var bar = document.createElement('div'); bar.className = 'sg-todo-head';
+    bar.innerHTML = '<p class="pg-par-sum sg-todo-sum"><span class="sg-chips" role="group" aria-label="Show">' + chip('all', 'All', total) + o.chips.map(function (c) { return chip(c.key, c.label, c.n, c.dot); }).join('') + '</span></p>';
+    if (h) h.insertAdjacentElement('afterend', bar); else sec.prepend(bar);
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest('.sg-chip[data-chip]'); if (!b) return;
+      var k = b.getAttribute('data-chip');
+      Array.prototype.forEach.call(bar.querySelectorAll('.sg-chip[data-chip]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k; });
+    });
+    return bar;
+  }
+  // Intent layer: a review of every page of the team's intent layer in one table, each page with one decision (delete
+  // it, move it then delete it, rename it, name it as Figma does, write it, complete it, tidy it, keep it), why, and each
+  // change it takes; then each component no page is written for. The most urgent decisions first.
   var IL = DATA.intentLayer;
   if (IL && (IL.pages || []).length) {
     hr(); navLink('intent-layer', 'intent layer');
@@ -2759,43 +2784,22 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilFor = function (p) { return p.component ? '<a class="sg-uses-link" href="#' + esc(cid(p.component)) + '">' + esc(p.component) + '</a>' : p.layer === 'components' ? '<span class="pg-missing">No component</span>' : esc(capital(p.kind)); };
     var ilGets = function (p) { return (p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>'; };
     var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || '<p class="pg-missing">Nothing to change.</p>'; };
-    // Why: for a page that names no component, the reason for its decision; for the others, what does not reach the
-    // agents, each with why.
     var ilWhy = function (p) { return p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : '<p class="pg-missing">Everything on it reaches the agents.</p>') : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'; };
-    var ACT_LEAD = {
-      'delete': 'These pages document nothing an agent can use and nothing that is not said elsewhere. Delete them.',
-      move: 'These pages are about a part of a component that has its own page. Move what is true of the part to that page, then delete them.',
-      rename: 'These pages document a component under another name. Rename each to the name Figma gives it.',
-      name: 'These pages match no component the engine can find. Name each as Figma names its component, or add the component to Figma.',
-      write: 'These pages document a component but say nothing an agent reads yet.',
-      complete: 'Agents read part of these pages, not what each piece is for together with when (or when not) to use it.',
-      tidy: 'Agents read these pages. Each still carries something to change.',
-      keep: 'Agents read these pages in full. Nothing to change.'
+    // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
+    var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
+    var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
+    var rows = IL.pages.slice().sort(function (x, y) { return labels.findIndex(function (l) { return l[0] === x.action; }) - labels.findIndex(function (l) { return l[0] === y.action; }); })
+      .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
+    var labelOf = function (k) { var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
+    var decisionCell = function (k) { return '<span class="pg-par-status pg-par--' + IL_DOT[k] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'; };
+    var rowHTML = function (p) {
+      if (p.missingFor) return '<tr data-chip="missing"><td>' + decisionCell('missing') + '</td><td><span class="pg-missing">No page</span></td><td><a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a></td><td><p class="sg-il-line"><strong>Write its page in the intent layer, named as the component is named in Figma.</strong></p></td><td><p class="sg-il-line">No page names this component, by name or by code file.</p></td><td><p class="pg-missing">Nothing.</p></td></tr>';
+      return '<tr data-chip="' + esc(p.action) + '"><td>' + decisionCell(p.action) + '</td><td>' + ilLink(p) + '</td><td>' + ilFor(p) + '</td><td>' + ilTodo(p) + '</td><td>' + ilWhy(p) + '</td><td>' + ilGets(p) + '</td></tr>';
     };
-    var labels = IL.actionLabels || [];
-    var ilCard = function (k, title) {
-      var rows = IL.pages.filter(function (p) { return p.action === k; });
-      if (!rows.length) return '';
-      return '<div class="pg-inspect" data-il-card="' + esc(k) + '"><div class="pg-inspect-head">' + esc(title) + '  ·  ' + rows.length + '</div><p class="sg-il-lead">' + esc(ACT_LEAD[k] || '') + '</p><div class="pg-par-scroll"><table class="pg-par-table sg-il"><thead><tr><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' +
-        rows.map(function (p) { return '<tr><td>' + ilLink(p) + '</td><td>' + ilFor(p) + '</td><td>' + ilTodo(p) + '</td><td>' + ilWhy(p) + '</td><td>' + ilGets(p) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
-    };
-    // At its top right, where the layer lives (GitLab), as a component's page links its Figma and its code.
-    var ilH = ilSec.querySelector('h2');
-    if (ilH && ilSrc.url) { var ilHead = document.createElement('div'); ilHead.className = 'pg-head'; ilH.parentNode.insertBefore(ilHead, ilH); ilHead.appendChild(ilH); ilHead.insertAdjacentHTML('beforeend', headLinksHTML([{ label: 'See intent layer', url: ilSrc.url }])); }
-    // The decisions as chips, each with its count: one shows only its card, All shows every card.
-    var acts = IL.actions || {}, shown = labels.filter(function (l) { return acts[l[0]]; });
-    var ilChip = function (k, label, n) { return '<button type="button" class="sg-chip" data-il="' + esc(k) + '" aria-pressed="' + (k === 'all') + '">' + esc(label) + countHTML(n) + '</button>'; };
-    var ilBox = document.createElement('div'); ilBox.className = 'pg-cards'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<span class="sg-chips" role="group" aria-label="Show">' + ilChip('all', 'All', IL.pages.length) + shown.map(function (l) { return ilChip(l[0], l[1], acts[l[0]]); }).join('') + '</span>' +
-      labels.map(function (l) { return ilCard(l[0], l[1]); }).join('') +
-      ((IL.noPage || []).length ? '<div class="pg-inspect" data-il-card="nopage"><div class="pg-inspect-head">Components with no page  ·  ' + IL.noPage.length + '</div><p class="sg-il-lead">No page of the intent layer names these components, by name or by code file. Write their page, or name an existing page as the component is named in Figma.</p><p class="sg-il-lead">' +
-        IL.noPage.map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</p></div>' : '');
-    ilBox.addEventListener('click', function (e) {
-      var b = e.target.closest('.sg-chip[data-il]'); if (!b) return;
-      var k = b.getAttribute('data-il');
-      Array.prototype.forEach.call(ilBox.querySelectorAll('.sg-chip[data-il]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-      Array.prototype.forEach.call(ilBox.querySelectorAll('[data-il-card]'), function (card) { card.hidden = k !== 'all' && card.getAttribute('data-il-card') !== k; });
-    });
+    var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
+    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: labels.filter(function (l) { return counts[l[0]]; }).map(function (l) { return { key: l[0], label: l[1], n: counts[l[0]], dot: IL_DOT[l[0]] }; }) });
+    var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
+    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
   }
   // For agents: what of Figma's and the code's notes no agent is given, each with why, what to do and whether to remove
   // it (the intent layer has its own page).
@@ -2803,6 +2807,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   if (LEFT.length) {
     hr(); navLink('for-agents', 'for agents');
     var faSec = section('for-agents', 'Agents', 'For agents', '');
+    pageBar(faSec, {});
     var lfBox = document.createElement('div'); lfBox.className = 'pg-cards'; faSec.appendChild(lfBox);
     var nLeft = LEFT.reduce(function (t, c) { return t + c.notesLeft.length; }, 0);
     lfBox.innerHTML = '<div class="pg-inspect"><div class="pg-inspect-head">Figma and the code  ·  ' + nLeft + '</div><p class="sg-il-lead">Notes on ' + LEFT.length + (LEFT.length === 1 ? ' component' : ' components') + ' (Figma annotations, the code\'s notes) that no agent is given. The description in Figma, its When to use and When not to use lines and the contract reach the agents in full.' + (IL ? ' The intent layer has a page of its own.' : '') + '</p><div class="pg-par-scroll"><table class="pg-par-table sg-il"><thead><tr><th>Component</th><th>What the agents do not get: why, what to do</th></tr></thead><tbody>' +

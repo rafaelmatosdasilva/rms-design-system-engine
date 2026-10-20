@@ -284,14 +284,14 @@ style guide each component's Documentation merges it with Figma, the code and th
 source with a link to its page, plus an Intent layer row: its page and how many lines were read (or, with no page,
 one to write). Every row of a component's tables opens in a side panel with all of it, nothing cut short; for the
 Intent layer row that is every line the engine took from the page, kind by kind, its other sections, its status and
-what was left out and why. The **Intent layer** page reviews every page with one decision, said as an instruction,
-most urgent first: **delete it** (it says nothing of its own once filler and facts are out, its code file is gone,
-or a component's page already says it), **move it, then delete it** (it is about a part of a component that has its
-own page: `PointListItem` beside `pointList`), **rename it** (a component's name with a generic word added, as
-"Panel General" for `panel`, when no page documents that component yet), **name it as in Figma** (it matches
-no component the engine can find), **write it**, **complete it** (what it is for, or when and when not to use it, is
-missing), **keep it, tidy it** (lines repeated on every page, facts, sections under a title no agent reads) or
-**keep it**; each with why, each change it takes and what the agents get from it. The engine never changes the
+what was left out and why. The **Intent layer** page reviews every page in one table, each with a one-word decision whose row says each
+change, most urgent first, the decisions as chips that filter the table (a component no page names is a row too,
+**Add**): **Delete** (it says nothing of its own once filler and facts are out, its code file is gone,
+or a component's page already says it), **Move** (it is about a part of a component that has its
+own page: `PointListItem` beside `pointList`), **Rename** (a component's name with a generic word added, as
+"Panel General" for `panel`, when no page documents that component yet), **Name** (as in Figma) (it matches
+no component the engine can find), **Write**, **Improve** (it exists and says something; each change it takes is listed: what to add, what to retitle, what to
+remove) or **Keep**; each with why, each change it takes and what the agents get from it. The engine never changes the
 layer: the changes are the team's. The audit prints how many pages each decision has.
 
 The **For agents** row of a component's Documentation rates how much an agent can take from everything written about
