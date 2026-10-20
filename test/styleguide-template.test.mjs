@@ -307,11 +307,11 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const a11y = await run(`document.querySelector('#c-chip .pg-a11y').textContent`);
     // One table by WCAG criterion, in the Playground's card, the same table as Parity's and the To do page's: the issue
-    // number, the criterion, what Figma states, the status with when and where it was read, and the arrow that opens the
-    // row; what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
+    // number, the criterion, the status with when and where it was read, and the arrow that opens the row; what the
+    // Figma notes say, what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
     // it and when the audit last ran. Only what applies. No separate table of sources.
-    assert.match(a11y, /Task nr.*WCAG criterion.*Figma states.*Status/);
-    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Found|What to do/, 'what was found and what to do in the row\'s panel only');
+    assert.match(a11y, /Task nr.*WCAG criterion.*Status/);
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found|What to do/, 'what the Figma notes say, what was found and what to do: in the row\'s panel only');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr.sg-row-open')].every((tr) => tr.lastElementChild.matches('td.sg-row-go') && !!tr.lastElementChild.querySelector('svg'))`), true, 'every row that opens ends with its arrow');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /What it means|Where it is read from/, 'no column of its own: what a criterion means is in its tip');
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
@@ -590,7 +590,8 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`location.hash = '#colors'`); await shownIs('colors'); await headsStick('#colors');
     // Over tables the lowest stuck bar paints the page's gap under its line (where a table's head will stick); a page
     // with no table (Identity) never has its content cut short under the line.
-    assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !!e && e.closest('.sg-section').id === 'colors' && e.classList.contains('sg-sticky-band'); })()`), true, 'over tables, the gap under the line');
+    await run(`window.scrollBy(0, 1); window.dispatchEvent(new Event('scroll'))`);
+    assert.equal(await until(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !!e && e.closest('.sg-section').id === 'colors' && e.classList.contains('sg-sticky-band'); })()`, (v) => v === true), true, 'over tables, the gap under the line');
     await run(`location.hash = '#brand-kit'`); await shownIs('brand-kit');
     await run(`window.scrollTo({ top: 1200, behavior: 'instant' })`); await new Promise((r) => setTimeout(r, 400));
     assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !e || !e.classList.contains('sg-sticky-band'); })()`), true, 'no gap cut under the line on a page with no table');
@@ -840,10 +841,14 @@ test('To do: a role the code fails or has still to be tried on is the code\'s ev
   assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'From Figma, once it is annotated' }], ''), 'You in Figma');
   // What a Figma note's role asks, not tried yet: the audit tries it on the code, so nothing is to do in Figma.
   assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'A developer in the code');
-  // A colour pair is a design decision; what only a person judges is checked by hand; the code's own finding is Claude's.
-  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'You in Figma');
+  // A colour pair lives in the system's colours, fixed in Figma and in the code when it has both; what only a person
+  // judges is checked by hand; the code's own finding is the code's.
+  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
   assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
   assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Read from the code' }], ''), 'A developer in the code');
+  // A colour's contrast is fixed where the system's colours live: in Figma and in the code when it has both.
+  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
+  assert.equal(a11yWho('1.4.11', 'audit', [audit], ''), 'In Figma and in the code');
 });
 
 test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {

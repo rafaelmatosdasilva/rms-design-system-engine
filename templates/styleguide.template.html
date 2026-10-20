@@ -907,8 +907,8 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-cols-5 th:nth-child(2) { width: 22%; } .sg-cols-5 th:nth-child(4) { width: 14%; } .sg-cols-5 th:nth-child(5) { width: 11%; }
 /* The widest column (what to do, what is written, what was found) takes the width the others leave; the row's arrow
    its own narrow column at the end, as every table whose rows open something has. */
-/* Accessibility: the criterion takes the room (it is what a row is about), Figma's states a share of it. */
-.sg-issues--a11y.sg-cols-5 th:nth-child(2) { width: auto; } .sg-issues--a11y.sg-cols-5 th:nth-child(3) { width: 24%; }
+/* Accessibility: the criterion takes the room (it is what a row is about); its status and when, a share each. */
+.sg-issues--a11y.sg-cols-4 th:nth-child(3) { width: 16%; } .sg-issues--a11y.sg-cols-4 th:nth-child(4) { width: 14%; }
 .sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
 .sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
@@ -2179,7 +2179,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
      own list, so "do 3 and 7" names them. */
   // Who acts on an item: you in the Figma file, the code, you deciding which side is
   // right when Figma and the code each have a case, or you checking by hand what only a person can judge.
-  var WHO = { figma: 'You in Figma', code: 'A developer in the code', both: 'You decide', person: 'You check by hand' };
+  var WHO = { figma: 'You in Figma', code: 'A developer in the code', figmaCode: 'In Figma and in the code', both: 'You decide', person: 'You check by hand' };
+  // Whether the system has a Figma file at all: with none, every fix is the code's.
+  var HAS_FIGMA = typeof COMPONENTS === 'undefined' || COMPONENTS.some(function (c) { return !c.codeOnly; });
+  // A colour's contrast lives in the system's colours: fixed in Figma and in the code alike when it has both.
+  var COLOUR_SC = /^1\.4\.(3|6|11)$/;
   // Who acts on an accessibility row: Figma when what is missing is in Figma (a role not stated yet), never when the
   // code fails what a Figma note asks (the note is right, the code changes); a colour pair is a design decision; what
   // only a person can judge is checked by hand; the rest is the code's. its: the row's open items ({ st, from }).
@@ -2189,7 +2193,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // What waits on its try in a browser is the code's to answer and the audit's to run, a duty a Figma note asked for
     // included: nothing about it is to do in Figma.
     var waits = its.length && its.every(function (it) { return /Tried once the audit runs/.test(it.html || ''); });
-    return waits ? WHO.code : /Figma/.test(from) && !failed ? WHO.figma : /^1\.4\.(3|11)$/.test(sc) ? WHO.figma : how === 'person' || (!its.length && /a person checks/.test(note)) ? WHO.person : WHO.code;
+    return waits ? WHO.code : /Figma/.test(from) && !failed ? WHO.figma : COLOUR_SC.test(sc) ? (HAS_FIGMA ? WHO.figmaCode : WHO.code) : how === 'person' || (!its.length && /a person checks/.test(note)) ? WHO.person : WHO.code;
   }
   function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
   var TODO = [], TODO_NO = {};
@@ -5314,7 +5318,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   };
   var ISSUE_COLS = {
     Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['Figma states', 'figma'], ['Found', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
+    Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
     Motion: [['Task nr', 'no'], ['What happens', 'kind'], ['Code', 'code'], ['Figma', 'figma'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
     Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
     Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
@@ -5325,7 +5329,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
   // What a table leaves to its row's panel: Accessibility's Found and What to do are read in full there, so the table has
   // room for the criterion and Figma's states.
-  var PANEL_ONLY = { Accessibility: ['code', 'todo'] };
+  var PANEL_ONLY = { Accessibility: ['figma', 'code', 'todo'] };   // what the Figma notes say, what the check found and what to do: the row's panel
   var tableColsOf = function (area) { var off = PANEL_ONLY[area] || []; return colsOf(area).filter(function (col) { return off.indexOf(col[1]) < 0; }); };
   var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
@@ -5350,7 +5354,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       m.addEventListener('click', function (e) { if (e.target.closest('[data-panel-close]') || e.target.closest('.sg-row-detail a[href^="#"]')) m._shut(); });
       m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.isTrusted) { e.stopPropagation(); m._shut(); } });
     }
-    var tmp = document.createElement('div'); tmp.innerHTML = r.kindHTML || esc(r.kind || ''); var title = tmp.textContent.trim() || d.area || 'Row';
+    // Its title: what the row is about, its words alone (a criterion's tip, what it means, stays out of it).
+    var tmp = document.createElement('div'); tmp.innerHTML = r.kind ? esc(r.kind) : r.kindHTML || '';
+    Array.prototype.forEach.call(tmp.querySelectorAll('.sg-tip, [role="tooltip"], .sg-hidden-text'), function (x) { x.remove(); });
+    var title = tmp.textContent.trim() || d.area || 'Row';
+    // Its task number, as the table and the Status page number it.
+    var nr = isOpen(r) ? TODO_NO[r.key] : null;
     var comp = String(r.key || '').split('\u0000')[0];
     var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
     var body = colsOf(d.area).filter(function (col) { return ['no', 'kind', 'updated'].indexOf(col[1]) < 0; }).map(function (col) {
@@ -5361,7 +5370,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
     }).join('');
     var det = m.querySelector('.sg-row-detail');
-    det.innerHTML = sidePanelPage({ badge: d.area || 'Task', title: title, sub: comp && comp !== title ? comp : '', body: body });
+    det.innerHTML = sidePanelPage({ badge: (d.area || 'Task') + (nr ? ' · Task ' + nr : ''), title: title, sub: comp && comp !== title ? comp : '', body: body });
     m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
@@ -6569,7 +6578,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var todos = [];
       r.its.forEach(function (it) { if (it.todo && it.st !== 'done' && todos.indexOf(it.todo) < 0) todos.push(it.todo); });
       if (act) todos.push(esc(act));
-      if (!todos.length && r.st === 'todo' && r.k.says) todos.push(esc('Change the code so ' + r.k.says.replace(/^\w/, function (k) { return k.toLowerCase(); })));
+      // A finding with no fix of its own: what the criterion asks, said where it is fixed (the colours in Figma and in the
+      // code when the system has both, else the code), as who acts says.
+      if (!todos.length && r.st === 'todo' && r.k.says) todos.push(esc((COLOUR_SC.test(r.k.sc) ? (HAS_FIGMA ? 'Change the colours in Figma and in the code so ' : 'Change the colours in the code so ') : 'Change the code so ') + r.k.says.replace(/^\w/, function (k) { return k.toLowerCase(); })));
       // What is still to be tried once the audit runs in a browser: running it is what to do.
       if (!todos.length && r.st === 'check' && r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) todos.push(esc('Run the audit, it tries this on ' + c.name + ' in a browser.'));
       var open = r.its.filter(function (it) { return it.st !== 'done'; });
