@@ -28,7 +28,7 @@ export const FORBIDDEN = new Set([
   'c411366b16d3e6f1', '1c52ae64d0c2147e', '5d986e63ff2f763b', '6d276d4c8562f9ca', 'e25e4e0bdefb175a',
   'f482813e1f552975', 'a014e20238d85a8b', '465a31889376534d', 'a17b72836b3c767c', '214bd8fc72fc14a5',
   '7645004daad329c8', '8a85212edd9b1cbf', '6f7e1788cf61f933', '58fc42db10026dd2', 'dc90e782ef3514fa',
-  '4b58e238abcdc554', 'ea44371c73220699',
+  '4b58e238abcdc554', 'ea44371c73220699', 'e3c328cd1a70a88b',
   '8d808f2ceea98a66', '13e1c22c1e6e6168', 'ac5f628a2d3196cb', '6cbf681846a571eb', '40c1f88fbe317aa3',
   'd1d40828ba0a9a71', '3ed4ed1073d30d61',
   // people and companies the work drew on
