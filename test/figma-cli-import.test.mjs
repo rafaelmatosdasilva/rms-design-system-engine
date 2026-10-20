@@ -82,6 +82,26 @@ test('a hidden stroke paint is not a stroke', async () => {
   assert.equal(structureFromComponent({ t: 'COMPONENT', h: 24, strokes: [{ type: 'SOLID' }] }).strokeOnDefault, true);
 });
 
+test('design.json\'s read is dated to the time figma-cli wrote it when it records the day alone, so it is not older than a read that morning', async () => {
+  const { readAt } = await import('../figma-cli-import.mjs');
+  const at = (iso) => () => new Date(iso);
+  assert.equal(readAt('2026-10-20', 'design.json', at('2026-10-20T17:05:00.000Z')), '2026-10-20T17:05:00.000Z');
+  assert.equal(readAt('2026-10-20', 'design.json', at('2026-10-24T09:00:00.000Z')), '2026-10-20T00:00:00.000Z', 'a file touched days later: the day alone');
+  assert.equal(readAt('2026-10-20', 'design.json', () => null), '2026-10-20T00:00:00.000Z');
+  assert.equal(readAt('2026-10-20T08:00:00Z', 'design.json', at('2026-10-20T17:05:00.000Z')), '2026-10-20T08:00:00.000Z', 'a time it records is kept');
+  assert.equal(readAt(undefined, 'design.json'), null);
+});
+
+test('a set\'s structure is read from its resting variant, never from a disabled or error variant Figma lists first', async () => {
+  const { structureFromComponent } = await import('../figma-cli-import.mjs');
+  const set = (vp, names) => ({ t: 'COMPONENT_SET', vp, kids: names.map((n, i) => ({ t: 'COMPONENT', n, h: 10 + i })) });
+  assert.equal(structureFromComponent(set({ Size: { values: ['s'] }, Disabled: { values: ['true', 'false'] } }, ['Size=s, Disabled=true', 'Size=s, Disabled=false'])).defaultVariant, 'Size=s, Disabled=false');
+  assert.equal(structureFromComponent(set({ State: { values: ['error', 'disabled', 'default'] } }, ['State=disabled', 'State=error', 'State=default'])).defaultVariant, 'State=default');
+  assert.equal(structureFromComponent(set({ State: { values: ['disabled', 'default', 'selected'] } }, ['State=default', 'State=disabled'])).h, 10, 'the facts come from the same variant');
+  assert.equal(structureFromComponent(set({ State: { values: ['Idle', 'Default'] } }, ['State=Default', 'State=Idle'])).defaultVariant, 'State=Idle');
+  assert.equal(structureFromComponent(set(undefined, ['Type=a', 'Type=b'])).defaultVariant, 'Type=a', 'no State axis: Figma\'s first');
+});
+
 test('a variable that points at one no longer in the file is recorded; one into a library collection is not', () => {
   const d = tidepoolDesign();
   const col = d.variables.find((c) => (c.variables ?? []).some((v) => Object.values(v.values ?? {}).some((x) => x && typeof x === 'object' && 'alias' in x)));

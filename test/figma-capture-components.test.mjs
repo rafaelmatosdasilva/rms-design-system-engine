@@ -303,6 +303,26 @@ test('components: one resting variant everywhere, matched by its axes, never by 
   assert.deepEqual(json(root, 'src/figma-component-props.snapshot.json').tab.layerAnnotations.map((x) => x.layer), ['Label'], 'the notes on the resting variant\'s layers');
 });
 
+test('components: the resting variant is the State axis\'s first value no person brings about, whatever order Figma lists it in', () => {
+  const resting = new Function(recipeFunctions(ENGINE, ['parseAxes', 'restingVariant']).join('\n') + '\nreturn restingVariant;')();
+  const set = (options, names, defaultName = names[0]) => {
+    const kids = names.map((n, i) => ({ type: 'COMPONENT', id: `1:${i}`, name: n }));
+    return { type: 'COMPONENT_SET', children: kids, defaultVariant: kids.find((k) => k.name === defaultName),
+      componentPropertyDefinitions: options ? { State: { type: 'VARIANT', variantOptions: options } } : {} };
+  };
+  const name = (s) => resting(s).name;
+  assert.equal(name(set(['disabled', 'default', 'selected'], ['state=disabled', 'state=default', 'state=selected'])), 'state=default', 'a disabled first value is not the rest');
+  assert.equal(name(set(['error', 'disabled', 'default'], ['state=disabled', 'state=error', 'state=default'])), 'state=default', 'nor an error, nor Figma\'s default when it is disabled');
+  assert.equal(name(set(['success', 'error', 'default', 'idle'], ['state=default', 'state=success'], 'state=success')), 'state=default');
+  assert.equal(name(set(['default', 'selected', 'draggingOver'], ['state=draggingOver', 'state=default'])), 'state=default');
+  assert.equal(name(set(['Idle', 'Default'], ['State=Default', 'State=Idle'])), 'State=Idle', 'a state the system inserts before Default is the rest');
+  assert.equal(name(set(['active', 'done'], ['state=done', 'state=active'])), 'state=active', 'every value brought about: the first');
+  assert.equal(name(set(['success', 'negative', 'alert'], ['state=negative', 'state=success', 'state=alert'])), 'state=success', 'outcomes only: the first, never the next outcome');
+  assert.equal(name(set(['alert', 'negative', 'positive', 'info'], ['status=alert', 'state=alert', 'state=info'])), 'state=info', 'the neutral one among outcomes');
+  assert.equal(name(set(null, ['State=Hover', 'State=Disabled', 'State=Default'])), 'State=Default', 'no definitions: the variants\' own values');
+  assert.equal(name(set(['default'], ['size=s, disabled=true, state=default', 'size=s, disabled=false, state=default'])), 'size=s, disabled=false, state=default');
+});
+
 test('components: kept by component id, so a component added mid-capture shifts no other; a refresh reads only what changed', async () => {
   const f = makeFile(), root = project(), dir = join(root, 'cap');
   // The checksums in pages of one component each (as when Figma is slow): every page continues where the last stopped.

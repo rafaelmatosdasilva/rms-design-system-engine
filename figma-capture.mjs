@@ -869,14 +869,23 @@ export async function captureWithFigmaCli(ROOT, cfg = {}, { run = figmaCliEval(R
   }
   return importCapture(ROOT, cfg, opts);
 }
-export function figmaCliEval(ROOT) {
-  return (code) => {
+// One script through figma-cli. A call that fails (Safe Mode's plugin can drop one, right after a snapshot or while it
+// reconnects) is tried once more after a pause, so one dropped call does not end a capture; the error says what
+// figma-cli printed, which in Safe Mode is on stdout, stderr left empty.
+export function figmaCliEval(ROOT, { spawn = spawnSync, pause = (ms) => new Promise((r) => setTimeout(r, ms)), retryMs = 5000 } = {}) {
+  const lastLine = (s) => String(s ?? '').trim().split('\n').map((l) => l.trim()).filter(Boolean).slice(-1)[0];
+  return async (code) => {
     const file = join(tmpdir(), `rms-capture-${process.pid}-${Date.now()}.js`);
     writeFileSync(file, code);
     try {
-      const r = spawnSync('figma-cli', ['eval', '--file', file], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
-      if (r.error || r.status !== 0) throw new Error(`figma-cli eval did not finish: ${(r.error?.message ?? r.stderr ?? '').trim().split('\n').slice(-1)[0] || `exit ${r.status}`}`);
-      return r.stdout;
+      let why = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt) await pause(retryMs);
+        const r = spawn('figma-cli', ['eval', '--file', file], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
+        if (!r.error && r.status === 0) return r.stdout;
+        why = r.error?.message ?? lastLine(r.stderr) ?? lastLine(r.stdout) ?? `exit ${r.status}`;
+      }
+      throw new Error(`figma-cli eval did not finish, twice: ${why}`);
     } finally { try { unlinkSync(file); } catch { /* gone */ } }
   };
 }

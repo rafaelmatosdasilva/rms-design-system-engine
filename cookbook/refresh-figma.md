@@ -785,8 +785,11 @@ const strokeOnAnyState = set.children.some(v => deepHasStroke(v));
 
 **The resting variant, and its root stroke** - `restingVariant`, `restingStroke` + `restingState`.
 Every Step 1c function reads a set from one variant, its *resting* variant, the pure at-rest one:
-the first value of its `State` axis (as Figma lists the axis), with `Disabled=False` and
-`Selected=False` where those axes exist. It is matched by the variant's axes, never by a word in its
+the first value of its `State` axis (as Figma lists the axis) that is not a state a person brings about
+(disabled, an error or another outcome, selected, active, hovered, done, loading…), with `Disabled=False` and
+`Selected=False` where those axes exist. Figma lists an axis in the order its values were added, so
+`[disabled, default, selected]` rests on `default`, never on `disabled`; an axis whose every value is
+one of those rests on its first. It is matched by the variant's axes, never by a word anywhere in its
 name: a `/default/i` test also finds `Type=Default, State=Hover`, and a capture that picks its default
 two ways reads two different variants for one component. So when the DS inserts a borderless "Idle"
 variant before the bordered "Default", every fact follows the new resting state and `restingStroke`
@@ -802,11 +805,18 @@ function restingVariant(root) {
   const variants = root.children.filter((c) => c.type === 'COMPONENT');
   if (!variants.length) return root;
   const atRest = (a) => (!('disabled' in a) || a.disabled === 'false') && (!('selected' in a) || a.selected === 'false');
+  // A state a person brings about, by any of its words (draggingOver is one).
+  const BROUGHT = ['disabled', 'error', 'invalid', 'warning', 'success', 'negative', 'positive', 'alert', 'danger', 'critical', 'selected', 'active', 'pressed', 'hover', 'hovered', 'focus', 'focused', 'done', 'completed', 'loading', 'checked', 'indeterminate', 'undetermined', 'readonly', 'open', 'expanded', 'dragging'];
+  const brought = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).some((w) => BROUGHT.includes(w));
   let defs = {};
   try { defs = root.componentPropertyDefinitions ?? {}; } catch (e) { /* a set with errors: its variants decide */ }
   const axis = Object.entries(defs).find(([k, d]) => d && d.type === 'VARIANT' && k.trim().toLowerCase() === 'state');
-  const options = axis?.[1].variantOptions ?? [];
-  const first = options.length ? String(options[0]).trim().toLowerCase() : variants.map((v) => parseAxes(v.name).state).find((s) => s != null);
+  // The State axis's values as Figma lists them, else in the order its variants come, their case kept.
+  const stateOf = (name) => { for (const p of name.split(',')) { const i = p.indexOf('='); if (i >= 0 && p.slice(0, i).trim().toLowerCase() === 'state') return p.slice(i + 1).trim(); } return null; };
+  const options = (axis?.[1].variantOptions ?? []).map(String);
+  const values = options.length ? options : [...new Set(variants.map((v) => stateOf(v.name)).filter((s) => s != null))];
+  const pick = values.find((s) => !brought(s)) ?? values[0];
+  const first = pick == null ? null : String(pick).trim().toLowerCase();
   const rest = variants.filter((v) => { const a = parseAxes(v.name); return (first == null || a.state === first) && atRest(a); });
   let figmaDefault = null;
   try { figmaDefault = root.defaultVariant ?? null; } catch (e) { /* none */ }
