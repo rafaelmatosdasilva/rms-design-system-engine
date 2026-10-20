@@ -1388,19 +1388,21 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
-    assert.match(tiles[0][1], /^\d+of 2\|components fully matched$/, 'parity counts the components that fully match');
+    assert.match(tiles[0][1], /^\d+of \d+\|components fully matched$/, 'parity counts the components that fully match');
+    // Every card over the same whole, Figma's components: the four totals are one.
+    assert.equal(new Set(tiles.map((x) => /of (\d+)/.exec(x[1])[1])).size, 1, 'the four cards count over the same total');
     assert.match(tiles[1][1], /^\d+of \d+\|components found in code$/, 'the components the code has, of every component Figma has');
     assert.match(tiles[1][2], /2 found/, 'the table\'s own words: Found, Unsure, Missing');
-    assert.match(tiles[2][1], /^\d+of 2\|components that pass$/);
+    assert.match(tiles[2][1], /^\d+of \d+\|components that pass$/);
     // Each card counts what its column's filter counts: every row whose state there applies (a component only Figma has
     // still owes its documentation).
     assert.match(tiles[3][1], /^\d+of \d+\|components fully documented$/);
-    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = +/of (\\d+)/.exec(tile.textContent)[1]; const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*N\\/A/.test(tr.cells[5].textContent)); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts the rows its column counts');
+    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = +/of (\\d+)/.exec(tile.textContent)[1]; const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent)); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has');
     assert.match(tiles[3][2], /\d+ (ready|partial|missing)/, 'the Documentation column\'s states: Ready, Partial, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
-    assert.match(how[0][1], /^Every component Figma and the code both have\. A part \(chartBars\/bar\) counts with its parent\. Match: all its props, tokens and values are the same in Figma and in the code\. Partial:/);
+    assert.match(how[0][1], /^Every component Figma has \(each card counts the same ones\); one not in the code yet, or with nothing to compare, is counted apart\. A part \(chartBars\/bar\) counts with its parent\. Match: all its props, tokens and values are the same in Figma and in the code\. Partial:/);
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
     if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Found', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');

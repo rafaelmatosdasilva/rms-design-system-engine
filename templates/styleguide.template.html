@@ -1137,20 +1137,21 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-big { font-size: calc(var(--sg-h1) * 4); line-height: normal; font-weight: var(--sg-heading-weight); }
 .sg-bk-tile-sub { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-m); font-size: var(--sg-l); }
 .sg-bk-weight { padding: var(--sg-space-xxs) var(--sg-space-s); border: var(--bk-line-w, 1px) solid currentColor; border-radius: var(--bk-rad-l, var(--sg-radius-pill)); font-size: var(--sg-m); }
-.sg-bk-wall { display: flex; height: calc(var(--sg-space-xxl) * 5); border-radius: var(--bk-rad, var(--sg-radius)); overflow: clip; border: var(--bk-line-w, 1px) solid var(--sg-line-colour); box-shadow: var(--bk-shadow, 0 0 #0000); }
-.sg-bk-wall > span { flex: 1; display: flex; align-items: flex-end; padding: var(--sg-space-l); background: var(--bk); color: var(--bk-on); transition: flex-grow var(--sg-move); }
+.sg-bk-wall { display: flex; height: calc(var(--sg-space-xxl) * 5); border-radius: var(--bk-rad, var(--sg-radius)); overflow: clip; outline: var(--bk-line-w, 1px) solid var(--sg-line-colour); outline-offset: calc(var(--bk-line-w, 1px) * -1); box-shadow: var(--bk-shadow, 0 0 #0000); }   /* the line drawn inside: a thicker one never moves the layout */
+.sg-bk-wall > span { flex: 1 1 0; min-width: 0; display: flex; align-items: flex-end; overflow: clip; background: var(--bk); color: var(--bk-on); transition: flex-grow var(--sg-move); }
+.sg-bk-wall > span:is(:first-child, :last-child) { flex: 1 0 auto; }   /* the two ends as wide as their names, so both always read */
 .sg-bk-wall > span:hover { flex-grow: 2.5; }
-.sg-bk-wall i { font-style: normal; font-size: var(--sg-s); opacity: 0; transition: opacity var(--sg-move); }
+.sg-bk-wall i { padding: var(--sg-space-l); white-space: nowrap; font-style: normal; font-size: var(--sg-s); opacity: 0; transition: opacity var(--sg-move); }
 .sg-bk-wall > span:hover i, .sg-bk-wall > span:is(:first-child, :last-child) i { opacity: 1; }   /* the two ends named in their own colour; the others on hover */
 .sg-bk-wall b { display: block; font-weight: var(--sg-heading-weight); }
 .sg-bk-ramp-row { display: grid; grid-template-columns: minmax(5rem, 9rem) minmax(0, 1fr); align-items: center; gap: var(--sg-space-m); }
 .sg-bk-ramp-name { font-size: var(--sg-m); color: var(--sg-text); }
-.sg-bk-ramp { display: flex; height: calc(var(--sg-space-xxl) * 2); border-radius: var(--bk-rad, var(--sg-radius)); overflow: clip; border: var(--bk-line-w, 1px) solid var(--sg-line-colour); box-shadow: var(--bk-shadow, 0 0 #0000); }
+.sg-bk-ramp { display: flex; height: calc(var(--sg-space-xxl) * 2); border-radius: var(--bk-rad, var(--sg-radius)); overflow: clip; outline: var(--bk-line-w, 1px) solid var(--sg-line-colour); outline-offset: calc(var(--bk-line-w, 1px) * -1); box-shadow: var(--bk-shadow, 0 0 #0000); }
 .sg-bk-ramp > span { flex: 1; background: var(--bk); transition: flex-grow var(--sg-move); }
 .sg-bk-ramp > span:hover { flex-grow: 2.5; }
 .sg-bk-swatches { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sg-card-gap); }   /* all on one line */
 @media (max-width: 720px) { .sg-bk-swatches { grid-auto-flow: row; grid-template-columns: 1fr; } }
-.sg-bk-swatch { border: var(--bk-line-w, 1px) solid var(--sg-line-colour); box-shadow: var(--bk-shadow, 0 0 #0000); border-radius: var(--bk-rad, var(--sg-radius)); overflow: clip; display: grid; grid-template-columns: calc(var(--sg-space-xxl) * 2) minmax(0, 1fr); }   /* the colour on the left, its name on the right */
+.sg-bk-swatch { outline: var(--bk-line-w, 1px) solid var(--sg-line-colour); outline-offset: calc(var(--bk-line-w, 1px) * -1); box-shadow: var(--bk-shadow, 0 0 #0000); border-radius: var(--bk-rad, var(--sg-radius)); overflow: clip; display: grid; grid-template-columns: calc(var(--sg-space-xxl) * 2) minmax(0, 1fr); }   /* the colour on the left, its name on the right */
 .sg-bk-swatch > i { display: block; background: var(--bk); }
 .sg-bk-swatch > span { display: flex; flex-direction: column; gap: var(--sg-space-xs); padding: var(--sg-space-l); min-width: 0; font-size: var(--sg-s); color: var(--sg-muted); }   /* one padding for every card in the kit */
 .sg-bk-swatch b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sg-text); font-weight: var(--sg-heading-weight); }
@@ -1181,13 +1182,23 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-t.sg-bk-bare { padding: 0; background: none; box-shadow: none; }   /* type straight on the page */
 /* Geometry and motion: drawings with their construction lines, in the brand's hues. */
 .sg-bk-t.sg-bk-bare-pad { padding: var(--sg-space-l); }
-.sg-bk-t.sg-bk-pmap { padding: var(--sg-space-l); }   /* the shapes' personality, at the foot of the page */
-.sg-bk-pmap-h { font-size: var(--sg-s); }
-.sg-bk-pmap-map { position: relative; flex: 1; min-height: 0; font-size: var(--sg-s); }
-.sg-bk-pmap-ax { position: absolute; background: currentColor; opacity: .2; }
-.sg-bk-pmap-q, .sg-bk-pmap-a { position: absolute; opacity: .55; white-space: nowrap; }
-.sg-bk-pmap-me { position: absolute; width: calc(var(--sg-space-xxl) * 2); height: var(--sg-space-xl); transform: translate(-50%, -50%); border-style: solid; border-color: currentColor; box-sizing: border-box; }
-.sg-bk-pmap-me-t { position: absolute; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+.sg-bk-t.sg-bk-pers { padding: var(--sg-space-xl); display: flex; flex-direction: column; gap: var(--sg-space-s); color: var(--t-fg); }   /* the brand's personality, at the foot of the page */
+.sg-bk-pers-top { display: flex; justify-content: space-between; gap: var(--sg-space-m); }
+.sg-bk-pers-h { font-size: var(--sg-s); opacity: .75; }
+.sg-bk-pers-key { display: flex; align-items: center; gap: var(--sg-space-xs); }   /* at the foot, on the left: light drawn whole, dark dashed, as thick as the shapes */
+.sg-bk-pers-kl { width: calc(var(--sg-space-xxl) * 2); height: var(--sg-space-s); overflow: visible; } .sg-bk-pers-kl.is-dark { margin-left: var(--sg-space-m); }
+.sg-bk-pers-svg .sg-bk-pers-shape { stroke-width: var(--bk-line-w, 1px); }   /* the theme's own line */
+.sg-bk-pers-kl.is-dark line, .sg-bk-pers-svg .is-dark { stroke-dasharray: max(var(--sg-space-xs), calc(var(--bk-line-w, 1px) * 4)) max(var(--sg-space-xxs), calc(var(--bk-line-w, 1px) * 3)); }   /* the dash grows with the line, so it reads however thick */
+.sg-bk-pers-t { margin: 0; font-size: calc(var(--sg-title) * 1.15); line-height: normal; color: var(--sg-text); }
+.sg-bk-pers-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--sg-space-xl); align-items: center; }
+.sg-bk-pers-chart { position: relative; height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1; margin: auto; color: var(--sg-text); }   /* as tall as its row, square: never cut by the tile */
+.sg-bk-pers-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sg-bk-pers-labs { position: absolute; inset: 0; font-size: var(--sg-s); line-height: var(--sg-lh); }   /* each pole's name as page text, at the page's own size whatever the chart's */
+.sg-bk-pers-l { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; opacity: .65; }
+.sg-bk-pers-l.is-lead { opacity: 1; font-weight: var(--sg-heading-weight); } .sg-bk-pers-l.is-faint { opacity: .4; }
+.sg-bk-pers-ev { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: var(--sg-space-xs) var(--sg-space-m); align-items: baseline; font-size: var(--sg-s); }
+.sg-bk-pers-ev b { color: var(--sg-text); } .sg-bk-pers-ev span { font-variant-numeric: tabular-nums; } .sg-bk-pers-ev i { font-style: normal; opacity: .7; }
+@media (max-width: 900px) { .sg-bk-pers-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; } .sg-bk-pers-chart { height: auto; width: min(100%, 28rem); } }   /* stacked: the chart as wide as it may be */
 /* Radius and border, three cards in one language: a solid line where the component has a border (the theme's width), a
    dashed one where it has none; only the component in focus in the hue, the rest neutral. */
 .sg-bk-rl-stage { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
@@ -1236,7 +1247,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-curve-plot > svg * { vector-effect: non-scaling-stroke; }
 .sg-bk-curve-plot .sg-bk-handle-l { stroke: var(--sg-muted); stroke-opacity: .35; stroke-dasharray: 3 3; }
 .sg-bk-runner { position: absolute; width: var(--sg-space-s); height: var(--sg-space-s); margin: calc(var(--sg-space-s) / -2) 0 0 calc(var(--sg-space-s) / -2); border-radius: var(--sg-radius-pill); }
-.sg-bk-runner { width: var(--sg-space-m); height: var(--sg-space-m); margin: calc(var(--sg-space-m) / -2) 0 0 calc(var(--sg-space-m) / -2); background: var(--sg-text); left: 0; top: 100%; animation-name: sg-bk-run-x, sg-bk-run-y; animation-iteration-count: infinite; animation-direction: alternate; animation-fill-mode: both; }
+.sg-bk-runner { --rn: calc(var(--sg-space-m) + var(--bk-line-w, 1px) * 2); width: var(--rn); height: var(--rn); margin: calc(var(--rn) / -2) 0 0 calc(var(--rn) / -2); background: var(--sg-text); box-shadow: 0 0 0 calc(var(--bk-line-w, 1px) + 2px) var(--t-bg, var(--sg-bg));   /* wider than the line it runs on, ringed in the card's ground: it reads on any line */ left: 0; top: 100%; animation-name: sg-bk-run-x, sg-bk-run-y; animation-iteration-count: infinite; animation-direction: alternate; animation-fill-mode: both; }
 @keyframes sg-bk-run-x { from { left: 0; } to { left: 100%; } }
 @keyframes sg-bk-run-y { from { top: 100%; } to { top: 0; } }
 .sg-bk-curve-name { position: absolute; top: var(--sg-space-s); left: var(--sg-space-s); display: flex; flex-direction: column; font-size: var(--sg-s); color: var(--sg-muted); font-variant-numeric: tabular-nums; }
@@ -3279,7 +3290,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // the drawing is not centred again, so nothing moves under the pointer.
       // A layer is always picked: the places are kept per card size and spread (worked out once for each), never per pick.
       var restKey = Math.round(box.width) + 'x' + Math.round(box.height) + ':' + (iso.getAttribute('data-state') || '');
-      var focused = iso._rest && iso._rest.key === restKey && !iso._centring;
+      var focused = iso._rest && iso._rest.key === restKey && !iso._centring && Math.max.apply(null, rows.map(function (r) { return r.x; })) + gap * 3 <= iso._rest.x0;
       if (focused) x0 = iso._rest.x0;
       // Always in the stack's order, the top layer first, whatever the state lifts.
       rows.sort(function (a, b) { return +b.c.getAttribute('data-z') - +a.c.getAttribute('data-z'); });
@@ -3297,7 +3308,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var st = iso.querySelector('.sg-bk-dp-stack'), lo = 1e9, hi = -1e9;
         Array.prototype.forEach.call(iso.querySelectorAll('.sg-bk-dp-plane'), function (p) { var q = p.getBoundingClientRect(); lo = Math.min(lo, q.left - box.left); });
         rows.forEach(function (r) { hi = Math.max(hi, r.c.getBoundingClientRect().right - box.left); });
-        var dx = box.width / 2 - (lo + hi) / 2;
+        var dx = box.width / 2 - (lo + hi) / 2 - gap * 2;   /* a little left of centre: room for the names */
         var room = box.width - gap * 8, span = hi - lo;
         if (st && span > room + 1) { iso._fit = Math.max(0.4, (iso._fit || 1) * room / span * 0.96); st.style.scale = iso._fit.toFixed(3); iso._centring = true; dpLeads(iso); iso._centring = false; iso._rest = null; dpLeads(iso); return; }   /* too wide with its names: smaller, then centred again */
         if (st && Math.abs(dx) > 1) { iso._dx = (iso._dx || 0) + dx; st.style.translate = Math.round(iso._dx) + 'px 0'; iso._centring = true; dpLeads(iso); iso._centring = false; return; }
@@ -3366,7 +3377,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // The kit's cards are drawn as the brand draws its own: its border thickness, and its shadow only when the brand
       // has shadows on (its "display" switch for all of them).
       var lineT = BK_ALL.filter(function (t) { return /(^|\/)border\/(all|left|top|width)$/i.test(t.figma) && bkPx(t) != null; }).sort(function (a, b) { return a.figma.split('/').length - b.figma.split('/').length; })[0];
-      bkOut.style.setProperty('--bk-line-w', lineT ? bkCss(lineT, 'px') : 'var(--sg-line-width, 1px)');
+      bkOut.style.setProperty('--bk-line-w', lineT ? 'max(1px, ' + bkCss(lineT, 'px') + ')' : 'var(--sg-line-width, 1px)');   // at least 1px: a card always has its edge
       var shOn = BK_ALL.filter(function (t) { return /(^|\/)shadow\/(all-?)?display$/i.test(t.figma); }).sort(function (a, b) { return a.figma.split('/').length - b.figma.split('/').length; })[0];
       // Shadows are on unless the brand switches them off; then none is drawn or named anywhere in the kit.
       var shadowsOn = !shOn || /^true$/i.test(bkNow(shOn));
@@ -4035,27 +4046,127 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           '<div class="sg-bk-dp-stack">' + dpPlanes + '</div><svg class="sg-bk-dp-leads" aria-hidden="true"></svg><div class="sg-bk-dp-calls">' + dpCalls + '</div>' +
           dpSpecs + '</div></div></div>';
       }
-      // At the foot, a personality map of the shapes: how round the controls are (across: their radius against half their
-      // height, the middle of them) and how outlined the system is (up: the share of border switches on, times the line's
-      // width), with the theme placed in it and the four corners named. Read in this theme and mode.
+      // At the foot, the brand's personality, read from what its tokens draw in this theme and mode: eight axes of
+      // opposites (each pole across the circle from its opposite), the dashed ring the balance between them, the shape
+      // reaching as far towards a pole as the tokens lean to it. Each axis says what it was read from.
       var PMAP = '';
       (function () {
+        var cl = function (v) { return isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0; }, med = function (a) { a = a.slice().sort(function (x, y) { return x - y; }); return a.length ? a[Math.floor(a.length / 2)] : null; };
+        var px = function (t) { var n = parseFloat(bkNow(t)); return isFinite(n) ? n : null; };
+        if (!hero) return;
+        // Colour is read in each colour mode the system has: a brand vivid in light and grey in dark reads as both. Its hue
+        // reads warm or cool (that is mostly what it moves); a vivid primary adds a little intensity; the text's contrast
+        // on the app's background reads safe and present when it is the strongest; grounds of pure white (in dark, pure
+        // black) read distant.
+        var mAx = AXES.filter(function (a) { return a.colour && a.attr && !a.classes; })[0];
+        var mDark = mAx && mAx.values.filter(function (v) { return v.value && /dark|night/i.test(v.label + ' ' + v.value); })[0], mLight = mAx && mAx.values.filter(function (v) { return v !== mDark; })[0];
+        var MODES = mDark && mLight ? [['light', mLight.value || 'light'], ['dark', mDark.value]] : [['', null]];
+        var txT = bkCols.filter(function (t) { return /(^|\/)text\/(primary|default|main)|text-?(primary|default|main)/i.test(t.figma) && !/button|link|chip|tag|badge|input/i.test(t.figma); })[0];
+        var bgT = bkCols.filter(function (t) { return /app-?background/i.test(t.figma); })[0];
+        var grounds = bkCols.filter(function (t) { return /(background|surface|container|app-?bg|canvas)/i.test(t.figma) && !/text|icon|border|stroke|shadow|state-?layer/i.test(t.figma); });
+        var colourIn = function (m) {
+          var was = mAx ? bkOut.getAttribute(mAx.attr) : null;
+          if (m[1] != null) { bkOut.setAttribute(mAx.attr, m[1]); bkMemo = {}; }
+          var h = bkHex(hero), rgb = h && bkRgb(h), c = { mode: m[0] };
+          if (rgb) {
+            var mx = Math.max.apply(null, rgb), mn = Math.min.apply(null, rgb), hu = 0; c.sat = mx - mn;
+            if (c.sat > 0) { hu = mx === rgb[0] ? ((rgb[1] - rgb[2]) / c.sat) % 6 : mx === rgb[1] ? (rgb[2] - rgb[0]) / c.sat + 2 : (rgb[0] - rgb[1]) / c.sat + 4; hu = (hu * 60 + 360) % 360; }
+            c.hue = hu; c.warmth = Math.cos((hu - 40) * Math.PI / 180) * Math.min(1, c.sat * 1.4); c.vivid = Math.min(1, c.sat * 1.3);
+          } else { c.sat = 0; c.hue = 0; c.warmth = 0; c.vivid = 0; }
+          c.cr = (txT && bgT && bkRatio(bkHex(txT), bkHex(bgT))) || bkRatio(ink, paper) || 12; c.crK = cl((c.cr - 9) / 6);
+          var pure = m[0] === 'dark' ? /^0{6}(ff)?$/i : /^f{6}(ff)?$/i;
+          c.pure = grounds.length ? grounds.filter(function (t) { return pure.test(String(bkHex(t) || '').replace('#', '')); }).length / grounds.length : 0;
+          c.say = (c.sat > 0.45 ? 'a vivid' : c.sat > 0.2 ? 'a muted' : 'a grey') + ' primary';
+          // Blue reads corporate; grounds of plain white and grey (untinted) read neutral, uncommitted, corporate.
+          c.blue = Math.pow(Math.max(0, Math.cos((c.hue - 220) * Math.PI / 180)), 2) * Math.min(1, c.sat * 1.4);
+          c.neutral = grounds.length ? grounds.filter(function (t) { var g = bkRgb(bkHex(t) || ''); return g && Math.max.apply(null, g) - Math.min.apply(null, g) < 0.04; }).length / grounds.length : 0;
+          if (m[1] != null) { if (was == null) bkOut.removeAttribute(mAx.attr); else bkOut.setAttribute(mAx.attr, was); bkMemo = {}; }
+          return c;
+        };
+        var COL = MODES.map(colourIn);
+        // The palette: how many hue families the primitives hold (status colours aside). Greys, one primary and one
+        // contrast colour read corporate; many hues read friendly.
+        var hueBins = {}; prim.forEach(function (t) { if (/error|danger|success|warning|info|alert|positive|negative|critical/i.test(t.figma)) return; var g = bkRgb(bkHex(t) || ''); if (!g) return; var x = Math.max.apply(null, g), y = Math.min.apply(null, g), d = x - y; if (d < 0.25) return; var hh = x === g[0] ? ((g[1] - g[2]) / d) % 6 : x === g[1] ? (g[2] - g[0]) / d + 2 : (g[0] - g[1]) / d + 4; hueBins[Math.round(((hh * 60 + 360) % 360) / 30) % 12] = 1; });
+        var hueN = Object.keys(hueBins).length, palK = hueN <= 2 ? 1 : hueN >= 5 ? -1 : (3.5 - hueN) / 1.5;
+        // Corners: the controls' radius in px (a pill counts as half its height), else the radii's middle. Up to 2px reads
+        // square (cold, direct, pragmatic); from there the corners invite, and from 16px they read warm.
         var H = DATA.figmaHeights || {}, ctl = [];
-        BK_ALL.forEach(function (t) { var p = t.figma.split('/'), comp = p[1] || ''; if (!/\/radius\/(all|top-?left)$/i.test(t.figma) || !/^(button|chip|tag|badge|checkbox|tab|toggle|switch)/i.test(comp) || !H[comp]) return; var r = bkPx(t); if (r == null) return; ctl.push(Math.min(1, r / (H[comp] / 2))); });
-        var disp = BK_ALL.filter(function (t) { return /\/border\/(default\/)?display$/i.test(t.figma); });
-        if (ctl.length < 3 || disp.length < 3) return;
-        ctl.sort(function (a, b) { return a - b; });
-        var round = ctl[Math.floor(ctl.length / 2)], on = disp.filter(function (t) { return /^true$/i.test(bkNow(t)); }).length, cover = on / disp.length;
-        var lineT = BK_ALL.find(function (t) { return t.figma === 'base/border/left'; }), line = lineT ? (bkPx(lineT) || 1) : 1, outline = Math.min(1, cover * line / 2);
-        var word = function (k) { return k <= .1 ? 'sharp' : k <= .3 ? 'crisp' : k <= .6 ? 'soft' : k < .95 ? 'round' : 'pill'; };
-        var xL = 14, xR = 86, yB = 84, yT = 14, x = xL + round * (xR - xL), y = yB - outline * (yB - yT);
-        var q = [['technical · precise', xL, yT, 'start'], ['bold · graphic', xR, yT, 'end'], ['solid · corporate', xL, yB, 'start'], ['friendly · soft', xR, yB, 'end']];
-        PMAP = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h4 sg-bk-block sg-bk-pmap" ' + bg2 + '><span class="sg-bk-pmap-h">Personality of the shapes</span>' +
-          '<div class="sg-bk-pmap-map">' + q.map(function (c) { return '<span class="sg-bk-pmap-q" style="left:' + c[1] + '%;top:' + c[2] + '%;text-align:' + c[3] + ';transform:translate(' + (c[3] === 'end' ? '-100%' : '0') + ',-50%)">' + c[0] + '</span>'; }).join('') +
-          '<i class="sg-bk-pmap-ax" style="left:' + xL + '%;right:' + (100 - xR) + '%;top:50%;height:var(--bk-line-w, 1px)"></i><i class="sg-bk-pmap-ax" style="top:' + yT + '%;bottom:' + (100 - yB) + '%;left:50%;width:var(--bk-line-w, 1px)"></i>' +
-          '<span class="sg-bk-pmap-a" style="left:' + xL + '%;top:calc(' + yB + '% + var(--sg-space-l))">sharp</span><span class="sg-bk-pmap-a" style="left:' + xR + '%;top:calc(' + yB + '% + var(--sg-space-l));transform:translateX(-100%)">round</span>' +
-          '<i class="sg-bk-pmap-me" style="left:' + x.toFixed(1) + '%;top:' + y.toFixed(1) + '%;border-radius:' + (round * 50).toFixed(0) + '%;border-width:' + line + 'px;color:' + esc(ac1) + '"></i>' +
-          '<span class="sg-bk-pmap-me-t" style="left:' + x.toFixed(1) + '%;top:calc(' + y.toFixed(1) + '% + var(--sg-space-xl));color:' + esc(ac1) + '"><b style="' + fam + strong + '">' + esc(bkBrand()) + '</b><br>' + word(round) + ' controls · ' + line + 'px line on ' + Math.round(cover * 100) + '%</span></div></div></div>';
+        BK_ALL.forEach(function (t) { var p = t.figma.split('/'), comp = p[1] || ''; if (!/\/radius\/(all|top-?left)$/i.test(t.figma) || !/^(button|chip|tag|badge|checkbox|tab|toggle|switch|input)/i.test(comp) || !H[comp]) return; var r = px(t); if (r != null) ctl.push(Math.min(r, H[comp] / 2)); });
+        var radAll = BK_ALL.filter(function (t) { return /radius/i.test(t.figma) && !/display/i.test(t.figma); }).map(px).filter(function (n) { return n != null && n >= 0 && n < 200; });
+        var rPx = ctl.length ? med(ctl) : radAll.length ? med(radAll) : 8;
+        var soft = Math.max(0, Math.min(1, (rPx - 2) / 14)), rWarm = cl((rPx - 9) / 7);
+        // Lines: the border width most tokens follow; over 1px reads graphic, bold, technical, retro.
+        var follow = {}; BK_ALL.forEach(function (t) { (t.aliases || []).forEach(function (a) { if (a) follow[a] = (follow[a] || 0) + 1; }); });
+        var lineT = BK_ALL.filter(function (t) { return /border|stroke/i.test(t.figma) && !/colou?r|radius|display|appearance/i.test(t.figma) && isPrim(t) && px(t) != null; }).sort(function (a, b) { return (follow[b.figma] || 0) - (follow[a.figma] || 0); })[0];
+        var line = lineT ? px(lineT) : 1, thick = line > 1 ? Math.min(1, line - 1) : 0;   // 2px already reads thick
+        // Shadows: how many are on, how blurred, how dark. A marked one (little blur, dark) reads graphic, technical,
+        // retro; a faded one (wide blur, faint) refined; none at all direct, flat, without distraction.
+        var shD = BK_ALL.filter(function (t) { return /shadow\/(.*\/)?display$/i.test(t.figma); }), shOn = shD.filter(function (t) { return /^true$/i.test(bkNow(t)); }).length;
+        var share = shD.length ? shOn / shD.length : 0, blur = med(BK_ALL.filter(function (t) { return /shadow\/blur$/i.test(t.figma); }).map(px).filter(function (n) { return n != null; })) || 0;
+        var alpha = med(BK_ALL.filter(function (t) { return /shadow\/colou?r$/i.test(t.figma); }).map(function (t) { var v = String(bkNow(t)).trim(), m = v.match(/rgba?\(([^)]+)\)/); if (m) { var q = m[1].split(/[\s,\/]+/).filter(Boolean); return q.length > 3 ? parseFloat(q[3]) * (/%/.test(q[3]) ? 0.01 : 1) : 1; } m = v.match(/^#?([0-9a-f]{8})$/i); return m ? parseInt(m[1].slice(6), 16) / 255 : /^#?[0-9a-f]{6}$/i.test(v) ? 1 : null; }).filter(function (n) { return n != null && isFinite(n); }));
+        if (alpha == null) alpha = 0.15;
+        var marked = share ? (1 - Math.min(1, blur / 16)) * 0.6 + Math.min(1, alpha / 0.35) * 0.4 : 0, faded = share ? 1 - marked : 0;
+        var dim = share * 0.7 + (share ? Math.min(1, blur / 24) * 0.3 : 0), mk = marked * share, fd = faded * share;   // as much as the shadows are on
+        // Softness is subtlety, not corners alone: round corners, faded shadows, thin type, fine lines. No shadow, heavy
+        // type and thick lines keep a round interface from reading soft.
+        var shSoft = share ? (faded * 2 - 1) * Math.min(1, share * 2) - (1 - Math.min(1, share * 2)) : -1;
+        // Type: the family's kind; thin type reads premium, soft, serene; heavy type heavy, graphic, present.
+        var fam = String(famName || '').toLowerCase();
+        var kind = /mono|code|courier/.test(fam) ? ['monospace', 1] : /serif|times|georgia|garamond|playfair|merriweather|lora|baskerville|caslon/.test(fam) && !/sans/.test(fam) ? ['serif', -0.7] : /rounded|nunito|quicksand|varela|comfortaa/.test(fam) ? ['rounded sans', -0.9] : /futura|poppins|montserrat|avenir|gotham|circular|manrope|outfit|geometric|product sans|urbanist/.test(fam) ? ['geometric sans', 0.4] : /open sans|source sans|fira sans|lato|segoe|frutiger|myriad|noto sans|calibri|gill/.test(fam) ? ['humanist sans', -0.4] : ['grotesque sans', 0.3];
+        var wNums = weights.map(function (t) { var n = parseFloat(bkNow(t)); return isFinite(n) && n >= 100 && n <= 1000 ? n : null; }).filter(function (n) { return n != null; });
+        var wMax = wNums.length ? Math.max.apply(null, wNums) : 400, wMin = wNums.length ? Math.min.apply(null, wNums) : 400, typeW = cl((wMax - 500) / 200);   // 400 thin-ish, 600 already thick
+        // Motion: slow reads premium, fast reads a startup's agility; an overshoot adds speed.
+        var ms = med(MOV.map(function (m) { return m.ms; })), over = MOV.some(function (m) { var c = String(m.ease).match(/cubic-bezier\(([^)]+)\)/); return c && c[1].split(',').map(parseFloat).some(function (n, k) { return (k === 1 || k === 3) && (n > 1 || n < 0); }); });
+        var speed = ms ? cl((260 - ms) / 160) : 0;
+        // Space: the middle gap and padding, against 12px; more room breathes, reads premium.
+        var sp = med(BK_ALL.filter(function (t) { return /(^|\/)(spacing|gap|padding)(\/|$)/i.test(t.figma) && !/radius/i.test(t.figma); }).map(px).filter(function (n) { return n != null && n > 0 && n < 200; }));
+        var airy = sp ? cl((sp / 12 - 1) * 1.5) : 0;
+        var shSay = !shD.length ? 'no shadows in the system' : !shOn ? 'no shadow on' : (marked >= 0.5 ? 'marked' : 'faded') + ' shadows (blur ' + blur + 'px)';
+        var axes = function (c) { return [
+          ['Bold', 'Quiet', cl((c.vivid * 2 - 1) * 0.2 + typeW * 0.45 + thick * 0.35 + (shD.length && !shOn ? 0.1 : 0) + mk * 0.15 + c.crK * 0.25), 'weight ' + wMax + ', ' + line + 'px lines', c.say + ', contrast ' + c.cr.toFixed(1) + ':1'],
+          ['Flat', 'Dimensional', cl(1 - 2 * dim), shD.length ? (shOn ? 'shadows on ' + shOn + ' of ' + shD.length + ', blur ' + blur + 'px' : 'no shadow on any of ' + shD.length + ' parts') : 'no shadows in the system', ''],
+          ['Technical', 'Human', cl(kind[1] * 0.4 + (1 - 2 * soft) * 0.25 + thick * 0.25 + typeW * 0.15 + mk * 0.3 - fd * 0.15 + (1 - Math.min(1, share * 2)) * 0.15), (famName || 'its type') + ' (' + kind[0] + '), ' + line + 'px lines, ' + shSay, ''],
+          ['Sharp', 'Soft', cl(-((soft * 2 - 1) * 0.25 + shSoft * 0.3 - typeW * 0.2 + (thick ? -thick : 0.3) * 0.25)), rPx + 'px corners, ' + shSay + ', weight ' + wMax + ', ' + line + 'px lines', ''],
+          ['Corporate', 'Friendly', cl(-(soft * 2 - 1) * 0.35 - c.warmth * 0.15 + c.blue * 0.2 - (over ? 0.15 : 0) + (c.pure - 0.3) * 0.4 + (c.neutral - 0.5) * 0.3 + palK * 0.15 + c.crK * 0.2), rPx + 'px corners, ' + hueN + (hueN === 1 ? ' hue' : ' hues') + ' in the palette', 'hue ' + Math.round(c.hue) + '°, contrast ' + c.cr.toFixed(1) + ':1, ' + Math.round(c.neutral * 100) + '% of grounds neutral, ' + Math.round(c.pure * 100) + '% pure ' + (c.mode === 'dark' ? 'black' : 'white')],
+          ['Fast', 'Calm', cl(speed * 0.8 + (c.vivid - 0.5) * 0.1 + typeW * 0.15 + (over ? 0.15 : 0) + c.crK * 0.2), (ms ? 'transitions ' + ms + 'ms' + (over ? ', overshoot' : '') : 'no motion tokens') + ', weight ' + wMax, 'contrast ' + c.cr.toFixed(1) + ':1'],
+          // Premium is elegance: room, thin type, slow motion, faded shadows, hairlines, a softer contrast, quiet colour.
+          // Safe is the standard that commits to nothing: the strongest contrast, regular weights and lines, the usual speed.
+          ['Premium', 'Safe', cl(airy * 0.25 - typeW * 0.3 - speed * 0.2 + (thick ? -thick * 0.3 : 0.05) + fd * 0.25 - mk * 0.15 + (0.5 - c.vivid) * 0.1 + (kind[1] === -0.7 || kind[0] === 'geometric sans' ? 0.1 : 0) + (wMin < 400 ? 0.15 : 0) - c.crK * 0.35 - (c.pure - 0.3) * 0.2 - 0.1),
+            'type ' + wMin + '–' + wMax + (sp ? ', spacing ' + sp + 'px' : '') + (ms ? ', ' + ms + 'ms' : '') + ', ' + shSay, 'contrast ' + c.cr.toFixed(1) + ':1'],
+          ['Warm', 'Cool', cl(c.warmth * 0.7 + rWarm * 0.3), rPx + 'px corners', 'primary hue ' + Math.round(c.hue) + '°']
+        ]; };
+        var AXM = COL.map(axes), two = AXM.length > 1;
+        // Each axis leans as the modes do together; the evidence says each mode's colour where they differ.
+        var AX = AXM[0].map(function (ax, k) {
+          var lean = AXM.reduce(function (n, m) { return n + m[k][2]; }, 0) / AXM.length;
+          var cs = AXM.map(function (m) { return m[k][4]; }), col = !cs[0] ? '' : two && cs[0] !== cs[1] ? 'in light ' + cs[0] + '; in dark ' + cs[1] : cs[0];
+          return [ax[0], ax[1], lean, ax[3] + (col ? ', ' + col : '')];
+        });
+        // The shape: each pole 0.5 ± half its lean (opposites sum to the whole), sixteen points round the circle.
+        var n = AX.length, R = 130, C = 170, lab = '', grid = '';
+        [1 / 3, 2 / 3, 1].forEach(function (k) { grid += '<circle cx="' + C + '" cy="' + C + '" r="' + (R * k).toFixed(1) + '" fill="none" stroke="currentColor" stroke-opacity=".15"/>'; });
+        grid += '<circle cx="' + C + '" cy="' + C + '" r="' + R / 2 + '" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="3 4"/>';
+        for (var k = 0; k < n; k++) { var a0 = (k * 180 / n - 90) * Math.PI / 180; grid += '<line x1="' + (C + Math.cos(a0) * R).toFixed(1) + '" y1="' + (C + Math.sin(a0) * R).toFixed(1) + '" x2="' + (C - Math.cos(a0) * R).toFixed(1) + '" y2="' + (C - Math.sin(a0) * R).toFixed(1) + '" stroke="currentColor" stroke-opacity=".15"/>'; }
+        var ptsOf = function (A) { var p = []; [0, 1].forEach(function (side) { A.forEach(function (ax, k) { var a = ((k * 180 / n) + side * 180 - 90) * Math.PI / 180, str = side ? 0.5 - ax[2] / 2 : 0.5 + ax[2] / 2; p.push([C + Math.cos(a) * R * str, C + Math.sin(a) * R * str]); }); }); return p; };
+        [0, 1].forEach(function (side) { AX.forEach(function (ax, k) {
+          var a = ((k * 180 / n) + side * 180 - 90) * Math.PI / 180, str = side ? 0.5 - ax[2] / 2 : 0.5 + ax[2] / 2;
+          var lx = (C + Math.cos(a) * (R + 22)) / 340 * 100, ly = (C + Math.sin(a) * (R + 22)) / 340 * 100, lead = str >= 0.62;
+          lab += '<span class="sg-bk-pers-l' + (lead ? ' is-lead' : str >= 0.5 ? '' : ' is-faint') + '" style="left:' + lx.toFixed(1) + '%;top:' + ly.toFixed(1) + '%">' + esc(ax[side]) + '</span>';
+        }); });
+        var poly = function (p, dark) { return '<polygon points="' + p.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '" fill="' + esc(ac1) + '" fill-opacity="' + (dark ? '.06' : '.2') + '" stroke="' + esc(ac1) + '" class="sg-bk-pers-shape' + (dark ? ' is-dark' : '') + '" vector-effect="non-scaling-stroke" stroke-linejoin="round"' + '/>' +
+          (dark ? '' : p.map(function (q) { return '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="2.5" fill="' + esc(ac1) + '"/>'; }).join('')); };
+        var shape = two ? poly(ptsOf(AXM[1]), true) + poly(ptsOf(AXM[0])) : poly(ptsOf(AXM[0]));
+        var keyLine = function (dark) { return '<svg class="sg-bk-pers-kl' + (dark ? ' is-dark' : '') + '" aria-hidden="true"><line x1="0" y1="50%" x2="100%" y2="50%" stroke="' + esc(ac1) + '"/></svg>'; };
+        var key = two ? '<div class="sg-bk-pers-h sg-bk-pers-key">' + keyLine() + 'Light' + keyLine(true) + 'Dark</div>' : '';
+        // In words: the three strongest leanings, then the next three, said as strongly as they lean.
+        var lean = AX.map(function (ax) { return { pole: ax[2] >= 0 ? ax[0] : ax[1], k: Math.abs(ax[2]), why: ax[3] }; }).sort(function (x, y) { return y.k - x.k; });
+        var lc = function (w) { return w.toLowerCase(); }, list = function (xs) { return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs.join(''); };
+        var head = list(lean.slice(0, 3).map(function (x, i) { return i ? lc(x.pole) : x.pole; }));
+        PMAP = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h5 sg-bk-block sg-bk-pers" ' + bg2 + ' role="group" aria-label="Personality">' +
+          '<div class="sg-bk-pers-top"><span class="sg-bk-pers-h">Personality</span><span class="sg-bk-pers-h">read from ' + BK_ALL.length + ' tokens' + (two ? ', in light and dark' : '') + '</span></div>' +
+          '<p class="sg-bk-pers-t" style="' + fam + strong + 'color:' + esc(ac1) + '">' + esc(head) + '</p>' +
+          '<div class="sg-bk-pers-body"><div class="sg-bk-pers-chart" role="img" aria-label="' + esc('Personality: ' + lean.map(function (x) { return x.pole + ' ' + Math.round(x.k * 100) + '%'; }).join(', ')) + '"><svg class="sg-bk-pers-svg" viewBox="0 0 340 340" aria-hidden="true">' + grid + shape + '</svg><div class="sg-bk-pers-labs" aria-hidden="true">' + lab + '</div></div>' +
+          '<div class="sg-bk-pers-ev">' + lean.map(function (x) { var p = Math.round(x.k * 100); return '<b>' + esc(p < 10 ? 'Balanced' : x.pole) + '</b><span>' + (p < 10 ? '·' : p + '%') + '</span><i>' + esc(x.why) + '</i>'; }).join('') + '</div></div>' + key + '</div></div>';
       })();
       html += (GEO.length ? '<div class="sg-bk-bento sg-bk-bento--geo">' + GEO.join('') + '</div>' : '') + MORPH + '<div class="sg-bk-bento">' + T.join('') + '</div>' + DEPTH + ICON + PMAP;   /* typography above motion */   // the contrast pairs (PAIRS) and the charts (CHARTS) are built, kept off the page for now   // the numbers (NUMS) are built, kept off the page for now   // motion, then type, icons, surfaces, numbers and charts
       bkOut.innerHTML = html;
@@ -6389,10 +6500,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var BAR = { match: 'done', figma: 'check', differs: 'fix', none: 'none' };
     var ORDER_ = { done: 0, check: 1, fix: 2, none: 3 };
     // Each state of a column, counted: its words as the table says them, its colour as its dot has it.
-    var states = function (list, pick) {
+    var states = function (list, pick, na) {   // na: what the grey part says (a check that cannot apply to it)
       var by = {}, out = [];
       list.forEach(function (o) { var x = pick(o), w = x.say === '–' ? 'N/A' : x.say; if (!by[w]) { by[w] = { cls: BAR[x.cls] || 'none', n: 0, word: w }; out.push(by[w]); } by[w].n++; });
-      return out.sort(function (p, q) { var a = MX_ORDER.indexOf(p.word), b = MX_ORDER.indexOf(q.word); return (a < 0 ? 99 : a) - (b < 0 ? 99 : b) || ORDER_[p.cls] - ORDER_[q.cls]; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + (x.word === 'N/A' ? 'with nothing to compare' : /^[A-Z]{2}/.test(x.word) ? x.word : x.word.charAt(0).toLowerCase() + x.word.slice(1)) }; });   // N/A said in words: only one side has it, or nothing of this kind to check
+      return out.sort(function (p, q) { var a = MX_ORDER.indexOf(p.word), b = MX_ORDER.indexOf(q.word); return (a < 0 ? 99 : a) - (b < 0 ? 99 : b) || ORDER_[p.cls] - ORDER_[q.cls]; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + (x.word === 'N/A' ? (na || 'with nothing to compare') : /^[A-Z]{2}/.test(x.word) ? x.word : x.word.charAt(0).toLowerCase() + x.word.slice(1)) }; });   // N/A said in words: only one side has it, or nothing of this kind to check
     };
     var countOf = function (parts, word) { return (parts.filter(function (x) { return x.word === word; })[0] || { n: 0 }).n; };
     // Each button the same few words, the legend's own: See 141 differs, See 60 missing.
@@ -6417,9 +6528,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Each card counts the rows its column's filter counts: every row whose state there applies (never an N/A), so a
     // card's numbers and its filter's are the same.
     var applies = function (pick) { return mx.filter(function (o) { var x = pick(o); return x && x.say !== 'N/A' && x.say !== '–'; }); };
-    var parRows = applies(function (o) { return o.par; }), accRows = applies(function (o) { return o.acc; }), docRows = applies(function (o) { return o.doc; });
+    // Every card over the same whole, Figma's components: what a card's check cannot apply to (a component not built yet,
+    // one with nothing to compare) is counted apart, in grey, so the four totals are one and the same.
+    var parRows = figmaRows, accRows = figmaRows, docRows = figmaRows;
     var parP = states(parRows, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
-    var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; });
+    var accP = states(accRows, function (o) { return o.acc; }, 'not in the code yet'), docP = states(docRows, function (o) { return o.doc; }, 'with nothing to document');
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
     var pT = card('Figma × Code Parity', parP, 'Match', parRows.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'));
@@ -6428,12 +6541,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    pT.how = 'Every component Figma and the code both have.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
+    pT.how = 'Every component Figma has (each card counts the same ones); one not in the code yet, or with nothing to compare, is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
     // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
     // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.
     iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
-    aT.how = 'Every component the code has: what is not in the code has nothing to try.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
-    dT.how = 'Every component, in Figma or in the code.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
+    aT.how = 'Every component Figma has; one not in the code yet has nothing to try, and is counted apart.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
+    dT.how = 'Every component Figma has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
@@ -8583,7 +8696,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // The Showroom's screens, and one drawn in a box as its card draws it (inert, scaled to the box): drawScreen returns
     // the screen's element and its fit, to call again when the box changes size.
     axes: AXES,   // the system's modes: each { attr, colour, values: [{ label, value }] }
-    icons: { figma: FIGMA_SVG },   // the page's own marks, so a module draws them alike
+    icons: { figma: FIGMA_SVG },
+    redraw: function () { redrawAll(); },   // every page drawn again: a module's theme applied over the brand   // the page's own marks, so a module draws them alike
     brandChoice: BRAND_CTL,   // the Theme choice: { select, set(brand), refresh(), sync() }, when the system has brands
     screens: DATA.showroom || [],
     drawScreen: function (s, box) {
