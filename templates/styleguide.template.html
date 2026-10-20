@@ -907,6 +907,8 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-cols-5 th:nth-child(2) { width: 22%; } .sg-cols-5 th:nth-child(4) { width: 14%; } .sg-cols-5 th:nth-child(5) { width: 11%; }
 /* The widest column (what to do, what is written, what was found) takes the width the others leave; the row's arrow
    its own narrow column at the end, as every table whose rows open something has. */
+/* Accessibility: the criterion takes the room (it is what a row is about), Figma's states a share of it. */
+.sg-issues--a11y.sg-cols-5 th:nth-child(2) { width: auto; } .sg-issues--a11y.sg-cols-5 th:nth-child(3) { width: 24%; }
 .sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
 .sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
@@ -1485,6 +1487,9 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-tk-crumb:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-link-pill { display: inline-flex; align-items: center; gap: var(--sg-space-s); max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; overflow-wrap: break-word; word-break: normal; cursor: pointer; text-decoration: none; }   /* anything that opens something else, in a table: its words in a pill, an arrow after them (a token's alias, a component's area) */
 .sg-link-pill:hover { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
+.sg-link-pill--table { margin: var(--sg-space-xxs) var(--sg-space-xxs) var(--sg-space-xxs) 0; vertical-align: middle; }   /* a link in a table, as a pill: several in one cell sit apart */
+table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: var(--sg-text); }   /* never underlined, as a pill is not */
+.sg-link-pill > .sg-link-words > code { font-size: inherit; }
 /* A pill's words on one line, cut short with an ellipsis when they do not fit: its whole name shows on hover (its title). */
 .sg-link-pill > .sg-link-words { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sg-link-pill:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
@@ -1767,7 +1772,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // A title's own words, without the actions it holds.
   // Code Connect's mark: two links hooked into each other (the code and its Figma component).
   var CODE_CONNECT_SVG = '<svg class="sg-status-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 10.3 9.6 6.9a1.6 1.6 0 0 1 2.3 2.3L8.5 12.6"/><path d="M9.8 5.7 6.4 9.1a1.6 1.6 0 0 1-2.3-2.3l3.4-3.4"/></svg>';
-  function titleText(h) { var c = h.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('.sg-section-actions'), function (x) { x.remove(); }); return c.textContent.trim(); }
+  function titleText(h) { var c = h.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('.sg-section-actions, .pg-head-links'), function (x) { x.remove(); }); return c.textContent.trim(); }
   // How tall the menu's head is, for each group's name to stick under it.
   (function () { var side = document.getElementById('sg-sidebar'), head = side && side.querySelector('.sg-sidebar-header'); if (!head) return; var set = function () { side.style.setProperty('--sg-sidebar-head-h', stuckH(head) + 'px'); }; set(); addEventListener('resize', set); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(set).observe(head); })();
   // The menu's own stuck line: under its head while the menu scrolls, or under the group's name stuck beneath it.
@@ -5385,7 +5390,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   function issueTableHTML(rows, bodyCls, head, area) {
     var cols = tableColsOf(area || ((rows || [])[0] || {}).area);
-    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + '"><thead><tr>' + cols.map(function (col) { return '<th' + (col[1] === 'no' ? ' class="sg-todo-no-head"' : '') + '>' + esc(col[0]) + '</th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
+    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + (area === 'Accessibility' ? ' sg-issues--a11y' : '') + '"><thead><tr>' + cols.map(function (col) { return '<th' + (col[1] === 'no' ? ' class="sg-todo-no-head"' : '') + '>' + esc(col[0]) + '</th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
   }
   // A count of each status above a table, as the Status page counts them.
   function statusSum(rows) {
@@ -8245,6 +8250,24 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       e.preventDefault(); set(clampTo(card, w), true); say(grip);
     });
     document.addEventListener('focusin', function (e) { if (e.target.classList && e.target.classList.contains('pg-panel-grip')) say(e.target); });
+  })();
+  // Every link inside a table that goes to another page (a component's, a token's group, a commit, the intent layer's
+  // page) is a link pill: its words, then the arrow, the one style for a link in a table (a template rule). Tables the
+  // system draws itself (a preview, a Showroom screen) are its own and left as they are.
+  var PILL_SKIP = '.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom, thead, .sg-tip';
+  function pillLinks(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('table a[href]:not(.sg-link-pill):not(.sg-card):not(.sg-mx-go)'), function (a) {
+      if (a.closest(PILL_SKIP) || a.closest('.sg-link-pill')) return;
+      a.classList.add('sg-link-pill', 'sg-link-pill--table');
+      if (!a.title) a.title = a.textContent.trim();   // its whole name on hover, when the pill cuts it short
+      if (!a.querySelector(':scope > .sg-link-words')) { var w = document.createElement('span'); w.className = 'sg-link-words'; while (a.firstChild) w.appendChild(a.firstChild); a.appendChild(w); }
+      a.insertAdjacentHTML('beforeend', LINK_GO);
+    });
+  }
+  (function () {
+    var queued = false, run = function () { queued = false; pillLinks(document); };
+    run();
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(function () { if (!queued) { queued = true; setTimeout(run, 0); } }).observe(document.querySelector('.sg-layout') || document.body, { childList: true, subtree: true });
   })();
   // The lowest bar stuck at the top carries the line under it (sg-sticky-edge), on every page alike.
   // Every bar that sticks, chip rows included: the line is always under the lowest one, on every page (a template rule).
