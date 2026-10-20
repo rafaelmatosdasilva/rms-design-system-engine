@@ -31,6 +31,7 @@
      dark mode, never pure black behind it nor pure white on it: a near black and a near white instead. */
   --sg-bg: #ffffff; --sg-bg-2: #f7f7f8; --sg-surface: #ffffff; --sg-stage: var(--sg-bg);
   --sg-text: #1c1c1e; --sg-text-2: #3a3a3c; --sg-muted: #5f5f64; --sg-border: #8e8e93; --sg-accent: #0a5fb4;
+  --sg-danger: #c62828; --sg-on-danger: #ffffff;   /* the page's own red for what cannot be undone (a delete): never the system's nor a theme's */
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-line-colour);
   /* The page's lines: the system's border in light; in dark the text's colour, faint and see-through, so a line keeps
      its edge and blends with whatever background a brand gives the page. */
@@ -94,6 +95,7 @@
 :where(:root)[data-sg-scheme="dark"] {
   --sg-bg: #161618; --sg-bg-2: #1e1e21; --sg-surface: #161618;
   --sg-text: #e6e6e8; --sg-text-2: #d4d4d8; --sg-muted: #a1a1aa; --sg-border: #52525b; --sg-accent: #6cb4ff;
+  --sg-danger: #f47174; --sg-on-danger: #1b0a0a;
   --sg-line-colour: color-mix(in srgb, var(--sg-text) 18%, transparent);
   --sg-line-solid: color-mix(in srgb, var(--sg-text) 18%, var(--sg-bg));   /* the same line, solid: where pieces of it meet, nothing doubles or shows through */
   --sg-warning-ink: var(--sg-warning);
@@ -188,6 +190,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-overlay-host { position: fixed; inset: 0; z-index: 1000; }   /* a dialog opened over the whole window, as its app's own layer holds it */
 /* The shared hover: a button, a typed field and a select alike (a switch's options take the fill alone, a card the line). */
 .sg-btn, .sg-input { transition: background-color var(--sg-fast), border-color var(--sg-fast); }
+.sg-btn { font-weight: var(--sg-text-weight); }   /* every button the page draws at the controls' weight, wherever it sits (a modal outside the page's main area too) */
 .sg-input:hover, #sg-search .sg-input:hover { background-color: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
 /* A button is solid: the same steps as the see-through fills, mixed into the background it sits on, so no line or
    picture behind it shows through. */
@@ -271,6 +274,29 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-dd-mark { flex: none; width: var(--sg-mark); height: var(--sg-mark); color: var(--sg-muted); }
 .sg-select-list { position: absolute; top: calc(100% + var(--sg-space-xs)); left: 0; right: 0; z-index: 30; box-sizing: border-box; max-height: 60vh; overflow: auto; padding: var(--sg-space-xs); background: var(--sg-surface); border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow-lift); outline: none; }
 .sg-select-list[hidden] { display: none; }
+/* A button's tone, on the system's own button (its shape, size and padding kept): primary inverts it, danger is the
+   page's own red, whatever the system or a theme makes of its colours. */
+[data-tone="primary"] { background: var(--sg-text) !important; border-color: var(--sg-text) !important; color: var(--sg-bg) !important; }
+/* A small square button (an icon alone in a list's row): the system's button, as tall as a line of the list. */
+[data-size="s"] { width: calc(var(--sg-control-h) * 0.7) !important; height: calc(var(--sg-control-h) * 0.7) !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; gap: 0 !important; }
+[data-size="s"] svg { width: calc(var(--sg-control-h) * 0.35); height: calc(var(--sg-control-h) * 0.35); }
+[data-tone="danger"] { background: var(--sg-danger) !important; border-color: var(--sg-danger) !important; color: var(--sg-on-danger) !important; }
+/* A modal (a confirmation): the page's card, its title and words at the page's sizes, entering with a short ease. */
+.sg-dialog { font-weight: var(--sg-text-weight); line-height: var(--sg-lh); width: min(30rem, calc(100vw - 2 * var(--sg-space-l))); margin: auto; padding: var(--sg-space-xl); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-bg); color: var(--sg-text); box-shadow: var(--sg-shadow-lift); }
+.sg-dialog::backdrop { background: color-mix(in srgb, var(--sg-bg) 55%, transparent); backdrop-filter: blur(2px); }
+.sg-dialog[open] { animation: sg-dialog-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.sg-dialog[open]::backdrop { animation: sg-fade-in 0.24s ease-out; }
+.sg-dialog.is-closing { animation: sg-dialog-out 0.16s ease-in forwards; }
+.sg-dialog.is-closing::backdrop { animation: sg-fade-out 0.16s ease-in forwards; }
+@keyframes sg-dialog-in { from { opacity: 0; transform: translateY(var(--sg-space-s)) scale(0.97); } }
+@keyframes sg-dialog-out { to { opacity: 0; transform: translateY(var(--sg-space-xs)) scale(0.98); } }
+@keyframes sg-fade-in { from { opacity: 0; } }
+@keyframes sg-fade-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sg-dialog[open], .sg-dialog[open]::backdrop, .sg-dialog.is-closing, .sg-dialog.is-closing::backdrop { animation: none; } }
+.sg-dialog-title { margin: 0 0 var(--sg-space-s); font-size: var(--sg-title); font-weight: var(--sg-heading-weight); line-height: normal; color: var(--sg-text); }
+.sg-dialog-title.is-danger { color: var(--sg-danger); }
+.sg-dialog-text { margin: 0 0 var(--sg-space-xl); font-size: var(--sg-m); line-height: var(--sg-lh); color: var(--sg-text-2); }
+.sg-dialog-acts { display: flex; justify-content: flex-end; gap: var(--sg-space-s); }
 .sg-dd-option { padding: var(--sg-space-s) var(--sg-space-m); border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); font-size: var(--sg-s); color: var(--sg-text); cursor: pointer; }
 .sg-dd-option.is-active { background: var(--sg-hover-fill); }
 .sg-dd-option + .sg-dd-option { margin-top: var(--sg-space-xxs); }   /* each option a little apart, so two marked ones never touch */
@@ -575,7 +601,7 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-searching .sg-main > *:not(.sg-controlbar) { pointer-events: none; }   /* the page under the search holds still and does not react */
 .sg-search-flyout > .sg-chips { position: sticky; top: calc(-1 * var(--sg-space-s)); z-index: 1; margin: calc(-1 * var(--sg-space-s)) calc(-1 * var(--sg-space-s)) 0; padding: var(--sg-space-s); background: var(--sg-bg); }   /* what to search in stays in view as the results scroll */
 .sg-search-flyout > .sg-chips.sg-sticky-edge::after { left: 0; right: 0; }
-.sg-search-flyout > .sg-chips { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .sg-search-flyout > .sg-chips > * { flex: none; } .sg-search-flyout > .sg-chips::-webkit-scrollbar { display: none; }   /* one row always; on a narrow screen it scrolls sideways */   /* its line the flyout's whole width */
+.sg-search-flyout > .sg-chips { flex: none; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .sg-search-flyout > .sg-chips > * { flex: none; } .sg-search-flyout > .sg-chips::-webkit-scrollbar { display: none; }   /* one row always; on a narrow screen it scrolls sideways */   /* its line the flyout's whole width */
 .sg-search-flyout .sg-results { margin: 0 calc(-1 * var(--sg-space-s)); }
 .sg-results > a { position: relative; }
 .sg-results > a + a { margin-top: var(--sg-space-l); }
@@ -1341,8 +1367,8 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 [data-sg-scheme="dark"] .sg-bk-dp-scene[data-focus] > i:not(.is-on) { opacity: .15; }
 .sg-bk-dp-scene[data-focus] > i.is-on { outline: calc(var(--bk-line-w, 1px) * 2) solid var(--dp-hue); outline-offset: calc(var(--bk-line-w, 1px) * -2); z-index: 1; }   /* the layer in focus outlined in the hue: a surface as dark as the page still reads as picked */   /* dark surfaces barely part from a dark page: dimmer there */
 .sg-bk-dp-iso { position: relative; display: grid; place-items: center; min-height: 0; perspective: calc(var(--sg-space-xxl) * 60); }   /* the same stack, pulled apart: one plane per height */
-.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move), translate var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.5)) scale(calc(1 - var(--dp-ex, 1.5) * .11)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
-.sg-bk-dp-plane { position: absolute; inset: 0; container-type: size; border-radius: calc(var(--bk-rad, var(--sg-radius)) * var(--dp-k, 1)); transform: translateZ(calc(var(--z) * var(--sg-space-xxl) * var(--dp-ex, 1.5) + var(--dp-pop, 0px))); transition: transform var(--sg-move), opacity var(--sg-move), outline-color var(--sg-move); }
+.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.5)) scale(calc(1 - var(--dp-ex, 1.5) * .11)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
+.sg-bk-dp-plane { position: absolute; inset: 0; container-type: size; overflow: clip; border-radius: calc(var(--bk-rad, var(--sg-radius)) * var(--dp-k, 1)); transform: translateZ(calc(var(--z) * var(--sg-space-xxl) * var(--dp-ex, 1.5) + var(--dp-pop, 0px))); transition: transform var(--sg-move), opacity var(--sg-move), outline-color var(--sg-move); }
 .sg-bk-dp-iso { background-image: linear-gradient(color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0), linear-gradient(90deg, color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0); background-size: var(--sg-space-xl) var(--sg-space-xl); }   /* a blueprint's faint grid, neutral */
 .sg-bk-dp-idx { opacity: .6; margin-right: var(--sg-space-s); font-variant-numeric: tabular-nums; }   /* each layer's index, as a drawing numbers its parts */
 .sg-bk-dp-iso { container-type: size; grid-template-rows: minmax(0, 1fr); padding: var(--sg-space-l) var(--sg-space-l) calc(var(--sg-space-l) * 5); order: -1; overflow: clip; }   /* the left card, on the page's raised surface, its callouts in the primary hue */
@@ -3264,6 +3290,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         Array.prototype.forEach.call(iso.querySelectorAll('.sg-bk-dp-plane'), function (p) { var q = p.getBoundingClientRect(); lo = Math.min(lo, q.left - box.left); });
         rows.forEach(function (r) { hi = Math.max(hi, r.c.getBoundingClientRect().right - box.left); });
         var dx = box.width / 2 - (lo + hi) / 2;
+        var room = box.width - gap * 8, span = hi - lo;
+        if (st && span > room + 1) { iso._fit = Math.max(0.4, (iso._fit || 1) * room / span * 0.96); st.style.scale = iso._fit.toFixed(3); iso._centring = true; dpLeads(iso); iso._centring = false; dpLeads(iso); return; }   /* too wide with its names: smaller, then centred again */
         if (st && Math.abs(dx) > 1) { iso._dx = (iso._dx || 0) + dx; st.style.translate = Math.round(iso._dx) + 'px 0'; iso._centring = true; dpLeads(iso); iso._centring = false; return; }
       }
       svg.innerHTML = out;
@@ -3274,7 +3302,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       Array.prototype.forEach.call(bkOut.querySelectorAll('.sg-bk-t.sg-bk-dp'), function (b) { var sc = b.querySelector('.sg-bk-dp-scene'), h = sc ? sc.offsetHeight : 0; if (h) { b.style.setProperty('--dp-kn', dpK(h)); sc.style.setProperty('--dp-k', dpK(h)); } });
       Array.prototype.forEach.call(bkOut.querySelectorAll('.sg-bk-dp-plane'), function (p) { if (p.offsetHeight) p.style.setProperty('--dp-k', dpK(p.offsetHeight)); });
     };
-    var dpLeadsAll = function () { dpFrame(); Array.prototype.forEach.call(bkOut.querySelectorAll('.sg-bk-dp-iso'), dpLeads); };
+    // Each drawing's names placed again whenever its card changes size or its planes finish moving: the drawing and its
+    // names stay one block, centred, whatever laid the card out last (a font, the window, a panel).
+    var dpWatch = function (iso) {
+      if (iso._dpWatched) return; iso._dpWatched = true;
+      if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { dpLeads(iso); }).observe(iso);
+      var st = iso.querySelector('.sg-bk-dp-stack'); if (st) st.addEventListener('transitionend', function (e) { if (e.target === st) dpLeads(iso); });
+    };
+    var dpLeadsAll = function () { dpFrame(); Array.prototype.forEach.call(bkOut.querySelectorAll('.sg-bk-dp-iso'), function (iso) { dpWatch(iso); dpLeads(iso); }); };
     if (!bkOut._dpLeadsOn) { bkOut._dpLeadsOn = 1; window.addEventListener('resize', function () { dpLeadsAll(); }); }
     var bkDraw = function () {
       if (bkProbe) { bkProbe.remove(); bkProbe = null; }
@@ -3896,7 +3931,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // so it is the same across and down.
         var dpM = '2cqw', dpIn = 'calc(' + dpM + ' + var(--sg-space-l))', dpLow = 'calc(14% + var(--sg-space-l))';
         var dpCol = function (side, top, bottom) { return side + ':' + dpM + ';width:calc((100% - ' + dpM + ' * 3) / 2);top:' + top + ';bottom:' + bottom; };
-        var dpRow = [['0', 'calc(50% + ' + dpM + ' / 2)'], ['calc(50% + ' + dpM + ' / 2)', '0']];
+        // The rows run past the drawing's top and bottom (clipped there): only the corners between them show, as a page
+        // that scrolls on past what is in view.
+        var dpRow = [['-12%', 'calc(50% + ' + dpM + ' / 2)'], ['calc(50% + ' + dpM + ' / 2)', '-12%']];
         var dpPlace = { card: dpCol('left', dpRow[0][0], dpRow[0][1]), card2: dpCol('right', dpRow[0][0], dpRow[0][1]), card3: dpCol('left', dpRow[1][0], dpRow[1][1]),
           card4: dpCol('right', dpRow[1][0], dpRow[1][1]), header: 'left:0;top:0;right:0;height:9%',
           drop: 'left:8%;top:4%;width:30%;height:20%', panel: 'left:0;right:0;bottom:0;height:9%', fab: 'right:' + dpIn + ';bottom:' + dpLow + ';height:7.2%;aspect-ratio:1',
