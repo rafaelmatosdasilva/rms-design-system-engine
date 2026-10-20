@@ -15,7 +15,7 @@ import {
 import { generateIntent } from '../intent-gen.mjs';
 import { guidanceView } from '../styleguide-data.mjs';
 import { buildLlms } from '../contract-gen.mjs';
-import { contextFrom, purposeLines } from '../prototype-context.mjs';
+import { contextFrom, purposeLines, notesOf, NOTES_SHOWN } from '../prototype-context.mjs';
 
 // ── An invented intent layer ──────────────────────────────────────────────────────────────────────────────────────
 const sections = (items) => ({ kind: 'sections', items: items.map(([title, body]) => ({ title, anchor: title.toLowerCase(), body })) });
@@ -91,7 +91,7 @@ function tarGz(files, top = 'acme-intent-main-abc1234') {
 function fakeGitlab({ sha = 'abc1234def5678', files = LAYER, status = 200 } = {}) {
   const calls = [];
   const fetchImpl = async (url, o = {}) => {
-    calls.push({ url, headers: o.headers ?? {} });
+    calls.push({ url, method: o.method ?? 'GET', headers: o.headers ?? {} });
     if (status !== 200) return { ok: false, status, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) };
     const u = new URL(url);
     if (/\/repository\/archive\.tar\.gz$/.test(u.pathname)) { const b = tarGz(files); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; }
@@ -197,6 +197,16 @@ test('read through the API into its snapshot; the token goes to the named host; 
   const sub = fakeGitlab({ sha: 'fff1234def5678' });
   await syncIntentLayer(dir, { intentLayer: { gitlab: LINK, entry: 'docs/dsds/system.dsds.json' } }, { env: ENV, fetchImpl: sub.fetchImpl });
   assert.match(sub.calls.at(-1).url, /path=docs%2Fdsds/);
+});
+
+test('read-only: only GETs, only the project, its latest commit and one archive; nothing written there', async () => {
+  const gl = fakeGitlab();
+  const dir = makeFixture({});
+  await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: gl.fetchImpl });
+  await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: gl.fetchImpl });
+  assert.ok(gl.calls.every((c) => c.method === 'GET'), JSON.stringify(gl.calls.map((c) => c.method)));
+  const base = 'https://git.acme.test/api/v4/projects/design%2Fintent';
+  for (const c of gl.calls) assert.ok(c.url === base || c.url.startsWith(`${base}/repository/commits/`) || c.url.startsWith(`${base}/repository/archive.tar.gz?`), c.url);
 });
 
 test('the token is never sent to a host not named in GITLAB_HOST', async () => {
@@ -327,4 +337,25 @@ test('the prototype context: a component\'s page fills what it is for, the other
 test('componentIntent lists only what the page says', () => {
   const v = entityView({ kind: 'component', name: 'X', documentBlocks: [sections([['Intent', 'For x.']])] }, 'a/x.json');
   assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null });
+});
+
+test('Figma\'s and the code\'s notes no agent is given: each with why, what to do and whether to remove it', () => {
+  const i = { design: { description: 'A chip.', annotations: [
+    'Filter pattern here: https://www.figma.com/design/AbC/Acme?node-id=1-2',
+    { label: 'A chip.', layer: 'Label' },
+    'Height 32px, padding 8px 12px, node 12:34',
+    'Never use it for navigation.', 'Keep the label short.', 'Group chips in a row.'] }, code: { note: 'Never use it for navigation.', cssComment: 'Wraps on small screens.' } };
+  const { notes, left } = notesOf(i, 'A chip.');
+  assert.deepEqual(notes, ['Never use it for navigation.', 'Keep the label short.', 'Group chips in a row.', 'Wraps on small screens.']);
+  const by = Object.fromEntries(left.map((l) => [l.reason, l]));
+  assert.equal(by.linkOnly.from, 'Figma annotation');
+  assert.match(by.linkOnly.fix, /in words/);
+  assert.equal(by.repeatsDescription.from, 'Figma annotation on its "Label" layer');
+  assert.match(by.repeatsDescription.remove, /^Yes/);
+  assert.equal(by.buildOnly.who, 'figma');
+  assert.equal(by.repeatsNote.from, 'the code (its note in the structure contract)');
+  assert.equal(by.notShown.text, 'Wraps on small screens.');
+  assert.equal(by.notShown.who, 'code');
+  assert.equal(NOTES_SHOWN, 3);
+  for (const l of left) assert.ok(l.why && l.fix && l.remove, l.reason);
 });

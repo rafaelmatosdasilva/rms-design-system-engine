@@ -4959,7 +4959,7 @@ function reportFull(label, items, shown) {
           const il = await import('./intent-layer.mjs');
           const snap = il.readIntentLayer(ROOT, cfg);
           const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)));
-          console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${rep.counts.thin + rep.counts.notUsed ? '  (why, page by page: the style guide\'s Intent layer page, --docs)' : ''}`);
+          console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${rep.counts.thin + rep.counts.notUsed ? '  (why, page by page: the style guide\'s For agents page, --docs)' : ''}`);
         } catch { /* the line above already says how many pages */ }
       }
     } catch (e) {

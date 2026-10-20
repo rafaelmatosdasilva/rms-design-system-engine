@@ -1502,9 +1502,10 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-token-var { margin-top: var(--sg-space-xxs); font-size: var(--sg-s); color: var(--sg-muted); }   /* the code's variable under Figma's name, quieter */   /* a mode a column: a narrow window scrolls the table sideways */
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: clip; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-cell-x); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
-/* The Intent layer page: a card's line under its head, and its rows read from the top. */
+/* The For agents page: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
+.sg-il-title { margin: var(--sg-space-l) 0 var(--sg-space-s); border: 0; background: none; padding: 0; font-size: var(--sg-m, 1rem); color: var(--sg-text, inherit); }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
 .sg-il-label { color: var(--sg-muted); font-size: var(--sg-s); }
@@ -1695,7 +1696,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     health: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
     status: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
     changelog: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
-    'intent-layer': '<circle cx="8" cy="8" r="6"/><path d="M10.6 5.4 9 9 5.4 10.6 7 7Z"/>',
+    'for-agents': '<circle cx="8" cy="8" r="6"/><path d="M10.6 5.4 9 9 5.4 10.6 7 7Z"/>',
     colors: '<circle cx="8" cy="8" r="6"/><path d="M8 2v12M2.8 5h10.4M2.8 11h10.4"/>',
     typography: '<path d="M3 4V3h10v1M8 3v10M6 13h4"/>',
     spacing: '<path d="M2 3v10M14 3v10M5 8h6M5 8l1.5-1.5M5 8l1.5 1.5M11 8l-1.5-1.5M11 8l-1.5 1.5"/>',
@@ -2741,15 +2742,26 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   // what they do not get and why. Not used first, then thin, then used, so the first row is the next page to fix; then
   // the components no page is written for.
   var IL = DATA.intentLayer;
+  var LEFT = COMPONENTS.filter(function (c) { return (c.notesLeft || []).length; });
+  if ((IL && (IL.pages || []).length) || LEFT.length) {
+    hr(); navLink('for-agents', 'for agents');
+    var ilSec = section('for-agents', 'Agents', 'For agents', '');
+  }
+  // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
+  var leftHTML = function (list) { return list.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what || n.text)) + '</strong>' + (n.from ? '<span class="pg-par-val">' + esc(capital(n.from)) + '</span>' : '') + '</p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join(''); };
+  if (LEFT.length) {
+    var lfBox = document.createElement('div'); lfBox.className = 'pg-cards'; ilSec.appendChild(lfBox);
+    var nLeft = LEFT.reduce(function (t, c) { return t + c.notesLeft.length; }, 0);
+    lfBox.innerHTML = '<div class="pg-inspect"><div class="pg-inspect-head">Figma and the code  ·  ' + nLeft + '</div><p class="sg-il-lead">Notes on ' + LEFT.length + (LEFT.length === 1 ? ' component' : ' components') + ' (Figma annotations, the code\'s notes) that no agent is given. The description in Figma, its When to use and When not to use lines and the contract reach the agents in full.</p><div class="pg-par-scroll"><table class="pg-par-table sg-il"><thead><tr><th>Component</th><th>What the agents do not get: why, what to do</th></tr></thead><tbody>' +
+      LEFT.map(function (c) { return '<tr><td><a class="sg-uses-link" href="#' + esc(cid(c.name)) + '">' + esc(c.name) + '</a></td><td>' + leftHTML(c.notesLeft) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+  }
   if (IL && (IL.pages || []).length) {
-    hr(); navLink('intent-layer', 'intent layer');
-    var ilSec = section('intent-layer', 'Agents', 'Intent layer', '');
     var ilSrc = IL.source || {};
     var ilLink = function (p) { return p.url ? '<a class="sg-uses-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name || p.file) + '</a>' : esc(p.name || p.file); };
     var ilFor = function (p) { return p.component ? '<a class="sg-uses-link" href="#' + esc(cid(p.component)) + '">' + esc(p.component) + '</a>' : p.layer === 'components' ? '<span class="pg-missing">No component</span>' : esc(capital(p.kind)); };
     var ilGets = function (p) { return (p.gets || []).length ? p.gets.map(function (g) { return '<p>' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>'; };
     // Each part left out: why, what to do so the agents get it, and whether to remove it.
-    var ilNot = function (p) { return (p.notUsed || []).length ? p.notUsed.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what)) + '</strong></p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join('') : '<p class="pg-missing">Nothing left out.</p>'; };
+    var ilNot = function (p) { return (p.notUsed || []).length ? leftHTML(p.notUsed) : '<p class="pg-missing">Nothing left out.</p>'; };
     var ilCard = function (verdict, title, lead) {
       var rows = IL.pages.filter(function (p) { return p.verdict === verdict; });
       if (!rows.length) return '';
@@ -2758,7 +2770,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     };
     var ilc = IL.counts || {};
     var ilBox = document.createElement('div'); ilBox.className = 'pg-cards'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<p>' + esc(IL.pages.length + ' pages read from ' + (ilSrc.url || 'GitLab') + (ilSrc.ref ? ' on ' + ilSrc.ref : '') + (ilSrc.sha ? ' at ' + ilSrc.sha.slice(0, 8) : '') + (ilSrc.committedAt ? ' (' + ilSrc.committedAt.slice(0, 10) + ')' : '') + ': ' +
+    ilBox.innerHTML = '<div class="pg-inspect-head sg-il-title">Intent layer</div><p>' + esc(IL.pages.length + ' pages read from ' + (ilSrc.url || 'GitLab') + (ilSrc.ref ? ' on ' + ilSrc.ref : '') + (ilSrc.sha ? ' at ' + ilSrc.sha.slice(0, 8) : '') + (ilSrc.committedAt ? ' (' + ilSrc.committedAt.slice(0, 10) + ')' : '') + ': ' +
         (ilc.used || 0) + ' used by the agents, ' + (ilc.thin || 0) + ' thin, ' + (ilc.notUsed || 0) + ' not used.' + (IL.repeated ? ' ' + IL.repeated + ' lines repeated on every page of their kind were left out.' : '')) + '</p>' +
       ilCard('not used', 'Not used', 'Nothing on these pages reaches an agent. Each row says why: fix it in the intent layer.') +
       ilCard('thin', 'Thin', 'Some of these pages reaches the agents, but not what the piece is for together with when (or when not) to use it.') +
@@ -2835,8 +2847,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       st: AGENT_CLS[a.cls][0], rel: '', at: DATA.builtAt || null, src: (a.from || []).slice(0, 3) };
   };
   // Its page in the team's intent layer: the link, and its rules (what it is for, when and when not to use it are merged
-  // into the rows below, each under its source). No page: one to write; a page no agent reads: why, on the Intent
-  // layer page.
+  // into the rows below, each under its source). No page: one to write; a page no agent reads: why, on the For agents
+  // page.
   var intentRow = function (c) {
     var il = c.intentLayer; if (!il) return null;
     if (il.none) return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: '<p class="pg-missing">No page names it.</p>',
@@ -2844,13 +2856,22 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     var said = ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules'].some(function (k) { var v = il[k]; return Array.isArray(v) ? v.length : !!v; });
     var link = il.url ? '<p><a class="sg-uses-link" href="' + esc(il.url) + '" target="_blank" rel="noopener">' + esc(il.file) + '</a></p>' : '<p>' + esc(il.file) + '</p>';
     var rules = (il.rules || []).length ? '<p class="pg-par-val">Rules</p>' + paras(il.rules) : '';
-    return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + (said ? rules : '<p class="pg-missing">Its page says nothing an agent reads: the Intent layer page says why.</p>'),
-      todo: said ? '' : esc('See the Intent layer page for what to change on its page.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: ['The intent layer (' + il.file + ')'] };
+    return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + (said ? rules : '<p class="pg-missing">Its page says nothing an agent reads: the For agents page says why.</p>'),
+      todo: said ? '' : esc('See the For agents page for what to change on its page.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: ['The intent layer (' + il.file + ')'] };
+  };
+  // Its notes no agent is given (Figma's annotations, the code's notes): each with why, what to do, and whether to remove
+  // it; who acts is whoever wrote it.
+  var leftRow = function (c) {
+    var l = c.notesLeft || []; if (!l.length) return null;
+    var whoOf = function (n) { return n.who === 'figma' ? WHO.figma : n.who === 'code' ? WHO.code : WHO.person; };
+    return { key: c.name + '\u0000doc:left', area: 'Documentation', kind: 'Not given to agents', written: leftHTML(l),
+      todo: esc(l.length === 1 ? 'Change it or remove it, as it says.' : 'Change or remove each, as it says.'), who: whoOf(l[0]), st: 'check', rel: '', at: DATA.builtAt || null,
+      src: l.map(function (n) { return capital(n.from); }).filter(function (x, i, a) { return a.indexOf(x) === i; }) };
   };
   function docIssueRows(c) {
     if (c.codeOnly) return [];
-    var tok = tokenDocRow(c), ag = agentRow(c), ir = intentRow(c);
-    return (ag ? [ag] : []).concat(ir ? [ir] : []).concat(KNOW.map(function (k) {
+    var tok = tokenDocRow(c), ag = agentRow(c), ir = intentRow(c), lr = leftRow(c);
+    return (ag ? [ag] : []).concat(ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
       var has = !!k[1](c);
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? k[2](c) : '<p class="pg-missing">' + esc(k[4]) + '</p>',
         todo: has ? '' : esc(WRITE_HOW[k[0]] || GUIDE_HINT), who: has ? '' : WHO.figma, st: has ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };

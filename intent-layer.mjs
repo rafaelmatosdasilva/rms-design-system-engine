@@ -12,6 +12,8 @@
 //   "intentLayer": { "gitlab": "<link>", "entry": "docs/dsds/system.dsds.json", "out": "intent-layer.snapshot.json" }
 // Without an entry, the shortest path ending in system.dsds.json is the index, else every *.dsds.json with an entity.
 //
+// READ-ONLY. The engine never writes to the intent layer: it only asks GitLab (GET) for the project, the branch's latest
+// commit and one archive, and the only file it writes is its own snapshot in the project. A read_api token is enough.
 // Read through the GitLab REST API, no clone: the branch's latest commit, then one archive of the folder that holds the
 // index, read in memory. Nothing is fetched again while the commit has not moved. The token is gitlab-source.mjs's:
 // GITLAB_TOKEN from the environment or the project's .env, only ever sent to gitlab.com or a host named in GITLAB_HOST.
@@ -431,9 +433,10 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
   const headers = token && tokenAllowedFor(p.host, env) ? { 'PRIVATE-TOKEN': token } : {};
   const notSent = token && !headers['PRIVATE-TOKEN'] ? `; a GITLAB_TOKEN is set but not sent to ${p.host}: add GITLAB_HOST=${p.host} to .env` : '';
   const fetchImpl = opts.fetchImpl ?? plainGet;
+  // Every call is a GET: the layer is read, never changed.
   const get = async (url) => {
     const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined;
-    try { return await fetchImpl(url, { headers, signal }); } catch { return { ok: false, status: 0 }; }
+    try { return await fetchImpl(url, { method: 'GET', headers, signal }); } catch { return { ok: false, status: 0 }; }
   };
   const fail = (r) => kept(r.status ? why(r.status, p.host) + notSent : `could not reach ${p.host}`);
   const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;

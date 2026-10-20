@@ -678,10 +678,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
       const ilNow = designIntent().components ?? {};
       const hasLayer = !!cfg.intentLayer;
+      // What of its notes (Figma's annotations, the code's notes) no agent is given, with why, what to do and whether to
+      // remove it: the same choice the prototype context makes (prototype-context.mjs → notesOf).
+      const { notesOf, intentText } = await import('./prototype-context.mjs');
+      for (const c of view.components) {
+        const left = notesOf(ilNow[c.name] ?? {}, intentText(c.description) || intentText(ilNow[c.name]?.design?.description) || null).left;
+        if (left.length) c.notesLeft = left;
+      }
       for (const c of view.components) {
         const il = ilNow[c.name]?.intentLayer ?? null;
         // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
-        // the contract); the Intent layer page gathers every page of it apart.
+        // the contract); the For agents page gathers every page of it apart.
         if (!il && hasLayer) c.intentLayer = { none: true };
         if (il) c.intentLayer = { file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null };
         c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c), intentLayer: il });

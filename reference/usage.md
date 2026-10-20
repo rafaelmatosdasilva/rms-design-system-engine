@@ -254,7 +254,9 @@ component's `guidelines` in `design-intent.json`, the rest in the global block, 
 **The intent layer, a GitLab project of DSDS pages.** When the team documents why each piece exists and how
 to use it in DSDS (the Design System Documentation Standard: an index `system.dsds.json` whose entity groups
 `$ref` one file per component, foundation, pattern, template or page), `rms-design-system-engine --intent-layer
-<project link>` sets `ds-config.json → intentLayer` and reads it at once. Every run reads it again through the
+<project link>` sets `ds-config.json → intentLayer` and reads it at once. It is **read-only**: the engine only
+asks GitLab for the project, its latest commit and one archive (GET, a `read_api` token is enough) and never
+writes to the layer; the only file it writes is its own snapshot in your project. Every run reads it again through the
 GitLab API when the branch's commit moved (one archive of the index's folder, read in memory, no clone), with the
 same token rules as above, into `intent-layer.snapshot.json`; GitLab not reachable keeps the snapshot and says
 from which commit. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
@@ -270,9 +272,16 @@ Where it is used: each component's `intentLayer` in `design-intent.json` (with i
 authored `whenNotToUse` first), and the prototype context (its own `intent` lines per component, its "when not
 to use" lines as never sentences the check holds; each pattern, template, page and flow page as a rule). In the
 style guide each component's Documentation merges it with Figma, the code and the contract, each line under its
-source with a link to its page, plus an Intent layer row (its page, its rules, or no page yet); the **Intent
-layer** page lists every page as used, thin or not used, with what the agents get and where, and for each part
+source with a link to its page, plus an Intent layer row (its page, its rules, or no page yet); the **For
+agents** page lists every page as used, thin or not used, with what the agents get and where, and for each part
 that reaches no agent why, what to change so it does, and whether to remove it. The audit prints the same counts.
+
+The same page does it for Figma and the code: a component's Figma description, its When to use and When not to use
+lines and the contract reach the agents in full, while its notes (Figma annotations, the code's note and the
+comment above its CSS rule) reach only the prototype context, the first three of them printed. A note that repeats
+the description or another note, one that is only a link or only says how the component is built, and a note past
+the first three are listed with why, what to do so the agents get it, and whether to remove it, on the page and as
+a Not given to agents row in the component's Documentation, for whoever wrote it.
 
 Because the file is regenerated every run, the generator is **merge-aware**: it reads the existing
 file and **preserves everything you authored** — each layer's `authored` string, and every
