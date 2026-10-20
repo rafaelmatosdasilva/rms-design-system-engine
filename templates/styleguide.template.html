@@ -1292,7 +1292,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-tm-svg .is-dash { stroke-dasharray: 4 4; }
 .sg-bk-tm-svg text:not(.sg-bk-tm-aa) { font-size: calc(var(--sg-s) / var(--tm-k, 1)); stroke: none; fill: currentColor; }   /* small words in the tile's ink: the hue is for the large letters and the lines */
 .sg-bk-tm-aa { fill: var(--bk-1); }
-.sg-bk-tm::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 var(--bk-line-w, 1px) var(--sg-line-colour); pointer-events: none; }   /* its outline over what fills it to the edge (the bars' panel) */
+.sg-bk-tm::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 var(--bk-line-w, 1px) var(--sg-line-colour), inset 0 0 0 var(--bk-line-w, 1px) var(--t-bg); pointer-events: none; }   /* its outline over what fills it to the edge (the bars' panel), on a ring of the card's own ground so it is one colour all round */
 .sg-bk-tm-ws { display: flex; flex-wrap: wrap; column-gap: var(--sg-space-l); row-gap: var(--sg-space-xxs); font-size: var(--sg-s); }
 .sg-bk-tm-ws i { font-style: normal; }
 .sg-bk-tm-rows { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--sg-space-s); }
