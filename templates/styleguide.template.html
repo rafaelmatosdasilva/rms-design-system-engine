@@ -631,6 +631,9 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .pg-inspect.sg-token-card table { table-layout: fixed; }   /* one rule for every table: the name a fixed share, the modes' columns sharing the rest equally, so the columns line up from one table to the next */
 .pg-inspect.sg-token-card .sg-token-name-col { width: 34%; }
 .pg-inspect.sg-token-card.sg-tk-table .sg-token-name-col { width: clamp(9rem, 20%, 16rem); }   /* a token's own name is the last part of its path, short: the modes' values get the room */
+/* A table's head that sticks draws its own bottom line, solid and inside the cell, so the line moves with it: a
+   collapsed table border stays in place when the cell sticks, and a see-through one shows the rows scrolling under it. */
+:is(.pg-inspect.sg-token-card thead th, .pg-inspect.sg-token-card :is(.sg-tk-group, .sg-tk-collhead) > th, .pg-par-table th) { --sg-th-line: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid); border-bottom-color: transparent; box-shadow: var(--sg-th-line); }
 .pg-inspect.sg-token-card thead th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); z-index: 5; background: var(--sg-bg-2); }   /* Name and the modes stay in view under the card's head */
 .pg-inspect.sg-token-card td, .pg-inspect.sg-token-card td:first-child, .pg-inspect.sg-token-card td:last-child { color: var(--sg-text); width: auto; word-break: normal; overflow-wrap: anywhere; }
 .pg-inspect.sg-token-card .sg-token-sample { width: calc(var(--sg-space-xxl) * 3); }
@@ -1533,7 +1536,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-section > .pg-areas ~ .pg-area { padding-top: 0; margin-top: var(--sg-stick-gap); }
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); }
 :is(.pg-par-card, .pg-inspect, .pg-code) { overflow-clip-margin: var(--sg-clip-m, var(--sg-radius)); }   /* room for the gap and the line it paints above itself (a plain length: the browser drops a calc() here) */
-:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid), 0 calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg), var(--sg-strip-l, 0 0 transparent), var(--sg-strip-r, 0 0 transparent); }   /* its top line, and the gap above it painted with the page */
+:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid), 0 calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg), var(--sg-strip-l, 0 0 transparent), var(--sg-strip-r, 0 0 transparent), var(--sg-th-line, 0 0 transparent); }   /* its top line, and the gap above it painted with the page */
 /* The outer heads' strips reach over the card's own side borders too, so no edge of the card shows above a stuck head
    in a system whose cards carry a real border. */
 .pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head { --sg-strip-l: calc(-1 * var(--sg-line-width, 1px)) calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg); }
@@ -1680,6 +1683,10 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // A component's place on the page: its name, any character an address reads (a slash, a space) as a dash.
   function cid(n) { return 'c-' + String(n).replace(/[^\w-]+/g, '-'); }
+  // How far down a bar that sticks under this one sits: this one's real height (its fraction of a pixel too, which a
+  // rounded height loses), less a pixel, so the bar under it tucks under its edge and nothing scrolling ever shows
+  // between two stuck bars, whatever the browser rounds. The one above is drawn over the one under it.
+  function stuckH(el) { return el ? Math.max(0, el.getBoundingClientRect().height - 1) : 0; }
   // Each item of the menu with the page's own mark before it: one for each page of the system and each foundation, one
   // shared by every component. Drawn with lines in the text's colour, never one of the system's icons.
   var NAV_MARK = {
@@ -1739,7 +1746,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   var CODE_CONNECT_SVG = '<svg class="sg-status-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 10.3 9.6 6.9a1.6 1.6 0 0 1 2.3 2.3L8.5 12.6"/><path d="M9.8 5.7 6.4 9.1a1.6 1.6 0 0 1-2.3-2.3l3.4-3.4"/></svg>';
   function titleText(h) { var c = h.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('.sg-section-actions'), function (x) { x.remove(); }); return c.textContent.trim(); }
   // How tall the menu's head is, for each group's name to stick under it.
-  (function () { var side = document.getElementById('sg-sidebar'), head = side && side.querySelector('.sg-sidebar-header'); if (!head) return; var set = function () { side.style.setProperty('--sg-sidebar-head-h', head.offsetHeight + 'px'); }; set(); addEventListener('resize', set); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(set).observe(head); })();
+  (function () { var side = document.getElementById('sg-sidebar'), head = side && side.querySelector('.sg-sidebar-header'); if (!head) return; var set = function () { side.style.setProperty('--sg-sidebar-head-h', stuckH(head) + 'px'); }; set(); addEventListener('resize', set); if (typeof ResizeObserver !== 'undefined') new ResizeObserver(set).observe(head); })();
   // The menu's own stuck line: under its head while the menu scrolls, or under the group's name stuck beneath it.
   (function () {
     var side = document.getElementById('sg-sidebar'), head = side && side.querySelector('.sg-sidebar-header'); if (!head) return;
@@ -1762,28 +1769,28 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   function underTitle(target) {
     if (!target) return;
     var tTitle = target.querySelector(':scope > h2'), tSwitch = Array.prototype.filter.call(target.querySelectorAll('.sg-size-switch'), function (x) { return !x.hidden; })[0] || target.querySelector('.sg-todo-head');   // the switch shown (the Showroom has one on its grid, another on a screen's page)   // what sticks under the title (a size switch, the Tasks' filter)
-    if (tTitle && tTitle.offsetParent) target.style.setProperty('--sg-title-h', tTitle.offsetHeight + 'px');   // the Status page's chips: the bar is drawn again, the page keeps it
-    if (tTitle && tSwitch && tTitle.offsetParent && !tSwitch.classList.contains('sg-todo-head')) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + tTitle.offsetHeight + 'px)';
+    if (tTitle && tTitle.offsetParent) target.style.setProperty('--sg-title-h', stuckH(tTitle) + 'px');   // the Status page's chips: the bar is drawn again, the page keeps it
+    if (tTitle && tSwitch && tTitle.offsetParent && !tSwitch.classList.contains('sg-todo-head')) tSwitch.style.top = 'calc(var(--sg-sticky-top, 0px) + ' + stuckH(tTitle) + 'px)';
     stickHeight(target);
   }
   function stickHeight(sec) {
     if (!sec) return;
-    var headRow = sec.querySelector('.pg-header > .pg-head'); if (headRow && headRow.offsetParent) sec.style.setProperty('--pg-head-h', headRow.offsetHeight + 'px');   // a component's title row, the areas sticking under it
+    var headRow = sec.querySelector('.pg-header > .pg-head'); if (headRow && headRow.offsetParent) sec.style.setProperty('--pg-head-h', stuckH(headRow) + 'px');   // a component's title row, the areas sticking under it
     var top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sg-sticky-top')) || 0, low = top;
     Array.prototype.forEach.call(sec.querySelectorAll(STICK_BARS), function (el) {
       if (!el.offsetParent || getComputedStyle(el).position !== 'sticky') return;
-      low = Math.max(low, (parseFloat(getComputedStyle(el).top) || 0) + el.offsetHeight);
+      low = Math.max(low, (parseFloat(getComputedStyle(el).top) || 0) + stuckH(el));
     });
     sec.style.setProperty('--pg-bars-h', (low - top) + 'px');   // the page's own bars: a component's chips stick under them
     Array.prototype.forEach.call(sec.querySelectorAll('.pg-card-section .pg-par-sum'), function (el) {
       if (!el.offsetParent || getComputedStyle(el).position !== 'sticky') return;
-      low = Math.max(low, (parseFloat(getComputedStyle(el).top) || 0) + el.offsetHeight);
+      low = Math.max(low, (parseFloat(getComputedStyle(el).top) || 0) + stuckH(el));
     });
     sec.style.setProperty('--pg-areas-h', (low - top) + 'px');   // with its chips: the cards' heads stick under all of them
     var head = Array.prototype.filter.call(sec.querySelectorAll('.pg-inspect-head'), function (h) { return h.offsetParent; })[0];
-    if (head) sec.style.setProperty('--pg-card-head-h', head.offsetHeight + 'px');
+    if (head) sec.style.setProperty('--pg-card-head-h', stuckH(head) + 'px');
     // Each card its own: a table's head row sticks under its own card's head, however tall that head is.
-    Array.prototype.forEach.call(sec.querySelectorAll('.pg-inspect-head'), function (h) { if (h.offsetParent && h.parentElement) h.parentElement.style.setProperty('--pg-card-head-h', h.offsetHeight + 'px'); });
+    Array.prototype.forEach.call(sec.querySelectorAll('.pg-inspect-head'), function (h) { if (h.offsetParent && h.parentElement) h.parentElement.style.setProperty('--pg-card-head-h', stuckH(h) + 'px'); });
   }
   // A token's name, wherever the page shows it, opens a panel in place: its Figma name, its value in each mode, the
   // components that use it (each linked to its page) and a button to copy it. Nothing moves; Escape or a click outside
@@ -2663,7 +2670,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
         fitQueued = false;
         if (!panel || panel.hidden) return;
         var t = srTitle, w = srSwitch;
-        sr.style.setProperty('--sr-head-h', ((t ? t.offsetHeight : 0) + (w && !w.hidden ? w.offsetHeight : 0)) + 'px');
+        sr.style.setProperty('--sr-head-h', Math.max(0, (t ? t.getBoundingClientRect().height : 0) + (w && !w.hidden ? w.getBoundingClientRect().height : 0) - 1) + 'px');
         if (window.innerWidth < 901) { panel.style.height = ''; return; }
         // down to where the page's own room under the screen begins, so panel and page end together at the window's foot
         var under = Math.max(0, document.documentElement.scrollHeight - (body.getBoundingClientRect().bottom + window.scrollY));
@@ -3969,7 +3976,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Used by ' + plural(comps.length, 'component', 'components') + '</div>' + usersTable(comps) + '</div>' });
       // The table's head stuck under the panel's head as the panel scrolls.
       var ph = det.querySelector('.sg-panel-head'), ch = det.querySelector('.sg-panel-body .pg-inspect-head');
-      var heads = function () { if (ph && ph.offsetHeight) det.style.setProperty('--sg-panel-head-h', ph.offsetHeight + 'px'); if (ch && ch.offsetHeight) det.style.setProperty('--pg-card-head-h', ch.offsetHeight + 'px'); };
+      var heads = function () { if (ph && ph.offsetHeight) det.style.setProperty('--sg-panel-head-h', stuckH(ph) + 'px'); if (ch && ch.offsetHeight) det.style.setProperty('--pg-card-head-h', stuckH(ch) + 'px'); };
       m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
       heads();   // measured once shown
       requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
@@ -4005,7 +4012,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     // tokens in each as Figma lists them (neutral1000 to neutral000 stays so). Never alphabetical.
     // How tall the modes' row is, so a group's row sticks right under it.
     var tkHeadRoom = function (root) {
-      var set = function () { Array.prototype.forEach.call(root.querySelectorAll('.sg-tk-table'), function (t) { var h = t.querySelector('thead tr'); if (h && h.offsetHeight) t.style.setProperty('--tk-colhead-h', h.offsetHeight + 'px'); }); };
+      var set = function () { Array.prototype.forEach.call(root.querySelectorAll('.sg-tk-table'), function (t) { var h = t.querySelector('thead tr'); if (h && h.offsetHeight) t.style.setProperty('--tk-colhead-h', stuckH(h) + 'px'); }); };
       set(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(set);
     };
     var tkFigmaOrder = function (paths) {
@@ -6630,7 +6637,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     // Its title row (its name, its Figma and Code links) sticks at the top as the page scrolls, the areas under it: both
     // plain bars that keep their size, so nothing moves as they stick.
     var headRow = sec.querySelector('.pg-head');
-    if (headRow) { var headHeight = function () { sec.style.setProperty('--pg-head-h', headRow.offsetHeight + 'px'); areasHeight(); }; headHeight(); if (window.ResizeObserver) new ResizeObserver(headHeight).observe(headRow); }
+    if (headRow) { var headHeight = function () { sec.style.setProperty('--pg-head-h', stuckH(headRow) + 'px'); areasHeight(); }; headHeight(); if (window.ResizeObserver) new ResizeObserver(headHeight).observe(headRow); }
     function showArea(v, kept) {
       // The area last chosen, kept for the next component only when that one has it (not every one is built with others).
       if (!sec.querySelector('.pg-area[data-area="' + v + '"]')) v = 'play';   // Specs, once its own area, is in the Playground
@@ -7661,8 +7668,9 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     // What sticks to the top of a page (a component's areas) sits under the top bar when one shows.
     var cbar = document.getElementById('sg-controlbar');
     var stickTop = function () {
-      var h = getComputedStyle(bar).display === 'none' ? 0 : bar.offsetHeight;
-      if (cbar && getComputedStyle(cbar).position === 'sticky') h += cbar.offsetHeight;   // the page's top bar too
+      var h = getComputedStyle(bar).display === 'none' ? 0 : bar.getBoundingClientRect().height;
+      if (cbar && getComputedStyle(cbar).position === 'sticky') h += cbar.getBoundingClientRect().height;   // the page's top bar too
+      h = Math.max(0, h - 1);   // what sticks under the bars tucks under their edge (stuckH)
       document.documentElement.style.setProperty('--sg-sticky-top', h + 'px');
     };
     window.addEventListener('resize', stickTop); stickTop();
