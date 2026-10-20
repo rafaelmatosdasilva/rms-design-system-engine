@@ -1326,7 +1326,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 [data-sg-scheme="dark"] .sg-bk-dp-scene[data-focus] > i:not(.is-on) { opacity: .15; }
 .sg-bk-dp-scene[data-focus] > i.is-on { outline: calc(var(--bk-line-w, 1px) * 2) solid var(--dp-hue); outline-offset: calc(var(--bk-line-w, 1px) * -2); z-index: 1; }   /* the layer in focus outlined in the hue: a surface as dark as the page still reads as picked */   /* dark surfaces barely part from a dark page: dimmer there */
 .sg-bk-dp-iso { position: relative; display: grid; place-items: center; min-height: 0; perspective: calc(var(--sg-space-xxl) * 60); }   /* the same stack, pulled apart: one plane per height */
-.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.2)) scale(calc(1 - var(--dp-ex, 1.5) * .1)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
+.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.5)) scale(calc(1 - var(--dp-ex, 1.5) * .11)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
 .sg-bk-dp-plane { position: absolute; inset: 0; container-type: size; border-radius: calc(var(--bk-rad, var(--sg-radius)) * var(--dp-k, 1)); transform: translateZ(calc(var(--z) * var(--sg-space-xxl) * var(--dp-ex, 1.5) + var(--dp-pop, 0px))); transition: transform var(--sg-move), opacity var(--sg-move), outline-color var(--sg-move); }
 .sg-bk-dp-iso { background-image: linear-gradient(color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0), linear-gradient(90deg, color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0); background-size: var(--sg-space-xl) var(--sg-space-xl); }   /* a blueprint's faint grid, neutral */
 .sg-bk-dp-idx { opacity: .6; margin-right: var(--sg-space-s); font-variant-numeric: tabular-nums; }   /* each layer's index, as a drawing numbers its parts */
@@ -1539,7 +1539,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 /* A component's chips stay in view under its areas, the gap above them painted with the page, the cards' heads under them. */
 #tokens > .sg-tokens-chips { margin-bottom: var(--sg-card-gap); }
 #tokens > .sg-tokens-chips { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--sg-title-h, 0px) + var(--sg-stick-gap)); z-index: 14; background: var(--sg-bg); padding: var(--sg-space-xs) 0; box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg); }   /* the collections' chips stay in view under the title */
-.pg-card-section .pg-par-sum:not(:empty) { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-bars-h, 0px) + var(--sg-stick-gap)); z-index: 14; background: var(--sg-bg); padding: var(--sg-space-xs) 0; box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg); }
+.pg-card-section .pg-par-sum:not(:empty) { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-bars-h, 0px)); z-index: 14; background: var(--sg-bg); padding: var(--sg-space-s) 0; box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg); }   /* stuck right under the tabs */
+.pg-card-section .pg-par-sum.sg-sticky-edge { box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg), 0 calc(var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 0 var(--sg-bg); }   /* the lowest stuck bar: the page's gap under its line, as every other */
 /* What the team wrote, in the Documentation table: its paragraphs as tight as a cell's one line. */
 .pg-written > p { margin: 0; }
 .pg-written > p + p { margin-top: var(--sg-space-xs); }
@@ -1642,6 +1643,17 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   // The page keeps the root size it loaded with: a system whose own CSS sizes text on a mode attribute (data-color, data-size)
   // would otherwise shrink or grow every rem on the page when a mode is switched on <html>.
   document.documentElement.style.fontSize = getComputedStyle(document.documentElement).fontSize;
+  // The whole page in the family the theme chosen names (its font token, as that theme sets it), whatever the code's own page
+  // rule writes by hand; read again whenever the theme, the brand or the mode changes.
+  (function () {
+    var tf = TOKENS.typeFamily && TOKENS.typeFamily.var ? TOKENS.typeFamily.var : ((TOKENS.typography || []).map(function (t) { return t.family && t.family.var; }).filter(Boolean)[0] || null);
+    if (!tf) return;
+    var apply = function () { var at = document.querySelector('.sg-layout') || document.body, fam = getComputedStyle(at).getPropertyValue(tf).trim(); document.body.style.fontFamily = fam ? fam + ', system-ui, sans-serif' : ''; };
+    apply();
+    // Read once the theme's own styles have landed (a brand's are written into the page just after its attribute).
+    var later = function () { apply(); setTimeout(apply, 60); };
+    if (typeof MutationObserver !== 'undefined') { var fo = new MutationObserver(later); fo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-brand', 'data-theme', 'data-sg-scheme', 'class'] }); fo.observe(document.head, { childList: true, subtree: true, characterData: true }); }
+  })();
   // The room a card lets its stuck head paint past its edge: the page's radius as a plain length, which is all the
   // browser takes there (a system whose radius is calc(12px + 4px) would otherwise get none, and its card borders show).
   (function () { var p = document.createElement('div'); p.style.cssText = 'position:absolute;visibility:hidden;width:var(--sg-radius)'; document.body.appendChild(p); var w = p.getBoundingClientRect().width; p.remove(); if (w > 0) document.documentElement.style.setProperty('--sg-clip-m', Math.ceil(w) + 'px'); })();

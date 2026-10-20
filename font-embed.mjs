@@ -86,7 +86,10 @@ export function missingFamilies(html) {
     return x.split(',')[0].trim().replace(/^['"]|['"]$/g, '').trim();
   };
   const decls = [...css.replace(/@font-face\s*\{[^}]*\}/g, '').matchAll(/(?:^|[;{\s])font-family\s*:\s*([^;}]+)/gi)].map((m) => m[1])
-    .concat([...String(html).matchAll(/\sstyle=["'][^"']*?font-family\s*:\s*([^;"']+)/gi)].map((m) => m[1]));
+    .concat([...String(html).matchAll(/\sstyle=["'][^"']*?font-family\s*:\s*([^;"']+)/gi)].map((m) => m[1]))
+    // Every family a theme names through a font token (--…font-family: …, --…fontFamily: …), each theme's and brand's,
+    // so the page has the font of whichever theme is chosen.
+    .concat([...css.matchAll(/--[\w-]*font-?family[\w-]*\s*:\s*([^;}]+)/gi)].map((m) => m[1]));
   for (const d of decls)
     {
       // The family it asks for first: the rest are fallbacks, there for a computer that lacks it.
