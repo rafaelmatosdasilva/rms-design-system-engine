@@ -2905,13 +2905,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       todo: esc(l.length === 1 ? 'Change it or remove it, as it says.' : 'Change or remove each, as it says.'), who: whoOf(l[0]), st: 'check', rel: '', at: DATA.builtAt || null,
       src: l.map(function (n) { return capital(n.from); }).filter(function (x, i, a) { return a.indexOf(x) === i; }) };
   };
+  // Written, but too thin to say anything: under four words, or a line that only names its section ("Overview
+  // section."). Such a row is never Ready: it is to check, with why.
+  var WEAK = function (html) { var t = String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); return !!t && (t.split(' ').filter(function (w) { return /[a-z]{2}/i.test(w); }).length < 4 || /^[\w\s\/'’&-]{1,40}\bsection\.?$/i.test(t)); };
   function docIssueRows(c) {
     if (c.codeOnly) return [];
     var tok = tokenDocRow(c), ag = agentRow(c), ir = intentRow(c), lr = leftRow(c);
     return (ag ? [ag] : []).concat(ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
-      var has = !!k[1](c);
-      return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? k[2](c) : '<p class="pg-missing">' + esc(k[4]) + '</p>',
-        todo: has ? '' : esc(WRITE_HOW[k[0]] || GUIDE_HINT), who: has ? '' : WHO.figma, st: has ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
+      var has = !!k[1](c), body = has ? k[2](c) : '', weak = has && k[0] !== 'Do and don\'t' && k[0] !== 'Role' && WEAK(body);   // a role is one word by nature
+      return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
+        todo: has && !weak ? '' : esc((weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
     })).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
@@ -5316,7 +5319,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
     var body = colsOf(d.area).filter(function (col) { return ['no', 'kind', 'updated'].indexOf(col[1]) < 0; }).map(function (col) {
       var k = col[1];
-      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : '') || '<p class="pg-missing">Nothing to do.</p>');
+      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : ''));   // nothing to do: no card
       if (k === 'status') return card(col[0], '<p>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel, d.area) + '</p>' + ((r.src || []).filter(Boolean).length ? '<p class="pg-par-val">Where it was read</p>' + r.src.filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') : '') + (r.at ? '<p class="pg-par-val">Updated ' + esc(when(r.at)) + '</p>' : ''));
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');

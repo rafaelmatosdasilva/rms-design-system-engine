@@ -34,6 +34,10 @@ import { parseGitlabProject, tokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 
 export const ID = 'dsds-gitlab';
+// The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
+// not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
+// to what is read.
+export const READER = 2;
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -304,7 +308,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     const sha = String(head?.id ?? '');
     if (!/^[0-9a-f]{7,64}$/i.test(sha)) return kept('GitLab gave no commit for this branch');
     const source = { id: ID, label: LABEL, url: `${p.origin}/${p.path}`, ref, sha, committedAt: String(head.committed_date ?? ''), entry: c.entry, entryGiven: c.entry ?? null };
-    if (prev?._source?.sha === sha && prev?._source?.url === source.url && (prev._source.entryGiven ?? null) === (c.entry ?? null)) {
+    if (prev?._source?.sha === sha && prev?._source?.url === source.url && (prev._source.entryGiven ?? null) === (c.entry ?? null) && prev._reader === READER) {
       return { ok: true, changed: false, out: c.out, source: prev._source, entities: prev.entities.length, boilerplate: prev.boilerplate ?? 0 };
     }
     const folder = c.entry && posix.dirname(c.entry) !== '.' ? posix.dirname(c.entry) : null;
@@ -325,7 +329,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     source.fetchedAt = (opts.now ?? new Date()).toISOString();
     const snap = {
       _note: 'The intent layer as read from GitLab (rms-design-system-engine). Regenerated when its commit moves; do not edit by hand, edit the layer itself.',
-      _source: source, system, boilerplate, entities,
+      _source: source, _reader: READER, system, boilerplate, entities,
     };
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(snap, null, 2) + '\n');

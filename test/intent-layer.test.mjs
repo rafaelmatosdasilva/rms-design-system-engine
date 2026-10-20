@@ -4,7 +4,7 @@
 // fetch serving a tar.gz built here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { makeFixture } from './helpers.mjs';
@@ -215,6 +215,19 @@ test('read-only: only GETs, only the project, its latest commit and one archive;
   assert.ok(gl.calls.every((c) => c.method === 'GET'), JSON.stringify(gl.calls.map((c) => c.method)));
   const base = 'https://git.acme.test/api/v4/projects/design%2Fintent';
   for (const c of gl.calls) assert.ok(c.url === base || c.url.startsWith(`${base}/repository/commits/`) || c.url.startsWith(`${base}/repository/archive.tar.gz?`), c.url);
+});
+
+test('a snapshot written by an older reader is read again, even when the commit has not moved', async () => {
+  const dir = makeFixture({});
+  await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: fakeGitlab().fetchImpl });
+  const file = join(dir, 'intent-layer.snapshot.json');
+  const snap = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, JSON.stringify({ ...snap, _reader: 1 }));
+  const again = fakeGitlab();
+  const r = await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: again.fetchImpl });
+  assert.equal(r.changed, true);
+  assert.equal(again.calls.length, 3, 'the archive is read again');
+  assert.ok(JSON.parse(readFileSync(file, 'utf8'))._reader > 1);
 });
 
 test('the token is never sent to a host not named in GITLAB_HOST', async () => {
