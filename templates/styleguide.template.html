@@ -908,7 +908,8 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 /* The widest column (what to do, what is written, what was found) takes the width the others leave; the row's arrow
    its own narrow column at the end, as every table whose rows open something has. */
 /* Accessibility: the criterion takes the room (it is what a row is about); its status and when, a share each. */
-.sg-issues--a11y.sg-cols-4 th:nth-child(3) { width: 16%; } .sg-issues--a11y.sg-cols-4 th:nth-child(4) { width: 14%; }
+.sg-issues--a11y.sg-cols-4 th:nth-child(3) { width: 26%; } .sg-issues--a11y.sg-cols-4 th:nth-child(4) { width: 14%; }
+.sg-issues .sg-one-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* a status's word and one line under it, never more */
 .sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
 .sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
@@ -1433,11 +1434,12 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-tk-detail { flex: 1; min-width: 0; overflow: auto; padding: 0 var(--sg-card-gap) var(--sg-space-xxl); }
 /* A side panel's page (sidePanelPage): its head stays at the panel's top, painted with the panel, as a component page's
    head stays under the page's bars; its body's cards a card gap apart, the first a stick gap under the head. */
-.sg-panel-head { position: sticky; top: 0; z-index: 7; display: flex; flex-direction: column; gap: var(--sg-space-xs); padding: var(--sg-space-xxl) 0 var(--sg-space-l); background: var(--sg-bg); }
-.sg-panel-head > h2 { margin: 0; font-size: calc(var(--sg-h2) * 1.6); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-panel-head { position: sticky; top: 0; z-index: 7; display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-xxl) 0 var(--sg-space-l); background: var(--sg-bg); }
+.sg-panel-head > h2 { margin: 0; font-size: calc(var(--sg-title) + var(--sg-space-xxs) * 3.5); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* every panel's title as a page's own title (the first panel's): one size, one line height */
 .sg-panel-head > .sg-section-badge, .sg-panel-head > .sg-panel-sub { margin: 0; }
 .sg-panel-sub { color: var(--sg-muted); font-size: var(--sg-s); overflow-wrap: anywhere; }
 /* Where a panel sits, each level from the outermost, as a breadcrumb: the page under it, the component, the tab, the task. */
+.sg-nav a > .sg-nav-tag { margin-left: auto; padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-s); color: var(--sg-muted); font-size: var(--sg-xs, var(--sg-s)); line-height: var(--sg-lh); }   /* a component the code has only as a CSS class */
 .sg-panel-crumbs { display: flex; flex-wrap: wrap; align-items: center; margin: 0; color: var(--sg-muted); font-size: var(--sg-s); }
 .sg-panel-crumbs > span + span::before { content: '\203A'; margin: 0 var(--sg-space-xs); color: var(--sg-muted); }
 .sg-panel-crumbs > span:last-child { color: var(--sg-text-2); }
@@ -1532,7 +1534,13 @@ tr.sg-row-open { cursor: pointer; }
 tr.sg-row-open:hover > td { background: var(--sg-a3); }
 tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: -2px; }
 .sg-cell-clip { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); }
-.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; }
+.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh); font-weight: var(--sg-text-weight); color: var(--sg-text); }
+/* A panel's card in the page's running text, the table's own: one size and one line height for all it holds, each
+   finding a paragraph of its own (its sign, a table's mark, left to the table). */
+.sg-row-detail-body :is(.pg-a11y-item, .pg-par-val, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }
+.sg-row-detail-body .pg-a11y-item { display: block; }
+.sg-row-detail-body .pg-a11y-item > [class^="pg-par--"]:first-child { display: none; }
+.sg-row-detail-body .pg-par-val { color: var(--sg-text-2); }
 .sg-row-detail-body > p, .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-xs); }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
@@ -1679,6 +1687,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var DATA = JSON.parse(document.getElementById('sg-data').textContent || '{}');
   var TOKENS = DATA.tokens || { colors: [], spacing: [], radii: [], sizing: [], typography: [] };
   var COMPONENTS = DATA.components || [];
+  // A component the code has only as a CSS class (its class in the stylesheet, no component file, nothing it renders):
+  // found, yet with no props to read or try, so its page draws it from Figma's structure.
+  function cssOnly(c) { return !!c && !c.codeOnly && !(c.api && c.api.file) && !c.source && !c.markup && !(c.renders || []).length; }
   // The page is still while the search is open (the loops below skip a beat).
   var sgQuiet = function () { return document.documentElement.classList.contains('sg-searching'); };
   // The page keeps the root size it loaded with: a system whose own CSS sizes text on a mode attribute (data-color, data-size)
@@ -5332,17 +5343,23 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     code: function (r) { return '<td>' + clip(r.code) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
     todo: function (r) { return '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>'; },
-    status: function (r) { return '<td>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel, r.area) + (r.fresh && isOpen(r) ? '<span class="pg-par-val">New in the last audit</span>' : '') + (r.src || []).filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td>'; }
+    // Its status in the table: the word, and one line under it (what it says, else that it is new, else where it was
+    // read); every source is in the row's panel.
+    status: function (r) {
+      // How it was checked, its date left to the Last checked column (one date per row, never two).
+      var one = (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || String((r.src || []).filter(Boolean)[0] || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser');
+      return '<td>' + statusHTML(r.st, '', r.area) + (one ? '<span class="pg-par-val sg-one-line" title="' + esc(one) + '">' + esc(one) + '</span>' : '') + '</td>';
+    }
   };
   var ISSUE_COLS = {
-    Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    Motion: [['Task nr', 'no'], ['What happens', 'kind'], ['Code', 'code'], ['Figma', 'figma'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    System: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']],
-    Page: [['Task nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']]
+    Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Motion: [['Task nr', 'no'], ['What happens', 'kind'], ['Code', 'code'], ['Figma', 'figma'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    System: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Page: [['Task nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']]
   };
   var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
   // What a table leaves to its row's panel: Accessibility's Found and What to do are read in full there, so the table has
@@ -5383,7 +5400,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var body = colsOf(d.area).filter(function (col) { return ['no', 'kind', 'updated'].indexOf(col[1]) < 0; }).map(function (col) {
       var k = col[1];
       if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : ''));   // nothing to do: no card
-      if (k === 'status') return card(col[0], '<p>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel, d.area) + '</p>' + ((r.src || []).filter(Boolean).length ? '<p class="pg-par-val">Where it was read</p>' + r.src.filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') : '') + (r.at ? '<p class="pg-par-val">Updated ' + esc(when(r.at)) + '</p>' : ''));
+      if (k === 'status') return card(col[0], '<p>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel, d.area) + '</p>' + ((r.src || []).filter(Boolean).length ? '<p class="pg-par-val">Where it was read</p>' + r.src.filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') : '') + (r.at ? '<p class="pg-par-val">Last checked ' + esc(when(r.at)) + '</p>' : ''));
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
     }).join('');
@@ -5923,7 +5940,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var counts = { all: 0, work: 0, nocode: 0, unsure: 0, done: 0, untested: 0 };
     var C = stateC;
     var cellOf = function (x) { return cell(x.cls, x.say, x.fix, x.dec); };
-    var CODE = { found: '<td data-ok="1">' + pill('match', 'Found') + '</td>', unsure: '<td data-ok="0">' + pill('figma', 'Unsure') + '</td>', missing: '<td data-ok="0">' + pill('differs', 'Missing') + '</td>' };
+    var CODE = { found: '<td data-ok="1">' + pill('match', 'Found') + '</td>', css: '<td data-ok="1"><span class="sg-mx-why">' + pill('match', 'CSS only') + tipHTML('Found only as a CSS class in the code: no component file, so it has no props to read or try, and its preview is drawn from Figma.', 'What CSS only means') + '</span></td>', unsure: '<td data-ok="0">' + pill('figma', 'Unsure') + '</td>', missing: '<td data-ok="0">' + pill('differs', 'Missing') + '</td>' };
     // A row: its name, Figma's and the code's side (found, unsure, missing), its Parity, Accessibility and Documentation,
     // what is left, when it was last checked, and its details.
     var mxRow = function (o) { return o; };
@@ -5950,7 +5967,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var mxRows = COMPONENTS.map(function (c) {
       var st = componentStates(c, ALL || !!c.__a11y), all = st.all, untested = st.untested, parC = st.par, accC = st.acc, docC = st.doc, fix = st.fix, dec = st.dec;
-      return mxRow({ name: c.name, figma: !c.codeOnly, code: 'found', par: parC, acc: accC, doc: docC, fix: fix, dec: dec, done: !fix && !dec && !untested, untested: untested, at: latest(all), href: '#' + cid(c.name),
+      return mxRow({ name: c.name, figma: !c.codeOnly, code: cssOnly(c) ? 'css' : 'found', par: parC, acc: accC, doc: docC, fix: fix, dec: dec, done: !fix && !dec && !untested, untested: untested, at: latest(all), href: '#' + cid(c.name),
         codeWhy: c.codeOnly && c.codeOnly.figma ? 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it. Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' : '' });
     });
     // A component of Figma's the code may have (a file suggested, or several as likely: Unsure, to confirm), one it has
@@ -5995,7 +6012,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       h.fix = all.reduce(function (n, x) { return n + (x.fix || 0); }, 0); h.dec = all.reduce(function (n, x) { return n + (x.dec || 0); }, 0);
       h.untested = all.some(function (x) { return x.untested; }); h.done = !h.fix && !h.dec && !h.untested;
       h.at = all.reduce(function (m, x) { return x.at && (!m || x.at > m) ? x.at : m; }, null);
-      if (h.family) { h.code = h.parts.some(function (x) { return x.code === 'found'; }) ? 'found' : h.parts.some(function (x) { return x.code === 'unsure'; }) ? 'unsure' : 'missing'; h.nocode = h.code === 'missing'; h.unsure = h.code === 'unsure'; }
+      if (h.family) { h.code = h.parts.some(function (x) { return x.code === 'found'; }) ? 'found' : h.parts.some(function (x) { return x.code === 'css'; }) ? 'css' : h.parts.some(function (x) { return x.code === 'unsure'; }) ? 'unsure' : 'missing'; h.nocode = h.code === 'missing'; h.unsure = h.code === 'unsure'; }
       // It opens its own page, else (a family with no component of its name) its first part's.
       if (!h.href) h.href = (h.parts.filter(function (x) { return x.href; })[0] || {}).href || null;
     });
@@ -6174,7 +6191,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Not checked; Ready, Partial, Missing). The big number is what is done; the bar and its legend split the rest.
   function fillHealth(mx) {
     if (!hl || !mx) return;
-    var figmaRows = mx.filter(function (o) { return o.figma; }), built = figmaRows.filter(function (o) { return o.code === 'found'; });
+    var figmaRows = mx.filter(function (o) { return o.figma; }), built = figmaRows.filter(function (o) { return o.code === 'found' || o.code === 'css'; });
     var BAR = { match: 'done', figma: 'check', differs: 'fix', none: 'none' };
     var ORDER_ = { done: 0, check: 1, fix: 2, none: 3 };
     // Each state of a column, counted: its words as the table says them, its colour as its dot has it.
@@ -6202,7 +6219,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var lower = function (xs) { return xs.map(function (x) { return x.charAt(0).toLowerCase() + x.slice(1); }); };
     var listed = function (xs) { return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs.join(''); };
-    var parP = states(built, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: { found: 'Found', unsure: 'Unsure', missing: 'Missing' }[o.code] }; });
+    var parP = states(built, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
     var accP = states(built, function (o) { return o.acc; }), docP = states(built, function (o) { return o.doc; });
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
@@ -6235,7 +6252,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var todoKey = 'Parity', todoDir = -1;
   var MX_COLS = ['Component', 'Figma', 'Code', 'Parity', 'Accessibility', 'Documentation', 'Last checked'];
   // Each column's states in one word, the same in the table, the cards and the chips.
-  var MX_WORD = { code: { found: 'Found', unsure: 'Unsure', missing: 'Missing' } };
+  var MX_WORD = { code: { found: 'Found', css: 'CSS only', unsure: 'Unsure', missing: 'Missing' } };
   var MX_ORDER = ['Missing', 'Differs', 'Issues', 'Unsure', 'Review', 'Partial', 'Untested', 'Found', 'Match', 'Pass', 'Ready'];
   var MX_CHIP_COLS = [
     ['Figma', 'figma', function (o) { return o.figma ? 'Found' : 'Missing'; }],
@@ -6718,6 +6735,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2>' + headLinksHTML(c.links) + '</div>' +
         // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
         (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
+        // One the code has only as a CSS class: said at its top, so its preview and its missing props read for what they are.
+        (cssOnly(c) ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">CSS only</span><span>' + esc('The code has it only as a CSS class' + (c.cls ? ' (.' + c.cls + ')' : '') + ', with no component file: it has no props to read or try, and its preview is drawn from Figma.') + '</span></p>' : '') +
         // Connected by the project's own Code Connect: a badge, its file named on hover.
         // (its status, Code Connect and test coverage open the line of its class, version and last change, below)
         // Retired and still in use: what replaces it and how much still moves, each place a row of the Status page.
@@ -7885,7 +7904,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       refreshers.push(lazyDraw(cardEl, cardEl._refresh));   // redrawn on a brand or mode change while it shows, else when it is opened
       return cardEl;
     };
-    if (inMenu(c)) navLink(cid(c.name), c.name);   // a part has its page, opened from its parent's Parts; one only the code has, its page from Status
+    if (inMenu(c)) { navLink(cid(c.name), c.name); if (cssOnly(c)) nav.lastElementChild.insertAdjacentHTML('beforeend', '<span class="sg-nav-tag" title="Only a CSS class in the code: no component file">CSS</span>'); }   // a part has its page, opened from its parent's Parts; one only the code has, its page from Status
     else { var fam = menuFamily(c); if (fam && !MENU_FAMS[fam]) { MENU_FAMS[fam] = 1; navLink(cid(FAM_FIRST[fam] || c.name), fam); } }
     if (ALL) { if (!ONLY || ONLY.indexOf(c.name) >= 0) BUILDERS[cid(c.name)](); } else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
   });
