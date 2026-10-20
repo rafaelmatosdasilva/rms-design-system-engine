@@ -223,6 +223,14 @@ test('the token and the host come from the project\'s .env', async () => {
   assert.equal(gl.calls[0].headers['PRIVATE-TOKEN'], 'from-env-file');
 });
 
+test('a project that is a GitLab mirror finds the token in the folder that holds it', async () => {
+  const outer = makeFixture({ '.env': 'GITLAB_TOKEN=outer-token\nGITLAB_HOST=git.acme.test\n', 'acme-ds/.gitlab-source.json': { origin: 'https://git.acme.test', host: 'git.acme.test', path: 'design/ds' } });
+  const gl = fakeGitlab();
+  const r = await syncIntentLayer(join(outer, 'acme-ds'), { intentLayer: LINK }, { env: {}, fetchImpl: gl.fetchImpl });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(gl.calls[0].headers['PRIVATE-TOKEN'], 'outer-token');
+});
+
 test('GitLab refusing keeps the snapshot already there and says why; never throws', async () => {
   const dir = makeFixture({});
   await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: fakeGitlab().fetchImpl });

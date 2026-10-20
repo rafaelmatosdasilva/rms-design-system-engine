@@ -959,7 +959,8 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
     console.log(c ? `\nIntent layer: ${c.url}${c.entry ? `  (index ${c.entry})` : ''}  → ${c.out}` : '\nNo intent layer set yet. Name its GitLab project: rms-design-system-engine --intent-layer <link>');
     process.exit(0);
   }
-  const hostEnv = { ...process.env, GITLAB_HOST: hostEnvFrom(process.env, [ROOT]) };
+  const envDirs = [ROOT, ...(existsSync(join(ROOT, '.gitlab-source.json')) ? [dirname(resolve(ROOT))] : [])];   // a mirror's .env is beside it
+  const hostEnv = { ...process.env, GITLAB_HOST: hostEnvFrom(process.env, envDirs) };
   const p = parseGitlabProject(link, hostEnv);
   if (!p) { console.log(`\n❌ ${link}\n   This is not a GitLab project link (https://<host>/<group>/<project>), so it was not set.`); process.exit(1); }
   const prev = il.intentLayerConfig(conf);
@@ -968,7 +969,7 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
   const r = await il.syncIntentLayer(ROOT, conf, {});
   console.log('\n' + il.describeSync(r));
   if (r?.error) {
-    if (!tokenFrom(process.env, [ROOT])) console.log('   If the project is private, create a GitLab personal access token with the read_api scope and put it in this project\'s .env as GITLAB_TOKEN=... (never paste it into the chat).');
+    if (!tokenFrom(process.env, envDirs)) console.log('   If the project is private, create a GitLab personal access token with the read_api scope and put it in this project\'s .env as GITLAB_TOKEN=... (never paste it into the chat).');
     if (p.host !== 'gitlab.com' && !hostEnv.GITLAB_HOST.split(',').map((h) => h.trim()).includes(p.host)) console.log(`   This is a company GitLab (${p.host}), so also add GITLAB_HOST=${p.host} to .env.`);
     console.log(`\nNEXT: make the fix named above, then run rms-design-system-engine --intent-layer ${link} again`);
     process.exit(1);

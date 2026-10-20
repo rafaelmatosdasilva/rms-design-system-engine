@@ -28,7 +28,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname, posix } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { parseGitlabProject, tokenFrom, hostEnvFrom, untar, plainGet } from './gitlab-source.mjs';
+import { parseGitlabProject, tokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { codeSnapshotPath } from './names.mjs';
 
@@ -426,10 +426,13 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
   const kept = (error) => ({ error, out: c.out, stale: !!prev, source: prev?._source ?? null });
   if (opts.offline) return kept('not checked against GitLab this run');
   const env = { ...(opts.env ?? process.env) };
-  env.GITLAB_HOST = hostEnvFrom(env, [ROOT]);
+  // The .env where it runs, and, for a project that is a GitLab mirror (gitlab-source.mjs), the folder that holds it:
+  // where the project was first named with --project=, and where its .env is.
+  const folders = [ROOT, ...(existsSync(join(ROOT, STATE_FILE)) ? [dirname(resolve(ROOT))] : [])];
+  env.GITLAB_HOST = hostEnvFrom(env, folders);
   const p = parseGitlabProject(c.url, env);
   if (!p) return { error: `${c.url} is not a GitLab project link`, out: c.out, stale: !!prev };
-  const token = tokenFrom(env, [ROOT]);
+  const token = tokenFrom(env, folders);
   const headers = token && tokenAllowedFor(p.host, env) ? { 'PRIVATE-TOKEN': token } : {};
   const notSent = token && !headers['PRIVATE-TOKEN'] ? `; a GITLAB_TOKEN is set but not sent to ${p.host}: add GITLAB_HOST=${p.host} to .env` : '';
   const fetchImpl = opts.fetchImpl ?? plainGet;
