@@ -10,6 +10,10 @@ import { agreedView, modeAxes, optionEffect, instanceMarkup, componentTokens, ag
 import { fixtureProject } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+// A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
+// what to do), the panel closed again after. In the page, as a script expression.
+const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } return t; })(${trExpr})`;
+const ROWS_FULL = (sel) => `[...document.querySelectorAll('${sel} tr.sg-row-open')].map((tr) => ${ROW_FULL('tr')}).join(' | ')`;
 
 const propsSnap = {
   chip: { properties: { Size: { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] }, Icon: { type: 'VARIANT', defaultValue: 'False', variantOptions: ['False', 'True'] }, 'Label#3:4': { type: 'TEXT', defaultValue: 'Filter' } }, annotations: [{ label: 'Role: togglebutton' }], description: 'A filter.' },
@@ -303,10 +307,12 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const a11y = await run(`document.querySelector('#c-chip .pg-a11y').textContent`);
     // One table by WCAG criterion, in the Playground's card, the same table as Parity's and the To do page's: the issue
-    // number, the area with the criterion, what Figma states, what was found, what to do with who acts, the status with
-    // when and where it was read; a count above it and when the audit last ran. Only what applies. No separate table of
-    // sources.
-    assert.match(a11y, /Task nr.*WCAG criterion.*Figma states.*Found.*What to do.*Status/);
+    // number, the criterion, what Figma states, the status with when and where it was read, and the arrow that opens the
+    // row; what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
+    // it and when the audit last ran. Only what applies. No separate table of sources.
+    assert.match(a11y, /Task nr.*WCAG criterion.*Figma states.*Status/);
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Found|What to do/, 'what was found and what to do in the row\'s panel only');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr.sg-row-open')].every((tr) => tr.lastElementChild.matches('td.sg-row-go') && !!tr.lastElementChild.querySelector('svg'))`), true, 'every row that opens ends with its arrow');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /What it means|Where it is read from/, 'no column of its own: what a criterion means is in its tip');
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
     // What a criterion means shows from its name, in the page's one tooltip (the same as the Status page's), on hover
@@ -315,8 +321,11 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`document.getElementById(${tip}.getAttribute('aria-describedby')).textContent`), /^WCAG 2\.1\.1 Keyboard \(A\)What it means.*How it is checked/);
     assert.equal(await run(`!document.querySelector('.sg-token-pop') || document.querySelector('.sg-token-pop').hidden`), true, 'no second kind of tip');
     assert.match(a11y, /2\.1\.1 Keyboard \(A\)/);
-    assert.match(a11y, /a <button type="button"> with aria-pressed/);
-    assert.match(a11y, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
+    // What was found and what to do: in each row's panel (a row and its panel read together).
+    const a11yFull = () => run(ROWS_FULL('#c-chip .pg-a11y-rows'));
+    const a11yRead = await a11yFull();
+    assert.match(a11yRead, /a <button type="button"> with aria-pressed/);
+    assert.match(a11yRead, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
     assert.match(a11y, /The audit has not run in a browser yet/);
     assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Pass \(\d+\)/, 'its chips count what passes, in the Status page\'s word');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
@@ -325,7 +334,7 @@ test('in the browser: no script error, a control changes the real component, the
     let live = '';
     for (let i = 0; i < 240 && !(/Tab reaches it once: "Filter"\..*In all \d+ variants\./.test(live) && /Given by the browser: Space flips aria-pressed/.test(live)); i++) {
       if (i) await new Promise((r) => setTimeout(r, 250));
-      live = await run(`document.querySelector('#c-chip .pg-a11y-rows').textContent`);
+      live = await a11yFull();
     }
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
@@ -343,7 +352,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /1\.4\.3 Contrast/.test(r.cells[1].textContent)).textContent`), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
+    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /1\.4\.3 Contrast/.test(r.cells[1].textContent))`)), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -477,7 +486,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Its Documentation is the table every task shares: each kind with what is written, what to do and its status, every
     // kind here, written or not, what is to write first; the Status page lists the same rows, only those not written yet.
     // Where it is used is its own area, never a kind of documentation.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|What is written|What to do|Status|Updated');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|What is written|What to do|Status|Updated|Open', 'and the arrow that opens the row, named for a screen reader');
     const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:nth-child(2)')].map((d) => d.textContent).sort().join('|')`);
     assert.equal(kinds, ['For agents', 'What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Its tokens'].sort().join('|'));
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*$/, 'what is to write first, then what is to check, what is written after');
@@ -586,15 +595,15 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`location.hash = '#c-chip/documentation'`); await shownIs('c-chip'); await headsStick('#c-chip');
     // The button as the system's script leaves it, a moment after it is drawn, and its focus ring drawn on ::after.
     await run(`location.hash = '#c-button/accessibility'`); await shownIs('c-button');
-    const btn = await until(`(document.querySelector('#c-button .pg-a11y-rows') || {}).textContent || ''`, (v) => /Tab reaches/.test(v));
+    const btn = await until(ROWS_FULL('#c-button .pg-a11y-rows'), (v) => /Tab reaches/.test(v));
     assert.match(btn, /Tab reaches it once: "Save now"/, 'measured once the system\'s script has named it');
     assert.doesNotMatch(btn, /shows no change when it takes the focus/, 'a ring drawn on ::after is a focus that shows');
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
-    assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
+    assert.match(await until(ROWS_FULL('#c-chip .pg-a11y-rows'), (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
     // A check a person made by hand is Done, by whom and when, while chip is as it was; one made before chip changed is
     // to check again, saying who checked it; one nobody checked says how to mark it.
-    const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + tr.textContent : ''; })()`);
+    const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + ${ROW_FULL('tr')} : ''; })()`);
     assert.match(await rowOf('1.3.3'), /^done\|.*Checked by QA on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
     assert.match(await rowOf('3.3.7'), /^check\|.*Checked by QA on 2026-09-01, before chip changed\..*Once someone has checked it, record it as checked and this row reads Done\./s);
     assert.match(await rowOf('1.4.5'), /^check\|.*Once someone has checked it, record it as checked and this row reads Done\./s);

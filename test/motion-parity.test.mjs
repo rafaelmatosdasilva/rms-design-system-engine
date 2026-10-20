@@ -118,7 +118,7 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
       // the code's timing and rule and less motion, Figma's and where in Figma, what to do and who does it, its status.
       let mine = [];
       for (let n = 0; n < 100 && !mine.length; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); mine = await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] tbody tr')].map((tr) => tr.textContent)`); }
-      assert.equal(await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] thead th')].map((th) => th.textContent).join('|')`), 'Task nr|What happens|Code|Figma|What to do|Status|Updated');
+      assert.equal(await run2(`[...document.querySelectorAll('#c-button .pg-area[data-area="motion"] thead th')].map((th) => th.textContent).join('|')`), 'Task nr|What happens|Code|Figma|What to do|Status|Updated|Open');
       assert.ok(mine.some((r) => /On hover.*250ms, ease-outIts prototype, State Default to Hover.*A developer in the code(Make it|Give it a transition of) 250ms, ease-out, as Figma has it \(its prototype, State Default to Hover\)\./.test(r)), JSON.stringify(mine));
       assert.ok(mine.some((r) => /Opensfades in\.button200ms, ease-out.*src\/components\/button\.css:\d+Keeps moving for less motionNoneYou in FigmaAnimate it in Figma as the code does \(fades in, 200ms, ease-out\), on its Motion timeline or in its prototype/.test(r)), JSON.stringify(mine));
       assert.match(await run2(`document.querySelector('#c-button .pg-areas [data-v="motion"]').textContent`), /^Motion, \d+ to fix$/, 'its tab says what is to do');

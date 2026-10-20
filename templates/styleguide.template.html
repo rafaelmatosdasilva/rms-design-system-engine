@@ -902,9 +902,14 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-issues { table-layout: fixed; }
 /* Each kind's own columns: six for Parity and Accessibility, four for the rest. */
 .sg-issues th:nth-child(1) { width: 7%; }
-.sg-cols-7 th:nth-child(2) { width: 11%; } .sg-cols-7 th:nth-child(3) { width: 13%; } .sg-cols-7 th:nth-child(4) { width: 18%; } .sg-cols-7 th:nth-child(5) { width: 26%; } .sg-cols-7 th:nth-child(6) { width: 14%; } .sg-cols-7 th:nth-child(7) { width: 11%; }
-.sg-cols-6 th:nth-child(2) { width: 12%; } .sg-cols-6 th:nth-child(3) { width: 30%; } .sg-cols-6 th:nth-child(4) { width: 26%; } .sg-cols-6 th:nth-child(5) { width: 14%; } .sg-cols-6 th:nth-child(6) { width: 11%; }
-.sg-cols-5 th:nth-child(2) { width: 22%; } .sg-cols-5 th:nth-child(3) { width: 46%; } .sg-cols-5 th:nth-child(4) { width: 14%; } .sg-cols-5 th:nth-child(5) { width: 11%; }
+.sg-cols-7 th:nth-child(2) { width: 11%; } .sg-cols-7 th:nth-child(3) { width: 13%; } .sg-cols-7 th:nth-child(4) { width: 18%; } .sg-cols-7 th:nth-child(6) { width: 14%; } .sg-cols-7 th:nth-child(7) { width: 11%; }
+.sg-cols-6 th:nth-child(2) { width: 12%; } .sg-cols-6 th:nth-child(4) { width: 26%; } .sg-cols-6 th:nth-child(5) { width: 14%; } .sg-cols-6 th:nth-child(6) { width: 11%; }
+.sg-cols-5 th:nth-child(2) { width: 22%; } .sg-cols-5 th:nth-child(4) { width: 14%; } .sg-cols-5 th:nth-child(5) { width: 11%; }
+/* The widest column (what to do, what is written, what was found) takes the width the others leave; the row's arrow
+   its own narrow column at the end, as every table whose rows open something has. */
+.sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
+.sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
+.sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
 .sg-issues th, .sg-issues td { padding-left: var(--sg-space-s); padding-right: var(--sg-space-s); }
@@ -1995,6 +2000,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Full screen's mark: four corners pointing out.
   var FULL_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>';
   var FIGMA_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1H5.67a2.33 2.33 0 0 0 0 4.67H8ZM8 1h2.33a2.33 2.33 0 0 1 0 4.67H8ZM8 5.67H5.67a2.33 2.33 0 0 0 0 4.66H8ZM8 10.33H5.67a2.33 2.33 0 1 0 2.33 2.34Z"/><circle cx="10.33" cy="8" r="2.33"/></svg>';   // Figma's mark in lines, as every mark of the page
+  // A link that leaves the guide for another site (the intent layer where it lives, a team's page): a box and an arrow out.
+  var EXTERNAL_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2H14v4.5M14 2 7.5 8.5M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5"/></svg>';
   var DOWNLOAD_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7.5m0 0L5 7m3 3 3-3M2.5 13h11"/></svg>';
   var CODE_SVG = '<svg class="sg-link-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4 1.5 8l4 4m5-8 4 4-4 4M9.5 2.5l-3 11"/></svg>';
   var WARN_SVG = '<svg class="sg-seg-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.75V8.5M8 11.25h.01"/></svg>';
@@ -5311,6 +5318,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     Page: [['Task nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']]
   };
   var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
+  // What a table leaves to its row's panel: Accessibility's Found and What to do are read in full there, so the table has
+  // room for the criterion and Figma's states.
+  var PANEL_ONLY = { Accessibility: ['code', 'todo'] };
+  var tableColsOf = function (area) { var off = PANEL_ONLY[area] || []; return colsOf(area).filter(function (col) { return off.indexOf(col[1]) < 0; }); };
+  var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
   // opens in the side panel (openRowPanel).
   function clip(html) { html = html || ''; return /<(p|div|details|table|ul)\b/i.test(html) || html.replace(/<[^>]+>/g, '').length > 180 ? '<div class="sg-cell-clip">' + html + '</div>' : html; }
@@ -5318,7 +5330,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function issueRowHTML(r, area) {
     var a = area || r.area, id = ROW_DETAIL.push({ r: r, area: a }) - 1;
     return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
-      colsOf(a).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '</tr>';
+      tableColsOf(a).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
   }
   // A row in full, in a panel from the right, as a token opens: each column of its table as a card, nothing cut short,
   // and what the table only counts (what was read from a page) written out.
@@ -5372,8 +5384,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     });
   }
   function issueTableHTML(rows, bodyCls, head, area) {
-    var cols = colsOf(area || ((rows || [])[0] || {}).area);
-    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + '"><thead><tr>' + cols.map(function (col) { return '<th' + (col[1] === 'no' ? ' class="sg-todo-no-head"' : '') + '>' + esc(col[0]) + '</th>'; }).join('') + '</tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
+    var cols = tableColsOf(area || ((rows || [])[0] || {}).area);
+    return '<div class="pg-par-card' + (head ? ' sg-todo-card' : '') + '">' + (head ? '<div class="pg-inspect-head">' + head + '</div>' : '') + '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cols-' + cols.length + '"><thead><tr>' + cols.map(function (col) { return '<th' + (col[1] === 'no' ? ' class="sg-todo-no-head"' : '') + '>' + esc(col[0]) + '</th>'; }).join('') + '<th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody' + (bodyCls ? ' class="' + bodyCls + '"' : '') + '>' + (rows || []).map(function (r) { return issueRowHTML(r, area); }).join('') + '</tbody></table></div></div>';
   }
   // A count of each status above a table, as the Status page counts them.
   function statusSum(rows) {
@@ -5541,7 +5553,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function headLinksHTML(list) {
     if (!(list || []).length) return '';
     // Named for where it takes you (Figma, Code), each with the page's own mark for it, never one of the system's icons.
-    var mark = function (label) { return /^figma$/i.test(label) ? FIGMA_SVG : /^code$/i.test(label) ? CODE_SVG : ''; };
+    var mark = function (label) { return /^figma$/i.test(label) ? FIGMA_SVG : /^code$/i.test(label) ? CODE_SVG : EXTERNAL_SVG; };   // any other: the mark of a link to another site
     return '<div class="pg-head-links">' + list.map(function (l) { return sysButton('a', /^code$/i.test(l.label) ? 'Code' : /^figma$/i.test(l.label) ? 'Figma' : l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"', null, null, mark(l.label)); }).join('') + '</div>';
   }
   function linksHTML(list) {
