@@ -41,6 +41,11 @@ export const FORBIDDEN = new Set([
 // First names once used as people in examples: matched as a whole capitalised word only (short names would match
 // inside joined words otherwise).
 export const FORBIDDEN_FIRST_NAMES = new Set(['24d4b96f58da6d4a', '8a5b4ac36aba7445', '3d099d0f13df9d0b']);
+// Short private names refused only as a word of their own: joined from shorter words they would match ordinary code
+// ("for (k in m)"). Hashed as the list above.
+export const FORBIDDEN_WORDS = new Set([
+  '872b449a658da8f8', '8d3b9db31d6ccf7c',
+]);
 export const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
 const seen = new Map();   // a word run is hashed once per run of the check
 const isForbidden = (s) => { let v = seen.get(s); if (v === undefined) { v = FORBIDDEN.has(hash(s)); if (seen.size < 2e6) seen.set(s, v); } return v; };
@@ -56,6 +61,7 @@ export function forbiddenHits(text) {
     for (let n = 1; n <= 4 && i + n <= words.length; n++) {
       const run = words.slice(i, i + n);
       for (const cand of [run.join('-'), run.join('')]) if (isForbidden(cand)) hits.add(`${i}:${n}`);
+      if (n === 1 && FORBIDDEN_WORDS.has(hash(run[0]))) hits.add(`${i}:1`);
     }
   }
   return hits.size;
