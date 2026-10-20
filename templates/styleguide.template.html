@@ -711,7 +711,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* A bar that sticks spans the content's whole width (into the page's side padding), so nothing shows beside it; once
    stuck, the lowest one has the page's line under it, as wide. */
 :is(.sg-hero > h1, .pg-head, .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head)::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-main-pad, 0px)); right: calc(-1 * var(--sg-main-pad, 0px)); background: var(--sg-bg); z-index: -1; pointer-events: none; }
-.pg-areas.sg-sticky-edge::after { display: none; }   /* the tabs draw their own line */
+/* stuck, the tabs carry the full-width line under them, as every other stuck bar does */
 .sg-sticky-edge::after { content: ''; position: absolute; left: calc(-1 * var(--sg-main-pad, 0px)); right: calc(-1 * var(--sg-main-pad, 0px)); bottom: -1px; height: var(--sg-line-width, 1px); background: var(--sg-line-colour); pointer-events: none; }
 /* A bar that sticks under a page's title (a foundation's or the Showroom's size switch, the Status page's chips) sits
    right under it, the title's own space between them, on every page alike. */
@@ -7647,6 +7647,10 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       document.documentElement.style.setProperty('--sg-sticky-top', h + 'px');
     };
     window.addEventListener('resize', stickTop); stickTop();
+    // Measured again whenever a bar changes height (its fonts arriving, a mode or a brand drawn again), so nothing scrolls
+    // in a sliver between the bars and what sticks under them.
+    if (typeof ResizeObserver !== 'undefined') { var stickRO = new ResizeObserver(stickTop); stickRO.observe(bar); if (cbar) stickRO.observe(cbar); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(stickTop);
     var open = function (on) {
       document.body.classList.toggle('sg-nav-open', on); menu.setAttribute('aria-expanded', on ? 'true' : 'false');
       if (on) setTimeout(function () { shut.focus({ preventScroll: true }); }, 50); else menu.focus();   // never the search: no keyboard pops up
