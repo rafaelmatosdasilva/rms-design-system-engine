@@ -1392,29 +1392,49 @@ export const GUIDANCE = [
 ];
 // seen: what the last audit found the products doing with the component (a rule laid over it, a look-alike built by
 // hand, a parent's rule overriding it), said plainly; it fills Common mistakes when the team wrote none.
-export function guidanceView({ description = '', annotations = [], note = '', authored = null, seen = [] } = {}) {
-  const found = {}, from = {};
-  const take = (text, source) => {
-    let cur = null;
-    for (const raw of String(text ?? '').split(/\r?\n/)) {
-      const line = raw.replace(/^\s*(?:[-*•]|#+)\s*/, '').trim();
-      if (!line) { cur = null; continue; }
-      const m = /^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
-      const hit = m && GUIDANCE.find(([, , re]) => re.test(m[1].trim()));
-      if (hit) { cur = hit[0]; if (!found[cur]) { found[cur] = []; from[cur] = source; } if (m[2].trim()) found[cur].push(m[2].trim()); continue; }
-      if (cur && from[cur] === source) found[cur].push(line);
-    }
+// intentLayer: the component's page in the team's intent layer (intent-layer.mjs → componentIntent), its lines already
+// sorted by kind. Each kind keeps the first source that wrote it (Figma, the code, the intent layer, then
+// contract.authored.json) and lists every other source that wrote it too under `also`, so a component's documentation
+// shows where each line came from and where two sources say it differently.
+export function guidanceView({ description = '', annotations = [], note = '', authored = null, seen = [], intentLayer = null } = {}) {
+  const found = {}, from = {}, link = {}, also = {};
+  const add = (key, list, source, url = null) => {
+    if (!list?.length) return;
+    if (!found[key]?.length) { found[key] = list; from[key] = source; if (url) link[key] = url; return; }
+    (also[key] ??= []).push({ from: source, text: list, ...(url ? { url } : {}) });
   };
-  take(description, 'Figma');
-  for (const a of annotations ?? []) take(typeof a === 'string' ? a : a?.label ?? a?.labelMarkdown ?? '', 'Figma');
-  take(note, 'the code');
+  // One source's text, read for "When to use: …" lines and the lines under them.
+  const read = (texts) => {
+    const out = {};
+    for (const text of texts) {
+      let cur = null;
+      for (const raw of String(text ?? '').split(/\r?\n/)) {
+        const line = raw.replace(/^\s*(?:[-*•]|#+)\s*/, '').trim();
+        if (!line) { cur = null; continue; }
+        const m = /^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
+        const hit = m && GUIDANCE.find(([, , re]) => re.test(m[1].trim()));
+        if (hit) { cur = hit[0]; out[cur] ??= []; if (m[2].trim()) out[cur].push(m[2].trim()); continue; }
+        if (cur) out[cur].push(line);
+      }
+    }
+    return out;
+  };
+  const figma = read([description, ...(annotations ?? []).map((a) => (typeof a === 'string' ? a : a?.label ?? a?.labelMarkdown ?? ''))]);
+  const code = read([note]);
+  for (const [key] of GUIDANCE) add(key, figma[key], 'Figma');
+  for (const [key] of GUIDANCE) add(key, code[key], 'the code');
+  if (intentLayer) {
+    const where = `the intent layer (${intentLayer.file ?? 'its page'})`;
+    for (const [key] of GUIDANCE) add(key, (intentLayer[key] ?? []).map(String).filter(Boolean), where, intentLayer.url ?? null);
+  }
   for (const [key] of GUIDANCE) {
     const v = authored?.[key];
     const list = Array.isArray(v) ? v.map(String).filter(Boolean) : typeof v === 'string' && v.trim() ? [v.trim()] : [];
-    if (list.length && !found[key]?.length) { found[key] = list; from[key] = 'contract.authored.json'; }
+    add(key, list, 'contract.authored.json');
   }
   if (!found.mistakes?.length && seen.length) { found.mistakes = [...new Set(seen.map(String))].slice(0, 6); from.mistakes = "the products' code, as the last audit found it"; }
-  const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null, ...(found[key]?.length ? { from: from[key] } : {}) }));
+  const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null,
+    ...(found[key]?.length ? { from: from[key] } : {}), ...(link[key] ? { url: link[key] } : {}), ...(also[key] ? { also: also[key] } : {}) }));
   return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
 }
 

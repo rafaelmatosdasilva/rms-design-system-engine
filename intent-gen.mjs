@@ -7,6 +7,8 @@
 //                      the comment that precedes each component rule in theme.css.
 //   • Facts          → structure snapshot (height, padding/gap tokens, variants).
 //   • Usage          → which plugin sources reference each component's class.
+//   • Intent layer   → the team's own documentation of why each piece exists and how to use it, read from GitLab
+//                      (intent-layer.mjs), under `intentLayer` with the page each line came from.
 //
 // It is an INTENT LAYER, not just components:
 //   { system, foundations, components, patterns, templates, pages, flows }
@@ -26,6 +28,7 @@ import { createHash } from 'node:crypto';
 import { resolveStatus } from './decision-status.mjs';
 import { loadLocator } from './component-locator.mjs';
 import { slugForUrl } from './gitlab-fetch.mjs';
+import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, fileUrl } from './intent-layer.mjs';
 
 const LAYERS = ['system', 'foundations', 'components', 'patterns', 'templates', 'pages', 'flows'];
 
@@ -233,6 +236,34 @@ export async function generateIntent(ROOT, cfg, opts = {}) {
     intent.guidelines = { _sources: GL.sources, _hash: GL.hash, general: general || null };
   }
 
+  // ── The intent layer (intent-layer.mjs), read from GitLab into its snapshot ────────────────────────────────
+  // Each component its page names gets it under `intentLayer`, with the page's file and link; each other layer the
+  // pages of its kind (a pattern, a template, a page). The pages that name no component of the system, and the
+  // components no page names, are listed: the one is a page to rename or a component Figma lacks, the other a page
+  // to write.
+  const IL = readIntentLayer(ROOT, cfg);
+  let withIntentLayer = 0;
+  if (IL) {
+    const src = IL._source ?? {};
+    const matched = matchComponents(Object.keys(intent.components), IL.entities, codeFilesOf(ROOT, cfg));
+    for (const [name, e] of matched) intent.components[name].intentLayer = componentIntent(e, src);
+    withIntentLayer = matched.size;
+    const used = new Set(matched.values());
+    for (const L of LAYERS) {
+      if (L === 'components') continue;
+      const own = IL.entities.filter((e) => e.layer === L).map((e) => componentIntent(e, src));
+      if (own.length) intent[L].intentLayer = own;
+    }
+    intent.intentLayer = {
+      _source: src,
+      system: IL.system ?? null,
+      pages: IL.entities.length,
+      repeatedLinesLeftOut: IL.boilerplate ?? 0,
+      noComponent: IL.entities.filter((e) => e.layer === 'components' && !used.has(e)).map((e) => ({ name: e.name, file: e.file, url: fileUrl(src, e.file) })),
+      noPage: Object.keys(intent.components).filter((n) => !matched.has(n)),
+    };
+  }
+
   // opts.write false: the intent is only read (a prototype reads it without writing a file into the project).
   if (opts.write !== false) writeFileSync(outPath, JSON.stringify(intent, null, 2) + '\n');
   const names = Object.keys(intent.components);
@@ -245,5 +276,7 @@ export async function generateIntent(ROOT, cfg, opts = {}) {
     authoredKept: names.filter(n => intent.components[n].authored).length + LAYERS.filter(L => L !== 'components' && intent[L].authored).length,
     withGuidelines: names.filter(n => intent.components[n].guidelines).length,
     guidelineSources: GL.sources.length,
+    withIntentLayer,
+    intentLayerPages: IL ? IL.entities.length : 0,
   };
 }

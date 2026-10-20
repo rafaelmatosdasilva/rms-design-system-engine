@@ -251,6 +251,29 @@ offline, or a wrong link → the committed file is kept and the audit never fail
 intent layer the same way as any guidelines file: a section headed with a component's name lands in that
 component's `guidelines` in `design-intent.json`, the rest in the global block, as written.
 
+**The intent layer, a GitLab project of DSDS pages.** When the team documents why each piece exists and how
+to use it in DSDS (the Design System Documentation Standard: an index `system.dsds.json` whose entity groups
+`$ref` one file per component, foundation, pattern, template or page), `rms-design-system-engine --intent-layer
+<project link>` sets `ds-config.json → intentLayer` and reads it at once. Every run reads it again through the
+GitLab API when the branch's commit moved (one archive of the index's folder, read in memory, no clone), with the
+same token rules as above, into `intent-layer.snapshot.json`; GitLab not reachable keeps the snapshot and says
+from which commit. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
+Usage rules; When not to use or What not to do; Common mistakes; Limitations; a numbered title is read by its
+words), with its use cases (recommended, discouraged) and checklists (rules). Facts the engine reads from Figma
+and the code (anatomy, API, states, tokens, source) are left out, and so is a line written on every page of a
+kind with only the name changed (a generator's filler). A page belongs to a component by its name ("Button
+Main" is `buttonMain`), its identifier, or the code file it names; the group the index puts it in decides
+its layer (a component in a "Templates" group is a template).
+
+Where it is used: each component's `intentLayer` in `design-intent.json` (with its page's link), the contract's
+`intent` block, a `for:` line in `llms.txt` when Figma has no description and its first `avoid:` line (the
+authored `whenNotToUse` first), and the prototype context (its own `intent` lines per component, its "when not
+to use" lines as never sentences the check holds; each pattern, template, page and flow page as a rule). In the
+style guide each component's Documentation merges it with Figma, the code and the contract, each line under its
+source with a link to its page, plus an Intent layer row (its page, its rules, or no page yet); the **Intent
+layer** page lists every page as used, thin or not used, with what the agents get and where, and for each part
+that reaches no agent why, what to change so it does, and whether to remove it. The audit prints the same counts.
+
 Because the file is regenerated every run, the generator is **merge-aware**: it reads the existing
 file and **preserves everything you authored** — each layer's `authored` string, and every
 component's `authored` field — refreshing only the derived parts. So you get one file that is

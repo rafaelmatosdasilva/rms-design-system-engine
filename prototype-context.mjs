@@ -206,11 +206,18 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const dos = (examples[name] ?? []).filter((e) => e.kind === 'do').map((e) => clean(e.caption)).filter(Boolean);
     const donts = (examples[name] ?? []).filter((e) => e.kind === 'dont').map((e) => clean(e.caption)).filter(Boolean);
     const notFor = clean(c.whenNotToUse ?? i.guidance?.whenNotToUse) || said('whenNotToUse').join(' ') || null;
+    // The team's intent layer, kept apart from Figma's and the code's words: what the agent composing a screen without a
+    // Figma layout reads to know what each component is for and what not to do with it.
+    const il = i.intentLayer ?? null;
+    const intentLayer = il ? Object.fromEntries(Object.entries({ purpose: intentText(il.purpose) || null, whenToUse: il.whenToUse ?? [], whenNotToUse: il.whenNotToUse ?? [], mistakes: il.mistakes ?? [], limitations: il.limitations ?? [], rules: il.rules ?? [], file: il.url ?? il.file ?? null })
+      .map(([k, v]) => [k, Array.isArray(v) ? v.map(clean).filter(Boolean) : v])) : null;
     components[name] = {
       // What rules a use out: the documentation's "never" sentences, when not to use it, every common mistake and
       // every Don't (each a use the team has seen go wrong).
       never: [...neverOf([guidelines, ...notes].filter(Boolean).join(' '), notFor),
-        ...mistakes.map((m) => ({ sentence: `Common mistake: ${m}`, clause: m, min: 2 })), ...donts.map((d) => ({ sentence: `Don't: ${d}`, clause: d, min: 2 }))],
+        ...mistakes.map((m) => ({ sentence: `Common mistake: ${m}`, clause: m, min: 2 })), ...donts.map((d) => ({ sentence: `Don't: ${d}`, clause: d, min: 2 })),
+        ...(intentLayer?.whenNotToUse ?? []).map((x) => ({ sentence: `Intent layer: ${x}`, clause: x, min: 2 }))],
+      intentLayer,
       whenToUse, mistakes, limitations, dos, donts,
       purpose,
       role,
@@ -229,6 +236,13 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const a = intent?.[L]?.authored;
     const text = typeof a === 'string' ? a.trim() : a && typeof a === 'object' ? JSON.stringify(a) : '';
     if (text) rules.push({ title: `${L} (design intent)`, text, file: null });
+    // The intent layer's pages of this layer (a pattern, a template, a page): what each is for, when and when not.
+    for (const pg of intent?.[L]?.intentLayer ?? []) {
+      const body = [pg.purpose, ...(pg.whenToUse ?? []).map((x) => `Use when: ${x}`), ...(pg.whenNotToUse ?? []).map((x) => `Not when: ${x}`),
+        ...(pg.mistakes ?? []).map((x) => `Common mistake: ${x}`), ...(pg.limitations ?? []).map((x) => `Limitation: ${x}`), ...(pg.rules ?? [])].filter(Boolean).join('\n');
+      if (body) rules.push({ title: `${pg.name} (${L}, intent layer)`, text: body, file: pg.url ?? pg.file ?? null });
+      for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null });
+    }
   }
   return { components, rules, limits: limitsFrom(components, rules, names) };
 }
@@ -276,7 +290,7 @@ export function limitsFrom(components, rules, names) {
   return out.filter((l) => !seen.has(l.component) && seen.add(l.component));
 }
 
-const said = (k) => k && (k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length);
+const said = (k) => k && (k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length || k.intentLayer);
 
 // One block per component for the catalog: what it is for, its role, its options' meaning, when not to use it, the
 // team's notes and its guidelines.
@@ -299,6 +313,16 @@ export function purposeLines(ctx, names, { width = 400 } = {}) {
     for (const d of k.donts ?? []) more('don\'t', d);
     for (const note of k.notes.slice(0, 3)) more('note', note);
     if (k.guidelines) more('guidelines', k.guidelines);
+    // The intent layer, under its own name.
+    const il = k.intentLayer;
+    if (il) {
+      if (il.purpose && il.purpose !== k.purpose) more('intent', il.purpose);
+      for (const u of il.whenToUse) more('intent: use when', u);
+      for (const u of il.whenNotToUse) more('intent: not for', u);
+      for (const m of il.mistakes) more('intent: mistake', m);
+      for (const l of il.limitations) more('intent: limit', l);
+      for (const r of il.rules) more('intent: rule', r);
+    }
   }
   return out;
 }
@@ -372,7 +396,8 @@ export function usesAgainstPurpose(ctx, nodes) {
   return [...byComponent].filter(([name]) => said(ctx.components[name])).map(([name, uses]) => {
     const k = ctx.components[name];
     const rule = [k.purpose, k.role ? `Role ${k.role}.` : null, k.whenToUse?.length ? `Use when ${k.whenToUse.join('; ')}.` : null, k.notFor ? `Not for ${k.notFor.replace(/^not for\s*/i, '')}` : null,
-      k.mistakes?.length ? `Common mistakes: ${k.mistakes.join('; ')}.` : null, k.donts?.length ? `Don't: ${k.donts.join('; ')}.` : null, k.guidelines ? `Guidelines: ${cut(k.guidelines, 240)}` : null].filter(Boolean).join(' ');
+      k.mistakes?.length ? `Common mistakes: ${k.mistakes.join('; ')}.` : null, k.donts?.length ? `Don't: ${k.donts.join('; ')}.` : null, k.guidelines ? `Guidelines: ${cut(k.guidelines, 240)}` : null,
+      k.intentLayer ? [k.intentLayer.purpose && !k.purpose ? `Intent layer: ${k.intentLayer.purpose}` : null, k.intentLayer.whenNotToUse.length ? `Intent layer, not for: ${k.intentLayer.whenNotToUse.join('; ')}.` : null].filter(Boolean).join(' ') || null : null].filter(Boolean).join(' ');
     return { component: name, uses: [...new Set(uses)], rule };
   });
 }

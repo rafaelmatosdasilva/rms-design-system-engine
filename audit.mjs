@@ -942,6 +942,41 @@ if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWi
   process.exit(failed ? 1 : 0);
 }
 
+// ── --intent-layer <link>: set the GitLab project that holds the intent layer, read it now, and exit ─────────
+// The link (a project, or /-/tree/<branch>) goes into ds-config.json → intentLayer; the layer is read at once into its
+// snapshot and the run says how many pages it found and how many components they name, or the one thing to fix.
+// --entry=<path> names the index when the project holds more than one system.dsds.json. No link: the one set.
+if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.startsWith('--intent-layer='))) {
+  const cfgPath = join(ROOT, 'ds-config.json');
+  if (!existsSync(cfgPath)) { console.error('❌ ds-config.json not found. Run the first-time setup first (rms-design-system-engine --init).'); process.exit(1); }
+  const conf = JSON.parse(readFileSync(cfgPath, 'utf8'));
+  const il = await import('./intent-layer.mjs');
+  const { parseGitlabProject, hostEnvFrom, tokenFrom } = await import('./gitlab-source.mjs');
+  const link = _argValues('--intent-layer').flatMap((v) => v.split(/[\s,]+/)).map((s) => s.trim()).filter(Boolean)[0];
+  const entry = _argValues('--entry')[0] ?? null;
+  if (!link) {
+    const c = il.intentLayerConfig(conf);
+    console.log(c ? `\nIntent layer: ${c.url}${c.entry ? `  (index ${c.entry})` : ''}  → ${c.out}` : '\nNo intent layer set yet. Name its GitLab project: rms-design-system-engine --intent-layer <link>');
+    process.exit(0);
+  }
+  const hostEnv = { ...process.env, GITLAB_HOST: hostEnvFrom(process.env, [ROOT]) };
+  const p = parseGitlabProject(link, hostEnv);
+  if (!p) { console.log(`\n❌ ${link}\n   This is not a GitLab project link (https://<host>/<group>/<project>), so it was not set.`); process.exit(1); }
+  const prev = il.intentLayerConfig(conf);
+  conf.intentLayer = entry || prev?.entry || (prev && prev.out !== il.DEFAULT_OUT) ? { gitlab: link, ...(entry || prev?.entry ? { entry: entry || prev.entry } : {}), ...(prev && prev.out !== il.DEFAULT_OUT ? { out: prev.out } : {}) } : link;
+  writeFileSync(cfgPath, JSON.stringify(conf, null, 2) + '\n');
+  const r = await il.syncIntentLayer(ROOT, conf, {});
+  console.log('\n' + il.describeSync(r));
+  if (r?.error) {
+    if (!tokenFrom(process.env, [ROOT])) console.log('   If the project is private, create a GitLab personal access token with the read_api scope and put it in this project\'s .env as GITLAB_TOKEN=... (never paste it into the chat).');
+    if (p.host !== 'gitlab.com' && !hostEnv.GITLAB_HOST.split(',').map((h) => h.trim()).includes(p.host)) console.log(`   This is a company GitLab (${p.host}), so also add GITLAB_HOST=${p.host} to .env.`);
+    console.log(`\nNEXT: make the fix named above, then run rms-design-system-engine --intent-layer ${link} again`);
+    process.exit(1);
+  }
+  console.log('\nNEXT: rms-design-system-engine   (every run reads it again when its commit moved, and folds it into the design intent, the contracts and the style guide)');
+  process.exit(0);
+}
+
 if (process.argv.includes('--capture-code')) {
   const passthrough = process.argv.slice(2).filter((a) => a !== '--capture-code');
   const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'code-capture.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });
@@ -4881,6 +4916,18 @@ function reportFull(label, items, shown) {
     }
   }
 
+  // ── The intent layer: read from GitLab when ds-config.json → intentLayer names it ─────────────
+  // Its DSDS pages (why each piece exists, how to use it) are read through the API into their snapshot BEFORE
+  // intent-gen, the contracts and the style guide read them. Read again only when the branch's commit moved;
+  // GitLab not reachable → the snapshot already there, said from which commit. Never fails the audit.
+  if (cfg.intentLayer) {
+    try {
+      const il = await import('./intent-layer.mjs');
+      const r = await il.syncIntentLayer(ROOT, cfg, { offline: process.argv.includes('--offline') });
+      if (r) console.log('\n' + (r.error ? C.yellow(il.describeSync(r)) : il.describeSync(r)));
+    } catch (e) { console.log(C.yellow('\n⚠️  Intent layer: not read (' + e.message + ')')); }
+  }
+
   // ── Design-intent (adopt-aware OUTPUT, not a gate) ──────────────────────────
   _section('advice');
   // Aggregates this project's Figma annotations + code notes + facts + usage into
@@ -4898,13 +4945,23 @@ function reportFull(label, items, shown) {
   const intentOut  = cfg.docs?.out
     ? join(ROOT, cfg.docs.out)
     : join(themeCss0 ? dirname(join(ROOT, themeCss0)) : ROOT, 'design-intent.json');
-  const docsAdopted = docsForced || cfg.docs?.auto === true || !!cfg.docs?.out || existsSync(intentOut);
+  const docsAdopted = docsForced || cfg.docs?.auto === true || !!cfg.docs?.out || !!cfg.intentLayer || existsSync(intentOut);
   if (!docsOff && docsAdopted && existsSync(structSnap)) {
     try {
       const { generateIntent } = await import('./intent-gen.mjs');
       const r = await generateIntent(ROOT, cfg, {});
       const glNote = r.guidelineSources ? ` · ${r.withGuidelines}/${r.components} w/ external guidelines (${r.guidelineSources} source${r.guidelineSources === 1 ? '' : 's'})` : '';
-      console.log(`\n📓 Design intent → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · ${r.withDesign} w/ Figma notes · ${r.withCode} w/ code notes · ${r.authoredKept} authored kept${glNote})`);
+      const ilNote = r.intentLayerPages ? ` · ${r.withIntentLayer}/${r.components} w/ an intent-layer page` : '';
+      console.log(`\n📓 Design intent → ${r.out.replace(ROOT + '/', '')}  (${r.components} components · ${r.withDesign} w/ Figma notes · ${r.withCode} w/ code notes · ${r.authoredKept} authored kept${glNote}${ilNote})`);
+      // What of the intent layer reaches the agents: each page used, thin or not used (the style guide lists why).
+      if (r.intentLayerPages) {
+        try {
+          const il = await import('./intent-layer.mjs');
+          const snap = il.readIntentLayer(ROOT, cfg);
+          const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)));
+          console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${rep.counts.thin + rep.counts.notUsed ? '  (why, page by page: the style guide\'s Intent layer page, --docs)' : ''}`);
+        } catch { /* the line above already says how many pages */ }
+      }
     } catch (e) {
       console.log(C.yellow('\n⚠️  design-intent generation failed (never fails the audit): ' + e.message));
     }

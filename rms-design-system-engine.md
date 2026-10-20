@@ -80,7 +80,7 @@ reference it points to say, never from memory or from this table alone.
 | the whole design system checked | `full-audit` |
 | the Figma data refreshed, or it is stale | `refresh-figma` |
 | to set the parity up (no `ds-config.json` yet) | `first-setup` |
-| to add a GitLab or Notion guidelines link | `guidelines-links` |
+| to add a GitLab or Notion guidelines link, or the GitLab project of the intent layer | `guidelines-links` |
 | a difference fixed (in code, or what to change in Figma) | `fix-a-difference` |
 | known differences accepted as debt | `accept-debt` |
 | states, variants or combinations mapped or explained | `states-and-variants` |
@@ -112,7 +112,7 @@ listed steps.**
 **Relay the engine's words, and follow its NEXT line.** Every audit ends with a `SUMMARY` block (also written
 to `.design-system-engine-out/summary.md`; `rms-design-system-engine --summary` prints the last one again) and one `NEXT:` line.
 Relay the summary in the chat as it is, without rewording its facts, then take the `NEXT:` line as the next
-step. `--init`, `--guidelines`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
+step. `--init`, `--guidelines`, `--intent-layer`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
 line says to do something only when the person asks (commit, apply the hand-back), ask them; never do it on
 your own. **Say that an audit ran only when its output is in front of you**: the engine prints its SUMMARY in
 the same call. Opening this skill or printing a recipe runs nothing, so never say an audit is running or that

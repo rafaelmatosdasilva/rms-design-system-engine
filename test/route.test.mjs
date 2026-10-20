@@ -72,6 +72,12 @@ test('guidelines links, setup and refresh', () => {
   assert.deepEqual(r('here are our guidelines: https://gitlab.com/acme/ds/-/wikis/Buttons and https://acme.notion.site/Chips-123').run,
     ['rms-design-system-engine --guidelines https://gitlab.com/acme/ds/-/wikis/Buttons https://acme.notion.site/Chips-123']);
   const setup = r('set up the parity. Figma is https://www.figma.com/design/AbC123/Tidepool and tokens are in src/theme.css', { hasConfig: false, components: [] });
+
+test('an intent layer\'s GitLab project, on any host, sets the intent layer', () => {
+  const il = r('use this intent layer: https://git.acme.test/design/intent');
+  assert.equal(il.recipe, 'guidelines-links');
+  assert.deepEqual(il.run, ['rms-design-system-engine --intent-layer https://git.acme.test/design/intent']);
+});
   assert.deepEqual([setup.recipe, setup.run], ['first-setup', ["rms-design-system-engine --init --figma-url='https://www.figma.com/design/AbC123/Tidepool' --theme-css='src/theme.css'"]]);
   const noUrl = r('audit the chip', { hasConfig: false, components: [] });
   assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked, and the request after it

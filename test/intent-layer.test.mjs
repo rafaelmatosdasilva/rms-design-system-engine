@@ -1,0 +1,330 @@
+// intent-layer.mjs - the team's intent layer (DSDS pages on GitLab) read through the API into a snapshot, matched to
+// the system's components, folded into the design intent, the contracts, llms.txt, the prototype context and the
+// style guide, and a report of what of it reaches the agents. An invented system (Acme); network through an injected
+// fetch serving a tar.gz built here.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { makeFixture } from './helpers.mjs';
+import {
+  intentLayerConfig, layerOf, keyOfTitle, itemsOf, entityView, readDsds, dropBoilerplate, matchComponents,
+  syncIntentLayer, readIntentLayer, componentIntent, useReport, describeSync, short,
+} from '../intent-layer.mjs';
+import { generateIntent } from '../intent-gen.mjs';
+import { guidanceView } from '../styleguide-data.mjs';
+import { buildLlms } from '../contract-gen.mjs';
+import { contextFrom, purposeLines } from '../prototype-context.mjs';
+
+// ── An invented intent layer ──────────────────────────────────────────────────────────────────────────────────────
+const sections = (items) => ({ kind: 'sections', items: items.map(([title, body]) => ({ title, anchor: title.toLowerCase(), body })) });
+// What a generator writes on every page, only the name changed.
+const filler = (name, file) => ({ kind: 'use-cases', purpose: `${name} should be used where it is part of the library.`,
+  items: [{ stance: 'recommended', description: `Use ${name} when the API of \`${file}\` matches the need.` }, { stance: 'discouraged', description: `Avoid duplicating ${name} with local markup.` }] });
+const comp = (id, name, file, blocks = []) => ({
+  dsdsVersion: '0.15.2',
+  entity: { kind: 'component', identifier: `component-${id}`, name, description: `${name} is a component implemented in \`${file}\`.`,
+    metadata: { status: 'draft', docOrigin: 'generated' }, documentBlocks: [filler(name, file), ...blocks],
+    $extensions: { 'com.acme.code': { sourcePath: file } } },
+});
+const LAYER = {
+  'docs/dsds/system.dsds.json': {
+    dsdsVersion: '0.15.2', systemInfo: { name: 'Acme DS', version: '2.0.0' },
+    documentBlocks: [sections([['How to read this', 'Read the pages before composing a screen.']])],
+    entityGroups: [
+      { name: 'Components', entities: ['button-main', 'chip-filter', 'card-plain', 'toast-general', 'tile-media', 'ghost-widget'].map((f) => ({ $ref: `./components/${f}.dsds.json#/entity` })) },
+      { name: 'Patterns', entities: [{ $ref: './patterns/saving.dsds.json#/entity' }] },
+      { name: 'Templates', entities: [{ $ref: './templates/checkout.dsds.json#/entity' }] },
+    ],
+  },
+  'docs/dsds/components/button-main.dsds.json': comp('button-main', 'Button Main', 'src/lib/buttons/Main.vue', [
+    sections([
+      ['Metadata', '- Name: Button Main\n- Status: Active'],
+      ['Intent', 'Use the main button for the next step the person is expected to take.\n\nTypical labels: Save, Continue.'],
+      ['Usage Rules', '- At most one main button in an action group.\n- Pair it with the secondary button for cancel.'],
+      ['What Not To Do', '- Do not use it for destructive actions; use the danger button.\n- Do not use it for navigation.'],
+      ['Tokens Used', '- `--acme-button-main-bg`'],
+      ['Token Notes', 'Colours come from the --acme-button-main-* tokens.'],
+    ]),
+    { kind: 'anatomy', parts: [{ identifier: 'root', name: 'Root' }] },
+    { kind: 'checklist', title: 'Checks', items: [{ label: 'Keep the label visible.', level: 'must' }] },
+  ]),
+  // Matched by its identifier, not its name.
+  'docs/dsds/components/chip-filter.dsds.json': comp('chip-filter', 'Filter Chip', 'src/lib/chips/Filter.vue', [sections([['Overview / When Not To Use', 'Not for a single choice: use a radio group.']])]),
+  // Matched by the code file only (its name and identifier differ from the component's).
+  'docs/dsds/components/card-plain.dsds.json': comp('card-plain', 'Card Plain Plain', 'src/lib/cards/Plain.vue', [sections([['Intent', 'A surface that groups one subject.']])]),
+  'docs/dsds/components/toast-general.dsds.json': comp('toast-general', 'Toast General', 'src/lib/toasts/General.vue'),
+  'docs/dsds/components/tile-media.dsds.json': comp('tile-media', 'Tile Media', 'src/lib/tiles/Media.vue'),
+  // Names no component of the system.
+  'docs/dsds/components/ghost-widget.dsds.json': comp('ghost-widget', 'Ghost Widget', 'src/lib/ghost/Widget.vue', [sections([['Intent', 'A widget nobody built.']])]),
+  'docs/dsds/patterns/saving.dsds.json': { entity: { kind: 'pattern', identifier: 'pattern-saving', name: 'Saving', documentBlocks: [sections([
+    ['2. Overview', 'Save a long form as a draft.'], ['When Not To Use', 'Not for the final submit.'], ['Core Rules', '- Say when the draft was saved.']])] } },
+  'docs/dsds/templates/checkout.dsds.json': { entity: { kind: 'template', identifier: 'template-checkout', name: 'Checkout', documentBlocks: [sections([['Anatomy', 'Header, steps, summary.']])] } },
+  'README.md': '# Acme intent layer\n',
+};
+const COMPONENTS = ['buttonMain', 'chipFilter', 'cardPlain', 'toastGeneral', 'tileMedia', 'iconOnly'];
+const CODE_FILES = { cardPlain: 'src/lib/cards/Plain.vue' };
+
+// A tar archive as GitLab sends it: every file under "<project>-<ref>-<sha>/".
+function tarGz(files, top = 'acme-intent-main-abc1234') {
+  const blocks = [];
+  const header = (name, size) => {
+    const h = Buffer.alloc(512);
+    h.write(name, 0, 100, 'utf8');
+    h.write('0000644\0', 100); h.write('0000000\0', 108); h.write('0000000\0', 116);
+    h.write(size.toString(8).padStart(11, '0') + '\0', 124); h.write('00000000000\0', 136);
+    h.write('        ', 148); h.write('0', 156); h.write('ustar\0', 257); h.write('00', 263);
+    let sum = 0; for (const b of h) sum += b;
+    h.write(sum.toString(8).padStart(6, '0') + '\0 ', 148);
+    return h;
+  };
+  for (const [path, content] of Object.entries(files)) {
+    const data = Buffer.from(typeof content === 'string' ? content : JSON.stringify(content));
+    blocks.push(header(`${top}/${path}`, data.length), data, Buffer.alloc((512 - (data.length % 512)) % 512));
+  }
+  blocks.push(Buffer.alloc(1024));
+  return gzipSync(Buffer.concat(blocks));
+}
+
+// A GitLab that answers the three calls the reader makes, counting them and the headers it was sent.
+function fakeGitlab({ sha = 'abc1234def5678', files = LAYER, status = 200 } = {}) {
+  const calls = [];
+  const fetchImpl = async (url, o = {}) => {
+    calls.push({ url, headers: o.headers ?? {} });
+    if (status !== 200) return { ok: false, status, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) };
+    const u = new URL(url);
+    if (/\/repository\/archive\.tar\.gz$/.test(u.pathname)) { const b = tarGz(files); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; }
+    if (/\/repository\/commits\//.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ id: sha, title: 'Docs', committed_date: '2026-10-01T10:00:00Z' }) };
+    return { ok: true, status: 200, json: async () => ({ default_branch: 'main' }) };
+  };
+  return { fetchImpl, calls };
+}
+const LINK = 'https://git.acme.test/design/intent';
+const ENV = { GITLAB_TOKEN: 't0k', GITLAB_HOST: 'git.acme.test' };
+
+// ── Pure parts ────────────────────────────────────────────────────────────────────────────────────────────────────
+test('config: a bare link or an object; nothing set is null', () => {
+  assert.equal(intentLayerConfig({}), null);
+  assert.deepEqual(intentLayerConfig({ intentLayer: LINK }), { url: LINK, entry: null, out: 'intent-layer.snapshot.json' });
+  assert.deepEqual(intentLayerConfig({ intentLayer: { gitlab: LINK, entry: '/docs/system.dsds.json', out: 'x.json' } }), { url: LINK, entry: 'docs/system.dsds.json', out: 'x.json' });
+});
+
+test('kinds land in the layers of the design intent; titles map to the kinds the style guide shows', () => {
+  assert.equal(layerOf('component'), 'components');
+  assert.equal(layerOf('product-page'), 'pages');
+  assert.equal(layerOf('module'), 'flows');
+  assert.equal(layerOf('token-group'), 'foundations');
+  assert.equal(layerOf('whatever', 'Patterns'), 'patterns');
+  assert.equal(layerOf('whatever'), 'system');
+  assert.equal(layerOf('component', 'Templates'), 'templates');
+  assert.equal(layerOf('component', 'Library components'), 'components');
+  assert.equal(layerOf('foundation', 'Product pages'), 'pages');
+  assert.equal(keyOfTitle('Overview / When To Use'), 'whenToUse');
+  assert.equal(keyOfTitle('What Not To Do'), 'whenNotToUse');
+  assert.equal(keyOfTitle('2. Overview'), 'purpose');
+  assert.equal(keyOfTitle('Token Notes'), null);
+  assert.deepEqual(itemsOf('- one\n- two\n\nA paragraph\nthat goes on.\n1. three'), ['one', 'two', 'A paragraph that goes on.', 'three']);
+  assert.equal(short('First sentence. Second one.'), 'First sentence.');
+});
+
+test('a DSDS index: its $refs followed, sections sorted by kind, facts and metadata left out, status read', () => {
+  const files = new Map(Object.entries(LAYER).filter(([p]) => p.endsWith('.json')));
+  const { system, entities } = readDsds(files, 'docs/dsds/system.dsds.json');
+  assert.equal(system.name, 'Acme DS');
+  assert.equal(system.sections[0].title, 'How to read this');
+  assert.equal(entities.length, 8);
+  const b = entities.find((e) => e.name === 'Button Main');
+  assert.equal(b.layer, 'components');
+  assert.equal(b.status, 'Active');
+  assert.equal(b.code, 'src/lib/buttons/Main.vue');
+  assert.equal(b.purpose[0], 'Use the main button for the next step the person is expected to take.');
+  assert.deepEqual(b.whenNotToUse.slice(-2), ['Do not use it for destructive actions; use the danger button.', 'Do not use it for navigation.']);
+  assert.deepEqual(b.rules, [{ text: 'Keep the label visible.', level: 'must' }]);
+  assert.deepEqual(b.facts, ['Tokens Used']);
+  assert.deepEqual(b.sections.map((s) => s.title), ['Token Notes']);
+  assert.equal(entities.find((e) => e.name === 'Saving').layer, 'patterns');
+  // No index: every file with an entity.
+  assert.equal(readDsds(files, null).entities.length, 8);
+});
+
+test('the filler a generator writes on every page is dropped, and counted per page', () => {
+  const files = new Map(Object.entries(LAYER).filter(([p]) => p.endsWith('.json')));
+  const { entities } = readDsds(files, 'docs/dsds/system.dsds.json');
+  const dropped = dropBoilerplate(entities);
+  assert.ok(dropped >= 6 * 4, `dropped ${dropped}`);
+  const b = entities.find((e) => e.name === 'Button Main');
+  assert.ok(!b.whenToUse.some((x) => /matches the need/.test(x)));
+  assert.ok(!b.purpose.some((x) => /part of the library|implemented in/.test(x)));
+  assert.equal(b.purpose[0], 'Use the main button for the next step the person is expected to take.');
+  assert.ok(b.repeated >= 4);
+  assert.deepEqual(entities.find((e) => e.name === 'Toast General').purpose, []);
+});
+
+test('pages match components by name, by identifier, then by the code file', () => {
+  const files = new Map(Object.entries(LAYER).filter(([p]) => p.endsWith('.json')));
+  const { entities } = readDsds(files, 'docs/dsds/system.dsds.json');
+  const m = matchComponents(COMPONENTS, entities, CODE_FILES);
+  assert.equal(m.get('buttonMain').name, 'Button Main');
+  assert.equal(m.get('chipFilter').name, 'Filter Chip');
+  assert.equal(m.get('cardPlain').name, 'Card Plain Plain');
+  assert.equal(m.has('iconOnly'), false);
+  assert.ok(![...m.values()].some((e) => e.name === 'Ghost Widget'));
+});
+
+// ── Reading it from GitLab ────────────────────────────────────────────────────────────────────────────────────────
+test('read through the API into its snapshot; the token goes to the named host; read again only when the commit moves', async () => {
+  const dir = makeFixture({});
+  const cfg = { intentLayer: LINK };
+  const gl = fakeGitlab();
+  const r = await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: gl.fetchImpl });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.changed, true);
+  assert.equal(r.entities, 8);
+  assert.equal(gl.calls.length, 3);
+  assert.ok(gl.calls.every((c) => c.headers['PRIVATE-TOKEN'] === 't0k'));
+  const snap = readIntentLayer(dir, cfg);
+  assert.equal(snap._source.url, LINK);
+  assert.equal(snap._source.ref, 'main');
+  assert.equal(snap._source.entry, 'docs/dsds/system.dsds.json');
+  assert.match(describeSync(r), /8 pages .* read →/);
+  // Same commit: two calls, no archive.
+  const again = fakeGitlab();
+  const r2 = await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: again.fetchImpl });
+  assert.equal(r2.changed, false);
+  assert.equal(again.calls.length, 2);
+  // An entry given: only its folder is asked for.
+  const sub = fakeGitlab({ sha: 'fff1234def5678' });
+  await syncIntentLayer(dir, { intentLayer: { gitlab: LINK, entry: 'docs/dsds/system.dsds.json' } }, { env: ENV, fetchImpl: sub.fetchImpl });
+  assert.match(sub.calls.at(-1).url, /path=docs%2Fdsds/);
+});
+
+test('the token is never sent to a host not named in GITLAB_HOST', async () => {
+  const gl = fakeGitlab();
+  await syncIntentLayer(makeFixture({}), { intentLayer: LINK }, { env: { GITLAB_TOKEN: 't0k' }, fetchImpl: gl.fetchImpl });
+  assert.ok(gl.calls.every((c) => !c.headers['PRIVATE-TOKEN']));
+});
+
+test('the token and the host come from the project\'s .env', async () => {
+  const dir = makeFixture({ '.env': 'GITLAB_TOKEN="from-env-file"\nGITLAB_HOST=git.acme.test\n' });
+  const gl = fakeGitlab();
+  const r = await syncIntentLayer(dir, { intentLayer: LINK }, { env: {}, fetchImpl: gl.fetchImpl });
+  assert.equal(r.ok, true);
+  assert.equal(gl.calls[0].headers['PRIVATE-TOKEN'], 'from-env-file');
+});
+
+test('GitLab refusing keeps the snapshot already there and says why; never throws', async () => {
+  const dir = makeFixture({});
+  await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: fakeGitlab().fetchImpl });
+  const r = await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: fakeGitlab({ status: 401 }).fetchImpl });
+  assert.equal(r.stale, true);
+  assert.match(r.error, /401/);
+  assert.match(describeSync(r), /using the copy of/);
+  assert.ok(readIntentLayer(dir, { intentLayer: LINK }));
+  const none = await syncIntentLayer(makeFixture({}), { intentLayer: LINK }, { env: ENV, fetchImpl: fakeGitlab({ files: { 'README.md': '# none' } }).fetchImpl });
+  assert.match(none.error, /no DSDS entities/);
+  assert.equal(await syncIntentLayer(makeFixture({}), {}, {}), null);
+});
+
+// ── Where it is used ──────────────────────────────────────────────────────────────────────────────────────────────
+async function project() {
+  const dir = makeFixture({
+    'theme.css': ':root{}\n',
+    'struct.json': { components: Object.fromEntries(COMPONENTS.map((n) => [n, { h: 24 }])) },
+    'props.json': { buttonMain: { description: 'The main action.', annotations: [], props: [] } },
+  });
+  const cfg = { paths: { themeCSS: 'theme.css', snapshotStructure: 'struct.json', compPropsSnapshot: 'props.json' }, componentFiles: CODE_FILES, intentLayer: LINK };
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: fakeGitlab().fetchImpl });
+  return { dir, cfg };
+}
+
+test('the design intent carries each component\'s page with its link, each layer its pages, and what matched nothing', async () => {
+  const { dir, cfg } = await project();
+  const r = await generateIntent(dir, cfg, {});
+  assert.equal(r.withIntentLayer, 5);
+  assert.equal(r.intentLayerPages, 8);
+  const it = JSON.parse(readFileSync(r.out, 'utf8'));
+  const b = it.components.buttonMain.intentLayer;
+  assert.equal(b.purpose, 'Use the main button for the next step the person is expected to take.');
+  assert.equal(b.url, `${LINK}/-/blob/main/docs/dsds/components/button-main.dsds.json`);
+  assert.deepEqual(b.rules, ['Keep the label visible. (must)']);
+  assert.equal(it.patterns.intentLayer[0].name, 'Saving');
+  assert.equal(it.templates.intentLayer[0].name, 'Checkout');
+  assert.deepEqual(it.intentLayer.noComponent.map((x) => x.name), ['Ghost Widget']);
+  assert.deepEqual(it.intentLayer.noPage, ['iconOnly']);
+  assert.equal(it.components.iconOnly.intentLayer, undefined);
+});
+
+test('the usage report: what reaches the agents and where, what does not and why, a verdict per page', async () => {
+  const { dir, cfg } = await project();
+  const snap = readIntentLayer(dir, cfg);
+  const rep = useReport(snap, matchComponents(COMPONENTS, snap.entities, CODE_FILES));
+  const page = (n) => rep.pages.find((p) => p.name === n);
+  assert.equal(page('Button Main').verdict, 'used');
+  assert.equal(page('Button Main').component, 'buttonMain');
+  assert.ok(page('Button Main').gets.find((g) => g.what === 'when not to use').to.includes('llms.txt (the first line)'));
+  assert.ok(page('Button Main').notUsed.some((n) => /Tokens Used/.test(n.what) && n.reason === 'facts' && /Figma and the code/.test(n.why) && /^Yes/.test(n.remove)));
+  assert.ok(page('Button Main').notUsed.some((n) => /Token Notes/.test(n.what) && n.reason === 'unknownTitle' && /When not to use/.test(n.fix) && /^No/.test(n.remove)));
+  assert.ok(page('Button Main').notUsed.some((n) => n.reason === 'repeated' && /every page of its kind/.test(n.why) && n.fix && n.remove));
+  assert.equal(page('Filter Chip').verdict, 'thin');                // when not to use, but not what it is for
+  assert.equal(page('Toast General').verdict, 'not used');          // only filler
+  assert.equal(page('Ghost Widget').verdict, 'not used');
+  assert.match(page('Ghost Widget').notUsed[0].why, /matches no component/);
+  assert.match(page('Ghost Widget').notUsed[0].fix, /as the component is named in Figma/);
+  assert.equal(page('Ghost Widget').notUsed.length, 1);              // nothing else matters until it is named
+  assert.equal(page('Saving').verdict, 'used');                     // a pattern: what it is for and its rules
+  assert.ok(page('Saving').gets.some((g) => /other sections/.test(g.what) && g.to[0].startsWith('the prototype context')));
+  assert.equal(page('Checkout').verdict, 'not used');               // only a fact section
+  assert.equal(page('Card Plain Plain').verdict, 'thin');           // what it is for, but not when
+  assert.deepEqual(rep.counts, { used: 2, thin: 2, notUsed: 4 });
+});
+
+test('a component\'s documentation merges the intent layer with Figma, the code and the contract, each under its source', () => {
+  const il = { file: 'docs/dsds/components/button-main.dsds.json', url: `${LINK}/-/blob/main/x`, whenNotToUse: ['Not for navigation.'], whenToUse: ['For the next step.'] };
+  const g = guidanceView({ description: 'Main.\nWhen not to use: for a destructive action', note: 'Avoid: two in a row', intentLayer: il, authored: { whenToUse: 'In forms.' } });
+  const not = g.sections.find((s) => s.key === 'whenNotToUse');
+  assert.equal(not.from, 'Figma');
+  assert.deepEqual(not.also, [{ from: 'the code', text: ['two in a row'] }, { from: 'the intent layer (docs/dsds/components/button-main.dsds.json)', text: ['Not for navigation.'], url: `${LINK}/-/blob/main/x` }]);
+  const use = g.sections.find((s) => s.key === 'whenToUse');
+  assert.equal(use.from, 'the intent layer (docs/dsds/components/button-main.dsds.json)');
+  assert.equal(use.url, `${LINK}/-/blob/main/x`);
+  assert.deepEqual(use.also, [{ from: 'contract.authored.json', text: ['In forms.'] }]);
+  assert.deepEqual(g.missing, ['mistakes', 'limitations']);
+});
+
+test('llms.txt: what it is for when Figma says nothing, its first "when not to use", and the other pages', () => {
+  const built = [
+    { name: 'buttonMain', contract: { description: '', props: [], intent: { source: LINK, purpose: 'For the next step. More.', whenNotToUse: ['Not for navigation.', 'Not twice.'] } } },
+    { name: 'chipFilter', contract: { description: 'A filter.', props: [], whenNotToUse: 'Authored: not for one choice.', intent: { source: LINK, whenNotToUse: ['Not for one choice.'] } } },
+  ];
+  const out = buildLlms(built, {}, 0, null, { intentLayer: { source: LINK, pages: [{ name: 'Saving', kind: 'pattern', purpose: 'Save a long form as a draft.' }] } });
+  assert.match(out, /- for: For the next step\./);
+  assert.match(out, /- avoid: Not for navigation\./);
+  assert.doesNotMatch(out, /Not twice/);
+  assert.match(out, /- avoid: Authored: not for one choice\./);          // the authored guidance comes first
+  assert.doesNotMatch(out, /- avoid: Not for one choice/);
+  assert.match(out, /## Patterns, templates and pages[\s\S]*- Saving \(pattern\): Save a long form as a draft\./);
+});
+
+test('the prototype context: a component\'s page fills what it is for, the other pages become rules', async () => {
+  const { dir, cfg } = await project();
+  const { intent } = await generateIntent(dir, cfg, { write: false });
+  const ctx = contextFrom({ components: { chipFilter: { props: {} }, cardPlain: { props: {} } } }, intent, []);
+  // Its own block, apart from Figma's and the code's words.
+  assert.equal(ctx.components.cardPlain.purpose, null);
+  assert.equal(ctx.components.cardPlain.intentLayer.purpose, 'A surface that groups one subject.');
+  assert.deepEqual(ctx.components.chipFilter.intentLayer.whenNotToUse, ['Not for a single choice: use a radio group.']);
+  assert.ok(ctx.components.chipFilter.never.some((n) => n.sentence === 'Intent layer: Not for a single choice: use a radio group.'));
+  const lines = purposeLines(ctx, ['cardPlain', 'chipFilter']).join('\n');
+  assert.match(lines, /intent A surface that groups one subject\./);
+  assert.match(lines, /intent: not for Not for a single choice/);
+  const saving = ctx.rules.filter((r) => /^Saving/.test(r.title));
+  assert.ok(saving.some((r) => /Save a long form as a draft\.[\s\S]*Not when: Not for the final submit\./.test(r.text)));
+  assert.ok(saving.some((r) => /Core Rules/.test(r.title) && r.file === `${LINK}/-/blob/main/docs/dsds/patterns/saving.dsds.json`));
+  assert.ok(existsSync(join(dir, 'intent-layer.snapshot.json')));
+});
+
+test('componentIntent lists only what the page says', () => {
+  const v = entityView({ kind: 'component', name: 'X', documentBlocks: [sections([['Intent', 'For x.']])] }, 'a/x.json');
+  assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null });
+});

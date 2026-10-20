@@ -676,8 +676,29 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // What the products get wrong with it, from the last audit: a rule laid over it, a look-alike, a parent overriding it.
       const PRODUCT_MISUSE = /hand-built|look-?alike|Nested components keep|Templates compose/i;
       const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
-      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c) });
+      const ilNow = designIntent().components ?? {};
+      const hasLayer = !!cfg.intentLayer;
+      for (const c of view.components) {
+        const il = ilNow[c.name]?.intentLayer ?? null;
+        // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
+        // the contract); the Intent layer page gathers every page of it apart.
+        if (!il && hasLayer) c.intentLayer = { none: true };
+        if (il) c.intentLayer = { file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null };
+        c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c), intentLayer: il });
+      }
     } catch { /* no guidance */ }
+    // The intent layer: every page, what the agents get from it and where, what they do not and why (intent-layer.mjs).
+    try {
+      const il = await import('./intent-layer.mjs');
+      const snap = il.readIntentLayer(ROOT, cfg);
+      if (snap) {
+        const names = (view.allComponents ?? view.components).map((c) => c.name);
+        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)));
+        const src = snap._source ?? {};
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, repeated: snap.boilerplate ?? 0, pages: report.pages,
+          noPage: names.filter((n) => !report.pages.some((p) => p.component === n)) };
+      }
+    } catch { /* no intent layer */ }
     // For agents: what an agent can take from the team's guidance for each component, its guidelines section and
     // Figma's words, rated ready, partial or thin, with what to add; the last extraction test's share when one ran.
     try {

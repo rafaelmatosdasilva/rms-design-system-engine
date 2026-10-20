@@ -291,6 +291,10 @@ Also on each component.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
 - **Status and coverage.** Stable, beta or deprecated when your team says so, and how much of its file your tests cover.
 
+### The intent layer
+
+Your intent layer (why each piece exists and how to use it, as DSDS pages on GitLab) is read on every run. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Intent layer page lists every page as used, thin or not used by the agents, and for each part they do not get, why, what to change, and whether to remove it.
+
 ### Guidance for agents
 
 Agents read your guidelines and Figma's descriptions to pick and use each component. [Ask Claude](commands.md#ask-the-system) to rate them, and each component gets a class.
