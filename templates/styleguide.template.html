@@ -8227,10 +8227,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var named = document.getElementById(labelId) || (wrap.parentElement && wrap.parentElement.querySelector('[id="' + labelId + '"]'));   // not on the page yet when drawn
     btn.innerHTML = (named && named.classList.contains('sg-dd-named') ? '<span class="sg-dd-label" aria-hidden="true">' + esc(named.textContent) + '</span>' : '') + '<span class="sg-dd-value"></span>' + LIST_MARK;
     var list = document.createElement('div'); list.className = 'sg-select-list'; list.id = id; list.setAttribute('role', 'listbox'); list.setAttribute('aria-labelledby', labelId); list.tabIndex = -1; list.hidden = true;
-    Array.prototype.forEach.call(sel.options, function (o, i) {
-      var opt = document.createElement('div'); opt.className = 'sg-dd-option'; opt.id = id + '-' + i; opt.setAttribute('role', 'option'); opt.dataset.v = o.value; opt.textContent = o.textContent;
-      list.appendChild(opt);
-    });
+    var fill = function () {
+      list.innerHTML = '';
+      Array.prototype.forEach.call(sel.options, function (o, i) {
+        var opt = document.createElement('div'); opt.className = 'sg-dd-option'; opt.id = id + '-' + i; opt.setAttribute('role', 'option'); opt.dataset.v = o.value; opt.textContent = o.textContent;
+        list.appendChild(opt);
+      });
+    };
+    fill();
     wrap.appendChild(btn); wrap.appendChild(list);
     var lab = document.getElementById(labelId); if (lab) { lab.removeAttribute('for'); lab.addEventListener('click', function () { btn.focus(); }); }
     var opts = function () { return Array.prototype.slice.call(list.querySelectorAll('[role="option"]')); }, active = -1;
@@ -8255,9 +8259,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     list.addEventListener('mousemove', function (e) { var o = e.target.closest('[role="option"]'); if (o) setActive(opts().indexOf(o)); });
     sel.addEventListener('change', sync);
     sync();
-    return { sync: sync };
+    return { sync: sync, refresh: function () { fill(); sync(); } };
   }
-  var BRANDS = DATA.brands && DATA.brands.list && DATA.brands.list.length ? DATA.brands : null;
+  var BRANDS = DATA.brands && DATA.brands.list && DATA.brands.list.length ? DATA.brands : null, BRAND_CTL = null;
   if (BRANDS) {
     var bst = document.createElement('style'); bst.id = 'sg-brand-css'; bst.textContent = (BRANDS.faces || '') + '\n' + (BRANDS.css || ''); document.head.appendChild(bst);
     // The guide around the previews takes the brand too, its look only: its colours, its corners and its family, read
@@ -8332,6 +8336,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var bSel = bWrap.querySelector('select');
     bSel.addEventListener('change', function () { setBrand(bSel.value); });
     var bDrop = customSelect(bSel, bId + '-label');
+    BRAND_CTL = { select: bSel, set: setBrand, refresh: bDrop.refresh, sync: bDrop.sync };
     var kept = null; try { kept = localStorage.getItem('sg-brand'); } catch (e) {}
     if (URLQ.get('brand') != null) kept = URLQ.get('brand');   // the address's brand first: a shared link opens in it
     bWrap.appendChild(fontNote);
@@ -8533,6 +8538,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // The Showroom's screens, and one drawn in a box as its card draws it (inert, scaled to the box): drawScreen returns
     // the screen's element and its fit, to call again when the box changes size.
     axes: AXES,   // the system's modes: each { attr, colour, values: [{ label, value }] }
+    icons: { figma: FIGMA_SVG },   // the page's own marks, so a module draws them alike
+    brandChoice: BRAND_CTL,   // the Theme choice: { select, set(brand), refresh(), sync() }, when the system has brands
     screens: DATA.showroom || [],
     drawScreen: function (s, box) {
       if (!s || !s.markup || typeof drawAt !== 'function') return null;
