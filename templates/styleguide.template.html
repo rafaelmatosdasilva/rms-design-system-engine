@@ -714,7 +714,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
    is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
 .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow var(--sg-fast); }
-.sg-sticky-edge { box-shadow: 0 calc(var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 0 var(--sg-bg); }   /* the lowest stuck bar paints the page's gap under its line, so nothing shows sliced right under it */
+.sg-sticky-edge.sg-sticky-band { box-shadow: 0 calc(var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 0 var(--sg-bg); }   /* over tables, the lowest stuck bar paints the page's gap under its line, where a table's head will stick, so nothing shows sliced right under it; over anything else (screens, a grid), the content scrolls right under the line, never cut short above it */
 /* A bar that sticks spans the content's whole width (into the page's side padding), so nothing shows beside it; once
    stuck, the lowest one has the page's line under it, as wide. */
 :is(.sg-hero > h1, .pg-head, .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head)::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-main-pad, 0px)); right: calc(-1 * var(--sg-main-pad, 0px)); background: var(--sg-bg); z-index: -1; pointer-events: none; }
@@ -5765,14 +5765,16 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     rows.forEach(function (h) {
       if (!h.parts) return;
       var all = (h.family ? [] : [h]).concat(h.parts);
-      h.par = worst(all.map(function (x) { return x.par; }), true); h.acc = worst(all.map(function (x) { return x.acc; })); h.doc = worst(all.map(function (x) { return x.doc; }));
-      // Each state opens the one that sets it (the part whose state the row shows), on what that one has to fix or
-      // decide, so the page it opens says the same word; one with no page of its own opens nothing.
+      // Each state opens the one that sets it (the part whose state the row shows, read before the row's own is
+      // replaced), on what that one has to fix or decide, so the page it opens says the same word; one with no page of
+      // its own opens nothing.
+      var setBy = {};
       ['par', 'acc', 'doc'].forEach(function (k) {
-        var from = all.reduce(function (m, x) { return x[k] && RANK(x[k]) > RANK(m[k]) ? x : m; }, all[0]);
-        if (!from || !from[k]) return;
-        h[k].href = from.href || null; h[k].st = from[k].fix ? 'todo' : from[k].dec ? 'check' : '';
+        var from = all.filter(function (x) { return x[k]; }).reduce(function (m, x) { return !m || RANK(x[k]) > RANK(m[k]) ? x : m; }, null);
+        if (from) setBy[k] = { href: from.href || null, st: from[k].fix ? 'todo' : from[k].dec ? 'check' : '' };
       });
+      h.par = worst(all.map(function (x) { return x.par; }), true); h.acc = worst(all.map(function (x) { return x.acc; })); h.doc = worst(all.map(function (x) { return x.doc; }));
+      ['par', 'acc', 'doc'].forEach(function (k) { if (setBy[k]) { h[k].href = setBy[k].href; h[k].st = setBy[k].st; } });
       h.fix = all.reduce(function (n, x) { return n + (x.fix || 0); }, 0); h.dec = all.reduce(function (n, x) { return n + (x.dec || 0); }, 0);
       h.untested = all.some(function (x) { return x.untested; }); h.done = !h.fix && !h.dec && !h.untested;
       h.at = all.reduce(function (m, x) { return x.at && (!m || x.at > m) ? x.at : m; }, null);
@@ -8070,11 +8072,16 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     stickQueued = false;
     var edge = null;
     Array.prototype.forEach.call(main.querySelectorAll(STICKY), function (el) {
-      el.classList.remove('sg-sticky-edge');
+      el.classList.remove('sg-sticky-edge', 'sg-sticky-band');
       if (!el.offsetParent || window.scrollY <= 0) return;
       if (el.getBoundingClientRect().top <= (parseFloat(getComputedStyle(el).top) || 0) + 1) { if (!edge || el.getBoundingClientRect().bottom > edge.getBoundingClientRect().bottom) edge = el; }
     });
-    if (edge) edge.classList.add('sg-sticky-edge');
+    if (edge) {
+      edge.classList.add('sg-sticky-edge');
+      // The gap under it only where a table's head sticks below it: elsewhere nothing is cut above the content.
+      var page = edge.closest('.sg-section');
+      if (page && page.querySelector('.pg-inspect-head, .pg-par-table, .sg-token-card thead')) edge.classList.add('sg-sticky-band');
+    }
   }
   window.addEventListener('scroll', function () { if (!stickQueued) { stickQueued = true; requestAnimationFrame(markStuck); } }, { passive: true });
   window.addEventListener('hashchange', route);

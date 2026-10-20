@@ -571,6 +571,12 @@ test('in the browser: no script error, a control changes the real component, the
       assert.equal(at.th, -1, `${sel}: the table's head tucked a pixel under the card's head`);
     };
     await run(`location.hash = '#colors'`); await shownIs('colors'); await headsStick('#colors');
+    // Over tables the lowest stuck bar paints the page's gap under its line (where a table's head will stick); a page
+    // with no table (Identity) never has its content cut short under the line.
+    assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !!e && e.closest('.sg-section').id === 'colors' && e.classList.contains('sg-sticky-band'); })()`), true, 'over tables, the gap under the line');
+    await run(`location.hash = '#brand-kit'`); await shownIs('brand-kit');
+    await run(`window.scrollTo({ top: 1200, behavior: 'instant' })`); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !e || !e.classList.contains('sg-sticky-band'); })()`), true, 'no gap cut under the line on a page with no table');
     await run(`location.hash = '#c-chip/documentation'`); await shownIs('c-chip'); await headsStick('#c-chip');
     // The button as the system's script leaves it, a moment after it is drawn, and its focus ring drawn on ::after.
     await run(`location.hash = '#c-button/accessibility'`); await shownIs('c-button');
