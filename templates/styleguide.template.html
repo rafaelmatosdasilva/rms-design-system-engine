@@ -1512,7 +1512,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-cell-clip { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); }
 .sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; }
 .sg-row-detail-body > p, .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-xs); }
-.sg-il-acts { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs) var(--sg-space-m); }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
 .sg-il-label { color: var(--sg-muted); font-size: var(--sg-s); }
@@ -2777,18 +2776,26 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilCard = function (k, title) {
       var rows = IL.pages.filter(function (p) { return p.action === k; });
       if (!rows.length) return '';
-      return '<div class="pg-inspect" id="intent-layer-' + esc(k) + '"><div class="pg-inspect-head">' + esc(title) + '  ·  ' + rows.length + '</div><p class="sg-il-lead">' + esc(ACT_LEAD[k] || '') + '</p><div class="pg-par-scroll"><table class="pg-par-table sg-il"><thead><tr><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' +
+      return '<div class="pg-inspect" data-il-card="' + esc(k) + '"><div class="pg-inspect-head">' + esc(title) + '  ·  ' + rows.length + '</div><p class="sg-il-lead">' + esc(ACT_LEAD[k] || '') + '</p><div class="pg-par-scroll"><table class="pg-par-table sg-il"><thead><tr><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' +
         rows.map(function (p) { return '<tr><td>' + ilLink(p) + '</td><td>' + ilFor(p) + '</td><td>' + ilTodo(p) + '</td><td>' + ilWhy(p) + '</td><td>' + ilGets(p) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
     };
+    // At its top right, where the layer lives (GitLab), as a component's page links its Figma and its code.
+    var ilH = ilSec.querySelector('h2');
+    if (ilH && ilSrc.url) { var ilHead = document.createElement('div'); ilHead.className = 'pg-head'; ilH.parentNode.insertBefore(ilHead, ilH); ilHead.appendChild(ilH); ilHead.insertAdjacentHTML('beforeend', headLinksHTML([{ label: 'See intent layer', url: ilSrc.url }])); }
+    // The decisions as chips, each with its count: one shows only its card, All shows every card.
+    var acts = IL.actions || {}, shown = labels.filter(function (l) { return acts[l[0]]; });
+    var ilChip = function (k, label, n) { return '<button type="button" class="sg-chip" data-il="' + esc(k) + '" aria-pressed="' + (k === 'all') + '">' + esc(label) + countHTML(n) + '</button>'; };
     var ilBox = document.createElement('div'); ilBox.className = 'pg-cards'; ilSec.appendChild(ilBox);
-    var acts = IL.actions || {};
-    ilBox.innerHTML = '<p>' + esc(IL.pages.length + ' pages read from ' + (ilSrc.url || 'the intent layer') + (ilSrc.ref ? ' on ' + ilSrc.ref : '') + (ilSrc.sha ? ' at ' + ilSrc.sha.slice(0, 8) : '') + (ilSrc.committedAt ? ' (' + ilSrc.committedAt.slice(0, 10) + ')' : '') + '. The engine only reads it: every change below is made in the intent layer itself.') + '</p>' +
-      '<p class="sg-il-acts">' + labels.filter(function (l) { return acts[l[0]]; }).map(function (l) { return '<a class="sg-uses-link" href="#intent-layer-' + esc(l[0]) + '">' + esc(l[1]) + '</a> ' + acts[l[0]]; }).join('  ·  ') + '</p>' +
+    ilBox.innerHTML = '<span class="sg-chips" role="group" aria-label="Show">' + ilChip('all', 'All', IL.pages.length) + shown.map(function (l) { return ilChip(l[0], l[1], acts[l[0]]); }).join('') + '</span>' +
       labels.map(function (l) { return ilCard(l[0], l[1]); }).join('') +
-      ((IL.noPage || []).length ? '<div class="pg-inspect"><div class="pg-inspect-head">Components with no page  ·  ' + IL.noPage.length + '</div><p class="sg-il-lead">No page of the intent layer names these components, by name or by code file. Write their page, or name an existing page as the component is named in Figma.</p><p class="sg-il-lead">' +
+      ((IL.noPage || []).length ? '<div class="pg-inspect" data-il-card="nopage"><div class="pg-inspect-head">Components with no page  ·  ' + IL.noPage.length + '</div><p class="sg-il-lead">No page of the intent layer names these components, by name or by code file. Write their page, or name an existing page as the component is named in Figma.</p><p class="sg-il-lead">' +
         IL.noPage.map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</p></div>' : '');
-    // A decision's link scrolls to its card on this page, never away from it.
-    ilBox.addEventListener('click', function (e) { var a = e.target.closest('a[href^="#intent-layer-"]'); if (!a) return; e.preventDefault(); var t = document.getElementById(a.getAttribute('href').slice(1)); if (t) t.scrollIntoView({ block: 'start' }); });
+    ilBox.addEventListener('click', function (e) {
+      var b = e.target.closest('.sg-chip[data-il]'); if (!b) return;
+      var k = b.getAttribute('data-il');
+      Array.prototype.forEach.call(ilBox.querySelectorAll('.sg-chip[data-il]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      Array.prototype.forEach.call(ilBox.querySelectorAll('[data-il-card]'), function (card) { card.hidden = k !== 'all' && card.getAttribute('data-il-card') !== k; });
+    });
   }
   // For agents: what of Figma's and the code's notes no agent is given, each with why, what to do and whether to remove
   // it (the intent layer has its own page).
