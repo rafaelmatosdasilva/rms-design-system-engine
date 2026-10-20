@@ -32,6 +32,39 @@ The title names the three strongest leanings, always in the chart's own order (B
 - its winning pole and its lean (under 10% is shown as Balanced);
 - what the lean was read from, with each mode's colour where the modes differ.
 
+## The words beside the chart
+
+On the left of the tile, three lines describe the brand; the chart sits on the right.
+
+1. **The character.** The brand as a person, built from its three strongest leanings:
+   - the strongest is who it is (Corporate: a professional; Bold: a showman);
+   - the second is how it is (dependable, precise);
+   - the third is what it is at heart.
+
+   Then what it wears, as the tokens draw it:
+   - colour: white and grey with a blue accent, or vivid orange rooms;
+   - corners;
+   - lines;
+   - shadows.
+
+   For example: "A cool-headed professional, dependable at heart, in white and grey with a blue accent, rounded corners, hairlines and soft shadows."
+2. **What it does.** The three strongest leanings said as of a person, each as heavy as it leans. For example: "It means business, keeps a cool head and plays it safe."
+3. **The proof.** One row per leaning, with the signals behind it in plain words on a simple scale, never as raw values:
+   - vivid, soft or muted colours;
+   - very high, high, moderate or low contrast;
+   - neutral, tinted or coloured backgrounds;
+   - square corners, subtle rounding, rounded or very rounded corners;
+   - fine, firm or thick lines;
+   - no shadows, few subtle shadows, subtle shadows or hard shadows;
+   - light, regular, strong or heavy type;
+   - quick, steady, slow or bouncy motion;
+   - tight, regular or generous space;
+   - one accent colour or a colourful palette.
+
+   A last row, "But …", names the strongest leaning that pulls the other way, when there is one.
+
+The chart's strongest three poles are named in the brand's hue.
+
 ## What each signal says
 
 These are the readings the weights below put into numbers.
@@ -80,7 +113,7 @@ An interface without shadows can never be the softest, however round its corners
 
 **Lines.** Over 1px reads more graphic, bold, technological and retro; 2px already reads thick.
 
-**Grounds.**
+**Grounds.** Backgrounds are weighed by how much their component is seen, as shadows are.
 
 - Many pure white backgrounds read corporate and distant.
 - In dark mode, pure black backgrounds read the same.
@@ -148,23 +181,23 @@ The colour signals are read once per colour mode:
 
 Each lean is clamped to −1…+1, read in each mode, and averaged across the modes.
 
-- **Bold ↔ Quiet:** heavy type, thick lines, strong contrast, marked shadows (or none at all) and a vivid primary read bold. Their opposites read quiet.
+- **Bold ↔ Quiet:** bold is daring (heavy lines, hard shadows, colour on the backgrounds), and a brand that reads safe is not bold. heavy type, thick lines, strong contrast, marked shadows (or none at all) and a vivid primary read bold. Their opposites read quiet.
   (vivid × 2 − 1) × 0.2 + weight × 0.45 + thick × 0.35 + 0.1 if every shadow is off + marked × 0.15 + contrast × 0.25
 - **Flat ↔ Dimensional:** no shadows read flat; many soft, far shadows read dimensional.
   1 − 2 × depth
-- **Technical ↔ Human:**
+- **Technical ↔ Human:** a flat interface reads technical.
   - Technical: a monospace, geometric or grotesque face, square corners, thick lines, marked shadows.
   - Human: humanist, serif or rounded faces, round corners, faded shadows.
 
   - Heavy type and few or no shadows lean technical too.
 
   typeface kind × 0.4 + (1 − 2 × softness) × 0.25 + thick × 0.25 + weight × 0.15 + marked × 0.3 − faded × 0.15 + (1 − min(1, share × 2)) × 0.15
-- **Sharp ↔ Soft:**
+- **Sharp ↔ Soft:** flat with lines over 1px reads a little sharp.
   - Soft needs subtlety: round corners, faded shadows, thin type and fine lines.
   - Sharp: square corners, no shadows, heavy type, thick lines.
 
   −((2 × softness − 1) × 0.25 + shadow softness × 0.3 − weight × 0.2 + (0.3 for hairlines, else −thick) × 0.25)
-- **Corporate ↔ Friendly:**
+- **Corporate ↔ Friendly:** the hue's warmth is read on Warm ↔ Cool, not here.
   - Corporate: square corners, a blue primary, pure and neutral grounds, a small palette, strong contrast.
   - Friendly: rounding corners, an overshooting easing, a warm hue, tinted grounds, many hues.
 
