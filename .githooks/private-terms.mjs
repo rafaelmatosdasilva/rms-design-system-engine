@@ -49,20 +49,20 @@ export function rememberProject(dir) {
 // Only the names a project's people chose are read: its components and their properties and options, its tokens'
 // paths, its collections and modes, its brands, its fonts, its pages and screens, its icons. The keys the engine's own
 // captures write (paddingVar, radiusPx, variantOptions) are never a project's, so they are never read.
-let COMMON = null;
+let COMMON = null, HAS_DICT = false;
 // The words everyone uses: the system's dictionary (a plural read as its singular), and CSS's and design systems'.
 function common() {
   if (COMMON) return COMMON;
   COMMON = new Set();
   for (const f of ['/usr/share/dict/words', '/usr/share/dict/web2', '/usr/dict/words', '/usr/share/dict/american-english']) {
-    try { for (const w of readFileSync(f, 'utf8').split('\n')) if (w) COMMON.add(w.toLowerCase()); break; } catch { /* the next */ }
+    try { for (const w of readFileSync(f, 'utf8').split('\n')) if (w) COMMON.add(w.toLowerCase()); HAS_DICT = true; break; } catch { /* the next */ }
   }
   for (const w of GENERIC_WORDS.split(/\s+/)) COMMON.add(w);
   return COMMON;
 }
 const isCommon = (w) => { const c = common(); return c.has(w) || (w.endsWith('ies') && c.has(w.slice(0, -3) + 'y')) || (w.endsWith('es') && c.has(w.slice(0, -2))) || (w.endsWith('s') && c.has(w.slice(0, -1))); };
 // Words of CSS, HTML and design systems a dictionary may lack.
-const GENERIC_WORDS = 'xs sm md lg xl xxl xxs xxxs xxxl px rem em ms vh vw dp pt deg rgb rgba hsl hex svg png css html js ui ux api url id ids nav btn img src alt aria rtl ltr min max auto inline flex grid hug fill fixed rgb srgb dropdown tooltip popover checkbox textarea navbar sidebar topbar toolbar statusbar breadcrumb breadcrumbs stepper spinner skeleton snackbar toast toasts accordion carousel pagination paginator datepicker timepicker colorpicker combobox listbox menubar tablist tabpanel treeview tree avatar badge chip chips tag tags pill slider switch toggle radio dialog modal sheet drawer popup lightbox banner callout alert alerts hero footer header heading subheading caption overline eyebrow placeholder hover focus focused pressed disabled readonly selected unselected checked unchecked indeterminate expanded collapsed active inactive visited loading empty error success warning info positive negative neutral pending critical primary secondary tertiary quaternary accent brand inverse inverted muted subtle strong emphasis elevated elevation surface surfaces background foreground outline outlined filled ghost link plain solid dashed dotted rounded pill radius radii stroke strokes shadow shadows blur opacity gradient overlay scrim backdrop divider dividers separator spacing spacer gap gaps padding margin inset offset width height size sizes sizing typography typeface font fonts weight weights lineheight letterspacing paragraph body label labels title titles subtitle display headline icon icons iconography illustration logo logos token tokens semantic primitive primitives alias aliases mode modes theme themes light dark density compact comfortable spacious breakpoint breakpoints viewport desktop laptop tablet mobile phone motion duration durations easing easings transition transitions animation keyframe delay variant variants variable variables property properties component components instance instances slot slots state states boolean booleans string strings number numbers collection collections layer layers frame frames page pages screen screens section sections figma';
+const GENERIC_WORDS = 'small medium large xs sm md lg xl xxl xxs xxxs xxxl px rem em ms vh vw dp pt deg rgb rgba hsl hex svg png css html js ui ux api url id ids nav btn img src alt aria rtl ltr min max auto inline flex grid hug fill fixed rgb srgb dropdown tooltip popover checkbox textarea navbar sidebar topbar toolbar statusbar breadcrumb breadcrumbs stepper spinner skeleton snackbar toast toasts accordion carousel pagination paginator datepicker timepicker colorpicker combobox listbox menubar tablist tabpanel treeview tree avatar badge chip chips tag tags pill slider switch toggle radio dialog modal sheet drawer popup lightbox banner callout alert alerts hero footer header heading subheading caption overline eyebrow placeholder hover focus focused pressed disabled readonly selected unselected checked unchecked indeterminate expanded collapsed active inactive visited loading empty error success warning info positive negative neutral pending critical primary secondary tertiary quaternary accent brand inverse inverted muted subtle strong emphasis elevated elevation surface surfaces background foreground outline outlined filled ghost link plain solid dashed dotted rounded pill radius radii stroke strokes shadow shadows blur opacity gradient overlay scrim backdrop divider dividers separator spacing spacer gap gaps padding margin inset offset width height size sizes sizing typography typeface font fonts weight weights lineheight letterspacing paragraph body label labels title titles subtitle display headline icon icons iconography illustration logo logos token tokens semantic primitive primitives alias aliases mode modes theme themes light dark density compact comfortable spacious breakpoint breakpoints viewport desktop laptop tablet mobile phone motion duration durations easing easings transition transitions animation keyframe delay variant variants variable variables property properties component components instance instances slot slots state states boolean booleans string strings number numbers collection collections layer layers frame frames page pages screen screens section sections figma';
 // Names made of common words that every design system writes the same way: never a project's own.
 const GENERIC_NAMES = new Set(('buttonprimary buttonsecondary buttontertiary buttonlink buttonicon iconbutton buttongroup ' +
   'textbutton linkbutton radiobutton radiogroup checkboxgroup togglebutton switchbutton segmentedcontrol listitem listgroup ' +
@@ -88,7 +88,8 @@ function distinctive(raw, { own = false } = {}) {
   const bare = t.replace(/\d+$/, '');
   if (isCommon(t) || (bare !== t && (isCommon(bare) || GENERIC_NAMES.has(bare))) || GENERIC_NAMES.has(t)) return null;
   const parts = camelParts(raw).filter((x) => !/^\d+$/.test(x));
-  if (parts.length <= 1 && !own) return parts.length && !isCommon(parts[0]) && !SIZE_STEP.test(parts[0]) ? t : null;
+  // One plain word is a project's only when a dictionary says it is no word: with none on this computer, never.
+  if (parts.length <= 1 && !own) return HAS_DICT && parts.length && !isCommon(parts[0]) && !SIZE_STEP.test(parts[0]) ? t : null;
   return t;
 }
 
