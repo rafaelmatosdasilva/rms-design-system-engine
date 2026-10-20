@@ -11,7 +11,7 @@ import { makeFixture } from './helpers.mjs';
 import {
   intentLayerConfig, layerOf, keyOfTitle, itemsOf, entityView, readDsds, dropBoilerplate, matchComponents,
   syncIntentLayer, readIntentLayer, componentIntent, useReport, describeSync, short, intentWords,
-  addSource, configuredSources, syncSources,
+  addSource, configuredSources, syncSources, systemNames,
 } from '../intent-layer.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -530,4 +530,30 @@ test('each page gets one decision, said as an instruction, with why: delete, mov
   assert.deepEqual([at('Chip').action, at('Chip').todo], ['improve', ['Remove the 2 lines written on every page alike, in whatever writes them.']]);
   assert.equal(rep.actions.delete, 3);
   for (const p of rep.pages) assert.ok(p.decision && Array.isArray(p.todo), p.name);
+});
+
+test('the components a page is judged against come from the sources, never from a saved design intent that may be missing', () => {
+  const figma = makeFixture({ 'struct.json': { components: { panel: { h: 1 }, _meta: {}, chip: { h: 1 } } } });
+  assert.deepEqual(systemNames(figma, { paths: { snapshotStructure: 'struct.json' } }), ['panel', 'chip']);
+  const code = makeFixture({ 'src/components/panels/Main.vue': '<template><div class="acme-panel"></div></template>\n' });
+  assert.deepEqual(systemNames(code, {}), ['Main']);
+  // "Panel General" is panel when panel has no page: Rename, wherever the report is built.
+  const page = { kind: 'component', layer: 'components', name: 'Panel General', id: null, status: null, file: 'panel/general.json', url: null, code: 'src/lib/panel/General.vue', summary: null,
+    purpose: ['Group one subject.'], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], facts: [], repeated: 0 };
+  const names = systemNames(figma, { paths: { snapshotStructure: 'struct.json' } });
+  const rep = useReport({ _source: {}, entities: [page] }, matchComponents(names, [page], {}), { names });
+  assert.deepEqual([rep.pages[0].action, rep.pages[0].todo[0]], ['rename', 'Rename this page to panel, the component\'s name in Figma.']);
+});
+
+test('a rename never goes to a part of a component: its page moves to the parent\'s page, or is deleted', () => {
+  const pg = (name, file) => ({ kind: 'component', layer: 'components', name, id: null, status: null, file, url: null, code: null, summary: null,
+    purpose: [`${name} says something.`], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], facts: [], repeated: 0 });
+  const names = ['grid', 'grid/Header', 'list/Row'];
+  const ents = [pg('Grid General', 'grid/general.json'), pg('Grid Header Base', 'grid/header-base.json'), pg('List Row Base', 'list/row-base.json')];
+  const rep = useReport({ _source: {}, entities: ents }, matchComponents(names, ents, {}), { names });
+  const at = (n) => rep.pages.find((p) => p.name === n);
+  assert.equal(at('Grid General').action, 'rename');                                          // grid: a component of its own
+  assert.deepEqual([at('Grid Header Base').action, at('Grid Header Base').notUsed[0].reason], ['move', 'subPart']);
+  assert.match(at('Grid Header Base').todo[0], /^Move what is true of grid\/Header and not yet on Grid General \(grid\/general\.json\) there/);
+  assert.deepEqual([at('List Row Base').action, at('List Row Base').notUsed[0].reason], ['delete', 'subPartAlone']);   // list has no page at all
 });

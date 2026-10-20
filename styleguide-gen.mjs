@@ -706,7 +706,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       if (snap) {
         // The components the agents get (the design intent's: Figma's, or with no Figma data the code's), not only the
         // ones this page shows, so the page and the audit judge each page alike.
-        const names = Object.keys(designIntent().components ?? {}).length ? Object.keys(designIntent().components) : (view.allComponents ?? view.components).map((c) => c.name);
+        const names = il.systemNames(ROOT, cfg);
         const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)) });
         const src = snap._source ?? {};
         view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, repeated: snap.boilerplate ?? 0, pages: report.pages,

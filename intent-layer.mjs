@@ -80,6 +80,17 @@ export function matchComponents(names, entities, codeFiles = {}) {
   return out;
 }
 
+// The components the agents get, as the design intent has them: Figma's (its structure snapshot), else, with no
+// Figma data, the code's own. Read from the sources, never from a saved design-intent.json that may not be there.
+export function systemNames(ROOT, cfg = {}) {
+  try {
+    const s = JSON.parse(readFileSync(resolve(ROOT, cfg.paths?.snapshotStructure || 'figma-structure.snapshot.json'), 'utf8'));
+    const names = Object.keys(s?.components ?? {}).filter((n) => !/^[_.]/.test(n));
+    if (names.length) return names;
+  } catch { /* no Figma data */ }
+  try { return codeComponents(ROOT, cfg).map((k) => k.name); } catch { return []; }
+}
+
 // The code file of each component the engine knows: ds-config.json → componentFiles, then the code capture's.
 export function codeFilesOf(ROOT, cfg = {}) {
   const out = {};
@@ -247,7 +258,7 @@ export const ACTIONS = [
   ['delete', 'Delete'], ['move', 'Move'], ['rename', 'Rename'], ['name', 'Name'],
   ['write', 'Write'], ['improve', 'Improve'], ['keep', 'Keep'],
 ];
-const ORPHAN_ACTION = { emptyPage: 'delete', codeGone: 'delete', partSaid: 'delete', copy: 'delete', part: 'move', rename: 'rename', noComponent: 'name' };
+const ORPHAN_ACTION = { emptyPage: 'delete', codeGone: 'delete', partSaid: 'delete', copy: 'delete', subPartAlone: 'delete', part: 'move', subPart: 'move', rename: 'rename', noComponent: 'name' };
 // → { action, decision, todo: [each change, as an instruction] }
 function decide(page, e, { comp, has }) {
   const label = (k) => ACTIONS.find(([x]) => x === k)[1];
@@ -300,7 +311,21 @@ export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = 
   const pageKey = norm(e.name);
   const close = names.filter((n) => !documented.has(n) && norm(n).length >= 4 && pageKey.includes(norm(n)))
     .filter((n) => wordsOfName(e.name).filter((w) => !norm(n).includes(w)).every((w) => GENERIC.test(w)));
-  if (close.length === 1) return say('rename', `It names no component of the system as Figma names it; ${close[0]} is that component, under its own name, and no page documents ${close[0]} yet.${twinNote}`, `Rename this page to ${close[0]}, the component's name in Figma.`, 'No.');
+  if (close.length === 1) {
+    const target = close[0];
+    // A part of another component (table/Header is table's): not one agents place on its own, so no page of its own.
+    // What it says goes on its parent's page when that page exists (or is this layer's, under another name); else it
+    // is deleted.
+    if (target.includes('/')) {
+      const parentName = target.split('/')[0];
+      const parentPage = [...forEntity].find(([, n]) => n === parentName)?.[0]
+        ?? others.find((x) => !forEntity.has(x) && norm(x.name).includes(norm(parentName)) && wordsOfName(x.name).filter((w) => !norm(parentName).includes(w)).every((w) => GENERIC.test(w)));
+      return parentPage
+        ? say('subPart', `It is about ${target}, a part of ${parentName}, not a component agents place on its own.${twinNote}`, `Move what is true of ${target} and not yet on ${pageOf(parentPage)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.')
+        : say('subPartAlone', `It is about ${target}, a part of ${parentName}, not a component agents place on its own, and no page documents ${parentName}.${twinNote}`, 'Delete this page, or, if what it says matters, make it the page of ' + parentName + ' first.', 'Yes.');
+    }
+    return say('rename', `It names no component of the system as Figma names it; ${target} is that component, under its own name, and no page documents ${target} yet.${twinNote}`, `Rename this page to ${target}, the component's name in Figma.`, 'No.');
+  }
   // A part of a component: its code file beside that component's, and its name (or its file's) holding the component's
   // name (PointListItem beside pointList). Its page belongs in that component's page.
   const ownKey = [norm(e.name), norm(String(e.code ?? '').split('/').pop().replace(/\.[^.]+$/, ''))];
