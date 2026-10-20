@@ -1430,13 +1430,15 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-tk-item[aria-pressed="true"] { background: var(--sg-a3); color: var(--sg-text); }
 .sg-tk-item:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-tk-open-cell { width: calc(var(--sg-control-h) + var(--sg-space-m)); text-align: right; }   /* the arrow that opens a token's details */
-.sg-comp-panel--narrow .sg-comp-panel-box { width: min(100vw, 48rem); }   /* a token's details: room for its modes side by side and its components' table */
+.sg-comp-panel--narrow .sg-comp-panel-box { width: min(100vw, 48rem); }
+.sg-comp-panel--wide .sg-comp-panel-box { width: min(100vw, 72rem); }   /* a task in full: its tables (what it affects) with room for each column on a line */   /* a token's details: room for its modes side by side and its components' table */
 .sg-tk-detail { flex: 1; min-width: 0; overflow: auto; padding: 0 var(--sg-card-gap) var(--sg-space-xxl); }
 /* A side panel's page (sidePanelPage): its head stays at the panel's top, painted with the panel, as a component page's
    head stays under the page's bars; its body's cards a card gap apart, the first a stick gap under the head. */
 .sg-panel-head { position: sticky; top: 0; z-index: 7; display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-xxl) 0 var(--sg-space-l); background: var(--sg-bg); }
 .sg-panel-head > h2 { margin: 0; font-size: calc(var(--sg-title) + var(--sg-space-xxs) * 3.5); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* every panel's title as a page's own title (the first panel's): one size, one line height */
 .sg-panel-head > .sg-section-badge, .sg-panel-head > .sg-panel-sub { margin: 0; }
+.sg-panel-head > h2 .sg-tip { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); vertical-align: middle; }   /* the row's tip after its title, at the table's size */
 .sg-panel-sub { color: var(--sg-muted); font-size: var(--sg-s); overflow-wrap: anywhere; }
 /* Where a panel sits, each level from the outermost, as a breadcrumb: the page under it, the component, the tab, the task. */
 .sg-nav a > .sg-nav-tag { margin-left: auto; padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-s); color: var(--sg-muted); font-size: var(--sg-xs, var(--sg-s)); line-height: var(--sg-lh); }   /* a component the code has only as a CSS class */
@@ -1537,11 +1539,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh); font-weight: var(--sg-text-weight); color: var(--sg-text); }
 /* A panel's card in the page's running text, the table's own: one size and one line height for all it holds, each
    finding a paragraph of its own (its sign, a table's mark, left to the table). */
-.sg-row-detail-body :is(.pg-a11y-item, .pg-par-val, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }
+.sg-row-detail-body :is(.pg-a11y-item, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }   /* a secondary line (pg-par-val) keeps the table's own size and colour */
 .sg-row-detail-body .pg-a11y-item { display: block; }
 .sg-row-detail-body .pg-a11y-item > [class^="pg-par--"]:first-child { display: none; }
-.sg-row-detail-body .pg-par-val { color: var(--sg-text-2); }
-.sg-affects th, .sg-affects td { position: static; white-space: normal; }   /* in a panel's card: a plain table, nothing sticks */
+.sg-affects th, .sg-affects td { position: static; white-space: normal; overflow-wrap: normal; word-break: normal; }
+.sg-affects { table-layout: auto; }   /* each column as wide as its words, never a word cut in two */   /* in a panel's card: a plain table, nothing sticks */
 .sg-affects .pg-par-val { display: block; }
 .sg-row-detail-body > p, .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-xs); }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
@@ -1873,7 +1875,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // A panel's head: where it is (each level, from the outermost), then its title, then what it is in full.
   function sidePanelPage(o) {
     var crumbs = (o.crumbs || []).filter(Boolean);
-    return '<header class="sg-panel-head">' + (crumbs.length ? '<nav class="sg-panel-crumbs" aria-label="Where you are">' + crumbs.map(function (c) { return '<span>' + esc(c) + '</span>'; }).join('') + '</nav>' : o.badge ? '<p class="sg-section-badge">' + esc(o.badge) + '</p>' : '') + '<h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p class="sg-panel-sub">' + esc(o.sub) + '</p>' : '') + '</header>' +
+    return '<header class="sg-panel-head">' + (crumbs.length ? '<nav class="sg-panel-crumbs" aria-label="Where you are">' + crumbs.map(function (c) { return '<span>' + esc(c) + '</span>'; }).join('') + '</nav>' : o.badge ? '<p class="sg-section-badge">' + esc(o.badge) + '</p>' : '') + '<h2>' + esc(o.title) + (o.titleTip ? ' ' + o.titleTip : '') + '</h2>' + (o.sub ? '<p class="sg-panel-sub">' + esc(o.sub) + '</p>' : '') + '</header>' +
       '<div class="sg-panel-body">' + o.body + '</div>';
   }
   // The components a token is used by, as the Status table shows them: whether Figma and the code have each, and an
@@ -5404,7 +5406,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var d = ROW_DETAIL[id]; if (!d) return;
     var r = d.r, m = document.getElementById('sg-row-panel');
     if (!m) {
-      m = document.createElement('div'); m.id = 'sg-row-panel'; m.className = 'sg-comp-panel sg-comp-panel--narrow'; m.hidden = true;
+      m = document.createElement('div'); m.id = 'sg-row-panel'; m.className = 'sg-comp-panel sg-comp-panel--wide'; m.hidden = true;
       m.innerHTML = '<div class="sg-comp-panel-scrim" data-panel-close></div><div class="sg-comp-panel-box" role="dialog" aria-modal="true" aria-label="Row details" tabindex="-1"><button type="button" class="sg-btn sg-comp-panel-close" data-panel-close aria-label="Close">' + MX_COLLAPSE + '</button><div class="sg-tk-detail sg-row-detail"></div></div>';
       (document.querySelector('.sg-layout') || document.body).appendChild(m);
       m._shut = function () { m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
@@ -5415,6 +5417,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var tmp = document.createElement('div'); tmp.innerHTML = r.kind ? esc(r.kind) : r.kindHTML || '';
     Array.prototype.forEach.call(tmp.querySelectorAll('.sg-tip, [role="tooltip"], .sg-hidden-text'), function (x) { x.remove(); });
     var title = tmp.textContent.trim() || d.area || 'Row';
+    // The tip the row's name carries in the table, after the panel's title too (a copy, its ids its own).
+    var tipNode = null, tipBox = document.createElement('div'); tipBox.innerHTML = r.kindHTML || '';
+    var tipSrc = tipBox.querySelector('.sg-tip');
+    if (tipSrc) { tipNode = tipSrc.cloneNode(true); Array.prototype.forEach.call([tipNode].concat(Array.prototype.slice.call(tipNode.querySelectorAll('[id], [aria-describedby], [aria-controls]'))), function (n) { ['id', 'aria-describedby', 'aria-controls'].forEach(function (a) { if (n.getAttribute && n.getAttribute(a)) n.setAttribute(a, n.getAttribute(a) + '-panel'); }); }); }
     // Its task number, as the table and the Status page number it.
     var nr = isOpen(r) ? TODO_NO[r.key] : null;
     var comp = String(r.key || '').split('\u0000')[0];
@@ -5450,7 +5456,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var det = m.querySelector('.sg-row-detail');
     var trail = trailHere(from);
     if (comp && trail.indexOf(comp) < 0) trail.push(comp);
-    det.innerHTML = sidePanelPage({ crumbs: trail.concat([d.area || 'Task', nr ? 'Task ' + nr : '']), title: title, body: body });
+    det.innerHTML = sidePanelPage({ crumbs: trail.concat([d.area || 'Task', nr ? 'Task ' + nr : '']), title: title, titleTip: tipNode ? tipNode.outerHTML : '', body: body });
     m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
@@ -6010,7 +6016,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var mxRows = COMPONENTS.map(function (c) {
       var st = componentStates(c, ALL || !!c.__a11y), all = st.all, untested = st.untested, parC = st.par, accC = st.acc, docC = st.doc, fix = st.fix, dec = st.dec;
-      return mxRow({ name: c.name, figma: !c.codeOnly, code: cssOnly(c) ? 'missing' : 'found', nocode: cssOnly(c), par: parC, acc: accC, doc: docC, fix: fix, dec: dec, done: !fix && !dec && !untested, untested: untested, at: latest(all), href: '#' + cid(c.name),
+      // Only a CSS class in the code: Missing there, as one only Figma has; nothing compared or tried until it is built.
+      if (cssOnly(c)) { parC = C('none', 'N/A', 0, 0, NA_WHY.cssOnly); accC = C('none', 'N/A', 0, 0, NA_WHY.cssOnlyA11y); docC = C('differs', 'Missing', 1, 0); fix = 1; dec = 0; untested = false; }
+      return mxRow({ name: c.name, figma: !c.codeOnly, code: cssOnly(c) ? 'missing' : 'found', nocode: cssOnly(c), par: parC, acc: accC, doc: docC, fix: fix, dec: dec, done: !fix && !dec && !untested, untested: untested, at: latest(all), href: cssOnly(c) ? null : '#' + cid(c.name),   // no component in the code: nothing to open, as one only Figma has
         codeWhy: cssOnly(c) ? 'The code has only its CSS class' + (c.cls ? ' (.' + c.cls + ')' : '') + ', no component file: it is not a component of the code yet. Build it as one, with the props Figma gives it.' : c.codeOnly && c.codeOnly.figma ? 'The code has ' + c.name + ' (' + c.codeOnly.file + '); Figma has no component for it. Add ' + c.name + ' to Figma, remove it from the code, or keep it as a known exception.' : '' });
     });
     // A component of Figma's the code may have (a file suggested, or several as likely: Unsure, to confirm), one it has
@@ -6021,7 +6029,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (shown[name]) return; shown[name] = true;
       var f = !r.from.codeOnly, unsure = !!r.from.pairing && r.from.match !== 'none' && !SR_MISSING[name];
       mxRows.push(mxRow({ name: name, figma: f, code: !f ? 'found' : unsure ? 'unsure' : 'missing',
-        par: unsure ? C('figma', 'Unsure', 0, 1) : C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnly : NA_WHY.codeOnly), acc: C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnly : NA_WHY.codeOnly), doc: f && !unsure ? C('differs', 'Missing', 1, 0) : C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnly : NA_WHY.codeOnly),
+        par: unsure ? C('none', 'N/A', 0, 0, 'Its file in the code is still to confirm (Code: Unsure): nothing is compared until it is.') : C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnly : NA_WHY.codeOnly), acc: C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnlyA11y : NA_WHY.codeOnly), doc: f && !unsure ? C('differs', 'Missing', 1, 0) : C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnly : NA_WHY.codeOnly),
         fix: unsure ? 0 : 1, dec: unsure ? 1 : 0, nocode: f && !unsure, unsure: unsure, at: r.at,
         codeWhy: (SR_MISSING[name] ? 'The Showroom found it missing from the code. ' : '') + String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim() }));
     });
@@ -6045,12 +6053,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Each state opens the one that sets it (the part whose state the row shows, read before the row's own is
       // replaced), on what that one has to fix or decide, so the page it opens says the same word; one with no page of
       // its own opens nothing.
+      // Its Parity, Accessibility and Documentation are read from what has a page to open (the component and its parts in
+      // the code); a part only Figma has counts in the Code column, never as a state that opens nothing.
+      var paged = all.filter(function (x) { return x.href; }), areaOf = paged.length ? paged : all;
       var setBy = {};
       ['par', 'acc', 'doc'].forEach(function (k) {
-        var from = all.filter(function (x) { return x[k]; }).reduce(function (m, x) { return !m || RANK(x[k]) > RANK(m[k]) ? x : m; }, null);
+        var from = areaOf.filter(function (x) { return x[k]; }).reduce(function (m, x) { return !m || RANK(x[k]) > RANK(m[k]) ? x : m; }, null);
         if (from) setBy[k] = { href: from.href || null, st: from[k].fix ? 'todo' : from[k].dec ? 'check' : '' };
       });
-      h.par = worst(all.map(function (x) { return x.par; }), true); h.acc = worst(all.map(function (x) { return x.acc; })); h.doc = worst(all.map(function (x) { return x.doc; }));
+      h.par = worst(areaOf.map(function (x) { return x.par; }), true); h.acc = worst(areaOf.map(function (x) { return x.acc; })); h.doc = worst(areaOf.map(function (x) { return x.doc; }));
       ['par', 'acc', 'doc'].forEach(function (k) { if (setBy[k]) { h[k].href = setBy[k].href; h[k].st = setBy[k].st; } });
       h.fix = all.reduce(function (n, x) { return n + (x.fix || 0); }, 0); h.dec = all.reduce(function (n, x) { return n + (x.dec || 0); }, 0);
       h.untested = all.some(function (x) { return x.untested; }); h.done = !h.fix && !h.dec && !h.untested;
@@ -6172,6 +6183,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var NA_WHY = {
     codeOnly: 'Only the code has this component: Figma has nothing to compare it with.',
     figmaOnly: 'Only Figma has this component: the code has nothing to compare it with yet.',
+    // Accessibility is tried on the code, not compared: one not in the code has nothing to try yet.
+    figmaOnlyA11y: 'Not in the code yet: there is nothing to try in a browser until it is built.',
+    cssOnly: 'Not a component of the code yet (the code has only its CSS class): nothing to compare until it is built.',
+    cssOnlyA11y: 'Not a component of the code yet (the code has only its CSS class): nothing to try in a browser until it is built.',
     Parity: 'Nothing of it was read from Figma or the code to compare yet.',
     Accessibility: 'No accessibility check applies to it.',
     Documentation: 'No kind of documentation applies to it.'
@@ -6241,7 +6256,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var states = function (list, pick) {
       var by = {}, out = [];
       list.forEach(function (o) { var x = pick(o), w = x.say === '–' ? 'N/A' : x.say; if (!by[w]) { by[w] = { cls: BAR[x.cls] || 'none', n: 0, word: w }; out.push(by[w]); } by[w].n++; });
-      return out.sort(function (p, q) { return ORDER_[p.cls] - ORDER_[q.cls] || q.n - p.n; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + (x.word === 'N/A' ? 'with nothing to compare' : /^[A-Z]{2}/.test(x.word) ? x.word : x.word.charAt(0).toLowerCase() + x.word.slice(1)) }; });   // N/A said in words: only one side has it, or nothing of this kind to check
+      return out.sort(function (p, q) { var a = MX_ORDER.indexOf(p.word), b = MX_ORDER.indexOf(q.word); return (a < 0 ? 99 : a) - (b < 0 ? 99 : b) || ORDER_[p.cls] - ORDER_[q.cls]; }).map(function (x) { return { cls: x.cls, n: x.n, word: x.word, say: x.n + ' ' + (x.word === 'N/A' ? 'with nothing to compare' : /^[A-Z]{2}/.test(x.word) ? x.word : x.word.charAt(0).toLowerCase() + x.word.slice(1)) }; });   // N/A said in words: only one side has it, or nothing of this kind to check
     };
     var countOf = function (parts, word) { return (parts.filter(function (x) { return x.word === word; })[0] || { n: 0 }).n; };
     // Each button the same few words, the legend's own: See 141 differs, See 60 missing.
@@ -6263,20 +6278,24 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var lower = function (xs) { return xs.map(function (x) { return x.charAt(0).toLowerCase() + x.slice(1); }); };
     var listed = function (xs) { return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs.join(''); };
-    var parP = states(built, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
-    var accP = states(built, function (o) { return o.acc; }), docP = states(built, function (o) { return o.doc; });
+    // Each card counts the rows its column's filter counts: every row whose state there applies (never an N/A), so a
+    // card's numbers and its filter's are the same.
+    var applies = function (pick) { return mx.filter(function (o) { var x = pick(o); return x && x.say !== 'N/A' && x.say !== '–'; }); };
+    var parRows = applies(function (o) { return o.par; }), accRows = applies(function (o) { return o.acc; }), docRows = applies(function (o) { return o.doc; });
+    var parP = states(parRows, function (o) { return o.par; }), codeP = states(mx, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
+    var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; });
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
-    var pT = card('Figma × Code Parity', parP, 'Match', built.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'));
-    var iT = card('Code Implementation', codeP, 'Found', figmaRows.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'));
-    var aT = card('Accessibility', accP, 'Pass', built.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'To review', 'AccessibilityReview'));
-    var dT = card('AI-ready Documentation', docP, 'Ready', built.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
+    var pT = card('Figma × Code Parity', parP, 'Match', parRows.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'));
+    var iT = card('Code Implementation', codeP, 'Found', mx.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'));
+    var aT = card('Accessibility', accP, 'Pass', accRows.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'To review', 'AccessibilityReview'));
+    var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    pT.how = 'Figma\'s components the code has.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
-    iT.how = 'Every component in Figma.' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
-    aT.how = 'Figma\'s components the code has.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
-    dT.how = 'Figma\'s components the code has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
+    pT.how = 'Every component Figma and the code both have.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
+    iT.how = 'Every component, in Figma or in the code.' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
+    aT.how = 'Every component the code has: what is not in the code has nothing to try.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
+    dT.how = 'Every component, in Figma or in the code.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
@@ -6297,7 +6316,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var MX_COLS = ['Component', 'Figma', 'Code', 'Parity', 'Accessibility', 'Documentation', 'Last checked'];
   // Each column's states in one word, the same in the table, the cards and the chips.
   var MX_WORD = { code: { found: 'Found', css: 'CSS only', unsure: 'Unsure', missing: 'Missing' } };
-  var MX_ORDER = ['Missing', 'Differs', 'Issues', 'Unsure', 'Review', 'Partial', 'Untested', 'Found', 'Match', 'Pass', 'Ready'];
+  // One order for a column's states, the cards' legends and the filters' lists alike: done first, then what is to
+  // check, then what is to fix, then what was not tried.
+  var MX_ORDER = ['Found', 'Match', 'Pass', 'Ready', 'Partial', 'Unsure', 'Review', 'Missing', 'Differs', 'Issues', 'Untested', 'N/A'];
   var MX_CHIP_COLS = [
     ['Figma', 'figma', function (o) { return o.figma ? 'Found' : 'Missing'; }],
     ['Code', 'code', function (o) { return MX_WORD.code[o.code]; }],
@@ -8030,6 +8051,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       INDEX = [];
       var add = function (kind, label, href, find, more) { INDEX.push({ kind: kind, label: label, href: href, find: find || null, hay: [label].concat(more || []).join(' ').toLowerCase() }); };   /* only components, tokens and icons, each by its own name and values */
       COMPONENTS.forEach(function (c) {
+        if (cssOnly(c)) return;   // not a component of the code yet: no page to find
         add('Component', c.name, '#' + cid(c.name), null, [c.cls]);   /* by its name and class: not its props, slots or words */
         ((c.ownTokens && c.ownTokens.colors) || []).concat((c.ownTokens && c.ownTokens.sizes) || []).forEach(function (t) { add('Token in ' + c.name, t.figma, '#' + cid(c.name), t.figma, [t.var, t.value]); });
       });
