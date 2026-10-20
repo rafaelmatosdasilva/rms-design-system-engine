@@ -224,6 +224,12 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`location.hash = '#c-chip'`);
     assert.equal(await shownIs('c-chip'), 'c-chip');
     await until(`document.querySelectorAll('.pg-preview').length`, (v) => v === 1);
+    // Each row of its tables (Parity, Accessibility, Documentation…) opens in full in a side panel, a card per column.
+    const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
+      return p && !p.hidden ? { title: p.querySelector('.sg-panel-head h2').textContent, cards: p.querySelectorAll('.sg-row-detail-body').length, sub: p.querySelector('.sg-panel-sub')?.textContent ?? '' } : null; })()`, (v) => !!v);
+    assert.ok(rowPanel && rowPanel.title && rowPanel.cards >= 2, JSON.stringify(rowPanel));
+    await run(`document.querySelector('#sg-row-panel [data-panel-close]').click()`);
+    assert.equal(await until(`document.getElementById('sg-row-panel').hidden`, (v) => v === true), true, 'it closes');
     assert.equal(await run(`document.querySelectorAll('.pg-preview').length`), 1);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`), 24);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);

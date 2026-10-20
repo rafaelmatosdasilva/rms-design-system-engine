@@ -272,9 +272,10 @@ Where it is used: each component's `intentLayer` in `design-intent.json` (with i
 authored `whenNotToUse` first), and the prototype context (its own `intent` lines per component, its "when not
 to use" lines as never sentences the check holds; each pattern, template, page and flow page as a rule). In the
 style guide each component's Documentation merges it with Figma, the code and the contract, each line under its
-source with a link to its page, plus an Intent layer row: its page, and a What was read from its page you can open
-with every line the engine took from it, kind by kind, its other sections, its status and what was left out and why
-(or, with no page, one to write); the **For
+source with a link to its page, plus an Intent layer row: its page and how many lines were read (or, with no page,
+one to write). Every row of a component's tables opens in a side panel with all of it, nothing cut short; for the
+Intent layer row that is every line the engine took from the page, kind by kind, its other sections, its status and
+what was left out and why; the **For
 agents** page lists every page as used, thin or not used, with what the agents get and where, and for each part
 that reaches no agent why, what to change so it does, and whether to remove it. The audit prints the same counts.
 

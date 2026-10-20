@@ -1505,8 +1505,13 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 /* The For agents page: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
-.sg-il-read > summary { cursor: pointer; color: var(--sg-muted); font-size: var(--sg-s); }
-.sg-il-read[open] > summary { margin-bottom: var(--sg-space-xs); }
+/* Each task row opens in full in the side panel: a long cell shows its first lines, faded, in the table. */
+tr.sg-row-open { cursor: pointer; }
+tr.sg-row-open:hover > td { background: var(--sg-a3); }
+tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: -2px; }
+.sg-cell-clip { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); }
+.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; }
+.sg-row-detail-body > p, .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-xs); }
 .sg-il-title { margin: var(--sg-space-l) 0 var(--sg-space-s); border: 0; background: none; padding: 0; font-size: var(--sg-m, 1rem); color: var(--sg-text, inherit); }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
@@ -2868,8 +2873,10 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       listOf(il.sections).map(function (x) { return '<p class="pg-par-val">' + esc(x.title) + ' (another section)</p>' + paras([x.text]); }).join('') +
       (il.status ? '<p class="pg-par-val">Status</p>' + paras([il.status]) : '') +
       (listOf(il.facts).length || il.repeated ? '<p class="pg-par-val">Left out</p>' + paras([].concat(listOf(il.facts).length ? [listOf(il.facts).join(', ') + ': facts the engine reads from Figma and the code'] : [], il.repeated ? [il.repeated + ' lines the same on every page of its kind'] : [])) : '');
-    var details = '<details class="sg-il-read"><summary>What was read from its page (' + n + (n === 1 ? ' line' : ' lines') + ')</summary>' + body + '</details>';
-    return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + details + (said ? '' : '<p class="pg-missing">Its page says nothing an agent reads: the For agents page says why.</p>'),
+    // In the table: its page and how much was read; the row opens everything read, in the side panel (writtenFull).
+    var none = said ? '' : '<p class="pg-missing">Its page says nothing an agent reads: the For agents page says why.</p>';
+    return { key: c.name + '\u0000doc:intent', area: 'Documentation', kind: 'Intent layer', written: link + '<p class="pg-par-val">' + n + (n === 1 ? ' line' : ' lines') + ' read from its page. Open the row to see them.</p>' + none,
+      writtenFull: link + '<p class="pg-par-val">What was read from its page (' + n + (n === 1 ? ' line' : ' lines') + ')</p>' + body + none,
       todo: said ? '' : esc('See the For agents page for what to change on its page.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: ['The intent layer (' + il.file + ')'] };
   };
   // Its notes no agent is given (Figma's annotations, the code's notes): each with why, what to do, and whether to remove
@@ -5245,11 +5252,11 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   var ISSUE_CELL = {
     no: function (r) { var n = isOpen(r) ? TODO_NO[r.key] : null; return '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>'; },
     kind: function (r) { return '<td class="sg-todo-area">' + (r.kindHTML || esc(r.kind || '')) + '</td>'; },
-    figma: function (r) { return '<td>' + (r.figma || '') + '</td>'; },
+    figma: function (r) { return '<td>' + clip(r.figma) + '</td>'; },
     // When it was last updated, in a column of its own: short, the full date and time on hover.
     updated: function (r) { return '<td class="pg-at-cell">' + (r.at ? '<span class="pg-at-date" title="' + esc(when(r.at)) + '">' + esc(whenShort(r.at)) + '</span>' : '') + '</td>'; },
-    written: function (r) { return '<td class="pg-written">' + (r.written || '') + '</td>'; },
-    code: function (r) { return '<td>' + (r.code || '') + '</td>'; },
+    written: function (r) { return '<td class="pg-written">' + clip(r.written) + '</td>'; },
+    code: function (r) { return '<td>' + clip(r.code) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
     todo: function (r) { return '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>'; },
     status: function (r) { return '<td>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel, r.area) + (r.fresh && isOpen(r) ? '<span class="pg-par-val">New in the last audit</span>' : '') + (r.src || []).filter(Boolean).map(function (x) { return '<span class="pg-a11y-from">' + esc(x) + '</span>'; }).join('') + '</td>'; }
@@ -5265,10 +5272,51 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     Page: [['Task nr', 'no'], ['Kind', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Updated', 'updated']]
   };
   var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
+  // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
+  // opens in the side panel (openRowPanel).
+  function clip(html) { html = html || ''; return /<(p|div|details|table|ul)\b/i.test(html) || html.replace(/<[^>]+>/g, '').length > 180 ? '<div class="sg-cell-clip">' + html + '</div>' : html; }
+  var ROW_DETAIL = [];   // every row drawn, by its index: what its side panel shows
   function issueRowHTML(r, area) {
-    return '<tr data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
-      colsOf(area || r.area).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '</tr>';
+    var a = area || r.area, id = ROW_DETAIL.push({ r: r, area: a }) - 1;
+    return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
+      colsOf(a).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '</tr>';
   }
+  // A row in full, in a panel from the right, as a token opens: each column of its table as a card, nothing cut short,
+  // and what the table only counts (what was read from a page) written out.
+  function openRowPanel(id, from) {
+    var d = ROW_DETAIL[id]; if (!d) return;
+    var r = d.r, m = document.getElementById('sg-row-panel');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'sg-row-panel'; m.className = 'sg-comp-panel sg-comp-panel--narrow'; m.hidden = true;
+      m.innerHTML = '<div class="sg-comp-panel-scrim" data-panel-close></div><div class="sg-comp-panel-box" role="dialog" aria-modal="true" aria-label="Row details" tabindex="-1"><button type="button" class="sg-btn sg-comp-panel-close" data-panel-close aria-label="Close">' + MX_COLLAPSE + '</button><div class="sg-tk-detail sg-row-detail"></div></div>';
+      (document.querySelector('.sg-layout') || document.body).appendChild(m);
+      m._shut = function () { m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
+      m.addEventListener('click', function (e) { if (e.target.closest('[data-panel-close]') || e.target.closest('.sg-row-detail a[href^="#"]')) m._shut(); });
+      m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.isTrusted) { e.stopPropagation(); m._shut(); } });
+    }
+    var tmp = document.createElement('div'); tmp.innerHTML = r.kindHTML || esc(r.kind || ''); var title = tmp.textContent.trim() || d.area || 'Row';
+    var comp = String(r.key || '').split('\u0000')[0];
+    var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+    var body = colsOf(d.area).filter(function (col) { return ['no', 'kind', 'updated'].indexOf(col[1]) < 0; }).map(function (col) {
+      var k = col[1];
+      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : '') || '<p class="pg-missing">Nothing to do.</p>');
+      if (k === 'status') return card(col[0], '<p>' + statusHTML(r.st, r.st === 'done' ? '' : r.rel, d.area) + '</p>' + ((r.src || []).filter(Boolean).length ? '<p class="pg-par-val">Where it was read</p>' + r.src.filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') : '') + (r.at ? '<p class="pg-par-val">Updated ' + esc(when(r.at)) + '</p>' : ''));
+      var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
+      return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
+    }).join('');
+    var det = m.querySelector('.sg-row-detail');
+    det.innerHTML = sidePanelPage({ badge: d.area || 'Task', title: title, sub: comp && comp !== title ? comp : '', body: body });
+    m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
+    requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
+    m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
+  }
+  // A click on a row (not on a link or a button in it), or Enter on it, opens it in full.
+  document.addEventListener('click', function (e) {
+    var tr = e.target.closest && e.target.closest('tr.sg-row-open'); if (!tr) return;
+    if (e.target.closest('a, button, input, select, textarea, summary, label, [contenteditable]') || String(window.getSelection && window.getSelection()).length) return;
+    openRowPanel(+tr.getAttribute('data-row-detail'), tr);
+  });
+  document.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr.sg-row-open'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRowPanel(+tr.getAttribute('data-row-detail'), tr); } });
   // Each open row's task number, as the Status page numbers it.
   function fillTodoNos(root) {
     Array.prototype.forEach.call(root.querySelectorAll('.sg-todo-no[data-todo-key]'), function (el) {
