@@ -34,7 +34,8 @@
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-line-colour);
   /* The page's lines: the system's border in light; in dark the text's colour, faint and see-through, so a line keeps
      its edge and blends with whatever background a brand gives the page. */
-  --sg-line-colour: color-mix(in srgb, var(--sg-border), var(--sg-text) 10%);   /* in light, the system's border a tenth of the way to the text, so lines read; in dark, see-through */
+  --sg-line-colour: color-mix(in srgb, var(--sg-border), var(--sg-text) 10%);
+  --sg-line-solid: var(--sg-line-colour);   /* in light, the system's border a tenth of the way to the text, so lines read; in dark, see-through */
   --sg-chevron-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m4 6 4 4 4-4'/%3E%3C/svg%3E");   /* a select's chevron */
   --sg-info-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.25'/%3E%3Cpath d='M8 7.5V11M8 4.75h.01'/%3E%3C/svg%3E");   /* the info box's mark */
   /* The page's see-through fills: the text's colour at five strengths, and nothing between them. 1: a resting field or
@@ -94,6 +95,7 @@
   --sg-bg: #161618; --sg-bg-2: #1e1e21; --sg-surface: #161618;
   --sg-text: #e6e6e8; --sg-text-2: #d4d4d8; --sg-muted: #a1a1aa; --sg-border: #52525b; --sg-accent: #6cb4ff;
   --sg-line-colour: color-mix(in srgb, var(--sg-text) 18%, transparent);
+  --sg-line-solid: color-mix(in srgb, var(--sg-text) 18%, var(--sg-bg));   /* the same line, solid: where pieces of it meet, nothing doubles or shows through */
   --sg-warning-ink: var(--sg-warning);
   --sg-tint: color-mix(in srgb, var(--sg-text) 2.5%, transparent);
 }
@@ -705,7 +707,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
    is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
 .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow var(--sg-fast); }
-.sg-sticky-edge { box-shadow: 0 var(--sg-stick-gap) 0 0 var(--sg-bg); }   /* the lowest stuck bar paints the page's gap under its line, so nothing shows sliced right under it */
+.sg-sticky-edge { box-shadow: 0 calc(var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 0 var(--sg-bg); }   /* the lowest stuck bar paints the page's gap under its line, so nothing shows sliced right under it */
 /* A bar that sticks spans the content's whole width (into the page's side padding), so nothing shows beside it; once
    stuck, the lowest one has the page's line under it, as wide. */
 :is(.sg-hero > h1, .pg-head, .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head)::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-main-pad, 0px)); right: calc(-1 * var(--sg-main-pad, 0px)); background: var(--sg-bg); z-index: -1; pointer-events: none; }
@@ -1525,7 +1527,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-section > .pg-areas ~ .pg-area { padding-top: 0; margin-top: var(--sg-stick-gap); }
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); }
 :is(.pg-par-card, .pg-inspect, .pg-code) { overflow-clip-margin: var(--sg-radius); }   /* room for the gap and the line it paints above itself (a plain length: the browser drops a calc() here) */
-:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-colour), 0 calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg); }   /* its top line, and the gap above it painted with the page */
+:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid), 0 calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg); }   /* its top line, and the gap above it painted with the page */
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head)::before,
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:last-child, .pg-inspect-head, .pg-code-head)::after { content: ''; position: absolute; top: calc(-1 * (var(--sg-stick-gap) + var(--sg-line-width, 1px))); width: var(--sg-radius); height: calc(var(--sg-stick-gap) + var(--sg-radius)); pointer-events: none; }   /* the gap above a corner (the card's side line hidden there), then the corner's curve, its edges a little soft so it reads as smooth as the card's own */
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head)::before { left: calc(-1 * var(--sg-line-width, 1px)); background: linear-gradient(var(--sg-bg), var(--sg-bg)) 0 0 / 100% var(--sg-stick-gap) no-repeat, radial-gradient(circle at 100% 100%, transparent calc(var(--sg-radius) - 1.6px), var(--sg-line-colour) calc(var(--sg-radius) - 1px), var(--sg-line-colour) calc(var(--sg-radius) - 0.4px), var(--sg-bg) calc(var(--sg-radius) + 0.2px)) 0 100% / 100% var(--sg-radius) no-repeat; }
