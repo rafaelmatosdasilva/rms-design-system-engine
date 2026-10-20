@@ -693,7 +693,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) {
         const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
         // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
-        // the contract); the For agents page gathers every page of it apart.
+        // the contract); the Intent layer page reviews every page of it apart.
         if (!il && hasLayer) c.intentLayer = { none: true };
         if (il) c.intentLayer = { source: il.source ?? 'the intent layer', file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null, sections: il.sections ?? null, facts: il.facts ?? null, repeated: il.repeated ?? 0 };
         c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c), intentLayer: il });
@@ -704,10 +704,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const il = await import('./intent-layer.mjs');
       const snap = il.readIntentLayer(ROOT, cfg);
       if (snap) {
-        const names = (view.allComponents ?? view.components).map((c) => c.name);
-        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)));
+        // The components the agents get (the design intent's: Figma's, or with no Figma data the code's), not only the
+        // ones this page shows, so the page and the audit judge each page alike.
+        const names = Object.keys(designIntent().components ?? {}).length ? Object.keys(designIntent().components) : (view.allComponents ?? view.components).map((c) => c.name);
+        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)) });
         const src = snap._source ?? {};
-        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, repeated: snap.boilerplate ?? 0, pages: report.pages,
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, repeated: snap.boilerplate ?? 0, pages: report.pages,
           noPage: names.filter((n) => !report.pages.some((p) => p.component === n)) };
       }
     } catch { /* no intent layer */ }

@@ -255,7 +255,7 @@ component's `guidelines` in `design-intent.json`, the rest in the global block, 
 source is an adapter (`intent-layer.mjs` → `SOURCES`) that reads its own format, read-only, into a snapshot in one
 shape: pages, each with what it is for, when to use it, when not to, common mistakes, limitations, rules, its other
 sections and what was left out. Everything that reads it (the design intent, the contracts, `llms.txt`, the
-prototypes, the style guide and the For agents page) takes only that shape and names each line by its source, so
+prototypes, the style guide and its Intent layer page) takes only that shape and names each line by its source, so
 another source (a design tool's own specs, another format) is one adapter, nothing else changed. Where two sources
 document one component, the first configured one is its page. The first source is the intent layer below.
 
@@ -284,9 +284,15 @@ style guide each component's Documentation merges it with Figma, the code and th
 source with a link to its page, plus an Intent layer row: its page and how many lines were read (or, with no page,
 one to write). Every row of a component's tables opens in a side panel with all of it, nothing cut short; for the
 Intent layer row that is every line the engine took from the page, kind by kind, its other sections, its status and
-what was left out and why; the **For
-agents** page lists every page as used, thin or not used, with what the agents get and where, and for each part
-that reaches no agent why, what to change so it does, and whether to remove it. The audit prints the same counts.
+what was left out and why. The **Intent layer** page reviews every page with one decision, said as an instruction,
+most urgent first: **delete it** (it says nothing of its own once filler and facts are out, its code file is gone,
+or a component's page already says it), **move it, then delete it** (it is about a part of a component that has its
+own page: `PointListItem` beside `pointList`), **rename it** (a component's name with a generic word added, as
+"Panel General" for `panel`, when no page documents that component yet), **name it as in Figma** (it matches
+no component the engine can find), **write it**, **complete it** (what it is for, or when and when not to use it, is
+missing), **keep it, tidy it** (lines repeated on every page, facts, sections under a title no agent reads) or
+**keep it**; each with why, each change it takes and what the agents get from it. The engine never changes the
+layer: the changes are the team's. The audit prints how many pages each decision has.
 
 The **For agents** row of a component's Documentation rates how much an agent can take from everything written about
 it, wherever it is written (its intent-layer page, its Figma description and annotations, a guidelines section
@@ -294,7 +300,7 @@ headed with its name): what it is, when to use it, when not to, its role, an exa
 Each source is read the same way, so what is missing can be written in whichever the team keeps; nothing has to be
 in Figma. `--guidance-rating` reads the same sources.
 
-The same page does it for Figma and the code: a component's Figma description, its When to use and When not to use
+The **For agents** page does the same for Figma and the code: a component's Figma description, its When to use and When not to use
 lines and the contract reach the agents in full, while its notes (Figma annotations, the code's note and the
 comment above its CSS rule) reach only the prototype context, the first three of them printed. A note that repeats
 the description or another note, one that is only a link or only says how the component is built, and a note past

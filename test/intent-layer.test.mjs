@@ -479,3 +479,42 @@ test('setup with a documentation link: a GitLab project is the intent layer, a w
   assert.deepEqual(b.cfg.guidelines.source.gitlab, ['https://git.acme.test/design/ds/-/wikis/Buttons']);
   assert.equal(b.cfg.intentLayer, undefined);
 });
+
+// ── One decision per page ────────────────────────────────────────────────────────────────────────────────────────
+test('each page gets one decision, said as an instruction, with why: delete, move then delete, rename, name as in Figma, complete, keep', () => {
+  const v = (name, file, code, extra = {}) => ({ kind: 'component', layer: 'components', name, id: null, status: null, file, url: null, code, summary: null,
+    purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], facts: [], repeated: 0, ...extra });
+  const shared = { purpose: ['Show short supporting points.'], whenToUse: ['Keep items parallel.'], sections: [{ title: 'Decision Rules', text: 'Points, steps, clauses.' }] };
+  const entities = [
+    v('Point List', 'lists/point-list.json', 'src/lib/lists/PointList.vue', { ...shared, whenNotToUse: ['Not for actions.'] }),
+    v('Point List Item', 'lists/point-list-item.json', 'src/lib/lists/PointListItem.vue', { ...shared, sections: [...shared.sections, { title: 'Spacing', text: 'Items sit 8 apart.' }] }),
+    v('Point List Row', 'lists/point-list-row.json', 'src/lib/lists/PointListRow.vue', shared),
+    v('Calendar General', 'calendar/general.json', 'src/lib/calendar/General.vue', { purpose: ['Pick a date.'], whenToUse: ['One date.'] }),
+    v('Old Widget', 'old/widget.json', 'src/lib/old/Widget.vue', { purpose: ['Gone.'] }),
+    v('Empty Thing', 'x/empty.json', null, { repeated: 4, facts: ['API'] }),
+    v('Mystery Panel', 'x/mystery.json', null, { purpose: ['A panel nobody named.'] }),
+    v('Tag', 'tag.json', 'src/lib/tag/Tag.vue', { purpose: ['Label a thing.'] }),
+    v('Chip', 'chip.json', 'src/lib/chip/Chip.vue', { purpose: ['Filter a list.'], whenNotToUse: ['Not for one choice.'], repeated: 2 }),
+    v('Banner', 'banner.json', 'src/lib/banner/Banner.vue', { purpose: ['Say something to the whole page.'], whenToUse: ['A message for every section.'] }),
+  ];
+  const names = ['pointList', 'calendar', 'tag', 'chip', 'banner'];
+  const matched = matchComponents(names, entities, {});
+  const rep = useReport({ _source: {}, entities }, matched, { names, codeExists: (f) => !/old\/Widget/.test(f) });
+  const at = (n) => rep.pages.find((p) => p.name === n);
+  assert.equal(at('Banner').action, 'keep');
+  assert.deepEqual(at('Banner').todo, []);
+  assert.equal(at('Point List').action, 'tidy');                     // a section under a title no agent reads
+  assert.match(at('Point List').todo[0], /^Retitle Decision Rules as When to use, When not to use/);
+  assert.deepEqual([at('Point List Item').action, at('Point List Item').notUsed[0].reason], ['move', 'part']);
+  assert.match(at('Point List Item').todo[0], /^Move what is true of this part and not yet on Point List \(lists\/point-list\.json\) there.*then delete this page\.$/);
+  assert.match(at('Point List Item').notUsed[0].why, /PointListItem\.vue is a part of pointList/);
+  assert.deepEqual([at('Point List Row').action, at('Point List Row').decision, at('Point List Row').todo], ['delete', 'Delete it', ['Delete this page.']]);   // its parent's page says it all
+  assert.deepEqual([at('Calendar General').action, at('Calendar General').todo[0]], ['rename', 'Rename this page to calendar, the component\'s name in Figma.']);
+  assert.deepEqual([at('Old Widget').action, at('Old Widget').notUsed[0].reason], ['delete', 'codeGone']);
+  assert.deepEqual([at('Empty Thing').action, at('Empty Thing').notUsed[0].reason], ['delete', 'emptyPage']);
+  assert.deepEqual([at('Mystery Panel').action, at('Mystery Panel').notUsed[0].reason], ['name', 'noComponent']);
+  assert.deepEqual([at('Tag').action, at('Tag').todo], ['complete', ['Add when to use it and when not to, as sections with those titles.']]);
+  assert.deepEqual([at('Chip').action, at('Chip').todo], ['tidy', ['Remove the 2 lines written on every page alike, in whatever writes them.']]);
+  assert.equal(rep.actions.delete, 3);
+  for (const p of rep.pages) assert.ok(p.decision && Array.isArray(p.todo), p.name);
+});

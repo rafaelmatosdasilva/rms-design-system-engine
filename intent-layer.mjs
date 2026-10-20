@@ -198,7 +198,8 @@ const KIND_WORDS = { purpose: 'what it is for', whenToUse: 'when to use', whenNo
 //   thin:     some of it reaches them, but not what it is for together with when to use it
 //   not used: nothing of it reaches them
 // matched: Map(component → entity) from matchComponents. → { pages: [...], counts: { used, thin, notUsed } }
-export function useReport(snap, matched = new Map()) {
+// opts: { names: the system's components, codeExists(file): is that code file in the project }.
+export function useReport(snap, matched = new Map(), { names = [], codeExists = null } = {}) {
   const forEntity = new Map([...matched].map(([n, e]) => [e, n]));
   const pages = [];
   for (const e of snap?.entities ?? []) {
@@ -207,7 +208,7 @@ export function useReport(snap, matched = new Map()) {
     const reach = comp ? REACH.components : REACH.other;
     const gets = [], notUsed = [];
     if (comp && !component) {
-      notUsed.push(notUsedItem('the whole page', 'noComponent'));
+      notUsed.push({ what: 'the whole page', ...orphanAdvice(e, { entities: snap.entities, forEntity, names, codeExists }) });
     } else {
       for (const k of ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules']) {
         const n = (e[k] ?? []).length; if (!n) continue;
@@ -230,13 +231,94 @@ export function useReport(snap, matched = new Map()) {
     // when it says what it is for and gives a rule or a section to compose by.
     const how = has('whenToUse') || has('whenNotToUse') || (!comp && (has('rules') || has('sections') || has('mistakes')));
     const verdict = !gets.length ? 'not used' : has('purpose') && how ? 'used' : 'thin';
-    pages.push({ name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed });
+    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed };
+    Object.assign(page, decide(page, e, { comp, has }));
+    pages.push(page);
   }
   const counts = { used: 0, thin: 0, notUsed: 0 };
   for (const p of pages) counts[p.verdict === 'used' ? 'used' : p.verdict === 'thin' ? 'thin' : 'notUsed']++;
-  return { pages, counts };
+  const actions = Object.fromEntries(ACTIONS.map(([k]) => [k, pages.filter((p) => p.action === k).length]));
+  return { pages, counts, actions };
 }
 
+// ── One decision per page, and the changes it takes ─────────────────────────────────────────────────────────────────
+// What the team does with each page, most urgent first, said as an instruction: [key, the decision].
+export const ACTIONS = [
+  ['delete', 'Delete it'], ['move', 'Move it, then delete it'], ['rename', 'Rename it'], ['name', 'Name it as in Figma'],
+  ['write', 'Write it'], ['complete', 'Complete it'], ['tidy', 'Keep it, tidy it'], ['keep', 'Keep it'],
+];
+const ORPHAN_ACTION = { emptyPage: 'delete', codeGone: 'delete', partSaid: 'delete', copy: 'delete', part: 'move', rename: 'rename', noComponent: 'name' };
+// → { action, decision, todo: [each change, as an instruction] }
+function decide(page, e, { comp, has }) {
+  const label = (k) => ACTIONS.find(([x]) => x === k)[1];
+  if (comp && !page.component) {
+    const o = page.notUsed[0];
+    const action = ORPHAN_ACTION[o.reason] ?? 'name';
+    return { action, decision: label(action), todo: [o.fix] };
+  }
+  const todo = [];
+  if (!has('purpose')) todo.push(comp ? 'Add what it is for, as an Intent or Overview section.' : 'Add what it is for, as an Overview section.');
+  if (comp && !has('whenToUse') && !has('whenNotToUse')) todo.push('Add when to use it and when not to, as sections with those titles.');
+  for (const n of page.notUsed) {
+    if (n.reason === 'unknownTitle') todo.push(`Retitle ${n.what.replace(/^\d+ sections? \((.*)\)$/, '$1')} as When to use, When not to use, Common mistakes or Limitations where they say how to use it; leave the rest as they are, for people.`);
+    if (n.reason === 'facts') todo.push(`Remove ${n.what}: the engine reads them from Figma and the code, and a copy here goes out of date.`);
+    if (n.reason === 'repeated') todo.push(`Remove the ${n.what.replace(/ repeated lines?$/, '')} lines written on every page alike, in whatever writes them.`);
+    if (n.reason === 'morePurpose') todo.push('Put the sentence that matters most first in what it is for: agents read that one.');
+  }
+  const action = page.verdict === 'not used' ? 'write' : page.verdict === 'thin' ? 'complete' : todo.length ? 'tidy' : 'keep';
+  return { action, decision: label(action), todo };
+}
+
+
+// ── A page that names no component: what to do with it ──────────────────────────────────────────────────────────────
+// One decision, said plainly, from what the page is: nothing of its own once filler and facts are out (delete it); the
+// page of a code file that is gone (delete it); a component's name with a generic word added, for a component no page
+// documents yet (rename it); the page of a part of a component that has its own page (fold it into that page, or
+// delete it when that page already says it); the same words as a component's page (delete it); else name it as Figma
+// does, or add the component to Figma. A decision is said only when the page shows it; else the plain one.
+const linesOf = (e) => [...e.purpose, ...e.whenToUse, ...e.whenNotToUse, ...e.mistakes, ...e.limitations, ...e.rules.map((r) => r.text ?? r), ...e.sections.map((x) => `${x.title}: ${x.text}`)]
+  .map((t) => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()).filter(Boolean);
+const wordsOfName = (n) => String(n ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const shares = (a, b) => { const B = new Set(b); return a.length ? a.filter((x) => B.has(x)).length / a.length : 0; };
+const pageOf = (x) => `${x.name} (${x.file})`;
+export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = [], codeExists = null } = {}) {
+  const say = (reason, why, fix, remove) => ({ reason, why, fix, remove });
+  const mine = linesOf(e);
+  if (!mine.length) return say('emptyPage', 'It names no component of the system and, once the lines written on every page alike and the facts the engine reads from Figma and the code are left out, says nothing of its own.',
+    'Delete this page.', 'Yes.');
+  if (e.code && codeExists && !codeExists(e.code)) return say('codeGone', `It is the page of ${e.code}, which is no longer in the code.`, 'Delete this page.', 'Yes.');
+  const dir = (f) => String(f ?? '').split('/').slice(0, -1).join('/');
+  const others = entities.filter((x) => x !== e && x.layer === 'components');
+  const twins = others.filter((x) => !forEntity.has(x) && shares(mine, linesOf(x)) >= 0.8).map((x) => x.name);
+  const twinNote = twins.length ? ` The same text is on ${twins.length === 1 ? twins[0] : `${twins.length} other pages (${twins.slice(0, 3).join(', ')}${twins.length > 3 ? ', …' : ''})`} too.` : '';
+  // A component's name with a generic word added ("Panel General" for panel), for a component no page documents
+  // yet: the same component, under another name. Only one such component, or none is said.
+  const documented = new Set(forEntity.values());
+  const GENERIC = /^(general|generic|base|default|main|standard|component|basic|primary)$/;
+  const pageKey = norm(e.name);
+  const close = names.filter((n) => !documented.has(n) && norm(n).length >= 4 && pageKey.includes(norm(n)))
+    .filter((n) => wordsOfName(e.name).filter((w) => !norm(n).includes(w)).every((w) => GENERIC.test(w)));
+  if (close.length === 1) return say('rename', `It names no component of the system as Figma names it; ${close[0]} is that component, under its own name, and no page documents ${close[0]} yet.${twinNote}`, `Rename this page to ${close[0]}, the component's name in Figma.`, 'No.');
+  // A part of a component: its code file beside that component's, and its name (or its file's) holding the component's
+  // name (PointListItem beside pointList). Its page belongs in that component's page.
+  const ownKey = [norm(e.name), norm(String(e.code ?? '').split('/').pop().replace(/\.[^.]+$/, ''))];
+  const parent = e.code ? others.filter((x) => forEntity.has(x) && x.code && dir(x.code) === dir(e.code))
+    .filter((x) => { const k = norm(forEntity.get(x).split('/').pop()); return k.length >= 4 && ownKey.some((o) => o !== k && o.includes(k)); })
+    .sort((a, b) => forEntity.get(b).length - forEntity.get(a).length)[0] : null;
+  if (parent) {
+    const said = shares(mine, linesOf(parent));
+    const short = e.code.split('/').pop();
+    return said >= 0.8
+      ? say('partSaid', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in Figma, and its page already says what this one says.${twinNote}`, 'Delete this page.', 'Yes.')
+      : say('part', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in Figma, so no agent is given this page.${twinNote}`,
+        `Move what is true of this part and not yet on ${pageOf(parent)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.');
+  }
+  // The same words as a component's page.
+  const copy = others.find((x) => forEntity.has(x) && shares(mine, linesOf(x)) >= 0.8);
+  if (copy) return say('copy', `It names no component of the system, and what it says is on the page of ${forEntity.get(copy)} (${copy.file}).${twinNote}`, 'Delete this page.', 'Yes.');
+  return say('noComponent', `Its name matches no component of the system, nor does the code file it names, so no agent is given it.${twinNote}`,
+    'Name it as the component is named in Figma. If the component is not in Figma yet, add it there; if it is not meant to be used, delete this page.', 'Only if the component is not meant to be used.');
+}
 
 // One line for the person, from a source's sync result (the DSDS adapter's words, the default).
 export const describeSync = dsds.describeSync;
