@@ -34,7 +34,8 @@
   --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-line-colour);
   /* The page's lines: the system's border in light; in dark the text's colour, faint and see-through, so a line keeps
      its edge and blends with whatever background a brand gives the page. */
-  --sg-line-colour: color-mix(in srgb, var(--sg-border), var(--sg-text) 10%);   /* in light, the system's border a tenth of the way to the text, so lines read; in dark, see-through */
+  --sg-line-colour: color-mix(in srgb, var(--sg-border), var(--sg-text) 10%);
+  --sg-line-solid: var(--sg-line-colour);   /* in light, the system's border a tenth of the way to the text, so lines read; in dark, see-through */
   --sg-chevron-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m4 6 4 4 4-4'/%3E%3C/svg%3E");   /* a select's chevron */
   --sg-info-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.25'/%3E%3Cpath d='M8 7.5V11M8 4.75h.01'/%3E%3C/svg%3E");   /* the info box's mark */
   /* The page's see-through fills: the text's colour at five strengths, and nothing between them. 1: a resting field or
@@ -94,6 +95,7 @@
   --sg-bg: #161618; --sg-bg-2: #1e1e21; --sg-surface: #161618;
   --sg-text: #e6e6e8; --sg-text-2: #d4d4d8; --sg-muted: #a1a1aa; --sg-border: #52525b; --sg-accent: #6cb4ff;
   --sg-line-colour: color-mix(in srgb, var(--sg-text) 18%, transparent);
+  --sg-line-solid: color-mix(in srgb, var(--sg-text) 18%, var(--sg-bg));   /* the same line, solid: where pieces of it meet, nothing doubles or shows through */
   --sg-warning-ink: var(--sg-warning);
   --sg-tint: color-mix(in srgb, var(--sg-text) 2.5%, transparent);
 }
@@ -108,6 +110,10 @@
    buttons and table cells content-box, and a component's padding counts on that). */
 .sg-page, .sg-page :where(*:not(:is(.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom) *)), .sg-page :where(*:not(:is(.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom) *))::before, .sg-page :where(*:not(:is(.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom) *))::after { box-sizing: border-box; }
 .sg-page { margin: 0; }
+/* The page's own buttons (a list's rows, a menu's options, its tabs) as tall as their words and padding make them, the
+   same in every system: a system's own button height (button { height: 24px }) is for its components, never the page's.
+   It weighs one class, so a rule of the page's that gives a button its height still wins. */
+:where(button)[class*="sg-"], :where(button)[class*="pg-"] { height: auto; }
 /* Only the page's own headings and paragraphs: a rule that reached into a preview would restyle the component. */
 :where(.sg-sidebar-header, .sg-hero, .sg-section, .sg-subsection, .sg-card, .pg-header, .pg-head, .sg-screens) > :where(h1, h2, h3, p, figure) { margin: 0; }
 /* The page's text (font, size, weight, line height, colour) is the system's own: its body rule, which the components
@@ -386,7 +392,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* The page's own info box, for every note it gives (an audit not run yet, a family that differs, what is left off): small
    words beside an info mark, on a quiet surface. A note that asks for something (sg-pending) carries the warning colour
    on its mark and its edge only. */
-.sg-info, .sg-pending { position: relative; display: block; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-tint); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-cell-x); padding-inline-start: calc(var(--sg-cell-x) + 1.15em + var(--sg-space-s)); margin: 0 0 var(--sg-space-l); max-width: 720px; }   /* a table row's room: the same padding as its cells */
+.sg-info, .sg-pending { position: relative; display: block; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-tint); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-cell-x); padding-inline-start: calc(var(--sg-cell-x) + 1.15em + var(--sg-space-s)); margin: 0 0 var(--sg-space-l); max-width: none; }   /* a table row's room: the same padding as its cells; one line while the page has the room */
 .sg-info::before, .sg-pending::before { content: ""; position: absolute; left: var(--sg-cell-x); top: calc(var(--sg-cell-x) + 0.15em); width: 1.15em; height: 1.15em; background: currentColor; -webkit-mask: var(--sg-info-mark) center / contain no-repeat; mask: var(--sg-info-mark) center / contain no-repeat; opacity: 0.8; }
 .sg-pending { border-color: color-mix(in srgb, var(--sg-warning) 45%, var(--sg-bg)); background: color-mix(in srgb, var(--sg-warning) 6%, var(--sg-bg-2)); }   /* a warning: the whole box a touch warm, never a side bar */
 .sg-pending::before { background: var(--sg-warning-ink); opacity: 1; }
@@ -705,11 +711,11 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every bar that stays at the top as a page scrolls (a component's areas, a page's title, a foundation's size switch)
    is one kind: the page's background, 8px above and below, and a line under the lowest one once it is stuck, faded in. */
 .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head { position: sticky; z-index: 15; background: var(--sg-bg); padding-top: var(--sg-space-s); padding-bottom: var(--sg-space-s); box-shadow: 0 1px 0 0 transparent; transition: box-shadow var(--sg-fast); }
-.sg-sticky-edge { box-shadow: 0 var(--sg-stick-gap) 0 0 var(--sg-bg); }   /* the lowest stuck bar paints the page's gap under its line, so nothing shows sliced right under it */
+.sg-sticky-edge { box-shadow: 0 calc(var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 0 var(--sg-bg); }   /* the lowest stuck bar paints the page's gap under its line, so nothing shows sliced right under it */
 /* A bar that sticks spans the content's whole width (into the page's side padding), so nothing shows beside it; once
    stuck, the lowest one has the page's line under it, as wide. */
 :is(.sg-hero > h1, .pg-head, .pg-areas, .sg-section:not(.pg-card-section) > h2, .sg-size-switch, .sg-todo-head)::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-main-pad, 0px)); right: calc(-1 * var(--sg-main-pad, 0px)); background: var(--sg-bg); z-index: -1; pointer-events: none; }
-.pg-areas.sg-sticky-edge::after { display: none; }   /* the tabs draw their own line */
+/* stuck, the tabs carry the full-width line under them, as every other stuck bar does */
 .sg-sticky-edge::after { content: ''; position: absolute; left: calc(-1 * var(--sg-main-pad, 0px)); right: calc(-1 * var(--sg-main-pad, 0px)); bottom: -1px; height: var(--sg-line-width, 1px); background: var(--sg-line-colour); pointer-events: none; }
 /* A bar that sticks under a page's title (a foundation's or the Showroom's size switch, the Status page's chips) sits
    right under it, the title's own space between them, on every page alike. */
@@ -1292,7 +1298,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-tm-svg .is-dash { stroke-dasharray: 4 4; }
 .sg-bk-tm-svg text:not(.sg-bk-tm-aa) { font-size: calc(var(--sg-s) / var(--tm-k, 1)); stroke: none; fill: currentColor; }   /* small words in the tile's ink: the hue is for the large letters and the lines */
 .sg-bk-tm-aa { fill: var(--bk-1); }
-.sg-bk-tm::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 var(--bk-line-w, 1px) var(--sg-line-colour); pointer-events: none; }   /* its outline over what fills it to the edge (the bars' panel) */
+.sg-bk-tm::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 var(--bk-line-w, 1px) var(--sg-line-colour), inset 0 0 0 var(--bk-line-w, 1px) var(--t-bg); pointer-events: none; }   /* its outline over what fills it to the edge (the bars' panel), on a ring of the card's own ground so it is one colour all round */
 .sg-bk-tm-ws { display: flex; flex-wrap: wrap; column-gap: var(--sg-space-l); row-gap: var(--sg-space-xxs); font-size: var(--sg-s); }
 .sg-bk-tm-ws i { font-style: normal; }
 .sg-bk-tm-rows { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--sg-space-s); }
@@ -1324,7 +1330,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 [data-sg-scheme="dark"] .sg-bk-dp-scene[data-focus] > i:not(.is-on) { opacity: .15; }
 .sg-bk-dp-scene[data-focus] > i.is-on { outline: calc(var(--bk-line-w, 1px) * 2) solid var(--dp-hue); outline-offset: calc(var(--bk-line-w, 1px) * -2); z-index: 1; }   /* the layer in focus outlined in the hue: a surface as dark as the page still reads as picked */   /* dark surfaces barely part from a dark page: dimmer there */
 .sg-bk-dp-iso { position: relative; display: grid; place-items: center; min-height: 0; perspective: calc(var(--sg-space-xxl) * 60); }   /* the same stack, pulled apart: one plane per height */
-.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.2)) scale(calc(1 - var(--dp-ex, 1.5) * .1)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
+.sg-bk-dp-stack { position: relative; width: min(calc(84cqw - var(--sg-space-xxl) * 3.6), 65cqh); aspect-ratio: 3 / 4; justify-self: center; transform-style: preserve-3d; transition: transform var(--sg-move); transform: translateY(calc(var(--dp-ex, 1.5) * var(--sg-space-xxl) * 1.5)) scale(calc(1 - var(--dp-ex, 1.5) * .11)) rotateX(56deg) rotateZ(-38deg); }   /* as wide as the view allows and no taller than it fits, at any spread */   /* lowered by half what the planes rise, and a little smaller, so it stays whole at any spread */
 .sg-bk-dp-plane { position: absolute; inset: 0; container-type: size; border-radius: calc(var(--bk-rad, var(--sg-radius)) * var(--dp-k, 1)); transform: translateZ(calc(var(--z) * var(--sg-space-xxl) * var(--dp-ex, 1.5) + var(--dp-pop, 0px))); transition: transform var(--sg-move), opacity var(--sg-move), outline-color var(--sg-move); }
 .sg-bk-dp-iso { background-image: linear-gradient(color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0), linear-gradient(90deg, color-mix(in srgb, var(--t-fg) 2.5%, transparent) var(--bk-line-w, 1px), transparent 0); background-size: var(--sg-space-xl) var(--sg-space-xl); }   /* a blueprint's faint grid, neutral */
 .sg-bk-dp-idx { opacity: .6; margin-right: var(--sg-space-s); font-variant-numeric: tabular-nums; }   /* each layer's index, as a drawing numbers its parts */
@@ -1471,6 +1477,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-tk-crumb:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-link-pill { display: inline-flex; align-items: center; gap: var(--sg-space-s); max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; overflow-wrap: break-word; word-break: normal; cursor: pointer; text-decoration: none; }   /* anything that opens something else, in a table: its words in a pill, an arrow after them (a token's alias, a component's area) */
 .sg-link-pill:hover { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
+/* A pill's words on one line, cut short with an ellipsis when they do not fit: its whole name shows on hover (its title). */
+.sg-link-pill > .sg-link-words { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sg-link-pill:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-link-pill > .sg-link-go { flex: none; width: var(--sg-mark); height: var(--sg-mark); color: var(--sg-muted); }
 .sg-link-pill:hover > .sg-link-go { color: var(--sg-text); }
@@ -1524,8 +1532,12 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-section > h2 + :not(.sg-size-switch, .pg-areas, .sg-section-badge), .sg-section > .sg-size-switch + :not(.pg-areas), .sg-section > .pg-areas + :not(.sg-size-switch) { margin-top: var(--sg-stick-gap); }
 .sg-section > .pg-areas ~ .pg-area { padding-top: 0; margin-top: var(--sg-stick-gap); }
 .pg-inspect-head ~ .pg-par-scroll .pg-par-table th { top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); }
-:is(.pg-par-card, .pg-inspect, .pg-code) { overflow-clip-margin: var(--sg-radius); }   /* room for the gap and the line it paints above itself (a plain length: the browser drops a calc() here) */
-:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-colour), 0 calc(-1 * var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 calc(var(--sg-line-width, 1px) * 2) var(--sg-bg); }   /* its top line, and the gap above it painted with the page */
+:is(.pg-par-card, .pg-inspect, .pg-code) { overflow-clip-margin: var(--sg-clip-m, var(--sg-radius)); }   /* room for the gap and the line it paints above itself (a plain length: the browser drops a calc() here) */
+:is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th, .pg-inspect-head, .pg-code-head) { box-shadow: 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid), 0 calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg), var(--sg-strip-l, 0 0 transparent), var(--sg-strip-r, 0 0 transparent); }   /* its top line, and the gap above it painted with the page */
+/* The outer heads' strips reach over the card's own side borders too, so no edge of the card shows above a stuck head
+   in a system whose cards carry a real border. */
+.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head { --sg-strip-l: calc(-1 * var(--sg-line-width, 1px)) calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg); }
+.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:last-child, .pg-inspect-head, .pg-code-head { --sg-strip-r: var(--sg-line-width, 1px) calc(-1 * var(--sg-stick-gap)) 0 var(--sg-bg); }
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head)::before,
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:last-child, .pg-inspect-head, .pg-code-head)::after { content: ''; position: absolute; top: calc(-1 * (var(--sg-stick-gap) + var(--sg-line-width, 1px))); width: var(--sg-radius); height: calc(var(--sg-stick-gap) + var(--sg-radius)); pointer-events: none; }   /* the gap above a corner (the card's side line hidden there), then the corner's curve, its edges a little soft so it reads as smooth as the card's own */
 :is(.pg-par-card:not(:has(> .pg-inspect-head)) .pg-par-table tr:first-child > th:first-child, .pg-inspect-head, .pg-code-head)::before { left: calc(-1 * var(--sg-line-width, 1px)); background: linear-gradient(var(--sg-bg), var(--sg-bg)) 0 0 / 100% var(--sg-stick-gap) no-repeat, radial-gradient(circle at 100% 100%, transparent calc(var(--sg-radius) - 1.6px), var(--sg-line-colour) calc(var(--sg-radius) - 1px), var(--sg-line-colour) calc(var(--sg-radius) - 0.4px), var(--sg-bg) calc(var(--sg-radius) + 0.2px)) 0 100% / 100% var(--sg-radius) no-repeat; }
@@ -1533,7 +1545,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 /* A component's chips stay in view under its areas, the gap above them painted with the page, the cards' heads under them. */
 #tokens > .sg-tokens-chips { margin-bottom: var(--sg-card-gap); }
 #tokens > .sg-tokens-chips { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--sg-title-h, 0px) + var(--sg-stick-gap)); z-index: 14; background: var(--sg-bg); padding: var(--sg-space-xs) 0; box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg); }   /* the collections' chips stay in view under the title */
-.pg-card-section .pg-par-sum:not(:empty) { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-bars-h, 0px) + var(--sg-stick-gap)); z-index: 14; background: var(--sg-bg); padding: var(--sg-space-xs) 0; box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg); }
+.pg-card-section .pg-par-sum:not(:empty) { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-bars-h, 0px)); z-index: 14; background: var(--sg-bg); padding: var(--sg-space-s) 0; box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg); }   /* stuck right under the tabs */
+.pg-card-section .pg-par-sum.sg-sticky-edge { box-shadow: 0 calc(-1 * var(--sg-stick-gap)) 0 0 var(--sg-bg), 0 calc(var(--sg-stick-gap) - var(--sg-line-width, 1px)) 0 0 var(--sg-bg); }   /* the lowest stuck bar: the page's gap under its line, as every other */
 /* What the team wrote, in the Documentation table: its paragraphs as tight as a cell's one line. */
 .pg-written > p { margin: 0; }
 .pg-written > p + p { margin-top: var(--sg-space-xs); }
@@ -1636,6 +1649,20 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
   // The page keeps the root size it loaded with: a system whose own CSS sizes text on a mode attribute (data-color, data-size)
   // would otherwise shrink or grow every rem on the page when a mode is switched on <html>.
   document.documentElement.style.fontSize = getComputedStyle(document.documentElement).fontSize;
+  // The whole page in the family the theme chosen names (its font token, as that theme sets it), whatever the code's own page
+  // rule writes by hand; read again whenever the theme, the brand or the mode changes.
+  (function () {
+    var tf = TOKENS.typeFamily && TOKENS.typeFamily.var ? TOKENS.typeFamily.var : ((TOKENS.typography || []).map(function (t) { return t.family && t.family.var; }).filter(Boolean)[0] || null);
+    if (!tf) return;
+    var apply = function () { var at = document.querySelector('.sg-layout') || document.body, fam = getComputedStyle(at).getPropertyValue(tf).trim(); document.body.style.fontFamily = fam ? fam + ', system-ui, sans-serif' : ''; };
+    apply();
+    // Read once the theme's own styles have landed (a brand's are written into the page just after its attribute).
+    var later = function () { apply(); setTimeout(apply, 60); };
+    if (typeof MutationObserver !== 'undefined') { var fo = new MutationObserver(later); fo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-brand', 'data-theme', 'data-sg-scheme', 'class'] }); fo.observe(document.head, { childList: true, subtree: true, characterData: true }); }
+  })();
+  // The room a card lets its stuck head paint past its edge: the page's radius as a plain length, which is all the
+  // browser takes there (a system whose radius is calc(12px + 4px) would otherwise get none, and its card borders show).
+  (function () { var p = document.createElement('div'); p.style.cssText = 'position:absolute;visibility:hidden;width:var(--sg-radius)'; document.body.appendChild(p); var w = p.getBoundingClientRect().width; p.remove(); if (w > 0) document.documentElement.style.setProperty('--sg-clip-m', Math.ceil(w) + 'px'); })();
   // What each component is, as the data gives it, taken before anything is drawn (drawing adds to it): the base of its
   // signature, which says whether accessibility results kept for it still hold (compSig).
   var COMP_DATA = {};
@@ -1672,7 +1699,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
   };
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
-  function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; a.innerHTML = navMark(id) + esc(label); (parent || nav).appendChild(a); }
+  // A page's name starts with a capital (Status, Identity, In use); a component's is written as the system names it.
+  function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; var l = String(label); if (!/^c-/.test(id)) l = l.charAt(0).toUpperCase() + l.slice(1); a.innerHTML = navMark(id) + esc(l); (parent || nav).appendChild(a); }
   // The foundations in the menu under their own label, as the components are under theirs.
   function foundationLink(id, label) {
     if (!foundationLink.labelled) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Foundations'; nav.appendChild(lab); foundationLink.labelled = true; }
@@ -3996,7 +4024,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       var v = tkBrandValue(r, label) || r.values[at], al = r.aliases && r.aliases[at];
       v = v == null ? '' : String(v);
       var sw = /^(#[0-9a-f]{3,8}|rgba?\(.+\))$/i.test(v) ? '<span class="sg-token-swatch" style="background:' + esc(v) + '"></span>' : '';
-      if (al) return '<td class="sg-token-value"' + (attrs || '') + '><button type="button" class="sg-link-pill sg-tk-alias" data-alias="' + esc(al) + '" title="' + esc(v) + '">' + (sw || '<span class="sg-tk-mark" aria-hidden="true">' + (TK_MARK[tkKind(r)] || '') + '</span>') + '<span>' + esc(al).replace(/\//g, '/<wbr>') + '</span>' + TK_GO + '</button></td>';
+      if (al) return '<td class="sg-token-value"' + (attrs || '') + '><button type="button" class="sg-link-pill sg-tk-alias" data-alias="' + esc(al) + '" title="' + esc(al + (v ? '\n' + v : '')) + '">' + (sw || '<span class="sg-tk-mark" aria-hidden="true">' + (TK_MARK[tkKind(r)] || '') + '</span>') + '<span class="sg-link-words">' + esc(al) + '</span>' + TK_GO + '</button></td>';
       return '<td class="sg-token-value"' + (attrs || '') + '>' + (sw ? sw + ' ' : '') + esc(v) + '</td>';
     };
     var tkBrandValue = function (r, label) {
@@ -7638,6 +7666,10 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
       document.documentElement.style.setProperty('--sg-sticky-top', h + 'px');
     };
     window.addEventListener('resize', stickTop); stickTop();
+    // Measured again whenever a bar changes height (its fonts arriving, a mode or a brand drawn again), so nothing scrolls
+    // in a sliver between the bars and what sticks under them.
+    if (typeof ResizeObserver !== 'undefined') { var stickRO = new ResizeObserver(stickTop); stickRO.observe(bar); if (cbar) stickRO.observe(cbar); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(stickTop);
     var open = function (on) {
       document.body.classList.toggle('sg-nav-open', on); menu.setAttribute('aria-expanded', on ? 'true' : 'false');
       if (on) setTimeout(function () { shut.focus({ preventScroll: true }); }, 50); else menu.focus();   // never the search: no keyboard pops up
@@ -7970,7 +8002,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     }
     route.ran = true; nudge();
   }
-  // Every page's title is its name in the menu, in the menu's own case (overview, tasks, colors): one name for one place.
+  // Every page's title is its name in the menu (Status, Identity, Colors): one name for one place.
   Array.prototype.forEach.call(nav.querySelectorAll('a[href^="#"]'), function (a) {
     var sec = document.getElementById(a.getAttribute('href').slice(1)); if (!sec || sec.classList.contains('pg-card-section')) return;
     var h = sec.querySelector('h1, h2'), name = a.textContent.replace(/\s*\(\d+\)$/, '').trim();

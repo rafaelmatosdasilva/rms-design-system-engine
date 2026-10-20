@@ -549,7 +549,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.doesNotMatch(await run(`[...document.querySelectorAll('#status tr')].map((tr) => tr.textContent).join('|')`), /shared tokens .*have no description in Figma/);
     const unused = await run(`[...document.querySelectorAll('#status .sg-mx-sys tr[data-area="Parity"]')].map((tr) => tr.textContent).join('|')`);
     if (/Tokens, unused/.test(unused)) assert.match(unused, /used by no component, in Figma or in the code.*Delete each in Figma, or bind it/);
-    assert.equal(await run(`document.querySelector('nav a[href="#status"]').textContent.trim()`), 'status', 'no number in the menu: the page counts');
+    assert.equal(await run(`document.querySelector('nav a[href="#status"]').textContent.trim()`), 'Status', 'no number in the menu: the page counts');
     // Every table's head stays in view as its rows scroll by: the card's head under what sticks at the top of the page,
     // the table's own head row under the card's head (or under the page's bars, for a card with no head of its own).
     const headsStick = async (sel) => {
@@ -1336,7 +1336,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     await waitForTrue(send, sessionId, FILE_PAGE_LOADED);
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     assert.equal(await run(`location.hash`), '#status', 'the old Health address opens Status');
-    assert.deepEqual(await run(`[...document.querySelectorAll('.sg-nav > a')].slice(0, 2).map((a) => a.textContent.replace(/ \\(\\d+\\)$/, ''))`), ['index', 'status'], 'second in the side panel, under the index');
+    assert.deepEqual(await run(`[...document.querySelectorAll('.sg-nav > a')].slice(0, 2).map((a) => a.textContent.replace(/ \\(\\d+\\)$/, ''))`), ['Index', 'Status'], 'second in the side panel, under the index');
     assert.equal(await run(`!!document.querySelector('.sg-nav a[href="#health"], .sg-nav a[href="#tasks"]')`), false, 'one page, not two');
     // Accessibility waits until every component is tried in this browser; then each card is a count over a total.
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });

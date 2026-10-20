@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { forbiddenHits, privateFindings, messageFindings, repoFindings, PUBLIC_EXAMPLE, ROOT } from '../.githooks/private-check.mjs';
@@ -129,7 +129,10 @@ test('a project the engine worked on gives its own names, and only those a perso
     writeFileSync(join(dir, 'figma-vars.snapshot.json'), JSON.stringify({ typography: { [j('Glim', 'mox')]: { 'base/font/family': j('Plo', 'nk Sans'), [j('quok', 'ka')]: 1 } } }));
     writeFileSync(join(dir, 'figma-structure.snapshot.json'), JSON.stringify({ components: { [j('header', 'Quokka')]: { paddingVar: 'x', radiusPx: 4 } } }));
     const t = [...projectTerms(dir).terms.keys()];
-    for (const want of [j('zor', 'ble'), j('header', 'quokka'), j('show', 'wombat'), j('zib', 'bets'), j('glim', 'mox'), j('plo', 'nksans'), j('pq9', 'or8', 'ns7', 'mt6', 'lu5', 'kv4')]) assert.ok(t.includes(want), want);
+    for (const want of [j('zor', 'ble'), j('header', 'quokka'), j('show', 'wombat'), j('plo', 'nksans'), j('pq9', 'or8', 'ns7', 'mt6', 'lu5', 'kv4')]) assert.ok(t.includes(want), want);
+    // One plain word counts only where a dictionary can tell it is no word (a computer without one counts none).
+    const dict = ['/usr/share/dict/words', '/usr/share/dict/web2', '/usr/dict/words', '/usr/share/dict/american-english'].some((f) => { try { return statSync(f).isFile(); } catch { return false; } });
+    if (dict) for (const want of [j('zib', 'bets'), j('glim', 'mox')]) assert.ok(t.includes(want), want);
     for (const not of ['buttonprimary', 'large', 'paddingvar', 'radiuspx', 'nodeid', 'size']) assert.ok(!t.includes(not), not);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
