@@ -65,3 +65,35 @@ test('missingFamilies: a family named through a custom property, in a rule or an
   assert.deepEqual(missingFamilies('<b style="font-family:var(--unset, acme grotesk), sans-serif">a</b>'), ['acme grotesk']);
   assert.deepEqual(missingFamilies('<style>@font-face { font-family: "Acme Sans"; src: url(x); } :root { --f: Acme Sans; } p { font-family: var(--f); }</style>'), []);
 });
+
+test('a family\'s own files are found in any folder of the system, by file or folder name', async () => {
+  const { localFonts } = await import('../font-embed.mjs');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const root = mkdtempSync(join(tmpdir(), 'own-fonts-'));
+  mkdirSync(join(root, 'assets/fonts/Acme'), { recursive: true });
+  writeFileSync(join(root, 'assets/fonts/Acme/Acme-Bold.woff2'), 'b');
+  writeFileSync(join(root, 'assets/fonts/Acme/Acme-Regular.woff2'), 'r');
+  mkdirSync(join(root, 'type/Grotesk'), { recursive: true });
+  writeFileSync(join(root, 'type/Grotesk/Medium.otf'), 'm');
+  mkdirSync(join(root, 'node_modules/@fontsource/mono-x/files'), { recursive: true });
+  writeFileSync(join(root, 'node_modules/@fontsource/mono-x/files/mono-x-latin-700-normal.woff2'), 'x');
+  writeFileSync(join(root, 'node_modules/@fontsource/mono-x/files/mono-x-cyrillic-700-normal.woff2'), 'c');
+  const r = await localFonts(['Acme', 'Grotesk', 'Mono X', 'Nowhere'], [root]);
+  assert.deepEqual(r.found, ['Acme', 'Grotesk', 'Mono X']);
+  assert.deepEqual(r.missing, ['Nowhere']);
+  assert.ok(r.faces.some((f) => /"Acme".*font-weight: 700/.test(f)));
+  assert.ok(r.faces.some((f) => /"Grotesk".*font-weight: 500/.test(f)));
+  assert.equal(r.faces.filter((f) => /"Mono X"/.test(f)).length, 1, 'the latin file only');
+  assert.ok(r.faces.some((f) => /"Mono X".*font-weight: 700/.test(f)));
+});
+
+test('a family on no font service but on Fontsource is written in from there', async () => {
+  const { fontsourceFonts } = await import('../font-embed.mjs');
+  const meta = { family: 'Open Thing', subsets: ['latin', 'cyrillic'], weights: [400, 700], styles: ['normal'], variable: false,
+    variants: { 400: { normal: { latin: { url: { woff2: 'https://cdn.example/latin-400.woff2' } } } }, 700: { normal: { latin: { url: { woff2: 'https://cdn.example/latin-700.woff2' } } } } } };
+  const r = await fontsourceFonts(['Open Thing', 'Gone'], { fetchText: async (u) => { if (/open-thing/.test(u)) return JSON.stringify(meta); throw new Error('404'); }, fetchBytes: async (u) => Buffer.from(u) });
+  assert.deepEqual(r.found, ['Open Thing']);
+  assert.deepEqual(r.missing, ['Gone']);
+  assert.equal(r.faces.length, 2);
+  assert.ok(r.faces.every((f) => /url\(data:font\/woff2;base64,/.test(f)));
+});

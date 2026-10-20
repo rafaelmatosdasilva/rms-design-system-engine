@@ -8,8 +8,8 @@
 // small. A stylesheet or a file that cannot be read leaves its link as it was, and says why. What was read is kept in
 // cacheDir, so a later build reads nothing again.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 const SERVICE = /^https:\/\/fonts\.googleapis\.com\//;
 // A current browser's name: the service answers it with woff2 files, the smallest.
@@ -115,4 +115,72 @@ export async function serviceFonts(families, { fetchText = netText, cacheDir = n
     if (hit) found.push({ family, url: hit }); else missing.push({ family, why: 'not on the font service' });
   }
   return { found, missing };
+}
+
+// Each family's own files, wherever the system keeps them: any folder of its code (fonts/Acme/Acme-Bold.otf,
+// assets/Inter-Regular.woff2, a family folder such as fonts/Inter/Regular.woff2, an installed @fontsource package),
+// each written in as data. roots: the folders to look in. → { faces: [css], found: [family], missing: [family] }
+const SKIP = /^(?:\.git|\.design-system-engine-[\w-]+|\.cache|\.next|\.nuxt|coverage)$/;
+const SCRIPTS = /cyrillic|greek|vietnamese|hebrew|arabic|devanagari|thai|khmer|japanese|korean|chinese|symbols|math/;
+export async function localFonts(families, roots = []) {
+  const { fontFaces } = await import('./figma-brands.mjs');
+  const files = [], seen = new Set();
+  const walk = (d, depth) => {
+    if (depth > 9 || files.length > 4000) return;
+    let ns = []; try { ns = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const n of ns) {
+      const p = join(d, n.name);
+      if (n.isDirectory()) {
+        if (SKIP.test(n.name)) continue;
+        // In installed packages only the font packages are read (@fontsource/inter, @fontsource-variable/inter).
+        if (n.name === 'node_modules') { for (const s of ['@fontsource', '@fontsource-variable']) walk(join(p, s), depth + 1); continue; }
+        walk(p, depth + 1);
+      } else if (/\.(woff2?|otf|ttf)$/i.test(n.name) && !seen.has(p)) { seen.add(p); files.push({ dir: basename(d), name: n.name, path: p }); }
+    }
+  };
+  for (const r of roots) walk(r, 0);
+  const sq = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const faces = [], found = [], missing = [];
+  for (const family of families) {
+    const fam = sq(family);
+    // A file named after the family, or one in a folder named after it (its name then read as the family's).
+    const mine = files.filter((f) => sq(f.name).startsWith(fam) || sq(f.dir) === fam)
+      .filter((f) => !SCRIPTS.test(f.name.toLowerCase()) || /latin/.test(f.name.toLowerCase()) && !/latin-?ext/.test(f.name.toLowerCase()))
+      .map((f) => ({ name: sq(f.name).startsWith(fam) ? f.name : `${family}-${f.name}`, get data() { return readFileSync(f.path); } }));
+    const own = mine.length ? fontFaces(family, mine) : [];
+    if (own.length) { faces.push(...own); found.push(family); } else missing.push(family);
+  }
+  return { faces, found, missing };
+}
+
+// Each family Fontsource has (open fonts beyond one service: Google's and others), its files written in as data: the
+// variable file when it has one, else each weight and style it has, latin and latin-ext. → { faces, found, missing }
+export async function fontsourceFonts(families, { fetchText = netText, fetchBytes = netBytes, cacheDir = null } = {}) {
+  const faces = [], found = [], missing = [];
+  for (const family of families) {
+    const id = String(family).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    try {
+      const meta = JSON.parse(String(await cached(cacheDir, `https://api.fontsource.org/v1/fonts/${id}`, '.json', fetchText)));
+      const subsets = ['latin', 'latin-ext'].filter((s) => (meta.subsets ?? []).includes(s));
+      const range = (s) => meta.unicodeRange?.[s] ? ` unicode-range: ${meta.unicodeRange[s]};` : '';
+      const own = [];
+      const face = async (url, weight, style, s) => {
+        const data = await cached(cacheDir, url, '.woff2', fetchBytes);
+        own.push(`@font-face { font-family: "${meta.family ?? family}"; src: url(data:font/woff2;base64,${data.toString('base64')}) format("woff2"); font-weight: ${weight}; font-style: ${style}; font-display: swap;${range(s)} }`);
+      };
+      const ws = meta.weights ?? [400], styles = meta.styles ?? ['normal'];
+      let variable = false;
+      if (meta.variable) try {
+        for (const st of styles) for (const s of subsets) await face(`https://cdn.jsdelivr.net/fontsource/fonts/${id}:vf@latest/${s}-wght-${st}.woff2`, `${Math.min(...ws)} ${Math.max(...ws)}`, st, s);
+        variable = true;
+      } catch { own.length = 0; }
+      if (!variable) for (const w of ws) for (const st of styles) for (const s of subsets) {
+        const url = meta.variants?.[w]?.[st]?.[s]?.url?.woff2;
+        if (url) await face(url, w, st, s);
+      }
+      if (!own.length) throw new Error('no files');
+      faces.push(...own); found.push(meta.family ?? family);
+    } catch { missing.push(family); }
+  }
+  return { faces, found, missing };
 }

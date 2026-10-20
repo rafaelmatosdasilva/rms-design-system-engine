@@ -1693,7 +1693,8 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
   };
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
-  function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; a.innerHTML = navMark(id) + esc(label); (parent || nav).appendChild(a); }
+  // A page's name starts with a capital (Status, Identity, In use); a component's is written as the system names it.
+  function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; var l = String(label); if (!/^c-/.test(id)) l = l.charAt(0).toUpperCase() + l.slice(1); a.innerHTML = navMark(id) + esc(l); (parent || nav).appendChild(a); }
   // The foundations in the menu under their own label, as the components are under theirs.
   function foundationLink(id, label) {
     if (!foundationLink.labelled) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.textContent = 'Foundations'; nav.appendChild(lab); foundationLink.labelled = true; }
@@ -7995,7 +7996,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
     }
     route.ran = true; nudge();
   }
-  // Every page's title is its name in the menu, in the menu's own case (overview, tasks, colors): one name for one place.
+  // Every page's title is its name in the menu (Status, Identity, Colors): one name for one place.
   Array.prototype.forEach.call(nav.querySelectorAll('a[href^="#"]'), function (a) {
     var sec = document.getElementById(a.getAttribute('href').slice(1)); if (!sec || sec.classList.contains('pg-card-section')) return;
     var h = sec.querySelector('h1, h2'), name = a.textContent.replace(/\s*\(\d+\)$/, '').trim();

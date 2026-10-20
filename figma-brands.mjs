@@ -338,7 +338,9 @@ export function fontFaces(family, files = []) {
     const ext = String(f.name).split('.').pop().toLowerCase(), base = sq(String(f.name).replace(/\.[^.]+$/, ''));
     if (!FORMAT[ext] || !base.startsWith(fam)) continue;
     const rest = base.slice(fam.length), italic = /italic|oblique/.test(rest), word = rest.replace(/italic|oblique/g, '');
-    const weight = (WEIGHTS.find(([w]) => word === w) ?? WEIGHTS.find(([w]) => word.includes(w)) ?? [null, 400])[1];
+    // A weight written as a number (inter-latin-700-normal.woff2), else as a word (Acme-Bold.otf).
+    const num = /(?:^|[^0-9])([1-9]00)(?![0-9])/.exec(word);
+    const weight = num ? +num[1] : (WEIGHTS.find(([w]) => word === w) ?? WEIGHTS.find(([w]) => word.includes(w)) ?? [null, 400])[1];
     const key = `${weight} ${italic}`, had = pick.get(key);
     if (!had || RANK[ext] < RANK[had.ext]) pick.set(key, { f, ext, weight, italic });
   }

@@ -1367,15 +1367,24 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // behind a firewall that blocks the service); one that cannot be read keeps its link.
   let fontsEmbedded = null;
   try {
-    const { embedRemoteFonts, missingFamilies, serviceFonts } = await import('./font-embed.mjs');
+    const { embedRemoteFonts, missingFamilies, serviceFonts, localFonts, fontsourceFonts } = await import('./font-embed.mjs');
+    const { codeRoots } = await import('./code-roots.mjs');
     const cacheDir = join(ROOT, OUT_DIR, 'fonts');
-    // A family the CSS names that nothing loads (the code's own body font, set but never imported) is asked of the font
-    // service too, so the page draws in it everywhere, not only where it happens to be installed.
-    const named = await serviceFonts(missingFamilies(html), { cacheDir });
-    if (named.found.length) { const links = named.found.map((f) => `<link rel="stylesheet" href="${f.url.replace(/&/g, '&amp;')}">`).join('\n'); html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => `${h}\n${links}`) : links + html; }
+    const intoHead = (x) => { html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => `${h}\n${x}`) : x + html; };
+    // Every family the page names that nothing loads (each theme's and brand's font, the code's own body font set but
+    // never imported) is looked for wherever it is, so the page draws in it everywhere: the system's own font files
+    // first (any folder of its code), then the font services (Google Fonts, then Fontsource).
+    const own = await localFonts(missingFamilies(html), codeRoots(ROOT, cfg));
+    if (own.faces.length) intoHead(`<style data-font-from="project">\n${own.faces.join('\n')}\n</style>`);
+    const named = await serviceFonts(own.missing, { cacheDir });
+    if (named.found.length) intoHead(named.found.map((f) => `<link rel="stylesheet" href="${f.url.replace(/&/g, '&amp;')}">`).join('\n'));
+    const open = await fontsourceFonts(named.missing.map((m) => m.family), { cacheDir });
+    if (open.faces.length) intoHead(`<style data-font-from="fontsource">\n${open.faces.join('\n')}\n</style>`);
     fontsEmbedded = await embedRemoteFonts(html, { cacheDir });
-    fontsEmbedded.missing = named.missing;
+    fontsEmbedded.missing = open.missing.map((family) => ({ family, why: 'not in the system\'s files nor on a font service' }));
     html = fontsEmbedded.html;
+    // A family found nowhere is said, so its files can be added to the system (a licensed font kept in its fonts folder).
+    if (open.missing.length) console.log(`  ⚠ Fonts found nowhere (not in the system's files nor on a font service): ${open.missing.join(', ')}. Add their files to the system's fonts folder.`);
   } catch { /* the links stay */ }
   // An older run never replaces a page built from newer inputs. The code capture's own copy (opts.out) is always
   // the code as it is now.
