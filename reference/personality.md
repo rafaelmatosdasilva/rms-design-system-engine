@@ -38,7 +38,7 @@ On the left of the tile, three lines describe the brand; the chart sits on the r
 
 1. **The definition.** The brand described as a person would describe it, in one sentence:
    - its two strongest leanings as adjectives (a safe, corporate brand);
-   - the character its tokens give it: thick lines or hard shadows read retro; soft far shadows with room, luxurious; very round corners on a warm hue, playful; colour on the backgrounds, colourful; white and grey with one accent, polished; hairlines, a light hand;
+   - the character its tokens give it: a serif reads classic and traditional; thick lines or hard shadows read retro; soft far shadows with room, luxurious; very round corners on a warm hue, playful; colour on the backgrounds, colourful; white and grey with one accent, polished; hairlines, a light hand;
    - how it comes across: its third leaning (precise and technological, cool-headed), and "straight to the point" when it is flat with thick lines.
 
    For example: "A warm, bold brand with a retro touch, straight to the point, precise and technological." Colour is not the subject: it shows in the proof.
@@ -73,7 +73,7 @@ These are the readings the weights below put into numbers.
 - The strongest contrast reads bold, present and safe: it is not calm, and not friendly.
 - A softer one reads more elegant.
 
-**Type.**
+**Type.** A serif reads classic, luxurious and traditional: it leans premium (+0.3) and a little calm (−0.1 on Fast).
 
 - Thin type reads premium, soft, delicate and serene.
 - Heavy type reads heavy, graphic and present.

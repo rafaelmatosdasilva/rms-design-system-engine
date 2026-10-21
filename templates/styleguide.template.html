@@ -3284,7 +3284,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return sel && sel.value && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : (DATA.title || 'Design system');
     };
     // The exploded view's leader lines, from each plane's far corner to its callout, drawn where both are now.
-    var dpLeads = function (iso) {
+    var dpLeads = function (iso, moving) {   // moving: the layers mid-animation; the names follow, nothing is centred or kept
       var svg = iso.querySelector('.sg-bk-dp-leads'); if (!svg) return;
       var box = iso.getBoundingClientRect(), out = '';
       if (!box.width) return;
@@ -3314,9 +3314,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var x2 = x0 - 3, mx = Math.max(r.x + 4, x2 - 10);
         out += '<g class="' + (r.c.getAttribute('data-z') === iso.getAttribute('data-focus') ? 'is-on' : '') + '"><polyline points="' + f(r.x) + ',' + f(r.y) + ' ' + f(mx) + ',' + f(r.y) + ' ' + f(x2) + ',' + f(y) + '"/><path d="M' + f(r.x - 4) + ' ' + f(r.y) + 'h8M' + f(r.x) + ' ' + f(r.y - 4) + 'v8"/></g>';
       });
-      if (!focused) iso._rest = { key: restKey, x0: x0, ys: ys };
+      if (!focused && !moving) iso._rest = { key: restKey, x0: x0, ys: ys };
       // The stack and its names together centred across the card: moved by what the names add on the right.
-      if (!iso._centring && !focused) {
+      if (!iso._centring && !focused && !moving) {
         var st = iso.querySelector('.sg-bk-dp-stack'), lo = 1e9, hi = -1e9;
         Array.prototype.forEach.call(iso.querySelectorAll('.sg-bk-dp-plane'), function (p) { var q = p.getBoundingClientRect(); lo = Math.min(lo, q.left - box.left); });
         rows.forEach(function (r) { hi = Math.max(hi, r.c.getBoundingClientRect().right - box.left); });
@@ -3342,7 +3342,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // and once more after the longest, should a transition never end (a hidden tab).
       var queued = 0, again = function () { if (queued) return; queued = setTimeout(function () { queued = 0; dpLeads(iso); }, 16); };
       // While they move, the names move with them, frame by frame.
-      var until = 0, follow = function () { var go = !until; until = performance.now() + 450; if (go) (function tick() { dpLeads(iso); if (performance.now() < until) requestAnimationFrame(tick); else until = 0; })(); };
+      var until = 0, follow = function () { var go = !until; until = performance.now() + 450; if (go) (function tick() { dpLeads(iso, true); if (performance.now() < until) requestAnimationFrame(tick); else until = 0; })(); };
       var mine = function (e) { return e.target === st || (e.target.classList && e.target.classList.contains('sg-bk-dp-plane')); };
       var st = iso.querySelector('.sg-bk-dp-stack');
       if (st) { st.addEventListener('transitionstart', function (e) { if (mine(e)) follow(); }); ['transitionend', 'transitioncancel'].forEach(function (t) { st.addEventListener(t, function (e) { if (mine(e)) again(); }); }); }
@@ -4160,7 +4160,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var shSoft = share ? (faded * 2 - 1) * Math.min(1, share * 2) - (1 - Math.min(1, share * 2)) : -1;
         // Type: the family's kind; thin type reads premium, soft, serene; heavy type heavy, graphic, present.
         var fam = String(famName || '').toLowerCase();
-        var kind = /mono|code|courier/.test(fam) ? ['monospace', 1] : /serif|times|georgia|garamond|playfair|merriweather|lora|baskerville|caslon/.test(fam) && !/sans/.test(fam) ? ['serif', -0.7] : /rounded|nunito|quicksand|varela|comfortaa/.test(fam) ? ['rounded sans', -0.9] : /futura|poppins|montserrat|avenir|gotham|circular|manrope|outfit|geometric|product sans|urbanist/.test(fam) ? ['geometric sans', 0.4] : /open sans|source sans|fira sans|lato|segoe|frutiger|myriad|noto sans|calibri|gill/.test(fam) ? ['humanist sans', -0.4] : ['grotesque sans', 0.3];
+        var kind = /mono|code|courier/.test(fam) ? ['monospace', 1] : /serif|times|georgia|garamond|playfair|merriweather|lora|baskerville|caslon|didot|bodoni|fraunces|crimson|cormorant|spectral|tiempos|freight|canela|ivar|recoleta|minion|sabon|bembo|cardo/.test(fam) && !/sans/.test(fam) ? ['serif', -0.7] : /rounded|nunito|quicksand|varela|comfortaa/.test(fam) ? ['rounded sans', -0.9] : /futura|poppins|montserrat|avenir|gotham|circular|manrope|outfit|geometric|product sans|urbanist/.test(fam) ? ['geometric sans', 0.4] : /open sans|source sans|fira sans|lato|segoe|frutiger|myriad|noto sans|calibri|gill/.test(fam) ? ['humanist sans', -0.4] : ['grotesque sans', 0.3];
         var wNums = weights.map(function (t) { var n = parseFloat(bkNow(t)); return isFinite(n) && n >= 100 && n <= 1000 ? n : null; }).filter(function (n) { return n != null; });
         var wMax = wNums.length ? Math.max.apply(null, wNums) : 400, wMin = wNums.length ? Math.min.apply(null, wNums) : 400, typeW = cl((wMax - 500) / 200);   // 400 thin-ish, 600 already thick
         // Motion: slow reads premium, fast reads a startup's agility; an overshoot adds speed.
@@ -4189,7 +4189,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           blue: function (c) { return c.blue > 0.5 ? 'a blue hue' : ''; } };
         var axes = function (c) {
           // Safe first: the standard (whites and greys, one accent, strong contrast, regular weights) commits to nothing.
-          var safeV = safeCut(cl(airy * 0.25 - typeW * 0.3 - speed * 0.2 + (thick ? -thick * 0.3 : 0.05) + fd * 0.25 - mk * 0.15 + (0.5 - c.vivid) * 0.1 + (kind[1] === -0.7 || kind[0] === 'geometric sans' ? 0.1 : 0) + (wMin < 400 ? 0.15 : 0) - c.crK * 0.35 - (c.pure - 0.2) * 0.4 - (c.neutral - 0.5) * 0.5 + c.tinted * 0.6 - palK * 0.2 - c.blue * 0.15 - 0.1));   // blue reads safe
+          var safeV = safeCut(cl(airy * 0.25 - typeW * 0.3 - speed * 0.2 + (thick ? -thick * 0.3 : 0.05) + fd * 0.25 - mk * 0.15 + (0.5 - c.vivid) * 0.1 + (kind[0] === 'serif' ? 0.3 : kind[0] === 'geometric sans' ? 0.1 : 0) + (wMin < 400 ? 0.15 : 0) - c.crK * 0.35 - (c.pure - 0.2) * 0.4 - (c.neutral - 0.5) * 0.5 + c.tinted * 0.6 - palK * 0.2 - c.blue * 0.15 - 0.1));   // blue reads safe
           // Bold is daring: heavy outlines, hard shadows, colour on the grounds, a vivid hue; heavy type a little. A brand
           // that reads safe is not bold.
           var boldV = cl((c.vivid * 2 - 1) * 0.15 + typeW * 0.2 + thick * 0.45 + (shD.length && !shOn ? 0.1 : 0) + mk * 0.3 + c.tinted * 0.6 + c.crK * 0.1 - 0.1 + (safeV < 0 ? safeV * 0.9 : 0));
@@ -4201,7 +4201,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           ['Technical', 'Human', cl(kind[1] * 0.4 + (1 - 2 * soft) * 0.25 + thick * 0.25 + typeW * 0.15 + mk * 0.3 - fd * 0.15 + (1 - Math.min(1, share * 2)) * 0.15 + Math.max(0, 1 - 2 * dim) * 0.3 + c.blue * 0.15), (famName || 'its type') + ' (' + kind[0] + '), ' + line + 'px lines, ' + shSay, '', [P.type, P.blue(c), P.corners, P.lines, P.shadows]],
           ['Sharp', 'Soft', cl(-((soft * 2 - 1) * 0.25 + shSoft * 0.3 - typeW * 0.2 + (thick ? -thick : 0.3) * 0.25) + Math.max(0, 1 - 2 * dim) * thick * 0.25), rPx + 'px corners, ' + shSay + ', weight ' + wMax + ', ' + line + 'px lines', '', [P.corners, P.shadows, P.lines, P.type]],
           ['Corporate', 'Friendly', cl(-(soft * 2 - 1) * 0.3 + c.blue * 0.15 - (over ? 0.15 : 0) + (c.pure - 0.2) * 0.5 + (c.neutral - 0.5) * 0.5 - c.tinted * 0.6 + palK * 0.25 + c.crK * 0.2 + 0.1), rPx + 'px corners, ' + hueN + (hueN === 1 ? ' hue' : ' hues') + ' in the palette', 'hue ' + Math.round(c.hue) + '°, contrast ' + c.cr.toFixed(1) + ':1, ' + Math.round(c.neutral * 100) + '% of grounds neutral, ' + Math.round(c.pure * 100) + '% pure ' + (c.mode === 'dark' ? 'black' : 'white'), [P.grounds(c), P.palette, P.corners, P.contrast(c)]],
-          ['Fast', 'Calm', cl(speed * 0.6 + (c.vivid - 0.5) * 0.2 + typeW * 0.15 + thick * 0.2 + mk * 0.2 + (over ? 0.15 : 0) + c.crK * 0.2), (ms ? 'transitions ' + ms + 'ms' + (over ? ', overshoot' : '') : 'no motion tokens') + ', weight ' + wMax, 'contrast ' + c.cr.toFixed(1) + ':1', [P.motion, P.contrast(c), P.colour(c), P.lines]],
+          ['Fast', 'Calm', cl(speed * 0.6 + (c.vivid - 0.5) * 0.2 + typeW * 0.15 + thick * 0.2 + mk * 0.2 + (over ? 0.15 : 0) + c.crK * 0.2 - (kind[0] === 'serif' ? 0.1 : 0)), (ms ? 'transitions ' + ms + 'ms' + (over ? ', overshoot' : '') : 'no motion tokens') + ', weight ' + wMax, 'contrast ' + c.cr.toFixed(1) + ':1', [P.motion, P.contrast(c), P.colour(c), P.lines]],
           // Premium is elegance: room, thin type, slow motion, faded shadows, hairlines, a softer contrast, quiet colour.
           // Safe is the standard that commits to nothing: the strongest contrast, regular weights and lines, the usual speed.
           ['Premium', 'Safe', safeV,
@@ -4250,9 +4250,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var MANNER = { Bold: 'impossible to miss', Quiet: 'never raising its voice', Flat: 'with nothing in the way', Dimensional: 'with depth you can feel', Technical: 'precise and technological', Human: 'close to people',
           Sharp: 'straight to the point', Soft: 'easy on the eye', Corporate: 'all business', Friendly: 'easy to approach', Fast: 'quick on its feet', Calm: 'never in a hurry',
           Premium: 'refined to the detail', Safe: 'never taking a risk', Warm: 'warm to the touch', Cool: 'cool-headed' };
-        // Its character, from the tokens: thick lines or hard shadows read retro; soft far shadows and room, luxurious; very
+        // Its character, from the tokens: a serif reads classic and traditional; thick lines or hard shadows read retro; soft far shadows and room, luxurious; very
         // round corners on a warm hue, playful; white and grey with one accent, polished; colour on the grounds, colourful.
-        var touch = mk >= 0.25 || thick >= 0.5 ? 'with a retro touch' : fd >= 0.3 && airy > 0.2 ? 'with a touch of luxury' : rPx > 16 && c0.warmth > 0.3 ? 'with a playful touch' :
+        var touch = kind[0] === 'serif' ? 'with a classic, traditional touch' : mk >= 0.25 || thick >= 0.5 ? 'with a retro touch' : fd >= 0.3 && airy > 0.2 ? 'with a touch of luxury' : rPx > 16 && c0.warmth > 0.3 ? 'with a playful touch' :
           c0.tinted > 0.25 ? 'with colour to spare' : c0.neutral >= 0.5 && hueN <= 2 ? 'with a polished finish' : line <= 1 ? 'with a light hand' : '';
         var manner = []; if (t3[2]) manner.push(MANNER[t3[2].pole]); if (flat > 0.2 && thick >= 0.5 && manner.indexOf(MANNER.Sharp) < 0) manner.unshift(MANNER.Sharp);
         var adjs = t3.slice(0, 2).map(function (x) { return ADJ[x.pole]; });
