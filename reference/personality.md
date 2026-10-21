@@ -25,7 +25,7 @@ The two poles of an axis always add up to the whole, so a shape reaching towards
 | 7 | Premium | Safe |
 | 8 | Warm | Cool |
 
-**Light and dark.** Colour is read in each colour mode the system has, and each mode draws its own shape: light whole, dark dashed, one over the other. A brand vivid in light and only greys in dark is perceived as both, so the two shapes show where the modes disagree. The title, the list and the leans are the two modes together (their average).
+**Light and dark.** The personality is the brand's, not the mode's: every token is read in light, colour in each mode (averaged), so the words and the leans are the same whichever mode is shown. Colour is read in each colour mode the system has, and each mode draws its own shape: light whole, dark dashed, one over the other. A brand vivid in light and only greys in dark is perceived as both, so the two shapes show where the modes disagree. The title, the list and the leans are the two modes together (their average).
 
 The title names the three strongest leanings, always in the chart's own order (Bold before Friendly before Warm), so the same three words read the same in every theme. The list beside the chart gives, for each axis:
 
@@ -36,32 +36,26 @@ The title names the three strongest leanings, always in the chart's own order (B
 
 On the left of the tile, three lines describe the brand; the chart sits on the right.
 
-1. **The character.** The brand as a person, built from its three strongest leanings:
-   - the strongest is who it is (Corporate: a professional; Bold: a showman);
-   - the second is how it is (dependable, precise);
-   - the third is what it is at heart.
+1. **The definition.** The brand described as a person would describe it, in one sentence:
+   - its two strongest leanings as adjectives (a safe, corporate brand);
+   - the character its tokens give it: thick lines or hard shadows read retro; soft far shadows with room, luxurious; very round corners on a warm hue, playful; colour on the backgrounds, colourful; white and grey with one accent, polished; hairlines, a light hand;
+   - how it comes across: its third leaning (precise and technological, cool-headed), and "straight to the point" when it is flat with thick lines.
 
-   Then what it wears, as the tokens draw it:
-   - colour: white and grey with a blue accent, or vivid orange rooms;
-   - corners;
-   - lines;
-   - shadows.
-
-   For example: "A cool-headed professional, dependable at heart, in white and grey with a blue accent, rounded corners, hairlines and soft shadows."
+   For example: "A warm, bold brand with a retro touch, straight to the point, precise and technological." Colour is not the subject: it shows in the proof.
 2. **What it does.** The three strongest leanings said as of a person, each as heavy as it leans. For example: "It means business, keeps a cool head and plays it safe."
-3. **The proof.** One row per leaning, with the signals behind it in plain words on a simple scale, never as raw values:
+3. **The proof.** One row for each of the three strongest leanings, with the signals behind it in plain words on a simple scale, never as raw values:
    - vivid, soft or muted colours;
    - very high, high, moderate or low contrast;
    - neutral, tinted or coloured backgrounds;
    - square corners, subtle rounding, rounded or very rounded corners;
    - fine, firm or thick lines;
    - no shadows, few subtle shadows, subtle shadows or hard shadows;
-   - light, regular, strong or heavy type;
+   - light, regular, strong or heavy type, and its kind in common words: neutral, geometric, friendly, classic, rounded or code-like;
    - quick, steady, slow or bouncy motion;
    - tight, regular or generous space;
    - one accent colour or a colourful palette.
 
-   A last row, "But …", names the strongest leaning that pulls the other way, when there is one.
+   Only the three strongest leanings, the ones the chart shows most, get a row.
 
 The chart's strongest three poles are named in the brand's hue.
 
@@ -171,7 +165,7 @@ The colour signals are read once per colour mode:
 | Shadow darkness | every shadow colour | its middle alpha (0.15 when none is read) |
 | Marked | blur and darkness | (1 − blur ÷ 16) × 0.6 + min(1, alpha ÷ 0.35) × 0.4; faded = 1 − marked; both × the share of shadows on |
 | Shadow softness | shadows | −1 with none on; else (2 × faded − 1) × min(1, share × 2) − (1 − min(1, share × 2)): few shadows on count as almost none |
-| Depth | shadows and blur | share × (0.4 + 0.6 × min(1, blur ÷ 24)): a hard shadow with no blur is graphic, not deep |
+| Depth | shadows and blur | min(1, share × 1.6) × (0.4 + 0.6 × min(1, blur ÷ 24)): shadows on half of what is seen already read deep; a hard shadow with no blur is graphic, not deep |
 | Typeface kind | the family's name | monospace +1, geometric +0.4, grotesque +0.3, humanist −0.4, serif −0.7, rounded −0.9 |
 | Weight | the typography weight tokens | the heaviest, as (heaviest − 500) ÷ 200 (600 already reads heavy); and the lightest |
 | Speed | the duration tokens | (260 − middle duration in ms) ÷ 160; whether an easing overshoots |
@@ -185,7 +179,7 @@ Each lean is clamped to −1…+1, read in each mode, and averaged across the mo
   (vivid × 2 − 1) × 0.2 + weight × 0.45 + thick × 0.35 + 0.1 if every shadow is off + marked × 0.15 + contrast × 0.25
 - **Flat ↔ Dimensional:** no shadows read flat; many soft, far shadows read dimensional.
   1 − 2 × depth
-- **Technical ↔ Human:** a flat interface reads technical.
+- **Technical ↔ Human:** a flat interface reads technical, and so does a blue hue (+ blue × 0.15).
   - Technical: a monospace, geometric or grotesque face, square corners, thick lines, marked shadows.
   - Human: humanist, serif or rounded faces, round corners, faded shadows.
 
@@ -207,7 +201,7 @@ Each lean is clamped to −1…+1, read in each mode, and averaged across the mo
   - Calm: long transitions, softer contrast, thin type, fine lines.
 
   speed × 0.6 + (vivid − 0.5) × 0.2 + weight × 0.15 + thick × 0.2 + marked × 0.2 + 0.15 if overshoot + contrast × 0.2
-- **Premium ↔ Safe:** elegance against the standard. Bold choices are not safe: a lean to Safe shrinks by how bold the picks are, min(1, thick × 0.45 + marked × 0.45 + (weight − 0.5) × 0.4 when over 0).
+- **Premium ↔ Safe:** elegance against the standard. A blue hue reads safe (− blue × 0.15). Bold choices are not safe: a lean to Safe shrinks by how bold the picks are, min(1, thick × 0.45 + marked × 0.45 + (weight − 0.5) × 0.4 when over 0).
   room × 0.25 − weight × 0.3 − speed × 0.2 + (0.05 for hairlines, else −thick × 0.3) + faded × 0.25 − marked × 0.15 + (0.5 − vivid) × 0.1 + 0.1 for a serif or geometric face + 0.15 if the lightest weight is under 400 − contrast × 0.35 − (pure grounds − 0.3) × 0.2 − 0.1
 - **Warm ↔ Cool:** not colour alone. Colour helps, corners and soft shadows warm as much; no shadows or hard ones cool.
   warmth × 0.45 + corner warmth × 0.3 + shadow softness × 0.25
