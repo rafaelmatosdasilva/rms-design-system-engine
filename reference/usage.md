@@ -92,6 +92,7 @@ rms-design-system-engine --styleguide --no-a11y-bake     # the page without its 
 rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
+rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
@@ -787,6 +788,27 @@ check (an authored binding, then `componentPropAliases`, then camelCase); intera
 as they are CSS. Type a component's props with it (`const check: ChipFigmaProps = {} as ChipProps`, or use
 it as the props type) and `tsc` shows prop drift in the editor and in CI. `contracts/` stays local, so set
 `contracts.propTypesOut` to a committed path when CI should check it.
+
+#### Publishing the contracts to a shared repository (`--contracts-out <dir>`)
+
+The local `contracts/` stay local. To give a team one shared contract per component (beside its intent layer, say),
+`rms-design-system-engine --contracts-out <dir>` writes the contracts in their published form into a folder of
+another repository's clone, and nothing else: one contract per code file (`contracts.layout: "code"`, see the
+configuration reference), `contract.schema.json`, and a generated `README.md` (what a contract holds, where each part
+comes from, coverage counts, and the Figma components with no file of their own). No token values, catalog,
+`llms.txt` or `.gitignore`; no copy of the intent layer's text (`intentPage` links to the page). A contract the code
+no longer has is removed. The same inputs give the same files, so an unchanged system gives no diff. The engine never
+commits or pushes: review the diff, commit it on a branch, and open a merge request. The published contracts are
+generated: changes go into the code, Figma or `contract.authored.json`, never into the files.
+
+Each published contract carries, beside the Figma half: `bindings.code` per property (the code prop or slot, who
+decided the pairing: `authored`, `alias`, `codeConnect` or `name`; its type, options, default, required, description;
+the Code Connect `valueMap`; `inverted` when the code holds the opposite of the Figma value, as `showClose` and
+`hideClose`), `conditions` (the attributes a property only decides are written, from the Code Connect template),
+`differences` (default, options, name), `codeOnly`, `events` with payloads, `slots` with their props, `states`
+(Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
+keyboard, each with where it was read). The props gate (Gate 14) pairs Figma and the code the same way
+(`prop-binding.mjs`), so the two never disagree.
 
 #### The code capture (every run, and `--capture-code` on its own)
 

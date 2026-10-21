@@ -5,7 +5,7 @@
 // its accessibility. Laid out by the code for an intent layer, published without copies, and the same file every run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
 import { generateContracts, contractFileFor } from '../contract-gen.mjs';
@@ -141,4 +141,26 @@ test('the path rule: a prefix swapped, each part in kebab-case; no code file, no
   assert.equal(contractFileFor('a', 'lib/Other.vue', { layout: 'code', paths }), null, 'outside every prefix');
   assert.equal(contractFileFor('a', null, { layout: 'code' }), null);
   assert.equal(contractFileFor('cards/row', 'x.vue'), 'cards/row.contract.json', 'by name, as before');
+});
+
+test('published to a shared folder: contracts, the schema and a README only; a contract the code no longer has is removed', async () => {
+  const dir = makeFixture(files());
+  const pub = join(dir, 'shared/contracts');
+  mkdirSync(join(pub, 'components/gone'), { recursive: true });
+  writeFileSync(join(pub, 'components/gone/old-tile.contract.json'), '{}');
+  writeFileSync(join(pub, 'components/keep.md'), 'not a contract');
+  const r = await generateContracts(dir, cfg({ paths: { 'src/components/kit/': 'components/' } }), { publishTo: 'shared/contracts', force: true });
+  assert.deepEqual(r.invalid, []);
+  assert.ok(existsSync(join(pub, 'components/tiles/one.contract.json')), 'laid out by the code by default');
+  assert.deepEqual(r.removed, ['components/gone/old-tile.contract.json']);
+  assert.ok(!existsSync(join(pub, 'components/gone')), 'the folder it leaves empty goes too');
+  assert.ok(existsSync(join(pub, 'components/keep.md')), 'only contracts are removed');
+  for (const local of ['tokens.json', 'catalog.json', 'llms.txt', 'built.json', '.gitignore', 'figma-props.d.ts']) assert.ok(!existsSync(join(pub, local)), `${local} stays local`);
+  assert.ok(existsSync(join(pub, 'contract.schema.json')));
+  const readme = readFileSync(join(pub, 'README.md'), 'utf8');
+  assert.match(readme, /Do not edit these files by hand/);
+  assert.match(readme, /\| Contracts \| \d+ \|/);
+  const again = readFileSync(join(pub, 'README.md'), 'utf8');
+  await generateContracts(dir, cfg({ paths: { 'src/components/kit/': 'components/' } }), { publishTo: 'shared/contracts', force: true });
+  assert.equal(readFileSync(join(pub, 'README.md'), 'utf8'), again, 'the same inputs, the same README');
 });
