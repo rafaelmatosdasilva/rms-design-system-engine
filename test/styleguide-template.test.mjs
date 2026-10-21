@@ -385,7 +385,8 @@ test('in the browser: no script error, a control changes the real component, the
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Token:/.test(r)), 'props and tokens: ' + parRows);
     const parityText = await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`);
-    assert.match(parityText, /Task nr.*Type.*Figma.*Code.*What to do.*Status.*Last checked/s);
+    assert.match(parityText, /Task nr.*Type.*Figma.*Code.*Status.*Last checked/s);
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip [data-area="parity"] thead').textContent`), /What to do/, 'what to do: in the row\'s panel only');
     assert.doesNotMatch(parityText, /Of \d+, \d+ the same/, 'no line counting what is the same, what differs and what is on one side');
     assert.deepEqual(await run(`[...document.querySelectorAll('#c-chip [data-area="parity"] tr[data-status="done"]')].filter((tr) => /Same/.test(tr.lastElementChild.textContent)).length`), 0, 'a row that is done says nothing more under Done');
     // Its chips show one status at a time, on Parity's own table, never on the Accessibility tables beside it.
