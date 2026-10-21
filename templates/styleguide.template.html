@@ -3338,7 +3338,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var dpWatch = function (iso) {
       if (iso._dpWatched) return; iso._dpWatched = true;
       if (typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { dpLeads(iso); }).observe(iso);
-      var st = iso.querySelector('.sg-bk-dp-stack'); if (st) st.addEventListener('transitionend', function (e) { if (e.target === st) dpLeads(iso); });
+      // The layers spread with transitions of their own: the names follow once each has arrived (one placing per frame),
+      // and once more after the longest, should a transition never end (a hidden tab).
+      var queued = 0, again = function () { if (queued) return; queued = setTimeout(function () { queued = 0; dpLeads(iso); }, 16); };
+      // While they move, the names move with them, frame by frame.
+      var until = 0, follow = function () { var go = !until; until = performance.now() + 450; if (go) (function tick() { dpLeads(iso); if (performance.now() < until) requestAnimationFrame(tick); else until = 0; })(); };
+      var mine = function (e) { return e.target === st || (e.target.classList && e.target.classList.contains('sg-bk-dp-plane')); };
+      var st = iso.querySelector('.sg-bk-dp-stack');
+      if (st) { st.addEventListener('transitionstart', function (e) { if (mine(e)) follow(); }); ['transitionend', 'transitioncancel'].forEach(function (t) { st.addEventListener(t, function (e) { if (mine(e)) again(); }); }); }
+      setTimeout(again, 900);
     };
     var dpLeadsAll = function () { dpFrame(); Array.prototype.forEach.call(bkOut.querySelectorAll('.sg-bk-dp-iso'), function (iso) { dpWatch(iso); dpLeads(iso); }); };
     if (!bkOut._dpLeadsOn) { bkOut._dpLeadsOn = 1; window.addEventListener('resize', function () { dpLeadsAll(); }); }

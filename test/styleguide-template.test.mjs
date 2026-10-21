@@ -191,6 +191,10 @@ test('in the browser: no script error, a control changes the real component, the
   mkdirSync(join(dir, 'tools', 'demo-module'), { recursive: true });
   writeFileSync(join(dir, 'tools', 'demo-module', 'module.js'), "var bar = SG.themeBar(); bar.insertAdjacentHTML('beforeend', SG.sysButton('button', 'Demo', ' data-demo')); bar.querySelector('[data-demo]').addEventListener('click', function (e) { SG.openPanel({ id: 'demo-panel', title: 'Demo', crumbs: ['Theme'], body: '<p class=\"demo-body\">' + SG.esc('<b>Hello</b>') + '</p>', from: e.currentTarget }); });");
   writeFileSync(join(dir, 'tools', 'demo-module', 'module.css'), '.demo-body { margin: 0; }');
+  // Its own data for this system, kept with the module (data/<system>/*.json), never in the system's project.
+  const sysSlug = String(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
+  mkdirSync(join(dir, 'tools', 'demo-module', 'data', sysSlug), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'demo-module', 'data', sysSlug, 'ocean.json'), JSON.stringify({ name: 'Ocean' }));
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'], styleguide: { ...(cfg0.styleguide ?? {}), modules: ['tools/demo-module'] } }));
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
@@ -232,6 +236,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.querySelector('a.sg-card[href="#c-chip"] .sg-thumb .chip')`), true, 'the card shows the component itself');
     // The module's button sits beside the Theme choice (made for it: this system has no brands), and opens its panel.
     assert.equal(await run(`!!document.querySelector('#mode-controls .sg-brand-ctl [data-demo]') && !!document.querySelector('style[data-sg-module="demo-module"]')`), true, 'a module\'s button and styles are in the page');
+    assert.equal(await run(`(SG.moduleData['demo-module'].files || []).map((f) => f.file + ':' + f.name).join()`), 'ocean.json:Ocean', 'a module reads its own data for this system');
     await run(`document.querySelector('[data-demo]').click()`);
     assert.deepEqual(await until(`(() => { const p = document.getElementById('demo-panel'); return p && !p.hidden ? [p.querySelector('h1, h2, .sg-panel-title') && p.querySelector('h1, h2, .sg-panel-title').textContent.trim(), p.querySelector('.demo-body').textContent] : null; })()`, Boolean), ['Demo', '<b>Hello</b>'], 'the module\'s panel opens with its title and body, its words escaped');
     await run(`document.getElementById('demo-panel')._shut()`);
