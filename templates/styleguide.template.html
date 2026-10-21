@@ -3389,13 +3389,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // where each lens looks and the stroke measured across its line; at the right each lens drawn large, the icon's own
     // pixel grid behind it, the cap's half-stroke circle and the corner's turn marked, named underneath.
     function lensTile(an) {
-      var bx = an.box, z = Math.max(bx[2], bx[3]), big = 583 / z, frameX = 72, frameY = 58, ox = frameX - bx[0] * big, oy = frameY - bx[1] * big;
+      var bx = an.box, z = Math.max(bx[2], bx[3]), big = 583 / z, frameX = 645, frameY = 58, ox = frameX - bx[0] * big, oy = frameY - bx[1] * big;
       var at = function (p) { return [ox + p[0] * big, oy + p[1] * big]; }, num = function (n) { return String(Math.round(n * 100) / 100); };
       // The icon's own drawing in the words' colour (its fills from a class would not reach a <use>).
       var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
       var icon = function (x, y, k) { return '<svg x="' + x + '" y="' + y + '" width="' + (bx[2] * k) + '" height="' + (bx[3] * k) + '" viewBox="' + bx.join(' ') + '" class="sg-bk-lens-icon" fill="currentColor" overflow="visible">' + body + '</svg>'; };
       var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
-      // Two by two, as they sit on the icon: the corner and the open gap above, the stroke's thickness and the end below.
+      // Two by two at the left, the icon at the right, as they sit on it: the corner and the open gap above, the stroke's thickness and the end below.
       var lenses = [an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }, an.gap && { p: an.gap.at, kind: 'gap' }, an.thick && { p: an.thick.at, kind: 'thick' }, an.end && { p: an.end.at, kind: 'end', round: an.end.round }].filter(Boolean);
       var R = 55, LR = 95, out = '', caps = '', VW = 1300, VH = 720;
       // The icon, large, on its pixel grid inside its own box.
@@ -3405,7 +3405,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Each lens, large, side by side beside the icon: the icon drawn so the point sits in the middle, clipped to the
       // circle, its name and what it shows under it. The gap's lens is drawn at the scale that holds both its ends.
       lenses.forEach(function (l, i) {
-        var cx = 842 + (i % 2) * (LR * 2 + 80), cy = 40 + LR + Math.floor(i / 2) * (LR * 2 + 95 + 59), id = 'sg-bk-lens-' + i;
+        var cx = 175 + (i % 2) * (LR * 2 + 80), cy = 40 + LR + Math.floor(i / 2) * (LR * 2 + 95 + 28), id = 'sg-bk-lens-' + i;
         var zoom = l.kind === 'gap' ? Math.min(LR * 2 / (an.w * 3.2), LR * 1.7 / (an.gap.gap + an.w * 3)) : LR * 2 / (an.w * 3.2), s1 = an.w * zoom / 2;
         var on = function (p) { return [cx + (p[0] - l.p[0]) * zoom, cy + (p[1] - l.p[1]) * zoom]; };
         // The icon's own pixel grid: a line at each whole unit of its drawing.
