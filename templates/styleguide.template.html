@@ -7222,11 +7222,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // card's numbers and its filter's are the same.
     var applies = function (pick) { return mx.filter(function (o) { var x = pick(o); return x && x.say !== 'N/A' && x.say !== '–'; }); };
     // Each card over Figma's components: what a card's check cannot apply to (one with nothing to compare) is counted
-    // apart, in grey. Parity and Accessibility count only what the code has built: one not built yet is the
-    // Implementation card's to say, and it says so. Documentation counts them all (a component owes its documentation
-    // before it is built).
+    // apart, in grey. Parity, Accessibility and Documentation count only what the code has built: one not built yet is
+    // the Implementation card's to say, and it says so.
     var builtRows = figmaRows.filter(function (o) { return o.code !== 'missing'; });
-    var parRows = builtRows, accRows = builtRows, docRows = figmaRows;
+    var parRows = builtRows, accRows = builtRows, docRows = builtRows;
     var parP = states(parRows, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
     var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; }, 'with nothing to document');
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
@@ -7249,7 +7248,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ['The accessibility tree', 'The browser\'s own: each control\'s name, role and state, as assistive technology reads them.'],
       ['Contrast', 'WCAG\'s formula: 4.5:1 for text, 3:1 for large text and control edges, in every theme and in two modes at once (dark with high contrast).']
     ];
-    dT.how = 'Every component Figma has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
+    dT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation).' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));

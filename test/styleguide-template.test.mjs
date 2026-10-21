@@ -1402,20 +1402,18 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
     assert.match(tiles[0][1], /^\d+of \d+\|components fully matched$/, 'parity counts the components that fully match');
-    // Implementation and Documentation count over Figma's components; Parity and Accessibility only over what the code
-    // has built (one not built yet is the Implementation card's to say), and never say "not in the code yet".
+    // Implementation counts over Figma's components; Parity, Accessibility and Documentation only over what the code has
+    // built (one not built yet is the Implementation card's to say), and never say "not in the code yet".
     const totals = tiles.map((x) => +/of (\d+)/.exec(x[1])[1]), found = +/^(\d+)/.exec(tiles[1][1])[1];
-    assert.equal(totals[1], totals[3], 'implementation and documentation count over the same total');
-    assert.equal(totals[0], found, 'parity counts the components the code has');
-    assert.equal(totals[2], found, 'accessibility counts the components the code has');
-    for (const k of [0, 2]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'parity and accessibility do not repeat what implementation says');
+    for (const k of [0, 2, 3]) assert.equal(totals[k], found, `${tiles[k][0]} counts the components the code has`);
+    for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what implementation says');
     assert.match(tiles[1][1], /^\d+of \d+\|components found in code$/, 'the components the code has, of every component Figma has');
     assert.match(tiles[1][2], /2 found/, 'the table\'s own words: Found, Unsure, Missing');
     assert.match(tiles[2][1], /^\d+of \d+\|components that pass$/);
-    // Each card counts what its column's filter counts: every row whose state there applies (a component only Figma has
-    // still owes its documentation).
+    // Each card counts what its column's filter counts: every row whose state there applies, of the components the code
+    // has built.
     assert.match(tiles[3][1], /^\d+of \d+\|components fully documented$/);
-    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = +/of (\\d+)/.exec(tile.textContent)[1]; const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent)); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has');
+    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = +/of (\\d+)/.exec(tile.textContent)[1]; const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent) && tr.dataset.stCode !== 'Missing'); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has that the code has built');
     assert.match(tiles[3][2], /\d+ (ready|partial|missing)/, 'the Documentation column\'s states: Ready, Partial, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
