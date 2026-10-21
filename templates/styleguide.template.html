@@ -994,7 +994,6 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .pg-controls > .pg-ctl > .pg-ctl-label, .pg-ctl.pg-width > .pg-ctl-label { font-size: var(--sg-m); color: var(--sg-text-2); }   /* a property's name in the page's running text size
    (13px), as a list's words are */
 .pg-controls > .pg-ctl > .pg-ctl-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pg-ctl-when { color: var(--sg-muted); }
 .pg-controls > .pg-ctl > .sg-seg { display: inline-flex; flex: none; width: auto; flex-wrap: nowrap; min-height: var(--pg-row-ctl); }
 .pg-controls > .pg-ctl > .sg-seg.sg-seg-default > button { min-height: 0; padding-top: 0; padding-bottom: 0; }   /* the side padding of every switch's options (8px more on a large window), only shorter */
 .pg-controls > .pg-ctl > .sg-select { flex: 0 1 55%; min-width: 0; }
@@ -4232,9 +4231,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // One icon, magnified on its grid, with two lenses: where its line ends and where it turns, each drawn again
         // large beside it, its pixel grid behind, with the stroke measured across it.
         var an = iconAnatomy(monoStd.slice(Math.floor(monoStd.length / 4)).concat(monoStd.slice(0, Math.floor(monoStd.length / 4))));
-        // The icon in the system's own icon colours: the four swUsed most (each value once), each on the brand ground it
-        // reads best on (the card, the primary, ink or paper, 3:1 at least), the swGrounds varied.
-        var swGrounds = [{ css: GROUND, hex: bg2x }, { css: HUE1, hex: h1x }, { css: INK, hex: ink }, { css: PAPER, hex: paper }], swByHex = {};
+        // The icon in the system's own icon colours: the four used most (each value once), each on the brand ground it
+        // reads best on (the primary, ink or paper, 3:1 at least; never the card's own ground, where the square would
+        // vanish), the grounds varied.
+        var swGrounds = [{ css: HUE1, hex: h1x }, { css: INK, hex: ink }, { css: PAPER, hex: paper }], swByHex = {};
         bkCols.filter(function (t) { return /icon/i.test(t.figma); }).forEach(function (t) { var swHx = bkHex(t); if (!bkRgb(swHx)) return; (swByHex[swHx] = swByHex[swHx] || { t: t, n: 0 }).n++; });
         var swUsed = {}, iconSw = [];
         Object.keys(swByHex).sort(function (a, b) { return swByHex[b].n - swByHex[a].n; }).forEach(function (swHx) {
@@ -4244,8 +4244,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           if (!swOk) return;
           swUsed[swOk.k] = (swUsed[swOk.k] || 0) + 1; iconSw.push({ bg: swOk.g.css, fg: bkCss(swByHex[swHx].t) });
         });
-        // Too few: the brand's own pairs fill it (words on the card, on the primary, paper on ink).
-        [{ bg: GROUND, fg: readOn(bg2x) }, { bg: HUE1, fg: onC1big }, { bg: INK, fg: PAPER }, { bg: PAPER, fg: INK }].forEach(function (o) { if (iconSw.length < 4) iconSw.push(o); });
+        // Too few: the brand's own pairs fill it (on the primary, paper on ink, ink on paper).
+        [{ bg: HUE1, fg: onC1big }, { bg: INK, fg: PAPER }, { bg: PAPER, fg: INK }, { bg: HUE1, fg: INK }].forEach(function (o) { if (iconSw.length < 4) iconSw.push(o); });
         if (an) addI('w6 h5 sg-bk-bare-pad sg-bk-lens-t', bg2, lensTile(an, iconSw));
       }
       ICON = '<div class="sg-bk-bento">' + IT.join('') + '</div>'; IT = [];   // the charts follow, at the end of the kit
@@ -5685,9 +5685,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var base = c.renders[0], baseRoot = rootOf(base.markup);
     if (!baseRoot) return base.markup;
     var at = function (r, k) { return k.label in r.props ? String(r.props[k.label]) : String(k.type === 'BOOLEAN' ? !!k.default : (k.default == null ? '' : k.default)); };
-    // A case its build drew with every value as chosen (alignment centred with full width on): that drawing itself.
-    var exact = c.renders.filter(function (r) { return (c.controls || []).every(function (k) { return at(r, k) === String(state[k.label]); }); })[0];
-    if (exact) return exact.markup;
     // The case its build drew for one prop set to this value, everything else as in the default case.
     var caseFor = function (k) {
       return c.renders.filter(function (r) {
@@ -5696,10 +5693,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       })[0] || null;
     };
     var away = (c.controls || []).filter(function (k) { return at(base, k) !== String(state[k.label]); });
+    // The case its build drew with the most of the chosen values together (alignment centred with full width on), and
+    // nothing else changed: drawn as it is, the props it does not cover added one by one as below.
+    var best = null, covered = [];
+    c.renders.forEach(function (r) {
+      if (!(c.controls || []).every(function (k) { var v = at(r, k); return v === String(state[k.label]) || v === at(base, k); })) return;
+      var n = away.filter(function (k) { return at(r, k) === String(state[k.label]); });
+      if (n.length > covered.length) { best = r; covered = n; }
+    });
+    if (best && covered.length === away.length) return best.markup;
+    var from = best && covered.length > 1 ? rootOf(best.markup) : null;
+    if (from) away = away.filter(function (k) { return covered.indexOf(k) < 0; });
     var cases = away.map(function (k) { return { k: k, r: caseFor(k) }; }).filter(function (x) { return x.r; });
     // The one prop that changes more than the root gives the drawing; the rest add their root changes to it.
-    var inner = cases.filter(function (x) { var r = rootOf(x.r.markup); return r && !sameInside(baseRoot, r); });
-    var start = inner.length ? rootOf(inner[inner.length - 1].r.markup) : baseRoot.cloneNode(true);
+    var inner = from ? [] : cases.filter(function (x) { var r = rootOf(x.r.markup); return r && !sameInside(baseRoot, r); });
+    var start = from || (inner.length ? rootOf(inner[inner.length - 1].r.markup) : baseRoot.cloneNode(true));
     cases.forEach(function (x) {
       if (inner.length && x === inner[inner.length - 1]) return;
       var r = rootOf(x.r.markup); if (!r) return;
@@ -8763,9 +8771,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     props.forEach(function (p) {
       var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (p.at != null) ctl.dataset.at = p.at; ctl._prop = p;
       // A prop only the code's API takes says so: Figma has no prop for it.
-      var label = '<div class="pg-ctl-label"' + (p.fromCode ? ' title="From the code\'s API: Figma has no prop for it"' : '') + '>' + esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '') + (p.fromCode ? '<span class="sg-hidden-text"> (from the code)</span>' : '') +
-        // A value the code applies only while another prop is on (alignment with fullWidth) says so beside its name.
-        ((p.onlyWith || []).length ? '<span class="pg-ctl-when"> · with ' + p.onlyWith.map(function (w) { return esc(w.label) + (w.on ? ' on' : ' off'); }).join(' and ') + '</span>' : '') + '</div>';
+      // What the label says beyond its name is in its tooltip: a prop only the code's API takes, and a value the code
+      // applies only while another prop is on (alignment with fullWidth).
+      var when = (p.onlyWith || []).length ? 'Applies only with ' + p.onlyWith.map(function (w) { return w.label + (w.on ? ' on' : ' off'); }).join(' and ') : '';
+      var tip = [p.fromCode ? 'From the code\'s API: Figma has no prop for it' : '', when].filter(Boolean).join('. ');
+      var label = '<div class="pg-ctl-label"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '') + (p.fromCode ? '<span class="sg-hidden-text"> (from the code)</span>' : '') +
+        (when ? '<span class="sg-hidden-text"> (' + esc(when.toLowerCase()) + ')</span>' : '') + '</div>';
       if (p.type === 'TEXT') {
         ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text" class="sg-input">');
         var field = ctl.querySelector('input'); field.value = state[p.label]; field.setAttribute('aria-label', p.label);
