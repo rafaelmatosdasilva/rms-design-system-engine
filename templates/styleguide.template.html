@@ -3064,26 +3064,22 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       todo: all ? '' : esc('Write what each token is for in its description in Figma. Agents read it to pick the right token.'), who: all ? '' : WHO.figma, st: all ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: n ? ['From the variables\' descriptions in Figma'] : [] };
   };
   // From the guidance rating (everything written about it, wherever it is written), only what no other row says: an
-  // example, its properties by name, and the names it gives that the system does not have. What it is, when to use it,
-  // when not to and its role are their own rows.
+  // example, and the names it gives that the system does not have. What it is, when to use it, when not to and its role
+  // are their own rows; its properties are in its contract, from Figma and the code, never asked for again here.
   var WHERE_TO_WRITE = function () { return 'in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, ' : '') + 'its description in Figma, or a section of your guidelines headed with its exact name. Each is read the same way.'; };
   var agentRows = function (c) {
-    var a = c.agentRating; if (!a) return [];
+    var a = c.agentRating || {};
     var base = { area: 'Documentation', rel: '', at: DATA.builtAt || null, src: (a.from || []).slice(0, 3) };
     var mk = function (key, kind, written, st, todo) { return Object.assign({ key: c.name + '\u0000doc:' + key, kind: kind, written: written, st: st, todo: st === 'done' ? '' : esc(todo), who: st === 'done' ? '' : WHO.person }, base); };
     var rows = [];
     var ex = !!(a.pieces || {}).example;
-    rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
+    if (c.agentRating) rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
       'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
-    var p = a.props || {};
-    if (p.total) {
-      var missing = p.missing || [];
-      var st = p.named === p.total ? 'done' : p.named ? 'check' : 'todo';
-      rows.push(mk('props', 'Properties named', '<p>' + p.named + ' of ' + p.total + ' properties named as Figma names them.' +
-        (typeof a.extracted === 'number' ? ' The extraction test named ' + Math.round(a.extracted * 100) + '% of their options right.' : '') + '</p>' +
-        (missing.length ? '<p class="pg-missing">Not named: ' + missing.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join(', ') + '.</p>' : ''), st,
-        'Name each property as Figma names it, with what its options do, ' + WHERE_TO_WRITE()));
-    }
+    // Its properties: done, in its contract (written from Figma and the code on every run), the file named so an agent
+    // and a person know where to read them.
+    var k = c.contract;
+    if (k && (k.props || []).length) rows.push(Object.assign(mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract, <code>' + esc(k.file) + '</code>, which the engine writes from Figma and the code on every run: ' +
+      k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ') + '. Agents read them there; nothing to write.</p>', 'done', ''), { src: ['Its contract'] }));
     if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
       'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
     return rows;
@@ -3389,8 +3385,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
       var icon = function (x, y, k) { return '<svg x="' + x + '" y="' + y + '" width="' + (bx[2] * k) + '" height="' + (bx[3] * k) + '" viewBox="' + bx.join(' ') + '" class="sg-bk-lens-icon" fill="currentColor" overflow="visible">' + body + '</svg>'; };
       var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
-      var lenses = [an.end && { p: an.end.at, kind: 'end', round: an.end.round }, an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }].filter(Boolean);
-      var R = 38, LR = 125, out = '';
+      // Top to bottom as they sit on the icon: the corner, the open gap, the end.
+      var lenses = [an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }, an.gap && { p: an.gap.at, kind: 'gap' }, an.end && { p: an.end.at, kind: 'end', round: an.end.round }].filter(Boolean);
+      var R = 38, LR = 80, out = '';
       // The icon, large, on its pixel grid inside its own box.
       out += gridLines(40, 40, 40 + bx[2] * big, 40 + bx[3] * big, big, 'sg-bk-lens-grid') + '<rect x="40" y="40" width="' + (bx[2] * big) + '" height="' + (bx[3] * big) + '" class="sg-bk-lens-box"/>' + icon(40, 40, big);
       lenses.forEach(function (l) { var c = at(l.p); out += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + R + '" class="sg-bk-lens-ring"/>'; });
@@ -3402,27 +3399,35 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         out += '<g class="sg-bk-lens-measure"><line x1="' + a1[0] + '" y1="' + a1[1] + '" x2="' + a2[0] + '" y2="' + a2[1] + '"/>' + tick(a1) + tick(a2) + '</g>' +
           '<text x="' + (a1[0] + px * 13) + '" y="' + (a1[1] + py * 13 + 6) + '" class="sg-bk-lens-num"' + (px < 0 ? ' text-anchor="end"' : '') + '>' + num(an.w) + '</text>';
       }
-      // Each lens, large: the icon drawn so the point sits in the middle, clipped to the circle.
-      var zoom = LR * 2 / (an.w * 3.2);
+      // Each lens, large, in a column beside the icon: the icon drawn so the point sits in the middle, clipped to the
+      // circle, its name and what it shows to its right. The gap's lens is drawn at the scale that holds both its ends.
       lenses.forEach(function (l, i) {
-        var cx = 640 + i * 280, cy = 40 + LR + 35, id = 'sg-bk-lens-' + i, s1 = an.w * zoom / 2;
+        var cx = 600, cy = 40 + LR + i * (LR * 2 + 10), id = 'sg-bk-lens-' + i;
+        var zoom = l.kind === 'gap' ? Math.min(LR * 2 / (an.w * 3.2), LR * 1.7 / (an.gap.gap + an.w * 3)) : LR * 2 / (an.w * 3.2), s1 = an.w * zoom / 2;
+        var on = function (p) { return [cx + (p[0] - l.p[0]) * zoom, cy + (p[1] - l.p[1]) * zoom]; };
         // The icon's own pixel grid: a line at each whole unit of its drawing.
         var g0 = gridLines(cx + (Math.floor(l.p[0] - LR / zoom) - l.p[0]) * zoom, cy + (Math.floor(l.p[1] - LR / zoom) - l.p[1]) * zoom, cx + LR + zoom, cy + LR + zoom, zoom, 'sg-bk-lens-grid');
-        var shift = function (v, c) { return c - v * zoom; };
+        var o = on([bx[0], bx[1]]);
         out += '<clipPath id="' + id + '"><circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '"/></clipPath>' +
-          '<g clip-path="url(#' + id + ')"><rect x="' + (cx - LR) + '" y="' + (cy - LR) + '" width="' + (LR * 2) + '" height="' + (LR * 2) + '" class="sg-bk-lens-ground"/>' +
-          g0 +
-          icon(shift(l.p[0] - bx[0], cx) - bx[0] * 0, shift(l.p[1] - bx[1], cy), zoom) + '</g>' +
+          '<g clip-path="url(#' + id + ')"><rect x="' + (cx - LR) + '" y="' + (cy - LR) + '" width="' + (LR * 2) + '" height="' + (LR * 2) + '" class="sg-bk-lens-ground"/>' + g0 + icon(o[0], o[1], zoom) + '</g>' +
           '<circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '" class="sg-bk-lens-ring"/>';
-        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="5" class="sg-bk-lens-dot"/>';
+        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="4" class="sg-bk-lens-dot"/>';
         if (l.kind === 'corner') out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/>';
-        var title = l.kind === 'end' ? (l.round ? 'Round cap' : 'Flat cap') : (l.round ? 'Round join' : 'Sharp join');
-        var sub = l.kind === 'end' ? (l.round ? 'ends reach half the stroke, r = ' + num(an.w / 2) + 'px' : 'ends stop square across the line')
-          : (l.round ? 'it turns in a curve, no sharp points' : 'it turns to a sharp point');
-        out += '<text x="' + (cx - LR) + '" y="' + (cy + LR + 50) + '" class="sg-bk-lens-title">' + esc(title) + '</text><text x="' + (cx - LR) + '" y="' + (cy + LR + 84) + '" class="sg-bk-lens-sub">' + esc(sub) + '</text>';
+        if (l.kind === 'gap') {
+          // The gap measured tip to tip.
+          var ga = on(an.gap.a), gb = on(an.gap.b), gx = gb[0] - ga[0], gy = gb[1] - ga[1], gd = Math.hypot(gx, gy) || 1, vx = gx / gd, vy = gy / gd;
+          var t1 = [ga[0] + vx * s1, ga[1] + vy * s1], t2 = [gb[0] - vx * s1, gb[1] - vy * s1], nx = -vy * 10, ny = vx * 10;
+          out += '<g class="sg-bk-lens-measure"><line x1="' + t1[0] + '" y1="' + t1[1] + '" x2="' + t2[0] + '" y2="' + t2[1] + '"/>' +
+            '<line x1="' + (t1[0] - nx) + '" y1="' + (t1[1] - ny) + '" x2="' + (t1[0] + nx) + '" y2="' + (t1[1] + ny) + '"/><line x1="' + (t2[0] - nx) + '" y1="' + (t2[1] - ny) + '" x2="' + (t2[0] + nx) + '" y2="' + (t2[1] + ny) + '"/></g>';
+        }
+        var title = l.kind === 'end' ? (l.round ? 'Round cap' : 'Flat cap') : l.kind === 'gap' ? 'Open stroke' : (l.round ? 'Round join' : 'Sharp join');
+        var sub = l.kind === 'end' ? (l.round ? 'half the stroke, r = ' + num(an.w / 2) + 'px' : 'ends cut square')
+          : l.kind === 'gap' ? 'the line breaks, ' + num(an.gap.gap) + 'px apart'
+          : (l.round ? 'turns in a curve, no points' : 'turns to a sharp point');
+        out += '<text x="' + (cx + LR + 24) + '" y="' + (cy - 6) + '" class="sg-bk-lens-title">' + esc(title) + '</text><text x="' + (cx + LR + 24) + '" y="' + (cy + 28) + '" class="sg-bk-lens-sub">' + esc(sub) + '</text>';
       });
       var set = an.set, same = (set.sameW === set.read ? 'the same on all ' + set.read + ' icons read' : 'the same on ' + set.sameW + ' of ' + set.read + ' icons read') + (an.src === 'figma' ? ', as Figma draws it' : an.src === 'code' ? ', as its code draws it' : ', measured on its drawing');
-      return '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 1060 560" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '">' + out +
+      return '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 1060 560" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out +
         '<text x="40" y="' + (84 + bx[3] * big) + '" class="sg-bk-lens-sub">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  stroke ' + num(an.w) + 'px, ' + esc(same) + '</text></svg>';
     }
     var anatomyCache = {};
@@ -3488,23 +3493,25 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var nbs = function (q) { var x = q % W, y = (q - x) / W, out = []; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; var X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < W && Y < H && sk[Y * W + X]) out.push(Y * W + X); } return out; };
         // Walk k steps along the line from q, away from where it came: the point reached (or null at a fork).
         // Two next pixels side by side are one line turning (the thinning leaves a step); apart, a fork.
-        var walk = function (q, from, k) {
+        var walk = function (q, from, k, least) {
           var prev = from, cur = q, dist = function (m, o) { return Math.hypot(m % W - o % W, Math.floor(m / W) - Math.floor(o / W)); };
           for (var s = 0; s < k; s++) {
             var n = nbs(cur).filter(function (m) { return m !== prev && nbs(prev).indexOf(m) < 0; });
             if (n.length > 1 && n.every(function (m) { return n.every(function (o) { return o === m || dist(m, o) < 1.5; }); })) n = [n.sort(function (x, y) { return dist(y, prev) - dist(x, prev); })[0]];
-            if (n.length !== 1) return null;
+            if (n.length !== 1) return least && s >= least ? cur : null;   // a fork: far enough, where it is
             prev = cur; cur = n[0];
           }
           return cur;
         };
-        var stepK = Math.max(4, Math.round(best * 1.2)), ends = [], corners = [];
+        // A turn is read two strokes along each way (a wide rounded corner only shows its turn from that far), or as far as
+        // the line goes before a fork, a stroke at least.
+        var stepK = Math.max(4, Math.round(best * 2)), ends = [], corners = [];
         for (var q = 0; q < W * H; q++) {
           if (!sk[q]) continue;
           var n0 = nbs(q);
           if (n0.length === 1) { var far = walk(n0[0], q, Math.round(best)); if (far != null) ends.push({ q: q, toward: far }); }   // a spur from a square corner is shorter than the stroke
           else if (n0.length === 2) {
-            var a = walk(n0[0], q, stepK), b = walk(n0[1], q, stepK); if (a == null || b == null) continue;
+            var a = walk(n0[0], q, stepK, best), b = walk(n0[1], q, stepK, best); if (a == null || b == null) continue;
             var qx = q % W, qy = (q - qx) / W, ax = a % W - qx, ay = (a - a % W) / W - qy, bx = b % W - qx, by = (b - b % W) / W - qy;
             var cos = (ax * bx + ay * by) / (Math.hypot(ax, ay) * Math.hypot(bx, by) || 1);
             if (cos > -0.35) corners.push({ q: q, cos: cos });   // turns by more than about 70 degrees
@@ -3533,19 +3540,38 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           var c = t - best / 2;
           return [(ex + ux * c) / S + vb[0], (ey + uy * c) / S + vb[1]];
         };
-        var end = ends[0] ? { at: capAt(ends[0]), toward: pt(ends[0].toward), round: capIs ? capIs === 'round' : round(ends[0].q) } : null;
-        var corner = corners[0] ? { at: pt(corners[0].q), round: joinIs ? joinIs === 'round' : round(corners[0].q) } : null;
-        return { id: id, w: w, src: src, box: vb, end: end, corner: corner };
+        // Each end once, with its cap's centre and the way it points.
+        var tips = [];
+        ends.forEach(function (e) {
+          var c = capAt(e), t = pt(e.toward), dx = c[0] - t[0], dy = c[1] - t[1], d = Math.hypot(dx, dy) || 1;
+          if (!tips.some(function (o) { return Math.hypot(o.at[0] - c[0], o.at[1] - c[1]) < w; })) tips.push({ q: e.q, at: c, toward: t, dir: [dx / d, dy / d] });
+        });
+        // Where the line is open: two ends that face each other across a short gap (the nearest pair, the highest first).
+        var gap = null;
+        tips.forEach(function (a, i) { tips.slice(i + 1).forEach(function (b) {
+          var dx = b.at[0] - a.at[0], dy = b.at[1] - a.at[1], d = Math.hypot(dx, dy) || 1;
+          if (a.dir[0] * b.dir[0] + a.dir[1] * b.dir[1] > -0.8 || (dx * a.dir[0] + dy * a.dir[1]) / d < 0.8 || d > w * 6) return;
+          var g = { a: a, b: b, mid: [(a.at[0] + b.at[0]) / 2, (a.at[1] + b.at[1]) / 2], gap: Math.round((d - w) * 4) / 4 };
+          if (!gap || g.mid[1] < gap.mid[1] - w || (Math.abs(g.mid[1] - gap.mid[1]) <= w && g.gap < gap.gap)) gap = g;
+        }); });
+        // The cap: the lowest end not at the gap. The join: the turn nearest the top left, at its sharpest.
+        var free = tips.filter(function (t) { return !gap || (t !== gap.a && t !== gap.b); });
+        var low = (free.length ? free : tips).sort(function (a, b) { return b.at[1] - a.at[1]; })[0];
+        var end = low ? { at: low.at, toward: low.toward, round: capIs ? capIs === 'round' : round(low.q) } : null;
+        var tl = corners.slice().sort(function (a, b) { var p1 = pt(a.q), p2 = pt(b.q); return p1[0] + p1[1] - p2[0] - p2[1]; })[0], cq = null;
+        if (tl) { var tp = pt(tl.q); cq = corners.filter(function (c) { var p2 = pt(c.q); return Math.hypot(p2[0] - tp[0], p2[1] - tp[1]) < w * 2; }).sort(function (a, b) { return b.cos - a.cos; })[0]; }
+        var corner = cq ? { at: pt(cq.q), round: joinIs ? joinIs === 'round' : round(cq.q) } : null;
+        return { id: id, w: w, src: src, box: vb, end: end, corner: corner, gap: gap ? { at: gap.mid, a: gap.a.at, b: gap.b.at, gap: gap.gap } : null };
       };
       var all = ids.slice(0, 24).map(function (id) { try { return read(id); } catch (e) { return null; } }).filter(Boolean);
       var out = null;
       if (all.length) {
         var wCount = {}; all.forEach(function (a) { wCount[a.w] = (wCount[a.w] || 0) + 1; });
         var wSet = Number(Object.keys(wCount).sort(function (a, b) { return wCount[b] - wCount[a]; })[0]);
-        var pick = all.filter(function (a) { return a.end && a.corner && a.w === wSet; })[0] || all.filter(function (a) { return a.end || a.corner; })[0];
+        var pick = all.filter(function (a) { return a.end && a.corner && a.gap && a.w === wSet; })[0] || all.filter(function (a) { return a.end && a.corner && a.w === wSet; })[0] || all.filter(function (a) { return a.end || a.corner; })[0];
         if (pick) {
           var ends = all.filter(function (a) { return a.end; }), corners = all.filter(function (a) { return a.corner; });
-          out = { id: pick.id, w: pick.w, src: pick.src, box: pick.box, end: pick.end, corner: pick.corner,
+          out = { id: pick.id, w: pick.w, src: pick.src, box: pick.box, end: pick.end, corner: pick.corner, gap: pick.gap,
             set: { read: all.length, sameW: wCount[wSet], w: wSet, ends: ends.length, roundEnds: ends.filter(function (a) { return a.end.round; }).length, corners: corners.length, roundCorners: corners.filter(function (a) { return a.corner.round; }).length } };
         }
       }
@@ -5951,8 +5977,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   };
   var colsOf = function (area) { return ISSUE_COLS[area] || ISSUE_COLS.System; };
   // What a table leaves to its row's panel: Accessibility's Found and What to do are read in full there, so the table has
-  // room for the criterion and Figma's states.
-  var PANEL_ONLY = { Accessibility: ['figma', 'code', 'todo'] };   // what the Figma notes say, what the check found and what to do: the row's panel
+  // room for the criterion and Figma's states; Documentation's table is its task, kind, status and when it was checked,
+  // what is written and what to do read in its panel.
+  var PANEL_ONLY = { Accessibility: ['figma', 'code', 'todo'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
   var tableColsOf = function (area) { var off = PANEL_ONLY[area] || []; return colsOf(area).filter(function (col) { return off.indexOf(col[1]) < 0; }); };
   var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
