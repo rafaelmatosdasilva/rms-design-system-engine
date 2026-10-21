@@ -73,7 +73,7 @@ Feeds Gate [20] (Icons)'s inventory part. The DS icon set often lives in a **sep
 const ICON_PAGE = null;          // e.g. 'Icons' to limit to one page, or null for all
 const STRIP_PREFIX = '';         // e.g. 'Icon/' if names are 'Icon/arrow-left'
 const NAME_FROM_LAST = false;    // true to keep only the last '/'-segment of the name
-const icons = new Set();
+const icons = new Set(), strokes = {};
 for (const node of figma.root.findAll(n => n.type === 'COMPONENT' || n.type === 'COMPONENT_SET')) {
   if (ICON_PAGE) { let p = node; while (p && p.type !== 'PAGE') p = p.parent; if (!p || p.name !== ICON_PAGE) continue; }
   let name = node.name;
@@ -81,8 +81,15 @@ for (const node of figma.root.findAll(n => n.type === 'COMPONENT' || n.type === 
   if (NAME_FROM_LAST && name.includes('/')) name = name.split('/').pop();
   name = name.trim();
   if (name) icons.add(name);
+  // An icon drawn as a line: its stroke (the weight most of its lines have, their cap and join), which the style
+  // guide's Identity shows; an outlined icon in the code is otherwise measured on its drawing.
+  const lines = node.type === 'COMPONENT' ? node.findAll(n => 'strokes' in n && n.strokes.length && typeof n.strokeWeight === 'number' && n.strokeWeight > 0) : [];
+  if (name && lines.length) {
+    const most = (k) => { const c = {}; for (const n of lines) c[n[k]] = (c[n[k]] || 0) + 1; return Object.keys(c).sort((a, b) => c[b] - c[a])[0]; };
+    strokes[name] = { weight: Number(most('strokeWeight')), cap: most('strokeCap'), join: most('strokeJoin') };
+  }
 }
-return JSON.stringify({ _updated: new Date().toISOString(), icons: [...icons].sort() }, null, 2);
+return JSON.stringify({ _updated: new Date().toISOString(), icons: [...icons].sort(), strokes }, null, 2);
 ```
 
 With a token instead, set `ds-config.json → iconLibraryFileKey` (and optional `icons: { page, namePrefix, nameFrom: 'last' }`) and the audit refreshes this file automatically from the library's `/components` on any plan.

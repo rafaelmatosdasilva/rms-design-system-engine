@@ -936,9 +936,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     } catch { /* none listed */ }
     for (const c of view.components) { const m = motionUi(c.cls, allCss); if (m) c.motion = m; }
     // Each icon as Figma has it (the icon snapshot, keyed by the code's symbol id): its Figma name and its size.
-    view.iconFigma = Object.fromEntries(Object.entries(readJson(cfg.paths?.snapshotIcons ?? '') ?? {})
+    // With its stroke when the capture read one (an icon drawn as a line in Figma: its weight, its cap, its join), in an
+    // entry's own `stroke` or in the snapshot's `strokes`, keyed by the Figma name.
+    const iconSnap = readJson(cfg.paths?.snapshotIcons ?? '') ?? {};
+    const strokeOf = (s) => (s && Number(s.weight) > 0 ? { weight: Number(s.weight), cap: String(s.cap ?? '').toLowerCase() || null, join: String(s.join ?? '').toLowerCase() || null } : null);
+    view.iconFigma = Object.fromEntries(Object.entries(iconSnap)
       .filter(([, i]) => i && typeof i === 'object' && (i.name || i.viewBox))
-      .map(([id, i]) => [id, { name: i.name ?? '', size: Number(String(i.viewBox ?? '').split(/[\s,]+/)[2]) || null }]));
+      .map(([id, i]) => [id, { name: i.name ?? '', size: Number(String(i.viewBox ?? '').split(/[\s,]+/)[2]) || null, ...(strokeOf(i.stroke) ? { stroke: strokeOf(i.stroke) } : {}) }]));
+    for (const [name, st] of Object.entries(iconSnap.strokes ?? {})) {
+      const id = Object.keys(view.iconFigma).find((k) => view.iconFigma[k].name === name) ?? name;
+      if (strokeOf(st)) view.iconFigma[id] = { ...(view.iconFigma[id] ?? { name, size: null }), stroke: strokeOf(st) };
+    }
     // The page's own controls (its tabs, segmented control, buttons, fields, cards, tooltips, icon buttons, overlay) are
     // the template's, at the template's sizes, never the system's components: the page is the frame, the system what it
     // shows. Every pick is the template's default (view.ui empty).

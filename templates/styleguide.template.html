@@ -1291,6 +1291,18 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-durs > i { display: block; height: var(--sg-space-s); border-radius: var(--sg-radius-pill); animation: sg-bk-fill 1s ease infinite alternate; }
 @keyframes sg-bk-fill { from { width: 0; } to { width: 100%; } }
 /* Icons and charts. */
+.sg-bk-lens .sg-bk-lens-grid { stroke: color-mix(in srgb, var(--sg-line-colour) 30%, transparent); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.sg-bk-lens .sg-bk-lens-box { fill: none; stroke: var(--sg-muted); stroke-dasharray: 6 6; stroke-width: var(--bk-line-w, 1px); vector-effect: non-scaling-stroke; }
+.sg-bk-lens .sg-bk-lens-ring { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: max(2px, var(--bk-line-w, 1px)); vector-effect: non-scaling-stroke; }
+.sg-bk-lens .sg-bk-lens-ground { fill: var(--bk-card); }
+.sg-bk-lens .sg-bk-lens-mark { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 2px; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
+.sg-bk-lens .sg-bk-lens-dot { fill: var(--bk-mark, var(--sg-accent)); }
+.sg-bk-lens .sg-bk-lens-measure { stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.sg-bk-lens text { font-size: var(--sg-space-l); }
+.sg-bk-lens .sg-bk-lens-icon { color: var(--sg-text); }
+.sg-bk-lens .sg-bk-lens-num { fill: var(--bk-mark, var(--sg-accent)); }
+.sg-bk-lens .sg-bk-lens-title { fill: var(--sg-text); font-size: calc(var(--sg-space-l) * 1.4); }
+.sg-bk-lens .sg-bk-lens-sub { fill: var(--sg-muted); }
 .sg-bk-keyline-t { --bk-grid: color-mix(in srgb, var(--sg-line-colour) 18%, transparent); background-image: repeating-linear-gradient(to right, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))), repeating-linear-gradient(to bottom, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))); background-position: center; }   /* the grid fills the whole card, in the brand's line thickness */
 .sg-bk-key-icon { fill: var(--sg-text); color: var(--sg-text); }
 .sg-bk-steps-t { flex-direction: row; align-items: flex-end; justify-content: space-around; }
@@ -3359,6 +3371,176 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var dpLeadsAll = function () { dpFrame(); Array.prototype.forEach.call(bkOut.querySelectorAll('.sg-bk-dp-iso'), function (iso) { dpWatch(iso); dpLeads(iso); }); };
     if (!bkOut._dpLeadsOn) { bkOut._dpLeadsOn = 1; window.addEventListener('resize', function () { dpLeadsAll(); }); }
+    // ── How the icons are drawn, read from their pixels: the system's icons are outlined shapes, so the stroke, its ends
+    // and its corners are measured, not read from attributes. Each icon is drawn ten times its size; its stroke is the
+    // width most often crossed, row by row and column by column; its line, thinned to one pixel, gives an end (where
+    // the line stops) and a corner (where it turns most sharply). An end or a corner is round when a disc of half the
+    // stroke, rolled inside the shape, still covers it. → { id, w, end, corner, set } (units of the icon's own grid)
+    // The magnified icon and its two lenses, drawn from iconAnatomy(): the icon on its grid at the left with a ring
+    // where each lens looks and the stroke measured across its line; at the right each lens drawn large, the icon's own
+    // pixel grid behind it, the cap's half-stroke circle and the corner's turn marked, named underneath.
+    function lensTile(an) {
+      var bx = an.box, z = Math.max(bx[2], bx[3]), big = 330 / z, ox = 40 - bx[0] * big, oy = 40 - bx[1] * big;
+      var at = function (p) { return [ox + p[0] * big, oy + p[1] * big]; }, num = function (n) { return String(Math.round(n * 100) / 100); };
+      // The icon's own drawing in the words' colour (its fills from a class would not reach a <use>).
+      var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
+      var icon = function (x, y, k) { return '<svg x="' + x + '" y="' + y + '" width="' + (bx[2] * k) + '" height="' + (bx[3] * k) + '" viewBox="' + bx.join(' ') + '" class="sg-bk-lens-icon" fill="currentColor" overflow="visible">' + body + '</svg>'; };
+      var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
+      var lenses = [an.end && { p: an.end.at, kind: 'end', round: an.end.round }, an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }].filter(Boolean);
+      var R = 28, LR = 125, out = '';
+      // The icon, large, on its pixel grid inside its own box.
+      out += gridLines(40, 40, 40 + bx[2] * big, 40 + bx[3] * big, big, 'sg-bk-lens-grid') + '<rect x="40" y="40" width="' + (bx[2] * big) + '" height="' + (bx[3] * big) + '" class="sg-bk-lens-box"/>' + icon(40, 40, big);
+      lenses.forEach(function (l) { var c = at(l.p); out += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + R + '" class="sg-bk-lens-ring"/>'; });
+      // The stroke, measured across the line just past the lens on its end.
+      if (an.end) {
+        var e = at(an.end.at), t = at(an.end.toward), dx = t[0] - e[0], dy = t[1] - e[1], d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, half = an.w * big / 2;
+        var mx = e[0] + ux * (an.w * big + R + 12), my = e[1] + uy * (an.w * big + R + 12), px = -uy, py = ux;
+        var a1 = [mx + px * half, my + py * half], a2 = [mx - px * half, my - py * half], tick = function (q) { return '<line x1="' + (q[0] - ux * 6) + '" y1="' + (q[1] - uy * 6) + '" x2="' + (q[0] + ux * 6) + '" y2="' + (q[1] + uy * 6) + '"/>'; };
+        out += '<g class="sg-bk-lens-measure"><line x1="' + a1[0] + '" y1="' + a1[1] + '" x2="' + a2[0] + '" y2="' + a2[1] + '"/>' + tick(a1) + tick(a2) + '</g>' +
+          '<text x="' + (a1[0] + px * 10) + '" y="' + (a1[1] + py * 10 + 5) + '" class="sg-bk-lens-num"' + (px < 0 ? ' text-anchor="end"' : '') + '>' + num(an.w) + '</text>';
+      }
+      // Each lens, large: the icon drawn so the point sits in the middle, clipped to the circle.
+      var zoom = LR * 2 / (an.w * 3.2);
+      lenses.forEach(function (l, i) {
+        var cx = 540 + i * 300, cy = 40 + LR, id = 'sg-bk-lens-' + i, s1 = an.w * zoom / 2;
+        // The icon's own pixel grid: a line at each whole unit of its drawing.
+        var g0 = gridLines(cx + (Math.floor(l.p[0] - LR / zoom) - l.p[0]) * zoom, cy + (Math.floor(l.p[1] - LR / zoom) - l.p[1]) * zoom, cx + LR + zoom, cy + LR + zoom, zoom, 'sg-bk-lens-grid');
+        var shift = function (v, c) { return c - v * zoom; };
+        out += '<clipPath id="' + id + '"><circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '"/></clipPath>' +
+          '<g clip-path="url(#' + id + ')"><rect x="' + (cx - LR) + '" y="' + (cy - LR) + '" width="' + (LR * 2) + '" height="' + (LR * 2) + '" class="sg-bk-lens-ground"/>' +
+          g0 +
+          icon(shift(l.p[0] - bx[0], cx) - bx[0] * 0, shift(l.p[1] - bx[1], cy), zoom) + '</g>' +
+          '<circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '" class="sg-bk-lens-ring"/>';
+        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="5" class="sg-bk-lens-dot"/>';
+        if (l.kind === 'corner') out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/>';
+        var title = l.kind === 'end' ? (l.round ? 'Round cap' : 'Flat cap') : (l.round ? 'Round join' : 'Sharp join');
+        var sub = l.kind === 'end' ? (l.round ? 'ends reach half the stroke, r = ' + num(an.w / 2) + 'px' : 'ends stop square across the line')
+          : (l.round ? 'it turns in a curve, no sharp points' : 'it turns to a sharp point');
+        out += '<text x="' + (cx - LR) + '" y="' + (cy + LR + 50) + '" class="sg-bk-lens-title">' + esc(title) + '</text><text x="' + (cx - LR) + '" y="' + (cy + LR + 84) + '" class="sg-bk-lens-sub">' + esc(sub) + '</text>';
+      });
+      var set = an.set, same = (set.sameW === set.read ? 'the same on all ' + set.read + ' icons read' : 'the same on ' + set.sameW + ' of ' + set.read + ' icons read') + (an.src === 'figma' ? ', as Figma draws it' : an.src === 'code' ? ', as its code draws it' : ', measured on its drawing');
+      return '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 1000 420" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '">' + out +
+        '<text x="40" y="' + (84 + bx[3] * big) + '" class="sg-bk-lens-sub">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  stroke ' + num(an.w) + 'px, ' + esc(same) + '</text></svg>';
+    }
+    var anatomyCache = {};
+    function iconAnatomy(ids) {
+      var key = ids.join('|'); if (anatomyCache[key] !== undefined) return anatomyCache[key];
+      var S = 10, cv = document.createElement('canvas'), ctx = cv.getContext('2d', { willReadFrequently: true });
+      var read = function (id) {
+        var sym = document.getElementById(id); if (!sym) return null;
+        var vb = (sym.getAttribute('viewBox') || '0 0 24 24').split(/[\s,]+/).map(Number), W = Math.round(vb[2] * S), H = Math.round(vb[3] * S);
+        if (!(W > 0 && H > 0) || W > 1200 || H > 1200) return null;
+        cv.width = W; cv.height = H; ctx.clearRect(0, 0, W, H);
+        var drawn = 0;
+        Array.prototype.forEach.call(sym.querySelectorAll('path,circle,rect,ellipse,polygon,polyline,line'), function (el) {
+          var attr = function (k) { for (var n = el; n && n !== sym.parentNode; n = n.parentNode) if (n.getAttribute && n.getAttribute(k) != null) return n.getAttribute(k); return null; };
+          var fill = attr('fill'), stroke = attr('stroke'), sw = parseFloat(attr('stroke-width')) || 1, p = new Path2D(), g = function (k) { return parseFloat(el.getAttribute(k)) || 0; };
+          var t = el.tagName.toLowerCase();
+          if (t === 'path') p = new Path2D(el.getAttribute('d') || '');
+          else if (t === 'circle') p.arc(g('cx'), g('cy'), g('r'), 0, 2 * Math.PI);
+          else if (t === 'ellipse') p.ellipse(g('cx'), g('cy'), g('rx'), g('ry'), 0, 0, 2 * Math.PI);
+          else if (t === 'rect') { if (p.roundRect) p.roundRect(g('x'), g('y'), g('width'), g('height'), g('rx') || g('ry')); else p.rect(g('x'), g('y'), g('width'), g('height')); }
+          else if (t === 'line') { p.moveTo(g('x1'), g('y1')); p.lineTo(g('x2'), g('y2')); }
+          else { var pts = (el.getAttribute('points') || '').trim().split(/[\s,]+/).map(Number); for (var i = 0; i + 1 < pts.length; i += 2) p[i ? 'lineTo' : 'moveTo'](pts[i], pts[i + 1]); if (t === 'polygon') p.closePath(); }
+          ctx.setTransform(S, 0, 0, S, -vb[0] * S, -vb[1] * S);
+          var tf = el.getAttribute('transform');
+          if (tf) try { var m = new DOMMatrix(tf.replace(/(\d)\s+(?=[-\d.])/g, '$1,')); ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f); } catch (e) { /* drawn without it */ }
+          ctx.fillStyle = ctx.strokeStyle = '#000';
+          if (stroke && stroke !== 'none') { ctx.lineWidth = sw; ctx.lineCap = attr('stroke-linecap') || 'butt'; ctx.lineJoin = attr('stroke-linejoin') || 'miter'; ctx.stroke(p); drawn++; }
+          if (fill !== 'none' || !stroke || stroke === 'none') { ctx.fill(p, attr('fill-rule') === 'evenodd' ? 'evenodd' : 'nonzero'); drawn++; }
+        });
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        if (!drawn) return null;
+        var px = ctx.getImageData(0, 0, W, H).data, on = new Uint8Array(W * H), count = 0;
+        for (var i = 0; i < W * H; i++) if (px[i * 4 + 3] > 127) { on[i] = 1; count++; }
+        if (!count) return null;
+        // The stroke: the run most often crossed (a filled area or a slanted line crosses wider, and less often).
+        var runs = {}, tally = function (len) { if (len >= 3 && len < W / 4) runs[len] = (runs[len] || 0) + 1; };
+        for (var y = 0; y < H; y++) { var r = 0; for (var x = 0; x <= W; x++) { if (x < W && on[y * W + x]) r++; else { tally(r); r = 0; } } }
+        for (var x2 = 0; x2 < W; x2++) { var r2 = 0; for (var y2 = 0; y2 <= H; y2++) { if (y2 < H && on[y2 * W + x2]) r2++; else { tally(r2); r2 = 0; } } }
+        var best = 0, bestN = 0;
+        Object.keys(runs).forEach(function (k) { var n = (runs[k] || 0) + (runs[+k - 1] || 0) + (runs[+k + 1] || 0); if (n > bestN) { bestN = n; best = +k; } });
+        if (!best) return null;
+        // The stroke Figma gives it, else the one its code draws, else the one measured.
+        var given = ((DATA.iconFigma || {})[id] || {}).stroke, line = sym.querySelector('[stroke-width]'), src = 'pixels', capIs = null, joinIs = null;
+        var w = Math.round(best / S * 4) / 4;
+        if (given) { w = given.weight; capIs = given.cap; joinIs = given.join; src = 'figma'; }
+        else if (line && parseFloat(line.getAttribute('stroke-width')) > 0) { w = parseFloat(line.getAttribute('stroke-width')); capIs = line.getAttribute('stroke-linecap') || 'butt'; joinIs = line.getAttribute('stroke-linejoin') || 'miter'; src = 'code'; }
+        // Thinned to one pixel (Zhang and Suen).
+        var sk = on.slice(), nb = function (a, x, y) { return [a[(y - 1) * W + x], a[(y - 1) * W + x + 1], a[y * W + x + 1], a[(y + 1) * W + x + 1], a[(y + 1) * W + x], a[(y + 1) * W + x - 1], a[y * W + x - 1], a[(y - 1) * W + x - 1]]; };
+        for (var it = 0, changed = true; changed && it < 60; it++) {
+          changed = false;
+          for (var pass = 0; pass < 2; pass++) {
+            var del = [];
+            for (var yy = 1; yy < H - 1; yy++) for (var xx = 1; xx < W - 1; xx++) {
+              if (!sk[yy * W + xx]) continue;
+              var P = nb(sk, xx, yy), B = P.reduce(function (a, v) { return a + v; }, 0); if (B < 2 || B > 6) continue;
+              var A = 0; for (var k = 0; k < 8; k++) if (!P[k] && P[(k + 1) % 8]) A++; if (A !== 1) continue;
+              if (pass === 0 ? (P[0] * P[2] * P[4] || P[2] * P[4] * P[6]) : (P[0] * P[2] * P[6] || P[0] * P[4] * P[6])) continue;
+              del.push(yy * W + xx);
+            }
+            if (del.length) { changed = true; del.forEach(function (q) { sk[q] = 0; }); }
+          }
+        }
+        var nbs = function (q) { var x = q % W, y = (q - x) / W, out = []; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; var X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < W && Y < H && sk[Y * W + X]) out.push(Y * W + X); } return out; };
+        // Walk k steps along the line from q, away from where it came: the point reached (or null at a fork).
+        // Two next pixels side by side are one line turning (the thinning leaves a step); apart, a fork.
+        var walk = function (q, from, k) {
+          var prev = from, cur = q, dist = function (m, o) { return Math.hypot(m % W - o % W, Math.floor(m / W) - Math.floor(o / W)); };
+          for (var s = 0; s < k; s++) {
+            var n = nbs(cur).filter(function (m) { return m !== prev && nbs(prev).indexOf(m) < 0; });
+            if (n.length > 1 && n.every(function (m) { return n.every(function (o) { return o === m || dist(m, o) < 1.5; }); })) n = [n.sort(function (x, y) { return dist(y, prev) - dist(x, prev); })[0]];
+            if (n.length !== 1) return null;
+            prev = cur; cur = n[0];
+          }
+          return cur;
+        };
+        var stepK = Math.max(4, Math.round(best * 1.2)), ends = [], corners = [];
+        for (var q = 0; q < W * H; q++) {
+          if (!sk[q]) continue;
+          var n0 = nbs(q);
+          if (n0.length === 1) { var far = walk(n0[0], q, Math.round(best)); if (far != null) ends.push({ q: q, toward: far }); }   // a spur from a square corner is shorter than the stroke
+          else if (n0.length === 2) {
+            var a = walk(n0[0], q, stepK), b = walk(n0[1], q, stepK); if (a == null || b == null) continue;
+            var qx = q % W, qy = (q - qx) / W, ax = a % W - qx, ay = (a - a % W) / W - qy, bx = b % W - qx, by = (b - b % W) / W - qy;
+            var cos = (ax * bx + ay * by) / (Math.hypot(ax, ay) * Math.hypot(bx, by) || 1);
+            if (cos > -0.35) corners.push({ q: q, cos: cos });   // turns by more than about 70 degrees
+          }
+        }
+        // Round where a disc of half the stroke, rolled inside the shape, covers what is near the point.
+        var R = Math.max(2, best / 2 - 0.75), disc = [];
+        for (var dy = -Math.ceil(R); dy <= Math.ceil(R); dy++) for (var dx = -Math.ceil(R); dx <= Math.ceil(R); dx++) if (dx * dx + dy * dy <= R * R) disc.push([dx, dy]);
+        var round = function (q) {
+          var cx = q % W, cy = (q - cx) / W, half = Math.round(best * 1.5), fits = {}, lost = 0;
+          var at = function (x, y) { return x >= 0 && y >= 0 && x < W && y < H && on[y * W + x]; };
+          var ok = function (x, y) { var k = y * W + x; if (fits[k] === undefined) fits[k] = at(x, y) && disc.every(function (d) { return at(x + d[0], y + d[1]); }); return fits[k]; };
+          for (var y = cy - half; y <= cy + half; y++) for (var x = cx - half; x <= cx + half; x++) {
+            if (!at(x, y)) continue;
+            if (!disc.some(function (d) { return ok(x + d[0], y + d[1]); })) lost++;
+          }
+          return lost < 0.15 * R * R;   // a square corner loses about 0.2 R² each
+        };
+        var pt = function (q) { var x = q % W; return [x / S + vb[0], (q - x) / W / S + vb[1]]; };
+        corners.sort(function (a, b) { return b.cos - a.cos; });
+        var end = ends[0] ? { at: pt(ends[0].q), toward: pt(ends[0].toward), round: capIs ? capIs === 'round' : round(ends[0].q) } : null;
+        var corner = corners[0] ? { at: pt(corners[0].q), round: joinIs ? joinIs === 'round' : round(corners[0].q) } : null;
+        return { id: id, w: w, src: src, box: vb, end: end, corner: corner };
+      };
+      var all = ids.slice(0, 24).map(function (id) { try { return read(id); } catch (e) { return null; } }).filter(Boolean);
+      var out = null;
+      if (all.length) {
+        var wCount = {}; all.forEach(function (a) { wCount[a.w] = (wCount[a.w] || 0) + 1; });
+        var wSet = Number(Object.keys(wCount).sort(function (a, b) { return wCount[b] - wCount[a]; })[0]);
+        var pick = all.filter(function (a) { return a.end && a.corner && a.w === wSet; })[0] || all.filter(function (a) { return a.end || a.corner; })[0];
+        if (pick) {
+          var ends = all.filter(function (a) { return a.end; }), corners = all.filter(function (a) { return a.corner; });
+          out = { id: pick.id, w: pick.w, src: pick.src, box: pick.box, end: pick.end, corner: pick.corner,
+            set: { read: all.length, sameW: wCount[wSet], w: wSet, ends: ends.length, roundEnds: ends.filter(function (a) { return a.end.round; }).length, corners: corners.length, roundCorners: corners.filter(function (a) { return a.corner.round; }).length } };
+        }
+      }
+      anatomyCache[key] = out;
+      return out;
+    }
     var bkDraw = function () {
       if (bkProbe) { bkProbe.remove(); bkProbe = null; }
       bkMemo = {};
@@ -3769,6 +3951,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var nameOf = function (id) { return String(id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, ''); };
       var IT = [], addI = function (cls, attrs, inner) { IT.push('<div class="sg-bk-t ' + cls + '" ' + attrs + '>' + inner + '</div>'); };
       if (mono.length) {
+        // One icon, magnified on its grid, with two lenses: where its line ends and where it turns, each drawn again
+        // large beside it, its pixel grid behind, with the stroke measured across it.
+        var an = iconAnatomy(monoStd.slice(Math.floor(monoStd.length / 4)).concat(monoStd.slice(0, Math.floor(monoStd.length / 4))));
+        if (an) addI('w6 h3 sg-bk-bare-pad sg-bk-keyline-t sg-bk-lens-t', bg2, lensTile(an));
         var star = mono[Math.floor(mono.length / 4)], vb = document.getElementById(star).getAttribute('viewBox') || '0 0 24 24', vz = Number(vb.split(/[\s,]+/)[2]) || 24;
         // The keyline: the icon on its grid, its padding, its circle and square, its size.
         var grid = ''; for (var gi = 0; gi <= 8; gi++) { var gx = 40 + gi * 30; grid += '<line x1="' + gx + '" y1="40" x2="' + gx + '" y2="280"/><line x1="40" y1="' + gx + '" x2="280" y2="' + gx + '"/>'; }
