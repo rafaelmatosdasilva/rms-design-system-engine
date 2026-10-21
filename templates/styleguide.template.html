@@ -3406,7 +3406,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Each lens, large, side by side beside the icon: the icon drawn so the point sits in the middle, clipped to the
       // circle, its name and what it shows under it. The gap's lens is drawn at the scale that holds both its ends.
       lenses.forEach(function (l, i) {
-        var cx = 175 + (i % 2) * (LR * 2 + 80), cy = 40 + LR + Math.floor(i / 2) * (LR * 2 + 95 + 28), id = 'sg-bk-lens-' + i;
+        // The group, lenses and their words, centred on the icon's frame.
+        var cx = 175 + (i % 2) * (LR * 2 + 80), cy = 57 + LR + Math.floor(i / 2) * (LR * 2 + 95 + 28), id = 'sg-bk-lens-' + i;
         var zoom = l.kind === 'gap' ? Math.min(LR * 2 / (an.w * 3.2), LR * 1.7 / (an.gap.gap + an.w * 3)) : LR * 2 / (an.w * 3.2), s1 = an.w * zoom / 2;
         var on = function (p) { return [cx + (p[0] - l.p[0]) * zoom, cy + (p[1] - l.p[1]) * zoom]; };
         // The icon's own pixel grid: a line at each whole unit of its drawing.
