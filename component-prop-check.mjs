@@ -31,6 +31,7 @@ import { loadLocator } from './component-locator.mjs';
 import { createApiReader } from './component-api.mjs';
 import { inProgressNames } from './in-progress.mjs';   // work in progress is not drift
 import { stateAxisTest, cleanFigmaProp } from './figma-props.mjs';
+import { bindingSources, bindFigmaProp } from './prop-binding.mjs';   // one decision for the check and the contract
 
 const ROOT = process.cwd();
 
@@ -272,7 +273,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
   const unsure       = new Map(Object.entries(api.props).filter(([, f]) => f.confidence === 'uncertain').map(([p, f]) => [norm(p), f.readings]));
   const cbind    = contractBindings(figmaName);                            // authored Figma->code bindings (the contract hub)
   // A Code Connect mapping is pairing evidence; a documented alias or a contract binding wins over it.
-  const aliases  = { ...(api.codeConnect ?? {}), ...(PROP_ALIASES[figmaName] ?? {}), ...cbind.attr };
+  const recorded = bindingSources({ codeConnect: api.codeConnect, aliases: PROP_ALIASES[figmaName], authored: cbind.attr });
   const rel = relative(ROOT, file);
 
   // #1/#3: for a matched prop, compare Figma's default value, variant options and type
@@ -313,7 +314,6 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     return { status: 'match', codeValue: codeDefault != null ? `default ${codeDefault}` : '(present)' };
   };
 
-  const codeSlots = { named: new Map(api.slots.named.map((n) => [norm(n), n])), hasDefault: api.slots.default };   // norm → as written
   const matchedCode = new Set();
   const missingHere = [];
   for (const fp of figNames) {
@@ -323,45 +323,27 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
 
     if (KNOWN_PROP_EXCEPTIONS.has(`${figmaName}/${fp}`)) { OK.push(`${figmaName}/${fp} (exempt)`); pushRow(fp, '(exempt)', 'match'); continue; }
 
-    // An INSTANCE_SWAP (e.g. an icon) is NOT assumed to be a slot: the code may expose it as
-    // a prop OR a slot. Match either, and report the actual representation.
+    // Which code prop or slot it is: one decision for the prop check and the contract (prop-binding.mjs). An
+    // INSTANCE_SWAP (e.g. an icon) is NOT assumed to be a slot: the code may expose it as a prop OR a slot.
+    const b = bindFigmaProp(fp, def, { codeProps: api.props, slots: api.slots, recorded, authoredSlots: cbind.slot });
     if (def?.type === 'INSTANCE_SWAP') {
-      const fn = norm(fp);
-      if (codeNorm.has(fn)) {
-        matchedCode.add(fn);
-        const cp = codeNorm.get(fn);
-        if (cp !== fp) { NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${cp}" (${nameDiff(fp, cp)})  (${rel})`); pushRow(cp, 'prop', 'name'); continue; }
-        OK.push(`${figmaName}/${fp} (prop)`); pushRow(cp, 'prop', 'match'); continue;
-      }
-      const aliasTo0 = aliases[fp] && norm(aliases[fp]);
-      if (aliasTo0 && codeNorm.has(aliasTo0)) { matchedCode.add(aliasTo0); OK.push(`${figmaName}/${fp} → ${aliases[fp]} (prop, alias)`); pushRow(aliases[fp], 'prop', 'match'); continue; }
-      if (codeSlots.named.has(fn)) {
-        const cs = codeSlots.named.get(fn);
-        if (cs !== fp) { NAME_FAIL.push(`${figmaName}/${fp}: the code names its slot "${cs}" (${nameDiff(fp, cs)})  (${rel})`); pushRow(cs, 'slot', 'name'); continue; }
-        OK.push(`${figmaName}/${fp} (slot)`); pushRow(cs, 'slot', 'match'); continue;
-      }
-      if (codeSlots.hasDefault)   { OK.push(`${figmaName}/${fp} (default slot)`); pushRow('(default slot)', 'slot', 'match'); continue; }
-      // A contract-authored slot binding resolves a slot whose code NAME differs from the Figma prop.
-      const sb = cbind.slot[fp];
-      if (typeof sb === 'string' && codeSlots.named.has(norm(sb))) { OK.push(`${figmaName}/${fp} → ${sb} (slot, contract)`); pushRow(sb, 'slot', 'match'); continue; }
-      SLOT_FAIL.push(`${figmaName}: Figma instance-swap "${fp}" has no code prop or slot  (${rel})`);
-      pushRow('not in code', '-', 'missing'); continue;
+      if (!b) { SLOT_FAIL.push(`${figmaName}: Figma instance-swap "${fp}" has no code prop or slot  (${rel})`); pushRow('not in code', '-', 'missing'); continue; }
+      if (b.as === 'defaultSlot') { OK.push(`${figmaName}/${fp} (default slot)`); pushRow('(default slot)', 'slot', 'match'); continue; }
+      const kind = b.as === 'slot' ? 'slot' : 'prop';
+      if (kind === 'prop') matchedCode.add(norm(b.code));
+      if (b.source === 'name' && !b.exactName) { NAME_FAIL.push(`${figmaName}/${fp}: the code names ${kind === 'slot' ? 'its slot' : 'it'} "${b.code}" (${nameDiff(fp, b.code)})  (${rel})`); pushRow(b.code, kind, 'name'); continue; }
+      OK.push(b.source === 'name' ? `${figmaName}/${fp} (${kind})` : `${figmaName}/${fp} → ${b.code} (${kind}, ${b.source === 'authored' && kind === 'slot' ? 'contract' : 'alias'})`);
+      pushRow(b.code, kind, 'match'); continue;
     }
-
-    const fn = norm(fp);
-    // A name the project recorded for this prop (contract.authored.json bindings, componentPropAliases) is the
-    // agreed one: it is read before the letter-case comparison, so Disabled bound to "disabled" is a match.
-    const bound = aliases[fp] != null ? Object.keys(api.props).find((p) => p === aliases[fp]) : null;
-    if (bound) { matchedCode.add(norm(bound)); OK.push(`${figmaName}/${fp} → ${bound} (alias)`); const v = checkValues(fp, def, bound); pushRow(bound, v.codeValue, v.status); continue; }
-    if (codeNorm.has(fn)) {
-      matchedCode.add(fn);
-      const cp = codeNorm.get(fn);
-      const v = checkValues(fp, def, cp);
-      if (cp !== fp) { NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${cp}" (${nameDiff(fp, cp)})  (${rel})`); pushRow(cp, v.codeValue, 'name'); continue; }
-      OK.push(`${figmaName}/${fp}`); pushRow(cp, v.codeValue, v.status); continue;
+    // A name the project recorded for this prop (contract.authored.json bindings, componentPropAliases, its Code
+    // Connect file) is the agreed one: it is read before the letter-case comparison, so Disabled bound to "disabled" is
+    // a match.
+    if (b) {
+      matchedCode.add(norm(b.code));
+      const v = checkValues(fp, def, b.code);
+      if (b.source === 'name' && !b.exactName) { NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${b.code}" (${nameDiff(fp, b.code)})  (${rel})`); pushRow(b.code, v.codeValue, 'name'); continue; }
+      OK.push(b.source === 'name' ? `${figmaName}/${fp}` : `${figmaName}/${fp} → ${b.code} (alias)`); pushRow(b.code, v.codeValue, v.status); continue;
     }
-    const aliasTo = aliases[fp] && norm(aliases[fp]);
-    if (aliasTo && codeNorm.has(aliasTo)) { matchedCode.add(aliasTo); OK.push(`${figmaName}/${fp} → ${aliases[fp]} (alias)`); const v = checkValues(fp, def, codeNorm.get(aliasTo)); pushRow(aliases[fp], v.codeValue, v.status); continue; }
     missingHere.push(fp);   // row added after rename-pairing below
     MISSING.push(`${figmaName}: Figma property "${fp}" has no code prop  (${rel})`);
   }

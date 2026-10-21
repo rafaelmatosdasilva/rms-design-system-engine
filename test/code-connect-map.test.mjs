@@ -38,3 +38,54 @@ test('the classic form: each code prop beside the Figma property it reads', () =
   assert.deepEqual(m.props.map((p) => `${p.figma}→${p.code}`), ['Label→label', 'Size→size', 'Disabled→disabled']);
   assert.deepEqual(m.props[1].values, { Small: 'sm', Large: 'lg' });
 });
+
+test('the template form read as code: a value, a condition (negated, or a comparison), an event, a fixed value, a nested tag', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=10-20
+// component=tile-one
+import figma from 'figma'
+import { iconOf } from './helpers'
+const revealCaption = figma.selectedInstance.getBoolean('revealCaption')
+const label = figma.selectedInstance.getString('captionWords')
+const tone = figma.selectedInstance.getEnum('tone', { Calm: 'calm', Loud: 'loud' })
+const outlined = figma.selectedInstance.getBoolean('outlined')
+const showLink = figma.selectedInstance.getBoolean('showLink')
+const icon = iconOf(figma.selectedInstance, 'iconContent')
+const width = figma.selectedInstance.getEnum('width', { Wide: 'wide' })
+const parts = [outlined ? 'a' : ''].join(',')
+export default {
+  example: figma.html\`
+<tile-one
+  \${revealCaption && label ? \`label="\${label}"\` : ''}
+  \${!revealCaption ? \`icon="\${icon}"\` : ''}
+  \${tone !== 'calm' ? \`tone="\${tone}"\` : ''}
+  \${tone === 'loud' ? 'shout' : ''}
+  \${outlined ? 'outlined' : ''}
+  \${showLink ? 'href="#"' : ''}
+  \${showLink ? '@opened="go"' : ''}
+  :options="{ width: '\${width}', parts: '\${parts}' }"
+>
+  <tile-badge \${outlined ? 'framed' : ''} />
+</tile-one>\`,
+}`;
+  const [m] = parseConnectFile(text, 'One.figma.js');
+  const say = (p) => `${p.figma}→${p.code ?? '∅'}${p.role === 'condition' ? ` if${p.negated ? ' not' : ''}${p.equals != null ? ` =${p.equals}` : ''}` : ''}${p.event ? ' event' : ''}`;
+  assert.equal(m.tag, 'tile-one');
+  assert.deepEqual(m.props.map(say), [
+    'revealCaption→label if', 'revealCaption→icon if not',
+    'captionWords→label',
+    'tone→tone', 'tone→shout if =loud',
+    'outlined→outlined',
+    'showLink→href if', 'showLink→opened if event',
+    'iconContent→icon',
+    'width→options.width',
+  ], 'its own attributes only: the badge\'s framed belongs to the badge');
+  assert.deepEqual(m.props.find((p) => p.figma === 'tone').values, { Calm: 'calm', Loud: 'loud' });
+  assert.ok(!m.props.some((p) => p.code === 'framed'), 'an attribute of another component inside the example is not this one\'s');
+});
+
+test('a template file that reads no property still connects its component', () => {
+  const [m] = parseConnectFile(`// url=https://www.figma.com/design/AbC/tileTwo?node-id=3-4
+import figma from 'figma'
+export default { example: figma.html\`<tile-two :rows="rows" @clicked="go" />\` }`, 'Two.figma.js');
+  assert.equal(m.nodeId, '3:4'); assert.equal(m.tag, 'tile-two'); assert.deepEqual(m.props, []);
+});

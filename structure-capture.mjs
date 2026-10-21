@@ -11,7 +11,7 @@ import { join, resolve, relative } from 'node:path';
 import { createApiReader } from './component-api.mjs';
 import { readSymbols, iconRefs, pathHash } from './icon-source.mjs';
 import { fingerprint, markupClassSet } from './markup-source.mjs';
-import { norm, usedComponents } from './component-source.mjs';
+import { norm, usedComponents, extractEventPayloads, extractSlotProps } from './component-source.mjs';
 
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 
@@ -46,9 +46,16 @@ export function captureApis(ROOT, specs, reader) {
     if (s.unbuilt) continue;
     const a = reader.apiFor(s.name);
     if (!a.file && !Object.keys(a.props).length) { api[s.name] = { file: null, how: a.how }; continue; }
+    // Its events with what each carries, what its scoped slots hand their content, the tag it is written with, and
+    // every reading its Code Connect file gives (a contract states them all).
+    const text = a.file ? reader.read(a.file) : '';
+    const payloads = extractEventPayloads(text), slotProps = extractSlotProps(text);
     api[s.name] = {
       file: a.file ? relative(ROOT, a.file) : null, how: a.how, readBy: a.readBy,
-      props: a.props, slots: a.slots, ...(a.codeConnect ? { codeConnect: a.codeConnect } : {}),
+      props: a.props, slots: { ...a.slots, ...(Object.keys(slotProps).length ? { props: slotProps } : {}) },
+      events: (a.events ?? []).map((name) => (payloads[name] ? { name, payload: payloads[name] } : { name })),
+      ...(a.tag ? { tag: a.tag, syntax: a.syntax } : {}),
+      ...(a.codeConnect ? { codeConnect: a.codeConnect } : {}), ...(a.codeConnectProps ? { codeConnectProps: a.codeConnectProps } : {}),
     };
   }
   return { api, sources: reader.sources };

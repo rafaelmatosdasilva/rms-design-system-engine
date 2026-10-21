@@ -281,6 +281,39 @@ export function extractRequired(text) {
   for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*PropTypes\.[\w.()'"`\[\], ]*?\.isRequired\b/g)) out.set(norm(m[1]), true);
   return out;
 }
+// What each event carries, as the code passes it: emit('changed', option.id) → { changed: ['option.id'] }. An event sent
+// with nothing is left out; one sent with different arguments in different places keeps each, once.
+export function extractEventPayloads(text) {
+  const out = {};
+  const src = String(text);
+  for (const m of src.matchAll(/(?:^|[^\w$.])\$?emit\s*\(\s*['"`]([\w:-]+)['"`]\s*,\s*/g)) {
+    let i = m.index + m[0].length, depth = 0, arg = '';
+    for (; i < src.length; i++) {
+      const c = src[i];
+      if ('([{'.includes(c)) depth++;
+      else if (')]}'.includes(c)) { if (!depth) break; depth--; }
+      else if (c === ',' && !depth) break;
+      arg += c;
+    }
+    const a = arg.trim().replace(/\s+/g, ' ');
+    if (a && !(out[m[1]] ??= []).includes(a)) out[m[1]].push(a);
+  }
+  for (const k of Object.keys(out)) if (!out[k].length) delete out[k];
+  return out;
+}
+// What a scoped slot hands its content: <slot name="row" :item="row" :index="i"> → { row: ['item', 'index'] }
+// (the default slot as `default`).
+export function extractSlotProps(text) {
+  const out = {};
+  for (const m of String(text).matchAll(/<slot\b([^>]*)>/g)) {
+    const attrs = m[1];
+    const name = /(?:^|\s)name\s*=\s*['"]([\w-]+)['"]/.exec(attrs)?.[1] ?? (/(?::|v-bind:)name\s*=/.test(attrs) ? null : 'default');
+    if (!name) continue;
+    const props = [...attrs.matchAll(/(?:^|\s)(?::|v-bind:)([\w-]+)\s*=/g)].map((x) => x[1]).filter((x) => x !== 'name');
+    if (props.length) out[name] = [...new Set([...(out[name] ?? []), ...props])];
+  }
+  return out;
+}
 // Best-effort: the events a component sends, in the order the code first names them. Vue: defineEmits([…]),
 // defineEmits<{ (e: 'x', …): void }>() or <{ x: […] }>(), options emits: […], emit('x') and $emit('x'); Svelte:
 // dispatch('x'); React and the rest: a prop named on + a capital (onChange), the callback a parent passes in.
