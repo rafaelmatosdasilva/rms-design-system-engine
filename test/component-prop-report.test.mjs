@@ -37,7 +37,7 @@ test('[report] rows classify match / rename / missing / extra', () => {
   const rs = rowsOf(runGate(GATE, FILES).dir);
   assert.equal(find(rs, 'size').status, 'match');
   assert.equal(find(rs, 'disabled').status, 'match');
-  assert.equal(find(rs, 'labelContent').status, 'rename');
+  assert.equal(find(rs, 'labelContent').status, 'name', 'paired by the naming convention (labelContent is label): a name difference, not a guess');
   assert.equal(find(rs, 'labelContent').codeProp, 'label');
   assert.equal(find(rs, 'loading').status, 'missing');
   assert.equal(find(rs, 'loading').codeProp, 'not in code');

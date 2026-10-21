@@ -450,10 +450,11 @@ const CODE_SIDE = {
   description: 'The code prop or slot this Figma property is, with the code\'s own facts (null: none found).',
   properties: {
     prop: str, slot: str, attribute: { type: ['string', 'boolean'] },
+    derived: { const: true, description: 'The code value is computed from the Figma value (a part of its words, an icon resolved from it), not the value itself.' },
     key: { type: 'string', description: 'The key of the object prop it fills (Code Connect writes :opts="{ caption: … }").' },
     as: { enum: ['prop', 'slot', 'defaultSlot'] },
-    source: { enum: ['authored', 'alias', 'codeConnect', 'name'], description: 'Who decided the pairing.' },
-    type: str, options: { type: 'array' }, default: {}, required: { type: 'boolean' }, description: str,
+    source: { enum: ['authored', 'alias', 'codeConnect', 'name', 'convention'], description: 'Who decided the pairing: a binding written by hand, a documented alias, Code Connect, the same name, or the naming convention (labelContent and label).' },
+    type: str, options: { type: 'array' }, default: {}, defaultExpression: { type: 'string', description: 'A default the code builds (an object, a list), as the code writes it.' }, required: { type: 'boolean' }, description: str,
     confidence: { enum: ['verified', 'single-source', 'uncertain'] },
     valueMap: { type: 'object', description: 'Figma value → code value, from Code Connect.' },
     inverted: { const: true, description: 'The code prop holds the opposite of the Figma value (Figma showClose on = code hideClose false).' },
@@ -502,7 +503,7 @@ const CONTRACT_SCHEMA = {
           },
           conditions: {
             type: 'array', description: 'Code attributes this property decides are written (from Code Connect): only when it is on, or off when negated, or equal to a value.',
-            items: { type: 'object', required: ['code', 'role'], properties: { code: str, role: { const: 'condition' }, negated: { type: 'boolean' }, equals: {} } },
+            items: { type: 'object', required: ['code', 'role'], properties: { code: str, role: { const: 'condition' }, negated: { type: 'boolean' }, equals: {}, unclear: { const: true, description: 'It decides the attribute in a way the reader does not follow (inside a computed value): which way is not said.' }, source: { enum: ['convention'], description: 'Read from the naming convention (showLabel and label), not from Code Connect.' } } },
           },
           differences: {
             type: 'array', description: 'Where Figma and the code disagree on this property.',
@@ -515,7 +516,7 @@ const CONTRACT_SCHEMA = {
     },
     codeOnly: {
       type: 'array', description: 'Code props no Figma property is paired with. setBy: the Figma properties that still reach it (deciding whether it is written, or filling it beside another prop).',
-      items: { type: 'object', required: ['name'], properties: { name: str, type: str, options: { type: 'array' }, default: {}, required: { type: 'boolean' }, description: str, confidence: str, setBy: strs } },
+      items: { type: 'object', required: ['name'], properties: { name: str, type: str, options: { type: 'array' }, default: {}, defaultExpression: str, required: { type: 'boolean' }, description: str, confidence: str, setBy: strs } },
     },
     events: { type: 'array', items: { type: 'object', required: ['name'], properties: { name: str, payload: strs }, additionalProperties: false } },
     codeSlots: { type: 'array', items: { type: 'object', required: ['name'], properties: { name: str, props: strs, figmaProperty: str }, additionalProperties: false } },

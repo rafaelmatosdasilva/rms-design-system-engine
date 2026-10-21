@@ -274,6 +274,9 @@ export function mergeApiReadings(readings) {
     if (type) fact.type = type;
     const description = seen.find((s) => s.e.description)?.e.description;   // what it is for, as its source writes it
     if (description) fact.description = description;
+    // A default the code builds (an object, a list): its expression, when no source gives a plain value.
+    const built = seen.find((s) => s.e.defaultExpression)?.e.defaultExpression;
+    if (built && fact.default == null) fact.defaultExpression = built;
     // Must be given: the best source that says, and never when the code gives it a default (it is filled for you).
     const req = seen.find((s) => typeof s.e.required === 'boolean');
     if (req) fact.required = req.e.required && fact.default == null;

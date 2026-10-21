@@ -121,3 +121,46 @@ export default {
     assert.ok(read.includes(x), `${x} in ${read.join(', ')}`);
   assert.ok(!read.includes('pinned→opts.caption:condition'), 'one item\'s condition never reaches another item');
 });
+
+test('a condition through a local, an attribute written either way, a key of an object the branch writes', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=12-34
+import figma from 'figma'
+const kind = figma.selectedInstance.getEnum('kind', { pickable: 'pickable', still: 'still' })
+const pinned = figma.selectedInstance.getBoolean('pinned')
+const filled = figma.selectedInstance.getBoolean('filled')
+const owner = figma.selectedInstance.getString('ownerWords')
+const pickable = kind === 'pickable'
+const entry = [owner ? \`owner: '\${owner}'\` : ''].filter(Boolean).join(', ')
+export default {
+  example: figma.html\`
+<tile-one
+  \${pickable ? ':pickParams="{ on: true }"' : ''}
+  \${pinned ? ':place="top"' : ':place="bottom"'}
+  \${filled ? \`:entries="[{ \${entry} }]"\` : ':entries="entries"'}
+/>\`,
+}`;
+  const [m] = parseConnectFile(text, 'Tile.figma.js');
+  const read = m.props.map((p) => `${p.figma}→${p.code}:${p.role}${p.equals != null ? '=' + p.equals : ''}${p.negated ? '!' : ''}`);
+  for (const x of ['kind→pickParams:condition=pickable', 'pinned→place:value', 'filled→entries:value', 'ownerWords→entries.owner:value'])
+    assert.ok(read.includes(x), `${x} in ${read.join(', ')}`);
+  assert.ok(!read.some((x) => /^pinned→place:condition/.test(x)), 'written either way: a value it picks, not a condition');
+  assert.ok(!read.some((x) => /^ownerWords→entries:condition/.test(x)), 'a property never decides the attribute it fills');
+});
+
+test('a value computed from one property is that property\'s value, marked; a value map only where its own value is written', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=56-78
+import figma from 'figma'
+const count = figma.selectedInstance.getString('countWords')
+const tone = figma.selectedInstance.getEnum('tone', { Calm: 'calm', Loud: 'loud' })
+const framed = figma.selectedInstance.getEnum('framed', { true: true, false: false })
+const most = count && count.includes('/') ? count.split('/')[1].trim() : ''
+const opts = [framed ? 'framed: true' : '', most ? \`most: \${most}\` : ''].filter(Boolean).join(', ')
+export default {
+  example: figma.html\`<tile-one tone="\${tone}" :opts="{ \${opts} }" />\`,
+}`;
+  const [m] = parseConnectFile(text, 'Tile.figma.js');
+  const by = (f, c) => m.props.find((p) => p.figma === f && p.code === c);
+  assert.equal(by('countWords', 'opts.most')?.derived, true);
+  assert.deepEqual(by('tone', 'tone')?.values, { Calm: 'calm', Loud: 'loud' });
+  assert.equal(by('framed', 'opts.framed')?.values, undefined, 'framed: true is not framed\'s value map');
+});

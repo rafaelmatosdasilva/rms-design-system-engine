@@ -46,3 +46,23 @@ defineProps({
 </script>`;
   assert.deepEqual(Object.keys(textComponentApi('Tile.vue', vue).props), ['pinned', 'tileName', 'caption', 'muted']);
 });
+
+test('a default the code builds is kept as its expression; a comment describing a shape gives no options', async () => {
+  const { textComponentApi } = await import('../component-source.mjs');
+  const vue = `<script setup>
+/** @ranges {Object} the ranges per kind; expects { kind: [min, max] }
+@size {String} the size, can be [s, m(default)] */
+defineProps({
+  ranges: { type: Object, default: () => { return { calm: [0, 40] } } },
+  size: { type: String, default: 'm' },
+  count: { type: Number, default: 3 },
+  wait: { type: [String, Number], default: 3000 },
+})
+</script>`;
+  const p = textComponentApi('Tile.vue', vue).props;
+  assert.equal(p.ranges.defaultExpression, '() => { return { calm: [0, 40] } }');
+  assert.equal(p.ranges.options, undefined, '[min, max] describes the shape, it lists no values');
+  assert.match(p.ranges.description, /\{ kind: \[min, max\] \}/);
+  assert.deepEqual([p.size.default, p.size.options, p.size.defaultExpression], ['m', ['s', 'm'], undefined]);
+  assert.equal(p.wait.default, 3000, 'a number written as a number stays one');
+});

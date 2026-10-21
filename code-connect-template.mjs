@@ -157,11 +157,14 @@ function idsOf(n) {
 // A text keeps a mark where a property's own value goes: \u0001name\u0002. Conditions: [{ v, negated?, equals? }].
 const MARK = (v) => `\u0001${v}\u0002`;
 const MAX_BRANCHES = 64;
-function conditionsOf(n, vars, negated = false) {
+// A local is read as what it holds (const hasBox = type === 'selectable', then ${hasBox ? … : ''}).
+function conditionsOf(n, vars, negated = false, locals = null, seen = new Set()) {
   if (!n) return [];
+  const again = (x, neg = negated) => conditionsOf(x, vars, neg, locals, seen);
   if (n.k === 'id' && vars.has(n.v)) return [{ v: n.v, negated }];
-  if (n.k === 'not') return conditionsOf(n.e, vars, !negated);
-  if (n.k === 'and' && !negated) return [...conditionsOf(n.l, vars), ...conditionsOf(n.r, vars)];
+  if (n.k === 'id' && locals?.has(n.v) && !seen.has(n.v)) { seen.add(n.v); return again(locals.get(n.v)); }
+  if (n.k === 'not') return again(n.e, !negated);
+  if (n.k === 'and' && !negated) return [...again(n.l), ...again(n.r)];
   if (n.k === 'cmp') {
     const side = n.l.k === 'id' && vars.has(n.l.v) ? n.l : n.r.k === 'id' && vars.has(n.r.v) ? n.r : null;
     const other = side === n.l ? n.r : n.l;
@@ -171,7 +174,8 @@ function conditionsOf(n, vars, negated = false) {
     }
   }
   // Anything else (an or, a negated and): each property it reads is a condition, its direction unknown.
-  return [...new Set(idsOf(n).filter((x) => vars.has(x)))].map((v) => ({ v, unclear: true }));
+  const ids = (x, sn = new Set()) => idsOf(x).flatMap((id) => (vars.has(id) ? [id] : locals?.has(id) && !sn.has(id) ? (sn.add(id), ids(locals.get(id), sn)) : []));
+  return [...new Set(ids(n))].map((v) => ({ v, unclear: true }));
 }
 function branches(n, vars, locals, seen = new Set()) {
   if (!n) return [{ text: '', conds: [] }];
@@ -193,11 +197,11 @@ function branches(n, vars, locals, seen = new Set()) {
       return acc;
     }
     case 'cond': {
-      const yes = branches(n.yes, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.test, vars), ...b.conds] }));
-      const no = branches(n.no, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.test, vars, true), ...b.conds] }));
+      const yes = branches(n.yes, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.test, vars, false, locals), ...b.conds] }));
+      const no = branches(n.no, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.test, vars, true, locals), ...b.conds] }));
       return [...yes, ...no];
     }
-    case 'and': return [...branches(n.r, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.l, vars), ...b.conds] })), { text: '', conds: [] }];
+    case 'and': return [...branches(n.r, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.l, vars, false, locals), ...b.conds] })), { text: '', conds: [] }];
     case 'or': return [...branches(n.l, vars, locals, seen), ...branches(n.r, vars, locals, seen)];
     // A list joined into one text: each item is read on its own, so one item's conditions never reach another's text.
     case 'join': return [...n.items.flatMap((it) => branches(it, vars, locals, seen)), { text: '', conds: [] }];
@@ -206,7 +210,10 @@ function branches(n, vars, locals, seen = new Set()) {
     case 'not': if (n.e?.k === 'id' && vars.has(n.e.v)) return [{ text: MARK(`!${n.e.v}`), conds: [] }];
     // falls through
     // An expression it cannot follow: no text, and the properties it reads are noted as used that way.
-    case 'opaque': case 'cmp': return [{ text: '', conds: [], opaque: [...new Set(idsOf(n).flatMap((x) => (vars.has(x) ? [x] : locals.has(x) ? idsOf(locals.get(x)).filter((y) => vars.has(y)) : [])))] }];
+    // A value computed from one property and nothing else (its words split, an icon resolved from it): that property's
+    // value, marked as computed.
+    case 'opaque': { const from = [...new Set(idsOf(n).flatMap((x) => (vars.has(x) ? [x] : locals.has(x) ? idsOf(locals.get(x)).filter((y) => vars.has(y)) : [])))]; if (from.length === 1) return [{ text: MARK(`~${from[0]}`), conds: [] }]; return [{ text: '', conds: [], opaque: from }]; }
+    case 'cmp': return [{ text: '', conds: [], opaque: [...new Set(idsOf(n).flatMap((x) => (vars.has(x) ? [x] : locals.has(x) ? idsOf(locals.get(x)).filter((y) => vars.has(y)) : [])))] }];
     default: return [{ text: '', conds: [] }];
   }
 }
@@ -274,8 +281,9 @@ export function readTemplateForm(src) {
     if (!text) return;
     const tagHere = openTag(context);
     if (!tagHere || (tag && tagHere !== tag)) return;   // between tags, or inside another component's tag
-    const self = new Set([...text.matchAll(/\u0001!?([^\u0002]+)\u0002/g)].map((x) => x[1]));
-    const valueOf = (mark, code, extra = {}) => (mark.startsWith('!') ? emit(mark.slice(1), { code, role: 'value', negated: true, ...extra }) : emit(mark, { code, role: 'value', ...extra }));
+    const self = new Set([...text.matchAll(/\u0001[!~]?([^\u0002]+)\u0002/g)].map((x) => x[1]));
+    // A mark is the property's own value (!: written the other way round; ~: computed from it, as a part of its words).
+    const valueOf = (mark, code, extra = {}) => (mark.startsWith('!') ? emit(mark.slice(1), { code, role: 'value', negated: true, mark: true, ...extra }) : mark.startsWith('~') ? emit(mark.slice(1), { code, role: 'value', derived: true, mark: true, ...extra }) : emit(mark, { code, role: 'value', mark: true, ...extra }));
     // A fixed true or false written under one property's own on/off (${!framed ? ':framed="false"' : ''}) is that
     // property's value: the code prop holds it (the other way round when they disagree).
     const ownValue = (literal) => {
@@ -320,10 +328,13 @@ export function readTemplateForm(src) {
       const name = attrName(a[1].replace(/^v-on:/, '@')); const value = a[3];
       const extra = event ? { event: true } : {};
       if (value != null) {
-        const marks = [...value.matchAll(/\u0001([^\u0002]+)\u0002/g)].map((x) => x[1]);
-        for (const v of marks) valueOf(v, name, extra);
+        const found = [...value.matchAll(/\u0001([^\u0002]+)\u0002/g)];
+        const marks = found.map((x) => x[1]);
+        // A mark inside an object the attribute writes ([{ owner: '${owner}' }]) fills that key of it.
+        const keyAt = (m) => (event ? null : /([A-Za-z_$][\w$]*)\s*:\s*['"`]?\s*$/.exec(value.slice(0, m.index))?.[1] ?? null);
+        for (const m of found) { const k = keyAt(m); valueOf(m[1], k ? `${name}.${k}` : name, extra); if (k) condition(`${name}.${k}`); }
         const own = !marks.length && !event ? ownValue(value) : null;
-        if (marks.length) condition(name);
+        if (found.some((m) => !keyAt(m))) condition(name);
         else if (own) emit(own.v, { code: name, role: 'value', ...(own.negated ? { negated: true } : {}) });
         else for (const c of b.conds) emit(c.v, { code: name, role: 'condition', ...flags(c), ...extra });
       } else {
@@ -335,14 +346,26 @@ export function readTemplateForm(src) {
   const props = [];
   for (const v of order) {
     const info = vars.get(v);
-    const entries = found.get(v);
-    const base = { figma: info.figma, kind: info.kind, ...(info.values ? { values: info.values } : {}) };
+    // An attribute written either way, with a different fixed value on and off (${on ? ':picked="a"' : ':picked="b"'}), is not
+    // decided by the property: the property picks its value.
+    // A property that fills an attribute (or a key of it) does not also decide that attribute: the branch that leaves its
+    // value out (${name ? `title: '${name}'` : ''}) is that same value, empty.
+    const all = found.get(v);
+    const fills = new Set(all.filter((e) => e.role === 'value' && e.code).map((e) => e.code));
+    const own = (e) => e.role === 'condition' && [...fills].some((f) => f === e.code || f.startsWith(`${e.code}.`));
+    const raw = all.filter((e) => !own(e));
+    const plainCond = (e) => e.role === 'condition' && e.code && e.equals == null && !e.unclear;
+    const picks = new Set(raw.filter((e) => plainCond(e) && e.negated && raw.some((o) => plainCond(o) && !o.negated && o.code === e.code)).map((e) => e.code));
+    const entries = [...raw.filter((e) => !(plainCond(e) && picks.has(e.code))), ...[...picks].filter((c) => !raw.some((e) => e.role === 'value' && e.code === c)).map((c) => ({ code: c, role: 'value' }))];
+    const base = { figma: info.figma, kind: info.kind };
+    // Its value map belongs where its own value is written (size="${size}"), never where it picks or switches one on.
+    const mapOf = (e) => (info.values && e.role === 'value' && e.mark ? { values: info.values } : {});
     // Its value first, then what it decides; one property used only where the reader cannot follow pairs with none.
     // A reading whose direction is unclear adds nothing beside a clear one of the same attribute.
-    const clear = entries.filter((e) => !e.unclear || !entries.some((o) => !o.unclear && o.code === e.code && o.role === e.role));
+    const clear = entries.filter((e) => (!e.unclear || !entries.some((o) => !o.unclear && o.code === e.code && o.role === e.role)));
     const sorted = [...clear].sort((x, y) => (x.role === y.role ? 0 : x.role === 'value' ? -1 : 1));
     if (!sorted.length) props.push({ ...base, code: null, role: 'value', ...(opaque.has(v) ? { reason: 'built into a value the reader does not follow' } : {}) });
-    for (const e of sorted) props.push({ ...base, ...e });
+    for (const e of sorted) { const { mark, ...rest } = e; props.push({ ...base, ...mapOf(e), ...rest }); }
   }
   return { tag, props };
 }

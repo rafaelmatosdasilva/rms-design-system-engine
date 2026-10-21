@@ -67,7 +67,7 @@ export function valuesOf(fp, codeConnectProps = []) {
 // What the Code Connect file does with a property besides filling its value: the attributes it decides are written.
 export function readingsOf(fp, codeConnectProps = []) {
   return (codeConnectProps ?? []).filter((p) => p.figma === fp && p.role === 'condition' && p.code && !p.event)
-    .map((p) => ({ code: p.code, role: 'condition', ...(p.negated ? { negated: true } : {}), ...(p.equals != null ? { equals: p.equals } : {}) }));
+    .map((p) => ({ code: p.code, role: 'condition', ...(p.negated ? { negated: true } : {}), ...(p.equals != null ? { equals: p.equals } : {}), ...(p.unclear ? { unclear: true } : {}) }));
 }
 
 // Whether a true/false binding writes the opposite of the Figma value (Figma "Show close" on is the code's hideClose
@@ -82,3 +82,42 @@ export function invertsValue(fp, code, { codeConnectProps = [], authored = null 
   return (ON.test(f) && OFF.test(c)) || (OFF.test(f) && ON.test(c));
 }
 export const flipBoolean = (v) => (/^true$/i.test(String(v)) ? 'false' : /^false$/i.test(String(v)) ? 'true' : v);
+
+// The naming conventions a design system keeps between its Figma file and its code, taken only where the types agree, so
+// a near name is never guessed (tileCaptionContent is never caption):
+//   value      Figma xContent (text or swap)  ↔ code x (a string)            labelContent → label
+//   condition  Figma showX (on/off)           ↔ code x (not on/off)         showLabel decides whether label is written
+//   value      Figma x (on/off)               ↔ code isX or xs (on/off)     interactive → isInteractive, showLabel → showLabels
+//   value      Figma x (variant)              ↔ the one code prop ending in X with exactly x's options   size → buttonSize
+// codeProps: { name: { type, options } }. codeConnectProps: the component's Code Connect readings, when it has a file: a
+// showX is never said to decide an x that file writes whatever showX is. → { code, role, source: 'convention' } or null.
+const typeOf = (d) => String(d?.type ?? '').toLowerCase();
+const onOff = (def) => def?.type === 'BOOLEAN' || (def?.type === 'VARIANT' && (def.variantOptions ?? []).length === 2 && def.variantOptions.every((o) => /^(true|false)$/i.test(String(o))));
+export function conventionFor(fp, def, codeProps = {}, { codeConnectProps = [] } = {}) {
+  const name = String(fp).split('#')[0].trim();
+  const byNorm = new Map(Object.keys(codeProps).map((p) => [norm(p), p]));
+  const stringy = (p) => /string/.test(typeOf(codeProps[p])) || !typeOf(codeProps[p]);
+  if (def?.type === 'TEXT' || def?.type === 'INSTANCE_SWAP') {
+    const base = name.replace(/\s*content$/i, '');
+    const p = base !== name && base ? byNorm.get(norm(base)) : null;
+    if (p && stringy(p)) return { code: p, role: 'value', source: 'convention' };
+    return null;
+  }
+  if (onOff(def)) {
+    const shown = /^show\s*(.+)$/i.exec(name)?.[1];
+    const p = shown ? byNorm.get(norm(shown)) : null;
+    const writtenAlways = (c) => (codeConnectProps ?? []).some((x) => x.role === 'value' && x.code === c) && !(codeConnectProps ?? []).some((x) => x.role === 'condition' && x.code === c);
+    if (p && !/boolean/.test(typeOf(codeProps[p])) && !writtenAlways(p)) return { code: p, role: 'condition', source: 'convention' };
+    for (const alt of [`is${name}`, `${name}s`]) {
+      const q = byNorm.get(norm(alt));
+      if (q && /boolean/.test(typeOf(codeProps[q]))) return { code: q, role: 'value', source: 'convention' };
+    }
+    return null;
+  }
+  if (def?.type === 'VARIANT' && (def.variantOptions ?? []).length > 1) {
+    const want = [...def.variantOptions].map(String).sort().join('|');
+    const fits = Object.keys(codeProps).filter((p) => norm(p) !== norm(name) && norm(p).endsWith(norm(name)) && Array.isArray(codeProps[p]?.options) && [...codeProps[p].options].map(String).sort().join('|') === want);
+    if (fits.length === 1) return { code: fits[0], role: 'value', source: 'convention' };
+  }
+  return null;
+}

@@ -221,7 +221,8 @@ const _unq = (s) => String(s).replace(/^['"`]|['"`]$/g, '').trim();
 // Covers React default params & defaultProps, Vue withDefaults / defineProps({default}).
 export function extractDefaults(text) {
   const out = new Map();
-  const put = (name, val) => { if (name) out.set(norm(name), _unq(val)); };
+  // A number or true/false written without quotes is that value, whatever else the prop may take (3000, not "3000").
+  const put = (name, val) => { if (!name) return; const v = String(val).trim(); out.set(norm(name), /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : _unq(val)); };
   for (const m of text.matchAll(new RegExp(`([A-Za-z_$][\\w$]*)\\s*=\\s*${_LIT}`, 'g'))) put(m[1], m[2]);   // ({ a = 'x' })
   for (const m of text.matchAll(/withDefaults\s*\([\s\S]*?,\s*\{([\s\S]*?)\}\s*\)/g))
     for (const p of m[1].matchAll(new RegExp(`([A-Za-z_$][\\w$]*)\\s*:\\s*${_LIT}`, 'g'))) put(p[1], p[2]);
@@ -252,9 +253,12 @@ export function extractDocumented(text) {
     const e = {}, t = m[2].trim().toLowerCase().split(/\s*[|,]\s*/).filter((x) => /^(string|boolean|number|object|array|function|date)$/.test(x));
     if (t.length) e.type = t.join(' | ');
     // What it is for, as written: the line without its list of values and the words that introduce it.
-    const desc = m[3].replace(/\*\/.*$/, '').replace(/\[[^\]]*\]/g, '').replace(/[,;:]?\s*(?:it\s+)?(?:can|could|may)\s+be\s*:?\s*$/i, '').replace(/^\s*[-–—:]\s*/, '').replace(/\s+/g, ' ').trim();
+    const shape = /object|array|function/.test(e.type ?? '');   // its brackets describe a shape: kept in its words
+    const desc = m[3].replace(/\*\/.*$/, '').replace(shape ? /(?!)/ : /\[[^\]]*\]/g, '').replace(/[,;:]?\s*(?:it\s+)?(?:can|could|may)\s+be\s*:?\s*$/i, '').replace(/^\s*[-–—:]\s*/, '').replace(/\s+/g, ' ').trim();
     if (desc) e.description = desc;
-    const list = /\[([^\]]+)\]/.exec(m[3])?.[1];
+    // A list of values belongs to a value a prop takes (a string, a number), never to the shape an object or a list
+    // is described with ({ type: [min, max] }).
+    const list = shape ? null : /\[([^\]]+)\]/.exec(m[3])?.[1];
     if (list) {
       const items = list.split(/,|\s+(?:or|and)\s+/).map((x) => x.trim()).filter(Boolean);
       const opts = items.map((x) => x.replace(/\s*\(default\)\s*$/i, '').replace(/^['"`]|['"`]$/g, ''));
@@ -263,6 +267,37 @@ export function extractDocumented(text) {
       if (def >= 0 && e.options) e.default = e.options[def];
     }
     if (Object.keys(e).length && !out.has(norm(m[1]))) out.set(norm(m[1]), e);
+  }
+  return out;
+}
+// A default the code builds (an object, a list, a function returning one) as its own words: code prop -> the expression
+// ({ neutral: [0, 40] }), from a Vue props object. A plain literal is extractDefaults' (those are values, these are code).
+export function extractDefaultExpressions(text) {
+  const out = new Map(), t = String(text), masked = maskCode(t);
+  const closeOf = (open) => { let d = 0; for (let i = open; i < masked.length; i++) { const ch = masked[i]; if ('{[('.includes(ch)) d++; else if ('}])'.includes(ch) && --d === 0) return i; } return -1; };
+  for (const m of masked.matchAll(/(?:defineProps\s*\(|[^.\w]props\s*:)\s*\{/g)) {
+    const open = m.index + m[0].length - 1, end = closeOf(open);
+    if (end < 0) continue;
+    let depth = 0;
+    for (let i = open + 1; i < end; i++) {
+      const ch = masked[i];
+      if ('{[('.includes(ch)) depth++; else if ('}])'.includes(ch)) depth--;
+      if (depth !== 0) continue;
+      const k = /^\s*,?\s*([A-Za-z_$][\w$]*)\s*:\s*\{/.exec(masked.slice(i, i + 200));
+      if (!k || (i > open + 1 && !/[,{\s]/.test(masked[i]))) continue;
+      const objOpen = i + k[0].length - 1, objEnd = closeOf(objOpen);
+      if (objEnd < 0) continue;
+      const body = masked.slice(objOpen, objEnd);
+      const d = /[{,]\s*default\s*:\s*/.exec(body);
+      if (d) {
+        const from = objOpen + d.index + d[0].length;
+        let j = from, dd = 0;
+        for (; j < objEnd; j++) { const ch = masked[j]; if ('{[('.includes(ch)) dd++; else if ('}])'.includes(ch)) dd--; else if (ch === ',' && dd === 0) break; }
+        const expr = t.slice(from, j).replace(/\s+/g, ' ').trim();
+        if (expr && !/^(['"`][^'"`]*['"`]|true|false|null|-?\d+(\.\d+)?)$/.test(expr)) out.set(norm(k[1]), expr.length > 200 ? expr.slice(0, 199) + '…' : expr);
+      }
+      i = objEnd;
+    }
   }
   return out;
 }
@@ -368,7 +403,7 @@ export function extractEvents(file, text, propNames = []) {
 export function textComponentApi(file, text) {
   // A Vue file's props are read from its scripts only: its template's bindings (:icon="icon") are never a default.
   const code = /\.vue$/i.test(String(file)) ? [...String(text).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n') || text : text;
-  const defaults = extractDefaults(code), options = extractOptions(code), required = extractRequired(code), types = extractTypes(code), documented = extractDocumented(code);
+  const defaults = extractDefaults(code), options = extractOptions(code), required = extractRequired(code), types = extractTypes(code), documented = extractDocumented(code), built = extractDefaultExpressions(code);
   const props = {};
   for (const p of extractProps(file, text)) {
     const e = {}, doc = documented.get(norm(p));
@@ -380,6 +415,7 @@ export function textComponentApi(file, text) {
     if (type) e.type = type;
     if (required.has(norm(p))) e.required = required.get(norm(p));
     if (doc?.description) e.description = doc.description;
+    if (e.default === undefined && built.has(norm(p))) e.defaultExpression = built.get(norm(p));
     props[p] = e;
   }
   const s = extractSlots(text);

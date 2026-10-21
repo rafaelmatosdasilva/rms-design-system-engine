@@ -3,7 +3,7 @@
 // is; what the project's Code Connect file says it decides beyond its value; where Figma and the code differ; the props
 // only the code has; its events and slots as the code declares them; its states, the tokens each state paints with,
 // and what the code says about its accessibility. Every fact names where it came from; nothing is guessed.
-import { bindingSources, bindFigmaProp, readingsOf, valuesOf, suggestionFor, invertsValue, flipBoolean } from './prop-binding.mjs';
+import { bindingSources, bindFigmaProp, readingsOf, valuesOf, suggestionFor, invertsValue, flipBoolean, conventionFor } from './prop-binding.mjs';
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const strip = (k) => String(k).split('#')[0].trim();
@@ -29,7 +29,15 @@ export function figmaValue(def) {
 export function codeHalf(contractProps, figmaProps = {}, api = null, { authored = {}, aliases = null } = {}) {
   const defs = new Map(Object.entries(figmaProps ?? {}).map(([k, d]) => [strip(k), d]));
   // A Vue Boolean prop given no default is false: Vue says so, so the contract does (other frameworks leave it unset).
-  const codeProps = Object.fromEntries(Object.entries(api?.props ?? {}).map(([n, d]) => [n, api?.syntax === 'vue' && d?.type === 'boolean' && d.default == null ? { ...d, default: false } : d]));
+  // A default read as text is the value it is: true, false or a number where the prop is a boolean or a number.
+  const typed = (d) => {
+    if (d?.default == null) return d;
+    const v = String(d.default).trim(), t = String(d.type ?? '');
+    if (/boolean/.test(t) && /^(true|false)$/.test(v)) return { ...d, default: v === 'true' };
+    if (/^number/.test(t) && /^-?\d+(\.\d+)?$/.test(v)) return { ...d, default: Number(v) };
+    return d;
+  };
+  const codeProps = Object.fromEntries(Object.entries(api?.props ?? {}).map(([n, d]) => [n, api?.syntax === 'vue' && d?.type === 'boolean' && d.default == null && !d.defaultExpression ? { ...d, default: false } : typed(d)]));
   const authoredAttr = Object.fromEntries(Object.entries(authored?.bindings ?? {}).filter(([, b]) => typeof b?.attribute === 'string').map(([k, b]) => [k, b.attribute]));
   const authoredSlots = Object.fromEntries(Object.entries(authored?.bindings ?? {}).filter(([, b]) => b?.slot != null).map(([k, b]) => [k, b.slot]));
   const recorded = bindingSources({ codeConnect: api?.codeConnect, aliases, authored: authoredAttr });
@@ -42,9 +50,13 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
     // by another reading, and gets the code's facts only when the code has that prop.
     const handWritten = p.bindings?.code && typeof p.bindings.code === 'object' && Object.keys(p.bindings.code).length;
     const authoredName = handWritten && typeof p.bindings.code.attribute === 'string' ? p.bindings.code.attribute : null;
-    const b = handWritten
+    const found = handWritten
       ? (authoredName && codeProps[authoredName] ? { code: authoredName, as: 'prop', source: 'authored', exactName: true } : null)
       : api ? bindFigmaProp(p.name, def, { codeProps, slots: api.slots ?? {}, recorded, authoredSlots }) : null;
+    // Nothing recorded and no same name: the design system's naming conventions, where the types agree (labelContent is
+    // label; showLabel decides whether label is written). Never over what its Code Connect file says.
+    const conv = !found && !handWritten && api && !readingsOf(p.name, api.codeConnectProps).length ? conventionFor(p.name, def, codeProps, { codeConnectProps: api.codeConnectProps }) : null;
+    const b = found ?? (conv?.role === 'value' ? { code: conv.code, as: 'prop', source: 'convention', exactName: false } : null);
     if (b) {
       // A key of an object prop has no facts of its own in the code: the object's type and default are not the key's.
       const c = b.key ? {} : codeProps[b.code] ?? {};
@@ -54,10 +66,11 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
       out.bindings.code = {
         ...(out.bindings.code && typeof out.bindings.code === 'object' ? out.bindings.code : {}),
         [b.as === 'prop' ? 'prop' : 'slot']: b.code, ...(b.key ? { key: b.key } : {}), as: b.as, source: b.source,
-        ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}),
+        ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}), ...(c.defaultExpression ? { defaultExpression: c.defaultExpression } : {}),
         ...(typeof c.required === 'boolean' ? { required: c.required } : {}), ...(c.description ? { description: c.description } : {}),
         ...(c.confidence ? { confidence: c.confidence } : {}), ...(ccValues.get(p.name) ? { valueMap: ccValues.get(p.name) } : {}),
         ...(inverted ? { inverted: true } : {}),
+        ...((api?.codeConnectProps ?? []).some((x) => x.figma === p.name && x.role === 'value' && x.derived && x.code === (b.key ? `${b.code}.${b.key}` : b.code)) ? { derived: true } : {}),
       };
       // Where Figma and the code differ on it: its default, and the values each has that the other does not (through
       // the Code Connect value map when there is one: Figma "Large" written "lg").
@@ -72,11 +85,12 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
         const onlyInFigma = f.filter((o) => !co.some((x) => same(x, o))), onlyInCode = co.filter((o) => !f.some((x) => same(x, o)));
         if (onlyInFigma.length || onlyInCode.length) differences.push({ kind: 'options', onlyInFigma, onlyInCode });
       }
-      if (b.source === 'name' && !b.exactName) differences.push({ kind: 'name', figma: p.name, code: b.code });
+      if ((b.source === 'name' || b.source === 'convention') && !b.exactName) differences.push({ kind: 'name', figma: p.name, code: b.code });
       if (differences.length) out.differences = differences;
     }
     // What the Code Connect file says it decides beyond a value: the attributes written only when it is on (or off).
     const conditions = readingsOf(p.name, api?.codeConnectProps);
+    if (conv?.role === 'condition') conditions.push({ code: conv.code, role: 'condition', source: 'convention' });
     if (conditions.length) out.conditions = conditions;
     // The other attributes it fills with the same value (helper words written as warning in one state and
     // note in another).
@@ -93,7 +107,7 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
   const decided = new Map();
   for (const p of props) for (const code of [...(p.conditions ?? []).map((x) => x.code), ...(p.alsoWrites ?? []), ...(p.bindings.code?.key ? [p.bindings.code.prop] : [])]) { const k = norm(code.split('.')[0]); decided.set(k, [...new Set([...(decided.get(k) ?? []), p.name])]); }
   const codeOnly = Object.entries(codeProps).filter(([n]) => !used.has(norm(n))).map(([n, c]) => ({
-    name: n, ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}),
+    name: n, ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}), ...(c.defaultExpression ? { defaultExpression: c.defaultExpression } : {}),
     ...(typeof c.required === 'boolean' ? { required: c.required } : {}), ...(c.description ? { description: c.description } : {}), ...(c.confidence ? { confidence: c.confidence } : {}),
     ...(decided.get(norm(n)) ? { setBy: decided.get(norm(n)) } : {}),
   }));

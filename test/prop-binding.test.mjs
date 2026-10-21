@@ -49,3 +49,23 @@ test('a key of an object prop is that prop at that key; every attribute a proper
   const cc = [{ figma: 'helperWords', code: 'warning', role: 'value' }, { figma: 'helperWords', code: 'note', role: 'value' }, { figma: 'helperWords', code: 'warning', role: 'condition' }];
   assert.deepEqual(valuesOf('helperWords', cc), ['warning', 'note']);
 });
+
+test('the naming conventions pair only where the types agree; a near name is never one', async () => {
+  const { conventionFor } = await import('../prop-binding.mjs');
+  const cp = { caption: { type: 'string' }, heading: { type: 'string' }, tileSize: { type: 'string', options: ['s', 'm'] }, otherSize: { type: 'string', options: ['s', 'm', 'l'] }, isPinned: { type: 'boolean' }, alert: { type: 'boolean' } };
+  assert.deepEqual(conventionFor('captionContent', { type: 'TEXT' }, cp), { code: 'caption', role: 'value', source: 'convention' });
+  assert.deepEqual(conventionFor('showCaption', { type: 'BOOLEAN' }, cp), { code: 'caption', role: 'condition', source: 'convention' });
+  assert.deepEqual(conventionFor('pinned', { type: 'VARIANT', variantOptions: ['true', 'false'] }, cp), { code: 'isPinned', role: 'value', source: 'convention' });
+  assert.deepEqual(conventionFor('size', { type: 'VARIANT', variantOptions: ['m', 's'] }, cp), { code: 'tileSize', role: 'value', source: 'convention' }, 'the one prop ending in Size with the same options');
+  assert.equal(conventionFor('subheadingContent', { type: 'TEXT' }, cp), null, 'subheading is not heading');
+  assert.equal(conventionFor('alertContent', { type: 'TEXT' }, cp), null, 'a text is not an on/off prop');
+  assert.equal(conventionFor('showAlert', { type: 'BOOLEAN' }, cp), null, 'an on/off prop is not shown by another');
+});
+
+test('a convention never says showX decides an x its Code Connect file always writes; a plural on/off pairs', async () => {
+  const { conventionFor } = await import('../prop-binding.mjs');
+  const cp = { badge: { type: 'string' }, showBadgeCounts: { type: 'boolean' } };
+  assert.equal(conventionFor('showBadge', { type: 'BOOLEAN' }, cp, { codeConnectProps: [{ figma: 'Badge', code: 'badge', role: 'value' }] }), null);
+  assert.deepEqual(conventionFor('showBadge', { type: 'BOOLEAN' }, cp, { codeConnectProps: [{ figma: 'Badge', code: 'badge', role: 'value' }, { figma: 'other', code: 'badge', role: 'condition' }] }), { code: 'badge', role: 'condition', source: 'convention' });
+  assert.deepEqual(conventionFor('showBadgeCount', { type: 'VARIANT', variantOptions: ['false', 'true'] }, cp), { code: 'showBadgeCounts', role: 'value', source: 'convention' });
+});

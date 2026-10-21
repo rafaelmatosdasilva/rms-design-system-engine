@@ -31,7 +31,7 @@ import { loadLocator } from './component-locator.mjs';
 import { createApiReader } from './component-api.mjs';
 import { inProgressNames } from './in-progress.mjs';   // work in progress is not drift
 import { stateAxisTest, cleanFigmaProp } from './figma-props.mjs';
-import { bindingSources, bindFigmaProp, readingsOf, invertsValue, flipBoolean } from './prop-binding.mjs';   // one decision for the check and the contract
+import { bindingSources, bindFigmaProp, readingsOf, invertsValue, flipBoolean, conventionFor } from './prop-binding.mjs';   // one decision for the check and the contract
 
 const ROOT = process.cwd();
 
@@ -367,6 +367,18 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
       const say = decides.map((d) => `${d.code}${d.negated ? ' when off' : d.equals != null ? ` when ${d.equals}` : ''}`).join(', ');
       for (const d of decides) matchedCode.add(norm(d.code.split('.')[0]));
       OK.push(`${figmaName}/${fp} → decides ${say} (Code Connect)`); pushRow(`(decides ${say})`, 'condition', 'match'); continue;
+    }
+    // The naming convention, where the types agree (prop-binding.mjs conventionFor), as the contract pairs it: a value
+    // under another name is a name difference, never a missing prop; a showX that decides x is its place in the code.
+    const conv = conventionFor(fp, def, api.props, { codeConnectProps: ccProps });
+    if (conv?.role === 'value') {
+      matchedCode.add(norm(conv.code));
+      const v = checkValues(fp, def, conv.code);
+      NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${conv.code}" (the naming convention pairs them)  (${rel})`); pushRow(conv.code, v.codeValue, 'name'); continue;
+    }
+    if (conv?.role === 'condition') {
+      matchedCode.add(norm(conv.code));
+      OK.push(`${figmaName}/${fp} → decides ${conv.code} (naming convention)`); pushRow(`(decides ${conv.code})`, 'condition', 'match'); continue;
     }
     missingHere.push(fp);   // row added after rename-pairing below
     MISSING.push(`${figmaName}: Figma property "${fp}" has no code prop  (${rel})${ccProps.length ? (ccProps.some((p) => p.figma === fp) ? ' - its Code Connect file reads it but writes no attribute' : ' - its Code Connect file does not read it') : ''}`);
