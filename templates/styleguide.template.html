@@ -1307,12 +1307,13 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens .sg-bk-lens-num { fill: var(--bk-mark, var(--sg-accent)); font-size: calc(var(--sg-space-l) * 1.85); }
 /* The drawing as large as the tile holds it (six rows, less the padding) at its own proportions, so the words laid over it
    stay under their lenses; the words in the page's sizes. */
-.sg-bk-lens-wrap { position: relative; width: min(100%, calc((var(--sg-space-xxl) * 18 + var(--sg-card-gap) * 5 - var(--sg-space-l) * 3) * 1300 / 720)); aspect-ratio: 1300 / 720; margin: auto; }
+.sg-bk-lens-wrap { position: relative; width: min(100%, calc((var(--sg-space-xxl) * 18 + var(--sg-card-gap) * 5 - var(--sg-space-l) * 2) * 1300 / 680)); aspect-ratio: 1300 / 680; margin: auto; }
+.sg-bk-t.sg-bk-lens-t { justify-content: center; }   /* the drawing in the middle of its card */
 .sg-bk-lens-wrap > .sg-bk-lens { position: absolute; inset: 0; }
 .sg-bk-lens-cap { position: absolute; width: 18%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--sg-space-xxs); text-align: center; }
 .sg-bk-lens-cap b { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--bk-mark, var(--sg-accent)); }
 .sg-bk-lens-cap span { font-size: var(--sg-s); color: var(--sg-muted); }
-.sg-bk-lens-foot { font-size: var(--sg-s); color: var(--sg-muted); }
+.sg-bk-lens-name { position: absolute; left: var(--sg-space-m); bottom: var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-muted); }
 .sg-bk-keyline-t { --bk-grid: color-mix(in srgb, var(--sg-line-colour) 18%, transparent); background-image: repeating-linear-gradient(to right, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))), repeating-linear-gradient(to bottom, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))); background-position: center; }   /* the grid fills the whole card, in the brand's line thickness */
 .sg-bk-pie { width: 100%; transform: rotate(-90deg); }
 .sg-bk-pie circle { fill: none; stroke-width: 34; animation: sg-bk-pie-in 1.2s ease-out both; }
@@ -3389,7 +3390,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // where each lens looks and the stroke measured across its line; at the right each lens drawn large, the icon's own
     // pixel grid behind it, the cap's half-stroke circle and the corner's turn marked, named underneath.
     function lensTile(an) {
-      var bx = an.box, z = Math.max(bx[2], bx[3]), big = 583 / z, frameX = 645, frameY = 58, ox = frameX - bx[0] * big, oy = frameY - bx[1] * big;
+      var bx = an.box, z = Math.max(bx[2], bx[3]), big = 583 / z, frameX = 645, frameY = 48, ox = frameX - bx[0] * big, oy = frameY - bx[1] * big;
       var at = function (p) { return [ox + p[0] * big, oy + p[1] * big]; }, num = function (n) { return String(Math.round(n * 100) / 100); };
       // The icon's own drawing in the words' colour (its fills from a class would not reach a <use>).
       var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
@@ -3397,7 +3398,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
       // Two by two at the left, the icon at the right, as they sit on it: the corner and the open gap above, the stroke's thickness and the end below.
       var lenses = [an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }, an.gap && { p: an.gap.at, kind: 'gap' }, an.thick && { p: an.thick.at, kind: 'thick' }, an.end && { p: an.end.at, kind: 'end', round: an.end.round }].filter(Boolean);
-      var R = 55, LR = 95, out = '', caps = '', VW = 1300, VH = 720;
+      var R = 55, LR = 95, out = '', caps = '', VW = 1300, VH = 680;
       // The icon, large, on its pixel grid inside its own box.
       // Its frame is drawn by the page (lensFrame below), in the brand's own corner radius.
       out += icon(frameX, frameY, big);
@@ -3457,7 +3458,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // Its name and what it shows under it, in the page's own text sizes (laid over the drawing, not scaled with it).
         caps += '<div class="sg-bk-lens-cap" style="left:' + (cx / VW * 100) + '%;top:' + ((cy + LR + 20) / VH * 100) + '%"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>';
       });
-      var set = an.set, same = (set.sameW === set.read ? 'one stroke on all ' + set.read + ' icons' : 'one stroke on ' + set.sameW + ' of ' + set.read + ' icons') + (an.src === 'figma' ? ', as Figma draws it' : an.src === 'code' ? ', as its code draws it' : ', read on their drawing');
       // The icon's frame, drawn by the page at its own size (so its dashes keep their spacing and its corner the brand's
       // radius), with a grid behind the icon half a stroke apart, laid on the icon's own outer edges, clipped to the frame.
       var gStep = an.w / 2, gAt = an.thick ? an.thick.e1 : an.end ? an.end.at : [bx[0], bx[1]];
@@ -3466,9 +3466,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       for (var gv = gAt[0] - Math.floor((gAt[0] - bx[0]) / gStep) * gStep; gv <= bx[0] + bx[2] + 1e-6; gv += gStep) gLines += '<line x1="' + pct(gv, bx[0], bx[2]) + '" y1="0" x2="' + pct(gv, bx[0], bx[2]) + '" y2="100%"/>';
       for (var gh = gAt[1] - Math.floor((gAt[1] - bx[1]) / gStep) * gStep; gh <= bx[1] + bx[3] + 1e-6; gh += gStep) gLines += '<line x1="0" y1="' + pct(gh, bx[1], bx[3]) + '" x2="100%" y2="' + pct(gh, bx[1], bx[3]) + '"/>';
       var lensFrame = '<div class="sg-bk-lens-frame" style="left:' + (frameX / VW * 100) + '%;top:' + (frameY / VH * 100) + '%;width:' + (bx[2] * big / VW * 100) + '%;height:' + (bx[3] * big / VH * 100) + '%">' +
-        '<svg aria-hidden="true"><clipPath id="sg-bk-lens-clip"><rect width="100%" height="100%"/></clipPath><g clip-path="url(#sg-bk-lens-clip)" class="sg-bk-lens-fgrid">' + gLines + '</g><rect width="100%" height="100%" class="sg-bk-lens-fline"/></svg></div>';
-      return '<div class="sg-bk-lens-wrap">' + lensFrame + '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 ' + VW + ' ' + VH + '" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out + '</svg>' + caps + '</div>' +
-        '<span class="sg-bk-lens-foot">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  ' + esc(same) + '</span>';
+        '<svg aria-hidden="true"><clipPath id="sg-bk-lens-clip"><rect width="100%" height="100%"/></clipPath><g clip-path="url(#sg-bk-lens-clip)" class="sg-bk-lens-fgrid">' + gLines + '</g><rect width="100%" height="100%" class="sg-bk-lens-fline"/></svg>' +
+        '<span class="sg-bk-lens-name">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '</span></div>';   // the icon's name, inside its frame
+      return '<div class="sg-bk-lens-wrap">' + lensFrame + '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 ' + VW + ' ' + VH + '" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out + '</svg>' + caps + '</div>';
     }
     var anatomyCache = {};
     function iconAnatomy(ids) {
