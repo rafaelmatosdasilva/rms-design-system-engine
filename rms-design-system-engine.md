@@ -96,7 +96,7 @@ reference it points to say, never from memory or from this table alone.
 
 Reference (`rms-design-system-engine --reference <name>`): `usage` (every command, option and output), `config`
 (`ds-config.json`, snapshot files, naming), `gates` (gate-specific rules), `maintainers` (changing the engine
-and the skill).
+and the skill), `personality` (how the style guide reads a brand's personality from its tokens).
 
 ## How to run this skill (read first)
 
