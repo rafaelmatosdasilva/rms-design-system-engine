@@ -1422,6 +1422,9 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
     if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Found', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');
+    // Every card's link shows the rows it promises: See 45 missing filters the table to those 45, never to none.
+    const promised = await run(`(() => { const out = []; for (const b of [...document.querySelectorAll('#status .sg-health-go [data-go-area]')]) { const n = +(/\\d+/.exec(b.textContent) || [0])[0]; b.click(); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => tr.offsetParent).length; out.push([b.getAttribute('data-go-area'), n, rows]); } return out; })()`);
+    for (const [area, n, rows] of promised) assert.equal(rows, n, `${area}: its link promises ${n} rows and the table shows ${rows}`);
     // Only the cards: no charts or lists of their own; the tasks follow, with their tabs.
     assert.equal(await run(`document.querySelectorAll('#status .sg-health-card, #status .sg-health-comps, #status .sg-health-list').length`), 0);
     assert.equal(await run(`document.querySelector('#status .sg-health-box').compareDocumentPosition(document.querySelector('#status .sg-matrix')) === Node.DOCUMENT_POSITION_FOLLOWING`), true, 'the cards above the table');
