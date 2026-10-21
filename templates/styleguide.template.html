@@ -1473,7 +1473,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-tk-main > .sg-tk-tables > :last-child { flex: 1; }
 .sg-tk-label { flex: none; font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-cell-x); border-bottom: var(--sg-line); background: var(--sg-bg-2); }   /* its head, as the table's */
 .sg-tk-colls-side { flex: none; display: flex; flex-direction: column; padding: var(--sg-space-s); border-bottom: var(--sg-line); }   /* the collections, whole, above the groups */
-.sg-tk-groups { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 0; padding: var(--sg-space-s); scrollbar-gutter: stable; }   /* the list scrolls under its head, 8px from its scroll bar */
+.sg-tk-groups { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 0; padding: var(--sg-space-s); }   /* the list scrolls under its head; its rows as wide as the collections' while it needs no scroll bar */
 .sg-tk-item { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); width: 100%; margin: 0; padding: var(--sg-space-s) var(--sg-space-m); border: 0; border-radius: var(--sg-control-radius); background: none; color: var(--sg-text-2); font: inherit; font-size: var(--sg-s); text-align: left; cursor: pointer; }
 .sg-tk-item:hover { background: var(--sg-hover-fill); color: var(--sg-text); }
 .sg-tk-item[aria-pressed="true"] { background: var(--sg-a3); color: var(--sg-text); }
@@ -1485,6 +1485,11 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 /* A side panel's page (sidePanelPage): its head stays at the panel's top, painted with the panel, as a component page's
    head stays under the page's bars; its body's cards a card gap apart, the first a stick gap under the head. */
 .sg-panel-head { position: sticky; top: 0; z-index: 7; display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-xxl) 0 var(--sg-space-l); background: var(--sg-bg); }
+/* As the page's own bars: its ground across the panel's whole width (into its side padding), and once the panel's content
+   scrolls under it, the page's line under it, as wide. */
+.sg-panel-head::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-card-gap)); right: calc(-1 * var(--sg-card-gap)); background: var(--sg-bg); z-index: -1; pointer-events: none; }
+.sg-panel-head::after { content: ''; position: absolute; left: calc(-1 * var(--sg-card-gap)); right: calc(-1 * var(--sg-card-gap)); bottom: 0; height: var(--sg-line-width, 1px); background: var(--sg-line-colour); opacity: 0; transition: opacity var(--sg-fast); pointer-events: none; }
+.sg-panel-head.is-stuck::after { opacity: 1; }
 .sg-panel-head > h2 { margin: 0; font-size: calc(var(--sg-title) + var(--sg-space-xxs) * 3.5); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* every panel's title as a page's own title (the first panel's): one size, one line height */
 .sg-panel-head > .sg-section-badge, .sg-panel-head > .sg-panel-sub { margin: 0; }
 .sg-panel-head > h2 .sg-tip { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); vertical-align: middle; }   /* the row's tip after its title, at the table's size */
@@ -1519,6 +1524,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 /* The tree's lines, as Figma draws them: under a group's chevron, down to each group inside it, an elbow to each, the
    last one's rounded. */
 .sg-tk-groups { --tk-ind: calc(var(--sg-space-l) + var(--sg-space-xs)); --tk-tw: calc(var(--sg-space-l) + var(--sg-space-xs)); }
+.sg-tk-row > .sg-tk-item { padding-left: var(--sg-space-xs); }   /* a group's name just after its chevron (or where one would be), not a whole padding away */
 .sg-tk-guide { position: absolute; top: 0; bottom: 0; left: calc(var(--k) * var(--tk-ind) + var(--tk-tw) / 2); width: calc(var(--tk-ind) - var(--tk-tw) / 2 + var(--sg-space-xxs)); pointer-events: none; border-left: var(--sg-line-width, 1px) solid var(--sg-line-colour); }
 .sg-tk-guide[data-t="tee"]::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: var(--sg-line-width, 1px) solid var(--sg-line-colour); }
 .sg-tk-guide[data-t="end"] { bottom: 50%; border-bottom: var(--sg-line-width, 1px) solid var(--sg-line-colour); border-bottom-left-radius: var(--sg-radius-s); }
@@ -8309,6 +8315,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   COMPONENTS.forEach(function (c) { if (/^#[\w-]+$/.test(c.cls || '') && !document.getElementById(c.cls.slice(1))) { var one = document.createElement('div'); one.id = c.cls.slice(1); document.body.appendChild(one); } });
   var refreshers = [];
   // Everything drawn again for a brand or mode change (each page only while it shows: lazyDraw).
+  // A panel's head stuck (its content scrolled under it) carries the full-width line.
+  document.addEventListener('scroll', function (e) { var d = e.target; if (!d || !d.classList || !d.classList.contains('sg-tk-detail')) return; var h = d.querySelector('.sg-panel-head'); if (h) h.classList.toggle('is-stuck', d.scrollTop > 0); }, true);
   function redrawAll() { refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); }
   // The components' group says how many there are: Components (117).
   if (COMPONENTS.length) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.dataset.group = 'Components'; lab.innerHTML = 'Components' + countHTML(menuCount()); nav.appendChild(lab); }
