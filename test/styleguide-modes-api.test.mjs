@@ -44,7 +44,7 @@ defineProps({ label: String, icon: String, buttonSize: { type: String, default: 
   const api = textComponentApi('Button.vue', vue);
   assert.deepEqual(api.props.icon, { type: 'string' }, ':icon="icon" is a binding, not a default');
   assert.deepEqual(api.props.disabled, { type: 'boolean' });
-  assert.deepEqual(api.props.buttonSize, { default: 'm', options: ['s', 'm', 'l'], type: 'string' });
+  assert.deepEqual(api.props.buttonSize, { default: 'm', description: 'the size', options: ['s', 'm', 'l'], type: 'string' }, 'the words before "can be" describe it');
   assert.deepEqual(api.props.alignment, { options: ['left', 'center', 'right'], type: 'string' });
   assert.equal(api.props.value.type, 'string | number');
   assert.equal(api.props.params.type, 'object');

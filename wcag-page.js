@@ -2,13 +2,16 @@
 //
 // Plain browser code with no imports: the audit's Chrome injects it (a11y-check.mjs), the style guide carries it in
 // its page (styleguide-gen.mjs) and runs it on every variant. Two calls, on window.__wcag21:
-//   check(root, opts)    → { findings: [{ kind, sc, desc }], ran: [kind] }   what the markup and the CSS show
-//   interact(root, opts) → Promise of the same                               what it does when used (hover, focus, input, press)
+//   check(root, opts)    → { findings: [{ kind, sc, desc }], ran: [kind], spoken: [{ desc, role, name, says }] }
+//                          what the markup and the CSS show, and what a screen reader says on each control
+//   interact(root, opts) → Promise of { findings, ran }    what it does when used (hover, focus, input, press, keys)
 // `ran` names each check that had something to look at (a component with no link never runs the link check), so a
 // criterion with nothing failing is said to be met only where it was tried. `desc` locates the element as the audit
 // does (tag#id.class), so a finding names the component it sits in. opts: { name } (the component's name, for the
 // status-message check), { wait } (ms a hover or focus is given to show its content, 300 by default), { triggers } (how many
-// elements the hover check tries, 10 by default).
+// elements the hover check tries, 10 by default), { keys } (true where the component's own script is on the page: its
+// keys are pressed; drawn as markup alone, nothing would answer them), { skip } (key checks the caller makes itself with real keys: 'arrows', 'escape',
+// 'focusreturn', 'modalescape').
 (function (g) {
   'use strict';
   var FOCUSABLE = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex],[contenteditable=""],[contenteditable=true]';
@@ -344,7 +347,69 @@
       if (!el.matches(LIVE) && !el.closest(LIVE) && !el.querySelector(LIVE)) push('status', '4.1.3', el, 'a message a screen reader is not told about (role="status", role="alert" or aria-live)');
     });
 
-    return { findings: out, ran: Object.keys(ran) };
+    // What a screen reader says on each control: its name, its role, its state ("Save, button, pressed"). A name that
+    // says nothing ("icon", "button", a file or an icon's name), or says the role a second time ("Close button, button"),
+    // fails 2.4.6; two links with the same words going to different places fail 2.4.4.
+    var spoken = [], said = {};
+    shown.filter(function (el) { return el.matches(CONTROL) || el.tagName === 'IMG' || el.getAttribute('role') === 'img'; }).forEach(function (el) {
+      var r = roleOf(el); if (!r) return;
+      var n = name(el), says = announce(el, r, n);
+      spoken.push({ desc: desc(el), role: r, name: n, says: says });
+      if (!n) return;
+      seen('weakname');
+      var w = weak(n, r);
+      if (w) push('weakname', '2.4.6', el, 'a screen reader says "' + says.slice(0, 60) + '": ' + w);
+      if (r === 'link' && el.getAttribute('href')) { seen('samename'); var k = norm(n); (said[k] = said[k] || []).push(el); }
+    });
+    Object.keys(said).forEach(function (k) {
+      var list = said[k], to = list.map(function (a) { return a.href; });
+      if (to.filter(function (h, i) { return to.indexOf(h) === i; }).length > 1) push('samename', '2.4.4', list[1], list.length + ' links say "' + name(list[0]).slice(0, 30) + '" and go to different places');
+    });
+
+    return { findings: out, ran: Object.keys(ran), spoken: spoken };
+  }
+
+  // ── What a screen reader says ──
+  var IMPLICIT = { A: function (el) { return el.hasAttribute('href') ? 'link' : ''; }, BUTTON: 'button', SUMMARY: 'button', TEXTAREA: 'textbox', IMG: function (el) { return el.getAttribute('alt') === '' ? '' : 'img'; },
+    SELECT: function (el) { return el.multiple || el.size > 1 ? 'listbox' : 'combobox'; }, H1: 'heading', H2: 'heading', H3: 'heading', H4: 'heading', H5: 'heading', H6: 'heading',
+    INPUT: function (el) { var t = (el.type || 'text').toLowerCase(), by = { checkbox: 'checkbox', radio: 'radio', range: 'slider', number: 'spinbutton', search: el.list ? 'combobox' : 'searchbox', button: 'button', submit: 'button', reset: 'button', image: 'button', hidden: '' }; return t in by ? by[t] : el.list ? 'combobox' : 'textbox'; } };
+  function roleOf(el) {
+    var r = (el.getAttribute('role') || '').trim().split(/\s+/)[0];
+    if (r && r !== 'none' && r !== 'presentation') return r;
+    var i = IMPLICIT[el.tagName]; return typeof i === 'function' ? i(el) : i || (el.matches(FOCUSABLE) && el.tabIndex >= 0 ? 'generic' : '');
+  }
+  // The words for each role and state, as screen readers say them (NVDA and VoiceOver say much the same).
+  var SAY_ROLE = { img: 'image', textbox: 'edit text', searchbox: 'search field', combobox: 'combo box', listbox: 'list box', menuitem: 'menu item', menuitemcheckbox: 'menu item checkbox',
+    menuitemradio: 'menu item radio', spinbutton: 'stepper', radio: 'radio button', option: 'option', generic: 'group' };
+  function announce(el, r, n) {
+    var a = function (k) { return el.getAttribute('aria-' + k); }, parts = [n || '(no name)', SAY_ROLE[r] || r];
+    if (r === 'heading') parts[1] = 'heading level ' + (a('level') || (el.tagName.match(/^H(\d)$/) || [])[1] || 2);
+    var checked = a('checked') != null ? a('checked') : el.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(el.type) ? String(el.indeterminate ? 'mixed' : el.checked) : null;
+    if (checked != null) parts.push(checked === 'mixed' ? 'mixed' : checked === 'true' ? (r === 'switch' ? 'on' : 'checked') : (r === 'switch' ? 'off' : 'not checked'));
+    if (a('pressed') === 'true') parts.push('pressed'); else if (a('pressed') === 'false') parts.push('not pressed');
+    if (a('expanded') === 'true') parts.push('expanded'); else if (a('expanded') === 'false') parts.push('collapsed');
+    if (a('selected') === 'true') parts.push('selected');
+    if (a('current') && a('current') !== 'false') parts.push('current' + (a('current') === 'true' ? '' : ' ' + a('current')));
+    if (/^(true|menu|listbox|dialog|tree|grid)$/.test(a('haspopup') || '') && r !== 'combobox') parts.push('has popup');
+    if (el.required || a('required') === 'true') parts.push('required');
+    if (a('invalid') && a('invalid') !== 'false') parts.push('invalid entry');
+    if (el.disabled || a('disabled') === 'true') parts.push('dimmed');
+    if (r === 'slider' || r === 'spinbutton') { var v = a('valuetext') || a('valuenow') || el.value; if (v) parts.splice(1, 0, v); }
+    var more = byIds(a('describedby')).filter(Boolean).map(function (d) { return d.textContent; }).join(' ').replace(/\s+/g, ' ').trim();
+    return parts.join(', ') + (more ? '. ' + more : '');
+  }
+  // A name that tells nothing of what the control does: a placeholder word, a role, a file or an icon's own name.
+  var GENERIC = /^(icon|image|img|picture|photo|graphic|svg|logo|button|btn|link|click|tap|press|label|text|title|untitled|placeholder|item|element|component|control|field|input|lorem ipsum.*|x|\W)$/i;
+  var ROLE_WORD = { button: /\bbutton$/i, link: /\blink$/i, checkbox: /\bcheck ?box$/i, radio: /\bradio( button)?$/i, switch: /\b(toggle|switch)$/i, tab: /\btab$/i, img: /\b(image|icon|picture)$/i, menuitem: /\bmenu item$/i };
+  function weak(n, r) {
+    var t = n.trim();
+    if (GENERIC.test(t)) return 'the name says nothing of what it is for';
+    if (/\.(svg|png|jpe?g|gif|webp)$/i.test(t)) return 'the name is a file name';
+    if (/^[a-z0-9]+([-_][a-z0-9]+)+$/.test(t) || /^(ic|icon|svg)[-_ ]/i.test(t)) return 'the name is an icon\'s or a file\'s name ("' + t.slice(0, 24) + '"), not what it does';
+    // A short name ending with its role ("Close button"); a sentence that happens to end so ("A card around its link") is not.
+    var words = t.split(/\s+/).length;
+    if (!ROLE_WORD[r] || !ROLE_WORD[r].test(t) || words > 3) return '';
+    return words > 1 ? 'the role is said twice (the name ends with "' + t.match(ROLE_WORD[r])[0].trim() + '")' : 'the name is only its role';
   }
 
   // ── What it does when used ──
@@ -389,7 +454,9 @@
     // A person who takes the focus somewhere else on the page while this runs (a click on a filter, the Brand choice)
     // stops it: what it was trying is left untried, never half-measured, and the focus stays where they put it.
     var hurt = null, INTERRUPTED = { interrupted: true };
-    var watch = function (e) { if (e.target && e.target !== document.body && !root.contains(e.target) && !(e.target.closest && e.target.closest('.pg-offstage'))) hurt = e.target; };
+    // `own` is set while a key check moves the focus itself (a menu drawn at the end of the page takes it).
+    var own = false;
+    var watch = function (e) { if (!own && e.target && e.target !== document.body && !root.contains(e.target) && !(e.target.closest && e.target.closest('.pg-offstage'))) hurt = e.target; };
     document.addEventListener('focusin', watch, true);
     var nap = function (ms) { return sleep(ms).then(function () { if (hurt) throw INTERRUPTED; }); };
     var stopSubmit = function (e) { e.preventDefault(); submitted = true; };
@@ -503,10 +570,114 @@
         if (changed) out.push({ kind: 'pointerdown', sc: '2.5.2', desc: was0 + ' (it acts when pressed, before the pointer is released)' });
         if (!root.isConnected) break;
       }
+      // 2.1.1 and 2.4.3, the keys of the ARIA Authoring Practices: arrows, Home and End in a tab list, a menu, a list box
+      // and a radio group; a combobox opens on Down and closes on Escape; a menu button's menu closes on Escape and gives
+      // the focus back; Tab stays inside a modal dialog. Only where the component's own script runs (opts.keys): drawn as
+      // markup alone, nothing answers a key. `skip` leaves out what the caller checks itself with real keys.
+      if (opts.keys) { own = true; try { await keyPatterns(root, opts.skip || [], push, ran, nap); } finally { own = false; } }
       if (hurt) throw INTERRUPTED;
       if (keep && keep.focus && keep !== document.body) keep.focus({ preventScroll: true }); else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       return { findings: out, ran: Object.keys(ran) };
     })().finally(function () { window.open = realOpen; history.pushState = realPush; document.removeEventListener('submit', stopSubmit, true); document.removeEventListener('focusin', watch, true); if (hurt && hurt.isConnected && document.activeElement !== hurt) hurt.focus({ preventScroll: true }); });
+  }
+
+  // ── The keys of the ARIA Authoring Practices (APG), pressed as the component's script hears them ──
+  var KEYCODE = { ArrowRight: 39, ArrowLeft: 37, ArrowDown: 40, ArrowUp: 38, Home: 36, End: 35, Escape: 27, Tab: 9, Enter: 13 };
+  function press(el, k, extra) {
+    var o = { key: k, code: k, bubbles: true, cancelable: true, composed: true };
+    Object.keys(extra || {}).forEach(function (x) { o[x] = extra[x]; });
+    var e = new KeyboardEvent('keydown', o);
+    // Older scripts read keyCode or which, which the event's options cannot set.
+    try { Object.defineProperty(e, 'keyCode', { get: function () { return KEYCODE[k] || 0; } }); Object.defineProperty(e, 'which', { get: function () { return KEYCODE[k] || 0; } }); } catch (x) { /* read as given */ }
+    el.dispatchEvent(e); el.dispatchEvent(new KeyboardEvent('keyup', o));
+    return e;
+  }
+  var GROUPS = [['tablist', '[role=tab]'], ['menu', '[role=menuitem],[role=menuitemcheckbox],[role=menuitemradio]'], ['menubar', '[role=menuitem],[role=menuitemcheckbox],[role=menuitemradio]'],
+    ['listbox', '[role=option]'], ['radiogroup', '[role=radio]']];
+  var marks = function (els) { return els.map(function (el) { return [el.getAttribute('aria-selected'), el.getAttribute('aria-checked'), el.getAttribute('aria-expanded')].join(); }).join('|'); };
+  async function keyPatterns(root, skip, push, ran, nap) {
+    var usable = function (el) { return vis(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true'; };
+    // Arrows, Home and End move along the items of a composite.
+    for (var gi = 0; gi < GROUPS.length; gi++) {
+      var role = GROUPS[gi][0];
+      var groups = scope(root).filter(function (el) { return el.nodeType === 1 && el.getAttribute('role') === role && vis(el); }).slice(0, 3);
+      for (var gj = 0; gj < groups.length; gj++) {
+        var grp = groups[gj];
+        var items = Array.prototype.filter.call(grp.querySelectorAll(GROUPS[gi][1]), function (it) { return usable(it) && it.closest('[role=' + role + ']') === grp; });
+        if (items.length < 2) continue;
+        // The focus sits on the container that names its current item (aria-activedescendant), or on the item Tab reaches.
+        var viaActive = grp.hasAttribute('aria-activedescendant') && grp.tabIndex >= 0;
+        var start = items.filter(function (it) { return it.tabIndex >= 0; })[0] || items.filter(function (it) { return it.getAttribute('aria-selected') === 'true' || it.getAttribute('aria-checked') === 'true'; })[0] || items[0];
+        var host = viaActive ? grp : start;
+        host.focus({ preventScroll: true });
+        if (document.activeElement !== host) continue;
+        var at = function () { var a = viaActive ? document.getElementById(grp.getAttribute('aria-activedescendant') || '') : document.activeElement; return items.indexOf(a); };
+        var on = function () { return viaActive ? grp : document.activeElement; };
+        var was = marks(items), from = at();
+        var vertical = role === 'menu' || role === 'listbox' || grp.getAttribute('aria-orientation') === 'vertical';
+        var keys = role === 'radiogroup' ? ['ArrowDown', 'ArrowRight'] : [vertical ? 'ArrowDown' : 'ArrowRight'];
+        var moved = false;
+        for (var ki = 0; ki < keys.length && !moved; ki++) { press(on(), keys[ki]); await nap(30); moved = at() >= 0 && at() !== from; }
+        press(on(), 'End'); await nap(30); var toEnd = at() === items.length - 1;
+        press(on(), 'Home'); await nap(30); var toHome = at() === 0;
+        if (skip.indexOf('arrows') < 0) { ran.arrows = 1; if (!moved) push('arrows', '2.1.1', grp, 'role="' + role + '": ' + keys.join(' or ') + ' does not move to the next ' + (role === 'tablist' ? 'tab' : role === 'radiogroup' ? 'choice' : 'item')); }
+        // Home and End are asked where the arrows work: without them, the arrows are what is missing.
+        if (moved && role !== 'radiogroup') { ran.homeend = 1; if (!toEnd || !toHome) push('homeend', '2.1.1', grp, 'role="' + role + '": ' + (!toEnd && !toHome ? 'Home and End do' : !toEnd ? 'End does' : 'Home does') + ' not go to the ' + (!toEnd && !toHome ? 'first and the last' : !toEnd ? 'last' : 'first') + ' item'); }
+        // What following the focus selected (a tab shown, a choice made) is put back.
+        if (marks(items) !== was && start.isConnected) { start.click(); start.focus({ preventScroll: true }); }
+        if (document.activeElement && root.contains(document.activeElement)) document.activeElement.blur();
+      }
+    }
+    // A combobox opens its list on Down and closes it on Escape, the focus staying in it.
+    var combos = scope(root).filter(function (el) { return el.nodeType === 1 && el.getAttribute('role') === 'combobox' && el.tagName !== 'SELECT' && usable(el) && el.getAttribute('aria-expanded') === 'false'; }).slice(0, 2);
+    for (var ci = 0; ci < combos.length; ci++) {
+      var cb = combos[ci], field = cb.matches(FOCUSABLE) ? cb : cb.querySelector('input,[tabindex]') || cb;
+      field.focus({ preventScroll: true });
+      if (document.activeElement !== field) continue;
+      ran.comboboxkeys = 1;
+      press(field, 'ArrowDown'); await nap(60);
+      if (cb.getAttribute('aria-expanded') !== 'true') { push('comboboxkeys', '2.1.1', cb, 'Down does not open its list'); field.blur(); continue; }
+      press(document.activeElement || field, 'Escape'); await nap(60);
+      var stays = document.activeElement === field || cb.contains(document.activeElement);
+      if (cb.getAttribute('aria-expanded') === 'true') { push('comboboxkeys', '2.1.1', cb, 'Escape does not close its list'); press(field, 'Escape'); }
+      else if (!stays) push('comboboxkeys', '2.1.1', cb, 'Escape closes its list but the focus goes to ' + (document.activeElement ? desc(document.activeElement) : 'the page'));
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+    // A menu button: its menu closes on Escape, and the focus is back on the button.
+    if (skip.indexOf('escape') < 0) {
+      var opens = scope(root).filter(function (el) { return el.nodeType === 1 && /^(true|menu|listbox|dialog)$/.test(el.getAttribute('aria-haspopup') || '') && el.getAttribute('aria-expanded') === 'false' && el.getAttribute('role') !== 'combobox' && usable(el); }).slice(0, 2);
+      for (var oi = 0; oi < opens.length; oi++) {
+        var t = opens[oi];
+        t.focus({ preventScroll: true }); t.click(); await nap(80);
+        if (t.getAttribute('aria-expanded') !== 'true') { t.blur(); continue; }
+        ran.escape = 1;
+        press(document.activeElement && document.activeElement !== document.body ? document.activeElement : t, 'Escape'); await nap(80);
+        if (t.getAttribute('aria-expanded') === 'true') { push('escape', '2.1.1', t, 'what it opens does not close with Escape'); t.click(); await nap(40); }
+        else if (skip.indexOf('focusreturn') < 0) { ran.focusreturn = 1; if (document.activeElement !== t) push('focusreturn', '2.4.3', t, 'Escape closes what it opens, but the focus goes to ' + (document.activeElement && document.activeElement !== document.body ? desc(document.activeElement) : 'the page')); }
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      }
+    }
+    // Tab and Shift+Tab stay inside a modal dialog: a native modal (showModal) and a page made inert behind it keep it so;
+    // otherwise its script has to move the focus round from its last control to its first.
+    if (skip.indexOf('modalescape') < 0) {
+      var modals = scope(root).filter(function (el) { return el.nodeType === 1 && vis(el) && (el.matches('dialog[open]') || el.matches('[role=dialog][aria-modal=true],[role=alertdialog][aria-modal=true]') && getComputedStyle(el).position === 'fixed'); }).slice(0, 2);
+      for (var mi = 0; mi < modals.length; mi++) {
+        var dlg = modals[mi];
+        var stops = Array.prototype.filter.call(dlg.querySelectorAll(FOCUSABLE), function (n) { return n.tabIndex >= 0 && !n.disabled && vis(n); });
+        if (stops.length < 2) continue;
+        var inert = dlg.matches(':modal') || Array.prototype.every.call(document.body.children, function (n) { return n.contains(dlg) || n.inert || n.getAttribute('aria-hidden') === 'true' || !vis(n); });
+        if (inert) { ran.modalescape = 1; continue; }
+        if (dlg.tagName === 'DIALOG' && !dlg.matches('[aria-modal=true]')) continue;   // shown with show(): not modal, Tab may leave
+        ran.modalescape = 1;
+        var last = stops[stops.length - 1], first = stops[0];
+        last.focus({ preventScroll: true }); press(last, 'Tab'); await nap(30);
+        var wraps = document.activeElement === first;
+        first.focus({ preventScroll: true }); press(first, 'Tab', { shiftKey: true }); await nap(30);
+        var back = document.activeElement === last;
+        if (!wraps || !back) push('modalescape', '2.4.3', dlg, (!wraps && !back ? 'Tab and Shift+Tab' : !wraps ? 'Tab from its last control' : 'Shift+Tab from its first control') + ' can leave it for the page behind');
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      }
+    }
   }
 
   // Only the control edges (1.4.11), for the passes that read them again in another mode or state: fast on a big page.

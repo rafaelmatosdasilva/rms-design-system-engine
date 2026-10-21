@@ -56,6 +56,8 @@ export function readIntentLayer(ROOT, cfg) {
     system: snaps.find(({ x }) => x.system)?.x.system ?? null,
     boilerplate: snaps.reduce((t, { x }) => t + (x.boilerplate ?? 0), 0),
     entities: snaps.flatMap(({ s, x }) => x.entities.map((e) => ({ ...e, source: src(s, x), url: e.url ?? dsds.fileUrl(x._source, e.file) }))),
+    // The component contracts kept beside the layer (shared-contracts.mjs): their links and what each lists.
+    contracts: snaps.flatMap(({ x }) => x.contracts ?? []),
   };
 }
 
@@ -243,9 +245,10 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     // A page that names no component: nothing else on it matters until it is named.
     if (comp && !component) notUsed.splice(1);
     const has = (k) => gets.some((g) => g.what.startsWith(KIND_WORDS[k]));
-    // A component's page is used when it says what the piece is for and when (or when not) to use it; any other page
-    // when it says what it is for and gives a rule or a section to compose by.
-    const how = has('whenToUse') || has('whenNotToUse') || (!comp && (has('rules') || has('sections') || has('mistakes')));
+    // A component's page is used when it says what the piece is for and when (or when not) to use it; a token's when it
+    // says what it is for (that one line is all a token's page has to say); any other page when it says what it is for
+    // and gives a rule or a section to compose by.
+    const how = has('whenToUse') || has('whenNotToUse') || (!comp && (e.kind === 'token' || has('rules') || has('sections') || has('mistakes')));
     const verdict = !gets.length ? 'not used' : has('purpose') && how ? 'used' : 'thin';
     const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed };
     Object.assign(page, decide(page, e, { comp, has }));
@@ -275,6 +278,8 @@ function decide(page, e, { comp, has }) {
   const todo = [];
   if (!has('purpose')) todo.push(comp ? 'Add what it is for, as an Intent or Overview section.' : 'Add what it is for, as an Overview section.');
   if (comp && !has('whenToUse') && !has('whenNotToUse')) todo.push('Add when to use it and when not to, as sections with those titles.');
+  // Any other page that says what it is for but not how to compose by it: what to add (never Improve with nothing to do).
+  if (!comp && page.verdict === 'thin' && has('purpose')) todo.push('Add how to use it: When to use, When not to use, Common mistakes or a rule, as sections with those titles.');
   for (const n of page.notUsed) {
     if (n.reason === 'unknownTitle') todo.push(`Retitle ${n.what.replace(/^\d+ sections? \((.*)\)$/, '$1')} as When to use, When not to use, Common mistakes or Limitations where they say how to use it; leave the rest as they are, for people.`);
     if (n.reason === 'facts') todo.push(`Remove ${n.what}: the engine reads them from Figma and the code, and a copy here goes out of date.`);

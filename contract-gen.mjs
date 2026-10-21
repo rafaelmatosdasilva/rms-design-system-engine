@@ -20,8 +20,8 @@
 //
 // Generic: no project names, tokens, or components are hardcoded.
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve, join, relative } from 'node:path';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, rmdirSync } from 'node:fs';
+import { dirname, resolve, join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pruneCandidates } from './prune-check.mjs';
 import { withTextScaleKeys } from './naming-convention.mjs';
@@ -35,6 +35,24 @@ import { readableOn } from './token-pairs.mjs';
 import { primitiveGuideLines } from './primitives.mjs';
 import { authorityLines } from './authority.mjs';
 import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, layerPages, short } from './intent-layer.mjs';
+import { codeHalf, codeSlots, figmaStatesVariants, stateTokens, accessibilityOf } from './contract-code.mjs';
+import { roleWord } from './role-markup.mjs';
+import { execFileSync } from 'node:child_process';
+import { mirrorState, ensureHistory, commitsOf } from './gitlab-history.mjs';
+
+// The last commit that changed a file: from git where the project is a checkout, else from the GitLab mirror's history
+// (gitlab-history.mjs). Per file, so a component whose file did not change keeps the same contract. null: not known.
+export function lastCommitOf(ROOT, file) {
+  if (!file) return null;
+  try {
+    const sha = execFileSync('git', ['log', '-1', '--format=%H', '--', file], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (/^[0-9a-f]{40}$/.test(sha)) return sha;
+  } catch { /* not a checkout */ }
+  try { return commitsOf(ROOT, [file], { max: 1 })?.[0]?.sha ?? null; } catch { return null; }
+}
+
+// The contract format's version, written in every contract and in its schema: raised when a field changes meaning.
+export const CONTRACT_VERSION = 1;
 
 function readJSON(p) { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } }
 function ensureDir(p) { try { mkdirSync(p, { recursive: true }); } catch { /* best-effort */ } }
@@ -190,11 +208,18 @@ function buildAnatomy(contract, structure, vars = {}) {
   const s = structure || {};
   const root = {};
 
-  const inset = insetOf(c.paddingVar || s.paddingVar);
-  if (inset) root.inset = inset;
+  // Padding bound to a border's width (base/border/top) is the room Figma leaves for the stroke, which the code's border
+  // takes: recorded as that, never as the component's padding.
+  const pad = c.paddingVar || s.paddingVar;
+  const inset = insetOf(pad);
+  const borderRoom = !c.paddingVar && pad && [pad.tb, pad.lr].filter(Boolean).every((v) => /(^|[/.])(border|stroke)s?([/.]|$)/i.test(String(v)));
+  if (inset) root[borderRoom ? 'borderInset' : 'inset'] = inset;
 
+  // A gap spaces two items or more: on a frame that lays out one (a button's single content frame) it does nothing, so
+  // whatever variable Figma bound there is not the component's spacing.
   const gap = c.gapVar ?? s.gapVar;
-  if (gap) root.gapToken = tokenRef(gap);
+  const items = c.inFlow ?? s.inFlow;
+  if (gap && (c.gapVar || items == null || items >= 2)) root.gapToken = tokenRef(gap);
   else if (c.gapPx === 0) root.gap = 0;
 
   const radius = c.innerRadiusVar || s.innerRadiusVar;
@@ -213,8 +238,13 @@ function buildAnatomy(contract, structure, vars = {}) {
 
   const anatomy = { root };
 
-  // children → named parts (from the hand-authored contract).
-  for (const ch of (c.children || [])) {
+  // children → named parts: the hand-authored contract's, then the frames inside it Figma binds a padding or a gap on
+  // (the structure snapshot's childFramePadding / childFrameGaps), where the component's real spacing often sits.
+  const captured = new Map();
+  for (const k of s.childFramePadding ?? []) if (k?.name) captured.set(k.name, { ...(captured.get(k.name) ?? { name: k.name }), paddingVar: k.paddingVar });
+  for (const k of s.childFrameGaps ?? []) if (k?.name) captured.set(k.name, { ...(captured.get(k.name) ?? { name: k.name }), gapVar: k.gapVar, gapPx: k.gapPx });
+  const authoredNames = new Set((c.children || []).map((ch) => ch?.name).filter(Boolean));
+  for (const ch of [...(c.children || []), ...[...captured.values()].filter((k) => !authoredNames.has(k.name))]) {
     if (!ch || !ch.name) continue;
     const part = {};
     if (ch.cssSelector) part.selector = ch.cssSelector;
@@ -245,7 +275,10 @@ function buildStatesVariants(contract, props) {
   return { states, variants };
 }
 
-function buildContract(name, { contract, structure, props, authored, composition, componentNames, vars = {}, intentPage = null }) {
+// code (optional): { api (structure-capture.mjs apiEntry), text (its source), aliases, stateBindings, publish, idPrefix,
+// schemaRef, figmaFile } - the code half of the contract (contract-code.mjs). publish: the contract is written for others to
+// read (an intent layer): it links the intent page instead of copying it, and leaves out where it is used locally.
+function buildContract(name, { contract, structure, props, authored, composition, componentNames, vars = {}, intentPage = null, code = null }) {
   const c = contract?.[name];
   const s = structure?.[name];
   const p = props?.[name];
@@ -253,8 +286,10 @@ function buildContract(name, { contract, structure, props, authored, composition
   const { states, variants } = buildStatesVariants(c, p);
 
   const out = {
-    $schema: './contract.schema.json',
-    id: 'rms.' + name,
+    $schema: code?.schemaRef ?? './contract.schema.json',
+    schemaVersion: CONTRACT_VERSION,
+    id: (code?.idPrefix ?? 'rms.') + name,
+    name,
     version: a.version || '0.1.0',                                                  // AUTHORED (from contract.authored.json)
     description: a.description                                                       // AUTHORED, else CAPTURED Figma component description
                  || (p?.description ? String(p.description).slice(0, 300)
@@ -267,10 +302,12 @@ function buildContract(name, { contract, structure, props, authored, composition
     variants,                                                                        // CAPTURED
     semantics: a.semantics || { element: null, aria: {} },                          // AUTHORED
     notes: a.notes || '',                                                            // AUTHORED
+    // No time of writing here (it is in built.json): a component that did not change gives the same file.
     'x-design-system-engine': {
-      note: 'Generated LOCAL view (rms-design-system-engine). CAPTURED fields refresh from the Figma snapshots each run; AUTHORED fields (version, description, notes, semantics, props[].bindings.code) come from the committed contract.authored.json — edit them THERE, not here. This file is gitignored; do not hand-edit.',
-      generated: new Date().toISOString(),
-      sources: 'figma-vars / figma-structure / figma-component-props snapshots + structure-contract.mjs + contract.authored.json',
+      note: code?.publish
+        ? 'Generated by rms-design-system-engine from Figma, the code and its Code Connect files. Never edit by hand: change Figma, the code or contract.authored.json, run the engine again and publish the result.'
+        : 'Generated LOCAL view (rms-design-system-engine). CAPTURED fields refresh from the Figma snapshots and the code each run; AUTHORED fields (version, description, notes, semantics, props[].bindings.code) come from the committed contract.authored.json — edit them THERE, not here. This file is gitignored; do not hand-edit.',
+      sources: 'figma-vars / figma-structure / figma-component-props snapshots + the code + Code Connect + structure-contract.mjs + contract.authored.json',
     },
   };
 
@@ -294,7 +331,10 @@ function buildContract(name, { contract, structure, props, authored, composition
 
   // The team's intent layer (intent-layer.mjs): why it exists and how to use it, as its page says, with the page's
   // link. Kept apart from the authored guidance above so each line keeps where it came from.
-  if (intentPage) {
+  // Published into the intent layer itself, the contract links the page instead of copying it, so the layer never reads
+  // its own words back.
+  if (intentPage && code?.publish) out.intentPage = intentPage.url ?? intentPage.file;
+  else if (intentPage) {
     const it = { source: intentPage.url ?? intentPage.file };
     for (const k of ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules']) if (intentPage[k]) it[k] = intentPage[k];
     if (Object.keys(it).length > 1) out.intent = it;
@@ -322,6 +362,34 @@ function buildContract(name, { contract, structure, props, authored, composition
   for (const pp of out.props) {
     const b = bindings[pp.name];
     if (b && typeof b === 'object') pp.bindings.code = b;   // { attribute } | { slot } | { attribute: true } ...
+  }
+
+  // The code half (contract-code.mjs): each Figma property's code prop or slot with the code's own facts, what its Code
+  // Connect file says it decides, where the two differ; the props only the code has; events, slots, states, the tokens
+  // each state paints with, and accessibility, each saying where it came from.
+  if (code) {
+    out.source = {
+      ...(p || s ? { figma: { ...(code.figmaFile ? { file: code.figmaFile } : {}), nodeId: p?.nodeId || s?.nodeId || null, name } } : {}),
+      ...(code.api?.file ? { code: { file: code.api.file, ...((code.api.codeConnectTag ?? code.api.tag) ? { tag: code.api.codeConnectTag ?? code.api.tag } : {}), ...(code.api.syntax ? { syntax: code.api.syntax } : {}), ...(code.commit ? { commit: code.commit } : {}) } } : {}),
+      ...(code.api?.codeConnectFile ? { codeConnect: code.api.codeConnectFile } : {}),
+    };
+    const half = codeHalf(out.props, p?.properties, code.api, { authored: a, aliases: code.aliases });
+    out.props = half.props;
+    if (half.codeOnly.length) out.codeOnly = half.codeOnly;
+    if (half.events.length) out.events = half.events;
+    const cs = codeSlots(code.api, out.props);
+    if (cs.length) out.codeSlots = cs;
+    if (!out.states.length && !out.variants.length) Object.assign(out, figmaStatesVariants(p?.properties, code.text));
+    const tk = stateTokens(code.stateBindings, p?.properties, code.componentTokens);
+    if (tk) out.tokens = tk;
+    const acc = accessibilityOf(code.text, { figmaRole: roleWord(p?.annotations), authored: a.semantics });
+    if (acc) out.accessibility = acc;
+    // Published, a contract says what is known: the whole description, and no empty placeholder for what nobody wrote.
+    if (code.publish) {
+      if (!a.description && p?.description) out.description = String(p.description).trim();
+      if (!a.semantics) delete out.semantics;
+      if (!a.notes) delete out.notes;
+    }
   }
 
   // Usage scaffold: a grounded, ready-to-fill example derived from THIS contract - the authored
@@ -374,83 +442,126 @@ function buildContract(name, { contract, structure, props, authored, composition
 }
 
 // ── Schema + minimal validator (no external deps) ─────────────────────────────
+// Every field a contract can carry is declared, so a reader knows the whole shape and an unknown field is an error.
+const str = { type: 'string' }, strs = { type: 'array', items: { type: 'string' } };
+const sourced = (value) => ({ type: 'object', required: ['value', 'from'], properties: { value, from: { enum: ['figma', 'code', 'authored'] } }, additionalProperties: false });
+const CODE_SIDE = {
+  type: ['object', 'null'],
+  description: 'The code prop or slot this Figma property is, with the code\'s own facts (null: none found).',
+  properties: {
+    prop: str, slot: str, attribute: { type: ['string', 'boolean'] },
+    derived: { const: true, description: 'The code value is computed from the Figma value (a part of its words, an icon resolved from it), not the value itself.' },
+    key: { type: 'string', description: 'The key of the object prop it fills (Code Connect writes :opts="{ caption: … }").' },
+    as: { enum: ['prop', 'slot', 'defaultSlot'] },
+    source: { enum: ['authored', 'alias', 'codeConnect', 'name', 'convention'], description: 'Who decided the pairing: a binding written by hand, a documented alias, Code Connect, the same name, or the naming convention (labelContent and label).' },
+    type: str, options: { type: 'array' }, default: {}, defaultExpression: { type: 'string', description: 'A default the code builds (an object, a list), as the code writes it.' }, required: { type: 'boolean' }, description: str,
+    confidence: { enum: ['verified', 'single-source', 'uncertain'] },
+    valueMap: { type: 'object', description: 'Figma value → code value, from Code Connect.' },
+    inverted: { const: true, description: 'The code prop holds the opposite of the Figma value (Figma showClose on = code hideClose false).' },
+  },
+};
 const CONTRACT_SCHEMA = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'https://rms-design-system-engine/contract.schema.json',
   title: 'rms-design-system-engine component contract',
+  description: 'One component: its Figma properties and the code prop each one is, where the two differ, what only the code has, its events, slots, states, tokens and accessibility. Generated; never edited by hand.',
   type: 'object',
-  required: ['id', 'version', 'props', 'anatomy'],
-  additionalProperties: true,
+  required: ['schemaVersion', 'id', 'name', 'version', 'props', 'anatomy'],
+  additionalProperties: false,
   properties: {
-    id: { type: 'string', pattern: '^rms\\.' },
-    version: { type: 'string' },
-    description: { type: 'string' },
+    $schema: str,
+    schemaVersion: { const: CONTRACT_VERSION },
+    id: { type: 'string', pattern: '^[A-Za-z0-9_.:/-]+$' },
+    name: str,
+    version: str,
+    description: str,
     figmaNodeId: { type: ['string', 'null'] },
+    source: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        figma: { type: 'object', properties: { file: str, nodeId: { type: ['string', 'null'] }, name: str, alsoDrawnAs: { type: 'array', description: 'Other Figma components drawn of the same code file.', items: { type: 'object', required: ['name'], properties: { name: str, nodeId: { type: ['string', 'null'] } } } } }, additionalProperties: false },
+        code: { type: 'object', properties: { file: str, tag: str, syntax: str, commit: { type: 'string', description: 'The last commit that changed its code file.' } }, additionalProperties: false },
+        codeConnect: str,
+      },
+    },
     props: {
       type: 'array',
+      description: 'One per Figma property.',
       items: {
         type: 'object',
         required: ['name', 'bindings'],
         properties: {
-          name: { type: 'string' },
-          type: { type: 'string' },
+          name: str, type: str, default: {}, options: { type: 'array' }, description: str, toggles: strs,
+          slot: { type: 'object' },
           bindings: {
             type: 'object',
             required: ['figma', 'code'],
             properties: {
-              figma: { type: 'object', required: ['kind', 'property'] },
-              code: { type: ['object', 'null'] },
+              figma: { type: 'object', required: ['kind', 'property'], properties: { kind: str, property: str, default: {}, defaultNodeId: str, options: { type: 'array' } } },
+              code: CODE_SIDE,
             },
           },
+          conditions: {
+            type: 'array', description: 'Code attributes this property decides are written (from Code Connect): only when it is on, or off when negated, or equal to a value.',
+            items: { type: 'object', required: ['code', 'role'], properties: { code: str, role: { const: 'condition' }, negated: { type: 'boolean' }, equals: {}, unclear: { const: true, description: 'It decides the attribute in a way the reader does not follow (inside a computed value): which way is not said.' }, source: { enum: ['convention'], description: 'Read from the naming convention (showLabel and label), not from Code Connect.' } } },
+          },
+          differences: {
+            type: 'array', description: 'Where Figma and the code disagree on this property.',
+            items: { type: 'object', required: ['kind'], properties: { kind: { enum: ['default', 'options', 'name'] }, figma: {}, code: {}, onlyInFigma: { type: 'array' }, onlyInCode: { type: 'array' } } },
+          },
+          suggestion: { type: 'string', description: 'A code prop with a near name, never taken as the binding: record it to make it one.' },
+          alsoWrites: { ...strs, description: 'Other code attributes (or keys of one, opts.caption) its Code Connect file fills with the same value.' },
         },
       },
     },
+    codeOnly: {
+      type: 'array', description: 'Code props no Figma property is paired with. setBy: the Figma properties that still reach it (deciding whether it is written, or filling it beside another prop).',
+      items: { type: 'object', required: ['name'], properties: { name: str, type: str, options: { type: 'array' }, default: {}, defaultExpression: str, required: { type: 'boolean' }, description: str, confidence: str, setBy: strs } },
+    },
+    events: { type: 'array', items: { type: 'object', required: ['name'], properties: { name: str, payload: strs }, additionalProperties: false } },
+    codeSlots: { type: 'array', items: { type: 'object', required: ['name'], properties: { name: str, props: strs, figmaProperty: str }, additionalProperties: false } },
     anatomy: { type: 'object', required: ['root'] },
-    states: { type: 'array' },
-    variants: { type: 'array' },
+    states: { type: 'array', items: { type: 'object', properties: { name: str, when: { type: 'object' }, selector: str, from: { enum: ['figma', 'code'] } } } },
+    variants: { type: 'array', items: { type: 'object', properties: { when: { type: 'object' }, selector: str, from: { enum: ['figma', 'code'] } } } },
+    tokens: { type: 'object', properties: { used: strs, byState: { type: 'object', additionalProperties: strs } }, additionalProperties: false },
+    accessibility: {
+      type: 'object', additionalProperties: false,
+      properties: { element: sourced(str), role: sourced(str), aria: sourced(strs), keyboard: sourced(strs) },
+    },
     semantics: { type: 'object' },
-    whenNotToUse: { type: 'string' },
+    notes: str,
+    whenNotToUse: str,
     status: {
       type: 'object',
       required: ['state'],
       properties: {
         state: { enum: ['current', 'deprecated', 'experimental'] },
-        supersededBy: { type: 'string' },
-        since: { type: 'string' },
-        rationale: { type: 'string' },
-        source: { type: 'string' },
+        supersededBy: str, since: str, rationale: str, source: str,
       },
     },
-    useInstead: { type: 'array', items: { type: 'string' } },
+    useInstead: strs,
     intent: {
       type: 'object',
       required: ['source'],
-      properties: {
-        source: { type: 'string' },
-        purpose: { type: 'string' },
-        whenToUse: { type: 'array', items: { type: 'string' } },
-        whenNotToUse: { type: 'array', items: { type: 'string' } },
-        mistakes: { type: 'array', items: { type: 'string' } },
-        limitations: { type: 'array', items: { type: 'string' } },
-        rules: { type: 'array', items: { type: 'string' } },
-      },
+      properties: { source: str, purpose: str, whenToUse: strs, whenNotToUse: strs, mistakes: strs, limitations: strs, rules: strs },
     },
-    relationships: {
-      type: 'object',
-      properties: {
-        composesWith: { type: 'array', items: { type: 'string' } },
-        neverCombineWith: { type: 'array', items: { type: 'string' } },
-      },
-    },
+    intentPage: { type: 'string', description: 'Its page in the intent layer, linked (a published contract never copies it).' },
+    relationships: { type: 'object', properties: { composesWith: strs, neverCombineWith: strs } },
+    usage: { type: 'object', properties: { element: str, props: { type: 'object' } } },
+    slots: { type: 'array', items: { type: 'object', required: ['name'] } },
+    livesIn: { type: 'object' },
+    'x-design-system-engine': { type: 'object' },
   },
 };
 
-// Minimal structural validator covering the schema above (required keys + prop shape).
+// Minimal structural validator covering the schema above (required keys, no unknown field, prop shape).
 // Returns a list of human-readable error strings (empty = valid).
 function validateContract(c) {
   const errs = [];
   for (const k of CONTRACT_SCHEMA.required) if (c[k] === undefined) errs.push(`missing "${k}"`);
-  if (c.id !== undefined && !/^rms\./.test(String(c.id))) errs.push('"id" must start with "rms."');
+  for (const k of Object.keys(c)) if (!(k in CONTRACT_SCHEMA.properties)) errs.push(`unknown field "${k}"`);
+  if (c.schemaVersion !== undefined && c.schemaVersion !== CONTRACT_VERSION) errs.push(`"schemaVersion" must be ${CONTRACT_VERSION}`);
+  if (c.id !== undefined && !/^[A-Za-z0-9_.:/-]+$/.test(String(c.id))) errs.push('"id" has characters an id cannot have');
   if (c.anatomy !== undefined && (typeof c.anatomy !== 'object' || c.anatomy.root === undefined)) errs.push('"anatomy.root" is required');
   if (c.props !== undefined) {
     if (!Array.isArray(c.props)) errs.push('"props" must be an array');
@@ -463,6 +574,7 @@ function validateContract(c) {
       if (!('code' in p.bindings)) errs.push(`props[${i}].bindings missing "code"`);
     });
   }
+  for (const k of ['codeOnly', 'events', 'codeSlots']) if (c[k] !== undefined && (!Array.isArray(c[k]) || c[k].some((x) => !x?.name))) errs.push(`"${k}" must be a list of entries with a name`);
   return errs;
 }
 
@@ -661,6 +773,81 @@ export function buildLlms(built, tokens, tokenCount, catalog = null, { maxBytes 
   return lines.join('\n');
 }
 
+// Where a contract is written, relative to the contracts folder: by its name (layout "name": name.contract.json, a slash
+// in the name a folder), or by its code file (layout "code"), each part of the path in kebab-case, a prefix of it swapped
+// as contracts.paths says ({ "src/components/": "components/" }: src/components/cards/MediaTile.vue →
+// components/cards/media-tile.contract.json). Laid out by the code, a component with no code file, or one outside every
+// prefix contracts.paths names, has no place (null).
+export function contractFileFor(name, codeFile, { layout = 'name', paths = null } = {}) {
+  if (layout !== 'code') return name + '.contract.json';
+  if (!codeFile) return null;
+  const rel = String(codeFile).replace(/\\/g, '/');
+  const entry = Object.entries(paths ?? {}).sort((x, y) => y[0].length - x[0].length).find(([from]) => rel.startsWith(from));
+  if (paths && !entry) return null;
+  const rest = entry ? entry[1] + rel.slice(entry[0].length) : rel;
+  const kebab = (seg) => seg.replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2').toLowerCase();
+  return rest.replace(/\.[^./]+$/, '').split('/').filter(Boolean).map(kebab).join('/') + '.contract.json';
+}
+
+// Every *.contract.json under a published folder (absolute paths).
+function contractFilesIn(dir) {
+  const out = [];
+  const walk = (d) => { let es = []; try { es = readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of es) { const p = join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name.endsWith('.contract.json')) out.push(p); } };
+  walk(dir);
+  return out.sort();
+}
+
+// The README of a published folder: what a contract holds, where each part comes from, how complete they are, and the
+// components not written. The same inputs give the same text (no date), so an unchanged system gives no diff.
+export function publishedReadme(built, skipped = [], { schema = 'contract.schema.json', figmaFile = null, undefinedRefs = [] } = {}) {
+  const cs = built.map((b) => b.contract);
+  const n = (f) => cs.filter(f).length;
+  const figmaProps = cs.flatMap((c) => (c.props ?? []).filter((p) => p.bindings?.figma));
+  const paired = figmaProps.filter((p) => p.bindings?.code || p.conditions?.length).length;
+  const differ = figmaProps.filter((p) => p.differences?.length).length;
+  const lines = [
+    '# Component contracts', '',
+    'One contract per component, generated by rms-design-system-engine from the Figma library and the code. **Do not edit these files by hand**: change the code, the Figma library or the project\'s authored decisions (contract.authored.json), then regenerate and open a merge request:', '',
+    '```bash', 'rms-design-system-engine --contracts-out <this folder>', '```', '',
+    `Each file is valid against [${schema}](${schema}) (JSON Schema 2020-12).`, '',
+    '## What a contract holds', '',
+    '| Field | What it says | From |', '|---|---|---|',
+    '| `id`, `name`, `description`, `source` | Which component, the Figma node and code file it was read from, and the last commit that changed that file | Figma, code |',
+    '| `props[]` | Each Figma property with the code prop or slot it is (`bindings.code`), who decided the pairing (`source`), the attributes it only decides (`conditions`), and where Figma and the code differ (`differences`) | Figma, code, Code Connect, authored |',
+    '| `codeOnly[]` | Code props Figma has no property for | code |',
+    '| `events[]`, `codeSlots[]` | What the component emits (with its payload), and the slots it takes content in (with what each hands its content) | code |',
+    '| `slots[]` | Each Figma instance swap: a place another component goes, and which ones it accepts | Figma |',
+    '| `states[]`, `variants` | Its states (Figma\'s state axis and the code\'s pseudo-classes) and other variants | Figma, code |',
+    '| `anatomy`, `tokens` | Its root and inner frames (padding, gap, radius, height, text style; `borderInset` where Figma\'s padding is the room for a border) and the tokens each state uses | Figma |',
+    '| `accessibility` | Its element, role, ARIA and keyboard, each value with where it was read | Figma annotations, code, authored |',
+    '| `intentPage` | The component\'s page in the intent layer (what it is for, when to use it) | intent layer |', '',
+    '## Coverage', '',
+    '| | |', '|---|---|',
+    `| Contracts | ${cs.length} |`,
+    `| With a Figma component | ${n((c) => c.source?.figma)} |`,
+    `| With a code file | ${n((c) => c.source?.code?.file)} |`,
+    `| Figma properties paired with the code | ${paired} of ${figmaProps.length} |`,
+    `| Figma properties where Figma and the code differ | ${differ} |`,
+    `| With states | ${n((c) => c.states?.length)} |`,
+    `| With events | ${n((c) => c.events?.length)} |`,
+    `| With accessibility | ${n((c) => c.accessibility && Object.keys(c.accessibility).length)} |`,
+    `| With an intent layer page | ${n((c) => c.intentPage)} |`,
+    ...(figmaFile ? ['', `Figma file: \`${figmaFile}\`.`] : []),
+  ];
+  // A token Figma binds that the captured variables do not have (a variable of another library, a renamed one): kept as
+  // Figma binds it, listed here so it is fixed in Figma.
+  if (undefinedRefs.length) {
+    lines.push('', '## Tokens Figma binds that the variables do not have', '', 'Fix these in Figma (bind a variable of the system), then publish again:', '');
+    for (const u of [...new Set(undefinedRefs)].sort()) lines.push(`- ${u.replace(/: references undefined token /, ': ')}`);
+  }
+  if (skipped.length) {
+    lines.push('', '## Not written', '', 'Figma components with no contract file of their own:', '', '| Component | Why |', '|---|---|');
+    const cell = (t) => (String(t).trim() ? String(t).trim().replace(/\|/g, '\\|') : '(a component with no name)');
+    for (const s of [...skipped].sort((a, b) => a.name.localeCompare(b.name))) lines.push(`| ${cell(s.name)} | ${cell(s.why)} |`);
+  }
+  return lines.join('\n') + '\n';
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 export async function generateContracts(ROOT, cfg, opts = {}) {
   const paths = cfg.paths || {};
@@ -687,9 +874,11 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // local by default (a single .gitignore below) since it carries the DS's real values.
   // Override any path via cfg.contracts.{out,tokensOut,schemaOut}.
   const cc = cfg.contracts || {};
-  const outDir    = cc.out       ? resolve(ROOT, cc.out)       : join(ROOT, 'contracts');
-  const tokensOut = cc.tokensOut ? resolve(ROOT, cc.tokensOut) : join(outDir, 'tokens.json');
-  const schemaOut = cc.schemaOut ? resolve(ROOT, cc.schemaOut) : join(outDir, 'contract.schema.json');
+  // Published for a shared repository (--contracts-out): only the contracts, the schema and a README go there.
+  const publishTo = opts.publishTo ? resolve(ROOT, opts.publishTo) : null;
+  const outDir    = publishTo ?? (cc.out ? resolve(ROOT, cc.out) : join(ROOT, 'contracts'));
+  const tokensOut = cc.tokensOut && !publishTo ? resolve(ROOT, cc.tokensOut) : join(outDir, 'tokens.json');
+  const schemaOut = cc.schemaOut && !publishTo ? resolve(ROOT, cc.schemaOut) : join(outDir, 'contract.schema.json');
   // The AUTHORED layer is a SINGLE committed file at the project root (decisions only, no captured
   // values), so it is safe to share and applies in CI — unlike the local, gitignored generated views.
   const authoredPath = cc.authored ? resolve(ROOT, cc.authored) : join(ROOT, 'contract.authored.json');
@@ -698,13 +887,40 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // structure snapshot, the hand-authored contract, and the props snapshot. Nothing is
   // hardcoded to a project or a component. Narrow to specific names with cfg.contracts.only:
   // [names] (or the legacy cfg.contracts.pilot) when you deliberately want a subset.
-  const codeNames = codeOnly ? (() => { try { return codeComponents(ROOT, cfg).map((k) => k.name); } catch { return []; } })() : [];
-  const allNames = [...new Set([
-    ...Object.keys(structure),
-    ...Object.keys(CONTRACT),
-    ...Object.keys(props).filter((k) => !k.startsWith('_')),
-    ...codeNames,
-  ])];
+  // The code's API of each component (structure-capture.mjs apiEntry: props, events, slots, Code Connect), read now so
+  // every contract carries its code half, and the components only the code has get a contract of their own.
+  const publish = publishTo ? true : cc.publish ?? opts.publish ?? false;
+  const layout = cc.layout ?? opts.layout ?? (publishTo ? 'code' : 'name');
+  const nodeIds = Object.fromEntries(Object.entries(props).filter(([, e]) => e?.nodeId).map(([n, e]) => [n, e.nodeId]));
+  let apiReader = null, apiEntryOf = () => null;
+  try {
+    const sc = await import('./structure-capture.mjs');
+    let classFor0 = null; try { classFor0 = (await loadLocator(ROOT, cfg)).classFor; } catch { /* by name */ }
+    apiReader = sc.apiReaderFor(ROOT, cfg, { classFor: classFor0, nodeIds });
+    const cache = new Map();
+    apiEntryOf = (n) => { if (!apiReader) return null; if (!cache.has(n)) { let e = null; try { e = sc.apiEntry(ROOT, apiReader, n); } catch { /* unreadable */ } cache.set(n, e); } return cache.get(n); };
+  } catch { /* no code reading: contracts from Figma alone */ }
+  const figmaNames = [...new Set([...Object.keys(structure), ...Object.keys(CONTRACT), ...Object.keys(props).filter((k) => !k.startsWith('_'))])];
+  const codeNames = (() => {
+    if (!codeOnly && cc.codeOnlyComponents === false) return [];
+    let found = []; try { found = codeComponents(ROOT, cfg); } catch { return []; }
+    if (codeOnly) return found.map((k) => k.name);
+    // Only the components whose file no Figma component is read from get a contract of their own, from the code alone,
+    // named as the project declares it (componentFiles), else by its file when that name is not ambiguous (two
+    // Primary.vue in two folders are named by nobody: declare them).
+    const figmaFiles = new Set(figmaNames.map((n) => apiEntryOf(n)?.file).filter(Boolean));
+    const taken = new Set(figmaNames.map((n) => n.toLowerCase()));
+    const out = [], files = new Set();
+    for (const [n, f] of Object.entries(cfg.componentFiles ?? {})) {
+      const file = String(f).replace(/\\/g, '/');
+      if (taken.has(n.toLowerCase()) || figmaFiles.has(file) || files.has(file) || !existsSync(resolve(ROOT, file))) continue;
+      out.push(n); files.add(file);
+    }
+    const base = new Map(); for (const k of found) base.set(k.name.toLowerCase(), (base.get(k.name.toLowerCase()) ?? 0) + 1);
+    for (const k of found) if (base.get(k.name.toLowerCase()) === 1 && !figmaFiles.has(k.file) && !files.has(k.file) && !taken.has(k.name.toLowerCase())) { out.push(k.name); files.add(k.file); }
+    return out;
+  })();
+  const allNames = [...new Set([...figmaNames, ...codeNames])];
   let targets = cc.only ?? opts.only ?? cc.pilot ?? opts.pilot ?? 'all';
   if (targets === 'all' || (Array.isArray(targets) && targets.includes('*'))) targets = allNames;
   if (typeof targets === 'string') targets = [targets];
@@ -713,7 +929,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // What this run is built from: an older run never replaces contracts built from newer inputs.
   const builtFile = join(outDir, 'built.json');
   const stamp = buildStamp(ROOT, { vars });
-  const may = mayWrite(builtFile, stamp, { ROOT, force: opts.force ?? process.argv.includes('--force'), label: relative(ROOT, outDir) || outDir });
+  const may = publishTo ? { ok: true } : mayWrite(builtFile, stamp, { ROOT, force: opts.force ?? process.argv.includes('--force'), label: relative(ROOT, outDir) || outDir });
   if (!may.ok) return { kept: may.line, outDir, tokensOut, schemaOut, authoredPath, components: [], invalid: [], tokenCount: 0, authoredIssues: [], droppedTokens: [], breaking: [], undefinedRefs: [], typeMismatches: [], prune: null, statusIssues: [], statusCounts: {} };
 
   // Load the committed AUTHORED layer. Scaffold it once if missing (empty bindings per component);
@@ -724,14 +940,14 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
       _note: 'Hand-authored contract layer (rms-design-system-engine) — COMMIT this file. It holds decisions only (Figma->code bindings, semantics, notes), never captured DS values, so it is safe to share and applies in CI. The generated contracts/ + tokens.json are local, gitignored views built from this + the Figma snapshots. Resolve a prop rename or slot by adding, under a component: "bindings": { "<figmaProp>": { "attribute": "codeName" } }  or  { "slot": "slotName" }. Optional agent guidance per component: "whenNotToUse" (string), "useInstead" (string or list), "neverCombineWith" (list of component names). Optional decision status: "status" (current | deprecated | experimental), "supersededBy" (the component that won), "since", "rationale" (the why).',
       components: Object.fromEntries(allNames.map((n) => [n, { bindings: {} }])),
     };
-    try { writeFileSync(authoredPath, JSON.stringify(authoredDoc, null, 2) + '\n'); } catch { /* best-effort */ }
+    if (!publishTo) try { writeFileSync(authoredPath, JSON.stringify(authoredDoc, null, 2) + '\n'); } catch { /* best-effort */ }
   }
   const authoredIssues = lintAuthored(authoredDoc);   // malformed bindings → surfaced, never silently ignored
 
   // Keep the generated DS data LOCAL by default — the token file and contracts carry
   // real, project-specific token values (proprietary). Drop a .gitignore in each output
   // dir so they are never pushed by accident. Opt out with cfg.contracts.gitignore=false.
-  if (cc.gitignore !== false) {
+  if (cc.gitignore !== false && !publishTo) {
     for (const d of new Set([outDir, dirname(tokensOut)])) {
       ensureDir(d);
       try { writeFileSync(join(d, '.gitignore'), '# rms-design-system-engine generated DS data — kept local, do not commit.\n*\n'); } catch { /* best-effort */ }
@@ -739,10 +955,9 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   }
 
   // 1) DTCG token dictionary (diff the structural shape vs the previous emit).
-  const prevTokens = readJSON(tokensOut);
+  const prevTokens = publishTo ? null : readJSON(tokensOut);
   const { tokens, dropped: droppedTokens } = buildTokens(vars, cfg.figma?.modes);
-  ensureDir(dirname(tokensOut));
-  writeFileSync(tokensOut, JSON.stringify(tokens, null, 2) + '\n');
+  if (!publishTo) { ensureDir(dirname(tokensOut)); writeFileSync(tokensOut, JSON.stringify(tokens, null, 2) + '\n'); }
   const tokenChanges = prevTokens ? diffTokens(flattenTokens(prevTokens), flattenTokens(tokens)) : [];   // first run has no baseline
   const tokenMap = flattenTokens(tokens);   // name -> { deprecated, type }
 
@@ -786,13 +1001,33 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // The intent layer's page for each component, when ds-config.json names one (intent-layer.mjs).
   const IL = readIntentLayer(ROOT, cfg);
   const intentPages = IL ? matchComponents(targets, IL.entities, codeFilesOf(ROOT, cfg)) : new Map();
+  const stateBindings = readJSON(resolve(ROOT, paths.stateBindings || 'component-state-bindings.json')) || {};
+  const stateTokensFile = readJSON(resolve(ROOT, paths.stateTokens || 'component-state-tokens.json'))?._components || {};
+  // Laid out by the code, one contract per code file: when several Figma components are drawn of one file (two states
+  // drawn as two components), the contract is the one with Figma properties (else the first), and names the others.
+  const placeOf = new Map(targets.map((n) => [n, contractFileFor(n, apiEntryOf(n)?.file ?? null, { layout, paths: cc.paths ?? null })]));
+  const sharing = new Map();
+  for (const n of targets) { const f = placeOf.get(n); if (f) sharing.set(f, [...(sharing.get(f) ?? []), n]); }
+  const lead = new Map([...sharing].map(([f, ns]) => [f, ns.find((n) => Object.keys(props[n]?.properties ?? {}).length) ?? ns[0]]));
+  const skipped = [];
+  // Published, each contract names the last commit that changed its file: a mirror's history is fetched once for all.
+  if (publish && mirrorState(ROOT)) { try { ensureHistory(ROOT, { paths: [...new Set(targets.map((n) => apiEntryOf(n)?.file).filter(Boolean))].map((path) => ({ path })) }); } catch { /* the commits stay unknown */ } }
   for (const name of targets) {
-    const file = join(outDir, name + '.contract.json');
+    const api = apiEntryOf(name);
+    const relFile = placeOf.get(name);
+    // Laid out by the code, a component with no code file has no place: it is listed, never written somewhere invented.
+    if (!relFile) { skipped.push({ name, why: 'no code file' }); continue; }
+    if (lead.get(relFile) !== name) { skipped.push({ name, why: `drawn of the same code file as ${lead.get(relFile)}` }); continue; }
+    const file = join(outDir, relFile);
     const prev = readJSON(file);                                              // previous emit (for the diff)
-    const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source) : null });
+    let text = ''; try { if (api?.file) text = readFileSync(resolve(ROOT, api.file), 'utf8'); } catch { /* unreadable */ }
+    const codePart = apiReader ? { api, text, aliases: cfg.componentPropAliases?.[name] ?? null, stateBindings: stateBindings[name] ?? null, componentTokens: stateTokensFile[name]?.tokens ?? null, publish, idPrefix: cc.idPrefix, schemaRef: relative(dirname(file), schemaOut).split(/[\\/]+/).join('/').replace(/^(?!\.)/, './'), figmaFile: cfg.figmaFileKey || undefined, commit: publish ? lastCommitOf(ROOT, api?.file) : null } : null;
+    const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source) : null, code: codePart });
     // From the code alone, no description is a placeholder saying it came from Figma.
-    if (codeOnly && /— captured from Figma by rms-design-system-engine\.$/.test(contract.description)) contract.description = '';
-    if (lives[name]) contract.livesIn = lives[name];
+    if ((codeOnly || !(props[name] || structure[name])) && /— captured from Figma by rms-design-system-engine\.$/.test(contract.description)) contract.description = '';
+    if (lives[name] && !publish) contract.livesIn = lives[name];
+    const also = (sharing.get(relFile) ?? []).filter((n) => n !== name);
+    if (also.length && contract.source) contract.source.figma = { ...(contract.source.figma ?? {}), alsoDrawnAs: also.map((n) => ({ name: n, nodeId: props[n]?.nodeId ?? structure[n]?.nodeId ?? null })) };
     const errs = validateContract(contract);
     mkdirSync(dirname(file), { recursive: true });   // a component named with a slash (table/row) gets its folder
     writeFileSync(file, JSON.stringify(contract, null, 2) + '\n');
@@ -813,6 +1048,17 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   for (const c of breaking) {
     const n = c.ref != null ? usage.tokens.get(c.ref) : (c.component != null ? usage.components.get(c.component) : undefined);
     if (n) c.consumers = n;
+  }
+
+  // Published: the contracts the code no longer has are removed, a README says what is there, and nothing local is written.
+  if (publishTo) {
+    const written = new Set(emitted.map((n) => resolve(outDir, placeOf.get(n))));
+    const removed = contractFilesIn(outDir).filter((f) => !written.has(f));
+    for (const f of removed) { try { unlinkSync(f); } catch { /* already gone */ } }
+    // The folders those leave empty go too (never the published folder itself).
+    for (const f of removed) for (let d = dirname(f); d.startsWith(outDir + sep) && d !== outDir; d = dirname(d)) { try { if (readdirSync(d).length) break; rmdirSync(d); } catch { break; } }
+    writeFileSync(join(outDir, 'README.md'), publishedReadme(built, skipped, { schema: relative(outDir, schemaOut), figmaFile: cfg.figmaFileKey || null, undefinedRefs }));
+    return { outDir, schemaOut, components: emitted, skipped, removed: removed.map((f) => relative(outDir, f)), invalid, breaking, undefinedRefs, typeMismatches, authoredIssues, droppedTokens, tokenCount: 0 };
   }
 
   // 4) AI index (llms.txt) — a machine-readable summary for agents, local beside the contracts.
@@ -857,5 +1103,5 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const statusCounts = built.reduce((acc, b) => { const st = b.contract.status?.state; if (st) acc[st] = (acc[st] || 0) + 1; return acc; }, {});
 
   try { ensureDir(outDir); writeFileSync(builtFile, JSON.stringify({ _built: stamp }, null, 2) + '\n'); } catch { /* best-effort */ }
-  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
+  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
 }

@@ -462,8 +462,11 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'docs').click()`);
     assert.equal(await run(`!!document.querySelector('#c-chip [data-area="docs"] .pg-anatomy')`), false, 'Documentation draws nothing of its own');
-    // Do and Don't from the references, each with its caption, the do first.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
+    // Do and Don't from the references, each with its caption, the do first: in its row's panel (the table is its task,
+    // kind, status and when it was checked).
+    await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].find((tr) => /Do and don't/.test(tr.cells[1].textContent)).click()`);
+    assert.equal(await run(`[...document.querySelectorAll('#sg-row-panel .pg-examples .pg-example')].map((e) => e.querySelector('.pg-ctl-label').textContent + ':' + e.querySelector('.pg-example-caption').textContent).join('|')`), "Do:One filter per chip|Don't:A sentence in a chip");
+    await run(`(() => { const m = document.getElementById('sg-row-panel'); if (m) { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } })()`);
     // Its Documentation first, in the table every task shares (as Parity and Accessibility are), then each section of
     // rows in the Playground's tables, its title the head (Details).
     assert.equal(await run(`document.querySelector('#c-chip [data-area="docs"] .pg-footer > .pg-doc').matches('.pg-knowledge') && !!document.querySelector('#c-chip [data-area="docs"] .pg-knowledge table.sg-issues')`), true);
@@ -503,16 +506,17 @@ test('in the browser: no script error, a control changes the real component, the
     // Its Documentation is the table every task shares: each kind with what is written, what to do and its status, every
     // kind here, written or not, what is to write first; the Status page lists the same rows, only those not written yet.
     // Where it is used is its own area, never a kind of documentation.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|What is written|What to do|Status|Last checked|Open', 'and the arrow that opens the row, named for a screen reader');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|Source|Status|Last checked|Open', 'and the arrow that opens the row, named for a screen reader');
     // A link in a table to another page of the guide is a link pill, its words then its arrow (a template rule); one out of
     // the guide stays an underlined link.
     assert.equal(await run(`[...document.querySelectorAll('.sg-section:not([hidden]) table a[href^="#"]')].filter((a) => !a.closest('thead, .sg-tip, .pg-preview, .pg-frame, .pg-variants, .pg-anat-wrap, .sg-showroom, .sg-thumb') && !a.classList.contains('sg-mx-go') && !(a.classList.contains('sg-link-pill') && a.querySelector('svg'))).length`), 0, 'every link in a table is a link pill');
     const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:nth-child(2)')].map((d) => d.textContent).sort().join('|')`);
-    assert.equal(kinds, ['For agents', 'What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Its tokens'].sort().join('|'));
+    assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Example', 'Its tokens'].sort().join('|'));
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*$/, 'what is to write first, then what is to check, what is written after');
-    assert.match(await run(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]').textContent`), /(Not written yet\.|No pictures yet\.)You in Figma.+Missing/);
+    // The table is its task, kind, status and when it was checked; what is written and what to do are in its panel.
+    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /Missing[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*You in Figma/);
     assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Partial|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
-    assert.match(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet/);
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet|You in Figma/, 'what is written and what to do: in the panel only');
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
     assert.equal(await run(`document.getElementById('sg-menu').textContent + '|' + document.getElementById('sg-nav-close').textContent`), 'Menu|Close menu');
     await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);

@@ -1,7 +1,7 @@
 // code-connect-map.mjs - what a project's own Figma Code Connect files say about each component: which Figma property
 // each code prop is, and how its values are written, read from the committed *.figma.* files (never Figma's API).
 //
-//   codeConnectMaps(ROOT, { include })   → [{ file, nodeId, slug, id, tag, props: [{ figma, code, kind, values? }] }]
+//   codeConnectMaps(ROOT, { include })   → [{ file, nodeId, slug, id, tag, props: [{ figma, code, kind, role?, negated?, equals?, values? }] }]
 //   codeConnectFor(maps, name, nodeId)   → the map that connects that Figma component, or null
 //   parseConnectFile(text, file)         → one file's maps
 //
@@ -11,9 +11,10 @@
 // names it by the attribute the variable fills. Advisory: the code's own API stays the truth; this pairs names.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { readTemplateForm } from './code-connect-template.mjs';
 
 const SKIP = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.design-system-engine-out']);
-const nodeIdOf = (raw) => { const m = /node-id=([\d]+)[-:%3A]+([\d]+)/i.exec(String(raw ?? '')); return m ? `${m[1]}:${m[2]}` : null; };
+const nodeIdOf = (raw) => { const m = /node-id=(\d+)(?:-|:|%3A)(\d+)/i.exec(String(raw ?? '')); return m ? `${m[1]}:${m[2]}` : null; };
 const slugOf = (url) => { const m = /figma\.com\/(?:file|design)\/[^/]+\/([^?/#]+)/i.exec(String(url ?? '')); return m ? decodeURIComponent(m[1]) : null; };
 
 // The values of an enum's map ({ s: 's', Large: 'lg' }): Figma's option → the code's value.
@@ -35,24 +36,12 @@ export function parseConnectFile(text = '', file = '') {
   const src = String(text);
   const out = [];
   // The template form: one component a file, named by its header comments.
-  if (/figma\.selectedInstance|figma\.currentLayer/.test(src)) {
+  if (/figma\.selectedInstance|figma\.currentLayer/.test(src) || (/\/\/\s*url\s*=/.test(src) && /figma\.(?:html|code|tsx|vue)\s*`/.test(src) && !/figma\.connect\(/.test(src))) {
     const url = /\/\/\s*url\s*=\s*(\S+)/.exec(src)?.[1] ?? null;
     const id = /\/\/\s*component\s*=\s*(\S+)/.exec(src)?.[1] ?? null;
-    const example = /example\s*:\s*figma\.(?:html|code|tsx|vue)?\s*`([\s\S]*?)`\s*,?\s*(?:imports|id|metadata|\})/.exec(src)?.[1] ?? '';
-    const tag = /<([a-z][\w-]*|[A-Z][\w]*)/.exec(example)?.[1] ?? null;
-    const props = [];
-    for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:figma\.(?:selectedInstance|currentLayer)\.get(Enum|Boolean|String|InstanceSwap|PropertyValue)\(\s*(['"])([^'"]+)\3|[\w$.]+\(\s*figma\.(?:selectedInstance|currentLayer)\s*,\s*(['"])([^'"]+)\5)/g)) {
-      const name = m[1], kind = (m[2] ?? 'instance').toLowerCase(), figma = m[4] ?? m[6];
-      const esc = name.replace(/[$]/g, '\\$');
-      // The attribute it fills as it is: attr="${name}"; or, for an on/off one, ${name ? 'attr' : ''} (the attribute
-      // given or not), or the one it gates (${show && label ? `label="${label}"` : ''} gives label). A prop built from
-      // several (params: { label: … }) pairs with none: it is not one Figma property.
-      const direct = new RegExp(`(?:^|[\\s<\`])([A-Za-z_:@][\\w:.-]*)\\s*=\\s*["']?\\$\\{\\s*${esc}\\s*\\}["']?(?=[\\s/>\`'"]|$)`).exec(example)?.[1];
-      const gate = kind === 'boolean' ? new RegExp(`\\$\\{\\s*${esc}\\b(?:\\s*&&\\s*[\\w$]+)*\\s*\\?\\s*(?:['"\`]([A-Za-z_:@][\\w:.-]*)['"\`]|\`\\s*([A-Za-z_:@][\\w:.-]*)\\s*=)`).exec(example) : null;
-      const code = direct ?? gate?.[1] ?? gate?.[2] ?? null;
-      const values = kind === 'enum' ? valuesOf(objectAt(src, m.index + m[0].length - 1)) : undefined;
-      props.push({ figma, code: code ? code.replace(/^[:@]|^v-bind:/, '') : null, kind, ...(values ? { values } : {}) });
-    }
+    // Read as the code it is (code-connect-template.mjs): each property by the attribute it fills, and by those it
+    // decides are written at all.
+    const { tag, props } = readTemplateForm(src);
     out.push({ file, nodeId: nodeIdOf(url), slug: slugOf(url), id, tag, props });
     return out;
   }

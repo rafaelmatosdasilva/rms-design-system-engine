@@ -286,6 +286,23 @@ if (process.argv.includes('--summary')) {
   process.exit(2);
 }
 
+// ── --contracts-out <dir>: the component contracts, published for a shared repository (an intent layer) ──
+// Only what belongs in a shared repository: one contract per code file, the schema, and a README. No token values,
+// no catalog, no copy of the intent layer's own text. Contracts the code no longer has are removed. Nothing is pushed.
+if (process.argv.includes('--contracts-out')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--contracts-out'), dir = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  if (!dir) { console.log('Give the folder: rms-design-system-engine --contracts-out <dir>  (for example <intent layer clone>/specs/contracts)'); process.exit(2); }
+  const { generateContracts } = await import('./contract-gen.mjs');
+  const r = await generateContracts(ROOT, pcfg, { publishTo: dir, force: true });
+  console.log(`📐 Contracts published → ${r.outDir}  (${r.components.length} contract${r.components.length === 1 ? '' : 's'}${r.removed?.length ? ` · ${r.removed.length} removed` : ''}${r.skipped?.length ? ` · ${r.skipped.length} not written, listed in README.md` : ''})`);
+  for (const i of r.invalid.slice(0, 20)) console.log(`   ❌ ${i.name}: ${i.errs.slice(0, 3).join('; ')}`);
+  if (r.undefinedRefs?.length) console.log(`   ⚠️  ${r.undefinedRefs.length} token(s) Figma binds that the variables do not have, listed in README.md: fix them in Figma`);
+  console.log(r.invalid.length ? `NEXT: fix the ${r.invalid.length} invalid contract(s) above, then publish again` : `NEXT: review the diff in ${dir}, commit it on a branch and open a merge request`);
+  process.exit(r.invalid.length ? 1 : 0);
+}
+
 // ── --figma-effects: each component's shadows, blurs, gradient and image fills, clipping and blend mode ──
 // Without a file: writes the read-only capture script to run with the Figma tool of the session. With the file its
 // answer was saved to: keeps it as the effects snapshot, then compares it with the code's own rules.

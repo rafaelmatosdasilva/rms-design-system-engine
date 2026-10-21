@@ -499,7 +499,7 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
   const { codeConnectMaps, codeConnectFor } = await import('./code-connect-map.mjs');
   let ccInclude = null; try { ccInclude = JSON.parse(readFileSync(join(ROOT, 'figma.config.json'), 'utf8'))?.codeConnect?.include ?? null; } catch { /* none */ }
   const ccMaps = codeConnectMaps(ROOT, { include: ccInclude });
-  const { harnessCases, variantsFromCode, pageColours, codeCases } = await import('./component-harness.mjs');
+  const { harnessCases, variantsFromCode, pageColours, codeCases, decidedCases } = await import('./component-harness.mjs');
   const { textComponentApi } = await import('./component-source.mjs');
   for (const name of names) {
     const file = locate(name);
@@ -522,9 +522,10 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     // Playground can show what its API takes.
     const example = bestExample(examples, name, propsSnap[name]);
     const figmaCases = fromFigma ? harnessCases(propsSnap[name], max, example) : null;
-    const cases = (figmaCases ? [...figmaCases, ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
+    const connect = codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [];
+    const cases = (figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: { ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), ...(pageData[resolve(ROOT, file)] ?? {}) }, connect: codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [], from: fromFigma ? 'figma' : 'code' });
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: { ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), ...(pageData[resolve(ROOT, file)] ?? {}) }, connect, from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);

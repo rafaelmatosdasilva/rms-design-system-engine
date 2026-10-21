@@ -31,6 +31,7 @@ import { loadLocator } from './component-locator.mjs';
 import { createApiReader } from './component-api.mjs';
 import { inProgressNames } from './in-progress.mjs';   // work in progress is not drift
 import { stateAxisTest, cleanFigmaProp } from './figma-props.mjs';
+import { bindingSources, bindFigmaProp, readingsOf, invertsValue, flipBoolean, conventionFor } from './prop-binding.mjs';   // one decision for the check and the contract
 
 const ROOT = process.cwd();
 
@@ -267,12 +268,18 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
   }
   const api = API.apiFor(figmaName);
   const codeNorm     = new Map(Object.keys(api.props).map(p => [norm(p), p]));   // normName -> original
-  const codeDefaults = new Map(Object.entries(api.props).filter(([, f]) => f.default != null).map(([p, f]) => [norm(p), f.default]));
+  // A Vue Boolean given no default is false (Vue says so): its Figma default is compared with that.
+  const vueBool = (f) => (/\.vue$/i.test(String(file)) && f.type === 'boolean' && f.default == null ? 'false' : f.default);
+  const codeDefaults = new Map(Object.entries(api.props).filter(([, f]) => vueBool(f) != null).map(([p, f]) => [norm(p), vueBool(f)]));
+  // The project's own Code Connect file: how it writes each Figma value in the code (Figma "Large" → "lg"), and the
+  // attributes a property only decides are written (its conditions).
+  const ccProps = api.codeConnectProps ?? [];
+  const valueMapOf = (fp) => ccProps.find((p) => p.figma === fp && p.role === 'value' && p.values)?.values ?? null;
   const codeOptions  = new Map(Object.entries(api.props).filter(([, f]) => Array.isArray(f.options)).map(([p, f]) => [norm(p), f.options.map(String)]));
   const unsure       = new Map(Object.entries(api.props).filter(([, f]) => f.confidence === 'uncertain').map(([p, f]) => [norm(p), f.readings]));
   const cbind    = contractBindings(figmaName);                            // authored Figma->code bindings (the contract hub)
   // A Code Connect mapping is pairing evidence; a documented alias or a contract binding wins over it.
-  const aliases  = { ...(api.codeConnect ?? {}), ...(PROP_ALIASES[figmaName] ?? {}), ...cbind.attr };
+  const recorded = bindingSources({ codeConnect: api.codeConnect, aliases: PROP_ALIASES[figmaName], authored: cbind.attr });
   const rel = relative(ROOT, file);
 
   // #1/#3: for a matched prop, compare Figma's default value, variant options and type
@@ -287,16 +294,24 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
       VALUE_INFO.push(`${figmaName}/${fp}: the code sources disagree on "${codeName}" (${r}) - not compared  (${rel})`);
       return { status: 'match', codeValue: '(readings disagree)' };
     }
-    const figDefault = def?.defaultValue;
+    const map = valueMapOf(fp);
+    const asCode = (v) => (map && map[v] != null ? map[v] : v);
+    // A true/false binding that writes the opposite (Figma showClose on = code hideClose false) is compared inverted.
+    const inverted = def?.type === 'BOOLEAN' && invertsValue(fp, codeName, { codeConnectProps: ccProps, authored: AUTHORED_DOC?.components?.[figmaName]?.bindings?.[fp] });
+    const figDefault = def?.defaultValue != null ? (inverted ? flipBoolean(def.defaultValue) : asCode(def.defaultValue)) : def?.defaultValue;
     const codeDefault = codeDefaults.get(cn);
     // A wrong default and a variant the code names differently are two findings: both are listed.
-    const defaultDiffers = figDefault != null && figDefault !== '' && codeDefault != null && !sameValue(figDefault, codeDefault);
+    // A Figma true/false against a code default that is not one (tone="calm") is not compared: the BOOLEAN note below says so.
+    const notBoolean = def?.type === 'BOOLEAN' && codeDefault != null && !/^(true|false)$/i.test(String(codeDefault));
+    const defaultDiffers = !notBoolean && figDefault != null && figDefault !== '' && codeDefault != null && !sameValue(figDefault, codeDefault);
     if (defaultDiffers)
-      VALUE_FAIL.push(`${figmaName}/${fp}: default differs - Figma "${figDefault}" vs code "${codeName}=${codeDefault}"${valueHint(figDefault, [codeDefault])}  (${rel})`);
+      VALUE_FAIL.push(inverted
+        ? `${figmaName}/${fp}: default differs - Figma "${def.defaultValue}" (written ${codeName}=${figDefault}) vs code "${codeName}=${codeDefault}"  (${rel})`
+        : `${figmaName}/${fp}: default differs - Figma "${figDefault}" vs code "${codeName}=${codeDefault}"${valueHint(figDefault, [codeDefault])}  (${rel})`);
     const opts = def?.type === 'VARIANT' && Array.isArray(def.variantOptions) && def.variantOptions.length ? codeOptions.get(cn) : null;
     if (defaultDiffers && !opts) return { status: 'value', codeValue: `default ${codeDefault}` };
     if (opts) {
-      const miss = def.variantOptions.filter(o => !opts.some((c) => sameValue(o, c)));
+      const miss = def.variantOptions.filter(o => !opts.some((c) => sameValue(asCode(o), c)));
       if (miss.length)
         VALUE_FAIL.push(`${figmaName}/${fp}: code prop "${codeName}" is missing Figma variant option(s) ${miss.map(o => `"${o}"${valueHint(o, opts)}`).join(', ')}  (${rel})`);
       return { status: miss.length || defaultDiffers ? 'value' : 'match', codeValue: opts.join(' · ') };
@@ -308,12 +323,11 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     if (def?.type === 'BOOLEAN') {
       if (codeDefault != null && codeDefault !== 'true' && codeDefault !== 'false')
         VALUE_INFO.push(`${figmaName}/${fp}: Figma BOOLEAN but code default "${codeDefault}" is not boolean - check the prop type  (${rel})`);
-      return { status: 'match', codeValue: 'boolean' };
+      return { status: 'match', codeValue: inverted ? 'boolean (inverted)' : 'boolean' };
     }
     return { status: 'match', codeValue: codeDefault != null ? `default ${codeDefault}` : '(present)' };
   };
 
-  const codeSlots = { named: new Map(api.slots.named.map((n) => [norm(n), n])), hasDefault: api.slots.default };   // norm → as written
   const matchedCode = new Set();
   const missingHere = [];
   for (const fp of figNames) {
@@ -323,47 +337,51 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
 
     if (KNOWN_PROP_EXCEPTIONS.has(`${figmaName}/${fp}`)) { OK.push(`${figmaName}/${fp} (exempt)`); pushRow(fp, '(exempt)', 'match'); continue; }
 
-    // An INSTANCE_SWAP (e.g. an icon) is NOT assumed to be a slot: the code may expose it as
-    // a prop OR a slot. Match either, and report the actual representation.
+    // Which code prop or slot it is: one decision for the prop check and the contract (prop-binding.mjs). An
+    // INSTANCE_SWAP (e.g. an icon) is NOT assumed to be a slot: the code may expose it as a prop OR a slot.
+    const b = bindFigmaProp(fp, def, { codeProps: api.props, slots: api.slots, recorded, authoredSlots: cbind.slot });
     if (def?.type === 'INSTANCE_SWAP') {
-      const fn = norm(fp);
-      if (codeNorm.has(fn)) {
-        matchedCode.add(fn);
-        const cp = codeNorm.get(fn);
-        if (cp !== fp) { NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${cp}" (${nameDiff(fp, cp)})  (${rel})`); pushRow(cp, 'prop', 'name'); continue; }
-        OK.push(`${figmaName}/${fp} (prop)`); pushRow(cp, 'prop', 'match'); continue;
-      }
-      const aliasTo0 = aliases[fp] && norm(aliases[fp]);
-      if (aliasTo0 && codeNorm.has(aliasTo0)) { matchedCode.add(aliasTo0); OK.push(`${figmaName}/${fp} → ${aliases[fp]} (prop, alias)`); pushRow(aliases[fp], 'prop', 'match'); continue; }
-      if (codeSlots.named.has(fn)) {
-        const cs = codeSlots.named.get(fn);
-        if (cs !== fp) { NAME_FAIL.push(`${figmaName}/${fp}: the code names its slot "${cs}" (${nameDiff(fp, cs)})  (${rel})`); pushRow(cs, 'slot', 'name'); continue; }
-        OK.push(`${figmaName}/${fp} (slot)`); pushRow(cs, 'slot', 'match'); continue;
-      }
-      if (codeSlots.hasDefault)   { OK.push(`${figmaName}/${fp} (default slot)`); pushRow('(default slot)', 'slot', 'match'); continue; }
-      // A contract-authored slot binding resolves a slot whose code NAME differs from the Figma prop.
-      const sb = cbind.slot[fp];
-      if (typeof sb === 'string' && codeSlots.named.has(norm(sb))) { OK.push(`${figmaName}/${fp} → ${sb} (slot, contract)`); pushRow(sb, 'slot', 'match'); continue; }
-      SLOT_FAIL.push(`${figmaName}: Figma instance-swap "${fp}" has no code prop or slot  (${rel})`);
-      pushRow('not in code', '-', 'missing'); continue;
+      if (!b) { SLOT_FAIL.push(`${figmaName}: Figma instance-swap "${fp}" has no code prop or slot  (${rel})`); pushRow('not in code', '-', 'missing'); continue; }
+      if (b.as === 'defaultSlot') { OK.push(`${figmaName}/${fp} (default slot)`); pushRow('(default slot)', 'slot', 'match'); continue; }
+      const kind = b.as === 'slot' ? 'slot' : 'prop';
+      if (kind === 'prop') matchedCode.add(norm(b.code));
+      if (b.source === 'name' && !b.exactName) { NAME_FAIL.push(`${figmaName}/${fp}: the code names ${kind === 'slot' ? 'its slot' : 'it'} "${b.code}" (${nameDiff(fp, b.code)})  (${rel})`); pushRow(b.code, kind, 'name'); continue; }
+      OK.push(b.source === 'name' ? `${figmaName}/${fp} (${kind})` : `${figmaName}/${fp} → ${b.code} (${kind}, ${b.source === 'authored' && kind === 'slot' ? 'contract' : 'alias'})`);
+      pushRow(b.code, kind, 'match'); continue;
     }
-
-    const fn = norm(fp);
-    // A name the project recorded for this prop (contract.authored.json bindings, componentPropAliases) is the
-    // agreed one: it is read before the letter-case comparison, so Disabled bound to "disabled" is a match.
-    const bound = aliases[fp] != null ? Object.keys(api.props).find((p) => p === aliases[fp]) : null;
-    if (bound) { matchedCode.add(norm(bound)); OK.push(`${figmaName}/${fp} → ${bound} (alias)`); const v = checkValues(fp, def, bound); pushRow(bound, v.codeValue, v.status); continue; }
-    if (codeNorm.has(fn)) {
-      matchedCode.add(fn);
-      const cp = codeNorm.get(fn);
-      const v = checkValues(fp, def, cp);
-      if (cp !== fp) { NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${cp}" (${nameDiff(fp, cp)})  (${rel})`); pushRow(cp, v.codeValue, 'name'); continue; }
-      OK.push(`${figmaName}/${fp}`); pushRow(cp, v.codeValue, v.status); continue;
+    // A name the project recorded for this prop (contract.authored.json bindings, componentPropAliases, its Code
+    // Connect file) is the agreed one: it is read before the letter-case comparison, so Disabled bound to "disabled" is
+    // a match.
+    if (b) {
+      matchedCode.add(norm(b.code));
+      // A key of an object prop (:opts="{ caption: … }"): the object has no default or options of that key to compare.
+      if (b.key) { OK.push(`${figmaName}/${fp} → ${b.code}.${b.key} (Code Connect)`); pushRow(`${b.code}.${b.key}`, '(a key of its object)', 'match'); continue; }
+      const v = checkValues(fp, def, b.code);
+      if (b.source === 'name' && !b.exactName) { NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${b.code}" (${nameDiff(fp, b.code)})  (${rel})`); pushRow(b.code, v.codeValue, 'name'); continue; }
+      OK.push(b.source === 'name' ? `${figmaName}/${fp}` : `${figmaName}/${fp} → ${b.code} (alias)`); pushRow(b.code, v.codeValue, v.status); continue;
     }
-    const aliasTo = aliases[fp] && norm(aliases[fp]);
-    if (aliasTo && codeNorm.has(aliasTo)) { matchedCode.add(aliasTo); OK.push(`${figmaName}/${fp} → ${aliases[fp]} (alias)`); const v = checkValues(fp, def, codeNorm.get(aliasTo)); pushRow(aliases[fp], v.codeValue, v.status); continue; }
+    // Not a value of its own: the Code Connect file says it decides whether other attributes are written (showIcon
+    // writes icon only when on). That is its place in the code, not a missing prop.
+    const decides = readingsOf(fp, ccProps);
+    if (decides.length) {
+      const say = decides.map((d) => `${d.code}${d.negated ? ' when off' : d.equals != null ? ` when ${d.equals}` : ''}`).join(', ');
+      for (const d of decides) matchedCode.add(norm(d.code.split('.')[0]));
+      OK.push(`${figmaName}/${fp} → decides ${say} (Code Connect)`); pushRow(`(decides ${say})`, 'condition', 'match'); continue;
+    }
+    // The naming convention, where the types agree (prop-binding.mjs conventionFor), as the contract pairs it: a value
+    // under another name is a name difference, never a missing prop; a showX that decides x is its place in the code.
+    const conv = conventionFor(fp, def, api.props, { codeConnectProps: ccProps });
+    if (conv?.role === 'value') {
+      matchedCode.add(norm(conv.code));
+      const v = checkValues(fp, def, conv.code);
+      NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${conv.code}" (the naming convention pairs them)  (${rel})`); pushRow(conv.code, v.codeValue, 'name'); continue;
+    }
+    if (conv?.role === 'condition') {
+      matchedCode.add(norm(conv.code));
+      OK.push(`${figmaName}/${fp} → decides ${conv.code} (naming convention)`); pushRow(`(decides ${conv.code})`, 'condition', 'match'); continue;
+    }
     missingHere.push(fp);   // row added after rename-pairing below
-    MISSING.push(`${figmaName}: Figma property "${fp}" has no code prop  (${rel})`);
+    MISSING.push(`${figmaName}: Figma property "${fp}" has no code prop  (${rel})${ccProps.length ? (ccProps.some((p) => p.figma === fp) ? ' - its Code Connect file reads it but writes no attribute' : ' - its Code Connect file does not read it') : ''}`);
   }
   // A code prop that is not a design decision is never "not in Figma": an event handler (onClick), and the plumbing
   // every component passes through (children, className, style, ref, key, id, aria-*, data-*).
@@ -382,7 +400,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
       SUGGEST.push(`${figmaName}: Figma "${fp}" might be code "${hit[1]}" - if so add componentPropAliases["${figmaName}"]["${fp}"] = "${hit[1]}"`);
       rows.push({ component: figmaName, figmaProp: fp, figmaValue: figmaValueOf(def), codeProp: hit[1], codeValue: '(rename?)', status: 'rename' });
     } else {
-      rows.push({ component: figmaName, figmaProp: fp, figmaValue: figmaValueOf(def), codeProp: 'not in code', codeValue: '-', status: 'missing' });
+      rows.push({ component: figmaName, figmaProp: fp, figmaValue: figmaValueOf(def), codeProp: 'not in code', codeValue: !ccProps.length ? '-' : ccProps.some((p) => p.figma === fp) ? '(Code Connect reads it, writes no attribute)' : '(Code Connect does not read it)', status: 'missing' });
     }
   }
 

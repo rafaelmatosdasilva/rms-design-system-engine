@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseConnectFile, codeConnectFor } from '../code-connect-map.mjs';
 
-test('the template form: each variable by the attribute it fills, a switch by the part it gives, a prop built from several by none', () => {
+test('the template form: each variable by the attribute it fills, a switch by the part it gives, a key of an object prop by its list', () => {
   const text = `// url=https://www.figma.com/file/AbC/buttonPrimary?node-id=3621-53438
 // component=button-primary
 import figma from 'figma'
@@ -26,7 +26,8 @@ export default {
 }`;
   const [m] = parseConnectFile(text, 'Primary.figma.js');
   assert.equal(m.nodeId, '3621:53438'); assert.equal(m.slug, 'buttonPrimary'); assert.equal(m.tag, 'button-primary');
-  assert.deepEqual(m.props.map((p) => `${p.figma}→${p.code}`), ['size→buttonSize', 'disabled→disabled', 'showLabel→label', 'labelContent→label', 'filled→null']);
+  assert.deepEqual(m.props.map((p) => `${p.figma}→${p.code}`), ['size→buttonSize', 'disabled→disabled', 'showLabel→label', 'labelContent→label', 'filled→params.x']);
+  assert.equal(m.props[4].role, 'condition', 'a key a list joined into :params writes only when filled is on');
   assert.deepEqual(m.props[0].values, { s: 's', m: 'm', l: 'l' });
   assert.equal(codeConnectFor([m], 'other', '3621-53438'), m, 'joined by node id');
   assert.equal(codeConnectFor([m], 'buttonPrimary', null), m, 'else by the name its link carries');
@@ -37,4 +38,129 @@ test('the classic form: each code prop beside the Figma property it reads', () =
   assert.equal(m.nodeId, '1:2');
   assert.deepEqual(m.props.map((p) => `${p.figma}→${p.code}`), ['Label→label', 'Size→size', 'Disabled→disabled']);
   assert.deepEqual(m.props[1].values, { Small: 'sm', Large: 'lg' });
+});
+
+test('the template form read as code: a value, a condition (negated, or a comparison), an event, a fixed value, a nested tag', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=10-20
+// component=tile-one
+import figma from 'figma'
+import { iconOf } from './helpers'
+const revealCaption = figma.selectedInstance.getBoolean('revealCaption')
+const label = figma.selectedInstance.getString('captionWords')
+const tone = figma.selectedInstance.getEnum('tone', { Calm: 'calm', Loud: 'loud' })
+const outlined = figma.selectedInstance.getBoolean('outlined')
+const showLink = figma.selectedInstance.getBoolean('showLink')
+const icon = iconOf(figma.selectedInstance, 'iconContent')
+const width = figma.selectedInstance.getEnum('width', { Wide: 'wide' })
+const parts = [outlined ? 'a' : ''].join(',')
+export default {
+  example: figma.html\`
+<tile-one
+  \${revealCaption && label ? \`label="\${label}"\` : ''}
+  \${!revealCaption ? \`icon="\${icon}"\` : ''}
+  \${tone !== 'calm' ? \`tone="\${tone}"\` : ''}
+  \${tone === 'loud' ? 'shout' : ''}
+  \${outlined ? 'outlined' : ''}
+  \${showLink ? 'href="#"' : ''}
+  \${showLink ? '@opened="go"' : ''}
+  :options="{ width: '\${width}', parts: '\${parts}' }"
+>
+  <tile-badge \${outlined ? 'framed' : ''} />
+</tile-one>\`,
+}`;
+  const [m] = parseConnectFile(text, 'One.figma.js');
+  const say = (p) => `${p.figma}→${p.code ?? '∅'}${p.role === 'condition' ? ` if${p.negated ? ' not' : ''}${p.equals != null ? ` =${p.equals}` : ''}` : ''}${p.event ? ' event' : ''}`;
+  assert.equal(m.tag, 'tile-one');
+  assert.deepEqual(m.props.map(say), [
+    'revealCaption→label if', 'revealCaption→icon if not',
+    'captionWords→label',
+    'tone→tone', 'tone→shout if =loud',
+    'outlined→outlined',
+    'showLink→href if', 'showLink→opened if event',
+    'iconContent→icon',
+    'width→options.width',
+  ], 'its own attributes only: the badge\'s framed belongs to the badge');
+  assert.deepEqual(m.props.find((p) => p.figma === 'tone').values, { Calm: 'calm', Loud: 'loud' });
+  assert.ok(!m.props.some((p) => p.code === 'framed'), 'an attribute of another component inside the example is not this one\'s');
+});
+
+test('a template file that reads no property still connects its component', () => {
+  const [m] = parseConnectFile(`// url=https://www.figma.com/design/AbC/tileTwo?node-id=3-4
+import figma from 'figma'
+export default { example: figma.html\`<tile-two :rows="rows" @clicked="go" />\` }`, 'Two.figma.js');
+  assert.equal(m.nodeId, '3:4'); assert.equal(m.tag, 'tile-two'); assert.deepEqual(m.props, []);
+});
+
+test('a list joined into an object prop: each key by its own conditions; a fixed true or false is the property\'s own value', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=1204-30551
+import figma from 'figma'
+const showCaption = figma.selectedInstance.getBoolean('showCaption')
+const caption = figma.selectedInstance.getString('captionWords')
+const pinned = figma.selectedInstance.getBoolean('pinned')
+const framed = figma.selectedInstance.getBoolean('framed')
+const helper = figma.selectedInstance.getString('helperWords')
+const tone = figma.selectedInstance.getEnum('tone', { calm: 'calm', loud: 'loud' })
+const opts = [
+  showCaption && caption ? \`caption: '\${caption}'\` : '',
+  pinned ? 'pinned: true' : '',
+].filter(Boolean).join(', ')
+export default {
+  example: figma.html\`
+<tile-one
+  :opts="{ \${opts} }"
+  \${!framed ? ':framed="false"' : ''}
+  \${tone === 'loud' && helper ? \`warning="\${helper}"\` : ''}
+  \${tone === 'calm' && helper ? \`note="\${helper}"\` : ''}
+/>\`,
+}`;
+  const [m] = parseConnectFile(text, 'Tile.figma.js');
+  assert.equal(m.nodeId, '1204:30551', 'a node id whose second part starts with 3 is read whole');
+  const say = (p) => `${p.figma}→${p.code}:${p.role}${p.negated ? '!' : ''}`;
+  const read = m.props.map(say);
+  for (const x of ['captionWords→opts.caption:value', 'showCaption→opts.caption:condition', 'pinned→opts.pinned:value', 'framed→framed:value', 'helperWords→warning:value', 'helperWords→note:value'])
+    assert.ok(read.includes(x), `${x} in ${read.join(', ')}`);
+  assert.ok(!read.includes('pinned→opts.caption:condition'), 'one item\'s condition never reaches another item');
+});
+
+test('a condition through a local, an attribute written either way, a key of an object the branch writes', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=12-34
+import figma from 'figma'
+const kind = figma.selectedInstance.getEnum('kind', { pickable: 'pickable', still: 'still' })
+const pinned = figma.selectedInstance.getBoolean('pinned')
+const filled = figma.selectedInstance.getBoolean('filled')
+const owner = figma.selectedInstance.getString('ownerWords')
+const pickable = kind === 'pickable'
+const entry = [owner ? \`owner: '\${owner}'\` : ''].filter(Boolean).join(', ')
+export default {
+  example: figma.html\`
+<tile-one
+  \${pickable ? ':pickParams="{ on: true }"' : ''}
+  \${pinned ? ':place="top"' : ':place="bottom"'}
+  \${filled ? \`:entries="[{ \${entry} }]"\` : ':entries="entries"'}
+/>\`,
+}`;
+  const [m] = parseConnectFile(text, 'Tile.figma.js');
+  const read = m.props.map((p) => `${p.figma}→${p.code}:${p.role}${p.equals != null ? '=' + p.equals : ''}${p.negated ? '!' : ''}`);
+  for (const x of ['kind→pickParams:condition=pickable', 'pinned→place:value', 'filled→entries:value', 'ownerWords→entries.owner:value'])
+    assert.ok(read.includes(x), `${x} in ${read.join(', ')}`);
+  assert.ok(!read.some((x) => /^pinned→place:condition/.test(x)), 'written either way: a value it picks, not a condition');
+  assert.ok(!read.some((x) => /^ownerWords→entries:condition/.test(x)), 'a property never decides the attribute it fills');
+});
+
+test('a value computed from one property is that property\'s value, marked; a value map only where its own value is written', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=56-78
+import figma from 'figma'
+const count = figma.selectedInstance.getString('countWords')
+const tone = figma.selectedInstance.getEnum('tone', { Calm: 'calm', Loud: 'loud' })
+const framed = figma.selectedInstance.getEnum('framed', { true: true, false: false })
+const most = count && count.includes('/') ? count.split('/')[1].trim() : ''
+const opts = [framed ? 'framed: true' : '', most ? \`most: \${most}\` : ''].filter(Boolean).join(', ')
+export default {
+  example: figma.html\`<tile-one tone="\${tone}" :opts="{ \${opts} }" />\`,
+}`;
+  const [m] = parseConnectFile(text, 'Tile.figma.js');
+  const by = (f, c) => m.props.find((p) => p.figma === f && p.code === c);
+  assert.equal(by('countWords', 'opts.most')?.derived, true);
+  assert.deepEqual(by('tone', 'tone')?.values, { Calm: 'calm', Loud: 'loud' });
+  assert.equal(by('framed', 'opts.framed')?.values, undefined, 'framed: true is not framed\'s value map');
 });

@@ -92,6 +92,7 @@ rms-design-system-engine --styleguide --no-a11y-bake     # the page without its 
 rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
+rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
@@ -215,10 +216,11 @@ reads one page and does not follow links inside it.
 
 **How much an agent can take from it** (`--guidance-rating`). Rates each component's guidance (its section in
 these files and Figma's description and annotations) for what an agent needs: a section headed with its exact name,
-what it is, when to use it, when not to, its role, an example, its properties by name, and no name the system does
-not have. Each component is ready, partial or thin; the document gets the same class from how many are ready. It
-prints what to add, writes `.design-system-engine-out/guidance-rating.json`, and the style guide shows the rating in
-each component's Documentation area (For agents). `--extract` also runs the extraction test, which spends the
+what it is, when to use it, when not to, its role, an example, and no name the system does not have (its properties
+are not asked for: the contract carries them from Figma and the code). Each component is ready, partial or thin;
+the document gets the same class from how many are ready. It prints what to add, writes
+`.design-system-engine-out/guidance-rating.json`, and the style guide shows what no other row of each component's
+Documentation area says: its Example row, and Names that do not exist when it gives one. `--extract` also runs the extraction test, which spends the
 person's model tokens: a question for each property with options, answered by a model that sees only the guidance
 through `guidelines.extract.cmd` (the prompt on stdin, the answers on stdout; `claude -p` by default), scored against
 Figma's options. `guidelines` is also a level of `eval-run.mjs --levels`.
@@ -294,11 +296,13 @@ no component the engine can find), **Write**, **Improve** (it exists and says so
 remove) or **Keep**; each with why, each change it takes and what the agents get from it. The engine never changes the
 layer: the changes are the team's. The audit prints how many pages each decision has.
 
-The **For agents** row of a component's Documentation rates how much an agent can take from everything written about
-it, wherever it is written (its intent-layer page, its Figma description and annotations, a guidelines section
-headed with its name): what it is, when to use it, when not to, its role, an example and its properties by name.
-Each source is read the same way, so what is missing can be written in whichever the team keeps; nothing has to be
-in Figma. `--guidance-rating` reads the same sources.
+A component's Documentation reads everything written about it, wherever it is written (its intent-layer page, its
+Figma description and annotations, a guidelines section headed with its name), one row per thing an agent needs: what
+it is, when to use it, when not to, its role, an **Example**, its **Properties** (done: the row names its contract file, which the engine writes from
+Figma and the code, and lists them; never asked for again), and **Names that do not exist** when the text gives a token, property or component the system does not have (a name with
+a `*` is a family, there when one of the system's names starts with it). Each source is read the same way, so what is
+missing can be written in whichever the team keeps; nothing has to be in Figma. `--guidance-rating` reads the same
+sources.
 
 The **For agents** page does the same for Figma and the code: a component's Figma description, its When to use and When not to use
 lines and the contract reach the agents in full, while its notes (Figma annotations, the code's note and the
@@ -436,8 +440,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Documentation, Migration, Products, System, the page's own items and Accessibility last, each when it has any; no
   All), numbered in that order, so what the browser still tries is numbered after the rest and no other number moves:
   Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Task nr, WCAG criterion, Figma
-  states, Found, What to do, Status), Documentation's the Documentation area's (Task nr, Kind, What is written, What to
-  do, Status), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
+  states, Found, What to do, Status), Documentation's the Documentation area's (Task nr, Kind, Source, Status,
+  Last checked; what is written, what to do and each source's file in the row's panel), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
   Status. The count at the top is the shown kind's, and every open row is numbered, Documentation's too. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
   (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
@@ -457,7 +461,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#status/documentation`). Its columns are Task nr, Kind, What is written, What to do (who writes it above it, You in Figma, and where) and Status (To fix, or Done with where it was written), one row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#status/documentation`). Its columns are Task nr, Kind, Source (where it was read, by name only: Figma, Intent layer, Code, Contract, Guidelines; the file in the row's panel), Status and Last checked; what is written and what to do (who writes it, You in Figma, and where) are in the row's panel (`PANEL_ONLY`). One row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role, Example, Properties: done, naming its contract file), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
@@ -538,8 +542,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
-  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
-  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header.
+  `styleguide.branch` or the origin's default branch), its page in the intent layer, its contract (a copy written
+  beside the guide, `contracts/<name>.contract.json`, so the button opens the file), `styleguide.componentDocs`
+  (`"https://wiki/…/{name}"`), `contract.authored.json` → `components.<name>.links`, as buttons at the top right of
+  its header.
 - **At a glance** (`factsOf`), under its name, on one line: its class (`.modal-card`), Version (the release its last
   change shipped in), Last changed, its date and time, and how to import it. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
   overview card, in one line, a fact that needs work marked with ! and in bold, never by colour alone.
@@ -782,6 +788,37 @@ check (an authored binding, then `componentPropAliases`, then camelCase); intera
 as they are CSS. Type a component's props with it (`const check: ChipFigmaProps = {} as ChipProps`, or use
 it as the props type) and `tsc` shows prop drift in the editor and in CI. `contracts/` stays local, so set
 `contracts.propTypesOut` to a committed path when CI should check it.
+
+#### Publishing the contracts to a shared repository (`--contracts-out <dir>`)
+
+The local `contracts/` stay local. To give a team one shared contract per component (beside its intent layer, say),
+`rms-design-system-engine --contracts-out <dir>` writes the contracts in their published form into a folder of
+another repository's clone, and nothing else: one contract per code file (`contracts.layout: "code"`, see the
+configuration reference), `contract.schema.json`, and a generated `README.md` (what a contract holds, where each part
+comes from, coverage counts, and the Figma components with no file of their own). No token values, catalog,
+`llms.txt` or `.gitignore`; no copy of the intent layer's text (`intentPage` links to the page). A contract the code
+no longer has is removed. The same inputs give the same files, so an unchanged system gives no diff. The engine never
+commits or pushes: review the diff, commit it on a branch, and open a merge request. The published contracts are
+generated: changes go into the code, Figma or `contract.authored.json`, never into the files.
+
+Each published contract carries, beside the Figma half: `bindings.code` per property (the code prop or slot, who
+decided the pairing: `authored`, `alias`, `codeConnect` or `name`; its type, options, default, required, description;
+the Code Connect `valueMap`; `inverted` when the code holds the opposite of the Figma value, as `showClose` and
+`hideClose`), `conditions` (the attributes a property only decides are written, from the Code Connect template),
+`differences` (default, options, name), `codeOnly`, `events` with payloads, `codeSlots` (the code's slots, with the props
+each hands its content; `slots` stays Figma's instance swaps and what each accepts), `states`
+(Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
+keyboard, each with where it was read), `anatomy` (the root and the inner frames Figma binds a padding or a gap
+on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`), and
+`source.code.commit` (the last commit that changed the component's file, so an unchanged component keeps the same
+file). The props gate (Gate 14) pairs Figma and the code the same way
+(`prop-binding.mjs`), so the two never disagree.
+
+Once published, the shared contracts are what the style guide links to. The intent-layer sync reads them with the
+pages (`shared-contracts.mjs`): each component's **Contract** button opens its file on GitLab, and its Documentation
+**Properties** row is done while the shared contract still lists what the code and Figma have, and a task to publish
+again when it does not (a prop, event, slot or Figma property added or gone, or a contract in another format). With
+none published, the row names the engine's local contract as a task to publish it.
 
 #### The code capture (every run, and `--capture-code` on its own)
 
@@ -1266,7 +1303,7 @@ scorecard's gate health).
 #### Accessibility check (advisory, from the render)
 
 A mechanical, agnostic accessibility pass (`a11y-check.mjs`) that reuses the Gate 22 CDP/headless-Chrome
-flow. It reports **WCAG AA contrast** per theme (computed `color` vs the background really painted behind the text: the layers at its centre in paint order, a sibling laid under it or a `::before` that covers its box included, not only its ancestors),
+flow. It reports **WCAG AA contrast** per theme (computed `color` vs the background really painted behind the text: the layers at its centre in paint order, a sibling laid under it or a `::before` or `::after` that covers its box included, not only its ancestors; in each declared colour mode and in each pair that can be on at once, such as dark with high contrast or a colour mode with another colour collection's modes),
 **accessible name + role** (interactive nodes from the accessibility tree — a component that never exposes
 aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11; a field whose frame shows its focus (`:focus-within` on the box around it, when it holds only that control) passes, its frame's ring measured the same way, as does a part beside it in that box (a radio's circle, a switch's track); a native checkbox or radio hidden under such a part is judged by it, a control that takes no focus (inside an inert thumbnail) is not judged, and a style that eases in or out is read where its transition ends), **state exposure** (an element whose state
 is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.invalid` / … — with no matching
@@ -1443,6 +1480,15 @@ there, never a failure.
   `tab`, `link`…) that does nothing on Enter (and Space for buttons, checkboxes and switches). The click is
   caught before the element's own handler, so the check never navigates or submits.
 - **Arrow keys** — a radio group, tab list, menu or list box whose items do not move with the arrow keys.
+- **The keys of each pattern (ARIA Authoring Practices)** — where the component's own script runs (an app page, or a
+  style guide that inlines `systemScripts`): a tab list, menu or list box that moves with the arrows but not with Home
+  and End (`homeend`, 2.1.1); a combobox whose list does not open on Down or close on Escape with the focus kept in it
+  (`comboboxkeys`, 2.1.1). On a style guide the same run also presses Escape on a menu button and Tab in a modal, as
+  the audit does with real keys. Drawn as markup alone, nothing answers a key, so nothing is pressed.
+- **What a screen reader says** — each control's name, role and state, as NVDA and VoiceOver say them ("Bold,
+  button, pressed"), shown under 4.1.2 in the style guide. A name that says little fails 2.4.6 (`weakname`): a
+  placeholder word or a role ("icon", "button"), a file or an icon's name ("chevron-down"), the role said twice
+  ("Close button, button"). Two links with the same words going to different places fail 2.4.4 (`samename`).
 - **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
   menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
   is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
@@ -1626,8 +1672,10 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **axe-core** is cached in `~/.cache/rms-design-system-engine` after the first download (or `a11y.axePath`
   points at a local copy), and is scoped to the checked components.
 
-**Not yet:** a component's contrast is measured in each mode the system declares (the system's text and background pairs
-are also checked in every combination of two switches, the `🎛` check, `modeCombinations` in config.md). The Figma side
+A component's text contrast is measured in each mode the system declares and in each pair of them that can be on at
+once (dark with high contrast); the style guide measures every combination of its colour switches, reading a sibling
+laid under the text and a `::before` or `::after` that covers a box. The system's text and background pairs are also
+checked in every combination of two switches (the `🎛` check, `modeCombinations` in config.md). The Figma side
 is read by `--figma-a11y` (contrast and target size on Figma's own screens) and its findings are pinned there by
 `--figma-edits`.
 

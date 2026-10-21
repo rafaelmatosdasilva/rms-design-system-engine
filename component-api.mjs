@@ -18,10 +18,11 @@
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
-import { join, resolve, dirname, extname, relative } from 'node:path';
+import { join, resolve, dirname, extname, relative, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi } from './component-source.mjs';
 import { parseCodeConnect, normalizeNodeId } from './codeconnect-check.mjs';
+import { parseConnectFile } from './code-connect-map.mjs';
 import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
 
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
@@ -122,6 +123,24 @@ export function storybookFiles(index, ROOT = '') {
 // import), propMap: { figmaProp: codeProp } }.
 export function codeConnectPairs(text, fileAbs) {
   const out = [];
+  // The template form (figma.selectedInstance.get… into figma.html): its tag names the component, the import in its
+  // imports list its file, and each property that fills an attribute its prop (one that only decides whether an
+  // attribute is written pairs with none here; `connections` keeps every reading).
+  if (!/figma\.connect\(/.test(String(text))) {
+    for (const m of parseConnectFile(text, fileAbs)) {
+      const imp = /import\s+[\w${}\s,]+\s+from\s+\\?['"]([^'"\\]+)\\?['"]/.exec(String(text).slice(Math.max(0, String(text).search(/imports\s*:/))))?.[1] ?? null;
+      let file = null;
+      if (imp) {
+        const at = fileAbs.lastIndexOf(`${sep}src${sep}`);
+        const base = imp.startsWith('@/') && at >= 0 ? join(fileAbs.slice(0, at + 5), imp.slice(2)) : imp.startsWith('.') ? resolve(dirname(fileAbs), imp) : null;
+        if (base) file = [base, ...['.vue', '.tsx', '.ts', '.jsx', '.js', '.svelte'].map((x) => base + x)].find((p) => existsSync(p) && extname(p)) ?? null;
+      }
+      const propMap = {};
+      for (const p of m.props) if (p.code && p.role === 'value' && !p.event && !(p.figma in propMap)) propMap[p.figma] = p.code;
+      out.push({ component: m.tag ?? m.id ?? '', nodeId: m.nodeId, file, propMap, connections: m.props, connectFile: fileAbs });
+    }
+    return out;
+  }
   for (const c of parseCodeConnect(text)) {
     let file = null;
     const id = c.component.split('.')[0];
@@ -253,6 +272,11 @@ export function mergeApiReadings(readings) {
     if (opts.length) fact.options = opts[0].e.options;
     const type = seen.find((s) => s.e.type)?.e.type;
     if (type) fact.type = type;
+    const description = seen.find((s) => s.e.description)?.e.description;   // what it is for, as its source writes it
+    if (description) fact.description = description;
+    // A default the code builds (an object, a list): its expression, when no source gives a plain value.
+    const built = seen.find((s) => s.e.defaultExpression)?.e.defaultExpression;
+    if (built && fact.default == null) fact.defaultExpression = built;
     // Must be given: the best source that says, and never when the code gives it a default (it is filled for you).
     const req = seen.find((s) => typeof s.e.required === 'boolean');
     if (req) fact.required = req.e.required && fact.default == null;
@@ -354,9 +378,9 @@ export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {}, pairin
       if (t) readings.push({ source: 'typescript', props: t.props });
       readings.push({ source: 'text', ...textComponentApi(file, text) });
     }
-    if (!readings.length) return { file: null, how, props: {}, slots: { named: [], default: false }, events: [], readBy: [], codeConnect: ccFor(name)?.propMap ?? null };
+    if (!readings.length) return { file: null, how, props: {}, slots: { named: [], default: false }, events: [], readBy: [], codeConnect: ccFor(name)?.propMap ?? null, ...(ccFor(name)?.connections ? { codeConnectProps: ccFor(name).connections, codeConnectFile: ccFor(name).connectFile, ...(ccFor(name).component ? { codeConnectTag: ccFor(name).component } : {}) } : {}) };
     const merged = mergeApiReadings(readings);
-    return { file, how, ...merged, ...callName(name, file, file ? read(file) : '', e, d), codeConnect: ccFor(name)?.propMap ?? null };
+    return { file, how, ...merged, ...callName(name, file, file ? read(file) : '', e, d), codeConnect: ccFor(name)?.propMap ?? null, ...(ccFor(name)?.connections ? { codeConnectProps: ccFor(name).connections, codeConnectFile: ccFor(name).connectFile, ...(ccFor(name).component ? { codeConnectTag: ccFor(name).component } : {}) } : {}) };
   }
 
   return { fileFor, apiFor, sources, read, files };

@@ -162,7 +162,11 @@ export function breakpointWidths(ROOT, cfg) {
 // the mode stands for, or the page would be measured in light for every mode.
 export function modeSwitch(mode, { styleguide = false } = {}) {
   const sw = modeSwitchFor(mode);
-  if (!styleguide || sw.unsupported) return sw;
+  return styleguide ? styleguideSwitch(sw) : sw;
+}
+// The style guide pins its own colour attribute: a switch that sets the colour scheme sets it too.
+export function styleguideSwitch(sw) {
+  if (sw.unsupported) return sw;
   const scheme = sw.media?.find((f) => f.name === 'prefers-color-scheme')?.value;
   if (!scheme) return sw;
   const set = `(() => { const r = document.documentElement; if (!r.hasAttribute('data-color')) return; if (!r.hasAttribute('data-design-system-engine-color-was')) r.setAttribute('data-design-system-engine-color-was', r.getAttribute('data-color')); r.setAttribute('data-color', ${JSON.stringify(scheme)}); })()`;

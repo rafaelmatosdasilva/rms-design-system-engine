@@ -111,8 +111,8 @@ const ENV = { GITLAB_TOKEN: 't0k', GITLAB_HOST: 'git.acme.test' };
 // ── Pure parts ────────────────────────────────────────────────────────────────────────────────────────────────────
 test('config: a bare link or an object; nothing set is null', () => {
   assert.equal(intentLayerConfig({}), null);
-  assert.deepEqual(intentLayerConfig({ intentLayer: LINK }), { url: LINK, entry: null, out: 'intent-layer.snapshot.json' });
-  assert.deepEqual(intentLayerConfig({ intentLayer: { gitlab: LINK, entry: '/docs/system.dsds.json', out: 'x.json' } }), { url: LINK, entry: 'docs/system.dsds.json', out: 'x.json' });
+  assert.deepEqual(intentLayerConfig({ intentLayer: LINK }), { url: LINK, entry: null, out: 'intent-layer.snapshot.json', contracts: null });
+  assert.deepEqual(intentLayerConfig({ intentLayer: { gitlab: LINK, entry: '/docs/system.dsds.json', out: 'x.json', contracts: '/specs/contracts/' } }), { url: LINK, entry: 'docs/system.dsds.json', out: 'x.json', contracts: 'specs/contracts' });
 });
 
 test('kinds land in the layers of the design intent; titles map to the kinds the style guide shows', () => {
@@ -154,6 +154,39 @@ test('a DSDS index: its $refs followed, sections sorted by kind, facts and metad
   assert.equal(entities.find((e) => e.name === 'Saving').layer, 'patterns');
   // No index: every file with an entity.
   assert.equal(readDsds(files, null).entities.length, 8);
+});
+
+test('DSDS 0.23: a guidelines section is read by its title, as a section is; Rules and the rest stay rules', () => {
+  const g = (title, ...statements) => ({ kind: 'guidelines', title, items: statements.map((s) => ({ statement: s, level: 'should' })) });
+  const v = entityView({ kind: 'component', id: 'component-tile-one', name: 'Tile One', description: 'A tile for one subject.', sections: [
+    g('When to use', 'Use it to group one subject.'),
+    g('When not to use', 'Not for a list of subjects: use the list.', 'Not for navigation.'),
+    g('Common mistakes', 'Putting two actions in it.'),
+    g('Limitations', 'One image at most.'),
+    g('Rules', 'Keep the title visible.'),
+    g('For agents', 'Read its contract first.'),
+    { kind: 'section', title: 'Specification', freeform: [{ title: 'Token Notes', body: 'Colours come from the tile tokens.' }] },
+  ] }, 'tile-one.dsds.json');
+  assert.deepEqual(v.whenToUse, ['Use it to group one subject.']);
+  assert.deepEqual(v.whenNotToUse, ['Not for a list of subjects: use the list.', 'Not for navigation.']);
+  assert.deepEqual(v.mistakes, ['Putting two actions in it.']);
+  assert.deepEqual(v.limitations, ['One image at most.']);
+  assert.deepEqual(v.rules.map((r) => r.text), ['Keep the title visible.', 'Read its contract first.']);
+  assert.deepEqual(v.purpose, ['A tile for one subject.']);
+  // Read so, a page that says when to use its component is used, never told to add it.
+  const r = useReport({ entities: [v] }, new Map([['tileOne', v]]), { names: ['tileOne'] });
+  assert.equal(r.pages[0].verdict, 'used');
+  assert.ok(!r.pages[0].todo.some((t) => /when to use/i.test(t) && /^Add/.test(t)), JSON.stringify(r.pages[0].todo));
+});
+
+test('a token\'s page is used when it says what the token is for; Improve always says what to add', () => {
+  const page = (kind, purpose, extra = {}) => ({ kind, layer: kind === 'token' ? 'foundations' : 'patterns', name: `${kind}-one`, file: `${kind}.dsds.json`, purpose, whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], facts: [], repeated: 0, ...extra });
+  const r = useReport({ entities: [page('token', ['Background colour of tileOne.']), page('pattern', ['Saving a long form.'])] });
+  const [token, pattern] = r.pages;
+  assert.deepEqual([token.verdict, token.action, token.todo], ['used', 'keep', []]);
+  assert.deepEqual([pattern.verdict, pattern.action], ['thin', 'improve']);
+  assert.match(pattern.todo[0], /^Add how to use it: When to use/);
+  for (const p of r.pages) if (p.action === 'improve') assert.ok(p.todo.length, `${p.name}: Improve with nothing to do`);
 });
 
 test('the filler a generator writes on every page is dropped, and counted per page', () => {
@@ -205,6 +238,17 @@ test('read through the API into its snapshot; the token goes to the named host; 
   const sub = fakeGitlab({ sha: 'fff1234def5678' });
   await syncIntentLayer(dir, { intentLayer: { gitlab: LINK, entry: 'docs/dsds/system.dsds.json' } }, { env: ENV, fetchImpl: sub.fetchImpl });
   assert.match(sub.calls.at(-1).url, /path=docs%2Fdsds/);
+});
+
+test('the component contracts kept beside the layer come with it: the link to each on GitLab and what it lists', async () => {
+  const dir = makeFixture({});
+  const contract = { schemaVersion: 1, id: 'buttonMain', name: 'buttonMain', version: '1.0.0', anatomy: { root: {} }, source: { code: { file: 'src/ui/ButtonMain.vue' } },
+    props: [{ name: 'size', bindings: { figma: { kind: 'VARIANT', property: 'size' }, code: { prop: 'size', as: 'prop', source: 'name' } } }], events: [{ name: 'clicked' }] };
+  const gl = fakeGitlab({ files: { ...LAYER, 'specs/contracts/components/button-main.contract.json': contract } });
+  await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: gl.fetchImpl });
+  const [k] = readIntentLayer(dir, { intentLayer: LINK }).contracts;
+  assert.deepEqual([k.name, k.format, k.codeFile, k.props, k.events], ['buttonMain', 1, 'src/ui/ButtonMain.vue', ['size'], ['clicked']]);
+  assert.equal(k.url, `${LINK}/-/blob/main/specs/contracts/components/button-main.contract.json`);
 });
 
 test('read-only: only GETs, only the project, its latest commit and one archive; nothing written there', async () => {

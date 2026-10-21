@@ -14,6 +14,7 @@ import { behavioursFor, partSheetLines, roleKey } from './behaviour-contract.mjs
 import { requirementEntry } from './annotation-categories.mjs';
 import { WCAG22, WCAG21_KIND } from './wcag21.mjs';
 import { figmaPropFor, BEHAVIOUR_PROP, STATE_PROP as STATE_DEFAULT_OFF } from './component-harness.mjs';
+import { conventionFor } from './prop-binding.mjs';
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // A Figma prop name without its node suffix ("Label#3:4" → "Label").
@@ -440,7 +441,8 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     for (const r of mine) {
       if (r.status !== 'match') { undecided++; continue; }   // missing, renamed, another value, or a prop only the code has
       const d = defs[r.figmaProp];
-      if (!d) continue;
+      // A component swap is which instance sits in a part: no switch says that (its show* switch shows or hides the part).
+      if (!d || d.type === 'INSTANCE_SWAP') continue;
       const prop = /^\(|^not in code$/.test(String(r.codeProp)) || !r.codeProp ? r.figmaProp : r.codeProp;
       const control = { label: r.figmaProp, prop, type: d.type, default: d.defaultValue ?? null };
       const pm = propertyMaps[name]?.[r.figmaProp] ?? propertyMaps[name]?.[cleanName(r.figmaProp)] ?? null;
@@ -1490,7 +1492,8 @@ export function codeControls(controls = [], api = null, figmaProps = [], connect
     const label = ccLabel ?? figmaPropFor(Object.keys(figmaDefs), p.name, names) ?? p.name;
     const base = { label, prop: p.name, fromCode: true, at: 1000 + out.length };
     const fig = figmaDefs[label]?.defaultValue;
-    if (/^boolean$/.test(p.type ?? '')) out.push({ ...base, type: 'BOOLEAN', default: String(fig ?? p.default) === 'true' });
+    // A state (disabled, selected) starts off, wherever Figma's default variant sits: the component as it is first met.
+    if (/^boolean$/.test(p.type ?? '')) out.push({ ...base, type: 'BOOLEAN', default: STATE_DEFAULT_OFF.test(String(label).replace(/\s+/g, '')) ? false : String(fig ?? p.default) === 'true' });
     else if ((p.values ?? []).length > 1) out.push({ ...base, type: 'VARIANT', default: fig != null && p.values.includes(String(fig)) ? String(fig) : p.default ?? p.values[0], options: p.values.map((v) => ({ label: v })) });
     // A text Figma has as a text prop (labelContent for label): a field, its words written where its build drew Figma's.
     else if (/^string$/.test(p.type ?? '') && figmaDefs[label]?.type === 'TEXT' && String(fig ?? '').trim()) out.push({ ...base, type: 'TEXT', default: String(fig) });
@@ -1717,7 +1720,11 @@ export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], 
     const label = key.split('#')[0];
     const ctl = controls.find((k) => lc(k.label) === lc(label));
     const own = ctl ? null : Object.keys(codeProps).find((n) => lc(n) === lc(label));
-    const codeName = ctl ? (ctl.prop ?? ctl.label) : own;
+    // The naming conventions the props check and the contracts pair by (prop-binding.mjs), so the three agree: a value under
+    // another name (showLabel → showLabels) is that prop, its name a difference; a showX that decides x is matched there.
+    const conv = ctl || own ? null : conventionFor(label, d, codeProps);
+    if (conv?.role === 'condition') { paired.add(lc(conv.code)); rows.push({ type: 'Prop', figma: { name: label, value: say(d) }, code: { name: conv.code, value: 'shown when it is set' }, status: 'match', at: propsAt, decides: true }); continue; }
+    const codeName = ctl ? (ctl.prop ?? ctl.label) : own ?? conv?.code;
     // A Figma slot the code holds in a part of its own (the contract names it: .modal-slot): paired with that part.
     const slotFigma = Object.values(fprops).filter((x) => x.type === 'SLOT').length;
     const part = d.type === 'SLOT' && !codeName ? slotParts.find((x) => lc(x.name) === lc(label)) ?? (slotFigma === 1 && slotParts.length === 1 ? slotParts[0] : null) : null;

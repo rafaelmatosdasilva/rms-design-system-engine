@@ -60,9 +60,11 @@
 // No npm dependencies (Node >= 22 built-in WebSocket). Honors No-imposed-structure: findings
 // come from measured pixels and the accessibility tree, not from any presumed token/tier model.
 //
+// Text contrast reads what is painted under the text where it sits (a sibling laid under it, a ::before or ::after that
+// covers a box), and is measured in each declared colour mode and in each pair that can be on at once (dark with high
+// contrast, a colour mode with another colour collection's modes).
+//
 // NOT yet, by design:
-//   - Text laid over a sibling or a pseudo-element: its background is taken from its ancestors.
-//   - Contrast in every combination of two mode switches (dark with high contrast): each declared mode is measured.
 //   - Reading order, skip links, landmark completeness beyond axe-core's best practices — and anything the render
 //     cannot reveal: only when the project declares it in ds-config.json, never imposed (No-imposed-structure).
 
@@ -77,8 +79,8 @@ import { spawn } from 'child_process';
 import { pathToFileURL } from 'url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
 import { loadLocator } from './component-locator.mjs';
-import { loadModes } from './mode-resolver.mjs';
-import { modeSwitch } from './code-capture.mjs';
+import { loadModes, loadCollections, combinedModes, mergeSwitches, modeSwitchFor } from './mode-resolver.mjs';
+import { modeSwitch, styleguideSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
 import { parseColor as parseCssColor } from './css-values.mjs';
@@ -1069,8 +1071,9 @@ function sweepExpression(roots, doFocus, stateMap) {
     const alpha = (b) => { const mm = String(b).match(/^rgba?\\(([^)]+)\\)/); const parts = mm ? mm[1].split(',') : null; return parts ? (parts[3]!==undefined ? parseFloat(parts[3]) : 1) : 0; };
     // The backgrounds behind an element, nearest first: its own, then its ancestors' up to the first opaque one.
     const ancestorLayers = (el) => { const layers = []; let node = el; while (node && node.nodeType===1) { const b = getComputedStyle(node).backgroundColor; layers.push(b); if (alpha(b) === 1) break; node = node.parentElement; } return layers; };
-    // A ::before that covers its element and paints a background: a layer laid over the element's own background.
-    const coverOf = (n) => { const p = getComputedStyle(n, '::before'); if (!p || p.content === 'none' || p.display === 'none' || alpha(p.backgroundColor) === 0) return null; const r = n.getBoundingClientRect(); const fits = Math.abs(parseFloat(p.width) - r.width) < 2 && Math.abs(parseFloat(p.height) - r.height) < 2; const inset = /absolute|fixed/.test(p.position) && p.top === '0px' && p.left === '0px' && p.right === '0px' && p.bottom === '0px'; return fits || inset ? p.backgroundColor : null; };
+    // A ::before or ::after that covers its element and paints a background: a layer laid over the element's own
+    // background (::after over ::before, as they paint).
+    const coverOf = (n) => { const r = n.getBoundingClientRect(); return ['::after', '::before'].map((ps) => { const p = getComputedStyle(n, ps); if (!p || p.content === 'none' || p.display === 'none' || alpha(p.backgroundColor) === 0) return null; const fits = Math.abs(parseFloat(p.width) - r.width) < 2 && Math.abs(parseFloat(p.height) - r.height) < 2; const inset = /absolute|fixed/.test(p.position) && p.top === '0px' && p.left === '0px' && p.right === '0px' && p.bottom === '0px'; return fits || inset ? p.backgroundColor : null; }).filter(Boolean); };
     // What is painted behind the text where it sits: the elements under its middle in paint order, a sibling laid
     // under it by its position included, and a ::before that covers one; not only its ancestors. Off screen, it is
     // scrolled into view first; where nothing can be read there (a bar stuck over it), its ancestors as before.
@@ -1086,7 +1089,7 @@ function sweepExpression(roots, doFocus, stateMap) {
       if (at < 0) return ancestorLayers(el);
       const layers = [];
       for (const n of stack.slice(at)) {
-        const c = coverOf(n); if (c) { layers.push(c); if (alpha(c) === 1) return layers; }
+        for (const c of coverOf(n)) { layers.push(c); if (alpha(c) === 1) return layers; }
         const b = getComputedStyle(n).backgroundColor; layers.push(b); if (alpha(b) === 1) return layers;
       }
       return layers;
@@ -1988,6 +1991,11 @@ async function main() {
   const sg = urlList.length || harness ? null : styleguideTarget(cfg, ROOT);
   // The styleguide pins its own mode attribute: switch it too, or every mode is measured as light.
   if (sg) modes = modeDefs.map((m) => ({ name: m.name || m.snapshotKey || 'light', sw: modeSwitch(m, { styleguide: true }) })).filter((m) => !m.sw.unsupported);
+  // Two colour modes on at once (dark with high contrast), for the text contrast: what each mode passes alone can fail
+  // together.
+  const pairModes = combinedModes(modeDefs, loadCollections(cfg).filter((c) => c.kind === 'color'))
+    .map((p) => { const sw = mergeSwitches(p.parts.map(modeSwitchFor)); return { name: p.name, sw: sg ? styleguideSwitch(sw) : sw, pair: true }; })
+    .filter((m) => !m.sw.unsupported);
   // On the styleguide, only the design system's own components are checked: the page's navigation,
   // badges and notes are the styleguide's chrome, not the DS.
   if ((sg || harness) && !roots) {
@@ -2303,11 +2311,20 @@ async function main() {
       const nf = { kind, plugin: label, desc, modes: [mode], perMode: { [mode]: 1 }, ...extra };
       once.set(k, nf); findings.push(nf);
     };
-    for (const mode of modes) {
+    for (const mode of [...modes, ...pairModes]) {
       await send('Emulation.setEmulatedMedia', { features: mode.sw.media }, sessionId);
       if (mode.sw.apply) await send('Runtime.evaluate', { expression: mode.sw.apply }, sessionId);
       await send('Runtime.evaluate', { expression: SETTLE_TRANSITIONS }, sessionId).catch(() => {});
-      const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, true, STATE_MAP), returnByValue: true }, sessionId).catch((e) => ({ error: e.message }));
+      const r = await send('Runtime.evaluate', { expression: sweepExpression(roots, !mode.pair, STATE_MAP), returnByValue: true }, sessionId).catch((e) => ({ error: e.message }));
+      // Two modes at once: only the text and the icons are read again; the focus and the rest were read in each mode.
+      if (mode.pair) {
+        const { textEls = [], iconEls = [] } = r.result?.value ?? {};
+        for (const f of contrastFindings(textEls, mode.name)) findings.push({ plugin: label, ...f });
+        for (const f of iconContrastFindings(iconEls, mode.name)) findings.push({ plugin: label, ...f });
+        if (textEls.length) ranChecks.add('modepairs');
+        if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId);
+        continue;
+      }
       if (!r.result?.value) { const why = r.error ?? r.exceptionDetails?.exception?.description?.split('\n')[0]; unread.push(`${where} (${mode.name}${why ? `: ${why}` : ''})`); if (mode.sw.undo) await send('Runtime.evaluate', { expression: mode.sw.undo }, sessionId); first = false; continue; }
       const { textEls = [], iconEls = [], noFocus = [], faintFocus = [], thinFocus = [], ariaState = [], notKeyboard = [], judged = [] } = r.result.value;
       // Every element read, with its verdict, so a check that passes says what it passed on.
@@ -2422,8 +2439,10 @@ async function main() {
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         ${SETTLE_TRANSITIONS};
         out.push(...(${edgesOnly} ? window.__wcag21.edges(el) : window.__wcag21.check(el, { name: sel || '' })).findings);
-        // What it does when used is tried on the first one, on the style guide the first one drawn in a preview.
-        if (!${edgesOnly} && !acted && (!stage || el.closest(stage))) { acted = true; out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4 })).findings); }
+        // What it does when used is tried on the first one, on the style guide the first one drawn in a preview. Its keys
+        // only where the system's script runs; the arrows, Escape, the focus given back and Tab in a modal are pressed
+        // with real keys further on.
+        if (!${edgesOnly} && !acted && (!stage || el.closest(stage))) { acted = true; out.push(...(await window.__wcag21.interact(el, { wait: 150, triggers: 4, keys: ${!target.styleguide} || !!document.querySelector('script[data-system-script]'), skip: ['arrows', 'escape', 'focusreturn', 'modalescape'] })).findings); }
       }
       return { out, total, checked: seen.length };
     })()`);

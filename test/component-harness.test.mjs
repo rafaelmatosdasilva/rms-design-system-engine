@@ -75,3 +75,15 @@ export function Stepper({ Value = '1', ...rest }) {
   const says = check(tidepool(below)).issues.filter((i) => /stepper/.test(i.selector)).map((i) => `${i.issue} ${i.selector}`);
   assert.deepEqual(says, ['partrole stepper: its "Decrement" part (decrement) goes past the minimum: pressed from 1, the value reached -3 (aria-valuemin 0). Stop at it, or disable the button there']);
 });
+
+test('a value written only while another prop is on is drawn with that prop on too, each of its values', async () => {
+  const { decidedCases, harnessCases } = await import('../component-harness.mjs');
+  const entry = { properties: { 'tone#1:2': { type: 'VARIANT', defaultValue: 'calm', variantOptions: ['calm', 'loud'] }, framed: { type: 'VARIANT', defaultValue: 'false', variantOptions: ['false', 'true'] } } };
+  const base = harnessCases(entry)[0].props;
+  const connect = [{ figma: 'tone', code: 'tone', role: 'value' }, { figma: 'framed', code: 'tone', role: 'condition' }, { figma: 'framed', code: 'framed', role: 'value' }];
+  const cases = decidedCases(entry, base, connect);
+  assert.deepEqual(cases.map((c) => c.label), ['tone=calm, framed=true', 'tone=loud, framed=true']);
+  assert.equal(cases[1].props.tone, 'loud'); assert.equal(cases[1].props.framed, 'true');
+  assert.deepEqual(decidedCases(entry, { ...base, framed: 'true' }, connect), [], 'already on in every case: nothing to add');
+  assert.deepEqual(decidedCases(entry, base, [{ figma: 'tone', code: 'tone', role: 'value' }]), [], 'nothing decides it');
+});
