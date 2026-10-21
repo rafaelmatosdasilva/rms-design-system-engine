@@ -3417,12 +3417,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         out += '<clipPath id="' + id + '"><circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '"/></clipPath>' +
           '<g clip-path="url(#' + id + ')"><rect x="' + (cx - LR) + '" y="' + (cy - LR) + '" width="' + (LR * 2) + '" height="' + (LR * 2) + '" class="sg-bk-lens-ground"/>' + g0 + icon(o[0], o[1], zoom) + '</g>' +
           '<circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '" class="sg-bk-lens-ring"/>';
-        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="8" class="sg-bk-lens-dot"/>';
-        if (l.kind === 'corner') out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/>';
+        // The cap: a circle as wide as the stroke on the cap's centre. The join: the circle its outer curve is drawn on.
+        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((an.end.wid || an.w) * zoom / 2) + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="8" class="sg-bk-lens-dot"/>';
+        if (l.kind === 'corner') {
+          if (an.corner.r > an.w * 0.1 && an.corner.ta) {
+            // The outer curve itself, dashed over it from one arm's edge to the other's.
+            // Drawn just outside the curve, on its centre, so the dashes are not lost on the edge.
+            var oc = on(an.corner.o), rr = an.corner.r * zoom + 6, grow = function (p) { var q = on(p), k = rr / (Math.hypot(q[0] - oc[0], q[1] - oc[1]) || 1); return [oc[0] + (q[0] - oc[0]) * k, oc[1] + (q[1] - oc[1]) * k]; };
+            var p1 = grow(an.corner.ta), p2 = grow(an.corner.tb), sw = ((p1[0] - oc[0]) * (p2[1] - oc[1]) - (p1[1] - oc[1]) * (p2[0] - oc[0])) > 0 ? 1 : 0;
+            out += '<path d="M' + p1[0] + ' ' + p1[1] + ' A' + rr + ' ' + rr + ' 0 0 ' + sw + ' ' + p2[0] + ' ' + p2[1] + '" class="sg-bk-lens-mark"/>';
+          } else out += '<circle cx="' + cx + '" cy="' + cy + '" r="8" class="sg-bk-lens-dot"/>';
+        }
         if (l.kind === 'gap') {
           // The gap measured tip to tip.
-          var ga = on(an.gap.a), gb = on(an.gap.b), gx = gb[0] - ga[0], gy = gb[1] - ga[1], gd = Math.hypot(gx, gy) || 1, vx = gx / gd, vy = gy / gd;
-          var t1 = [ga[0] + vx * s1, ga[1] + vy * s1], t2 = [gb[0] - vx * s1, gb[1] - vy * s1], nx = -vy * 20, ny = vx * 20;
+          var t1 = on(an.gap.a), t2 = on(an.gap.b), gx = t2[0] - t1[0], gy = t2[1] - t1[1], gd = Math.hypot(gx, gy) || 1, vx = gx / gd, vy = gy / gd, nx = -vy * 20, ny = vx * 20;
           out += '<g class="sg-bk-lens-measure"><line x1="' + t1[0] + '" y1="' + t1[1] + '" x2="' + t2[0] + '" y2="' + t2[1] + '"/>' +
             '<line x1="' + (t1[0] - nx) + '" y1="' + (t1[1] - ny) + '" x2="' + (t1[0] + nx) + '" y2="' + (t1[1] + ny) + '"/><line x1="' + (t2[0] - nx) + '" y1="' + (t2[1] - ny) + '" x2="' + (t2[0] + nx) + '" y2="' + (t2[1] + ny) + '"/></g>';
         }
@@ -3522,7 +3530,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
             var a = walk(n0[0], q, stepK, best), b = walk(n0[1], q, stepK, best); if (a == null || b == null) continue;
             var qx = q % W, qy = (q - qx) / W, ax = a % W - qx, ay = (a - a % W) / W - qy, bx = b % W - qx, by = (b - b % W) / W - qy;
             var cos = (ax * bx + ay * by) / (Math.hypot(ax, ay) * Math.hypot(bx, by) || 1);
-            if (cos > -0.35) corners.push({ q: q, cos: cos });   // turns by more than about 70 degrees
+            if (cos > -0.35) corners.push({ q: q, cos: cos, a: a, b: b });   // turns by more than about 70 degrees
           }
         }
         // Round where a disc of half the stroke, rolled inside the shape, covers what is near the point.
@@ -3538,7 +3546,29 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           }
           return lost < 0.15 * R * R;   // a square corner loses about 0.2 R² each
         };
-        var pt = function (q) { var x = q % W; return [x / S + vb[0], (q - x) / W / S + vb[1]]; };
+        var pt = function (q) { var x = q % W; return [(x + 0.5) / S + vb[0], ((q - x) / W + 0.5) / S + vb[1]]; };
+        var toU = function (x, y) { return [x / S + vb[0], y / S + vb[1]]; }, cen = function (q) { return [q % W + 0.5, Math.floor(q / W) + 0.5]; };
+        var unit = function (x, y) { var d = Math.hypot(x, y) || 1; return [x / d, y / d]; };
+        // Sub-pixel: how much of a point the drawing covers (its edges are anti-aliased), and how far along a direction an
+        // edge is crossed, so a mark lands on the stroke's real edge, not on the pixel next to it.
+        var cover = function (x, y) {
+          var x0 = Math.floor(x - 0.5), y0 = Math.floor(y - 0.5), fx = x - 0.5 - x0, fy = y - 0.5 - y0;
+          var g = function (X, Y) { return X < 0 || Y < 0 || X >= W || Y >= H ? 0 : px[(Y * W + X) * 4 + 3] / 255; };
+          return g(x0, y0) * (1 - fx) * (1 - fy) + g(x0 + 1, y0) * fx * (1 - fy) + g(x0, y0 + 1) * (1 - fx) * fy + g(x0 + 1, y0 + 1) * fx * fy;
+        };
+        var cross = function (x, y, ux, uy, max) {
+          var prev = cover(x, y), inside = prev >= 0.5;
+          for (var t = 0.25; t <= max; t += 0.25) { var c = cover(x + ux * t, y + uy * t); if ((c >= 0.5) !== inside) return t - 0.25 + 0.25 * (prev - 0.5) / ((prev - c) || 1); prev = c; }
+          return null;
+        };
+        // The middle of the stroke across a point inside it, and its width there.
+        // Only a clean cross-section counts: one as wide as the stroke (not into a curve or a crossing line).
+        var across = function (x, y, u) {
+          if (cover(x, y) < 0.5) return null;
+          var t1 = cross(x, y, -u[1], u[0], best * 2), t2 = cross(x, y, u[1], -u[0], best * 2);
+          if (t1 == null || t2 == null || Math.abs(t1 + t2 - best) > best * 0.12) return null;
+          return { x: x - u[1] * (t1 - t2) / 2, y: y + u[0] * (t1 - t2) / 2, w: t1 + t2 };
+        };
         corners.sort(function (a, b) { return b.cos - a.cos; });
         // The cap's centre: half a stroke back from the tip, the tip found by going on along the line until the shape stops
         // (thinning stops the line short of it, by an amount that varies).
@@ -3548,28 +3578,67 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           var c = t - best / 2;
           return [(ex + ux * c) / S + vb[0], (ey + uy * c) / S + vb[1]];
         };
-        // Each end once, with its cap's centre and the way it points.
+        // An end, exactly: the line's middle read across it a stroke and two strokes back, its tip where the shape stops
+        // along that middle, the cap's centre half its width back from the tip.
+        var endAt = function (e) {
+          var c0 = capAt(e), C = [(c0[0] - vb[0]) * S, (c0[1] - vb[1]) * S], tw = cen(e.toward), u = unit(C[0] - tw[0], C[1] - tw[1]);
+          var m1 = across(C[0] - u[0] * best * 1.2, C[1] - u[1] * best * 1.2, u), m2 = across(C[0] - u[0] * best * 2.2, C[1] - u[1] * best * 2.2, u);
+          if (m1 && m2) u = unit(m1.x - m2.x, m1.y - m2.y);
+          var base = m1 || { x: C[0] - u[0] * best, y: C[1] - u[1] * best, w: best }, wid = m1 && m2 ? (m1.w + m2.w) / 2 : base.w;
+          var t = cross(base.x, base.y, u[0], u[1], best * 4); if (t == null) t = best * 1.5;
+          var T = [base.x + u[0] * t, base.y + u[1] * t];
+          return { at: toU(T[0] - u[0] * wid / 2, T[1] - u[1] * wid / 2), tip: toU(T[0], T[1]), toward: toU(base.x, base.y), dir: u, wid: wid / S, mid: m1 };
+        };
+        // Each end once.
         var tips = [];
         ends.forEach(function (e) {
-          var c = capAt(e), t = pt(e.toward), dx = c[0] - t[0], dy = c[1] - t[1], d = Math.hypot(dx, dy) || 1;
-          if (!tips.some(function (o) { return Math.hypot(o.at[0] - c[0], o.at[1] - c[1]) < w; })) tips.push({ q: e.q, at: c, toward: t, dir: [dx / d, dy / d] });
+          var r = endAt(e);
+          if (!tips.some(function (o) { return Math.hypot(o.at[0] - r.at[0], o.at[1] - r.at[1]) < w; })) { r.q = e.q; tips.push(r); }
         });
         // Where the line is open: two ends that face each other across a short gap (the nearest pair, the highest first).
         var gap = null;
         tips.forEach(function (a, i) { tips.slice(i + 1).forEach(function (b) {
           var dx = b.at[0] - a.at[0], dy = b.at[1] - a.at[1], d = Math.hypot(dx, dy) || 1;
           if (a.dir[0] * b.dir[0] + a.dir[1] * b.dir[1] > -0.8 || (dx * a.dir[0] + dy * a.dir[1]) / d < 0.8 || d > w * 6) return;
-          var g = { a: a, b: b, mid: [(a.at[0] + b.at[0]) / 2, (a.at[1] + b.at[1]) / 2], gap: Math.round((d - w) * 4) / 4 };
+          // One line through both: its axis joins the two ends' middles, each tip found along it.
+          var ta = a.tip, tb = b.tip;
+          if (a.mid && b.mid) {
+            var ax = unit(b.mid.x - a.mid.x, b.mid.y - a.mid.y), da = cross(a.mid.x, a.mid.y, ax[0], ax[1], best * 4), db = cross(b.mid.x, b.mid.y, -ax[0], -ax[1], best * 4);
+            if (da != null && db != null) { ta = toU(a.mid.x + ax[0] * da, a.mid.y + ax[1] * da); tb = toU(b.mid.x - ax[0] * db, b.mid.y - ax[1] * db); }
+          }
+          var g = { a: a, b: b, ta: ta, tb: tb, mid: [(ta[0] + tb[0]) / 2, (ta[1] + tb[1]) / 2], gap: Math.round(Math.hypot(tb[0] - ta[0], tb[1] - ta[1]) * 4) / 4 };
           if (!gap || g.mid[1] < gap.mid[1] - w || (Math.abs(g.mid[1] - gap.mid[1]) <= w && g.gap < gap.gap)) gap = g;
         }); });
         // The cap: the lowest end not at the gap. The join: the turn nearest the top left, at its sharpest.
         var free = tips.filter(function (t) { return !gap || (t !== gap.a && t !== gap.b); });
         var low = (free.length ? free : tips).sort(function (a, b) { return b.at[1] - a.at[1]; })[0];
-        var end = low ? { at: low.at, toward: low.toward, round: capIs ? capIs === 'round' : round(low.q) } : null;
+        var end = low ? { at: low.at, toward: low.toward, wid: low.wid, round: capIs ? capIs === 'round' : round(low.q) } : null;
         var tl = corners.slice().sort(function (a, b) { var p1 = pt(a.q), p2 = pt(b.q); return p1[0] + p1[1] - p2[0] - p2[1]; })[0], cq = null;
         if (tl) { var tp = pt(tl.q); cq = corners.filter(function (c) { var p2 = pt(c.q); return Math.hypot(p2[0] - tp[0], p2[1] - tp[1]) < w * 2; }).sort(function (a, b) { return b.cos - a.cos; })[0]; }
-        var corner = cq ? { at: pt(cq.q), round: joinIs ? joinIs === 'round' : round(cq.q) } : null;
-        return { id: id, w: w, src: src, box: vb, end: end, corner: corner, gap: gap ? { at: gap.mid, a: gap.a.at, b: gap.b.at, gap: gap.gap } : null };
+        // A turn, exactly: each arm's middle line read across it, where the two lines meet, the corner their outer edges
+        // make, and how far in the drawing's outer curve starts from it along the turn's bisector: its radius, and centre.
+        var turnAt = function (c) {
+          // Each arm read at several distances out from the turn; the two farthest clean cross-sections give its line.
+          var K = cen(c.q), arm = function (e) {
+            var E = cen(e), u = unit(E[0] - K[0], E[1] - K[1]), ok = [];
+            [1, 0.85, 0.7, 0.55, 0.4].forEach(function (f) { if (ok.length < 2) { var m = across(K[0] + (E[0] - K[0]) * f, K[1] + (E[1] - K[1]) * f, u); if (m) ok.push(m); } });
+            if (ok.length === 2 && Math.hypot(ok[0].x - ok[1].x, ok[0].y - ok[1].y) > 2) u = unit(ok[0].x - ok[1].x, ok[0].y - ok[1].y);
+            return ok[0] ? { x: ok[0].x, y: ok[0].y, u: u, w: ok[0].w } : null;
+          };
+          var A = arm(c.a), B = arm(c.b); if (!A || !B) return null;
+          var den = A.u[0] * B.u[1] - A.u[1] * B.u[0]; if (Math.abs(den) < 0.2) return null;
+          var tA = ((B.x - A.x) * B.u[1] - (B.y - A.y) * B.u[0]) / den, P = [A.x + A.u[0] * tA, A.y + A.u[1] * tA];
+          var bis = unit(A.u[0] + B.u[0], A.u[1] + B.u[1]), half = Math.acos(Math.max(-1, Math.min(1, A.u[0] * B.u[0] + A.u[1] * B.u[1]))) / 2, sn = Math.sin(half) || 1, wid = (A.w + B.w) / 2;
+          var Q = [P[0] - bis[0] * wid / 2 / sn, P[1] - bis[1] * wid / 2 / sn], d = cross(Q[0], Q[1], bis[0], bis[1], best * 6) || 0;
+          var r = 1 / sn - 1 > 0.01 ? d / (1 / sn - 1) : 0, O = [Q[0] + bis[0] * r / sn, Q[1] + bis[1] * r / sn];
+          // Where the curve meets each arm's outer edge (out from its centre, away from the other arm), and its middle.
+          var out = function (u, v) { var k = u[0] * v[0] + u[1] * v[1]; return unit(-(v[0] - k * u[0]), -(v[1] - k * u[1])); }, nA = out(A.u, B.u), nB = out(B.u, A.u);
+          var mr = Math.max(0, r - wid / 2);   // the lens on the middle of the stroke where it turns
+          return { at: toU(O[0] - bis[0] * mr, O[1] - bis[1] * mr), o: toU(O[0], O[1]), r: r / S, ta: toU(O[0] + nA[0] * r, O[1] + nA[1] * r), tb: toU(O[0] + nB[0] * r, O[1] + nB[1] * r), wid: wid / S };
+        };
+        var turn = cq ? turnAt(cq) : null;
+        var corner = cq ? { at: turn ? turn.at : pt(cq.q), r: turn ? turn.r : 0, o: turn && turn.o, ta: turn && turn.ta, tb: turn && turn.tb, round: joinIs ? joinIs === 'round' : round(cq.q) } : null;
+        return { id: id, w: w, src: src, box: vb, end: end, corner: corner, gap: gap ? { at: gap.mid, a: gap.ta, b: gap.tb, gap: gap.gap } : null };
       };
       var all = ids.slice(0, 24).map(function (id) { try { return read(id); } catch (e) { return null; } }).filter(Boolean);
       var out = null;
