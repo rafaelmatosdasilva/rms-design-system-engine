@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// private-check.mjs - nothing private ever enters this public repository.
+// private-check.mjs - nothing private ever enters this public repository (or any repository that runs it with
+// RMS_CHECK_ROOT: a private module kept outside the engine is held to the same rule).
 //
 // The engine is built against private projects and from private notes, and the repository is public: a fork or a
 // search must find nothing of them. This refuses, in any file, commit message or added line:
@@ -33,7 +34,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { localTerms, PUBLIC_HOST } from './private-terms.mjs';
 
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// The repository checked: the engine's own, or another kept private beside it (RMS_CHECK_ROOT), as strict.
+export const ROOT = process.env.RMS_CHECK_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Runs of 1 to 4 words, joined with "-" and with nothing ("Some Name", "some-name", "someName").
 export const FORBIDDEN = new Set([
