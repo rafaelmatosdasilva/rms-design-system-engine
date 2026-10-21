@@ -1488,8 +1488,8 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 /* As the page's own bars: its ground across the panel's whole width (into its side padding), and once the panel's content
    scrolls under it, the page's line under it, as wide. */
 .sg-panel-head::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sg-card-gap)); right: calc(-1 * var(--sg-card-gap)); background: var(--sg-bg); z-index: -1; pointer-events: none; }
-.sg-panel-head::after { content: ''; position: absolute; left: calc(-1 * var(--sg-card-gap)); right: calc(-1 * var(--sg-card-gap)); bottom: 0; height: var(--sg-line-width, 1px); background: var(--sg-line-colour); opacity: 0; transition: opacity var(--sg-fast); pointer-events: none; }
-.sg-panel-head.is-stuck::after { opacity: 1; }
+.sg-panel-head::after, .sg-panel-head.sg-sticky-edge::after { content: ''; position: absolute; left: calc(-1 * var(--sg-card-gap)); right: calc(-1 * var(--sg-card-gap)); bottom: 0; height: var(--sg-line-width, 1px); background: var(--sg-line-colour); opacity: 0; transition: opacity var(--sg-fast); pointer-events: none; }
+.sg-panel-head.sg-sticky-edge::after { opacity: 1; }
 .sg-panel-head > h2 { margin: 0; font-size: calc(var(--sg-title) + var(--sg-space-xxs) * 3.5); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; }   /* every panel's title as a page's own title (the first panel's): one size, one line height */
 .sg-panel-head > .sg-section-badge, .sg-panel-head > .sg-panel-sub { margin: 0; }
 .sg-panel-head > h2 .sg-tip { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); vertical-align: middle; }   /* the row's tip after its title, at the table's size */
@@ -8316,7 +8316,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var refreshers = [];
   // Everything drawn again for a brand or mode change (each page only while it shows: lazyDraw).
   // A panel's head stuck (its content scrolled under it) carries the full-width line.
-  document.addEventListener('scroll', function (e) { var d = e.target; if (!d || !d.classList || !d.classList.contains('sg-tk-detail')) return; var h = d.querySelector('.sg-panel-head'); if (h) h.classList.toggle('is-stuck', d.scrollTop > 0); }, true);
+  document.addEventListener('scroll', function (e) { var d = e.target; if (!d || !d.classList || !d.classList.contains('sg-tk-detail')) return; var h = d.querySelector('.sg-panel-head'); if (h) h.classList.toggle('sg-sticky-edge', d.scrollTop > 0); }, true);
   function redrawAll() { refreshers.concat(DRAWERS).forEach(function (r) { try { r(); } catch (e) {} }); }
   // The components' group says how many there are: Components (117).
   if (COMPONENTS.length) { var lab = document.createElement('div'); lab.className = 'sg-nav-label'; lab.dataset.group = 'Components'; lab.innerHTML = 'Components' + countHTML(menuCount()); nav.appendChild(lab); }
