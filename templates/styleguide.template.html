@@ -3310,6 +3310,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var restKey = Math.round(box.width) + 'x' + Math.round(box.height) + ':' + (iso.getAttribute('data-state') || '');
       var focused = iso._rest && iso._rest.key === restKey && !iso._centring && Math.max.apply(null, rows.map(function (r) { return r.x; })) + gap * 3 <= iso._rest.x0;
       if (focused) x0 = iso._rest.x0;
+      else if (iso._centredKey === restKey && iso._rest && iso._rest.key === restKey) x0 = Math.max(x0, iso._rest.x0);   // a lifted layer only pushes the names right
       // Always in the stack's order, the top layer first, whatever the state lifts.
       rows.sort(function (a, b) { return +b.c.getAttribute('data-z') - +a.c.getAttribute('data-z'); });
       var last = -1e9;
@@ -3321,15 +3322,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         out += '<g class="' + (r.c.getAttribute('data-z') === iso.getAttribute('data-focus') ? 'is-on' : '') + '"><polyline points="' + f(r.x) + ',' + f(r.y) + ' ' + f(mx) + ',' + f(r.y) + ' ' + f(x2) + ',' + f(y) + '"/><path d="M' + f(r.x - 4) + ' ' + f(r.y) + 'h8M' + f(r.x) + ' ' + f(r.y - 4) + 'v8"/></g>';
       });
       if (!focused && !moving) iso._rest = { key: restKey, x0: x0, ys: ys };
-      // The stack and its names together centred across the card: moved by what the names add on the right.
-      if (!iso._centring && !focused && !moving) {
+      // The stack and its names together centred across the card: moved by what the names add on the right. Once per card
+      // size and spread (exploded or stacked): a layer picked, lifting, never moves the drawing.
+      if (!iso._centring && !focused && !moving && iso._centredKey !== restKey) {
         var st = iso.querySelector('.sg-bk-dp-stack'), lo = 1e9, hi = -1e9;
         Array.prototype.forEach.call(iso.querySelectorAll('.sg-bk-dp-plane'), function (p) { var q = p.getBoundingClientRect(); lo = Math.min(lo, q.left - box.left); });
         rows.forEach(function (r) { hi = Math.max(hi, r.c.getBoundingClientRect().right - box.left); });
-        var dx = box.width / 2 - (lo + hi) / 2 - gap * 2;   /* a little left of centre: room for the names */
+        var dx = box.width / 2 - (lo + hi) / 2;   /* the drawing and its names, one block, centred in the card */
         var room = box.width - gap * 8, span = hi - lo;
         if (st && span > room + 1) { iso._fit = Math.max(0.4, (iso._fit || 1) * room / span * 0.96); st.style.scale = iso._fit.toFixed(3); iso._centring = true; dpLeads(iso); iso._centring = false; iso._rest = null; dpLeads(iso); return; }   /* too wide with its names: smaller, then centred again */
-        if (st && Math.abs(dx) > 1) { iso._dx = (iso._dx || 0) + dx; st.style.translate = Math.round(iso._dx) + 'px 0'; iso._centring = true; dpLeads(iso); iso._centring = false; return; }
+        if (st && Math.abs(dx) > 1) { iso._dx = (iso._dx || 0) + dx; var ty = (getComputedStyle(st).translate || '').split(' ')[1] || '0px'; st.style.translate = Math.round(iso._dx) + 'px ' + ty;   /* across only: the height is dpPlace's */ iso._centring = true; dpLeads(iso); iso._centring = false; return; }
+        iso._centredKey = restKey;   // centred: kept until the card's size or spread changes
       }
       svg.innerHTML = out;
     };
@@ -4333,7 +4336,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var spec = dpIso.hasAttribute('data-focus') ? dpIso.querySelector('.sg-bk-dp-spec:not([hidden])') : null;
         var room = spec ? spec.getBoundingClientRect().height + (parseFloat(getComputedStyle(dpIso).getPropertyValue('--sg-space-l')) || 0) : 0;
         var want = Math.max(ir.top, ir.top + (ir.height - room - (bot - top)) / 2);   // never cut at the top, where the view is too short for both
-        st.style.translate = '0 ' + Math.round(cur + want - top) + 'px';
+        var tx = tr && tr !== 'none' ? tr.split(' ')[0] : '0px';
+        st.style.translate = tx + ' ' + Math.round(cur + want - top) + 'px';   // up and down only: across is the centring's
       };
       if (dpIso && typeof ResizeObserver !== 'undefined') new ResizeObserver(function () { dpPlace(); }).observe(dpIso);
       if (dpIso) {
