@@ -1372,15 +1372,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // Modules (ds-config.json → styleguide.modules): folders kept outside the system and the engine, each with a module.js,
   // an optional module.css and optional data per system (data/<system>/*.json), inlined last so each builds on the page's
   // own helpers (window.SG): a button, a panel.
-  const modules = () => (Array.isArray(cfg.styleguide?.modules) ? cfg.styleguide.modules : []).map((p) => {
-    const dir = resolve(ROOT, String(p).replace(/^~(?=$|\/)/, homedir()));
+  // An entry is a folder, or { path, data }: data names a folder of its own (kept apart from the module and from the
+  // system's project) whose <system>/ subfolder holds the module's data; without it, the module's own data/ folder.
+  const home = (p) => resolve(ROOT, String(p).replace(/^~(?=$|\/)/, homedir()));
+  const modules = () => (Array.isArray(cfg.styleguide?.modules) ? cfg.styleguide.modules : []).map((entry) => {
+    const p = entry && typeof entry === 'object' ? entry.path : entry;
+    const dir = home(p);
     const read = (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch { return null; } };
     const js = read('module.js'), css = read('module.css'), name = basename(dir).replace(/[^\w-]/g, '');
     if (js == null) return '<!-- styleguide.modules: a folder with no module.js -->';
-    // Its own data for this system: the JSON files in its data/<system>/ folder (the system's name as a slug), kept with
-    // the module, never in the system's project; the page reads them as SG.moduleData['<module>'].
+    // Its data for this system: the JSON files in <data>/<system>/ (the system's name as a slug), never in the system's
+    // project; the page reads them as SG.moduleData['<module>'].
     const sys = String(cfg.name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
-    const dataDir = join(dir, 'data', sys);
+    const dataDir = join(entry && typeof entry === 'object' && entry.data ? home(entry.data) : join(dir, 'data'), sys);
     let data = [];
     try { data = readdirSync(dataDir).filter((f) => /\.json$/i.test(f)).sort().map((f) => { try { return { file: f, ...JSON.parse(readFileSync(join(dataDir, f), 'utf8')) }; } catch { return null; } }).filter(Boolean); } catch { /* no data for this system */ }
     const dataTag = `<script data-sg-module-data="${name}">\n(window.SG.moduleData = window.SG.moduleData || {})[${JSON.stringify(name)}] = { system: ${JSON.stringify(sys)}, files: ${JSON.stringify(data).replace(/<\/script/gi, '<\\/script')} };\n</script>\n`;

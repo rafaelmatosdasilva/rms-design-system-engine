@@ -191,11 +191,12 @@ test('in the browser: no script error, a control changes the real component, the
   mkdirSync(join(dir, 'tools', 'demo-module'), { recursive: true });
   writeFileSync(join(dir, 'tools', 'demo-module', 'module.js'), "var bar = SG.themeBar(); bar.insertAdjacentHTML('beforeend', SG.sysButton('button', 'Demo', ' data-demo')); bar.querySelector('[data-demo]').addEventListener('click', function (e) { SG.openPanel({ id: 'demo-panel', title: 'Demo', crumbs: ['Theme'], body: '<p class=\"demo-body\">' + SG.esc('<b>Hello</b>') + '</p>', from: e.currentTarget }); });");
   writeFileSync(join(dir, 'tools', 'demo-module', 'module.css'), '.demo-body { margin: 0; }');
-  // Its own data for this system, kept with the module (data/<system>/*.json), never in the system's project.
+  // Its data for this system, kept in a folder of its own ({ path, data }: <data>/<system>/*.json), apart from the module
+  // and never in the system's project.
   const sysSlug = String(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
-  mkdirSync(join(dir, 'tools', 'demo-module', 'data', sysSlug), { recursive: true });
-  writeFileSync(join(dir, 'tools', 'demo-module', 'data', sysSlug, 'ocean.json'), JSON.stringify({ name: 'Ocean' }));
-  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'], styleguide: { ...(cfg0.styleguide ?? {}), modules: ['tools/demo-module'] } }));
+  mkdirSync(join(dir, 'tools', 'demo-data', sysSlug), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'demo-data', sysSlug, 'ocean.json'), JSON.stringify({ name: 'Ocean' }));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'], styleguide: { ...(cfg0.styleguide ?? {}), modules: [{ path: 'tools/demo-module', data: 'tools/demo-data' }] } }));
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
