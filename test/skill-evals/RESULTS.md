@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Style guide: personality, Identity layout, module data (continuous evaluation)
+
+What changed since the entry below (engine c7ee2d0): Guide set changed: the skill index names the personality reference.
+
+Guide set measured: `f33772e7c2b2` · Project measured: `13d811a9d668`
+
+| Haiku, engine f93e3b7 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 79/80 | 70/70 |
+| Mean cost a run | $0.063 | $0.059 |
+| Input a run | 134k | 108k |
+| Rule violations | 1 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 134k. Records: `records/2026-10-21-identity-depth-view-centred-once`.
+
 ## 2026-10: Guidance rating for agents (continuous evaluation)
 
 What changed since the entry below (engine 8015c10, merged as 16d1a6d): the team's guidance rated for what an agent can take from it (`--guidance-rating`, `--extract`). The guide changed in `cookbook/guidelines-links.md` and `reference/usage.md`.

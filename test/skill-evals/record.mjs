@@ -15,6 +15,7 @@
 // Transcripts are never copied (they stay in results/, gitignored). Rescore and summarize read the copies as they read
 // results/.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -99,7 +100,10 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
     const rows = readFileSync(src.path, 'utf8').split('\n').filter(Boolean).map((l) => pruneRow(JSON.parse(l))).filter(Boolean);
     const dir = join(HERE, 'records', name, src.sub);
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, basename(src.path)), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+    // A path on this computer is written from ~ (a run names the engine where it lives): a record never carries a
+    // person's home folder.
+    const home = homedir();
+    writeFileSync(join(dir, basename(src.path)), rows.map((r) => JSON.stringify(r).split(home).join('~')).join('\n') + '\n');
     console.log(`${join('records', name, src.sub, basename(src.path))}: ${rows.length} rows`);
   }
   if (ENTRY) {
