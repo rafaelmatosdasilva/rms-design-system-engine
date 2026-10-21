@@ -47,6 +47,9 @@ test('a run is older when an input is older and none is newer; inputs that canno
   assert.equal(cmp(at(one, '120'), at(two, '300')).older, false);
   assert.equal(cmp(at(two, '120'), at(one, '300')).older, false, 'older code but newer Figma: not older');
   assert.equal(cmp(at(two, null, '2026-10-02'), at(two, null, '2026-10-01')).older, true, 'Figma read earlier');
+  assert.match(cmp(at(two, null, '2026-10-02'), at(two, null, '2026-10-01')).why[0], /^Figma read 2026-10-01 is older than the Figma read 2026-10-02 it/);
+  assert.equal(cmp(at(two, null, '2026-10-20T16:08:43.129Z'), at(two, null, '2026-10-20T09:15:00.000Z')).why[0],
+    'Figma read 2026-10-20 09:15 UTC is older than the Figma read 2026-10-20 16:08 UTC it was built from', 'two reads one day: their times');
   // Two branches cannot be ordered: either may write.
   git(d, 'checkout', '-q', '-b', 'side', one); writeFileSync(join(d, 'b.txt'), 'b'); git(d, 'add', '-A'); git(d, 'commit', '-qm', 'side');
   assert.equal(cmp(at(two), at(git(d, 'rev-parse', 'HEAD'))).older, false);

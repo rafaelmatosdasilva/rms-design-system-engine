@@ -14,9 +14,10 @@
 // the snapshot a capture through the Figma tool gives.
 //
 // Pure except importFigmaCli (reads and writes files).
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { buildStamp, mayWrite } from './stamp.mjs';
+import { motionValue } from './figma-capture.mjs';
 
 export const FIGMA_CLI_FORMAT = 2;   // design.json `version` this reader knows
 
@@ -47,7 +48,8 @@ const isPrivate = (name) => !String(name ?? '').trim() || /^[_.]/.test(String(na
 export function tokensFromDesign(design, tokens = []) {
   const byKey = new Map();
   for (const c of design?.variables ?? []) for (const v of c.variables ?? []) byKey.set(`${c.name}\u0000${v.name}`, v);
-  const shown = (x, before) => {
+  const shown = (x, before, kind) => {
+    if (x != null && (typeof x === 'object' || kind === 'TIMING')) { const mv = motionValue(x, kind); if (mv) return mv; }   // an easing, a timing
     if (x == null || typeof x === 'object') return undefined;   // a value it cannot write: the one kept stands
     if (typeof x === 'number') { const n = Math.round(x * 1000) / 1000, unit = /(%|px)$/.exec(String(before ?? 'px'))?.[1] ?? ''; return n + unit; }
     return typeof x === 'string' && /^#[0-9a-f]{6,8}$/i.test(x) ? x.toLowerCase() : String(x);
@@ -57,7 +59,7 @@ export function tokensFromDesign(design, tokens = []) {
     const values = {}, aliases = {};
     for (const m of Object.keys(t.values ?? {})) {
       const { value, chain } = resolveVar(byKey, t.collection, t.name, m);
-      values[m] = shown(value, t.values[m]) ?? t.values[m];
+      values[m] = shown(value, t.values[m], t.kind) ?? t.values[m];
       if (chain.length) aliases[m] = chain[0];
     }
     const { aliases: _, ...rest } = t;
@@ -188,9 +190,30 @@ function colourOf(node, kind) {
   return raw ? { hex: raw.slice(0, 7).toLowerCase() } : null;
 }
 
-// The structure the engine compares, from a component's default variant.
+// A state a person brings about, by any of its words (draggingOver), as the capture recipe's restingVariant has it.
+const BROUGHT = ['disabled', 'error', 'invalid', 'warning', 'success', 'negative', 'positive', 'alert', 'danger', 'critical', 'selected', 'active', 'pressed', 'hover', 'hovered', 'focus', 'focused', 'done', 'completed', 'loading', 'checked', 'indeterminate', 'undetermined', 'readonly', 'open', 'expanded', 'dragging'];
+const brought = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).some((w) => BROUGHT.includes(w));
+
+// The variant a set shows at rest, the one the chunked capture reads (refresh recipe, restingVariant): the State axis's
+// first value no person brings about, with Disabled and Selected false; of several, Figma's default (its first child)
+// when it is one, else the first. Never the first child alone: Figma keeps a disabled or error variant first as often
+// as not.
+export function restingKid(node) {
+  const kids = (node?.kids ?? []).filter((k) => k?.n);
+  if (!kids.length) return node?.kids?.[0];
+  const axes = (k) => Object.fromEntries(Object.entries(parseVariant(k.n)).map(([a, v]) => [a.toLowerCase(), v]));
+  const atRest = (a) => (!('disabled' in a) || a.disabled.toLowerCase() === 'false') && (!('selected' in a) || a.selected.toLowerCase() === 'false');
+  const stateKey = Object.keys(node.vp ?? {}).find((k) => k.trim().toLowerCase() === 'state');
+  const values = (stateKey ? node.vp[stateKey]?.values : null) ?? [...new Set(kids.map((k) => axes(k).state).filter((s) => s != null))];
+  const pick = values.find((s) => !brought(s)) ?? values[0];
+  const first = pick == null ? null : String(pick).trim().toLowerCase();
+  const rest = kids.filter((k) => { const a = axes(k); return (first == null || String(a.state ?? '').toLowerCase() === first) && atRest(a); });
+  return rest[0] ?? kids[0];
+}
+
+// The structure the engine compares, from a component's resting variant.
 export function structureFromComponent(node) {
-  const v = node.t === 'COMPONENT_SET' ? node.kids?.[0] : node;
+  const v = node.t === 'COMPONENT_SET' ? restingKid(node) : node;
   if (!v) return {};
   const s = {};
   if (typeof v.h === 'number') s.h = v.h;
@@ -249,6 +272,17 @@ export function snapshotsFromDesign(design, cfg = {}, existing = {}, now = new D
   return { vars, props, structure, counts: { modes: Object.keys(t.color).length, colours: colourCount, sizing: Object.keys(t.sizing).length, components: names.length } };
 }
 
+// When design.json read Figma: its extractedAt, and when that is a day with no time, the time the file was written
+// that day (within a day of it, so a time zone never moves it to another).
+export function readAt(extractedAt, file, mtime = (f) => { try { return statSync(f).mtime; } catch { return null; } }) {
+  if (!extractedAt) return null;
+  const day = new Date(extractedAt);
+  if (Number.isNaN(day.getTime())) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(extractedAt).trim())) return day.toISOString();
+  const written = mtime(file);
+  return written && Math.abs(written.getTime() - day.getTime()) < 2 * 86400000 ? written.toISOString() : day.toISOString();
+}
+
 // Read design.json, write the snapshots at the paths ds-config.json names. Returns the counts and the paths written.
 export function importFigmaCli(ROOT, cfg = {}, file = 'design.json') {
   const abs = join(ROOT, file);
@@ -261,8 +295,10 @@ export function importFigmaCli(ROOT, cfg = {}, file = 'design.json') {
   };
   const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return undefined; } };
   const out = snapshotsFromDesign(design, cfg, { vars: read(paths.vars), props: read(paths.props), structure: read(paths.structure) });
-  // What they were read from: when Figma was read; a snapshot read later than this design.json stays.
-  const stamp = buildStamp(ROOT, { figma: null, figmaRead: design.meta?.extractedAt ? new Date(design.meta.extractedAt).toISOString() : out.vars._updated });
+  // What they were read from: when Figma was read; a snapshot read later than this design.json stays. figma-cli
+  // records the day alone (extractedAt "2026-10-20", midnight once parsed), so a snapshot it made that afternoon read
+  // as older than one read that morning: the time the file was written, when it is on that day, says when.
+  const stamp = buildStamp(ROOT, { figma: null, figmaRead: readAt(design.meta?.extractedAt, abs) ?? out.vars._updated });
   const kept = [];
   for (const k of ['vars', 'props', 'structure']) {
     const may = mayWrite(join(ROOT, paths[k]), stamp, { ROOT, label: paths[k] });

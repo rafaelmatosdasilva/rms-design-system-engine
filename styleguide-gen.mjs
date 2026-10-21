@@ -30,6 +30,7 @@ import { findIconFolder, folderSymbols } from './icon-folder.mjs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
+import { homedir } from 'os';
 import { OUT_DIR } from './names.mjs';
 
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
@@ -676,8 +677,47 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // What the products get wrong with it, from the last audit: a rule laid over it, a look-alike, a parent overriding it.
       const PRODUCT_MISUSE = /hand-built|look-?alike|Nested components keep|Templates compose/i;
       const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
-      for (const c of view.components) c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c) });
+      const ilNow = designIntent().components ?? {};
+      const hasLayer = !!cfg.intentLayer;
+      // What of its notes (Figma's annotations, the code's notes) no agent is given, with why, what to do and whether to
+      // remove it: the same choice the prototype context makes (prototype-context.mjs → notesOf).
+      const { notesOf, intentText } = await import('./prototype-context.mjs');
+      for (const c of view.components) {
+        const left = notesOf(ilNow[c.name] ?? {}, intentText(c.description) || intentText(ilNow[c.name]?.design?.description) || null).left;
+        if (left.length) c.notesLeft = left;
+      }
+      // Its intent-layer page, read from the layer's snapshot itself, so a style guide built on its own (--styleguide)
+      // has it without the design intent being written again.
+      const ilMod = await import('./intent-layer.mjs');
+      // Read again where it lives first (GitLab): nothing is fetched while its commit has not moved, and when it cannot be
+      // read the copy kept is used and said, never silently.
+      if (hasLayer && !opts.offline) { try { for (const r of await ilMod.syncSources(ROOT, cfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+      const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
+      const ilMatch = ilSnap ? ilMod.matchComponents(view.components.map((c) => c.name), ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
+      for (const c of view.components) {
+        const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
+        // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
+        // the contract); the Intent layer page reviews every page of it apart.
+        if (!il && hasLayer) c.intentLayer = { none: true };
+        if (il) c.intentLayer = { source: il.source ?? 'the intent layer', file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null, sections: il.sections ?? null, facts: il.facts ?? null, repeated: il.repeated ?? 0 };
+        c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c), intentLayer: il });
+      }
     } catch { /* no guidance */ }
+    // The intent layer: every page, what the agents get from it and where, what they do not and why (intent-layer.mjs).
+    try {
+      const il = await import('./intent-layer.mjs');
+      const snap = il.readIntentLayer(ROOT, cfg);
+      if (snap) {
+        // The components the agents get (the design intent's: Figma's, or with no Figma data the code's), not only the
+        // ones this page shows, so the page and the audit judge each page alike.
+        const names = il.systemNames(ROOT, cfg);
+        const from = il.namesFrom(ROOT, cfg);
+        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from });
+        const src = snap._source ?? {};
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages,
+          noPage: names.filter((n) => !report.pages.some((p) => p.component === n)) };
+      }
+    } catch { /* no intent layer */ }
     // For agents: what an agent can take from the team's guidance for each component, its guidelines section and
     // Figma's words, rated ready, partial or thin, with what to add; the last extraction test's share when one ran.
     try {
@@ -686,13 +726,18 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { facts, props } = gr.readFacts(ROOT, cfg);
       if (Object.keys(facts.components).length) {
         const gl = ingestGuidelines(ROOT, cfg);
-        const rating = gr.rateGuidance(gr.sectionsFrom(gl, facts, gr.figmaWords(props)), facts);
+        // Figma's words and, when there is one, each component's intent-layer page: wherever the team wrote it.
+        const ilm = await import('./intent-layer.mjs');
+        const ilSnap = ilm.readIntentLayer(ROOT, cfg);
+        const words = gr.figmaWords(props);
+        for (const [n, t] of Object.entries(ilm.intentWords(ilSnap, Object.keys(facts.components), ilm.codeFilesOf(ROOT, cfg)))) words[n] = [words[n], t].filter(Boolean).join('\n');
+        const rating = gr.rateGuidance(gr.sectionsFrom(gl, facts, words), facts);
         const last = readJson(join(OUT_DIR, 'guidance-rating.json'));
         const extracted = Object.fromEntries((last?.components ?? []).filter((x) => typeof x.extracted === 'number').map((x) => [x.name, x.extracted]));
         const byName = new Map(rating.components.map((r) => [r.name, r]));
         for (const c of view.components) {
           const r = byName.get(c.name); if (!r) continue;
-          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total }, unknown: r.unknown, add: r.add, from: gl.sources.length ? gl.sources : ['Figma'], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
+          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total }, unknown: r.unknown, add: r.add, from: [...gl.sources, 'Figma', ...(ilSnap ? ['the intent layer'] : [])], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
         }
         view.agentRating = { cls: rating.cls, ready: rating.ready, partial: rating.partial, thin: rating.thin, total: rating.total };
       }
@@ -760,7 +805,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       view.tokens.sizing = [];
     }
     // Every variable Figma has, in each of its modes, for the Tokens page (allVariables, styleguide-data.mjs).
-    try { const { allVariables } = await import('./styleguide-data.mjs'); const av = allVariables(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss); if (av.length) view.allVars = av; } catch { /* the page lists the agreed tokens */ }
+    try { const { allVariables } = await import('./styleguide-data.mjs'); const av = allVariables(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {}, systemCss, readJson(cfg.figmaCli?.designJson ?? 'design.json')); if (av.length) view.allVars = av; } catch { /* the page lists the agreed tokens */ }
     // Each token's Figma collection, when the capture kept it (Tokens page); else the page groups by its name's first part.
     {
       const of = (readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {})._collections?.of ?? null;
@@ -1324,6 +1369,27 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const systemScripts = () => (Array.isArray(cfg.systemScripts) ? cfg.systemScripts : []).map((p) => {
     try { return `<script data-system-script="${String(p).replace(/"/g, '')}">\n${readFileSync(resolve(ROOT, p), 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`; } catch { return `<!-- systemScripts: ${String(p).replace(/--/g, '')} not found -->`; }
   }).join('\n');
+  // Modules (ds-config.json → styleguide.modules): folders kept outside the system and the engine, each with a module.js,
+  // an optional module.css and optional data per system (data/<system>/*.json), inlined last so each builds on the page's
+  // own helpers (window.SG): a button, a panel.
+  // An entry is a folder, or { path, data }: data names a folder of its own (kept apart from the module and from the
+  // system's project) whose <system>/ subfolder holds the module's data; without it, the module's own data/ folder.
+  const home = (p) => resolve(ROOT, String(p).replace(/^~(?=$|\/)/, homedir()));
+  const modules = () => (Array.isArray(cfg.styleguide?.modules) ? cfg.styleguide.modules : []).map((entry) => {
+    const p = entry && typeof entry === 'object' ? entry.path : entry;
+    const dir = home(p);
+    const read = (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch { return null; } };
+    const js = read('module.js'), css = read('module.css'), name = basename(dir).replace(/[^\w-]/g, '');
+    if (js == null) return '<!-- styleguide.modules: a folder with no module.js -->';
+    // Its data for this system: the JSON files in <data>/<system>/ (the system's name as a slug), never in the system's
+    // project; the page reads them as SG.moduleData['<module>'].
+    const sys = String(cfg.name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
+    const dataDir = join(entry && typeof entry === 'object' && entry.data ? home(entry.data) : join(dir, 'data'), sys);
+    let data = [];
+    try { data = readdirSync(dataDir).filter((f) => /\.json$/i.test(f)).sort().map((f) => { try { return { file: f, ...JSON.parse(readFileSync(join(dataDir, f), 'utf8')) }; } catch { return null; } }).filter(Boolean); } catch { /* no data for this system */ }
+    const dataTag = `<script data-sg-module-data="${name}">\n(window.SG.moduleData = window.SG.moduleData || {})[${JSON.stringify(name)}] = { system: ${JSON.stringify(sys)}, files: ${JSON.stringify(data).replace(/<\/script/gi, '<\\/script')} };\n</script>\n`;
+    return dataTag + (css ? `<style data-sg-module="${name}">\n${css.replace(/<\/style/gi, '<\\/style')}\n</style>\n` : '') + `<script data-sg-module="${name}">\n${js.replace(/<\/script/gi, '<\\/script')}\n</script>`;
+  }).join('\n');
   // opts.partsOnly: what the page is made of, without writing it (a prototype draws with the same parts).
   if (opts.partsOnly) {
     const componentCss = await componentCSS();
@@ -1340,6 +1406,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     CHROME: () => chromeCSS(),
     ICON_SHEET: () => iconSheet(),
     SYSTEM_SCRIPTS: () => systemScripts(),
+    MODULES: () => modules(),
     // The WCAG 2.2 checks the page runs on every variant (wcag-page.js).
     WCAG_PAGE: async () => (await import('./wcag21.mjs')).WCAG_PAGE_SOURCE.replace(/<\/script/gi, '<\\/script'),
     USAGE: () => JSON.stringify(usageMap(intent)),

@@ -139,7 +139,7 @@ test('each component\'s Documentation area says what an agent can take from its 
   const of = (n) => (data.components ?? []).find((c) => c.name === n);
   assert.equal(of('button').agentRating.cls, 'ready');
   assert.equal(of('badge').agentRating.cls, 'partial');
-  assert.deepEqual(of('badge').agentRating.from, ['guidelines.md']);
+  assert.deepEqual(of('badge').agentRating.from, ['guidelines.md', 'Figma']);   // every place it was read from
   assert.match(page, /kind: 'For agents'/, 'the row in the template');
   assert.ok(existsSync(join(dir, 'guidelines.md')));
 });

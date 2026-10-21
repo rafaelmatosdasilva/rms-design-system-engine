@@ -188,7 +188,11 @@ const FIGMA_BRANCH = /\bfigma\b[\s\S]{0,30}\b(branch|ramo)\b|\b(branch|ramo)\b[\
 // The team's guidance rated for what agents can take from it; the extraction test only when they ask for it.
 const RATE_GUIDANCE = /\b(rate|grade|score|classif\w*|evaluate|assess|review|avalia\w*|classifica\w*)\b[\s\S]{0,60}\b(guidance|guidelines?|documentation|docs|intent|diretrizes|documenta[çc][ãa]o)\b|\b(guidance|guidelines?|documentation|docs)\b[\s\S]{0,40}\b(for|para)\s+(agents?|ai|llms?|agentes)\b/i;
 const EXTRACT_ASKED = /\bextract\w*|\bwith a model\b|\bmodel test\b|\bteste?\b[\s\S]{0,20}\bmodelo\b/i;
+// The team's intent layer: a GitLab project of DSDS pages, named with "intent layer" and its link (any host).
+const INTENT_LAYER = /\bintent[- ]layer\b|\bcamada de inten[çc][ãa]o\b/i;
+const ANY_LINK = /https?:\/\/[^\s)>\]]+/i;
 const RULES = [
+  ['guidelines-links', (t) => INTENT_LAYER.test(t) && ANY_LINK.test(t), 'intent-layer'],
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
@@ -333,6 +337,7 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
       notes.push('The engine lists every Figma edit and writes the script for it; show the person the list and ask. Only when they say yes, run .design-system-engine-out/handback/figma-apply.js with the Figma MCP\'s use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.');
       return { recipe, question: false, run: [`${cmd} --figma-edits`], notes };
     }
+    if (kind === 'intent-layer') return { recipe, question: false, run: [`${cmd} --intent-layer ${t.match(ANY_LINK)[0]}`], notes };
     if (recipe === 'guidelines-links' && !kind) return { recipe, question, run: [`${cmd} --guidelines ${links(t).join(' ')}`], notes };
     if (recipe === 'prototype') {
       notes.push('A prototype is made only of the design system\'s components with their own options, and the engine\'s layout pieces; never write HTML, CSS or a component for it, and never change the system\'s files. Write it as a composition in prototypes/<name>.json, run --prototype on it, and fix each ❌ line until it is drawn. A need nothing fits is a Missing box; tell the person every gap it lists, as written.');
@@ -446,11 +451,16 @@ const shellQuote = (x) => `'${String(x).replace(/'/g, `'\\''`)}'`;
 function setupRun(t, cmd, { cloud = false, then = true } = {}) {
   const { figma, css, project } = codeAndFigma(t);
   const code = css ? ` --theme-css='${css}'` : ` --project='${project ?? '<. for this folder, or the folder or repository link>'}'`;
+  // The written documentation for agents (an intent layer, a wiki or Notion page): optional, one link, named in the request.
+  const docs = (String(t ?? '').match(/\b(?:intent[- ]layer|documentation|docs|guidelines)\b[^\n]{0,40}?(https?:\/\/[^\s)>\]]+)/i) ?? [])[1] ?? null;
   const ask = [!css && !project && whereCode('the design system\'s', cloud),
-    !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`].filter(Boolean);
+    !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`,
+  ].filter(Boolean);
+  // Asked with the rest, in the same message, never as a question of its own when nothing else is missing.
+  if (ask.length && !docs) ask.push('a link to its written documentation for agents, if they have one (optional: an intent layer on GitLab, a wiki or Notion page)');
   const request = String(t ?? '').trim().replace(/\s+/g, ' ');
   const after = then && request && !SETUP_ASKED.test(request) ? ` --then=${shellQuote(request.slice(0, 400))}` : '';
-  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}${after}`],
+  return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}${docs ? ` --documentation='${docs}'` : ask.length ? ` --documentation='<the documentation link; left out when there is none>'` : ''}${after}`],
     ask: ask.length ? ask.join(', and ') : null };
 }
 

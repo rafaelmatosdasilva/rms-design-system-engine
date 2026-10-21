@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, exist
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { varsScript, readCapture, importCapture, captureWithFigmaCli, parseAnswer, cyrb53, recipeScripts, importLines, varsItems, encodeValue, decodeValue } from '../figma-capture.mjs';
+import { varsScript, readCapture, importCapture, captureWithFigmaCli, figmaCliEval, parseAnswer, cyrb53, recipeScripts, importLines, varsItems, encodeValue, decodeValue } from '../figma-capture.mjs';
 import { snapshotsFromDesign } from '../figma-cli-import.mjs';
 import { largeVarsFile, asFigma as asLargeFigma } from './figma-standin.mjs';
 
@@ -293,4 +293,20 @@ test('answers saved in the form before still read; new checksums name every chun
   r = await importCapture(root, cfg, { dir });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.ok(readdirSync(dir).every((x) => x === 'vars-sums.json' || Number(/\d+/.exec(x)?.[0]) < sums.of), 'the answers in the form before are cleared');
+});
+
+test('figma-cli: a call that fails is tried once more after a pause; two failures say what figma-cli printed', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'figma-cli-eval-'));
+  const answers = (list) => { const left = [...list], asked = []; return { asked, spawn: (cmd, args) => { asked.push([cmd, args[0]]); return left.shift(); } }; };
+  const paused = [];
+  const pause = async (ms) => { paused.push(ms); };
+  let f = answers([{ status: 1, stdout: '', stderr: '' }, { status: 0, stdout: '{"ok":1}\n', stderr: '' }]);
+  assert.equal(await figmaCliEval(root, { spawn: f.spawn, pause, retryMs: 7 })('return 1'), '{"ok":1}\n');
+  assert.deepEqual(f.asked, [['figma-cli', 'eval'], ['figma-cli', 'eval']]);
+  assert.deepEqual(paused, [7]);
+  f = answers([{ status: 1, stdout: 'x\n✗ Not connected to Figma\n\n', stderr: '' }, { status: 1, stdout: '✗ Execution timeout (90s).\n', stderr: '' }]);
+  await assert.rejects(figmaCliEval(root, { spawn: f.spawn, pause })('return 1'), /did not finish, twice: ✗ Execution timeout \(90s\)\.$/);
+  f = answers([{ status: 0, stdout: '1\n' }]);
+  assert.equal(await figmaCliEval(root, { spawn: f.spawn, pause })('return 1'), '1\n');
+  assert.equal(f.asked.length, 1, 'a call that works is made once');
 });

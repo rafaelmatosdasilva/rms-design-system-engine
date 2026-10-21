@@ -302,6 +302,15 @@ export async function varsFromItems(items, cfg = {}, { engineDir = ENGINE } = {}
 // and each token's collection, kind, scopes, description, its value in each mode of its collection (an alias followed to
 // the value it ends at) and, in a mode where it points at another token, that token's name. Nothing guessed.
 // → { collections: [{ name, modes: [name] }], tokens: [{ name, collection, kind, scopes?, description?, values: { mode: value }, aliases?: { mode: name } }] }
+// A motion value as CSS writes it: Figma's easing ({ easingFunctionCubicBezier: { x1, y1, x2, y2 } }, or the curve itself)
+// as cubic-bezier(…), a timing (seconds) as milliseconds. Anything else: null.
+export function motionValue(v, kind = null) {
+  if (typeof v === 'number' && kind === 'TIMING') return Math.round(v * 1000) + 'ms';
+  const b = v && typeof v === 'object' ? (v.easingFunctionCubicBezier ?? v.cubicBezier ?? v) : null;
+  if (b && ['x1', 'y1', 'x2', 'y2'].every((k) => typeof b[k] === 'number')) return `cubic-bezier(${[b.x1, b.y1, b.x2, b.y2].map((n) => Math.round(n * 100) / 100).join(', ')})`;
+  if (v && typeof v === 'object' && /LINEAR/i.test(v.type ?? '')) return 'linear';
+  return null;
+}
 export function tokensFromItems(items = []) {
   const cols = items.filter((i) => i.k === 'collection').map((i) => i.v);
   const colById = new Map(cols.map((c) => [c.id, c]));
@@ -311,6 +320,9 @@ export function tokensFromItems(items = []) {
   const shown = (v, kind, scopes) => {
     if (v == null) return null;
     if (kind === 'COLOR' && typeof v === 'object') return hex(v);
+    // Motion: an easing as CSS writes it, a time in milliseconds (Figma keeps seconds).
+    if (typeof v === 'object') return motionValue(v) ?? JSON.stringify(v);
+    if (kind === 'TIMING' && typeof v === 'number') return motionValue(v, kind);
     if (kind === 'FLOAT' && typeof v === 'number') {
       const n = Math.round(v * 1000) / 1000;
       return (scopes ?? []).some((s) => /OPACITY/.test(s)) ? n + '%' : (scopes ?? []).some((s) => /FONT_WEIGHT|FONT_VARIATIONS/.test(s)) ? String(n) : n + 'px';
@@ -857,14 +869,23 @@ export async function captureWithFigmaCli(ROOT, cfg = {}, { run = figmaCliEval(R
   }
   return importCapture(ROOT, cfg, opts);
 }
-export function figmaCliEval(ROOT) {
-  return (code) => {
+// One script through figma-cli. A call that fails (Safe Mode's plugin can drop one, right after a snapshot or while it
+// reconnects) is tried once more after a pause, so one dropped call does not end a capture; the error says what
+// figma-cli printed, which in Safe Mode is on stdout, stderr left empty.
+export function figmaCliEval(ROOT, { spawn = spawnSync, pause = (ms) => new Promise((r) => setTimeout(r, ms)), retryMs = 5000 } = {}) {
+  const lastLine = (s) => String(s ?? '').trim().split('\n').map((l) => l.trim()).filter(Boolean).slice(-1)[0];
+  return async (code) => {
     const file = join(tmpdir(), `rms-capture-${process.pid}-${Date.now()}.js`);
     writeFileSync(file, code);
     try {
-      const r = spawnSync('figma-cli', ['eval', '--file', file], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
-      if (r.error || r.status !== 0) throw new Error(`figma-cli eval did not finish: ${(r.error?.message ?? r.stderr ?? '').trim().split('\n').slice(-1)[0] || `exit ${r.status}`}`);
-      return r.stdout;
+      let why = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt) await pause(retryMs);
+        const r = spawn('figma-cli', ['eval', '--file', file], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
+        if (!r.error && r.status === 0) return r.stdout;
+        why = r.error?.message ?? lastLine(r.stderr) ?? lastLine(r.stdout) ?? `exit ${r.status}`;
+      }
+      throw new Error(`figma-cli eval did not finish, twice: ${why}`);
     } finally { try { unlinkSync(file); } catch { /* gone */ } }
   };
 }

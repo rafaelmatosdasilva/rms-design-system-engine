@@ -1392,29 +1392,49 @@ export const GUIDANCE = [
 ];
 // seen: what the last audit found the products doing with the component (a rule laid over it, a look-alike built by
 // hand, a parent's rule overriding it), said plainly; it fills Common mistakes when the team wrote none.
-export function guidanceView({ description = '', annotations = [], note = '', authored = null, seen = [] } = {}) {
-  const found = {}, from = {};
-  const take = (text, source) => {
-    let cur = null;
-    for (const raw of String(text ?? '').split(/\r?\n/)) {
-      const line = raw.replace(/^\s*(?:[-*•]|#+)\s*/, '').trim();
-      if (!line) { cur = null; continue; }
-      const m = /^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
-      const hit = m && GUIDANCE.find(([, , re]) => re.test(m[1].trim()));
-      if (hit) { cur = hit[0]; if (!found[cur]) { found[cur] = []; from[cur] = source; } if (m[2].trim()) found[cur].push(m[2].trim()); continue; }
-      if (cur && from[cur] === source) found[cur].push(line);
-    }
+// intentLayer: the component's page in the team's intent layer (intent-layer.mjs → componentIntent), its lines already
+// sorted by kind. Each kind keeps the first source that wrote it (Figma, the code, the intent layer, then
+// contract.authored.json) and lists every other source that wrote it too under `also`, so a component's documentation
+// shows where each line came from and where two sources say it differently.
+export function guidanceView({ description = '', annotations = [], note = '', authored = null, seen = [], intentLayer = null } = {}) {
+  const found = {}, from = {}, link = {}, also = {};
+  const add = (key, list, source, url = null) => {
+    if (!list?.length) return;
+    if (!found[key]?.length) { found[key] = list; from[key] = source; if (url) link[key] = url; return; }
+    (also[key] ??= []).push({ from: source, text: list, ...(url ? { url } : {}) });
   };
-  take(description, 'Figma');
-  for (const a of annotations ?? []) take(typeof a === 'string' ? a : a?.label ?? a?.labelMarkdown ?? '', 'Figma');
-  take(note, 'the code');
+  // One source's text, read for "When to use: …" lines and the lines under them.
+  const read = (texts) => {
+    const out = {};
+    for (const text of texts) {
+      let cur = null;
+      for (const raw of String(text ?? '').split(/\r?\n/)) {
+        const line = raw.replace(/^\s*(?:[-*•]|#+)\s*/, '').trim();
+        if (!line) { cur = null; continue; }
+        const m = /^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
+        const hit = m && GUIDANCE.find(([, , re]) => re.test(m[1].trim()));
+        if (hit) { cur = hit[0]; out[cur] ??= []; if (m[2].trim()) out[cur].push(m[2].trim()); continue; }
+        if (cur) out[cur].push(line);
+      }
+    }
+    return out;
+  };
+  const figma = read([description, ...(annotations ?? []).map((a) => (typeof a === 'string' ? a : a?.label ?? a?.labelMarkdown ?? ''))]);
+  const code = read([note]);
+  for (const [key] of GUIDANCE) add(key, figma[key], 'Figma');
+  for (const [key] of GUIDANCE) add(key, code[key], 'the code');
+  if (intentLayer) {
+    const where = `${intentLayer.source ?? 'the intent layer'} (${intentLayer.file ?? 'its page'})`;   // the source it came from, by its own name
+    for (const [key] of GUIDANCE) add(key, (intentLayer[key] ?? []).map(String).filter(Boolean), where, intentLayer.url ?? null);
+  }
   for (const [key] of GUIDANCE) {
     const v = authored?.[key];
     const list = Array.isArray(v) ? v.map(String).filter(Boolean) : typeof v === 'string' && v.trim() ? [v.trim()] : [];
-    if (list.length && !found[key]?.length) { found[key] = list; from[key] = 'contract.authored.json'; }
+    add(key, list, 'contract.authored.json');
   }
   if (!found.mistakes?.length && seen.length) { found.mistakes = [...new Set(seen.map(String))].slice(0, 6); from.mistakes = "the products' code, as the last audit found it"; }
-  const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null, ...(found[key]?.length ? { from: from[key] } : {}) }));
+  const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null,
+    ...(found[key]?.length ? { from: from[key] } : {}), ...(link[key] ? { url: link[key] } : {}), ...(also[key] ? { also: also[key] } : {}) }));
   return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
 }
 
@@ -1549,6 +1569,36 @@ const wcagOfLine = (line) => (/error/i.test(line) ? '3.3.1' : '4.1.2');
 // "WCAG 2.1.1 Keyboard (A)": a criterion as the page names it.
 export const wcagLabel = (id) => (!id ? null : WCAG_CRITERIA[id] ? `WCAG ${id} ${WCAG_CRITERIA[id][0]} (${WCAG_CRITERIA[id][1]})` : `WCAG ${id}`);
 
+// What a finding affects, in plain words, from what the check recorded: the part of the component (its label, an icon,
+// a button, the whole component), what of it (its text, its focus ring, its tap area), the words on it, the state and the
+// colour mode it was seen in, and the measure against what it needs. r: a11y.json's issue · cls: the component's class.
+const AFFECTS = { contrast: 'Text colour', hovercontrast: 'Text colour on hover', statecontrast: 'Text colour when focused or pressed', cvdcontrast: 'Text colour for colour-blind readers', iconcontrast: 'Icon colour', focuscontrast: 'Focus ring colour', focus: 'Focus ring', target: 'Tap area', target44: 'Tap area', name: 'Name a screen reader says', semantics: 'Role', keyboard: 'Keyboard use', zoom: 'Zoomed text', reflow: 'Narrow screen', spacing: 'Text spacing', boundary: 'Edge colour', stateedge: 'Edge colour when focused or pressed' };
+const TAG_WORD = { button: 'Button', a: 'Link', input: 'Field', select: 'Select', textarea: 'Text field', img: 'Image', svg: 'Icon', label: 'Label', li: 'List item', ul: 'List', h1: 'Heading', h2: 'Heading', h3: 'Heading', table: 'Table', dialog: 'Dialog' };
+export function affected(r = {}, cls = null) {
+  const sel = String(r.selector ?? '');
+  const [own, inside] = sel.split(' in ');
+  const human = (w) => String(w).replace(/[-_]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, (c) => c.toUpperCase());
+  let part = '';
+  const tag = /^<(\w+)>/.exec(own ?? '');
+  const el = /^(\w+)?((?:\.[\w-]+)+)/.exec(own ?? '');
+  if (tag) part = TAG_WORD[tag[1].toLowerCase()] ?? `<${tag[1]}>`;
+  else if (el) {
+    const classes = el[2].split('.').filter(Boolean);
+    part = cls && classes.includes(cls) ? 'The whole component' : human(classes[0]);
+  } else if (own && /^\w+$/.test(own)) part = TAG_WORD[own.toLowerCase()] ?? human(own);
+  return {
+    part: part || (inside ? 'A part of it' : 'The whole component'),
+    what: AFFECTS[r.issue] ?? null,
+    element: own && !/ with | no /.test(own) ? own.trim() : tag ? `<${tag[1]}>` : null,
+    text: r.text ?? null,
+    state: r.state ?? null,
+    mode: r.theme ?? null,
+    measured: r.contrast != null ? `${r.contrast}:1` : r.size ?? null,
+    needs: r.needs != null ? `${r.needs}:1` : null,
+    places: r.places ?? null,
+  };
+}
+
 // name, cls: the component · role: its role word (Figma's annotation, else the authored contract) · annotations: Figma's
 // notes on it · parts: its part roles ([{ layer, part }]) · exceptions: behaviours the person excused ({ id: reason }) ·
 // result: the last browser check (a11y.json), or null · guide: { kind: { title(n), fix } } (a11y-check.mjs A11Y_GUIDE).
@@ -1585,14 +1635,14 @@ export function a11yView({ name, cls = null, role = null, roleFrom = null, annot
         const k = r.issue + '|' + detail;
         if (seen.has(k)) continue;
         seen.add(k);
-        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail, ...(r.rule ? { wcag: r.wcag ?? null, help: r.help } : {}) });
+        found.push({ kind: r.issue, fix: r.fix ?? guide[r.issue]?.fix ?? '', detail, item: affected(r, cls), ...(r.rule ? { wcag: r.wcag ?? null, help: r.help } : {}) });
       }
       // One line per kind of problem: how many, where each is, the fix and the criterion once.
       const issues = [];
       for (const f of found) {
         const same = issues.find((i) => i.kind === f.kind);
-        if (same) { same.details.push(f.detail); continue; }
-        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? f.wcag ?? null, details: [f.detail], ...(f.help ? { help: f.help } : {}) });
+        if (same) { same.details.push(f.detail); same.items.push(f.item); continue; }
+        issues.push({ kind: f.kind, fix: f.fix, wcag: A11Y_WCAG[f.kind] ?? f.wcag ?? null, details: [f.detail], items: [f.item], ...(f.help ? { help: f.help } : {}) });
       }
       // An axe-core rule is said in its own words (its help line).
       for (const i of issues) i.title = guide[i.kind]?.title ? guide[i.kind].title(i.details.length) : i.help ?? i.kind;
@@ -1927,7 +1977,18 @@ export function motionTodos(m, components = []) {
 // boolean, text), its collection when the capture kept it, and its value in each mode Figma gives it.
 // vars: the Figma variables snapshot; css: the system's own CSS (to know which variables the code declares).
 // → [{ figma, var, type, collection, modes: [label], values: [value], aliases?: [the token each mode points at, or null] }]
-export function allVariables(vars = {}, css = '') {
+// A motion token's value as CSS writes it: an easing as cubic-bezier(…), a timing in milliseconds. An easing a capture
+// could only write as "[object Object]" is read from design.json (design: figma-cli's snapshot) when it holds it.
+function motionShown(t, m, v, design) {
+  let x = v;
+  if (x === '[object Object]' && design) {
+    for (const c of design.variables ?? []) if (c.name === t.collection) for (const dv of c.variables ?? []) if (dv.name === t.name) x = dv.values?.[m] ?? x;
+  }
+  if (x && typeof x === 'object') { const b = x.easingFunctionCubicBezier ?? x; if (['x1', 'y1', 'x2', 'y2'].every((k) => typeof b[k] === 'number')) return `cubic-bezier(${[b.x1, b.y1, b.x2, b.y2].map((n) => Math.round(n * 100) / 100).join(', ')})`; return /LINEAR/i.test(x.type ?? '') ? 'linear' : null; }
+  if (t.kind === 'TIMING' && x != null && /^-?[\d.]+$/.test(String(x))) return Math.round(Number(x) * 1000) + 'ms';
+  return x === '[object Object]' ? null : x;
+}
+export function allVariables(vars = {}, css = '', design = null) {
   const declared = new Set((String(css).match(/--[\w-]+(?=\s*:)/g) ?? []));
   const codeVar = (n) => { const v = '--' + String(n).replace(/[\/\s]+/g, '-'); return declared.has(v) ? v : null; };
   // Figma's own tokens, as the capture kept them (figmaTokens): each in its collection, every mode of it, its aliases.
@@ -1941,7 +2002,7 @@ export function allVariables(vars = {}, css = '') {
       const scope = (t.scopes ?? []).join(' '), byScope = SCOPE.find(([re]) => re.test(scope))?.[1];
       const type = /motion/i.test(t.collection ?? '') ? 'motion' : byScope ?? named(t.name) ?? KIND[t.kind] ?? 'number';
       const modes = modesOf.get(t.collection) ?? Object.keys(t.values ?? {});
-      return { figma: t.name, var: codeVar(t.name), type, collection: t.collection, modes, values: modes.map((m) => t.values?.[m] ?? null), ...(t.aliases ? { aliases: modes.map((m) => t.aliases[m] ?? null) } : {}), ...(t.description ? { description: t.description } : {}) };
+      return { figma: t.name, var: codeVar(t.name), type, collection: t.collection, modes, values: modes.map((m) => (t.kind === 'EASING' || t.kind === 'TIMING' ? motionShown(t, m, t.values?.[m] ?? null, design) : t.values?.[m] ?? null)), ...(t.aliases ? { aliases: modes.map((m) => t.aliases[m] ?? null) } : {}), ...(t.description ? { description: t.description } : {}) };
     });
   }
   const of = vars._collections?.of ?? {};

@@ -80,7 +80,7 @@ reference it points to say, never from memory or from this table alone.
 | the whole design system checked | `full-audit` |
 | the Figma data refreshed, or it is stale | `refresh-figma` |
 | to set the parity up (no `ds-config.json` yet) | `first-setup` |
-| to add a GitLab or Notion guidelines link | `guidelines-links` |
+| to add a GitLab or Notion guidelines link, or the GitLab project of the intent layer | `guidelines-links` |
 | a difference fixed (in code, or what to change in Figma) | `fix-a-difference` |
 | known differences accepted as debt | `accept-debt` |
 | states, variants or combinations mapped or explained | `states-and-variants` |
@@ -96,7 +96,7 @@ reference it points to say, never from memory or from this table alone.
 
 Reference (`rms-design-system-engine --reference <name>`): `usage` (every command, option and output), `config`
 (`ds-config.json`, snapshot files, naming), `gates` (gate-specific rules), `maintainers` (changing the engine
-and the skill).
+and the skill), `personality` (how the style guide reads a brand's personality from its tokens).
 
 ## How to run this skill (read first)
 
@@ -112,7 +112,7 @@ listed steps.**
 **Relay the engine's words, and follow its NEXT line.** Every audit ends with a `SUMMARY` block (also written
 to `.design-system-engine-out/summary.md`; `rms-design-system-engine --summary` prints the last one again) and one `NEXT:` line.
 Relay the summary in the chat as it is, without rewording its facts, then take the `NEXT:` line as the next
-step. `--init`, `--guidelines`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
+step. `--init`, `--guidelines`, `--intent-layer`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
 line says to do something only when the person asks (commit, apply the hand-back), ask them; never do it on
 your own. **Say that an audit ran only when its output is in front of you**: the engine prints its SUMMARY in
 the same call. Opening this skill or printing a recipe runs nothing, so never say an audit is running or that
@@ -156,10 +156,11 @@ node <install-dir>/audit.mjs --init \
   # --figma-url: optional; --figma-source-url='<upstream DS URL>': optional, consumer/branded-fork files
 ```
 
-**Setup asks the person two things before it writes anything: where the code is (this folder,
-another folder, or a link to its repository on GitHub or GitLab) and the link to the Figma file.** The code is required and never
-guessed; the Figma link is optional (without it only the code's own checks run, and nothing is
-compared with Figma). The router asks what the request leaves out, in one message; a setup run
+**Setup asks the person, in one message, before it writes anything: where the code is (this folder,
+another folder, or a link to its repository on GitHub or GitLab), the link to the Figma file, and a link to the
+written documentation for agents (an intent layer on GitLab, a wiki or Notion page).** The code is required and never
+guessed; the Figma link is optional (without it only the code's own checks run, nothing is compared with Figma,
+and the components are the code's own), and so is the documentation link (`--documentation=<link>`). The router asks what the request leaves out, in one message; a setup run
 that does not know where the code is writes nothing, and its NEXT line asks. Pass the answer as
 `--project=<folder or link>` (`.` for this folder; a GitHub link is cloned beside the folder, `owner/repo`
 means GitHub; a GitLab link, gitlab.com or a company's own, is read through GitLab's API, never cloned:

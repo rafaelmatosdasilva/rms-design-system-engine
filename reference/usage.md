@@ -251,6 +251,62 @@ offline, or a wrong link → the committed file is kept and the audit never fail
 intent layer the same way as any guidelines file: a section headed with a component's name lands in that
 component's `guidelines` in `design-intent.json`, the rest in the global block, as written.
 
+**Documentation sources.** The team's written documentation for agents can come from more than one place. Each
+source is an adapter (`intent-layer.mjs` → `SOURCES`) that reads its own format, read-only, into a snapshot in one
+shape: pages, each with what it is for, when to use it, when not to, common mistakes, limitations, rules, its other
+sections and what was left out. Everything that reads it (the design intent, the contracts, `llms.txt`, the
+prototypes, the style guide and its Intent layer page) takes only that shape and names each line by its source, so
+another source (a design tool's own specs, another format) is one adapter, nothing else changed. Where two sources
+document one component, the first configured one is its page. The first source is the intent layer below.
+
+**The intent layer, a GitLab project of DSDS pages.** When the team documents why each piece exists and how
+to use it in DSDS (the Design System Documentation Standard: an index `system.dsds.json` whose entity groups
+`$ref` one file per component, foundation, pattern, template or page), `rms-design-system-engine --intent-layer
+<project link>` (or `--init --documentation=<link>`) sets `ds-config.json → intentLayer` and reads it at once. A
+project with no Figma file gets all of it too: its components are the code's own, each with its file's props. It is **read-only**: the engine only
+asks GitLab for the project, its latest commit and one archive (GET, a `read_api` token is enough) and never
+writes to the layer; the only file it writes is its own snapshot in your project. Every run reads it again through the
+GitLab API when the branch's commit moved (one archive of the index's folder, read in memory, no clone), with the
+same token rules as above, into `intent-layer.snapshot.json`; GitLab not reachable keeps the snapshot and says
+from which commit. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
+Usage rules; When not to use or What not to do; Common mistakes; Limitations; a numbered title is read by its
+words), with its use cases (recommended, discouraged) and checklists (rules). Facts the engine reads from Figma
+and the code (anatomy, API, states, tokens, source) are left out, and so is a line written on every page of a
+kind with only the name changed (a generator's filler). A page belongs to a component by its name ("Button
+Main" is `buttonMain`), its identifier, or the code file it names; the group the index puts it in decides
+its layer (a component in a "Templates" group is a template).
+
+Where it is used: each component's `intentLayer` in `design-intent.json` (with its page's link), the contract's
+`intent` block, a `for:` line in `llms.txt` when Figma has no description and its first `avoid:` line (the
+authored `whenNotToUse` first), and the prototype context (its own `intent` lines per component, its "when not
+to use" lines as never sentences the check holds; each pattern, template, page and flow page as a rule). In the
+style guide each component's Documentation merges it with Figma, the code and the contract, each line under its
+source with a link to its page, plus an Intent layer row: its page and how many lines were read (or, with no page,
+one to write). Every row of a component's tables opens in a side panel with all of it, nothing cut short; for the
+Intent layer row that is every line the engine took from the page, kind by kind, its other sections, its status and
+what was left out and why. The **Intent layer** page reviews every page in one table, each with a one-word decision whose row says each
+change, most urgent first, the decisions as chips that filter the table (a component no page names is a row too,
+**Add**): **Delete** (it says nothing of its own once filler and facts are out, its code file is gone,
+or a component's page already says it), **Move** (it is about a part of a component that has its
+own page: `PointListItem` beside `pointList`), **Rename** (a component's name with a generic word added, as
+"Panel General" for `panel`, when no page documents that component yet), **Name** (as in Figma) (it matches
+no component the engine can find), **Write**, **Improve** (it exists and says something; each change it takes is listed: what to add, what to retitle, what to
+remove) or **Keep**; each with why, each change it takes and what the agents get from it. The engine never changes the
+layer: the changes are the team's. The audit prints how many pages each decision has.
+
+The **For agents** row of a component's Documentation rates how much an agent can take from everything written about
+it, wherever it is written (its intent-layer page, its Figma description and annotations, a guidelines section
+headed with its name): what it is, when to use it, when not to, its role, an example and its properties by name.
+Each source is read the same way, so what is missing can be written in whichever the team keeps; nothing has to be
+in Figma. `--guidance-rating` reads the same sources.
+
+The **For agents** page does the same for Figma and the code: a component's Figma description, its When to use and When not to use
+lines and the contract reach the agents in full, while its notes (Figma annotations, the code's note and the
+comment above its CSS rule) reach only the prototype context, the first three of them printed. A note that repeats
+the description or another note, one that is only a link or only says how the component is built, and a note past
+the first three are listed with why, what to do so the agents get it, and whether to remove it, on the page and as
+a Not given to agents row in the component's Documentation, for whoever wrote it.
+
 Because the file is regenerated every run, the generator is **merge-aware**: it reads the existing
 file and **preserves everything you authored** — each layer's `authored` string, and every
 component's `authored` field — refreshing only the derived parts. So you get one file that is

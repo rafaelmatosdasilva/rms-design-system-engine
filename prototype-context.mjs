@@ -25,6 +25,61 @@ const clean = (s) => String(s ?? '').replace(/@(deprecated|experimental|status|u
 // What a description or a note says a component is for, without what is there for whoever builds it: the engine's own
 // placeholder ("captured from Figma"), Figma node ids, the class it maps to, a build stamp, a banner, a CSS sentence, a
 // bare list of tokens. → the words left, or '' when nothing is left.
+// What of a component's notes (Figma's annotations, the code's notes, what the team authored in design-intent.json)
+// the agent composing a prototype is shown, and what it is not, with why, what to do and whether to remove it. Only
+// the first NOTES_SHOWN are printed in its catalog block; a note that repeats its description or another note is
+// dropped. i: the component in design-intent.json; purpose: what it is for, as the catalog says it.
+export const NOTES_SHOWN = 3;
+export const NOTE_LEFT = {
+  repeatsDescription: {
+    why: 'It says what the component\'s description already says, so the agent is not given it twice.',
+    fix: 'Nothing, or write what the description does not say (when not to use it, a limit) instead.',
+    remove: 'Yes: the description already carries it.',
+  },
+  repeatsNote: {
+    why: 'Another note on it says the same, so only that one is given.',
+    fix: 'Keep it in one place, where the team keeps it up to date.',
+    remove: 'Yes, this copy.',
+  },
+  notShown: {
+    why: `Only the first ${NOTES_SHOWN} notes of a component are printed for the agent that composes a prototype; this one still helps match a request and rule a use out, but the agent does not read it.`,
+    fix: 'Write it as a When to use or When not to use line of its Figma description, or on its intent-layer page: those are given in full.',
+    remove: 'No, unless it says nothing that matters for using the component.',
+  },
+  linkOnly: {
+    why: 'It is only a link (to a Figma frame, a page), and the agent cannot open a link, so nothing of it is given.',
+    fix: 'Write in words what the agent should take from what it links to (when to use it, what not to do), and keep the link for people.',
+    remove: 'No: keep the link and add the words.',
+  },
+  buildOnly: {
+    why: 'It only says how the component is built (sizes, node ids, the class it maps to, CSS), which the agent reads from Figma and the code themselves, so nothing of it is given.',
+    fix: 'If it should guide its use, say what it is for or when not to use it, in words.',
+    remove: 'Yes, unless a developer needs it next to the code.',
+  },
+};
+const noteFrom = (a) => (a?.layer ? `Figma annotation on its "${a.layer}" layer` : 'Figma annotation');
+export function notesOf(i = {}, purpose = null) {
+  const same = (a, b) => { const k = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); return !!k(a) && !!k(b) && (k(a).includes(k(b)) || k(b).includes(k(a))); };
+  const raw = [
+    ...(i.design?.annotations ?? []).map((a) => ({ text: clean(a?.label ?? a), from: noteFrom(a), who: 'figma' })).filter((n) => n.text && !/^role\s*:/i.test(n.text)),
+    { text: i.code?.note, from: 'the code (its note in the structure contract)', who: 'code' },
+    { text: i.code?.cssComment, from: 'the code (the comment above its CSS rule)', who: 'code' },
+    { text: i.authored, from: 'design-intent.json (authored)', who: 'person' },
+  ].filter((n) => String(n.text ?? '').trim());
+  const notes = [], left = [];
+  for (const n of raw) {
+    const t = intentText(n.text);
+    const say = (reason) => left.push({ text: String(n.text).replace(/\s+/g, ' ').trim(), from: n.from, who: n.who, reason, ...NOTE_LEFT[reason] });
+    // Nothing left once what is there for whoever builds it is taken out: a link (the agent cannot open it), else build notes.
+    if (!t || /^\S*https?:\/\/\S+$/.test(t)) { say(/https?:\/\//.test(n.text) ? 'linkOnly' : 'buildOnly'); continue; }
+    if (same(t, purpose)) { say('repeatsDescription'); continue; }
+    if (notes.some((o) => same(o.text, t))) { say('repeatsNote'); continue; }
+    notes.push({ ...n, text: t });
+  }
+  for (const n of notes.slice(NOTES_SHOWN)) left.push({ text: n.text, from: n.from, who: n.who, reason: 'notShown', ...NOTE_LEFT.notShown });
+  return { notes: notes.map((n) => n.text), left };
+}
+
 export function intentText(s) {
   let t = clean(s)
     .replace(/(^|\s)[\w/-]+ — captured from Figma by rms-design-system-engine\.?/gi, ' ')
@@ -97,7 +152,7 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
   const themeCss = Array.isArray(cfg.paths?.themeCSS) ? cfg.paths.themeCSS[0] : cfg.paths?.themeCSS;
   const intentFile = cfg.docs?.out ? resolve(ROOT, cfg.docs.out) : join(themeCss ? dirname(resolve(ROOT, themeCss)) : ROOT, 'design-intent.json');
   const structFile = resolve(ROOT, cfg.paths?.snapshotStructure ?? 'figma-structure.snapshot.json');
-  try { if (existsSync(structFile)) intent = (await generateIntent(ROOT, cfg, { write: false })).intent; } catch { /* the catalog alone still says what each component is for */ }
+  try { if (existsSync(structFile) || cfg.figmaFileKey === '') intent = (await generateIntent(ROOT, cfg, { write: false })).intent; } catch { /* the catalog alone still says what each component is for */ }
   if (!intent) intent = readJSON(intentFile);
 
   const figmaDir = dirname(structFile);
@@ -196,7 +251,7 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const purpose = intentText(c.description) || intentText(i.design?.description) || null;
     // Notes say what the component is for; one that only repeats its description, or says how it is built, is left out.
     const same = (a, b) => { const k = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); return !!k(a) && !!k(b) && (k(a).includes(k(b)) || k(b).includes(k(a))); };
-    const notes = [...annotations.filter((a) => !/^role\s*:/i.test(a)), i.code?.note, i.code?.cssComment, i.authored].map(intentText).filter(Boolean).filter((n, x, all) => !same(n, purpose) && all.findIndex((o) => same(o, n)) === x);
+    const { notes } = notesOf(i, purpose);
     const options = Object.entries(c.props ?? {}).filter(([, e]) => e.description).map(([p, e]) => `${p}: ${clean(e.description)}`);
     const guidelines = clean(own.has(name) ? own.get(name).join(' ') : i.guidelines) || null;
     // Its usage, as the style guide shows it (When to use, When not to use, Common mistakes, Limitations).
@@ -206,11 +261,18 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const dos = (examples[name] ?? []).filter((e) => e.kind === 'do').map((e) => clean(e.caption)).filter(Boolean);
     const donts = (examples[name] ?? []).filter((e) => e.kind === 'dont').map((e) => clean(e.caption)).filter(Boolean);
     const notFor = clean(c.whenNotToUse ?? i.guidance?.whenNotToUse) || said('whenNotToUse').join(' ') || null;
+    // The team's intent layer, kept apart from Figma's and the code's words: what the agent composing a screen without a
+    // Figma layout reads to know what each component is for and what not to do with it.
+    const il = i.intentLayer ?? null;
+    const intentLayer = il ? Object.fromEntries(Object.entries({ purpose: intentText(il.purpose) || null, whenToUse: il.whenToUse ?? [], whenNotToUse: il.whenNotToUse ?? [], mistakes: il.mistakes ?? [], limitations: il.limitations ?? [], rules: il.rules ?? [], file: il.url ?? il.file ?? null })
+      .map(([k, v]) => [k, Array.isArray(v) ? v.map(clean).filter(Boolean) : v])) : null;
     components[name] = {
       // What rules a use out: the documentation's "never" sentences, when not to use it, every common mistake and
       // every Don't (each a use the team has seen go wrong).
       never: [...neverOf([guidelines, ...notes].filter(Boolean).join(' '), notFor),
-        ...mistakes.map((m) => ({ sentence: `Common mistake: ${m}`, clause: m, min: 2 })), ...donts.map((d) => ({ sentence: `Don't: ${d}`, clause: d, min: 2 }))],
+        ...mistakes.map((m) => ({ sentence: `Common mistake: ${m}`, clause: m, min: 2 })), ...donts.map((d) => ({ sentence: `Don't: ${d}`, clause: d, min: 2 })),
+        ...(intentLayer?.whenNotToUse ?? []).map((x) => ({ sentence: `Intent layer: ${x}`, clause: x, min: 2 }))],
+      intentLayer,
       whenToUse, mistakes, limitations, dos, donts,
       purpose,
       role,
@@ -229,6 +291,13 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const a = intent?.[L]?.authored;
     const text = typeof a === 'string' ? a.trim() : a && typeof a === 'object' ? JSON.stringify(a) : '';
     if (text) rules.push({ title: `${L} (design intent)`, text, file: null });
+    // The intent layer's pages of this layer (a pattern, a template, a page): what each is for, when and when not.
+    for (const pg of intent?.[L]?.intentLayer ?? []) {
+      const body = [pg.purpose, ...(pg.whenToUse ?? []).map((x) => `Use when: ${x}`), ...(pg.whenNotToUse ?? []).map((x) => `Not when: ${x}`),
+        ...(pg.mistakes ?? []).map((x) => `Common mistake: ${x}`), ...(pg.limitations ?? []).map((x) => `Limitation: ${x}`), ...(pg.rules ?? [])].filter(Boolean).join('\n');
+      if (body) rules.push({ title: `${pg.name} (${L}, intent layer)`, text: body, file: pg.url ?? pg.file ?? null });
+      for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null });
+    }
   }
   return { components, rules, limits: limitsFrom(components, rules, names) };
 }
@@ -276,7 +345,7 @@ export function limitsFrom(components, rules, names) {
   return out.filter((l) => !seen.has(l.component) && seen.add(l.component));
 }
 
-const said = (k) => k && (k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length);
+const said = (k) => k && (k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length || k.intentLayer);
 
 // One block per component for the catalog: what it is for, its role, its options' meaning, when not to use it, the
 // team's notes and its guidelines.
@@ -297,8 +366,18 @@ export function purposeLines(ctx, names, { width = 400 } = {}) {
     for (const l of k.limitations ?? []) more('limit', l);
     for (const d of k.dos ?? []) more('do', d);
     for (const d of k.donts ?? []) more('don\'t', d);
-    for (const note of k.notes.slice(0, 3)) more('note', note);
+    for (const note of k.notes.slice(0, NOTES_SHOWN)) more('note', note);
     if (k.guidelines) more('guidelines', k.guidelines);
+    // The intent layer, under its own name.
+    const il = k.intentLayer;
+    if (il) {
+      if (il.purpose && il.purpose !== k.purpose) more('intent', il.purpose);
+      for (const u of il.whenToUse) more('intent: use when', u);
+      for (const u of il.whenNotToUse) more('intent: not for', u);
+      for (const m of il.mistakes) more('intent: mistake', m);
+      for (const l of il.limitations) more('intent: limit', l);
+      for (const r of il.rules) more('intent: rule', r);
+    }
   }
   return out;
 }
@@ -372,7 +451,8 @@ export function usesAgainstPurpose(ctx, nodes) {
   return [...byComponent].filter(([name]) => said(ctx.components[name])).map(([name, uses]) => {
     const k = ctx.components[name];
     const rule = [k.purpose, k.role ? `Role ${k.role}.` : null, k.whenToUse?.length ? `Use when ${k.whenToUse.join('; ')}.` : null, k.notFor ? `Not for ${k.notFor.replace(/^not for\s*/i, '')}` : null,
-      k.mistakes?.length ? `Common mistakes: ${k.mistakes.join('; ')}.` : null, k.donts?.length ? `Don't: ${k.donts.join('; ')}.` : null, k.guidelines ? `Guidelines: ${cut(k.guidelines, 240)}` : null].filter(Boolean).join(' ');
+      k.mistakes?.length ? `Common mistakes: ${k.mistakes.join('; ')}.` : null, k.donts?.length ? `Don't: ${k.donts.join('; ')}.` : null, k.guidelines ? `Guidelines: ${cut(k.guidelines, 240)}` : null,
+      k.intentLayer ? [k.intentLayer.purpose && !k.purpose ? `Intent layer: ${k.intentLayer.purpose}` : null, k.intentLayer.whenNotToUse.length ? `Intent layer, not for: ${k.intentLayer.whenNotToUse.join('; ')}.` : null].filter(Boolean).join(' ') || null : null].filter(Boolean).join(' ');
     return { component: name, uses: [...new Set(uses)], rule };
   });
 }

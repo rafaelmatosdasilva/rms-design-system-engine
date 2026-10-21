@@ -64,7 +64,10 @@ export function compareStamps(prev, next, { ROOT = null, engineDir = ENGINE } = 
   };
   const vals = Object.values(inputs);
   const older = vals.includes('older') && !vals.includes('newer');
-  const say = { code: (s) => `code ${String(s.code).slice(0, 7)}`, figma: (s) => (s.figma != null ? `Figma version ${s.figma}` : `Figma read ${String(s.figmaRead).slice(0, 10)}`), engine: (s) => `engine ${String(s.engine).slice(0, 7)}` };
+  // Two Figma reads on one day say their time too: "2026-10-20 is older than 2026-10-20" says nothing.
+  const sameDay = String(prev?.figmaRead ?? '').slice(0, 10) === String(next?.figmaRead ?? '').slice(0, 10);
+  const readWhen = (s) => { const t = String(s.figmaRead); return sameDay && t.length > 10 ? `${t.slice(0, 10)} ${t.slice(11, 16)} UTC` : t.slice(0, 10); };
+  const say = { code: (s) => `code ${String(s.code).slice(0, 7)}`, figma: (s) => (s.figma != null ? `Figma version ${s.figma}` : `Figma read ${readWhen(s)}`), engine: (s) => `engine ${String(s.engine).slice(0, 7)}` };
   const why = Object.entries(inputs).filter(([, v]) => v === 'older').map(([k]) => `${say[k](next)} is older than the ${say[k](prev)} it was built from`);
   return { older, inputs, why };
 }

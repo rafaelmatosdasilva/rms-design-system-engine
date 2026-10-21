@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// private-check.mjs - nothing private ever enters this public repository.
+// private-check.mjs - nothing private ever enters this public repository (or any repository that runs it with
+// RMS_CHECK_ROOT: a private module kept outside the engine is held to the same rule).
 //
 // The engine is built against private projects and from private notes, and the repository is public: a fork or a
 // search must find nothing of them. This refuses, in any file, commit message or added line:
@@ -33,7 +34,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { localTerms, PUBLIC_HOST } from './private-terms.mjs';
 
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// The repository checked: the engine's own, or another kept private beside it (RMS_CHECK_ROOT), as strict.
+export const ROOT = process.env.RMS_CHECK_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Runs of 1 to 4 words, joined with "-" and with nothing ("Some Name", "some-name", "someName").
 export const FORBIDDEN = new Set([
@@ -50,6 +52,8 @@ export const FORBIDDEN = new Set([
   // the private backlog and the owner's personal address
   '0cfbd5a35f88c2ef', '49f94064933b52f6', '7b682e980cda89ba', 'a2ecd660a27c8db8', 'ea6214d81b87a69a',
   'd79e4b5fcb6c289d', '6d381e28f97ddd5f',
+  // private modules kept outside the engine
+  '2dc4eb7142840b03', '63e774e3e28ee459', 'bfc553418d7459f4', '6eca9600e85946ba', '6d1cf6612d05cdb1', 'ad32cdbbdad61224', '8be4e5489d3b14d3', '30d97e37a52b3aec',
 ]);
 // First names once used as people in examples: matched as a whole capitalised word only (short names would match
 // inside joined words otherwise).

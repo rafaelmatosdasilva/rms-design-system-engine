@@ -67,6 +67,17 @@ export function buildCatalog(built, { code = null, selectorFor = null, examples 
       }
       props[p.name] = e;
     }
+    // No Figma props (a system read from its code alone): the code's own, as its file declares them.
+    if (!(c.props ?? []).length) {
+      for (const [pn, pe] of Object.entries(api?.props ?? {})) {
+        if (STATE_PROP.test(pn)) continue;
+        const t = String(pe?.type ?? '').toLowerCase();
+        const e = { type: Array.isArray(pe?.options) && pe.options.length ? 'enum' : /bool/.test(t) ? 'boolean' : 'text', codeName: pn };
+        if (e.type === 'enum') e.values = pe.options.map(String);
+        if (pe?.default != null && pe.default !== '') e.default = pe.default;
+        props[pn] = e;
+      }
+    }
     const rel = c.relationships ?? {};
     const inCode = Object.entries(code?.nesting?.[name]?.contains ?? {}).filter(([k, v]) => names.has(k) && (v.renderedIn?.length || v.inSource)).map(([k]) => k);
     const children = [...new Set([...(rel.composesWith ?? []), ...inCode])].filter((k) => k !== name);

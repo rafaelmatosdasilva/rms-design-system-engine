@@ -10,6 +10,10 @@ import { agreedView, modeAxes, optionEffect, instanceMarkup, componentTokens, ag
 import { fixtureProject } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+// A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
+// what to do), the panel closed again after. In the page, as a script expression.
+const ROW_FULL = (trExpr) => `((tr) => { if (!tr) return ''; tr.click(); const d = document.querySelector('#sg-row-panel .sg-row-detail'); const t = tr.textContent + ' ' + (d ? d.textContent : ''); const m = document.getElementById('sg-row-panel'); if (m) { m._open = false; m.hidden = true; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); } return t; })(${trExpr})`;
+const ROWS_FULL = (sel) => `[...document.querySelectorAll('${sel} tr.sg-row-open')].map((tr) => ${ROW_FULL('tr')}).join(' | ')`;
 
 const propsSnap = {
   chip: { properties: { Size: { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] }, Icon: { type: 'VARIANT', defaultValue: 'False', variantOptions: ['False', 'True'] }, 'Label#3:4': { type: 'TEXT', defaultValue: 'Filter' } }, annotations: [{ label: 'Role: togglebutton' }], description: 'A filter.' },
@@ -182,7 +186,17 @@ test('in the browser: no script error, a control changes the real component, the
   writeFileSync(join(dir, 'src', 'components', 'system.js'), "new MutationObserver(() => Promise.resolve().then(() => { for (const b of document.querySelectorAll('.button:not([aria-label])')) b.setAttribute('aria-label', 'Save now'); })).observe(document.body, { subtree: true, childList: true });");
   writeFileSync(join(dir, 'src', 'components', 'button.css'), readFileSync(join(dir, 'src', 'components', 'button.css'), 'utf8') + "\n.button { position: relative; }\n.button:focus-visible { outline: none; }\n.button::after { content: ''; position: absolute; inset: -3px; border-radius: inherit; }\n.button:focus-visible::after { outline: 2px solid var(--button-background); }\n");
   const cfg0 = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
-  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'] }));
+  // A module of the team's own, kept outside the system (styleguide.modules): a button beside the Theme choice that opens
+  // a side panel, built with the page's own helpers (window.SG).
+  mkdirSync(join(dir, 'tools', 'demo-module'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'demo-module', 'module.js'), "var bar = SG.themeBar(); bar.insertAdjacentHTML('beforeend', SG.sysButton('button', 'Demo', ' data-demo')); bar.querySelector('[data-demo]').addEventListener('click', function (e) { SG.openPanel({ id: 'demo-panel', title: 'Demo', crumbs: ['Theme'], body: '<p class=\"demo-body\">' + SG.esc('<b>Hello</b>') + '</p>', from: e.currentTarget }); });");
+  writeFileSync(join(dir, 'tools', 'demo-module', 'module.css'), '.demo-body { margin: 0; }');
+  // Its data for this system, kept in a folder of its own ({ path, data }: <data>/<system>/*.json), apart from the module
+  // and never in the system's project.
+  const sysSlug = String(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
+  mkdirSync(join(dir, 'tools', 'demo-data', sysSlug), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'demo-data', sysSlug, 'ocean.json'), JSON.stringify({ name: 'Ocean' }));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'], styleguide: { ...(cfg0.styleguide ?? {}), modules: [{ path: 'tools/demo-module', data: 'tools/demo-data' }] } }));
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
@@ -221,9 +235,22 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await shownIs('status'), 'status', 'the page opens on Status');
     assert.equal(await run(`document.querySelector('.sg-nav a[href="#index"]').hidden`), true, 'the index is not in the menu');
     assert.equal(await run(`!!document.querySelector('a.sg-card[href="#c-chip"] .sg-thumb .chip')`), true, 'the card shows the component itself');
+    // The module's button sits beside the Theme choice (made for it: this system has no brands), and opens its panel.
+    assert.equal(await run(`!!document.querySelector('#mode-controls .sg-brand-ctl [data-demo]') && !!document.querySelector('style[data-sg-module="demo-module"]')`), true, 'a module\'s button and styles are in the page');
+    assert.equal(await run(`(SG.moduleData['demo-module'].files || []).map((f) => f.file + ':' + f.name).join()`), 'ocean.json:Ocean', 'a module reads its own data for this system');
+    await run(`document.querySelector('[data-demo]').click()`);
+    assert.deepEqual(await until(`(() => { const p = document.getElementById('demo-panel'); return p && !p.hidden ? [p.querySelector('h1, h2, .sg-panel-title') && p.querySelector('h1, h2, .sg-panel-title').textContent.trim(), p.querySelector('.demo-body').textContent] : null; })()`, Boolean), ['Demo', '<b>Hello</b>'], 'the module\'s panel opens with its title and body, its words escaped');
+    await run(`document.getElementById('demo-panel')._shut()`);
+    assert.equal(await until(`document.getElementById('demo-panel').hidden`, (v) => v === true), true, 'and closes');
     await run(`location.hash = '#c-chip'`);
     assert.equal(await shownIs('c-chip'), 'c-chip');
     await until(`document.querySelectorAll('.pg-preview').length`, (v) => v === 1);
+    // Each row of its tables (Parity, Accessibility, Documentation…) opens in full in a side panel, a card per column.
+    const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
+      return p && !p.hidden ? { title: p.querySelector('.sg-panel-head h2').textContent, cards: p.querySelectorAll('.sg-row-detail-body').length, sub: p.querySelector('.sg-panel-sub')?.textContent ?? '' } : null; })()`, (v) => !!v);
+    assert.ok(rowPanel && rowPanel.title && rowPanel.cards >= 2, JSON.stringify(rowPanel));
+    await run(`document.querySelector('#sg-row-panel [data-panel-close]').click()`);
+    assert.equal(await until(`document.getElementById('sg-row-panel').hidden`, (v) => v === true), true, 'it closes');
     assert.equal(await run(`document.querySelectorAll('.pg-preview').length`), 1);
     assert.equal(await run(`document.querySelector('#c-chip .pg-preview .chip').getBoundingClientRect().height`), 24);
     await run(`[...document.querySelectorAll('#c-chip .pg-ctl button')].find((b) => b.textContent === 'L').click()`);
@@ -297,10 +324,12 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
     const a11y = await run(`document.querySelector('#c-chip .pg-a11y').textContent`);
     // One table by WCAG criterion, in the Playground's card, the same table as Parity's and the To do page's: the issue
-    // number, the area with the criterion, what Figma states, what was found, what to do with who acts, the status with
-    // when and where it was read; a count above it and when the audit last ran. Only what applies. No separate table of
-    // sources.
-    assert.match(a11y, /Task nr.*WCAG criterion.*Figma states.*Found.*What to do.*Status/);
+    // number, the criterion, the status with when and where it was read, and the arrow that opens the row; what the
+    // Figma notes say, what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
+    // it and when the audit last ran. Only what applies. No separate table of sources.
+    assert.match(a11y, /Task nr.*WCAG criterion.*Status/);
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found|What to do/, 'what the Figma notes say, what was found and what to do: in the row\'s panel only');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr.sg-row-open')].every((tr) => tr.lastElementChild.matches('td.sg-row-go') && !!tr.lastElementChild.querySelector('svg'))`), true, 'every row that opens ends with its arrow');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /What it means|Where it is read from/, 'no column of its own: what a criterion means is in its tip');
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
     // What a criterion means shows from its name, in the page's one tooltip (the same as the Status page's), on hover
@@ -309,8 +338,11 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await run(`document.getElementById(${tip}.getAttribute('aria-describedby')).textContent`), /^WCAG 2\.1\.1 Keyboard \(A\)What it means.*How it is checked/);
     assert.equal(await run(`!document.querySelector('.sg-token-pop') || document.querySelector('.sg-token-pop').hidden`), true, 'no second kind of tip');
     assert.match(a11y, /2\.1\.1 Keyboard \(A\)/);
-    assert.match(a11y, /a <button type="button"> with aria-pressed/);
-    assert.match(a11y, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
+    // What was found and what to do: in each row's panel (a row and its panel read together).
+    const a11yFull = () => run(ROWS_FULL('#c-chip .pg-a11y-rows'));
+    const a11yRead = await a11yFull();
+    assert.match(a11yRead, /a <button type="button"> with aria-pressed/);
+    assert.match(a11yRead, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
     assert.match(a11y, /The audit has not run in a browser yet/);
     assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Pass \(\d+\)/, 'its chips count what passes, in the Status page\'s word');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
@@ -319,7 +351,7 @@ test('in the browser: no script error, a control changes the real component, the
     let live = '';
     for (let i = 0; i < 240 && !(/Tab reaches it once: "Filter"\..*In all \d+ variants\./.test(live) && /Given by the browser: Space flips aria-pressed/.test(live)); i++) {
       if (i) await new Promise((r) => setTimeout(r, 250));
-      live = await run(`document.querySelector('#c-chip .pg-a11y-rows').textContent`);
+      live = await a11yFull();
     }
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
@@ -337,7 +369,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /1\.4\.3 Contrast/.test(r.cells[1].textContent)).textContent`), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
+    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /1\.4\.3 Contrast/.test(r.cells[1].textContent))`)), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -353,7 +385,7 @@ test('in the browser: no script error, a control changes the real component, the
     const parRows = await run(`[...document.querySelectorAll('#c-chip .pg-par-table tbody tr')].map((r) => r.dataset.type + ':' + r.dataset.status)`);
     assert.ok(parRows.some((r) => /^Prop:/.test(r)) && parRows.some((r) => /^Token:/.test(r)), 'props and tokens: ' + parRows);
     const parityText = await run(`document.querySelector('#c-chip [data-area="parity"]').textContent`);
-    assert.match(parityText, /Task nr.*Type.*Figma.*Code.*What to do.*Status.*Updated/s);
+    assert.match(parityText, /Task nr.*Type.*Figma.*Code.*What to do.*Status.*Last checked/s);
     assert.doesNotMatch(parityText, /Of \d+, \d+ the same/, 'no line counting what is the same, what differs and what is on one side');
     assert.deepEqual(await run(`[...document.querySelectorAll('#c-chip [data-area="parity"] tr[data-status="done"]')].filter((tr) => /Same/.test(tr.lastElementChild.textContent)).length`), 0, 'a row that is done says nothing more under Done');
     // Its chips show one status at a time, on Parity's own table, never on the Accessibility tables beside it.
@@ -471,7 +503,10 @@ test('in the browser: no script error, a control changes the real component, the
     // Its Documentation is the table every task shares: each kind with what is written, what to do and its status, every
     // kind here, written or not, what is to write first; the Status page lists the same rows, only those not written yet.
     // Where it is used is its own area, never a kind of documentation.
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|What is written|What to do|Status|Updated');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge thead th')].map((d) => d.textContent).join('|')`), 'Task nr|Kind|What is written|What to do|Status|Last checked|Open', 'and the arrow that opens the row, named for a screen reader');
+    // A link in a table to another page of the guide is a link pill, its words then its arrow (a template rule); one out of
+    // the guide stays an underlined link.
+    assert.equal(await run(`[...document.querySelectorAll('.sg-section:not([hidden]) table a[href^="#"]')].filter((a) => !a.closest('thead, .sg-tip, .pg-preview, .pg-frame, .pg-variants, .pg-anat-wrap, .sg-showroom, .sg-thumb') && !a.classList.contains('sg-mx-go') && !(a.classList.contains('sg-link-pill') && a.querySelector('svg'))).length`), 0, 'every link in a table is a link pill');
     const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:nth-child(2)')].map((d) => d.textContent).sort().join('|')`);
     assert.equal(kinds, ['For agents', 'What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Its tokens'].sort().join('|'));
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*$/, 'what is to write first, then what is to check, what is written after');
@@ -564,22 +599,34 @@ test('in the browser: no script error, a control changes the real component, the
       }
       await new Promise((r) => setTimeout(r, 400));
       const at = await run(`(() => { const card = ${pick}; const bars = [...document.querySelectorAll('${sel} .pg-areas, ${sel} > h2, ${sel} .sg-size-switch, ${sel} .sg-todo-head, ${sel} .pg-par-sum')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'sticky'); const low = Math.max(0, ...bars.map((e) => e.getBoundingClientRect().bottom)); const own = card.querySelector(':scope > .pg-inspect-head'), head = own ? own.getBoundingClientRect() : { top: low, bottom: low }, th = card.querySelector('thead th'); const probe = document.createElement('div'); probe.style.height = 'var(--sg-stick-gap)'; card.appendChild(probe); const gap = probe.getBoundingClientRect().height; probe.remove(); const r = { card: card.getBoundingClientRect().top < low, head: own ? Math.round(head.top - low - gap) : 0, th: th ? Math.round(th.getBoundingClientRect().top - (own ? head.bottom : low + gap)) : 0 }; document.body.style.paddingBottom = ''; window.scrollTo(0, 0); return r; })()`);
-      // (every stuck head keeps the page's stick gap under what sticks above it, painted with the page)
-      assert.deepEqual(at, { card: true, head: 0, th: 0 }, `${sel}: the card scrolled past the top, its head under the page's bars, the table's head under it`);
+      // (every stuck head keeps the page's stick gap under what sticks above it, painted with the page; and each stuck
+      // bar tucks one pixel under the one above it, so nothing scrolling shows between them, whatever the rounding)
+      assert.equal(at.card, true, `${sel}: the card scrolled past the top`);
+      assert.ok(at.head === 0 || at.head === -1, `${sel}: its head right under the page's bars, at most a pixel under their edge (${at.head})`);
+      assert.equal(at.th, -1, `${sel}: the table's head tucked a pixel under the card's head`);
     };
     await run(`location.hash = '#colors'`); await shownIs('colors'); await headsStick('#colors');
+    // Over tables the lowest stuck bar paints the page's gap under its line (where a table's head will stick); a page
+    // with no table (Identity) never has its content cut short under the line.
+    // (read from the template: the lowest stuck bar is marked on a scroll frame, which a headless page times freely)
+    const sgTpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+    assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, \.sg-token-card thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over tables, the gap under the line');
+    assert.match(sgTpl, /\.sg-sticky-edge\.sg-sticky-band \{ box-shadow:/);
+    await run(`location.hash = '#brand-kit'`); await shownIs('identity');
+    await run(`window.scrollTo({ top: 1200, behavior: 'instant' })`); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !e || !e.classList.contains('sg-sticky-band'); })()`), true, 'no gap cut under the line on a page with no table');
     await run(`location.hash = '#c-chip/documentation'`); await shownIs('c-chip'); await headsStick('#c-chip');
     // The button as the system's script leaves it, a moment after it is drawn, and its focus ring drawn on ::after.
     await run(`location.hash = '#c-button/accessibility'`); await shownIs('c-button');
-    const btn = await until(`(document.querySelector('#c-button .pg-a11y-rows') || {}).textContent || ''`, (v) => /Tab reaches/.test(v));
+    const btn = await until(ROWS_FULL('#c-button .pg-a11y-rows'), (v) => /Tab reaches/.test(v));
     assert.match(btn, /Tab reaches it once: "Save now"/, 'measured once the system\'s script has named it');
     assert.doesNotMatch(btn, /shows no change when it takes the focus/, 'a ring drawn on ::after is a focus that shows');
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
-    assert.match(await until(`(document.querySelector('#c-chip .pg-a11y-rows') || {}).textContent || ''`, (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
+    assert.match(await until(ROWS_FULL('#c-chip .pg-a11y-rows'), (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
     // A check a person made by hand is Done, by whom and when, while chip is as it was; one made before chip changed is
     // to check again, saying who checked it; one nobody checked says how to mark it.
-    const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + tr.textContent : ''; })()`);
+    const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + ${ROW_FULL('tr')} : ''; })()`);
     assert.match(await rowOf('1.3.3'), /^done\|.*Checked by QA on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
     assert.match(await rowOf('3.3.7'), /^check\|.*Checked by QA on 2026-09-01, before chip changed\..*Once someone has checked it, record it as checked and this row reads Done\./s);
     assert.match(await rowOf('1.4.5'), /^check\|.*Once someone has checked it, record it as checked and this row reads Done\./s);
@@ -615,7 +662,8 @@ test('"In use" shows the approved pictures of the system\'s own frames', { timeo
 
 test('the template\'s heading and paragraph rules reach only its own chrome, never a component in a preview', () => {
   const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
-  const css = tpl.slice(tpl.lastIndexOf('<style'), tpl.lastIndexOf('</style>')).replace(/\/\*[\s\S]*?\*\//g, '');
+  // The last <style> tag itself (a word that only starts like one, as a workbook's styleSheet the page writes, is not).
+  const css = tpl.slice([...tpl.matchAll(/<style[\s>]/g)].pop().index, tpl.lastIndexOf('</style>')).replace(/\/\*[\s\S]*?\*\//g, '');
   const top = (sel) => { const out = ['']; let depth = 0; for (const ch of sel) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && !depth) out.push(''); else out[out.length - 1] += ch; } return out.map((x) => x.trim()); };
   const selectors = (css.match(/[^{}]+\{/g) ?? []).flatMap((r) => top(r.slice(0, -1)));
   assert.ok(selectors.length > 50, 'the page\'s own stylesheet is read');
@@ -814,10 +862,14 @@ test('To do: a role the code fails or has still to be tried on is the code\'s ev
   assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'From Figma, once it is annotated' }], ''), 'You in Figma');
   // What a Figma note's role asks, not tried yet: the audit tries it on the code, so nothing is to do in Figma.
   assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'A developer in the code');
-  // A colour pair is a design decision; what only a person judges is checked by hand; the code's own finding is Claude's.
-  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'You in Figma');
+  // A colour pair lives in the system's colours, fixed in Figma and in the code when it has both; what only a person
+  // judges is checked by hand; the code's own finding is the code's.
+  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
   assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
   assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Read from the code' }], ''), 'A developer in the code');
+  // A colour's contrast is fixed where the system's colours live: in Figma and in the code when it has both.
+  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
+  assert.equal(a11yWho('1.4.11', 'audit', [audit], ''), 'In Figma and in the code');
 });
 
 test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {
@@ -1252,8 +1304,10 @@ test('a Tokens page as Figma keeps them: collections, a tree of groups, the coll
   assert.match(tpl, /var TK_FILTER = \[\['', 'All'\], \['colour', 'Colors'\], \['typography', 'Typography'\], \['spacing', 'Spacing'\], \['radius', 'Radii'\], \['motion', 'Motion'\]\];/);
   // The brand kit: the system at a glance, first of the foundations, every value through its token's variable (the
   // brand and mode chosen show), its words on a colour the secondary hue or black or white, whichever reads.
-  assert.match(tpl, /foundationLink\('brand-kit', 'identity'\)/, 'an identity page (the brand kit) among the foundations');
-  assert.ok(tpl.indexOf("foundationLink('brand-kit'") < tpl.indexOf("foundationLink('tokens'"), 'the brand kit first, before the tokens');
+  assert.match(tpl, /foundationLink\('identity', 'identity'\)/, 'an identity page among the foundations (#brand-kit, its old address, opens it)');
+  assert.ok(tpl.indexOf("foundationLink('identity'") < tpl.indexOf("foundationLink('tokens'"), 'identity first, before the tokens');
+  // Every page's address is its name in the menu: rename one, and its address follows.
+  for (const [, id, label] of tpl.matchAll(/(?:navLink|foundationLink)\('([^']+)', '([^']+)'\)/g)) assert.equal(id, label.replace(/\s+/g, '-'), `the ${label} page's address`);
   assert.match(tpl, /var bkCss = function \(t, unit\) \{[^\n]*var nm = t\.var \|\| [^\n]*'var\(' \+ nm/, 'a value drawn through its variable, Figma\'s value behind it');
   assert.match(tpl, /prefers-reduced-motion: reduce\) \{ \.sg-bk-bento \*/, 'still when the person asks for less motion');
   assert.match(tpl, /class="sg-link-pill sg-tk-alias" data-alias="/, 'an alias as Figma shows it, opening the token it points at');
@@ -1342,16 +1396,21 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
-    assert.match(tiles[0][1], /^\d+of 2\|components fully matched$/, 'parity counts the components that fully match');
-    assert.match(tiles[1][1], /^2of \d+\|components found in code$/, 'Figma\'s components the code has, of all of Figma\'s');
+    assert.match(tiles[0][1], /^\d+of \d+\|components fully matched$/, 'parity counts the components that fully match');
+    // Every card over the same whole, Figma's components: the four totals are one.
+    assert.equal(new Set(tiles.map((x) => /of (\d+)/.exec(x[1])[1])).size, 1, 'the four cards count over the same total');
+    assert.match(tiles[1][1], /^\d+of \d+\|components found in code$/, 'the components the code has, of every component Figma has');
     assert.match(tiles[1][2], /2 found/, 'the table\'s own words: Found, Unsure, Missing');
-    assert.match(tiles[2][1], /^\d+of 2\|components that pass$/);
-    assert.match(tiles[3][1], /^\d+of 2\|components fully documented$/);
+    assert.match(tiles[2][1], /^\d+of \d+\|components that pass$/);
+    // Each card counts what its column's filter counts: every row whose state there applies (a component only Figma has
+    // still owes its documentation).
+    assert.match(tiles[3][1], /^\d+of \d+\|components fully documented$/);
+    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = +/of (\\d+)/.exec(tile.textContent)[1]; const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent)); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has');
     assert.match(tiles[3][2], /\d+ (ready|partial|missing)/, 'the Documentation column\'s states: Ready, Partial, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
-    assert.match(how[0][1], /^Figma's components the code has\. A part \(chartBars\/bar\) counts with its parent\. Match: all its props, tokens and values are the same in Figma and in the code\. Partial:/);
+    assert.match(how[0][1], /^Every component Figma has \(each card counts the same ones\); one not in the code yet, or with nothing to compare, is counted apart\. A part \(chartBars\/bar\) counts with its parent\. Match: all its props, tokens and values are the same in Figma and in the code\. Partial:/);
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
     if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Found', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');

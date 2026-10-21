@@ -110,6 +110,9 @@ export function projectTerms(root) {
   };
   const keys = new Set(), hosts = new Set();
   const cfg = readJson(join(root, 'ds-config.json'), {});
+  // Its custom themes, made with a module and kept apart from it (styleguide.modules: { path, data }): each one's name
+  // and file are the project's as much as its brands are.
+  for (const f of themeFiles(root, cfg)) { const t = readJson(f, {}); if (t.name) { add(t.name, 'custom theme', own); name(t.name, 'custom theme', own); } add(basename(f).replace(/\.theme\.json$|\.json$/i, ''), 'custom theme', own); }
   const near = (f) => { try { return readFileSync(join(root, f), 'utf8'); } catch { return ''; } };
   // The project's own names: its setup's name, its folder, its package, its repository and its hosts.
   if (cfg.name) { add(cfg.name, 'project name', own); for (const w of String(cfg.name).split(/\s+/)) add(w, 'project name', own); }
@@ -188,6 +191,18 @@ export function projectTerms(root) {
   for (const h of hosts) { out.set(norm(h), 'host'); for (const part of h.split('.').slice(0, -1)) add(part, 'host', own); }
   return { terms: out, phrases: [...phrases], keys: [...keys], hosts: [...hosts] };
 }
+// The theme files a project's modules keep for it: <data>/<system>/*.json (data: the entry's own folder, else the
+// module's data/).
+function themeFiles(root, cfg) {
+  const sys = String(cfg.name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system', out = [];
+  const home = (p) => resolve(root, String(p).replace(/^~(?=$|\/)/, homedir()));
+  for (const m of cfg.styleguide?.modules ?? []) {
+    const dir = m && typeof m === 'object' ? (m.data ? home(m.data) : m.path ? join(home(m.path), 'data') : null) : typeof m === 'string' ? join(home(m), 'data') : null;
+    if (!dir) continue;
+    try { for (const f of readdirSync(join(dir, sys))) if (/\.json$/i.test(f)) out.push(join(dir, sys, f)); } catch { /* none for this system */ }
+  }
+  return out;
+}
 // Hosts everyone uses: never a project's own.
 export const PUBLIC_HOST = /(^|\.)(figma\.com|github\.com|githubusercontent\.com|github\.io|gitlab\.com|bitbucket\.org|notion\.so|notion\.site|google\.com|googleapis\.com|gstatic\.com|npmjs\.(com|org)|jsdelivr\.net|unpkg\.com|w3\.org|mozilla\.org|example\.(com|org|net)|example|test|invalid|localhost|fontsource\.org|cloudflare\.com|claude\.(com|ai)|anthropic\.com|nodejs\.org|json-schema\.org|schema\.org|shields\.io|rsms\.me|git-scm\.com)$/i;
 
@@ -196,6 +211,7 @@ const newest = (root) => {
   let t = 0;
   const look = (f) => { try { t = Math.max(t, statSync(f).mtimeMs); } catch { /* none */ } };
   look(join(root, 'ds-config.json'));
+  for (const f of themeFiles(root, readJson(join(root, 'ds-config.json'), {}))) look(f);   // a theme made since
   try { for (const n of readdirSync(root)) if (/\.json$/.test(n)) look(join(root, n)); } catch { /* none */ }
   return t;
 };
