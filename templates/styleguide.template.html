@@ -1305,9 +1305,9 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens text { font-size: var(--sg-space-l); }
 .sg-bk-lens .sg-bk-lens-icon { color: var(--sg-text); }
 .sg-bk-lens .sg-bk-lens-num { fill: var(--bk-mark, var(--sg-accent)); font-size: calc(var(--sg-space-l) * 1.85); }
-/* The drawing as large as the tile holds it (six rows, less the padding) at its own proportions, so the words laid over it
+/* The drawing as large as the tile holds it (five rows, as tall as the type card, less the padding) at its own proportions, so the words laid over it
    stay under their lenses; the words in the page's sizes. */
-.sg-bk-lens-wrap { position: relative; width: min(100%, calc((var(--sg-space-xxl) * 18 + var(--sg-card-gap) * 5 - var(--sg-space-l) * 2) * 1300 / 680)); aspect-ratio: 1300 / 680; margin: auto; }
+.sg-bk-lens-wrap { position: relative; width: min(100%, calc((var(--sg-space-xxl) * 15 + var(--sg-card-gap) * 4 - var(--sg-space-l) * 2) * 1300 / 680)); aspect-ratio: 1300 / 680; margin: auto; }
 .sg-bk-t.sg-bk-lens-t { justify-content: center; }   /* the drawing in the middle of its card */
 .sg-bk-lens-wrap > .sg-bk-lens { position: absolute; inset: 0; }
 .sg-bk-lens-cap { position: absolute; width: 18%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--sg-space-xxs); text-align: center; }
@@ -4106,7 +4106,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // One icon, magnified on its grid, with two lenses: where its line ends and where it turns, each drawn again
         // large beside it, its pixel grid behind, with the stroke measured across it.
         var an = iconAnatomy(monoStd.slice(Math.floor(monoStd.length / 4)).concat(monoStd.slice(0, Math.floor(monoStd.length / 4))));
-        if (an) addI('w6 h6 sg-bk-bare-pad sg-bk-lens-t', bg2, lensTile(an));
+        if (an) addI('w6 h5 sg-bk-bare-pad sg-bk-lens-t', bg2, lensTile(an));
       }
       ICON = '<div class="sg-bk-bento">' + IT.join('') + '</div>'; IT = [];   // the charts follow, at the end of the kit
       // The charts, moving: the system's own chart tokens (the pie's slices and separator, the columns' bars, column,
