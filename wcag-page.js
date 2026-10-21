@@ -356,9 +356,9 @@
       var n = name(el), says = announce(el, r, n);
       spoken.push({ desc: desc(el), role: r, name: n, says: says });
       if (!n) return;
-      // Only a name nobody sees (aria-label, a title, alt text): a visible label is the words the design shows, its own
-      // sample text on a specimen, and reads as what it says.
-      if (norm(n) === norm(text(el)) || (el.labels && el.labels.length && norm(n) === norm(Array.prototype.map.call(el.labels, text).join(' ')))) { if (r === 'link' && el.getAttribute('href')) { seen('samename'); var kv = norm(n); (said[kv] = said[kv] || []).push(el); } return; }
+      // Only a name nobody sees (aria-label, a title, alt text): a visible label, or a name whose words the component
+      // shows, is the words the design shows (its own sample text on a specimen) and reads as what it says.
+      if (norm(n) === norm(text(el)) || (el.labels && el.labels.length && norm(n) === norm(Array.prototype.map.call(el.labels, text).join(' '))) || (' ' + norm(text(root)) + ' ').indexOf(' ' + norm(n) + ' ') >= 0) { if (r === 'link' && el.getAttribute('href')) { seen('samename'); var kv = norm(n); (said[kv] = said[kv] || []).push(el); } return; }
       seen('weakname');
       var w = weak(n, r);
       if (w) push('weakname', '2.4.6', el, 'a screen reader says "' + says.slice(0, 60) + '": ' + w);
@@ -402,7 +402,9 @@
     return parts.join(', ') + (more ? '. ' + more : '');
   }
   // A name that tells nothing of what the control does: a placeholder word, a role, a file or an icon's own name.
-  var GENERIC = /^(icon|image|img|picture|photo|graphic|svg|logo|button|btn|link|click|tap|press|label|text|title|untitled|placeholder|item|element|component|control|field|input|lorem ipsum.*|x|\W)$/i;
+  // Only words that show the name is missing (an icon's or an image's stand-in, a verb alone, a placeholder): a plain noun
+  // ("Field", "Label", "Title") is a specimen's sample text as often as a weak name, and is left to a person.
+  var GENERIC = /^(icon|image|img|picture|photo|graphic|svg|logo|button|btn|link|click|tap|press|untitled|placeholder|lorem ipsum.*|x|\W)$/i;
   var ROLE_WORD = { button: /\bbutton$/i, link: /\blink$/i, checkbox: /\bcheck ?box$/i, radio: /\bradio( button)?$/i, switch: /\b(toggle|switch)$/i, tab: /\btab$/i, img: /\b(image|icon|picture)$/i, menuitem: /\bmenu item$/i };
   function weak(n, r) {
     var t = n.trim();
