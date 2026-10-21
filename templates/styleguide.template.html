@@ -3079,7 +3079,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // and a person know where to read them.
     var k = c.contract;
     if (k && (k.props || []).length) rows.push(Object.assign(mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract, <code>' + esc(k.file) + '</code>, which the engine writes from Figma and the code on every run: ' +
-      k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ') + '. Agents read them there; nothing to write.</p>', 'done', ''), { src: ['Its contract'] }));
+      k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ') + '. Agents read them there; nothing to write.</p>', 'done', ''), { src: ['Its contract (' + k.file + ')'] }));
     if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
       'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
     return rows;
@@ -5939,6 +5939,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function isOpen(r) { return r.st === 'todo' || r.st === 'check'; }
   // The one line under a status, the table's and the panel's: what it says, else that it is new, else how it is checked,
   // with no date (its date is in Last checked): a check a person still has to make says it is still to make.
+  // A source by name only: what it is (Figma, the intent layer, the code, the contract, a guidelines file), never its path.
+  function srcNames(src) {
+    var name = function (x) { x = String(x || ''); return /intent layer/i.test(x) ? 'Intent layer' : /contract/i.test(x) ? 'Contract' : /figma|variables/i.test(x) ? 'Figma' : /guideline|\.md\b|notion|wiki/i.test(x) ? 'Guidelines' : /code|css|\.(vue|jsx?|tsx?)\b|comment|stylesheet/i.test(x) ? 'Code' : /^(the )?references|pictures|\.png\b/i.test(x) ? 'References' : x; };
+    var out = []; (src || []).forEach(function (x) { var n = name(x); if (n && out.indexOf(n) < 0) out.push(n); }); return out;
+  }
   function statusLine(r) {
     var how = function (x) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, r.st === 'done' ? 'Checked by a person' : 'To check by a person'); };
     return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || how((r.src || []).filter(Boolean)[0]);
@@ -5957,11 +5962,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     code: function (r) { return '<td>' + clip(r.code) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
     todo: function (r) { return '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>'; },
+    // Where it was read, by name only (Figma, Intent layer, Code, Contract, Guidelines); the file and its path are in the
+    // row's panel.
+    source: function (r) { return '<td class="sg-src-cell">' + esc(srcNames(r.src).join(' · ')) + '</td>'; },
     // Its status in the table: the word, and one line under it (what it says, else that it is new, else where it was
-    // read); every source is in the row's panel.
+    // read, unless its table has a Source column); every source is in the row's panel.
     status: function (r) {
       // How it was checked, its date left to the Last checked column (one date per row, never two).
-      var one = statusLine(r);
+      var one = r.area === 'Documentation' ? (r.st === 'done' ? '' : r.rel || '') : statusLine(r);
       return '<td>' + statusHTML(r.st, '', r.area) + (one ? '<span class="pg-par-val sg-one-line" title="' + esc(one) + '">' + esc(one) + '</span>' : '') + '</td>';
     }
   };
@@ -5969,7 +5977,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Motion: [['Task nr', 'no'], ['What happens', 'kind'], ['Code', 'code'], ['Figma', 'figma'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
-    Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['Source', 'source'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Products: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     System: [['Task nr', 'no'], ['Type', 'kind'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
