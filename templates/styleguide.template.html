@@ -1292,7 +1292,11 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 @keyframes sg-bk-fill { from { width: 0; } to { width: 100%; } }
 /* Icons and charts. */
 .sg-bk-lens .sg-bk-lens-grid { stroke: color-mix(in srgb, var(--sg-line-colour) 30%, transparent); stroke-width: 1px; vector-effect: non-scaling-stroke; }
-.sg-bk-lens-frame { position: absolute; border-radius: var(--bk-rad, var(--sg-radius)); outline: var(--bk-line-w, 1px) dashed var(--sg-muted); outline-offset: 0; }   /* the icon's frame in the brand's corner radius */
+.sg-bk-lens-frame { position: absolute; }
+.sg-bk-lens-frame > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.sg-bk-lens-frame rect { rx: var(--bk-rad, var(--sg-radius)); }   /* the frame and its grid in the brand's corner radius */
+.sg-bk-lens-fgrid { stroke: color-mix(in srgb, var(--sg-line-colour) 30%, transparent); stroke-width: 1px; }
+.sg-bk-lens-fline { fill: none; stroke: var(--sg-muted); stroke-width: var(--bk-line-w, 1px); stroke-dasharray: 3 7; }
 .sg-bk-lens .sg-bk-lens-ring { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: calc(max(2px, var(--bk-line-w, 1px)) * 0.8); vector-effect: non-scaling-stroke; }
 .sg-bk-lens .sg-bk-lens-ground { fill: var(--bk-card); }
 .sg-bk-lens .sg-bk-lens-mark { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
@@ -3385,7 +3389,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // where each lens looks and the stroke measured across its line; at the right each lens drawn large, the icon's own
     // pixel grid behind it, the cap's half-stroke circle and the corner's turn marked, named underneath.
     function lensTile(an) {
-      var bx = an.box, z = Math.max(bx[2], bx[3]), big = 583 / z, frameX = 72, frameY = 68, ox = frameX - bx[0] * big, oy = frameY - bx[1] * big;
+      var bx = an.box, z = Math.max(bx[2], bx[3]), big = 583 / z, frameX = 72, frameY = 58, ox = frameX - bx[0] * big, oy = frameY - bx[1] * big;
       var at = function (p) { return [ox + p[0] * big, oy + p[1] * big]; }, num = function (n) { return String(Math.round(n * 100) / 100); };
       // The icon's own drawing in the words' colour (its fills from a class would not reach a <use>).
       var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
@@ -3401,7 +3405,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Each lens, large, side by side beside the icon: the icon drawn so the point sits in the middle, clipped to the
       // circle, its name and what it shows under it. The gap's lens is drawn at the scale that holds both its ends.
       lenses.forEach(function (l, i) {
-        var cx = 842 + (i % 2) * (LR * 2 + 80), cy = 40 + LR + Math.floor(i / 2) * (LR * 2 + 95 + 80), id = 'sg-bk-lens-' + i;
+        var cx = 842 + (i % 2) * (LR * 2 + 80), cy = 40 + LR + Math.floor(i / 2) * (LR * 2 + 95 + 59), id = 'sg-bk-lens-' + i;
         var zoom = l.kind === 'gap' ? Math.min(LR * 2 / (an.w * 3.2), LR * 1.7 / (an.gap.gap + an.w * 3)) : LR * 2 / (an.w * 3.2), s1 = an.w * zoom / 2;
         var on = function (p) { return [cx + (p[0] - l.p[0]) * zoom, cy + (p[1] - l.p[1]) * zoom]; };
         // The icon's own pixel grid: a line at each whole unit of its drawing.
@@ -3454,7 +3458,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         caps += '<div class="sg-bk-lens-cap" style="left:' + (cx / VW * 100) + '%;top:' + ((cy + LR + 20) / VH * 100) + '%"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>';
       });
       var set = an.set, same = (set.sameW === set.read ? 'one stroke on all ' + set.read + ' icons' : 'one stroke on ' + set.sameW + ' of ' + set.read + ' icons') + (an.src === 'figma' ? ', as Figma draws it' : an.src === 'code' ? ', as its code draws it' : ', read on their drawing');
-      var lensFrame = '<div class="sg-bk-lens-frame" style="left:' + (frameX / VW * 100) + '%;top:' + (frameY / VH * 100) + '%;width:' + (bx[2] * big / VW * 100) + '%;height:' + (bx[3] * big / VH * 100) + '%;--nx:' + bx[2] + ';--ny:' + bx[3] + '"></div>';
+      // The icon's frame, drawn by the page at its own size (so its dashes keep their spacing and its corner the brand's
+      // radius), with a grid behind the icon half a stroke apart, laid on the icon's own outer edges, clipped to the frame.
+      var gStep = an.w / 2, gAt = an.thick ? an.thick.e1 : an.end ? an.end.at : [bx[0], bx[1]];
+      if (an.corner && an.corner.ta) { var go = an.corner.o, gx = function (t) { return Math.abs(t[0] - go[0]) > Math.abs(t[1] - go[1]); }; gAt = [gx(an.corner.ta) ? an.corner.ta[0] : an.corner.tb[0], gx(an.corner.ta) ? an.corner.tb[1] : an.corner.ta[1]]; }
+      var gLines = '', pct = function (v, o, n) { return ((v - o) / n * 100) + '%'; };
+      for (var gv = gAt[0] - Math.floor((gAt[0] - bx[0]) / gStep) * gStep; gv <= bx[0] + bx[2] + 1e-6; gv += gStep) gLines += '<line x1="' + pct(gv, bx[0], bx[2]) + '" y1="0" x2="' + pct(gv, bx[0], bx[2]) + '" y2="100%"/>';
+      for (var gh = gAt[1] - Math.floor((gAt[1] - bx[1]) / gStep) * gStep; gh <= bx[1] + bx[3] + 1e-6; gh += gStep) gLines += '<line x1="0" y1="' + pct(gh, bx[1], bx[3]) + '" x2="100%" y2="' + pct(gh, bx[1], bx[3]) + '"/>';
+      var lensFrame = '<div class="sg-bk-lens-frame" style="left:' + (frameX / VW * 100) + '%;top:' + (frameY / VH * 100) + '%;width:' + (bx[2] * big / VW * 100) + '%;height:' + (bx[3] * big / VH * 100) + '%">' +
+        '<svg aria-hidden="true"><clipPath id="sg-bk-lens-clip"><rect width="100%" height="100%"/></clipPath><g clip-path="url(#sg-bk-lens-clip)" class="sg-bk-lens-fgrid">' + gLines + '</g><rect width="100%" height="100%" class="sg-bk-lens-fline"/></svg></div>';
       return '<div class="sg-bk-lens-wrap">' + lensFrame + '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 ' + VW + ' ' + VH + '" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out + '</svg>' + caps + '</div>' +
         '<span class="sg-bk-lens-foot">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  ' + esc(same) + '</span>';
     }
