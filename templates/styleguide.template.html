@@ -3417,15 +3417,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       out += icon(frameX, frameY, big);
       // The construction line over it: the line each stroke is drawn on, a ring at each end, a dot at each turn.
       if (an.build) {
-        // Drawn through its points as a smooth curve (Catmull-Rom), so a rounded turn reads round and a straight stays straight.
-        var curve = function (ps) {
-          var c = ps.map(at), d = 'M' + c[0][0].toFixed(1) + ' ' + c[0][1].toFixed(1);
-          for (var k = 0; k < c.length - 1; k++) {
-            var p0 = c[k - 1] || c[k], p1 = c[k], p2 = c[k + 1], p3 = c[k + 2] || p2;
-            d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ' ' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) + ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ' ' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) + ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
-          }
-          return d;
-        };
+        // Drawn through its points as they are: a straight stays straight, a rounded turn is its many short steps.
+        var curve = function (ps) { return ps.map(function (p, k) { var c = at(p); return (k ? 'L' : 'M') + c[0].toFixed(2) + ' ' + c[1].toFixed(2); }).join(''); };
         out += '<g class="sg-bk-lens-build">' + an.build.paths.map(function (ps) { return '<path d="' + curve(ps) + '"/>'; }).join('') + '</g>' +
           an.build.ends.map(function (p) { var c = at(p); return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + (an.w * big * 0.3) + '" class="sg-bk-lens-end"/>'; }).join('') +
           an.build.turns.map(function (p) { var c = at(p); return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + (an.w * big * 0.22) + '" class="sg-bk-lens-dot"/>'; }).join('');
@@ -3768,11 +3761,19 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           var fa = freeEnd(r[0]) && !tipOf[r[0]], fb = freeEnd(r[r.length - 1]) && !tipOf[r[r.length - 1]];
           return !((fa !== fb) && r.length < best);   // a piece between two forks stays, however short
         });
+        // Each point is the stroke's true middle across it (sub-pixel), so a straight stretch is straight; where no clean
+        // cross-section exists (at a fork), the line runs on straight to the fork.
         var build = kept.map(function (r) {
-          var pts = r.length > 4 ? smooth(r.map(pt)) : r.map(pt);
-          if (freeEnd(r[0])) { var e0 = stretch(r, 0); pts.unshift(e0); endsAt.push(e0); }
-          if (freeEnd(r[r.length - 1])) { var e1 = stretch(r, 1); pts.push(e1); endsAt.push(e1); }
-          return simplify(pts, 0.08);
+          var pts = [];
+          for (var k = 0; k < r.length; k++) {
+            var A = cen(r[Math.max(0, k - 3)]), B = cen(r[Math.min(r.length - 1, k + 3)]), C = cen(r[k]), m = across(C[0], C[1], unit(B[0] - A[0], B[1] - A[1]));
+            if (m) pts.push(toU(m.x, m.y));
+          }
+          if (pts.length < 2) pts = r.length > 4 ? smooth(r.map(pt)) : r.map(pt);
+          var onTo = function (P, p0, p1) { var u = unit(p0[0] - p1[0], p0[1] - p1[1]), t = (P[0] - p0[0]) * u[0] + (P[1] - p0[1]) * u[1]; return t > 0 ? [p0[0] + u[0] * t, p0[1] + u[1] * t] : null; };
+          if (freeEnd(r[0])) { var e0 = stretch(r, 0); pts.unshift(e0); endsAt.push(e0); } else if (pts.length > 1) { var f0 = onTo(pt(r[0]), pts[0], pts[1]); if (f0) pts.unshift(f0); }
+          if (freeEnd(r[r.length - 1])) { var e1 = stretch(r, 1); pts.push(e1); endsAt.push(e1); } else if (pts.length > 1) { var f1 = onTo(pt(r[r.length - 1]), pts[pts.length - 1], pts[pts.length - 2]); if (f1) pts.push(f1); }
+          return simplify(pts, 0.03);
         });
         // Where two strokes alone meet at a point (an arrow's tip), they join where their straight lines cross.
         var meet = {}, joins = [];
@@ -3797,7 +3798,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           joins.push(X);
         });
         // The turns: each corner once at its sharpest, and any point where the simplified line bends by more than 60 degrees.
-        var turnDots = [], addTurn = function (p) { if (!turnDots.some(function (o) { return Math.hypot(o[0] - p[0], o[1] - p[1]) < w * 2; })) turnDots.push(p); };
+        var turnDots = [], addTurn = function (p) { if (!turnDots.concat(endsAt).some(function (o) { return Math.hypot(o[0] - p[0], o[1] - p[1]) < w * (turnDots.indexOf(o) >= 0 ? 2 : 1); })) turnDots.push(p); };   // never on an end
         joins.forEach(addTurn);
         corners.slice().sort(function (a, b) { return b.cos - a.cos; }).forEach(function (c) { addTurn(pt(c.q)); });
         build.forEach(function (ps) { for (var k = 1; k < ps.length - 1; k++) { var u1 = unit(ps[k][0] - ps[k - 1][0], ps[k][1] - ps[k - 1][1]), u2 = unit(ps[k + 1][0] - ps[k][0], ps[k + 1][1] - ps[k][1]); if (u1[0] * u2[0] + u1[1] * u2[1] < 0.5) addTurn(ps[k]); } });
@@ -8482,6 +8483,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       drawSlots();
       drawnWidth = (preview.firstElementChild && preview.firstElementChild.getBoundingClientRect().width) || drawnWidth;
       if (AREA === 'variants' && !drawingVariants) requestAnimationFrame(drawVariants);
+      dependents();
+    }
+    // A control whose prop the code uses only while another is on (labelContent with showLabel on, alignment with
+    // fullWidth on) is disabled while that one is not: nothing it sets would show. Its tooltip says what it waits for.
+    function dependents() {
+      Array.prototype.forEach.call(controlsEl ? controlsEl.children : [], function (k) {
+        var p = k._prop; if (!p || !(p.onlyWith || []).length) return;
+        var met = p.onlyWith.every(function (w) { var v = state[w.label]; return (v === true || String(v).toLowerCase() === 'true') === !!w.on; });
+        k.classList.toggle('is-off', !met);
+        Array.prototype.forEach.call(k.querySelectorAll('input, select, textarea, button:not(.sg-tip-btn)'), function (x) { x.disabled = !met; });
+      });
     }
     // Each slot of the component (a Figma SLOT) marked where it sits: the area it takes, named Slot inside it (and its own
     // name when it has one), in place of the placeholder its markup holds. A slot the code gives a part of its own
@@ -8776,12 +8788,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     props.forEach(function (p) {
       var ctl = document.createElement('div'); ctl.className = 'pg-ctl'; if (p.at != null) ctl.dataset.at = p.at; ctl._prop = p;
       // A prop only the code's API takes says so: Figma has no prop for it.
-      // What the label says beyond its name is in its tooltip: a prop only the code's API takes, and a value the code
-      // applies only while another prop is on (alignment with fullWidth).
+      // What the label says beyond its name is in a tooltip beside it: a prop only the code's API takes, and a value the
+      // code applies only while another prop is on (alignment with fullWidth).
       var when = (p.onlyWith || []).length ? 'Applies only with ' + p.onlyWith.map(function (w) { return w.label + (w.on ? ' on' : ' off'); }).join(' and ') : '';
       var tip = [p.fromCode ? 'From the code\'s API: Figma has no prop for it' : '', when].filter(Boolean).join('. ');
-      var label = '<div class="pg-ctl-label"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '') + (p.fromCode ? '<span class="sg-hidden-text"> (from the code)</span>' : '') +
-        (when ? '<span class="sg-hidden-text"> (' + esc(when.toLowerCase()) + ')</span>' : '') + '</div>';
+      // The page's own tooltip, its round "i" beside the name, says it (its bubble placed over the panel, never cut).
+      var name = esc(p.label) + (p.prop !== p.label ? '<code>' + esc(p.prop) + '</code>' : '');
+      var label = '<div class="pg-ctl-label">' + (tip ? '<span class="sg-mx-why"><span>' + name + '</span>' + tipHTML(tip, 'About ' + p.label) + '</span>' : name) + '</div>';
       if (p.type === 'TEXT') {
         ctl.innerHTML = label + (DATA.ui && DATA.ui.field ? DATA.ui.field.markup : '<input type="text" class="sg-input">');
         var field = ctl.querySelector('input'); field.value = state[p.label]; field.setAttribute('aria-label', p.label);
@@ -8840,6 +8853,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ordered = Array.prototype.slice.call(controlsEl.children).map(function (k, i) { return { k: k, at: k.dataset.at === undefined ? 1e6 + i : +k.dataset.at }; })
       .sort(function (a, b) { return a.at - b.at; }).map(function (x) { return x.k; });
     showFirst(ordered, function (k) { return k._prop; }).forEach(function (k) { controlsEl.appendChild(k); });
+    dependents();
     if (!props.length && !(c.unbuilt || []).length) { var none = document.createElement('div'); none.className = 'pg-empty'; none.textContent = c.codeOnly ? 'Only in the code: its props are under Documentation, compared with nothing in Figma.' : 'No agreed props yet.'; controlsEl.appendChild(none); }
     return sec;
   }
