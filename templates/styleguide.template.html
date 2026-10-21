@@ -4246,6 +4246,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         });
         // Too few: the brand's own pairs fill it (on the primary, paper on ink, ink on paper).
         [{ bg: HUE1, fg: onC1big }, { bg: INK, fg: PAPER }, { bg: PAPER, fg: INK }, { bg: HUE1, fg: INK }].forEach(function (o) { if (iconSw.length < 4) iconSw.push(o); });
+        // One is always on the primary, last: in an icon colour that reads on it (3:1), else the brand's colour for words on it.
+        if (!iconSw.some(function (o) { return o.bg === HUE1; })) {
+          var onHue = Object.keys(swByHex).filter(function (h) { return (bkRatio(h, h1x) || 0) >= 3; }).sort(function (a, b) { return swByHex[b].n - swByHex[a].n; })[0];
+          iconSw[3] = { bg: HUE1, fg: onHue ? bkCss(swByHex[onHue].t) : onC1big };
+        } else iconSw.push(iconSw.splice(iconSw.findIndex(function (o) { return o.bg === HUE1; }), 1)[0]);
         if (an) addI('w6 h5 sg-bk-bare-pad sg-bk-lens-t', bg2, lensTile(an, iconSw));
       }
       ICON = '<div class="sg-bk-bento">' + IT.join('') + '</div>'; IT = [];   // the charts follow, at the end of the kit
