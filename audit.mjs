@@ -1005,6 +1005,31 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
   process.exit(0);
 }
 
+// ── --watch-intent-layer [minutes]: build the style guide again each time the intent layer gets a new commit ──
+// Every few minutes (5 by default) one GET asks GitLab for the layer's latest commit; when it has moved, the layer is
+// read again and the style guide is built, so its intent layer page follows every commit. Read-only; stop with Ctrl+C.
+if (process.argv.includes('--watch-intent-layer')) {
+  let wcfg = {};
+  try { wcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { syncIntentLayer, intentLayerConfig } = await import('./doc-source-dsds.mjs');
+  const c = intentLayerConfig(wcfg);
+  if (!c) { console.log('No intent layer is set: rms-design-system-engine --intent-layer <GitLab link> first.'); process.exit(2); }
+  const at = process.argv.indexOf('--watch-intent-layer'), minutes = Math.max(1, Number(process.argv[at + 1]) || 5);
+  const now = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  console.log(`👀 Watching ${c.url} every ${minutes} min: the style guide is built again when its commit moves. Stop with Ctrl+C.`);
+  for (;;) {
+    const r = await syncIntentLayer(ROOT, wcfg, {});
+    const sha = r?.source?.sha ? r.source.sha.slice(0, 8) : '?';
+    if (r?.error) console.log(`${now()} ⚠️  ${r.error}`);
+    else if (r?.changed) {
+      console.log(`${now()} 🧭 new commit ${sha}: building the style guide`);
+      const b = spawnSync(process.execPath, [join(SCRIPT_DIR, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: ROOT, stdio: 'inherit' });
+      console.log(b.status === 0 ? `${now()} ✅ style guide built from ${sha}` : `${now()} ❌ the style guide build failed (exit ${b.status}); tried again on the next commit`);
+    } else console.log(`${now()} up to date (${sha})`);
+    await new Promise((res) => setTimeout(res, minutes * 60000));
+  }
+}
+
 if (process.argv.includes('--capture-code')) {
   const passthrough = process.argv.slice(2).filter((a) => a !== '--capture-code');
   const r = spawnSync(process.execPath, [join(SCRIPT_DIR, 'code-capture.mjs'), ...passthrough], { cwd: ROOT, stdio: 'inherit' });

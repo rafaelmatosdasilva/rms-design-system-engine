@@ -93,6 +93,7 @@ rms-design-system-engine --publish-styleguide            # write the CI job that
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
+rms-design-system-engine --watch-intent-layer [min]     # keep running: build the style guide again each time the intent layer gets a new commit (checks every 5 min)
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)

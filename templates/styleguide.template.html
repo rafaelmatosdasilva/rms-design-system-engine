@@ -3006,6 +3006,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ilLinks.insertAdjacentHTML('afterbegin', sysButton('button', 'Download for Excel', ' data-il-export="xlsx"', null, null, DOWNLOAD_SVG) + sysButton('button', 'Download for Claude', ' data-il-export="md"', null, null, DOWNLOAD_SVG));
       ilLinks.addEventListener('click', function (e) { var b = e.target.closest('[data-il-export]'); if (!b) return; if (b.getAttribute('data-il-export') === 'xlsx') ilSave(ilBase + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ilXlsx()); else ilSave(ilBase + '.md', 'text/markdown;charset=utf-8', ilMd()); });
     }
+    // Which version of the layer this is: its commit on GitLab, when it was made and when it was last checked, so a
+    // reader knows the review is current (each build reads the layer again when its commit has moved).
+    if (ilSrc.sha) {
+      var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+      var ilAt = (ilSrc.url ? ilSrc.url.replace(/^https?:\/\//, '') : 'the intent layer') + ' @ ' + (ilSrc.ref || '') + ' ' + String(ilSrc.sha).slice(0, 8);
+      ilSec.insertAdjacentHTML('beforeend', '<p class="sg-info sg-il-source">Read from ' + (ilSrc.url ? '<a class="sg-uses-link" href="' + esc(ilSrc.url + '/-/commit/' + ilSrc.sha) + '" target="_blank" rel="noopener">' + esc(ilAt) + '</a>' : esc(ilAt)) +
+        (ilSrc.committedAt ? ', committed ' + esc(ilWhen(ilSrc.committedAt)) : '') + (ilSrc.fetchedAt ? '; checked ' + esc(ilWhen(ilSrc.fetchedAt)) : '') + '. The style guide reads it again on every build, when its commit has moved.</p>');
+    }
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
   }
