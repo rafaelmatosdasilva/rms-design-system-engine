@@ -186,8 +186,11 @@ function branches(n, vars, locals, seen = new Set()) {
     }
     case 'and': return [...branches(n.r, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.l, vars), ...b.conds] })), { text: '', conds: [] }];
     case 'or': return [...branches(n.l, vars, locals, seen), ...branches(n.r, vars, locals, seen)];
+    // A property written the other way round (:hidden="${!shown}"): its value, marked negated.
+    case 'not': if (n.e?.k === 'id' && vars.has(n.e.v)) return [{ text: MARK(`!${n.e.v}`), conds: [] }];
+    // falls through
     // An expression it cannot follow: no text, and the properties it reads are noted as used that way.
-    case 'opaque': case 'not': case 'cmp': return [{ text: '', conds: [], opaque: [...new Set(idsOf(n).flatMap((x) => (vars.has(x) ? [x] : locals.has(x) ? idsOf(locals.get(x)).filter((y) => vars.has(y)) : [])))] }];
+    case 'opaque': case 'cmp': return [{ text: '', conds: [], opaque: [...new Set(idsOf(n).flatMap((x) => (vars.has(x) ? [x] : locals.has(x) ? idsOf(locals.get(x)).filter((y) => vars.has(y)) : [])))] }];
     default: return [{ text: '', conds: [] }];
   }
 }
@@ -255,7 +258,8 @@ export function readTemplateForm(src) {
     if (!text) return;
     const tagHere = openTag(context);
     if (!tagHere || (tag && tagHere !== tag)) return;   // between tags, or inside another component's tag
-    const self = new Set([...text.matchAll(/\u0001([^\u0002]+)\u0002/g)].map((x) => x[1]));
+    const self = new Set([...text.matchAll(/\u0001!?([^\u0002]+)\u0002/g)].map((x) => x[1]));
+    const valueOf = (mark, code, extra = {}) => (mark.startsWith('!') ? emit(mark.slice(1), { code, role: 'value', negated: true, ...extra }) : emit(mark, { code, role: 'value', ...extra }));
     const condition = (target) => {
       for (const c of b.conds) {
         if (self.has(c.v) && (c.equals != null || !c.negated)) continue;   // a property tested against itself: its value
@@ -269,7 +273,7 @@ export function readTemplateForm(src) {
         const sofar = open.value + text.slice(0, mk.index);
         const key = /([A-Za-z_$][\w$]*)\s*:\s*['"`]?\s*$/.exec(sofar)?.[1];
         const target = attrName(open.name) + (key ? `.${key}` : '');
-        emit(mk[1], { code: target, role: 'value' });
+        valueOf(mk[1], target);
         condition(target);
       }
       return;
@@ -285,7 +289,7 @@ export function readTemplateForm(src) {
       const extra = event ? { event: true } : {};
       if (value != null) {
         const marks = [...value.matchAll(/\u0001([^\u0002]+)\u0002/g)].map((x) => x[1]);
-        for (const v of marks) emit(v, { code: name, role: 'value', ...extra });
+        for (const v of marks) valueOf(v, name, extra);
         if (marks.length) condition(name);
         else for (const c of b.conds) emit(c.v, { code: name, role: 'condition', ...flags(c), ...extra });
       } else {

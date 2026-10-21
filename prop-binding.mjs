@@ -3,6 +3,7 @@
 //
 //   bindingSources({ codeConnect, aliases, authored }) → the names recorded for each Figma property, by who recorded them
 //   bindFigmaProp(fp, def, ctx) → { code, as: 'prop'|'slot'|'defaultSlot', source, exactName } or null
+//   invertsValue(fp, code, ctx) → true when a true/false binding writes the opposite value (show ↔ hide)
 //   readingsOf(fp, codeConnectProps) → what the project's Code Connect file does with the property beyond its value:
 //                                      [{ code, role: 'condition', negated?, equals? }]
 //
@@ -57,3 +58,16 @@ export function readingsOf(fp, codeConnectProps = []) {
   return (codeConnectProps ?? []).filter((p) => p.figma === fp && p.role === 'condition' && p.code && !p.event)
     .map((p) => ({ code: p.code, role: 'condition', ...(p.negated ? { negated: true } : {}), ...(p.equals != null ? { equals: p.equals } : {}) }));
 }
+
+// Whether a true/false binding writes the opposite of the Figma value (Figma "Show close" on is the code's hideClose
+// false). The project's own word decides first (negated on its contract.authored.json binding), then its Code Connect file
+// (hideClose={!showClose}), then the two names when they say opposite things (show/has/with ↔ hide/no/without).
+const ON = /^(show|has|with|enable|enabled|display|visible)(?=[^a-z]|$)/, OFF = /^(hide|hidden|no|without|disable|disabled|not)(?=[^a-z]|$)/;
+const head = (s) => String(s).split('#')[0].trim().replace(/^./, (c) => c.toLowerCase());
+export function invertsValue(fp, code, { codeConnectProps = [], authored = null } = {}) {
+  if (typeof authored?.negated === 'boolean') return authored.negated;
+  if ((codeConnectProps ?? []).some((p) => p.figma === fp && p.code === code && p.role === 'value' && p.negated)) return true;
+  const f = head(fp), c = head(code);
+  return (ON.test(f) && OFF.test(c)) || (OFF.test(f) && ON.test(c));
+}
+export const flipBoolean = (v) => (/^true$/i.test(String(v)) ? 'false' : /^false$/i.test(String(v)) ? 'true' : v);

@@ -430,6 +430,7 @@ const CODE_SIDE = {
     type: str, options: { type: 'array' }, default: {}, required: { type: 'boolean' }, description: str,
     confidence: { enum: ['verified', 'single-source', 'uncertain'] },
     valueMap: { type: 'object', description: 'Figma value → code value, from Code Connect.' },
+    inverted: { const: true, description: 'The code prop holds the opposite of the Figma value (Figma showClose on = code hideClose false).' },
   },
 };
 const CONTRACT_SCHEMA = {

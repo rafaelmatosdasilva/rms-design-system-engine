@@ -3,7 +3,7 @@
 // is; what the project's Code Connect file says it decides beyond its value; where Figma and the code differ; the props
 // only the code has; its events and slots as the code declares them; its states, the tokens each state paints with,
 // and what the code says about its accessibility. Every fact names where it came from; nothing is guessed.
-import { bindingSources, bindFigmaProp, readingsOf, suggestionFor } from './prop-binding.mjs';
+import { bindingSources, bindFigmaProp, readingsOf, suggestionFor, invertsValue, flipBoolean } from './prop-binding.mjs';
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const strip = (k) => String(k).split('#')[0].trim();
@@ -47,6 +47,7 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
       : api ? bindFigmaProp(p.name, def, { codeProps, slots: api.slots ?? {}, recorded, authoredSlots }) : null;
     if (b) {
       const c = codeProps[b.code] ?? {};
+      const inverted = b.as === 'prop' && def.type === 'BOOLEAN' && invertsValue(p.name, b.code, { codeConnectProps: api?.codeConnectProps, authored: authored?.bindings?.[p.name] });
       if (b.as === 'prop') used.add(norm(b.code));
       out.bindings.code = {
         ...(out.bindings.code && typeof out.bindings.code === 'object' ? out.bindings.code : {}),
@@ -54,13 +55,14 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
         ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}),
         ...(typeof c.required === 'boolean' ? { required: c.required } : {}), ...(c.description ? { description: c.description } : {}),
         ...(c.confidence ? { confidence: c.confidence } : {}), ...(ccValues.get(p.name) ? { valueMap: ccValues.get(p.name) } : {}),
+        ...(inverted ? { inverted: true } : {}),
       };
       // Where Figma and the code differ on it: its default, and the values each has that the other does not (through
       // the Code Connect value map when there is one: Figma "Large" written "lg").
       const differences = [];
       const fd = out.bindings.figma.default, cd = c.default;
       const map = ccValues.get(p.name) ?? {};
-      const asCode = (v) => (map[v] != null ? map[v] : v);
+      const asCode = (v) => (inverted ? flipBoolean(v) : map[v] != null ? map[v] : v);
       if (fd != null && fd !== '' && cd != null && !same(asCode(fd), cd)) differences.push({ kind: 'default', figma: fd, code: cd });
       if (Array.isArray(def.variantOptions) && Array.isArray(c.options) && !def.variantOptions.every((o) => o === 'true' || o === 'false')) {
         const f = def.variantOptions.map(asCode), co = c.options;
