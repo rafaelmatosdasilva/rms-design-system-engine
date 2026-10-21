@@ -808,7 +808,10 @@ the Code Connect `valueMap`; `inverted` when the code holds the opposite of the 
 `differences` (default, options, name), `codeOnly`, `events` with payloads, `codeSlots` (the code's slots, with the props
 each hands its content; `slots` stays Figma's instance swaps and what each accepts), `states`
 (Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
-keyboard, each with where it was read). The props gate (Gate 14) pairs Figma and the code the same way
+keyboard, each with where it was read), `anatomy` (the root and the inner frames Figma binds a padding or a gap
+on; a gap on a frame of one item is left out, and padding bound to a border width is `borderInset`), and
+`source.code.commit` (the last commit that changed the component's file, so an unchanged component keeps the same
+file). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.
 
 Once published, the shared contracts are what the style guide links to. The intent-layer sync reads them with the

@@ -37,6 +37,19 @@ import { authorityLines } from './authority.mjs';
 import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, layerPages, short } from './intent-layer.mjs';
 import { codeHalf, codeSlots, figmaStatesVariants, stateTokens, accessibilityOf } from './contract-code.mjs';
 import { roleWord } from './role-markup.mjs';
+import { execFileSync } from 'node:child_process';
+import { mirrorState, ensureHistory, commitsOf } from './gitlab-history.mjs';
+
+// The last commit that changed a file: from git where the project is a checkout, else from the GitLab mirror's history
+// (gitlab-history.mjs). Per file, so a component whose file did not change keeps the same contract. null: not known.
+export function lastCommitOf(ROOT, file) {
+  if (!file) return null;
+  try {
+    const sha = execFileSync('git', ['log', '-1', '--format=%H', '--', file], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (/^[0-9a-f]{40}$/.test(sha)) return sha;
+  } catch { /* not a checkout */ }
+  try { return commitsOf(ROOT, [file], { max: 1 })?.[0]?.sha ?? null; } catch { return null; }
+}
 
 // The contract format's version, written in every contract and in its schema: raised when a field changes meaning.
 export const CONTRACT_VERSION = 1;
@@ -195,11 +208,18 @@ function buildAnatomy(contract, structure, vars = {}) {
   const s = structure || {};
   const root = {};
 
-  const inset = insetOf(c.paddingVar || s.paddingVar);
-  if (inset) root.inset = inset;
+  // Padding bound to a border's width (base/border/top) is the room Figma leaves for the stroke, which the code's border
+  // takes: recorded as that, never as the component's padding.
+  const pad = c.paddingVar || s.paddingVar;
+  const inset = insetOf(pad);
+  const borderRoom = !c.paddingVar && pad && [pad.tb, pad.lr].filter(Boolean).every((v) => /(^|[/.])(border|stroke)s?([/.]|$)/i.test(String(v)));
+  if (inset) root[borderRoom ? 'borderInset' : 'inset'] = inset;
 
+  // A gap spaces two items or more: on a frame that lays out one (a button's single content frame) it does nothing, so
+  // whatever variable Figma bound there is not the component's spacing.
   const gap = c.gapVar ?? s.gapVar;
-  if (gap) root.gapToken = tokenRef(gap);
+  const items = c.inFlow ?? s.inFlow;
+  if (gap && (c.gapVar || items == null || items >= 2)) root.gapToken = tokenRef(gap);
   else if (c.gapPx === 0) root.gap = 0;
 
   const radius = c.innerRadiusVar || s.innerRadiusVar;
@@ -218,8 +238,13 @@ function buildAnatomy(contract, structure, vars = {}) {
 
   const anatomy = { root };
 
-  // children → named parts (from the hand-authored contract).
-  for (const ch of (c.children || [])) {
+  // children → named parts: the hand-authored contract's, then the frames inside it Figma binds a padding or a gap on
+  // (the structure snapshot's childFramePadding / childFrameGaps), where the component's real spacing often sits.
+  const captured = new Map();
+  for (const k of s.childFramePadding ?? []) if (k?.name) captured.set(k.name, { ...(captured.get(k.name) ?? { name: k.name }), paddingVar: k.paddingVar });
+  for (const k of s.childFrameGaps ?? []) if (k?.name) captured.set(k.name, { ...(captured.get(k.name) ?? { name: k.name }), gapVar: k.gapVar, gapPx: k.gapPx });
+  const authoredNames = new Set((c.children || []).map((ch) => ch?.name).filter(Boolean));
+  for (const ch of [...(c.children || []), ...[...captured.values()].filter((k) => !authoredNames.has(k.name))]) {
     if (!ch || !ch.name) continue;
     const part = {};
     if (ch.cssSelector) part.selector = ch.cssSelector;
@@ -345,7 +370,7 @@ function buildContract(name, { contract, structure, props, authored, composition
   if (code) {
     out.source = {
       ...(p || s ? { figma: { ...(code.figmaFile ? { file: code.figmaFile } : {}), nodeId: p?.nodeId || s?.nodeId || null, name } } : {}),
-      ...(code.api?.file ? { code: { file: code.api.file, ...((code.api.codeConnectTag ?? code.api.tag) ? { tag: code.api.codeConnectTag ?? code.api.tag } : {}), ...(code.api.syntax ? { syntax: code.api.syntax } : {}) } } : {}),
+      ...(code.api?.file ? { code: { file: code.api.file, ...((code.api.codeConnectTag ?? code.api.tag) ? { tag: code.api.codeConnectTag ?? code.api.tag } : {}), ...(code.api.syntax ? { syntax: code.api.syntax } : {}), ...(code.commit ? { commit: code.commit } : {}) } } : {}),
       ...(code.api?.codeConnectFile ? { codeConnect: code.api.codeConnectFile } : {}),
     };
     const half = codeHalf(out.props, p?.properties, code.api, { authored: a, aliases: code.aliases });
@@ -454,7 +479,7 @@ const CONTRACT_SCHEMA = {
       type: 'object', additionalProperties: false,
       properties: {
         figma: { type: 'object', properties: { file: str, nodeId: { type: ['string', 'null'] }, name: str, alsoDrawnAs: { type: 'array', description: 'Other Figma components drawn of the same code file.', items: { type: 'object', required: ['name'], properties: { name: str, nodeId: { type: ['string', 'null'] } } } } }, additionalProperties: false },
-        code: { type: 'object', properties: { file: str, tag: str, syntax: str }, additionalProperties: false },
+        code: { type: 'object', properties: { file: str, tag: str, syntax: str, commit: { type: 'string', description: 'The last commit that changed its code file.' } }, additionalProperties: false },
         codeConnect: str,
       },
     },
@@ -773,7 +798,7 @@ function contractFilesIn(dir) {
 
 // The README of a published folder: what a contract holds, where each part comes from, how complete they are, and the
 // components not written. The same inputs give the same text (no date), so an unchanged system gives no diff.
-export function publishedReadme(built, skipped = [], { schema = 'contract.schema.json', figmaFile = null } = {}) {
+export function publishedReadme(built, skipped = [], { schema = 'contract.schema.json', figmaFile = null, undefinedRefs = [] } = {}) {
   const cs = built.map((b) => b.contract);
   const n = (f) => cs.filter(f).length;
   const figmaProps = cs.flatMap((c) => (c.props ?? []).filter((p) => p.bindings?.figma));
@@ -786,13 +811,13 @@ export function publishedReadme(built, skipped = [], { schema = 'contract.schema
     `Each file is valid against [${schema}](${schema}) (JSON Schema 2020-12).`, '',
     '## What a contract holds', '',
     '| Field | What it says | From |', '|---|---|---|',
-    '| `id`, `name`, `description`, `source` | Which component, and the Figma node and code file it was read from | Figma, code |',
+    '| `id`, `name`, `description`, `source` | Which component, the Figma node and code file it was read from, and the last commit that changed that file | Figma, code |',
     '| `props[]` | Each Figma property with the code prop or slot it is (`bindings.code`), who decided the pairing (`source`), the attributes it only decides (`conditions`), and where Figma and the code differ (`differences`) | Figma, code, Code Connect, authored |',
     '| `codeOnly[]` | Code props Figma has no property for | code |',
     '| `events[]`, `codeSlots[]` | What the component emits (with its payload), and the slots it takes content in (with what each hands its content) | code |',
     '| `slots[]` | Each Figma instance swap: a place another component goes, and which ones it accepts | Figma |',
     '| `states[]`, `variants` | Its states (Figma\'s state axis and the code\'s pseudo-classes) and other variants | Figma, code |',
-    '| `anatomy`, `tokens` | Its parts, and the tokens each state uses | Figma |',
+    '| `anatomy`, `tokens` | Its root and inner frames (padding, gap, radius, height, text style; `borderInset` where Figma\'s padding is the room for a border) and the tokens each state uses | Figma |',
     '| `accessibility` | Its element, role, ARIA and keyboard, each value with where it was read | Figma annotations, code, authored |',
     '| `intentPage` | The component\'s page in the intent layer (what it is for, when to use it) | intent layer |', '',
     '## Coverage', '',
@@ -808,6 +833,12 @@ export function publishedReadme(built, skipped = [], { schema = 'contract.schema
     `| With an intent layer page | ${n((c) => c.intentPage)} |`,
     ...(figmaFile ? ['', `Figma file: \`${figmaFile}\`.`] : []),
   ];
+  // A token Figma binds that the captured variables do not have (a variable of another library, a renamed one): kept as
+  // Figma binds it, listed here so it is fixed in Figma.
+  if (undefinedRefs.length) {
+    lines.push('', '## Tokens Figma binds that the variables do not have', '', 'Fix these in Figma (bind a variable of the system), then publish again:', '');
+    for (const u of [...new Set(undefinedRefs)].sort()) lines.push(`- ${u.replace(/: references undefined token /, ': ')}`);
+  }
   if (skipped.length) {
     lines.push('', '## Not written', '', 'Figma components with no contract file of their own:', '', '| Component | Why |', '|---|---|');
     const cell = (t) => (String(t).trim() ? String(t).trim().replace(/\|/g, '\\|') : '(a component with no name)');
@@ -978,6 +1009,8 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   for (const n of targets) { const f = placeOf.get(n); if (f) sharing.set(f, [...(sharing.get(f) ?? []), n]); }
   const lead = new Map([...sharing].map(([f, ns]) => [f, ns.find((n) => Object.keys(props[n]?.properties ?? {}).length) ?? ns[0]]));
   const skipped = [];
+  // Published, each contract names the last commit that changed its file: a mirror's history is fetched once for all.
+  if (publish && mirrorState(ROOT)) { try { ensureHistory(ROOT, { paths: [...new Set(targets.map((n) => apiEntryOf(n)?.file).filter(Boolean))].map((path) => ({ path })) }); } catch { /* the commits stay unknown */ } }
   for (const name of targets) {
     const api = apiEntryOf(name);
     const relFile = placeOf.get(name);
@@ -987,7 +1020,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     const file = join(outDir, relFile);
     const prev = readJSON(file);                                              // previous emit (for the diff)
     let text = ''; try { if (api?.file) text = readFileSync(resolve(ROOT, api.file), 'utf8'); } catch { /* unreadable */ }
-    const codePart = apiReader ? { api, text, aliases: cfg.componentPropAliases?.[name] ?? null, stateBindings: stateBindings[name] ?? null, componentTokens: stateTokensFile[name]?.tokens ?? null, publish, idPrefix: cc.idPrefix, schemaRef: relative(dirname(file), schemaOut).split(/[\\/]+/).join('/').replace(/^(?!\.)/, './'), figmaFile: cfg.figmaFileKey || undefined } : null;
+    const codePart = apiReader ? { api, text, aliases: cfg.componentPropAliases?.[name] ?? null, stateBindings: stateBindings[name] ?? null, componentTokens: stateTokensFile[name]?.tokens ?? null, publish, idPrefix: cc.idPrefix, schemaRef: relative(dirname(file), schemaOut).split(/[\\/]+/).join('/').replace(/^(?!\.)/, './'), figmaFile: cfg.figmaFileKey || undefined, commit: publish ? lastCommitOf(ROOT, api?.file) : null } : null;
     const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source) : null, code: codePart });
     // From the code alone, no description is a placeholder saying it came from Figma.
     if ((codeOnly || !(props[name] || structure[name])) && /— captured from Figma by rms-design-system-engine\.$/.test(contract.description)) contract.description = '';
@@ -1023,7 +1056,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     for (const f of removed) { try { unlinkSync(f); } catch { /* already gone */ } }
     // The folders those leave empty go too (never the published folder itself).
     for (const f of removed) for (let d = dirname(f); d.startsWith(outDir + sep) && d !== outDir; d = dirname(d)) { try { if (readdirSync(d).length) break; rmdirSync(d); } catch { break; } }
-    writeFileSync(join(outDir, 'README.md'), publishedReadme(built, skipped, { schema: relative(outDir, schemaOut), figmaFile: cfg.figmaFileKey || null }));
+    writeFileSync(join(outDir, 'README.md'), publishedReadme(built, skipped, { schema: relative(outDir, schemaOut), figmaFile: cfg.figmaFileKey || null, undefinedRefs }));
     return { outDir, schemaOut, components: emitted, skipped, removed: removed.map((f) => relative(outDir, f)), invalid, breaking, undefinedRefs, typeMismatches, authoredIssues, droppedTokens, tokenCount: 0 };
   }
 

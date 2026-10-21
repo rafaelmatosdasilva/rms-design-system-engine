@@ -298,6 +298,7 @@ if (process.argv.includes('--contracts-out')) {
   const r = await generateContracts(ROOT, pcfg, { publishTo: dir, force: true });
   console.log(`📐 Contracts published → ${r.outDir}  (${r.components.length} contract${r.components.length === 1 ? '' : 's'}${r.removed?.length ? ` · ${r.removed.length} removed` : ''}${r.skipped?.length ? ` · ${r.skipped.length} not written, listed in README.md` : ''})`);
   for (const i of r.invalid.slice(0, 20)) console.log(`   ❌ ${i.name}: ${i.errs.slice(0, 3).join('; ')}`);
+  if (r.undefinedRefs?.length) console.log(`   ⚠️  ${r.undefinedRefs.length} token(s) Figma binds that the variables do not have, listed in README.md: fix them in Figma`);
   console.log(r.invalid.length ? `NEXT: fix the ${r.invalid.length} invalid contract(s) above, then publish again` : `NEXT: review the diff in ${dir}, commit it on a branch and open a merge request`);
   process.exit(r.invalid.length ? 1 : 0);
 }

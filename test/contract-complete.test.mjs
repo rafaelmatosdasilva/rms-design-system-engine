@@ -164,3 +164,27 @@ test('published to a shared folder: contracts, the schema and a README only; a c
   await generateContracts(dir, cfg({ paths: { 'src/components/kit/': 'components/' } }), { publishTo: 'shared/contracts', force: true });
   assert.equal(readFileSync(join(pub, 'README.md'), 'utf8'), again, 'the same inputs, the same README');
 });
+
+test('anatomy: a gap on a frame of one item is not spacing, padding of a border\'s width is its room, inner frames are parts; published, the commit that last changed its file', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const f = files();
+  f['struct.json'].components.tileOne = { nodeId: '10:20', h: 40, inFlow: 1, gapVar: 'tile/minHeight', gapPx: 40, paddingVar: { tb: 'base/border/top', lr: 'base/border/left' },
+    childFramePadding: [{ name: 'Content', paddingVar: { tb: null, lr: 'spacing/padding/s' } }], childFrameGaps: [{ name: 'Content', gapVar: 'spacing/gap/m', gapPx: 8 }] };
+  f['struct.json'].components.tileTwo = { nodeId: '10:30', h: 40, inFlow: 3, gapVar: 'spacing/gap/s', paddingVar: { tb: 'spacing/padding/s', lr: null } };
+  const dir = makeFixture(f);
+  execFileSync('git', ['init', '-q'], { cwd: dir });
+  execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'add', '-A'], { cwd: dir });
+  execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', 'tiles'], { cwd: dir });
+  const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+  const r = await generateContracts(dir, cfg({ paths: { 'src/components/kit/': 'components/' } }), { publishTo: 'pub', force: true });
+  assert.deepEqual(r.invalid, []);
+  const one = JSON.parse(readFileSync(join(dir, 'pub/components/tiles/one.contract.json'), 'utf8'));
+  assert.equal(one.anatomy.root.gapToken, undefined, 'one item: nothing to space');
+  assert.deepEqual(one.anatomy.root.borderInset, { blockToken: '{base.border.top}', inlineToken: '{base.border.left}' });
+  assert.equal(one.anatomy.root.inset, undefined);
+  assert.deepEqual(one.anatomy.Content, { gapToken: '{spacing.gap.m}', inset: { inlineToken: '{spacing.padding.s}' } });
+  assert.equal(one.source.code.commit, sha);
+  const two = JSON.parse(readFileSync(join(dir, 'pub/components/tiles/two.contract.json'), 'utf8'));
+  assert.equal(two.anatomy.root.gapToken, '{spacing.gap.s}', 'three items: their spacing');
+  assert.deepEqual(two.anatomy.root.inset, { blockToken: '{spacing.padding.s}' });
+});
