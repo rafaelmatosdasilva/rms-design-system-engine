@@ -25,7 +25,7 @@ import { buildStamp, mayWrite, stampMeta } from './stamp.mjs';
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS, scopeView, attrModeCSS, colourAttrMode, modeScopes } from './styleguide-data.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, rmSync } from 'fs';
 import { findIconFolder, folderSymbols } from './icon-folder.mjs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -574,6 +574,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const own = (contract.CONTRACT?.[c.name]?.children ?? []).filter((k) => k?.name && typeof k.cssSelector === 'string' && k.cssSelector.trim());
       if (own.length) c.anatomy = own.map((k) => ({ name: k.name, selector: k.cssSelector, ...(slotNames.has(k.name.toLowerCase().replace(/[\s_-]+/g, '')) || /slot/i.test(k.name) ? { slot: true } : {}) }));
     }
+    const liveApi = new Map();   // each component's API as its file says it now, for its contract's drift below
     // Its code API, as whoever uses it writes it: the props (each one the code says must be given marked), the events
     // it sends and its slots, read from the component's own file (component-api.mjs). An HTML and CSS system has none.
     if (cfg.frameworkComponents !== false) {
@@ -591,6 +592,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           const cc = codeConnectFor(ccMaps, c.name, nodeIds[c.name]);
           if (cc) c.codeConnect = { file: cc.file, props: cc.props };
           const api = reader.apiFor(c.name);
+          liveApi.set(c.name, api);
           const v = api.file && apiView(api, relative(ROOT, api.file));
           // The Vue transition it enters and leaves with (<transition name="slide">), so its Playground can play both.
           if (api.file) { const t = /<transition\b[^>]*?\bname\s*=\s*["']([\w-]+)["']/i.exec(readText(api.file)) ?? (/<transition\b/i.test(readText(api.file)) ? [null, 'v'] : null); if (t) c.vueTransition = t[1]; }
@@ -598,6 +600,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           if (vueLists[c.name]) c.codeLists = vueLists[c.name];
           // What only its API takes is a Playground control too, when its own build drew each case of it.
           if (v && c.renders) c.controls = [...(c.controls ?? []), ...codeControls(c.controls ?? [], v, ctx?.propsSnap?.[c.name]?.properties ?? {}, c.codeConnect?.props ?? [])];
+          // A value its Code Connect writes only while another prop is on (alignment with fullWidth): its control says so.
+          if (cc) for (const k of c.controls ?? []) {
+            const codes = cc.props.filter((p) => p.role === 'value' && p.code && String(p.figma).toLowerCase() === String(k.label).toLowerCase()).map((p) => p.code);
+            const by = cc.props.filter((p) => p.role === 'condition' && codes.includes(p.code) && p.figma !== k.label && p.equals == null && !p.unclear && !p.event);
+            if (by.length) k.onlyWith = [...new Map(by.map((p) => [p.figma, { label: p.figma, on: !p.negated }])).values()];
+          }
           // Its text controls open on the words of the example its build drew (figma-examples.mjs), as the drawing does.
           const ex = bestExample(examples, c.name, ctx?.propsSnap?.[c.name]);
           if (ex && c.renders) for (const k of c.controls ?? []) if (k.type === 'TEXT' && typeof ex.props?.[k.label] === 'string' && ex.props[k.label].trim()) k.default = ex.props[k.label];
@@ -742,19 +750,31 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         view.agentRating = { cls: rating.cls, ready: rating.ready, partial: rating.partial, thin: rating.thin, total: rating.total };
       }
     } catch { /* no rating */ }
-    // Its properties: in its contract, the file the engine writes from Figma and the code on every run, so its
-    // Documentation says where an agent reads them and never asks for them again. A copy sits beside the guide, so its
-    // Contract button opens the file itself. { file, href, props: [names] }
+    // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
+    // --contracts-out through a merge request): its Contract button opens it on GitLab, and its Documentation says what it
+    // lists and whether that still matches the code and Figma (shared-contracts.mjs). With none published yet, the
+    // engine's local one is named, as a task to publish. { file, href?, shared?, props: [names], drift? }
     try {
+      const shared = (await import('./intent-layer.mjs')).readIntentLayer(ROOT, cfg)?.contracts ?? [];
+      const { sharedContractFor, contractDrift } = await import('./shared-contracts.mjs');
       const dir = cfg.contracts?.out ? resolve(ROOT, cfg.contracts.out) : join(ROOT, 'contracts');
-      const beside = join(dirname(projectOut), 'contracts');
       for (const c of view.components) {
+        const api = liveApi.get(c.name);
+        const read = !!api?.file;
+        const k = sharedContractFor(shared, c.name, read ? relative(ROOT, api.file) : null);
+        if (k) {
+          const figma = k.name === c.name && ctx?.propsSnap?.[c.name]?.properties ? Object.keys(ctx.propsSnap[c.name].properties) : null;
+          const drift = contractDrift(k, { codeProps: read ? Object.keys(api.props ?? {}) : null, events: read ? api.events ?? [] : null, slots: read ? [...(api.slots?.default ? ['default'] : []), ...(api.slots?.named ?? [])] : null, figmaProps: figma });
+          c.contract = { file: k.file, ...(k.url ? { href: k.url } : {}), shared: true, props: k.props, ...(drift.length ? { drift } : {}) };
+          continue;
+        }
         const file = join(dir, c.name + '.contract.json');
-        const k = readJson(file); if (!k || !Array.isArray(k.props)) continue;
-        let href = null;
-        try { mkdirSync(beside, { recursive: true }); copyFileSync(file, join(beside, c.name + '.contract.json')); href = `contracts/${encodeURIComponent(c.name)}.contract.json`; } catch { /* no copy: no button */ }
-        c.contract = { file: relative(ROOT, file), ...(href ? { href } : {}), props: k.props.map((p) => p?.name).filter(Boolean) };
+        const local = readJson(file); if (!local || !Array.isArray(local.props)) continue;
+        c.contract = { file: relative(ROOT, file), props: local.props.map((p) => p?.name).filter(Boolean) };
       }
+      // The copies an older build put beside the guide are gone: the Contract button opens the shared file.
+      const beside = join(dirname(projectOut), 'contracts');
+      try { if (existsSync(beside) && readdirSync(beside).every((f) => f.endsWith('.contract.json'))) rmSync(beside, { recursive: true }); } catch { /* kept */ }
     } catch { /* no contracts */ }
     const { segmentedUi, tabsUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
@@ -1187,7 +1207,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.links = [
           { label: 'Figma', url: figmaLink(cfg.figmaFileKey, ids[c.name]) },
           { label: 'Code', url: w?.at ? fileUrl(repo, branch, w.at[0], w.at[1]) : null },
-          // Its page in the intent layer, and its contract (the copy beside the guide): straight to each.
+          // Its page in the intent layer, and its contract there: straight to each.
           { label: 'Intent layer', url: c.intentLayer?.url ?? null },
           { label: 'Contract', url: c.contract?.href ?? null },
           ...(docsUrl ? [{ label: 'Documentation', url: String(docsUrl).replace(/\{name\}/g, encodeURIComponent(c.name)) }] : []),

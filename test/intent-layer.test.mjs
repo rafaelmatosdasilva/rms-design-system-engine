@@ -111,8 +111,8 @@ const ENV = { GITLAB_TOKEN: 't0k', GITLAB_HOST: 'git.acme.test' };
 // ── Pure parts ────────────────────────────────────────────────────────────────────────────────────────────────────
 test('config: a bare link or an object; nothing set is null', () => {
   assert.equal(intentLayerConfig({}), null);
-  assert.deepEqual(intentLayerConfig({ intentLayer: LINK }), { url: LINK, entry: null, out: 'intent-layer.snapshot.json' });
-  assert.deepEqual(intentLayerConfig({ intentLayer: { gitlab: LINK, entry: '/docs/system.dsds.json', out: 'x.json' } }), { url: LINK, entry: 'docs/system.dsds.json', out: 'x.json' });
+  assert.deepEqual(intentLayerConfig({ intentLayer: LINK }), { url: LINK, entry: null, out: 'intent-layer.snapshot.json', contracts: null });
+  assert.deepEqual(intentLayerConfig({ intentLayer: { gitlab: LINK, entry: '/docs/system.dsds.json', out: 'x.json', contracts: '/specs/contracts/' } }), { url: LINK, entry: 'docs/system.dsds.json', out: 'x.json', contracts: 'specs/contracts' });
 });
 
 test('kinds land in the layers of the design intent; titles map to the kinds the style guide shows', () => {
@@ -238,6 +238,17 @@ test('read through the API into its snapshot; the token goes to the named host; 
   const sub = fakeGitlab({ sha: 'fff1234def5678' });
   await syncIntentLayer(dir, { intentLayer: { gitlab: LINK, entry: 'docs/dsds/system.dsds.json' } }, { env: ENV, fetchImpl: sub.fetchImpl });
   assert.match(sub.calls.at(-1).url, /path=docs%2Fdsds/);
+});
+
+test('the component contracts kept beside the layer come with it: the link to each on GitLab and what it lists', async () => {
+  const dir = makeFixture({});
+  const contract = { schemaVersion: 1, id: 'buttonMain', name: 'buttonMain', version: '1.0.0', anatomy: { root: {} }, source: { code: { file: 'src/ui/ButtonMain.vue' } },
+    props: [{ name: 'size', bindings: { figma: { kind: 'VARIANT', property: 'size' }, code: { prop: 'size', as: 'prop', source: 'name' } } }], events: [{ name: 'clicked' }] };
+  const gl = fakeGitlab({ files: { ...LAYER, 'specs/contracts/components/button-main.contract.json': contract } });
+  await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: gl.fetchImpl });
+  const [k] = readIntentLayer(dir, { intentLayer: LINK }).contracts;
+  assert.deepEqual([k.name, k.format, k.codeFile, k.props, k.events], ['buttonMain', 1, 'src/ui/ButtonMain.vue', ['size'], ['clicked']]);
+  assert.equal(k.url, `${LINK}/-/blob/main/specs/contracts/components/button-main.contract.json`);
 });
 
 test('read-only: only GETs, only the project, its latest commit and one archive; nothing written there', async () => {

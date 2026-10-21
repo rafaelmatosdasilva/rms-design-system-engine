@@ -56,6 +56,8 @@ export function readIntentLayer(ROOT, cfg) {
     system: snaps.find(({ x }) => x.system)?.x.system ?? null,
     boilerplate: snaps.reduce((t, { x }) => t + (x.boilerplate ?? 0), 0),
     entities: snaps.flatMap(({ s, x }) => x.entities.map((e) => ({ ...e, source: src(s, x), url: e.url ?? dsds.fileUrl(x._source, e.file) }))),
+    // The component contracts kept beside the layer (shared-contracts.mjs): their links and what each lists.
+    contracts: snaps.flatMap(({ x }) => x.contracts ?? []),
   };
 }
 

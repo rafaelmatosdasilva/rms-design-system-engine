@@ -811,6 +811,12 @@ each hands its content; `slots` stays Figma's instance swaps and what each accep
 keyboard, each with where it was read). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.
 
+Once published, the shared contracts are what the style guide links to. The intent-layer sync reads them with the
+pages (`shared-contracts.mjs`): each component's **Contract** button opens its file on GitLab, and its Documentation
+**Properties** row is done while the shared contract still lists what the code and Figma have, and a task to publish
+again when it does not (a prop, event, slot or Figma property added or gone, or a contract in another format). With
+none published, the row names the engine's local contract as a task to publish it.
+
 #### The code capture (every run, and `--capture-code` on its own)
 
 Figma is captured once per run into snapshots every gate reads. The code is now captured the same way:

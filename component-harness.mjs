@@ -210,6 +210,31 @@ export function harnessCases(entry = {}, max = 16, example = null) {
   return cases.slice(0, max);
 }
 
+// A property whose value is written only while another one is on (its Code Connect file writes alignment only with
+// fullWidth): each of its values drawn with that one on too, so the Playground shows the two together as the component
+// draws them, never a value drawn where the code ignores it. base: the default case's props. connect: the Code Connect
+// readings (code-connect-map.mjs). → [{ label, props }]
+export function decidedCases(entry = {}, base = {}, connect = []) {
+  const defs = Object.fromEntries(Object.entries(entry.properties ?? {}).map(([k, d]) => [clean(k), d]));
+  const onOff = (d) => d?.type === 'BOOLEAN' || (d?.type === 'VARIANT' && (d.variantOptions ?? []).length === 2 && d.variantOptions.every((o) => /^(true|false)$/i.test(String(o))));
+  const out = [], seen = new Set();
+  for (const v of (connect ?? []).filter((p) => p.role === 'value' && p.code && !p.event)) {
+    const q = defs[clean(v.figma)];
+    if (q?.type !== 'VARIANT' || onOff(q)) continue;
+    for (const c of connect.filter((p) => p.role === 'condition' && p.code === v.code && p.figma !== v.figma && p.equals == null && !p.unclear)) {
+      const d = defs[clean(c.figma)];
+      if (!onOff(d)) continue;
+      const on = d.type === 'BOOLEAN' ? !c.negated : String(!c.negated);
+      if (String(base[clean(c.figma)]) === String(on)) continue;   // on already in every case
+      for (const o of q.variantOptions ?? []) {
+        const label = `${clean(v.figma)}=${o}, ${clean(c.figma)}=${on}`;
+        if (!seen.has(label)) { seen.add(label); out.push({ label, props: propsOf({ ...base, [clean(c.figma)]: on, [clean(v.figma)]: o }) }); }
+      }
+    }
+  }
+  return out;
+}
+
 // ── A code prop Figma has no prop for ─────────────────────────────────────────────────────────────────────────────
 // Which of Figma's props stands for a code prop: the same name, Figma's with what it holds after it (labelContent for
 // label, iconContent for icon), or the one Figma name a code name ends with (size for buttonSize). → its key, or null.

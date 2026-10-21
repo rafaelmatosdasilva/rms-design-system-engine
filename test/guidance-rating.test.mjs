@@ -147,12 +147,12 @@ test('each component\'s Documentation area says what an agent can take from its 
   const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
   const data = JSON.parse(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/.exec(page)[1]);
   const of = (n) => (data.components ?? []).find((c) => c.name === n);
-  assert.deepEqual(of('button').contract, { file: join('contracts', 'button.contract.json'), href: 'contracts/button.contract.json', props: ['variant', 'size', 'label'] });
-  assert.match(page, /'props', 'Properties'/, 'its Properties row: done, the contract file named');
-  // Its Contract button opens the copy beside the guide.
-  assert.deepEqual(of('button').links.find((l) => l.label === 'Contract'), { label: 'Contract', url: 'contracts/button.contract.json' });
-  assert.ok(existsSync(join(dir, '.design-system-engine-out', 'styleguide', 'contracts', 'button.contract.json')));
-  assert.equal(of('badge').links.find((l) => l.label === 'Contract'), undefined, 'no contract, no button');
+  // Only the engine's local contract: named, as a task to publish it; no copy beside the guide and no button, since the
+  // Contract button opens the one everybody reads, in the intent layer (shared-contracts.test.mjs).
+  assert.deepEqual(of('button').contract, { file: join('contracts', 'button.contract.json'), props: ['variant', 'size', 'label'] });
+  assert.match(page, /'props', 'Properties'/, 'its Properties row, the contract file named');
+  assert.equal(of('button').links.find((l) => l.label === 'Contract'), undefined);
+  assert.ok(!existsSync(join(dir, '.design-system-engine-out', 'styleguide', 'contracts')));
   assert.equal(of('button').agentRating.cls, 'ready');
   assert.equal(of('badge').agentRating.cls, 'partial');
   assert.deepEqual(of('badge').agentRating.from, ['guidelines.md', 'Figma']);   // every place it was read from

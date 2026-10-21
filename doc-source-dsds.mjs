@@ -13,6 +13,8 @@
 //   "intentLayer": "https://<host>/<group>/<project>"                    (or /-/tree/<branch>)
 //   "intentLayer": { "gitlab": "<link>", "entry": "docs/dsds/system.dsds.json", "out": "intent-layer.snapshot.json" }
 // Without an entry, the shortest path ending in system.dsds.json is the index, else every *.dsds.json with an entity.
+// The component contracts in the same repository (*.contract.json, published with --contracts-out) are read too, for
+// their links and what each lists; "contracts": "<folder>" names their folder when the entry's folder does not hold it.
 //
 // READ-ONLY. The engine never writes to the intent layer: it only asks GitLab (GET) for the project, the branch's latest
 // commit and one archive, and the only file it writes is its own snapshot in the project. A read_api token is enough.
@@ -32,12 +34,13 @@ import { join, resolve, dirname, posix } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { parseGitlabProject, tokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
+import { contractSummaries } from './shared-contracts.mjs';
 
 export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 4;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations)
+export const READER = 5;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs)
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -52,7 +55,7 @@ export function intentLayerConfig(cfg) {
   const o = typeof raw === 'string' ? { gitlab: raw } : raw;
   const url = String(o.gitlab ?? o.url ?? '').trim();
   if (!url) return null;
-  return { url, entry: o.entry ? String(o.entry).replace(/^\/+/, '') : null, out: o.out || DEFAULT_OUT };
+  return { url, entry: o.entry ? String(o.entry).replace(/^\/+/, '') : null, out: o.out || DEFAULT_OUT, contracts: o.contracts ? String(o.contracts).replace(/^\/+|\/+$/g, '') : null };
 }
 
 // ── Where each entity sits in the design intent ─────────────────────────────────────────────────────────────────────
@@ -369,9 +372,18 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     const a = await get(`${base}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}${folder ? `&path=${encodeURIComponent(folder)}` : ''}`);
     if (!a.ok) return fail(a);
     const files = new Map();
-    for (const f of untar(gunzipSync(Buffer.from(await a.arrayBuffer())))) {
-      if (!/\.json$/i.test(f.path)) continue;
-      try { files.set(f.path, JSON.parse(f.data.toString('utf8'))); } catch { /* not JSON: not read */ }
+    const keep = (archive) => {
+      for (const f of untar(gunzipSync(Buffer.from(archive)))) {
+        if (!/\.json$/i.test(f.path)) continue;
+        try { files.set(f.path, JSON.parse(f.data.toString('utf8'))); } catch { /* not JSON: not read */ }
+      }
+    };
+    keep(await a.arrayBuffer());
+    // The component contracts kept in the layer (intentLayer.contracts): read from the same commit when the entry's
+    // folder does not hold them. They are read for their links and what they list, never changed.
+    if (c.contracts && folder && !(c.contracts + '/').startsWith(folder + '/')) {
+      const k = await get(`${base}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}&path=${encodeURIComponent(c.contracts)}`);
+      if (k.ok) keep(await k.arrayBuffer());
     }
     const entry = c.entry ?? [...files.keys()].filter((f) => /(^|\/)system\.dsds\.json$/i.test(f)).sort((x, y) => x.split('/').length - y.split('/').length || x.length - y.length)[0] ?? null;
     if (c.entry && !files.has(c.entry)) return kept(`${c.entry} is not in ${p.path} on ${ref}: check intentLayer.entry`);
@@ -384,6 +396,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     const snap = {
       _note: 'The intent layer as read from GitLab (rms-design-system-engine). Regenerated when its commit moves; do not edit by hand, edit the layer itself.',
       _source: source, _reader: READER, system, boilerplate, entities,
+      contracts: contractSummaries(files, (f) => fileUrl(source, f)),
     };
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(snap, null, 2) + '\n');

@@ -440,7 +440,8 @@ export function agreedView({ propsSnap = {}, rows = [], agreedRecord = {}, class
     for (const r of mine) {
       if (r.status !== 'match') { undecided++; continue; }   // missing, renamed, another value, or a prop only the code has
       const d = defs[r.figmaProp];
-      if (!d) continue;
+      // A component swap is which instance sits in a part: no switch says that (its show* switch shows or hides the part).
+      if (!d || d.type === 'INSTANCE_SWAP') continue;
       const prop = /^\(|^not in code$/.test(String(r.codeProp)) || !r.codeProp ? r.figmaProp : r.codeProp;
       const control = { label: r.figmaProp, prop, type: d.type, default: d.defaultValue ?? null };
       const pm = propertyMaps[name]?.[r.figmaProp] ?? propertyMaps[name]?.[cleanName(r.figmaProp)] ?? null;
@@ -1490,7 +1491,8 @@ export function codeControls(controls = [], api = null, figmaProps = [], connect
     const label = ccLabel ?? figmaPropFor(Object.keys(figmaDefs), p.name, names) ?? p.name;
     const base = { label, prop: p.name, fromCode: true, at: 1000 + out.length };
     const fig = figmaDefs[label]?.defaultValue;
-    if (/^boolean$/.test(p.type ?? '')) out.push({ ...base, type: 'BOOLEAN', default: String(fig ?? p.default) === 'true' });
+    // A state (disabled, selected) starts off, wherever Figma's default variant sits: the component as it is first met.
+    if (/^boolean$/.test(p.type ?? '')) out.push({ ...base, type: 'BOOLEAN', default: STATE_DEFAULT_OFF.test(String(label).replace(/\s+/g, '')) ? false : String(fig ?? p.default) === 'true' });
     else if ((p.values ?? []).length > 1) out.push({ ...base, type: 'VARIANT', default: fig != null && p.values.includes(String(fig)) ? String(fig) : p.default ?? p.values[0], options: p.values.map((v) => ({ label: v })) });
     // A text Figma has as a text prop (labelContent for label): a field, its words written where its build drew Figma's.
     else if (/^string$/.test(p.type ?? '') && figmaDefs[label]?.type === 'TEXT' && String(fig ?? '').trim()) out.push({ ...base, type: 'TEXT', default: String(fig) });
