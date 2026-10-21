@@ -3491,8 +3491,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         '<svg aria-hidden="true"><clipPath id="sg-bk-lens-clip"><rect width="100%" height="100%"/></clipPath><g clip-path="url(#sg-bk-lens-clip)" class="sg-bk-lens-fgrid">' + gLines + '</g><rect width="100%" height="100%" class="sg-bk-lens-fline"/></svg>' +
         '<span class="sg-bk-lens-name">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '</span></div>';   // the icon's name, inside its frame
       // The colour squares, stacked at the left, the icon in each: drawn by the page, in the brand's corner radius.
-      var sq = 130, sqGap = (583 - sq * 4) / 3, squares = (sw || []).slice(0, 4).map(function (o, k) {
-        return '<div class="sg-bk-lens-sw" style="left:' + (40 / VW * 100) + '%;top:' + ((frameY + k * (sq + sqGap)) / VH * 100) + '%;width:' + (sq / VW * 100) + '%;height:' + (sq / VH * 100) + '%;background:' + esc(o.bg) + ';color:' + esc(o.fg) + '"><svg viewBox="' + bx.join(' ') + '" fill="currentColor" aria-hidden="true">' + body + '</svg></div>';
+      var sq = 117, sqGap = (583 - sq * 4) / 3, squares = (sw || []).slice(0, 4).map(function (o, k) {
+        return '<div class="sg-bk-lens-sw" style="left:' + ((105 - sq / 2) / VW * 100) + '%;top:' + ((frameY + k * (sq + sqGap)) / VH * 100) + '%;width:' + (sq / VW * 100) + '%;height:' + (sq / VH * 100) + '%;background:' + esc(o.bg) + ';color:' + esc(o.fg) + '"><svg viewBox="' + bx.join(' ') + '" fill="currentColor" aria-hidden="true">' + body + '</svg></div>';
       }).join('');
       return '<div class="sg-bk-lens-wrap">' + squares + lensFrame + '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 ' + VW + ' ' + VH + '" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out + '</svg>' + caps + '</div>';
     }
@@ -3771,8 +3771,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           }
           if (pts.length < 2) pts = r.length > 4 ? smooth(r.map(pt)) : r.map(pt);
           var onTo = function (P, p0, p1) { var u = unit(p0[0] - p1[0], p0[1] - p1[1]), t = (P[0] - p0[0]) * u[0] + (P[1] - p0[1]) * u[1]; return t > 0 ? [p0[0] + u[0] * t, p0[1] + u[1] * t] : null; };
-          if (freeEnd(r[0])) { var e0 = stretch(r, 0); pts.unshift(e0); endsAt.push(e0); } else if (pts.length > 1) { var f0 = onTo(pt(r[0]), pts[0], pts[1]); if (f0) pts.unshift(f0); }
-          if (freeEnd(r[r.length - 1])) { var e1 = stretch(r, 1); pts.push(e1); endsAt.push(e1); } else if (pts.length > 1) { var f1 = onTo(pt(r[r.length - 1]), pts[pts.length - 1], pts[pts.length - 2]); if (f1) pts.push(f1); }
+          // A free end: on the line itself, half a stroke back from where the line leaves the shape (the cap's centre).
+          var capOn = function (a, b) {
+            var u = unit(a[0] - b[0], a[1] - b[1]), ax = (a[0] - vb[0]) * S, ay = (a[1] - vb[1]) * S, t = cross(ax, ay, u[0], u[1], best * 4);
+            return t == null ? null : toU(ax + u[0] * (t - best / 2), ay + u[1] * (t - best / 2));
+          };
+          var lineEnd = function (first) { var n = pts.length, a = first ? pts[0] : pts[n - 1], b = first ? pts[Math.min(n - 1, 4)] : pts[Math.max(0, n - 5)]; return n > 1 ? capOn(a, b) : null; };
+          if (freeEnd(r[0])) { var e0 = lineEnd(true) || stretch(r, 0); pts.unshift(e0); endsAt.push(e0); } else if (pts.length > 1) { var f0 = onTo(pt(r[0]), pts[0], pts[1]); if (f0) pts.unshift(f0); }
+          if (freeEnd(r[r.length - 1])) { var e1 = lineEnd(false) || stretch(r, 1); pts.push(e1); endsAt.push(e1); } else if (pts.length > 1) { var f1 = onTo(pt(r[r.length - 1]), pts[pts.length - 1], pts[pts.length - 2]); if (f1) pts.push(f1); }
           return simplify(pts, 0.03);
         });
         // Where two strokes alone meet at a point (an arrow's tip), they join where their straight lines cross.
@@ -3798,7 +3804,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           joins.push(X);
         });
         // The turns: each corner once at its sharpest, and any point where the simplified line bends by more than 60 degrees.
-        var turnDots = [], addTurn = function (p) { if (!turnDots.concat(endsAt).some(function (o) { return Math.hypot(o[0] - p[0], o[1] - p[1]) < w * (turnDots.indexOf(o) >= 0 ? 2 : 1); })) turnDots.push(p); };   // never on an end
+        var turnDots = [], addTurn = function (p) { if (!turnDots.concat(endsAt).some(function (o) { return Math.hypot(o[0] - p[0], o[1] - p[1]) < w * (turnDots.indexOf(o) >= 0 ? 2 : 1.2); })) turnDots.push(p); };   // two strokes apart, never on an end
         joins.forEach(addTurn);
         corners.slice().sort(function (a, b) { return b.cos - a.cos; }).forEach(function (c) { addTurn(pt(c.q)); });
         build.forEach(function (ps) { for (var k = 1; k < ps.length - 1; k++) { var u1 = unit(ps[k][0] - ps[k - 1][0], ps[k][1] - ps[k - 1][1]), u2 = unit(ps[k + 1][0] - ps[k][0], ps[k + 1][1] - ps[k][1]); if (u1[0] * u2[0] + u1[1] * u2[1] < 0.5) addTurn(ps[k]); } });
