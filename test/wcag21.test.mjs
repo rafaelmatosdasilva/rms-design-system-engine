@@ -253,7 +253,7 @@ test('page: what a screen reader says, and names that say little or the same', {
       const box = document.createElement('div');
       box.innerHTML = '<button type="button" aria-pressed="true">Bold</button><button type="button" aria-expanded="false" aria-haspopup="menu">More</button>'
         + '<input type="checkbox" id="cb" checked><label for="cb">Remember me</label><input type="text" aria-label="Email" required>'
-        + '<button type="button" aria-label="icon"><svg></svg></button><button type="button" aria-label="chevron-down"><svg></svg></button><button type="button">Close button</button>'
+        + '<button type="button" aria-label="icon"><svg></svg></button><button type="button" aria-label="chevron-down"><svg></svg></button><button type="button" aria-label="Close button"><svg></svg></button><button type="button">Field</button>'
         + '<a href="/a">Edit</a><a href="/b">Edit</a><a href="/c">Open</a><a href="/c">Open</a>';
       document.body.appendChild(box);
       const out = window.__wcag21.check(box, { name: 'x' });
@@ -267,6 +267,6 @@ test('page: what a screen reader says, and names that say little or the same', {
     has(/^weakname: .*"Close button, button": the role is said twice/);
     has(/^samename: .*2 links say "Edit" and go to different places/);
     assert.equal(r.f.filter((d) => /samename/.test(d)).length, 1, 'two links to the same place are fine');
-    assert.equal(r.f.filter((d) => /weakname/.test(d)).length, 3, JSON.stringify(r.f));
+    assert.equal(r.f.filter((d) => /weakname/.test(d)).length, 3, JSON.stringify(r.f));   // a visible "Field" is the design's own words: left alone
   });
 });

@@ -1159,9 +1159,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const uses = scripts.flatMap(([f, t]) => { const fns = scriptUses({ text: t, cls: c.cls, name: c.name }); if (!fns.length) return []; const from = stylesheetImport({ file: f, pkg: pkgFor(f) }).from; return [fns.every((x) => x.exported) ? { line: `import { ${fns.map((x) => x.name).join(', ')} } from '${from}';`, from, module: true } : { line: fns.map((x) => `${x.name}(${x.args})`).join('; '), from, module: false }]; });
         return uses.length ? { ...imp, uses } : imp;
       };
+      // Each component as Figma draws it (its bound variables), so a value row can say where it is and what sets it.
+      const structAll = readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
       for (const c of view.components) {
         c.parity = parityView({ name: c.name, agreed: agreedRec, census: census[c.name] ?? null, differences: c.differences ?? [], controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], ownTokens: c.ownTokens ?? null });
-        c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt, slotParts: (c.anatomy ?? []).filter((x) => x.slot) });
+        c.parity.rows = parityRows({ name: c.name, propsSnap, controls: c.controls ?? [], unbuilt: c.unbuilt ?? [], codeProps: c.api?.props ?? {}, allTokens: c.allTokens ?? [], check, agreed: agreedRec, propsAt: propsSnap._updated ?? null, checkedAt, slotParts: (c.anatomy ?? []).filter((x) => x.slot), structure: structAll[c.name] ?? null, rootClass: c.cls ?? null });
         const text = c.api?.file ? readText(c.api.file) : '';
         const uses = nestedComponents({ name: c.name, cls: c.cls, markup: c.markup ?? '', text, names, tags: fileTags, files: fileOf });
         if (uses.length) c.uses = uses;
