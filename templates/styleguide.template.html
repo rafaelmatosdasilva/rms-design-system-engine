@@ -7168,11 +7168,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Each card counts the rows its column's filter counts: every row whose state there applies (never an N/A), so a
     // card's numbers and its filter's are the same.
     var applies = function (pick) { return mx.filter(function (o) { var x = pick(o); return x && x.say !== 'N/A' && x.say !== '–'; }); };
-    // Every card over the same whole, Figma's components: what a card's check cannot apply to (a component not built yet,
-    // one with nothing to compare) is counted apart, in grey, so the four totals are one and the same.
-    var parRows = figmaRows, accRows = figmaRows, docRows = figmaRows;
+    // Each card over Figma's components: what a card's check cannot apply to (one with nothing to compare) is counted
+    // apart, in grey. Accessibility counts only what the code has built: one not built yet is the Implementation card's
+    // to say, and it says so.
+    var parRows = figmaRows, accRows = figmaRows.filter(function (o) { return o.code !== 'missing'; }), docRows = figmaRows;
     var parP = states(parRows, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
-    var accP = states(accRows, function (o) { return o.acc; }, 'not in the code yet'), docP = states(docRows, function (o) { return o.doc; }, 'with nothing to document');
+    var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; }, 'with nothing to document');
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
     var pT = card('Figma × Code Parity', parP, 'Match', parRows.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'));

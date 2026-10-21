@@ -1486,9 +1486,10 @@ there, never a failure.
   (`comboboxkeys`, 2.1.1). On a style guide the same run also presses Escape on a menu button and Tab in a modal, as
   the audit does with real keys. Drawn as markup alone, nothing answers a key, so nothing is pressed.
 - **What a screen reader says** — each control's name, role and state, as NVDA and VoiceOver say them ("Bold,
-  button, pressed"), shown under 4.1.2 in the style guide. A name that says little fails 2.4.6 (`weakname`): a
-  placeholder word or a role ("icon", "button"), a file or an icon's name ("chevron-down"), the role said twice
-  ("Close button, button"). Two links with the same words going to different places fail 2.4.4 (`samename`).
+  button, pressed"), shown under 4.1.2 in the style guide. A name nobody sees (an `aria-label`, a title, alt text) that
+  says little fails 2.4.6 (`weakname`): a placeholder word or a role ("icon", "button"), a file or an icon's name
+  ("chevron-down"), the role said twice ("Close button, button"). A visible label is the design's own words and is left
+  alone. Two links with the same words going to different places fail 2.4.4 (`samename`).
 - **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
   menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
   is pressed, and what it opened must close and give the focus back to that control. A link does not navigate

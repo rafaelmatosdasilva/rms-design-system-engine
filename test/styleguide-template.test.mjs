@@ -1401,8 +1401,12 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
     assert.match(tiles[0][1], /^\d+of \d+\|components fully matched$/, 'parity counts the components that fully match');
-    // Every card over the same whole, Figma's components: the four totals are one.
-    assert.equal(new Set(tiles.map((x) => /of (\d+)/.exec(x[1])[1])).size, 1, 'the four cards count over the same total');
+    // Parity, Implementation and Documentation count over Figma's components; Accessibility only over what the code has
+    // built (one not built yet is the Implementation card's to say), and never says "not in the code yet".
+    const totals = tiles.map((x) => +/of (\d+)/.exec(x[1])[1]), found = +/^(\d+)/.exec(tiles[1][1])[1];
+    assert.equal(new Set([totals[0], totals[1], totals[3]]).size, 1, 'parity, implementation and documentation count over the same total');
+    assert.equal(totals[2], found, 'accessibility counts the components the code has');
+    assert.doesNotMatch(tiles[2][2], /not in the code yet/, 'accessibility does not repeat what implementation says');
     assert.match(tiles[1][1], /^\d+of \d+\|components found in code$/, 'the components the code has, of every component Figma has');
     assert.match(tiles[1][2], /2 found/, 'the table\'s own words: Found, Unsure, Missing');
     assert.match(tiles[2][1], /^\d+of \d+\|components that pass$/);

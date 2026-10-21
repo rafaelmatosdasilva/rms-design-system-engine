@@ -356,6 +356,9 @@
       var n = name(el), says = announce(el, r, n);
       spoken.push({ desc: desc(el), role: r, name: n, says: says });
       if (!n) return;
+      // Only a name nobody sees (aria-label, a title, alt text): a visible label is the words the design shows, its own
+      // sample text on a specimen, and reads as what it says.
+      if (norm(n) === norm(text(el)) || (el.labels && el.labels.length && norm(n) === norm(Array.prototype.map.call(el.labels, text).join(' ')))) { if (r === 'link' && el.getAttribute('href')) { seen('samename'); var kv = norm(n); (said[kv] = said[kv] || []).push(el); } return; }
       seen('weakname');
       var w = weak(n, r);
       if (w) push('weakname', '2.4.6', el, 'a screen reader says "' + says.slice(0, 60) + '": ' + w);
