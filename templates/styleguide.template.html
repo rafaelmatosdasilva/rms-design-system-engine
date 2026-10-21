@@ -1608,6 +1608,10 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 /* The Intent layer and For agents pages: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
+.sg-issues.sg-il th:nth-child(1) { width: 7.5rem; }   /* Decision: its label whole */
+.sg-issues.sg-il th:nth-child(3) { width: 9rem; }     /* For */
+.sg-issues.sg-il th:nth-child(5) { width: 9.5rem; }   /* Last updated: a date and a time */
+.sg-il--plain :is(th, td):nth-child(4) { display: none; }   /* Why, empty in every row shown */
 /* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
 .sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
 .sg-h2-links > .pg-head-links { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); }
@@ -2919,6 +2923,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var k = b.getAttribute('data-chip');
       Array.prototype.forEach.call(bar.querySelectorAll('.sg-chip[data-chip]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
       Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k; });
+      sec.dispatchEvent(new CustomEvent('sg-chip', { detail: k }));
     });
     return bar;
   }
@@ -2933,8 +2938,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilLink = function (p) { return (p.url ? '<a class="sg-uses-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name || p.file) + '</a>' : esc(p.name || p.file)) + '<span class="pg-par-val">' + esc(p.file || '') + '</span>'; };
     var ilFor = function (p) { return p.component ? '<a class="sg-uses-link" href="#' + esc(cid(p.component)) + '">' + esc(p.component) + '</a>' : p.layer === 'components' ? '<span class="pg-missing">No component</span>' : esc(capital(p.kind)); };
     var ilGets = function (p) { return (p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>'; };
-    var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || '<p class="pg-missing">Nothing to change.</p>'; };
-    var ilWhy = function (p) { return p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : '<p class="pg-missing">Everything on it reaches the agents.</p>') : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'; };
+    // A page kept as it is: its Keep says it all, so What to do and Why stay empty rather than repeat it on every row.
+    var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
+    var ilWhy = function (p) { return p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
     var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
@@ -2942,9 +2948,26 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
     var labelOf = function (k) { var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
     var decisionCell = function (k) { return '<span class="pg-par-status pg-par--' + IL_DOT[k] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'; };
-    var rowHTML = function (p) {
-      if (p.missingFor) return '<tr data-chip="missing"><td>' + decisionCell('missing') + '</td><td><span class="pg-missing">No page</span></td><td><a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a></td><td><p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p></td><td><p class="sg-il-line">No page names this component, by name or by code file.</p></td><td><p class="pg-missing">Nothing.</p></td></tr>';
-      return '<tr data-chip="' + esc(p.action) + '"><td>' + decisionCell(p.action) + '</td><td>' + ilLink(p) + '</td><td>' + ilFor(p) + '</td><td>' + ilTodo(p) + '</td><td>' + ilWhy(p) + '</td><td>' + ilGets(p) + '</td></tr>';
+    // Each row's cells, once: the table shows Decision, File, For, Why and when its file last changed; a click on the row
+    // (or Enter) opens it in the side panel, with what to do and what the agents get from it.
+    // When the page's file last changed in the intent layer (its last commit), as a date and time.
+    var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+    var ilCellsOf = function (p) {
+      if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">No file</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
+        updated: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
+      return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
+    };
+    var rowHTML = function (p, i) {
+      var c = ilCellsOf(p);
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"><td>' + c.decision + '</td><td>' + c.file + '</td><td>' + c.forWhat + '</td><td>' + c.why + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+    };
+    var ilPanel = function (i, from) {
+      var p = rows[i]; if (!p) return;
+      var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
+      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Why', c.why) + card('What the agents get', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer', labelOf(p.missingFor ? 'missing' : p.action)], title: p.missingFor || p.name || p.file || 'Page', body: body });
+      panelShow(m, from);
     };
     var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
     pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: labels.filter(function (l) { return counts[l[0]]; }).map(function (l) { return { key: l[0], label: l[1], n: counts[l[0]], dot: IL_DOT[l[0]] }; }) });
@@ -2959,14 +2982,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // of a cell on its own line, the head row bold and fixed, each page's link kept.
     var ilCells = function (td) { var d = td.cloneNode(true); Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = '\n' + v.textContent.trim(); }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
     var ilXlsx = function () {
-      var table = ilBox.querySelector('table'), head = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); });
-      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.map.call(tr.children, function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }); });
+      // The table's columns (its open arrow left out), then what to do and what the agents get, which the table leaves to
+      // the side panel.
+      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'What the agents get']);
+      var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = ilCellsOf(rows[i])[k]; return ilCells(d); };
+      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
       var x = function (v) { return String(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
       var col = function (i) { return String.fromCharCode(65 + i); };
       var cell = function (r, i, text, style) { return '<c r="' + col(i) + r + '" t="inlineStr" s="' + style + '"><is><t xml:space="preserve">' + x(text) + '</t></is></c>'; };
       var links = [], rowsXml = ['<row r="1">' + head.map(function (h, i) { return cell(1, i, h, 1); }).join('') + '</row>'];
       body.forEach(function (cells, n) { var r = n + 2; rowsXml.push('<row r="' + r + '">' + cells.map(function (c, i) { if (c.url) links.push({ ref: col(i) + r, url: c.url }); return cell(r, i, c.text, c.url ? 2 : 0); }).join('') + '</row>'); });
-      var widths = [12, 36, 26, 60, 50, 42], last = col(head.length - 1) + (body.length + 1);
+      var widths = [12, 36, 26, 50, 20, 60, 42], last = col(head.length - 1) + (body.length + 1);
       var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:' + last + '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + head.map(function (h, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (widths[i] || 30) + '" customWidth="1"/>'; }).join('') + '</cols><sheetData>' + rowsXml.join('') + '</sheetData><autoFilter ref="A1:' + last + '"/>' + (links.length ? '<hyperlinks>' + links.map(function (l, i) { return '<hyperlink ref="' + l.ref + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</hyperlinks>' : '') + '</worksheet>';
       var rel = function (rels) { return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>'; };
       var files = [
@@ -3006,16 +3032,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ilLinks.insertAdjacentHTML('afterbegin', sysButton('button', 'Download for Excel', ' data-il-export="xlsx"', null, null, DOWNLOAD_SVG) + sysButton('button', 'Download for Claude', ' data-il-export="md"', null, null, DOWNLOAD_SVG));
       ilLinks.addEventListener('click', function (e) { var b = e.target.closest('[data-il-export]'); if (!b) return; if (b.getAttribute('data-il-export') === 'xlsx') ilSave(ilBase + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ilXlsx()); else ilSave(ilBase + '.md', 'text/markdown;charset=utf-8', ilMd()); });
     }
-    // Which version of the layer this is: its commit on GitLab, when it was made and when it was last checked, so a
-    // reader knows the review is current (each build reads the layer again when its commit has moved).
-    if (ilSrc.sha) {
-      var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
-      var ilAt = (ilSrc.url ? ilSrc.url.replace(/^https?:\/\//, '') : 'the intent layer') + ' @ ' + (ilSrc.ref || '') + ' ' + String(ilSrc.sha).slice(0, 8);
-      ilSec.insertAdjacentHTML('beforeend', '<p class="sg-info sg-il-source">Read from ' + (ilSrc.url ? '<a class="sg-uses-link" href="' + esc(ilSrc.url + '/-/commit/' + ilSrc.sha) + '" target="_blank" rel="noopener">' + esc(ilAt) + '</a>' : esc(ilAt)) +
-        (ilSrc.committedAt ? ', committed ' + esc(ilWhen(ilSrc.committedAt)) : '') + (ilSrc.fetchedAt ? '; checked ' + esc(ilWhen(ilSrc.fetchedAt)) : '') + '. The style guide reads it again on every build, when its commit has moved.</p>');
-    }
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    // Why, with nothing in any row shown (only kept pages), is left out.
+    var ilColumns = function () {
+      var t = ilBox.querySelector('table'); if (!t) return;
+      var shown = Array.prototype.filter.call(t.querySelectorAll('tbody tr'), function (tr) { return !tr.hidden; });
+      t.classList.toggle('sg-il--plain', shown.length > 0 && shown.every(function (tr) { return !tr.children[3].textContent.trim(); }));
+    };
+    ilSec.addEventListener('sg-chip', ilColumns);
+    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>File</th><th>For</th><th>Why</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
+    ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
+    ilColumns();
   }
   // For agents: what of Figma's and the code's notes no agent is given, each with why, what to do and whether to remove
   // it (the intent layer has its own page).

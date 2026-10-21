@@ -100,6 +100,9 @@ function fakeGitlab({ sha = 'abc1234def5678', files = LAYER, status = 200 } = {}
     if (status !== 200) return { ok: false, status, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) };
     const u = new URL(url);
     if (/\/repository\/archive\.tar\.gz$/.test(u.pathname)) { const b = tarGz(files); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; }
+    // A file's last commit (when its page last changed) and what changed between two commits.
+    if (/\/repository\/commits$/.test(u.pathname)) return { ok: true, status: 200, json: async () => [{ id: sha, committed_date: '2026-09-15T08:30:00Z' }] };
+    if (/\/repository\/compare$/.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ diffs: [{ new_path: 'docs/dsds/components/button-main.dsds.json', old_path: 'docs/dsds/components/button-main.dsds.json' }] }) };
     if (/\/repository\/commits\//.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ id: sha, title: 'Docs', committed_date: '2026-10-01T10:00:00Z' }) };
     return { ok: true, status: 200, json: async () => ({ default_branch: 'main' }) };
   };
@@ -222,7 +225,10 @@ test('read through the API into its snapshot; the token goes to the named host; 
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.changed, true);
   assert.equal(r.entities, 8);
-  assert.equal(gl.calls.length, 3);
+  const dated = (calls) => calls.filter((c) => /\/repository\/commits\?/.test(c.url)).length;   // one per page file, the first time
+  assert.equal(gl.calls.length - dated(gl.calls), 3);
+  assert.ok(dated(gl.calls) > 0);
+  assert.equal(readIntentLayer(dir, cfg).entities.find((e) => e.name === 'Button Main').updatedAt, '2026-09-15T08:30:00Z', 'when its file last changed');
   assert.ok(gl.calls.every((c) => c.headers['PRIVATE-TOKEN'] === 't0k'));
   const snap = readIntentLayer(dir, cfg);
   assert.equal(snap._source.url, LINK);
@@ -237,7 +243,7 @@ test('read through the API into its snapshot; the token goes to the named host; 
   // An entry given: only its folder is asked for.
   const sub = fakeGitlab({ sha: 'fff1234def5678' });
   await syncIntentLayer(dir, { intentLayer: { gitlab: LINK, entry: 'docs/dsds/system.dsds.json' } }, { env: ENV, fetchImpl: sub.fetchImpl });
-  assert.match(sub.calls.at(-1).url, /path=docs%2Fdsds/);
+  assert.match(sub.calls.find((c) => /archive\.tar\.gz/.test(c.url)).url, /path=docs%2Fdsds/);
 });
 
 test('the component contracts kept beside the layer come with it: the link to each on GitLab and what it lists', async () => {
@@ -251,6 +257,19 @@ test('the component contracts kept beside the layer come with it: the link to ea
   assert.equal(k.url, `${LINK}/-/blob/main/specs/contracts/components/button-main.contract.json`);
 });
 
+test('each page says when its file last changed; a new commit dates only the files it changed, with one compare', async () => {
+  const dir = makeFixture({});
+  const cfg = { intentLayer: LINK };
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: fakeGitlab().fetchImpl });
+  const next = fakeGitlab({ sha: 'fff9999aaa0000' });
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: next.fetchImpl });
+  assert.ok(next.calls.some((c) => /\/repository\/compare\?from=abc1234def5678&to=fff9999aaa0000/.test(c.url)));
+  assert.equal(next.calls.filter((c) => /\/repository\/commits\?/.test(c.url)).length, 0, 'the files already dated are not asked again');
+  const pages = readIntentLayer(dir, cfg).entities;
+  assert.equal(pages.find((e) => e.name === 'Button Main').updatedAt, '2026-10-01T10:00:00Z', 'changed in the new commit: its date');
+  assert.equal(pages.find((e) => e.name === 'Filter Chip').updatedAt, '2026-09-15T08:30:00Z', 'unchanged: its date kept');
+});
+
 test('read-only: only GETs, only the project, its latest commit and one archive; nothing written there', async () => {
   const gl = fakeGitlab();
   const dir = makeFixture({});
@@ -258,7 +277,7 @@ test('read-only: only GETs, only the project, its latest commit and one archive;
   await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: gl.fetchImpl });
   assert.ok(gl.calls.every((c) => c.method === 'GET'), JSON.stringify(gl.calls.map((c) => c.method)));
   const base = 'https://git.acme.test/api/v4/projects/design%2Fintent';
-  for (const c of gl.calls) assert.ok(c.url === base || c.url.startsWith(`${base}/repository/commits/`) || c.url.startsWith(`${base}/repository/archive.tar.gz?`), c.url);
+  for (const c of gl.calls) assert.ok(c.url === base || c.url.startsWith(`${base}/repository/commits/`) || c.url.startsWith(`${base}/repository/commits?`) || c.url.startsWith(`${base}/repository/compare?`) || c.url.startsWith(`${base}/repository/archive.tar.gz?`), c.url);
 });
 
 test('a snapshot written by an older reader is read again, even when the commit has not moved', async () => {
@@ -270,7 +289,7 @@ test('a snapshot written by an older reader is read again, even when the commit 
   const again = fakeGitlab();
   const r = await syncIntentLayer(dir, { intentLayer: LINK }, { env: ENV, fetchImpl: again.fetchImpl });
   assert.equal(r.changed, true);
-  assert.equal(again.calls.length, 3, 'the archive is read again');
+  assert.ok(again.calls.some((c) => /archive\.tar\.gz/.test(c.url)), 'the archive is read again');
   assert.ok(JSON.parse(readFileSync(file, 'utf8'))._reader > 1);
 });
 
