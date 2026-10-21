@@ -63,6 +63,9 @@ test('a component is ready with what it is, when to use it and when not, its rol
   assert.equal(some.cls, 'partial');
   assert.deepEqual(some.unknown, ['--hb-old-tone']);
   assert.ok(some.add.some((a) => /when not to use/.test(a)) && some.add.some((a) => /exists nowhere/.test(a)));
+  // A family of names (a *) exists when one of the system's names starts with it; one that none starts with does not.
+  const family = rateComponent('badge', 'Shows a status of the item.\nUse `--status-*` and `radius/*` for it, never `--hb-gone-*`.', facts);
+  assert.deepEqual(family.unknown, ['--hb-gone-*']);
 });
 
 test('the whole guidance: a class from how many components are ready, the headings that name no component', () => {
@@ -140,6 +143,8 @@ test('each component\'s Documentation area says what an agent can take from its 
   assert.equal(of('button').agentRating.cls, 'ready');
   assert.equal(of('badge').agentRating.cls, 'partial');
   assert.deepEqual(of('badge').agentRating.from, ['guidelines.md', 'Figma']);   // every place it was read from
-  assert.match(page, /kind: 'For agents'/, 'the row in the template');
+  assert.match(page, /'example', 'Example'/, 'its Example row in the template');
+  assert.match(page, /'props', 'Properties named'/, 'its Properties named row');
+  assert.doesNotMatch(page, /kind: 'For agents'/, 'no row that repeats the others');
   assert.ok(existsSync(join(dir, 'guidelines.md')));
 });

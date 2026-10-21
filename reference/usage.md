@@ -217,8 +217,9 @@ reads one page and does not follow links inside it.
 these files and Figma's description and annotations) for what an agent needs: a section headed with its exact name,
 what it is, when to use it, when not to, its role, an example, its properties by name, and no name the system does
 not have. Each component is ready, partial or thin; the document gets the same class from how many are ready. It
-prints what to add, writes `.design-system-engine-out/guidance-rating.json`, and the style guide shows the rating in
-each component's Documentation area (For agents). `--extract` also runs the extraction test, which spends the
+prints what to add, writes `.design-system-engine-out/guidance-rating.json`, and the style guide shows what no other
+row of each component's Documentation area says: its Example and Properties named rows, and Names that do not exist
+when it gives one. `--extract` also runs the extraction test, which spends the
 person's model tokens: a question for each property with options, answered by a model that sees only the guidance
 through `guidelines.extract.cmd` (the prompt on stdin, the answers on stdout; `claude -p` by default), scored against
 Figma's options. `guidelines` is also a level of `eval-run.mjs --levels`.
@@ -294,11 +295,13 @@ no component the engine can find), **Write**, **Improve** (it exists and says so
 remove) or **Keep**; each with why, each change it takes and what the agents get from it. The engine never changes the
 layer: the changes are the team's. The audit prints how many pages each decision has.
 
-The **For agents** row of a component's Documentation rates how much an agent can take from everything written about
-it, wherever it is written (its intent-layer page, its Figma description and annotations, a guidelines section
-headed with its name): what it is, when to use it, when not to, its role, an example and its properties by name.
-Each source is read the same way, so what is missing can be written in whichever the team keeps; nothing has to be
-in Figma. `--guidance-rating` reads the same sources.
+A component's Documentation reads everything written about it, wherever it is written (its intent-layer page, its
+Figma description and annotations, a guidelines section headed with its name), one row per thing an agent needs: what
+it is, when to use it, when not to, its role, an **Example** and its **Properties named** as Figma names them, and
+**Names that do not exist** when the text gives a token, property or component the system does not have (a name with
+a `*` is a family, there when one of the system's names starts with it). Each source is read the same way, so what is
+missing can be written in whichever the team keeps; nothing has to be in Figma. `--guidance-rating` reads the same
+sources.
 
 The **For agents** page does the same for Figma and the code: a component's Figma description, its When to use and When not to use
 lines and the contract reach the agents in full, while its notes (Figma annotations, the code's note and the

@@ -57,7 +57,14 @@ export function rateComponent(name, text, facts) {
   const propNames = [...new Set(comp.props.map((p) => p.name))];
   const named = propNames.filter((p) => new RegExp(`(^|[^\\w])${esc(p)}([^\\w]|$)`, 'i').test(t));
   const known = new Set([...facts.tokens ?? [], ...propNames, ...comp.props.flatMap((p) => p.options), ...Object.keys(facts.components ?? {})].map(norm));
-  const unknown = [...new Set(namesIn(t).filter((n) => /^--|\/|^[a-z]+[A-Z]\w*$/.test(n) && !known.has(norm(n)) && !known.has(norm(n.replace(/^--/, '')))))];
+  // A name with a * in it is a family (`--card-*`, `color/brand/*`): it exists when a name the system has starts with
+  // what comes before the *.
+  const isKnown = (n) => {
+    const bare = n.replace(/^--/, '');
+    if (bare.includes('*')) { const head = norm(bare.split('*')[0]); return head.length >= 3 && [...known].some((k) => k.startsWith(head)); }
+    return known.has(norm(n)) || known.has(norm(bare));
+  };
+  const unknown = [...new Set(namesIn(t).filter((n) => /^--|\/|^[a-z]+[A-Z]\w*$/.test(n) && !isKnown(n)))];
   // What to add, the names that mislead an agent first.
   const add = unknown.map((u) => `\`${u}\` exists nowhere in the system: rename it or take it out`);
   if (!t) add.push(`a section headed ${name}, its exact name`);

@@ -737,7 +737,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const byName = new Map(rating.components.map((r) => [r.name, r]));
         for (const c of view.components) {
           const r = byName.get(c.name); if (!r) continue;
-          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total }, unknown: r.unknown, add: r.add, from: [...gl.sources, 'Figma', ...(ilSnap ? ['the intent layer'] : [])], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
+          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total, missing: r.props.missing }, unknown: r.unknown, add: r.add, from: [...gl.sources, 'Figma', ...(ilSnap ? ['the intent layer'] : [])], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
         }
         view.agentRating = { cls: rating.cls, ready: rating.ready, partial: rating.partial, thin: rating.thin, total: rating.total };
       }

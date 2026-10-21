@@ -3063,20 +3063,30 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     return { key: c.name + '\u0000doc:tokens', area: 'Documentation', kind: 'Its tokens', written: head + miss + said,
       todo: all ? '' : esc('Write what each token is for in its description in Figma. Agents read it to pick the right token.'), who: all ? '' : WHO.figma, st: all ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: n ? ['From the variables\' descriptions in Figma'] : [] };
   };
-  // For agents: what an agent can take from the team's guidance for it (its guidelines section and Figma's words),
-  // rated ready, partial or thin, with each piece still to add. Ready is done, partial is to check, thin is to write.
-  var AGENT_CLS = { ready: ['done', 'Ready'], partial: ['check', 'Partial'], thin: ['todo', 'Thin'] };
-  var agentRow = function (c) {
-    var a = c.agentRating; if (!a || !AGENT_CLS[a.cls]) return null;
-    var got = [['what', 'what it is'], ['whenToUse', 'when to use it'], ['whenNotToUse', 'when not to'], ['role', 'its role'], ['example', 'an example']].filter(function (p) { return (a.pieces || {})[p[0]]; }).map(function (p) { return p[1]; });
-    var written = '<p class="pg-par-val">How much an agent that builds with the system can take from everything written about this component, wherever it is written (' + esc((a.from || []).join(', ')) + '): what it is, when to use it, when not to, its role, an example, and its properties by name.</p>' +
-      '<p>' + esc(AGENT_CLS[a.cls][1]) + '. ' + (got.length ? 'An agent can read ' + esc(got.join(', ')) + '.' : 'An agent finds nothing about it yet.') +
-      (a.props && a.props.total ? ' ' + a.props.named + ' of ' + a.props.total + ' properties named.' : '') +
-      (typeof a.extracted === 'number' ? ' The extraction test named ' + Math.round(a.extracted * 100) + '% of its options right.' : '') + '</p>' +
-      ((a.add || []).length ? '<p class="pg-missing">Add ' + esc(a.add.join('; ')) + '.</p>' : '');
-    return { key: c.name + '\u0000doc:agents', area: 'Documentation', kind: 'For agents', written: written,
-      todo: a.cls === 'ready' ? '' : esc('Add what is missing in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, ' : '') + 'its description in Figma, or a section of your guidelines headed with its exact name. It does not have to be Figma: each is read the same way.'), who: a.cls === 'ready' ? '' : WHO.person,
-      st: AGENT_CLS[a.cls][0], rel: '', at: DATA.builtAt || null, src: (a.from || []).slice(0, 3) };
+  // From the guidance rating (everything written about it, wherever it is written), only what no other row says: an
+  // example, its properties by name, and the names it gives that the system does not have. What it is, when to use it,
+  // when not to and its role are their own rows.
+  var WHERE_TO_WRITE = function () { return 'in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer, ' : '') + 'its description in Figma, or a section of your guidelines headed with its exact name. Each is read the same way.'; };
+  var agentRows = function (c) {
+    var a = c.agentRating; if (!a) return [];
+    var base = { area: 'Documentation', rel: '', at: DATA.builtAt || null, src: (a.from || []).slice(0, 3) };
+    var mk = function (key, kind, written, st, todo) { return Object.assign({ key: c.name + '\u0000doc:' + key, kind: kind, written: written, st: st, todo: st === 'done' ? '' : esc(todo), who: st === 'done' ? '' : WHO.person }, base); };
+    var rows = [];
+    var ex = !!(a.pieces || {}).example;
+    rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
+      'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
+    var p = a.props || {};
+    if (p.total) {
+      var missing = p.missing || [];
+      var st = p.named === p.total ? 'done' : p.named ? 'check' : 'todo';
+      rows.push(mk('props', 'Properties named', '<p>' + p.named + ' of ' + p.total + ' properties named as Figma names them.' +
+        (typeof a.extracted === 'number' ? ' The extraction test named ' + Math.round(a.extracted * 100) + '% of their options right.' : '') + '</p>' +
+        (missing.length ? '<p class="pg-missing">Not named: ' + missing.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join(', ') + '.</p>' : ''), st,
+        'Name each property as Figma names it, with what its options do, ' + WHERE_TO_WRITE()));
+    }
+    if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
+      'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
+    return rows;
   };
   // Its page in the team's intent layer: the link, and its rules (what it is for, when and when not to use it are merged
   // into the rows below, each under its source). No page: one to write; a page no agent reads: why, on the For agents
@@ -3115,12 +3125,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var WEAK = function (html) { var t = String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); return !!t && (t.split(' ').filter(function (w) { return /[a-z]{2}/i.test(w); }).length < 4 || /^[\w\s\/'’&-]{1,40}\bsection\.?$/i.test(t)); };
   function docIssueRows(c) {
     if (c.codeOnly) return [];
-    var tok = tokenDocRow(c), ag = agentRow(c), ir = intentRow(c), lr = leftRow(c);
-    return (ag ? [ag] : []).concat(ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
+    var tok = tokenDocRow(c), ag = agentRows(c), ir = intentRow(c), lr = leftRow(c);
+    return (ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
       var has = !!k[1](c), body = has ? k[2](c) : '', weak = has && k[0] !== 'Do and don\'t' && k[0] !== 'Role' && WEAK(body);   // a role is one word by nature
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
         todo: has && !weak ? '' : esc((weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
-    })).concat(tok ? [tok] : []);
+    })).concat(ag).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
   function knowledgeHTML(c) {
