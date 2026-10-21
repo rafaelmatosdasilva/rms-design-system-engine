@@ -7189,9 +7189,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // card's numbers and its filter's are the same.
     var applies = function (pick) { return mx.filter(function (o) { var x = pick(o); return x && x.say !== 'N/A' && x.say !== '–'; }); };
     // Each card over Figma's components: what a card's check cannot apply to (one with nothing to compare) is counted
-    // apart, in grey. Accessibility counts only what the code has built: one not built yet is the Implementation card's
-    // to say, and it says so.
-    var parRows = figmaRows, accRows = figmaRows.filter(function (o) { return o.code !== 'missing'; }), docRows = figmaRows;
+    // apart, in grey. Parity and Accessibility count only what the code has built: one not built yet is the
+    // Implementation card's to say, and it says so. Documentation counts them all (a component owes its documentation
+    // before it is built).
+    var builtRows = figmaRows.filter(function (o) { return o.code !== 'missing'; });
+    var parRows = builtRows, accRows = builtRows, docRows = figmaRows;
     var parP = states(parRows, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
     var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; }, 'with nothing to document');
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
@@ -7202,7 +7204,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    pT.how = 'Every component Figma has (each card counts the same ones); one not in the code yet, or with nothing to compare, is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
+    pT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation); one with nothing to compare is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
     // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
     // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.
     iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';

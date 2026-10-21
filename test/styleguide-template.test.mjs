@@ -1401,12 +1401,13 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
     assert.match(tiles[0][1], /^\d+of \d+\|components fully matched$/, 'parity counts the components that fully match');
-    // Parity, Implementation and Documentation count over Figma's components; Accessibility only over what the code has
-    // built (one not built yet is the Implementation card's to say), and never says "not in the code yet".
+    // Implementation and Documentation count over Figma's components; Parity and Accessibility only over what the code
+    // has built (one not built yet is the Implementation card's to say), and never say "not in the code yet".
     const totals = tiles.map((x) => +/of (\d+)/.exec(x[1])[1]), found = +/^(\d+)/.exec(tiles[1][1])[1];
-    assert.equal(new Set([totals[0], totals[1], totals[3]]).size, 1, 'parity, implementation and documentation count over the same total');
+    assert.equal(totals[1], totals[3], 'implementation and documentation count over the same total');
+    assert.equal(totals[0], found, 'parity counts the components the code has');
     assert.equal(totals[2], found, 'accessibility counts the components the code has');
-    assert.doesNotMatch(tiles[2][2], /not in the code yet/, 'accessibility does not repeat what implementation says');
+    for (const k of [0, 2]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'parity and accessibility do not repeat what implementation says');
     assert.match(tiles[1][1], /^\d+of \d+\|components found in code$/, 'the components the code has, of every component Figma has');
     assert.match(tiles[1][2], /2 found/, 'the table\'s own words: Found, Unsure, Missing');
     assert.match(tiles[2][1], /^\d+of \d+\|components that pass$/);
@@ -1418,7 +1419,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
-    assert.match(how[0][1], /^Every component Figma has \(each card counts the same ones\); one not in the code yet, or with nothing to compare, is counted apart\. A part \(chartBars\/bar\) counts with its parent\. Match: all its props, tokens and values are the same in Figma and in the code\. Partial:/);
+    assert.match(how[0][1], /^Every component Figma has that the code has built \(one not built yet is on Code Implementation\); one with nothing to compare is counted apart\. A part \(chartBars\/bar\) counts with its parent\. Match: all its props, tokens and values are the same in Figma and in the code\. Partial:/);
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
     if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Found', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');
