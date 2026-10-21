@@ -250,7 +250,7 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     // and gives a rule or a section to compose by.
     const how = has('whenToUse') || has('whenNotToUse') || (!comp && (e.kind === 'token' || has('rules') || has('sections') || has('mistakes')));
     const verdict = !gets.length ? 'not used' : has('purpose') && how ? 'used' : 'thin';
-    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}) };
+    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}) };
     Object.assign(page, decide(page, e, { comp, has }));
     pages.push(page);
   }
