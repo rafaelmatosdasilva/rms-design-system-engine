@@ -137,7 +137,7 @@ export function codeConnectPairs(text, fileAbs) {
       }
       const propMap = {};
       for (const p of m.props) if (p.code && p.role === 'value' && !p.event && !(p.figma in propMap)) propMap[p.figma] = p.code;
-      out.push({ component: m.tag ?? m.id ?? '', nodeId: m.nodeId, file, propMap, connections: m.props });
+      out.push({ component: m.tag ?? m.id ?? '', nodeId: m.nodeId, file, propMap, connections: m.props, connectFile: fileAbs });
     }
     return out;
   }
@@ -272,6 +272,8 @@ export function mergeApiReadings(readings) {
     if (opts.length) fact.options = opts[0].e.options;
     const type = seen.find((s) => s.e.type)?.e.type;
     if (type) fact.type = type;
+    const description = seen.find((s) => s.e.description)?.e.description;   // what it is for, as its source writes it
+    if (description) fact.description = description;
     // Must be given: the best source that says, and never when the code gives it a default (it is filled for you).
     const req = seen.find((s) => typeof s.e.required === 'boolean');
     if (req) fact.required = req.e.required && fact.default == null;
@@ -373,9 +375,9 @@ export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {}, pairin
       if (t) readings.push({ source: 'typescript', props: t.props });
       readings.push({ source: 'text', ...textComponentApi(file, text) });
     }
-    if (!readings.length) return { file: null, how, props: {}, slots: { named: [], default: false }, events: [], readBy: [], codeConnect: ccFor(name)?.propMap ?? null, ...(ccFor(name)?.connections ? { codeConnectProps: ccFor(name).connections } : {}) };
+    if (!readings.length) return { file: null, how, props: {}, slots: { named: [], default: false }, events: [], readBy: [], codeConnect: ccFor(name)?.propMap ?? null, ...(ccFor(name)?.connections ? { codeConnectProps: ccFor(name).connections, codeConnectFile: ccFor(name).connectFile, ...(ccFor(name).component ? { codeConnectTag: ccFor(name).component } : {}) } : {}) };
     const merged = mergeApiReadings(readings);
-    return { file, how, ...merged, ...callName(name, file, file ? read(file) : '', e, d), codeConnect: ccFor(name)?.propMap ?? null, ...(ccFor(name)?.connections ? { codeConnectProps: ccFor(name).connections } : {}) };
+    return { file, how, ...merged, ...callName(name, file, file ? read(file) : '', e, d), codeConnect: ccFor(name)?.propMap ?? null, ...(ccFor(name)?.connections ? { codeConnectProps: ccFor(name).connections, codeConnectFile: ccFor(name).connectFile, ...(ccFor(name).component ? { codeConnectTag: ccFor(name).component } : {}) } : {}) };
   }
 
   return { fileFor, apiFor, sources, read, files };

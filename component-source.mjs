@@ -229,12 +229,16 @@ export function extractTypes(text) {
 // its type, the values it lists and the one marked default. code prop -> { type?, options?, default? }.
 export function extractDocumented(text) {
   const out = new Map();
-  for (const m of String(text).matchAll(/@([A-Za-z_$][\w$]*)\s*\{([A-Za-z|\s]+)\}([^\n]*)/g)) {
-    const e = {}, t = m[2].trim().toLowerCase().split(/\s*\|\s*/).filter((x) => /^(string|boolean|number|object|array|function)$/.test(x));
+  // @size {String} what it does, can be [s, m (default), l]   ·   @value {String, Number} …   ·   [a, b or c]
+  for (const m of String(text).matchAll(/@([A-Za-z_$][\w$]*)\s*\{([A-Za-z|,\s]+)\}([^\n]*)/g)) {
+    const e = {}, t = m[2].trim().toLowerCase().split(/\s*[|,]\s*/).filter((x) => /^(string|boolean|number|object|array|function|date)$/.test(x));
     if (t.length) e.type = t.join(' | ');
+    // What it is for, as written: the line without its list of values and the words that introduce it.
+    const desc = m[3].replace(/\*\/.*$/, '').replace(/\[[^\]]*\]/g, '').replace(/[,;:]?\s*(?:it\s+)?(?:can|could|may)\s+be\s*:?\s*$/i, '').replace(/^\s*[-–—:]\s*/, '').replace(/\s+/g, ' ').trim();
+    if (desc) e.description = desc;
     const list = /\[([^\]]+)\]/.exec(m[3])?.[1];
     if (list) {
-      const items = list.split(',').map((x) => x.trim()).filter(Boolean);
+      const items = list.split(/,|\s+(?:or|and)\s+/).map((x) => x.trim()).filter(Boolean);
       const opts = items.map((x) => x.replace(/\s*\(default\)\s*$/i, '').replace(/^['"`]|['"`]$/g, ''));
       if (opts.length >= 2 && opts.every((o) => /^[\w.-]+$/.test(o))) e.options = opts;
       const def = items.findIndex((x) => /\(default\)\s*$/i.test(x));
@@ -347,6 +351,7 @@ export function textComponentApi(file, text) {
     const type = types.get(norm(p)) ?? doc?.type;
     if (type) e.type = type;
     if (required.has(norm(p))) e.required = required.get(norm(p));
+    if (doc?.description) e.description = doc.description;
     props[p] = e;
   }
   const s = extractSlots(text);

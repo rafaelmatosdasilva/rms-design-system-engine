@@ -42,23 +42,24 @@ export function apiReaderFor(ROOT, cfg, { classFor, nodeIds } = {}) {
 export function captureApis(ROOT, specs, reader) {
   if (!reader) return { api: {}, note: 'frameworkComponents is false: components are markup and CSS, so there are no props to read' };
   const api = {};
-  for (const s of specs) {
-    if (s.unbuilt) continue;
-    const a = reader.apiFor(s.name);
-    if (!a.file && !Object.keys(a.props).length) { api[s.name] = { file: null, how: a.how }; continue; }
-    // Its events with what each carries, what its scoped slots hand their content, the tag it is written with, and
-    // every reading its Code Connect file gives (a contract states them all).
-    const text = a.file ? reader.read(a.file) : '';
-    const payloads = extractEventPayloads(text), slotProps = extractSlotProps(text);
-    api[s.name] = {
-      file: a.file ? relative(ROOT, a.file) : null, how: a.how, readBy: a.readBy,
-      props: a.props, slots: { ...a.slots, ...(Object.keys(slotProps).length ? { props: slotProps } : {}) },
-      events: (a.events ?? []).map((name) => (payloads[name] ? { name, payload: payloads[name] } : { name })),
-      ...(a.tag ? { tag: a.tag, syntax: a.syntax } : {}),
-      ...(a.codeConnect ? { codeConnect: a.codeConnect } : {}), ...(a.codeConnectProps ? { codeConnectProps: a.codeConnectProps } : {}),
-    };
-  }
+  for (const s of specs) if (!s.unbuilt) api[s.name] = apiEntry(ROOT, reader, s.name);
   return { api, sources: reader.sources };
+}
+// One component's API as the snapshot and the contract keep it: its props, its events with what each carries, what its
+// scoped slots hand their content, the tag it is written with, and every reading its Code Connect file gives.
+export function apiEntry(ROOT, reader, name) {
+  const a = reader.apiFor(name);
+  if (!a.file && !Object.keys(a.props).length) return { file: null, how: a.how };
+  const text = a.file ? reader.read(a.file) : '';
+  const payloads = extractEventPayloads(text), slotProps = extractSlotProps(text);
+  return {
+    file: a.file ? relative(ROOT, a.file) : null, how: a.how, readBy: a.readBy,
+    props: a.props, slots: { ...a.slots, ...(Object.keys(slotProps).length ? { props: slotProps } : {}) },
+    events: (a.events ?? []).map((e) => (payloads[e] ? { name: e, payload: payloads[e] } : { name: e })),
+    ...(a.tag ? { tag: a.tag, syntax: a.syntax } : {}),
+    ...(a.codeConnect ? { codeConnect: a.codeConnect } : {}), ...(a.codeConnectProps ? { codeConnectProps: a.codeConnectProps } : {}),
+    ...(a.codeConnectFile ? { codeConnectFile: relative(ROOT, a.codeConnectFile) } : {}), ...(a.codeConnectTag ? { codeConnectTag: a.codeConnectTag } : {}),
+  };
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
