@@ -1608,6 +1608,10 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 /* The Intent layer and For agents pages: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
+/* Balanced at every width: the file (its name and path) takes what the others leave. */
+.sg-issues.sg-il th:nth-child(1) { width: 13%; }      /* Decision */
+.sg-issues.sg-il th:nth-child(3) { width: 21%; }      /* For */
+.sg-issues.sg-il th:nth-child(4) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
 /* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
 .sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
 .sg-h2-links > .pg-head-links { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); }
@@ -2919,6 +2923,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var k = b.getAttribute('data-chip');
       Array.prototype.forEach.call(bar.querySelectorAll('.sg-chip[data-chip]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
       Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k; });
+      sec.dispatchEvent(new CustomEvent('sg-chip', { detail: k }));
     });
     return bar;
   }
@@ -2933,8 +2938,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilLink = function (p) { return (p.url ? '<a class="sg-uses-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name || p.file) + '</a>' : esc(p.name || p.file)) + '<span class="pg-par-val">' + esc(p.file || '') + '</span>'; };
     var ilFor = function (p) { return p.component ? '<a class="sg-uses-link" href="#' + esc(cid(p.component)) + '">' + esc(p.component) + '</a>' : p.layer === 'components' ? '<span class="pg-missing">No component</span>' : esc(capital(p.kind)); };
     var ilGets = function (p) { return (p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>'; };
-    var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || '<p class="pg-missing">Nothing to change.</p>'; };
-    var ilWhy = function (p) { return p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : '<p class="pg-missing">Everything on it reaches the agents.</p>') : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'; };
+    // A page kept as it is: its Keep says it all, so What to do and Why stay empty rather than repeat it on every row.
+    var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
+    var ilWhy = function (p) { return p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
     var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
@@ -2942,9 +2948,26 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
     var labelOf = function (k) { var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
     var decisionCell = function (k) { return '<span class="pg-par-status pg-par--' + IL_DOT[k] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'; };
-    var rowHTML = function (p) {
-      if (p.missingFor) return '<tr data-chip="missing"><td>' + decisionCell('missing') + '</td><td><span class="pg-missing">No page</span></td><td><a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a></td><td><p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p></td><td><p class="sg-il-line">No page names this component, by name or by code file.</p></td><td><p class="pg-missing">Nothing.</p></td></tr>';
-      return '<tr data-chip="' + esc(p.action) + '"><td>' + decisionCell(p.action) + '</td><td>' + ilLink(p) + '</td><td>' + ilFor(p) + '</td><td>' + ilTodo(p) + '</td><td>' + ilWhy(p) + '</td><td>' + ilGets(p) + '</td></tr>';
+    // Each row's cells, once: the table shows Decision, File, For and when its file last changed; a click on the row (or
+    // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
+    // When the page's file last changed in the intent layer (its last commit), as a date and time.
+    var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+    var ilCellsOf = function (p) {
+      if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">No file</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
+        updated: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
+      return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
+    };
+    var rowHTML = function (p, i) {
+      var c = ilCellsOf(p);
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"><td>' + c.decision + '</td><td>' + c.file + '</td><td>' + c.forWhat + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+    };
+    var ilPanel = function (i, from) {
+      var p = rows[i]; if (!p) return;
+      var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
+      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Why', c.why) + card('What the agents get', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer', labelOf(p.missingFor ? 'missing' : p.action)], title: p.missingFor || p.name || p.file || 'Page', body: body });
+      panelShow(m, from);
     };
     var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
     pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: labels.filter(function (l) { return counts[l[0]]; }).map(function (l) { return { key: l[0], label: l[1], n: counts[l[0]], dot: IL_DOT[l[0]] }; }) });
@@ -2959,14 +2982,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // of a cell on its own line, the head row bold and fixed, each page's link kept.
     var ilCells = function (td) { var d = td.cloneNode(true); Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = '\n' + v.textContent.trim(); }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
     var ilXlsx = function () {
-      var table = ilBox.querySelector('table'), head = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); });
-      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.map.call(tr.children, function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }); });
+      // The table's columns (its open arrow left out), then what to do, why and what the agents get, which the table leaves
+      // to the side panel.
+      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Why', 'What the agents get']);
+      var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = ilCellsOf(rows[i])[k]; return ilCells(d); };
+      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
       var x = function (v) { return String(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
       var col = function (i) { return String.fromCharCode(65 + i); };
       var cell = function (r, i, text, style) { return '<c r="' + col(i) + r + '" t="inlineStr" s="' + style + '"><is><t xml:space="preserve">' + x(text) + '</t></is></c>'; };
       var links = [], rowsXml = ['<row r="1">' + head.map(function (h, i) { return cell(1, i, h, 1); }).join('') + '</row>'];
       body.forEach(function (cells, n) { var r = n + 2; rowsXml.push('<row r="' + r + '">' + cells.map(function (c, i) { if (c.url) links.push({ ref: col(i) + r, url: c.url }); return cell(r, i, c.text, c.url ? 2 : 0); }).join('') + '</row>'); });
-      var widths = [12, 36, 26, 60, 50, 42], last = col(head.length - 1) + (body.length + 1);
+      var widths = [12, 36, 26, 20, 60, 50, 42], last = col(head.length - 1) + (body.length + 1);
       var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:' + last + '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + head.map(function (h, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (widths[i] || 30) + '" customWidth="1"/>'; }).join('') + '</cols><sheetData>' + rowsXml.join('') + '</sheetData><autoFilter ref="A1:' + last + '"/>' + (links.length ? '<hyperlinks>' + links.map(function (l, i) { return '<hyperlink ref="' + l.ref + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</hyperlinks>' : '') + '</worksheet>';
       var rel = function (rels) { return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>'; };
       var files = [
@@ -3007,7 +3033,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ilLinks.addEventListener('click', function (e) { var b = e.target.closest('[data-il-export]'); if (!b) return; if (b.getAttribute('data-il-export') === 'xlsx') ilSave(ilBase + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ilXlsx()); else ilSave(ilBase + '.md', 'text/markdown;charset=utf-8', ilMd()); });
     }
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>Page</th><th>For</th><th>What to do</th><th>Why</th><th>What the agents get</th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>File</th><th>For</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
+    ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
   }
   // For agents: what of Figma's and the code's notes no agent is given, each with why, what to do and whether to remove
   // it (the intent layer has its own page).
@@ -3143,9 +3171,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Written, but too thin to say anything: under four words, or a line that only names its section ("Overview
   // section."). Such a row is never Ready: it is to check, with why.
   var WEAK = function (html) { var t = String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); return !!t && (t.split(' ').filter(function (w) { return /[a-z]{2}/i.test(w); }).length < 4 || /^[\w\s\/'’&-]{1,40}\bsection\.?$/i.test(t)); };
+  // Where each kind belongs, for a row still to write: its Source is that place (one, the team's own), never where the
+  // engine happened to look. A written row's Source stays where it was read.
+  var DOC_HOME = function () { return DATA.intentLayer ? 'Its page in the intent layer' : 'Its description in Figma'; };
+  var WRITE_TO = { 'What it is': DOC_HOME, 'When to use': DOC_HOME, 'When not to use': DOC_HOME, 'Common mistakes': DOC_HOME, Limitations: DOC_HOME, Example: DOC_HOME, 'Intent layer': function () { return 'Its page in the intent layer'; },
+    'Do and don\'t': function () { return 'Frames in Figma, or the references folder'; }, Role: function () { return 'An annotation on it in Figma'; }, 'Its tokens': function () { return 'Its variables\' descriptions in Figma'; }, Properties: function () { return 'Its shared contract'; } };
+  var writeTo = function (r) { return r.st === 'todo' && WRITE_TO[r.kind] ? Object.assign({}, r, { src: [WRITE_TO[r.kind]()], writeTo: true }) : r; };
   function docIssueRows(c) {
     if (c.codeOnly) return [];
     var tok = tokenDocRow(c), ag = agentRows(c), ir = intentRow(c), lr = leftRow(c);
+    return docRowsOf(c, tok, ag, ir, lr).map(writeTo);
+  }
+  function docRowsOf(c, tok, ag, ir, lr) {
     return (ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
       var has = !!k[1](c), body = has ? k[2](c) : '', weak = has && k[0] !== 'Do and don\'t' && k[0] !== 'Role' && WEAK(body);   // a role is one word by nature
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
@@ -6268,7 +6305,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // What a table leaves to its row's panel: Accessibility's Found and What to do are read in full there, so the table has
   // room for the criterion and Figma's states; Documentation's table is its task, kind, status and when it was checked,
   // what is written and what to do read in its panel.
-  var PANEL_ONLY = { Accessibility: ['figma', 'code', 'todo'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
+  var PANEL_ONLY = { Parity: ['todo'], Accessibility: ['figma', 'code', 'todo'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
   var tableColsOf = function (area) { var off = PANEL_ONLY[area] || []; return colsOf(area).filter(function (col) { return off.indexOf(col[1]) < 0; }); };
   var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
@@ -6298,11 +6335,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var nr = isOpen(r) ? TODO_NO[r.key] : null;
     var comp = String(r.key || '').split('\u0000')[0];
     var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+    // A source in the intent layer opens there: the component's own page, or the layer itself when no page is written yet.
+    var ilHref = function (x) { if (!/intent layer/i.test(x)) return null; var own = HAS_PAGE[comp] && HAS_PAGE[comp].intentLayer; return (own && own.url) || (DATA.intentLayer && DATA.intentLayer.source && DATA.intentLayer.source.url) || null; };
+    var ilFile = function (url) { var m = /\/-\/blob\/[^/]+\/(.+)$/.exec(url); return m ? decodeURIComponent(m[1]) : url.replace(/^https?:\/\//, ''); };
     var body = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; }).map(function (col) {
       var k = col[1];
       if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : ''));   // nothing to do: no card
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
-      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + card('Where it was read', (r.src || []).filter(Boolean).map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('')); }
+      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + card(r.writeTo ? 'Where to write it' : 'Where it was read', (r.src || []).filter(Boolean).map(function (x) { var url = ilHref(x), file = url && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join('')); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
@@ -6413,7 +6453,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function parityIssueRows(c) {
     var out = [], diffs = c.differences || [], used = {}, at0 = (DATA.differences && DATA.differences.at) || DATA.builtAt || null, lname = c.name.toLowerCase();
     var notBuilt = {}; (c.unbuilt || []).forEach(function (u) { notBuilt[String(u.label || u).toLowerCase()] = u.label || String(u); });
-    var side = function (x, where) { return x ? '<code>' + (/^--[\w-]+$/.test(x.name) ? usesLink(x.name) : esc(x.name)) + '</code>' + (x.value ? '<span class="pg-par-val">' + esc(x.value) + '</span>' : '') + (where ? '<span class="pg-par-val">' + esc(where) + '</span>' : '') : '<span class="pg-par-none">Not there</span>'; };
+    // A side in the table is its name and value; where it applies (its frame, its selector) is for the row's panel.
+    var side = function (x, where) { return x ? '<code>' + (/^--[\w-]+$/.test(x.name) ? usesLink(x.name) : esc(x.name)) + '</code>' + (x.value ? '<span class="pg-par-val">' + esc(x.value) + '</span>' : '') + (where ? '<span class="pg-par-val sg-panel-only">' + esc(where) + '</span>' : '') : '<span class="pg-par-none">Not there</span>'; };
     // Where in the code a difference is (its selector and file line), as the audit wrote it.
     var whereOf = function (x) { var m = /\(([^()]*:\d+[^()]*)\)/.exec(String(x.what || '')); return m ? m[1] : ''; };
     // A mismatch is a difference, flagged as one (Differs), whoever decides which side is right: knowing it differs is
@@ -7181,9 +7222,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // card's numbers and its filter's are the same.
     var applies = function (pick) { return mx.filter(function (o) { var x = pick(o); return x && x.say !== 'N/A' && x.say !== '–'; }); };
     // Each card over Figma's components: what a card's check cannot apply to (one with nothing to compare) is counted
-    // apart, in grey. Accessibility counts only what the code has built: one not built yet is the Implementation card's
-    // to say, and it says so.
-    var parRows = figmaRows, accRows = figmaRows.filter(function (o) { return o.code !== 'missing'; }), docRows = figmaRows;
+    // apart, in grey. Parity, Accessibility and Documentation count only what the code has built: one not built yet is
+    // the Implementation card's to say, and it says so.
+    var builtRows = figmaRows.filter(function (o) { return o.code !== 'missing'; });
+    var parRows = builtRows, accRows = builtRows, docRows = builtRows;
     var parP = states(parRows, function (o) { return o.par; }), codeP = states(figmaRows, function (o) { return { cls: { found: 'match', css: 'match', unsure: 'figma', missing: 'differs' }[o.code], say: MX_WORD.code[o.code] }; });
     var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; }, 'with nothing to document');
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
@@ -7194,7 +7236,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    pT.how = 'Every component Figma has (each card counts the same ones); one not in the code yet, or with nothing to compare, is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
+    pT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation); one with nothing to compare is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
     // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
     // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.
     iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
@@ -7206,7 +7248,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ['The accessibility tree', 'The browser\'s own: each control\'s name, role and state, as assistive technology reads them.'],
       ['Contrast', 'WCAG\'s formula: 4.5:1 for text, 3:1 for large text and control edges, in every theme and in two modes at once (dark with high contrast).']
     ];
-    dT.how = 'Every component Figma has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
+    dT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation).' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));

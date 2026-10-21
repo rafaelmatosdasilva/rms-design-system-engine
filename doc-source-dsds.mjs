@@ -40,7 +40,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 5;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs)
+export const READER = 6;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -391,12 +391,31 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     if (!entities.length) return kept(`no DSDS entities found in ${p.path} on ${ref} (looked for system.dsds.json and *.dsds.json files)`);
     const boilerplate = dropBoilerplate(entities);
     for (const e of entities) e.url = fileUrl(source, e.file);
+    // When each page's file last changed: the files a new commit changed (one compare with the commit read before) take
+    // its date; a file not dated yet asks for its own last commit, once. A date not known is left out, never guessed.
+    const fileDates = { ...(prev?._reader >= 6 ? prev.fileDates ?? {} : {}) };
+    const previous = prev?._reader >= 6 ? prev?._source?.sha : null;
+    if (previous && previous !== sha) {
+      const cmp = await get(`${base}/repository/compare?from=${encodeURIComponent(previous)}&to=${encodeURIComponent(sha)}`);
+      if (cmp.ok) { try { for (const d of (await cmp.json())?.diffs ?? []) { if (d.new_path) fileDates[d.new_path] = source.committedAt; if (d.deleted_file) delete fileDates[d.old_path]; } } catch { /* the files ask below */ } }
+      else for (const k of Object.keys(fileDates)) delete fileDates[k];
+    }
+    const undated = [...new Set(entities.map((e) => e.file).filter(Boolean))].filter((f) => !fileDates[f]);
+    for (let i = 0; i < undated.length; i += 8) {
+      await Promise.all(undated.slice(i, i + 8).map(async (f) => {
+        const c = await get(`${base}/repository/commits?ref_name=${encodeURIComponent(sha)}&path=${encodeURIComponent(f)}&per_page=1`);
+        if (!c.ok) return;
+        try { const at = (await c.json())?.[0]?.committed_date; if (at) fileDates[f] = String(at); } catch { /* left undated */ }
+      }));
+    }
+    for (const e of entities) if (fileDates[e.file]) e.updatedAt = fileDates[e.file];
     source.entry = entry;
     source.fetchedAt = (opts.now ?? new Date()).toISOString();
     const snap = {
       _note: 'The intent layer as read from GitLab (rms-design-system-engine). Regenerated when its commit moves; do not edit by hand, edit the layer itself.',
       _source: source, _reader: READER, system, boilerplate, entities,
       contracts: contractSummaries(files, (f) => fileUrl(source, f)),
+      fileDates,
     };
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(snap, null, 2) + '\n');

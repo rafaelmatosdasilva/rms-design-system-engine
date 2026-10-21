@@ -121,5 +121,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `guidance-rating` | The 21 guide tasks on Haiku (engine c7ee2d0) | "Guidance rating for agents" |
 | `2026-10-21-identity-depth-view-centred-once` | The 21 guide tasks on Haiku (engine f93e3b7) | "Style guide: personality, Identity layout, module data" |
 | `2026-10-21-parity-each-side-says-where` | The 21 guide tasks on Haiku (engine 8d5c3d6) | "Parity: each side says where a value is and what sets it; a token finding as what Figma has and what the code has" |
+| `2026-10-21-status-the-documentation-card-counts` | The 21 guide tasks on Haiku (engine 7a568ab) | "Status: the Documentation card counts only what the code has built, as Parity and Accessibility do" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
