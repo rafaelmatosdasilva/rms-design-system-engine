@@ -14,7 +14,7 @@ import { join, relative } from 'node:path';
 import { readTemplateForm } from './code-connect-template.mjs';
 
 const SKIP = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.design-system-engine-out']);
-const nodeIdOf = (raw) => { const m = /node-id=([\d]+)[-:%3A]+([\d]+)/i.exec(String(raw ?? '')); return m ? `${m[1]}:${m[2]}` : null; };
+const nodeIdOf = (raw) => { const m = /node-id=(\d+)(?:-|:|%3A)(\d+)/i.exec(String(raw ?? '')); return m ? `${m[1]}:${m[2]}` : null; };
 const slugOf = (url) => { const m = /figma\.com\/(?:file|design)\/[^/]+\/([^?/#]+)/i.exec(String(url ?? '')); return m ? decodeURIComponent(m[1]) : null; };
 
 // The values of an enum's map ({ s: 's', Large: 'lg' }): Figma's option → the code's value.

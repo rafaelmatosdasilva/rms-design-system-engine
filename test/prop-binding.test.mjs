@@ -40,3 +40,12 @@ test('what a Code Connect file decides beyond a value: each attribute a property
   assert.deepEqual(readingsOf('tone', cc), [{ code: 'shout', role: 'condition', equals: 'loud' }]);
   assert.deepEqual(readingsOf('showLink', cc), [], 'an event listener is not a prop');
 });
+
+test('a key of an object prop is that prop at that key; every attribute a property fills is listed', async () => {
+  const { valuesOf } = await import('../prop-binding.mjs');
+  const recorded = bindingSources({ codeConnect: { captionWords: 'opts.caption' } });
+  assert.deepEqual(bindFigmaProp('captionWords', { type: 'TEXT' }, { codeProps: { opts: {} }, recorded }), { code: 'opts', as: 'prop', source: 'codeConnect', exactName: true, key: 'caption' });
+  assert.equal(bindFigmaProp('captionWords', { type: 'TEXT' }, { codeProps: { other: {} }, recorded }), null, 'no such object prop: no binding');
+  const cc = [{ figma: 'helperWords', code: 'warning', role: 'value' }, { figma: 'helperWords', code: 'note', role: 'value' }, { figma: 'helperWords', code: 'warning', role: 'condition' }];
+  assert.deepEqual(valuesOf('helperWords', cc), ['warning', 'note']);
+});

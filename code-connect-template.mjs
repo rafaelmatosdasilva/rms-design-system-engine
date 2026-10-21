@@ -89,6 +89,12 @@ function parse(tokens) {
   const unary = () => { if (peek('!')) { p++; return { k: 'not', e: unary() }; } return postfix(); };
   const postfix = () => {
     let e = primary();
+    // [a, b ? `x` : ''].filter(Boolean).join(', '): a list written as one text, each item on its own.
+    if (e.k === 'arr') {
+      while (peek('.') && tokens[p + 1]?.v === 'filter') { p += 2; if (peek('(')) { p++; collectUntil(')'); } }
+      if (peek('.') && tokens[p + 1]?.v === 'join') { p += 2; if (peek('(')) { p++; collectUntil(')'); } e = { k: 'join', items: e.items }; }
+      else e = { k: 'opaque', ids: e.items.flatMap(idsOf) };
+    }
     // a member, an index or a call: what it reads is kept, what it does is not followed.
     while (peek('.') || peek('?.') || peek('(') || peek('[')) {
       const ids = idsOf(e);
@@ -120,7 +126,13 @@ function parse(tokens) {
     if (tk.t === 'tpl') return { k: 'tpl', parts: tk.parts.map((x) => (x.expr != null ? { expr: parseExpr(x.expr) } : x)) };
     if (tk.t === 'id') return ['true', 'false', 'null', 'undefined'].includes(tk.v) ? { k: 'str', v: tk.v === 'true' ? 'true' : '' } : { k: 'id', v: tk.v };
     if (tk.t === 'op' && tk.v === '(') { const e = ternary(); if (peek(')')) p++; return e; }
-    if (tk.t === 'op' && (tk.v === '[' || tk.v === '{')) return { k: 'opaque', ids: collectUntil(tk.v === '[' ? ']' : '}') };
+    if (tk.t === 'op' && tk.v === '[') {
+      const items = [];
+      while (p < tokens.length && !peek(']')) { const at = p; items.push(ternary()); if (peek(',')) p++; else if (p === at) p++; else if (!peek(']')) return { k: 'opaque', ids: [...items.flatMap(idsOf), ...collectUntil(']')] }; }
+      if (peek(']')) p++;
+      return { k: 'arr', items };
+    }
+    if (tk.t === 'op' && tk.v === '{') return { k: 'opaque', ids: collectUntil('}') };
     return { k: 'str', v: '' };
   };
   return ternary();
@@ -135,6 +147,7 @@ function idsOf(n) {
     case 'cond': return [...idsOf(n.test), ...idsOf(n.yes), ...idsOf(n.no)];
     case 'and': case 'or': return [...idsOf(n.l), ...idsOf(n.r)];
     case 'not': return idsOf(n.e);
+    case 'arr': case 'join': return n.items.flatMap(idsOf);
     case 'cmp': return [...idsOf(n.l), ...idsOf(n.r)];
     default: return [];
   }
@@ -186,6 +199,9 @@ function branches(n, vars, locals, seen = new Set()) {
     }
     case 'and': return [...branches(n.r, vars, locals, seen).map((b) => ({ ...b, conds: [...conditionsOf(n.l, vars), ...b.conds] })), { text: '', conds: [] }];
     case 'or': return [...branches(n.l, vars, locals, seen), ...branches(n.r, vars, locals, seen)];
+    // A list joined into one text: each item is read on its own, so one item's conditions never reach another's text.
+    case 'join': return [...n.items.flatMap((it) => branches(it, vars, locals, seen)), { text: '', conds: [] }];
+    case 'arr': return [{ text: '', conds: [], opaque: idsOf(n).filter((x) => vars.has(x)) }];
     // A property written the other way round (:hidden="${!shown}"): its value, marked negated.
     case 'not': if (n.e?.k === 'id' && vars.has(n.e.v)) return [{ text: MARK(`!${n.e.v}`), conds: [] }];
     // falls through
@@ -260,6 +276,14 @@ export function readTemplateForm(src) {
     if (!tagHere || (tag && tagHere !== tag)) return;   // between tags, or inside another component's tag
     const self = new Set([...text.matchAll(/\u0001!?([^\u0002]+)\u0002/g)].map((x) => x[1]));
     const valueOf = (mark, code, extra = {}) => (mark.startsWith('!') ? emit(mark.slice(1), { code, role: 'value', negated: true, ...extra }) : emit(mark, { code, role: 'value', ...extra }));
+    // A fixed true or false written under one property's own on/off (${!framed ? ':framed="false"' : ''}) is that
+    // property's value: the code prop holds it (the other way round when they disagree).
+    const ownValue = (literal) => {
+      const c = b.conds.length === 1 ? b.conds[0] : null;
+      if (!c || c.equals != null || c.unclear || !/^(true|false)$/.test(String(literal).trim())) return null;
+      const negated = (String(literal).trim() === 'false') !== !!c.negated;
+      return { v: c.v, ...(negated ? { negated: true } : {}) };
+    };
     const condition = (target) => {
       for (const c of b.conds) {
         if (self.has(c.v) && (c.equals != null || !c.negated)) continue;   // a property tested against itself: its value
@@ -276,6 +300,14 @@ export function readTemplateForm(src) {
         valueOf(mk[1], target);
         condition(target);
       }
+      // Keys written with a fixed value inside the attribute (mandatory: true): decided by the branch's conditions.
+      if (!/\u0001/.test(text)) {
+        for (const kv of text.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*([^,}\n]+)/g)) {
+          const target = `${attrName(open.name)}.${kv[1]}`, own = ownValue(kv[2]);
+          if (own) emit(own.v, { code: target, role: 'value', ...(own.negated ? { negated: true } : {}) });
+          else for (const c of b.conds) emit(c.v, { code: target, role: 'condition', ...(c.negated ? { negated: true } : {}), ...(c.equals != null ? { equals: c.equals } : {}), ...(c.unclear ? { unclear: true } : {}) });
+        }
+      }
       return;
     }
     // Attributes the branch writes itself: name="…${v}…" (its value), name="fixed" (written when its conditions hold:
@@ -290,7 +322,9 @@ export function readTemplateForm(src) {
       if (value != null) {
         const marks = [...value.matchAll(/\u0001([^\u0002]+)\u0002/g)].map((x) => x[1]);
         for (const v of marks) valueOf(v, name, extra);
+        const own = !marks.length && !event ? ownValue(value) : null;
         if (marks.length) condition(name);
+        else if (own) emit(own.v, { code: name, role: 'value', ...(own.negated ? { negated: true } : {}) });
         else for (const c of b.conds) emit(c.v, { code: name, role: 'condition', ...flags(c), ...extra });
       } else {
         for (const c of b.conds) emit(c.v, { code: name, role: c.equals != null || c.unclear || event ? 'condition' : 'value', ...flags(c), ...extra });

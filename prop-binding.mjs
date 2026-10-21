@@ -2,7 +2,9 @@
 // prop check (Gate 14) and the contract both ask here, so they never give two answers.
 //
 //   bindingSources({ codeConnect, aliases, authored }) → the names recorded for each Figma property, by who recorded them
-//   bindFigmaProp(fp, def, ctx) → { code, as: 'prop'|'slot'|'defaultSlot', source, exactName } or null
+//   bindFigmaProp(fp, def, ctx) → { code, as: 'prop'|'slot'|'defaultSlot', source, exactName, key? } or null (key: the key of an
+//                                 object prop it fills, as Code Connect writes :opts="{ caption: … }")
+//   valuesOf(fp, codeConnectProps) → every attribute or key the Code Connect file fills with the property's value
 //   invertsValue(fp, code, ctx) → true when a true/false binding writes the opposite value (show ↔ hide)
 //   readingsOf(fp, codeConnectProps) → what the project's Code Connect file does with the property beyond its value:
 //                                      [{ code, role: 'condition', negated?, equals? }]
@@ -29,10 +31,13 @@ export function bindFigmaProp(fp, def, { codeProps = {}, slots = { named: [], de
   const byNorm = new Map(names.map((p) => [norm(p), p]));
   const rec = recorded[fp];
   const slotByNorm = new Map((slots.named ?? []).map((n) => [norm(n), n]));
+  // A recorded key of an object prop (Code Connect writing :opts="{ caption: … }"): that prop, at that key.
+  const keyed = rec && rec.name.includes('.') && names.includes(rec.name.split('.')[0]) ? { code: rec.name.split('.')[0], as: 'prop', source: rec.source, exactName: true, key: rec.name.split('.').slice(1).join('.') } : null;
   // An instance swap may be a prop or a slot: its own name first, then a recorded one, then a slot.
   if (def?.type === 'INSTANCE_SWAP') {
     if (byNorm.has(norm(fp))) { const p = byNorm.get(norm(fp)); return { code: p, as: 'prop', source: 'name', exactName: p === fp }; }
     if (rec && byNorm.has(norm(rec.name))) return { code: byNorm.get(norm(rec.name)), as: 'prop', source: rec.source, exactName: true };
+    if (keyed) return keyed;
     if (slotByNorm.has(norm(fp))) { const s = slotByNorm.get(norm(fp)); return { code: s, as: 'slot', source: 'name', exactName: s === fp }; }
     if (slots.default) return { code: 'default', as: 'defaultSlot', source: 'name', exactName: true };
     const sb = authoredSlots[fp];
@@ -41,6 +46,7 @@ export function bindFigmaProp(fp, def, { codeProps = {}, slots = { named: [], de
   }
   // A recorded name, as written, is the agreed one: read before the letter-case comparison.
   if (rec && names.includes(rec.name)) return { code: rec.name, as: 'prop', source: rec.source, exactName: true };
+  if (keyed) return keyed;
   if (byNorm.has(norm(fp))) { const p = byNorm.get(norm(fp)); return { code: p, as: 'prop', source: 'name', exactName: p === fp }; }
   if (rec && byNorm.has(norm(rec.name))) return { code: byNorm.get(norm(rec.name)), as: 'prop', source: rec.source, exactName: true };
   return null;
@@ -51,6 +57,11 @@ export function suggestionFor(fp, unusedCodeProps = []) {
   const fn = norm(fp);
   if (fn.length < 3) return null;
   return unusedCodeProps.find((p) => { const cn = norm(p); return cn.length >= 3 && (cn.includes(fn) || fn.includes(cn)); }) ?? null;
+}
+
+// Every attribute (or key of one) the Code Connect file fills with a property's value, in the order it writes them.
+export function valuesOf(fp, codeConnectProps = []) {
+  return [...new Set((codeConnectProps ?? []).filter((p) => p.figma === fp && p.role === 'value' && p.code && !p.event).map((p) => p.code))];
 }
 
 // What the Code Connect file does with a property besides filling its value: the attributes it decides are written.

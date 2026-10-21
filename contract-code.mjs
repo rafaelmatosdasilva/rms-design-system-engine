@@ -3,7 +3,7 @@
 // is; what the project's Code Connect file says it decides beyond its value; where Figma and the code differ; the props
 // only the code has; its events and slots as the code declares them; its states, the tokens each state paints with,
 // and what the code says about its accessibility. Every fact names where it came from; nothing is guessed.
-import { bindingSources, bindFigmaProp, readingsOf, suggestionFor, invertsValue, flipBoolean } from './prop-binding.mjs';
+import { bindingSources, bindFigmaProp, readingsOf, valuesOf, suggestionFor, invertsValue, flipBoolean } from './prop-binding.mjs';
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const strip = (k) => String(k).split('#')[0].trim();
@@ -46,12 +46,14 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
       ? (authoredName && codeProps[authoredName] ? { code: authoredName, as: 'prop', source: 'authored', exactName: true } : null)
       : api ? bindFigmaProp(p.name, def, { codeProps, slots: api.slots ?? {}, recorded, authoredSlots }) : null;
     if (b) {
-      const c = codeProps[b.code] ?? {};
+      // A key of an object prop has no facts of its own in the code: the object's type and default are not the key's.
+      const c = b.key ? {} : codeProps[b.code] ?? {};
       const inverted = b.as === 'prop' && def.type === 'BOOLEAN' && invertsValue(p.name, b.code, { codeConnectProps: api?.codeConnectProps, authored: authored?.bindings?.[p.name] });
-      if (b.as === 'prop') used.add(norm(b.code));
+      // An object prop a key is filled in stays among the code's own props, with its facts, set by the keys' properties.
+      if (b.as === 'prop' && !b.key) used.add(norm(b.code));
       out.bindings.code = {
         ...(out.bindings.code && typeof out.bindings.code === 'object' ? out.bindings.code : {}),
-        [b.as === 'prop' ? 'prop' : 'slot']: b.code, as: b.as, source: b.source,
+        [b.as === 'prop' ? 'prop' : 'slot']: b.code, ...(b.key ? { key: b.key } : {}), as: b.as, source: b.source,
         ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}),
         ...(typeof c.required === 'boolean' ? { required: c.required } : {}), ...(c.description ? { description: c.description } : {}),
         ...(c.confidence ? { confidence: c.confidence } : {}), ...(ccValues.get(p.name) ? { valueMap: ccValues.get(p.name) } : {}),
@@ -63,7 +65,8 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
       const fd = out.bindings.figma.default, cd = c.default;
       const map = ccValues.get(p.name) ?? {};
       const asCode = (v) => (inverted ? flipBoolean(v) : map[v] != null ? map[v] : v);
-      if (fd != null && fd !== '' && cd != null && !same(asCode(fd), cd)) differences.push({ kind: 'default', figma: fd, code: cd });
+      const comparable = def.type !== 'BOOLEAN' || /^(true|false)$/i.test(String(cd));   // a Figma true/false against tone="calm": not compared
+      if (comparable && fd != null && fd !== '' && cd != null && !same(asCode(fd), cd)) differences.push({ kind: 'default', figma: fd, code: cd });
       if (Array.isArray(def.variantOptions) && Array.isArray(c.options) && !def.variantOptions.every((o) => o === 'true' || o === 'false')) {
         const f = def.variantOptions.map(asCode), co = c.options;
         const onlyInFigma = f.filter((o) => !co.some((x) => same(x, o))), onlyInCode = co.filter((o) => !f.some((x) => same(x, o)));
@@ -75,17 +78,24 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
     // What the Code Connect file says it decides beyond a value: the attributes written only when it is on (or off).
     const conditions = readingsOf(p.name, api?.codeConnectProps);
     if (conditions.length) out.conditions = conditions;
+    // The other attributes it fills with the same value (helper words written as warning in one state and
+    // note in another).
+    const bound = b ? (b.key ? `${b.code}.${b.key}` : b.code) : null;
+    const also = valuesOf(p.name, api?.codeConnectProps).filter((x) => x !== bound);
+    if (also.length) out.alsoWrites = also;
     return out;
   });
   // A Figma property no code prop is: a near name is suggested, never taken.
   const unusedNames = Object.keys(codeProps).filter((n) => !used.has(norm(n)));
   for (const p of props) if (!p.bindings.code && !p.conditions && api) { const s = suggestionFor(p.name, unusedNames); if (s) p.suggestion = s; }
-  // A prop that decides an attribute (its condition) has a home even with no value of its own.
-  for (const p of props) for (const c of p.conditions ?? []) used.add(norm(c.code));
-  const PLUMBING = /^(on[A-Z]\w*|children|className|class|style|ref|key|id|aria-[\w-]+|data-[\w-]+)$/;
-  const codeOnly = Object.entries(codeProps).filter(([n]) => !used.has(norm(n)) && !PLUMBING.test(n)).map(([n, c]) => ({
+  // A code prop no Figma property fills, with the Figma properties that only decide whether it is written (showIcon
+  // decides icon). Every declared prop is listed: id and the like are part of what the component accepts.
+  const decided = new Map();
+  for (const p of props) for (const code of [...(p.conditions ?? []).map((x) => x.code), ...(p.alsoWrites ?? []), ...(p.bindings.code?.key ? [p.bindings.code.prop] : [])]) { const k = norm(code.split('.')[0]); decided.set(k, [...new Set([...(decided.get(k) ?? []), p.name])]); }
+  const codeOnly = Object.entries(codeProps).filter(([n]) => !used.has(norm(n))).map(([n, c]) => ({
     name: n, ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}),
     ...(typeof c.required === 'boolean' ? { required: c.required } : {}), ...(c.description ? { description: c.description } : {}), ...(c.confidence ? { confidence: c.confidence } : {}),
+    ...(decided.get(norm(n)) ? { setBy: decided.get(norm(n)) } : {}),
   }));
   const events = (api?.events ?? []).map((e) => (typeof e === 'string' ? { name: e } : e));
   return { props, codeOnly, events };

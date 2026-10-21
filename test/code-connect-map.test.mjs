@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseConnectFile, codeConnectFor } from '../code-connect-map.mjs';
 
-test('the template form: each variable by the attribute it fills, a switch by the part it gives, a prop built from several by none', () => {
+test('the template form: each variable by the attribute it fills, a switch by the part it gives, a key of an object prop by its list', () => {
   const text = `// url=https://www.figma.com/file/AbC/buttonPrimary?node-id=3621-53438
 // component=button-primary
 import figma from 'figma'
@@ -26,7 +26,8 @@ export default {
 }`;
   const [m] = parseConnectFile(text, 'Primary.figma.js');
   assert.equal(m.nodeId, '3621:53438'); assert.equal(m.slug, 'buttonPrimary'); assert.equal(m.tag, 'button-primary');
-  assert.deepEqual(m.props.map((p) => `${p.figma}→${p.code}`), ['size→buttonSize', 'disabled→disabled', 'showLabel→label', 'labelContent→label', 'filled→null']);
+  assert.deepEqual(m.props.map((p) => `${p.figma}→${p.code}`), ['size→buttonSize', 'disabled→disabled', 'showLabel→label', 'labelContent→label', 'filled→params.x']);
+  assert.equal(m.props[4].role, 'condition', 'a key a list joined into :params writes only when filled is on');
   assert.deepEqual(m.props[0].values, { s: 's', m: 'm', l: 'l' });
   assert.equal(codeConnectFor([m], 'other', '3621-53438'), m, 'joined by node id');
   assert.equal(codeConnectFor([m], 'buttonPrimary', null), m, 'else by the name its link carries');
@@ -88,4 +89,35 @@ test('a template file that reads no property still connects its component', () =
 import figma from 'figma'
 export default { example: figma.html\`<tile-two :rows="rows" @clicked="go" />\` }`, 'Two.figma.js');
   assert.equal(m.nodeId, '3:4'); assert.equal(m.tag, 'tile-two'); assert.deepEqual(m.props, []);
+});
+
+test('a list joined into an object prop: each key by its own conditions; a fixed true or false is the property\'s own value', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=1204-30551
+import figma from 'figma'
+const showCaption = figma.selectedInstance.getBoolean('showCaption')
+const caption = figma.selectedInstance.getString('captionWords')
+const pinned = figma.selectedInstance.getBoolean('pinned')
+const framed = figma.selectedInstance.getBoolean('framed')
+const helper = figma.selectedInstance.getString('helperWords')
+const tone = figma.selectedInstance.getEnum('tone', { calm: 'calm', loud: 'loud' })
+const opts = [
+  showCaption && caption ? \`caption: '\${caption}'\` : '',
+  pinned ? 'pinned: true' : '',
+].filter(Boolean).join(', ')
+export default {
+  example: figma.html\`
+<tile-one
+  :opts="{ \${opts} }"
+  \${!framed ? ':framed="false"' : ''}
+  \${tone === 'loud' && helper ? \`warning="\${helper}"\` : ''}
+  \${tone === 'calm' && helper ? \`note="\${helper}"\` : ''}
+/>\`,
+}`;
+  const [m] = parseConnectFile(text, 'Tile.figma.js');
+  assert.equal(m.nodeId, '1204:30551', 'a node id whose second part starts with 3 is read whole');
+  const say = (p) => `${p.figma}→${p.code}:${p.role}${p.negated ? '!' : ''}`;
+  const read = m.props.map(say);
+  for (const x of ['captionWords→opts.caption:value', 'showCaption→opts.caption:condition', 'pinned→opts.pinned:value', 'framed→framed:value', 'helperWords→warning:value', 'helperWords→note:value'])
+    assert.ok(read.includes(x), `${x} in ${read.join(', ')}`);
+  assert.ok(!read.includes('pinned→opts.caption:condition'), 'one item\'s condition never reaches another item');
 });

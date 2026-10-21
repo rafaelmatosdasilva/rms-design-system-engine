@@ -805,7 +805,8 @@ Each published contract carries, beside the Figma half: `bindings.code` per prop
 decided the pairing: `authored`, `alias`, `codeConnect` or `name`; its type, options, default, required, description;
 the Code Connect `valueMap`; `inverted` when the code holds the opposite of the Figma value, as `showClose` and
 `hideClose`), `conditions` (the attributes a property only decides are written, from the Code Connect template),
-`differences` (default, options, name), `codeOnly`, `events` with payloads, `slots` with their props, `states`
+`differences` (default, options, name), `codeOnly`, `events` with payloads, `codeSlots` (the code's slots, with the props
+each hands its content; `slots` stays Figma's instance swaps and what each accepts), `states`
 (Figma's state axis and the code's pseudo-classes), `tokens` per state, and `accessibility` (element, role, ARIA,
 keyboard, each with where it was read). The props gate (Gate 14) pairs Figma and the code the same way
 (`prop-binding.mjs`), so the two never disagree.

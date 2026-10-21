@@ -301,7 +301,9 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     const figDefault = def?.defaultValue != null ? (inverted ? flipBoolean(def.defaultValue) : asCode(def.defaultValue)) : def?.defaultValue;
     const codeDefault = codeDefaults.get(cn);
     // A wrong default and a variant the code names differently are two findings: both are listed.
-    const defaultDiffers = figDefault != null && figDefault !== '' && codeDefault != null && !sameValue(figDefault, codeDefault);
+    // A Figma true/false against a code default that is not one (tone="calm") is not compared: the BOOLEAN note below says so.
+    const notBoolean = def?.type === 'BOOLEAN' && codeDefault != null && !/^(true|false)$/i.test(String(codeDefault));
+    const defaultDiffers = !notBoolean && figDefault != null && figDefault !== '' && codeDefault != null && !sameValue(figDefault, codeDefault);
     if (defaultDiffers)
       VALUE_FAIL.push(inverted
         ? `${figmaName}/${fp}: default differs - Figma "${def.defaultValue}" (written ${codeName}=${figDefault}) vs code "${codeName}=${codeDefault}"  (${rel})`
@@ -352,6 +354,8 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     // a match.
     if (b) {
       matchedCode.add(norm(b.code));
+      // A key of an object prop (:opts="{ caption: … }"): the object has no default or options of that key to compare.
+      if (b.key) { OK.push(`${figmaName}/${fp} → ${b.code}.${b.key} (Code Connect)`); pushRow(`${b.code}.${b.key}`, '(a key of its object)', 'match'); continue; }
       const v = checkValues(fp, def, b.code);
       if (b.source === 'name' && !b.exactName) { NAME_FAIL.push(`${figmaName}/${fp}: the code names it "${b.code}" (${nameDiff(fp, b.code)})  (${rel})`); pushRow(b.code, v.codeValue, 'name'); continue; }
       OK.push(b.source === 'name' ? `${figmaName}/${fp}` : `${figmaName}/${fp} → ${b.code} (alias)`); pushRow(b.code, v.codeValue, v.status); continue;
@@ -361,7 +365,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     const decides = readingsOf(fp, ccProps);
     if (decides.length) {
       const say = decides.map((d) => `${d.code}${d.negated ? ' when off' : d.equals != null ? ` when ${d.equals}` : ''}`).join(', ');
-      for (const d of decides) matchedCode.add(norm(d.code));
+      for (const d of decides) matchedCode.add(norm(d.code.split('.')[0]));
       OK.push(`${figmaName}/${fp} → decides ${say} (Code Connect)`); pushRow(`(decides ${say})`, 'condition', 'match'); continue;
     }
     missingHere.push(fp);   // row added after rename-pairing below

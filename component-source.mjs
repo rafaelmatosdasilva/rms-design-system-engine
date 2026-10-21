@@ -136,8 +136,26 @@ export function resolveComponentFile(name, { ROOT, cfg = {}, files, read, classF
 // ── Props (text patterns) ─────────────────────────────────────────────────────
 // Union of everything found; over-collecting a few names is fine (only unmatched Figma
 // properties fail, and extra code props are advisory).
+// The text with its comments blanked and the brackets and commas inside its strings blanked, every character kept in
+// place: a comment before a key (/* why */ name: String) or a '}' in a default no longer hides a key or ends an object.
+export function maskCode(text) {
+  const t = String(text), out = t.split('');
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i], nx = t[i + 1];
+    if (ch === '/' && nx === '*') { const end = t.indexOf('*/', i + 2); const stop = end < 0 ? t.length : end + 2; for (let j = i; j < stop; j++) if (t[j] !== '\n') out[j] = ' '; i = stop - 1; }
+    else if (ch === '/' && nx === '/' && t[i - 1] !== ':') { let j = i; for (; j < t.length && t[j] !== '\n'; j++) out[j] = ' '; i = j - 1; }
+    else if (ch === '"' || ch === "'" || ch === '`') {
+      let j = i + 1;
+      for (; j < t.length && t[j] !== ch; j++) { if (t[j] === '\\') { j++; continue; } if (ch !== '`' && t[j] === '\n') break; if ('{}[](),'.includes(t[j])) out[j] = ' '; }
+      i = j;
+    }
+  }
+  return out.join('');
+}
+
 // The keys of the object literal whose { is at `open`, at its own level only (nested objects skipped).
 export function topKeys(text, open) {
+  text = maskCode(text);
   const keys = [];
   let depth = 0, start = open + 1;
   for (let i = open; i < text.length; i++) {
@@ -265,11 +283,21 @@ export function extractSlots(text) {
   const byKey = new Map();
   const named = { add: (n) => { if (!byKey.has(norm(n))) byKey.set(norm(n), n); } };
   let hasDefault = false;
-  for (const m of text.matchAll(/<slot\b[^>]*\bname\s*=\s*['"`]([\w-]+)['"`]/g)) named.add(m[1]);  // Vue named
-  if (/<slot(\s|\/|>)/.test(text) && !/<slot\b[^>]*\bname\s*=/.test(text)) hasDefault = true;            // Vue default
+  // Vue: each <slot> tag is named (name="x"), named by an expression (:name="`row-${id}`", kept as written), or the
+  // default one; a file can have both.
+  for (const m of text.matchAll(/<slot\b([^>]*)>/g)) {
+    const attrs = m[1];
+    const fixed = /(?:^|\s)name\s*=\s*(['"])([^'"]+)\1/.exec(attrs);
+    const bound = /(?:^|\s)(?::|v-bind:)name\s*=\s*"([^"]+)"/.exec(attrs);
+    if (fixed) named.add(fixed[2]);
+    else if (bound) named.add(bound[1].trim().replace(/^[`']|[`']$/g, ''));
+    else hasDefault = true;
+  }
   for (const m of text.matchAll(/defineSlots\s*<\s*\{([\s\S]*?)\}/g))
     for (const p of m[1].matchAll(/([A-Za-z_$][\w$]*)\s*[?:]/g)) named.add(p[1]);                        // Vue defineSlots
-  if (/\bchildren\b/.test(text)) hasDefault = true;                                                      // React children
+  // React children: children read on its own or as props.children, never the word in a Vue file or as a member of
+  // data (item.children).
+  if (!/<template[\s>]/.test(text) && /(?<![.\w$])children\b|\bprops\.children\b/.test(text)) hasDefault = true;
   for (const m of text.matchAll(/([A-Za-z_$][\w$]*)\s*\??\s*:\s*React\.?ReactNode/g)) named.add(m[1]);     // React ReactNode props as slots
   return { named: new Set(byKey.values()), hasDefault };
 }
