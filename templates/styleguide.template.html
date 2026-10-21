@@ -1301,9 +1301,14 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens text { font-size: var(--sg-space-l); }
 .sg-bk-lens .sg-bk-lens-icon { color: var(--sg-text); }
 .sg-bk-lens .sg-bk-lens-num { fill: var(--bk-mark, var(--sg-accent)); font-size: calc(var(--sg-space-l) * 1.85); }
-.sg-bk-lens .sg-bk-lens-title { fill: var(--sg-text); font-size: calc(var(--sg-space-l) * 2.2); }
-.sg-bk-lens .sg-bk-lens-note { fill: var(--sg-muted); font-size: calc(var(--sg-space-l) * 1.7); }
-.sg-bk-lens .sg-bk-lens-sub { fill: var(--sg-muted); }
+/* The drawing as large as the tile holds it (five rows, less the padding) at its own proportions, so the words laid over it
+   stay under their lenses; the words in the page's sizes. */
+.sg-bk-lens-wrap { position: relative; width: min(100%, calc((var(--sg-space-xxl) * 15 + var(--sg-card-gap) * 4 - var(--sg-space-l) * 3) * 1688 / 720)); aspect-ratio: 1688 / 720; margin: auto; }
+.sg-bk-lens-wrap > .sg-bk-lens { position: absolute; inset: 0; }
+.sg-bk-lens-cap { position: absolute; width: 18%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--sg-space-xxs); text-align: center; }
+.sg-bk-lens-cap b { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--bk-mark, var(--sg-accent)); }
+.sg-bk-lens-cap span { font-size: var(--sg-s); color: var(--sg-muted); }
+.sg-bk-lens-foot { font-size: var(--sg-s); color: var(--sg-muted); }
 .sg-bk-keyline-t { --bk-grid: color-mix(in srgb, var(--sg-line-colour) 18%, transparent); background-image: repeating-linear-gradient(to right, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))), repeating-linear-gradient(to bottom, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))); background-position: center; }   /* the grid fills the whole card, in the brand's line thickness */
 .sg-bk-pie { width: 100%; transform: rotate(-90deg); }
 .sg-bk-pie circle { fill: none; stroke-width: 34; animation: sg-bk-pie-in 1.2s ease-out both; }
@@ -3388,7 +3393,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
       // In the order they sit on the icon, top to bottom: the corner, the open gap, the end.
       var lenses = [an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }, an.gap && { p: an.gap.at, kind: 'gap' }, an.end && { p: an.end.at, kind: 'end', round: an.end.round }].filter(Boolean);
-      var R = 55, LR = 140, out = '';
+      var R = 55, LR = 140, out = '', caps = '', VW = 1688, VH = 720;
       // The icon, large, on its pixel grid inside its own box.
       out += gridLines(40, 40, 40 + bx[2] * big, 40 + bx[3] * big, big, 'sg-bk-lens-grid') + '<rect x="40" y="40" width="' + (bx[2] * big) + '" height="' + (bx[3] * big) + '" class="sg-bk-lens-box"/>' + icon(40, 40, big);
       lenses.forEach(function (l) { var c = at(l.p); out += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + R + '" class="sg-bk-lens-ring"/>'; });
@@ -3426,14 +3431,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var sub = l.kind === 'end' ? (l.round ? 'the line ends, in a soft round tip' : 'the line ends, cut square')
           : l.kind === 'gap' ? 'the line breaks, then starts again'
           : (l.round ? 'turns in a curve, no sharp points' : 'turns to a point, no curve');
-        // Its name and what it shows under it, a line each side of the comma.
-        var lines = sub.split(', ').map(function (t, k, all) { return t + (k < all.length - 1 ? ',' : ''); });
-        out += '<text x="' + cx + '" y="' + (cy + LR + 84) + '" text-anchor="middle" class="sg-bk-lens-title">' + esc(title) + '</text>' +
-          lines.map(function (t, k) { return '<text x="' + cx + '" y="' + (cy + LR + 148 + k * 52) + '" text-anchor="middle" class="sg-bk-lens-note">' + esc(t) + '</text>'; }).join('');
+        // Its name and what it shows under it, in the page's own text sizes (laid over the drawing, not scaled with it).
+        caps += '<div class="sg-bk-lens-cap" style="left:' + (cx / VW * 100) + '%;top:' + ((cy + LR + 28) / VH * 100) + '%"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>';
       });
       var set = an.set, same = (set.sameW === set.read ? 'one stroke on all ' + set.read + ' icons' : 'one stroke on ' + set.sameW + ' of ' + set.read + ' icons') + (an.src === 'figma' ? ', as Figma draws it' : an.src === 'code' ? ', as its code draws it' : ', read on their drawing');
-      return '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 1688 760" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out +
-        '<text x="40" y="' + (84 + bx[3] * big) + '" class="sg-bk-lens-sub">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  ' + esc(same) + '</text></svg>';
+      return '<div class="sg-bk-lens-wrap"><svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 ' + VW + ' ' + VH + '" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out + '</svg>' + caps + '</div>' +
+        '<span class="sg-bk-lens-foot">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  ' + esc(same) + '</span>';
     }
     var anatomyCache = {};
     function iconAnatomy(ids) {
