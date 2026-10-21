@@ -1301,6 +1301,8 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens .sg-bk-lens-ground { fill: var(--bk-card); }
 .sg-bk-lens .sg-bk-lens-mark { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
 .sg-bk-lens .sg-bk-lens-dot { fill: var(--bk-mark, var(--sg-accent)); }
+.sg-bk-lens .sg-bk-lens-build { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sg-bk-lens .sg-bk-lens-end { fill: var(--bk-card); stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
 .sg-bk-lens .sg-bk-lens-measure { stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
 .sg-bk-lens text { font-size: var(--sg-space-l); }
 .sg-bk-lens .sg-bk-lens-icon { color: var(--sg-text); }
@@ -3086,11 +3088,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ex = !!(a.pieces || {}).example;
     if (c.agentRating) rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
       'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
-    // Its properties: done, in its contract (written from Figma and the code on every run), the file named so an agent
-    // and a person know where to read them.
+    // Its properties, in its contract. The one everybody reads is in the intent layer: done while it still lists what the
+    // code and Figma have, a task to publish again when it does not. Only the engine's local one: a task to publish it.
     var k = c.contract;
-    if (k && (k.props || []).length) rows.push(Object.assign(mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract, <code>' + esc(k.file) + '</code>, which the engine writes from Figma and the code on every run: ' +
-      k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ') + '. Agents read them there; nothing to write.</p>', 'done', ''), { src: ['Its contract (' + k.file + ')'] }));
+    if (k && (k.props || []).length) {
+      var where = k.href ? '<a href="' + esc(k.href) + '" target="_blank" rel="noopener"><code>' + esc(k.file) + '</code></a>' : '<code>' + esc(k.file) + '</code>';
+      var listed = k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ');
+      var publish = 'Publish the contracts again from the code project (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request.';
+      var row = !k.shared
+        ? mk('props', 'Properties', '<p class="pg-missing">Its properties are only in the engine\'s local contract, ' + where + ', which nobody else reads.</p>', 'todo', 'Publish the contracts to the intent layer (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request, so everybody reads the same one.')
+        : (k.drift || []).length
+          ? mk('props', 'Properties', '<p class="pg-missing">Its contract in the intent layer, ' + where + ', is out of date: ' + k.drift.map(esc).join('; ') + '.</p>', 'todo', publish)
+          : mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract in the intent layer, ' + where + ', which the engine generates from Figma and the code: ' + listed + '. Agents read them there; nothing to write.</p>', 'done', '');
+      rows.push(Object.assign(row, { src: ['Its contract (' + k.file + ')'] }));
+    }
     if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
       'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
     return rows;
@@ -3402,6 +3413,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // The icon, large, on its pixel grid inside its own box.
       // Its frame is drawn by the page (lensFrame below), in the brand's own corner radius.
       out += icon(frameX, frameY, big);
+      // The construction line over it: the line each stroke is drawn on, a ring at each end, a dot at each turn.
+      if (an.build) {
+        // Drawn through its points as a smooth curve (Catmull-Rom), so a rounded turn reads round and a straight stays straight.
+        var curve = function (ps) {
+          var c = ps.map(at), d = 'M' + c[0][0].toFixed(1) + ' ' + c[0][1].toFixed(1);
+          for (var k = 0; k < c.length - 1; k++) {
+            var p0 = c[k - 1] || c[k], p1 = c[k], p2 = c[k + 1], p3 = c[k + 2] || p2;
+            d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ' ' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) + ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ' ' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) + ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+          }
+          return d;
+        };
+        out += '<g class="sg-bk-lens-build">' + an.build.paths.map(function (ps) { return '<path d="' + curve(ps) + '"/>'; }).join('') + '</g>' +
+          an.build.ends.map(function (p) { var c = at(p); return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + (an.w * big * 0.3) + '" class="sg-bk-lens-end"/>'; }).join('') +
+          an.build.turns.map(function (p) { var c = at(p); return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + (an.w * big * 0.22) + '" class="sg-bk-lens-dot"/>'; }).join('');
+      }
       lenses.forEach(function (l) { var c = at(l.p); out += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + R + '" class="sg-bk-lens-ring"/>'; });
       // Each lens, large, side by side beside the icon: the icon drawn so the point sits in the middle, clipped to the
       // circle, its name and what it shows under it. The gap's lens is drawn at the scale that holds both its ends.
@@ -3677,7 +3703,99 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           far0 = dmin; thick = { at: toU(m3.x, m3.y), e1: toU(m3.x - u3[1] * m3.w / 2, m3.y + u3[0] * m3.w / 2), e2: toU(m3.x + u3[1] * m3.w / 2, m3.y - u3[0] * m3.w / 2), dir: u3, wid: m3.w / S };
         }
         var corner = cq ? { at: turn ? turn.at : pt(cq.q), r: turn ? turn.r : 0, o: turn && turn.o, ta: turn && turn.ta, tb: turn && turn.tb, round: joinIs ? joinIs === 'round' : round(cq.q) } : null;
-        return { id: id, w: w, src: src, box: vb, end: end, corner: corner, thick: thick, gap: gap ? { at: gap.mid, a: gap.ta, b: gap.tb, gap: gap.gap } : null };
+        // The construction line: the thinned line traced into paths (a staircase pixel the thinning leaves is skipped),
+        // a spur shorter than the stroke dropped, each end carried on to its cap's centre, and simplified to its corners
+        // (Ramer-Douglas-Peucker, a twentieth of a unit). Its turns: one per corner, at its sharpest.
+        // Only where the line sits a half stroke inside the shape (its exact distance to the outside, Felzenszwalb's
+        // transform): the spurs thinning leaves toward a corner's outer point fall away.
+        var INF = 1e9, dt = new Float64Array(W * H);
+        for (var qd = 0; qd < W * H; qd++) dt[qd] = on[qd] ? INF : 0;
+        var pass1 = function (f, n) {
+          var d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1), k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+          for (var q = 1; q < n; q++) { var sx; do { var r = v[k]; sx = ((f[q] + q * q) - (f[r] + r * r)) / (2 * q - 2 * r); if (sx <= z[k]) k--; else break; } while (k >= 0); k++; v[k] = q; z[k] = sx; z[k + 1] = INF; }
+          k = 0; for (var q2 = 0; q2 < n; q2++) { while (z[k + 1] < q2) k++; d[q2] = (q2 - v[k]) * (q2 - v[k]) + f[v[k]]; }
+          return d;
+        };
+        for (var yy2 = 0; yy2 < H; yy2++) { var row = pass1(dt.subarray(yy2 * W, yy2 * W + W), W); for (var xx2 = 0; xx2 < W; xx2++) dt[yy2 * W + xx2] = row[xx2]; }
+        for (var xx3 = 0; xx3 < W; xx3++) { var colv = new Float64Array(H); for (var yy3 = 0; yy3 < H; yy3++) colv[yy3] = dt[yy3 * W + xx3]; var cd = pass1(colv, H); for (var yy4 = 0; yy4 < H; yy4++) dt[yy4 * W + xx3] = cd[yy4]; }
+        var deep2 = Math.pow(best * 0.42, 2), line = sk.slice();
+        for (var qp = 0; qp < W * H; qp++) if (line[qp] && dt[qp] < deep2) line[qp] = 0;
+        // One pixel wide everywhere: a pixel whose neighbours stay joined without it is dropped (a step, a two-pixel clump
+        // on a slant), an end and a fork kept.
+        for (var pass2 = 0, gone = 1; gone && pass2 < 8; pass2++) {
+          gone = 0;
+          for (var qs = 0; qs < W * H; qs++) {
+            if (!line[qs]) continue;
+            var xs = qs % W, ys = (qs - xs) / W, ring = [];
+            for (var dy4 = -1; dy4 <= 1; dy4++) for (var dx4 = -1; dx4 <= 1; dx4++) { if (!dx4 && !dy4) continue; var rx4 = xs + dx4, ry4 = ys + dy4; if (rx4 >= 0 && ry4 >= 0 && rx4 < W && ry4 < H && line[ry4 * W + rx4]) ring.push([dx4, dy4]); }
+            if (ring.length < 2) continue;
+            var seen4 = [ring[0]], stack4 = [ring[0]];
+            while (stack4.length) { var c4 = stack4.pop(); ring.forEach(function (o) { if (seen4.indexOf(o) < 0 && Math.abs(o[0] - c4[0]) <= 1 && Math.abs(o[1] - c4[1]) <= 1) { seen4.push(o); stack4.push(o); } }); }
+            if (seen4.length === ring.length) { line[qs] = 0; gone = 1; }
+          }
+        }
+        var lnb = function (q) { var x = q % W, y = (q - x) / W, o = []; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; var X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < W && Y < H && line[Y * W + X]) o.push(Y * W + X); } return o; };
+        var done = {}, runs = [];
+        for (var qn = 0; qn < W * H; qn++) {
+          if (!line[qn] || lnb(qn).length === 2) continue;
+          lnb(qn).forEach(function (m) {
+            if (done[qn + '>' + m]) return;
+            var path = [qn, m], prev = qn, cur = m;
+            while (lnb(cur).length === 2 && path.length < W * H) { var nx = lnb(cur).filter(function (o) { return o !== prev; })[0]; if (nx == null || nx === qn) break; path.push(nx); prev = cur; cur = nx; }
+            done[qn + '>' + m] = done[cur + '>' + prev] = 1;
+            runs.push(path);
+          });
+        }
+        var tipOf = {}; tips.forEach(function (t) { tipOf[t.q] = t; });
+        var simplify = function (pts, eps) {
+          if (pts.length < 3) return pts;
+          var a = pts[0], b = pts[pts.length - 1], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1e-9, far = 0, at = 0;
+          for (var k = 1; k < pts.length - 1; k++) { var dd = Math.abs((pts[k][0] - a[0]) * dy - (pts[k][1] - a[1]) * dx) / L; if (dd > far) { far = dd; at = k; } }
+          return far > eps ? simplify(pts.slice(0, at + 1), eps).slice(0, -1).concat(simplify(pts.slice(at), eps)) : [a, b];
+        };
+        // A spur (one free end, shorter than the stroke) is the thinning's, not the drawing's; a short stroke on its own is kept.
+        var freeEnd = function (q) { return lnb(q).length === 1; }, endsAt = [];
+        var stretch = function (r, k) { var q = r[k === 0 ? 0 : r.length - 1], deep = r[k === 0 ? Math.min(r.length - 1, Math.round(best)) : Math.max(0, r.length - 1 - Math.round(best))]; return tipOf[q] ? tipOf[q].at : endAt({ q: q, toward: deep }).at; };
+        // Smoothed (the thinning steps a pixel at a time), then simplified.
+        var smooth = function (pts) { return pts.map(function (p, k) { if (k < 2 || k > pts.length - 3) return p; var sx = 0, sy = 0; for (var j = -2; j <= 2; j++) { sx += pts[k + j][0]; sy += pts[k + j][1]; } return [sx / 5, sy / 5]; }); };
+        var kept = runs.filter(function (r) {
+          var fa = freeEnd(r[0]) && !tipOf[r[0]], fb = freeEnd(r[r.length - 1]) && !tipOf[r[r.length - 1]];
+          return !((fa !== fb) && r.length < best);   // a piece between two forks stays, however short
+        });
+        var build = kept.map(function (r) {
+          var pts = r.length > 4 ? smooth(r.map(pt)) : r.map(pt);
+          if (freeEnd(r[0])) { var e0 = stretch(r, 0); pts.unshift(e0); endsAt.push(e0); }
+          if (freeEnd(r[r.length - 1])) { var e1 = stretch(r, 1); pts.push(e1); endsAt.push(e1); }
+          return simplify(pts, 0.08);
+        });
+        // Where two strokes alone meet at a point (an arrow's tip), they join where their straight lines cross.
+        var meet = {}, joins = [];
+        kept.forEach(function (r, k) { [[r[0], 0], [r[r.length - 1], 1]].forEach(function (e) { if (!freeEnd(e[0])) (meet[e[0]] = meet[e[0]] || []).push([k, e[1]]); }); });
+        Object.keys(meet).forEach(function (n) {
+          var m = meet[n]; if (m.length !== 2) return;
+          // Each arm's line read from a stretch away from the meeting (near it, thinning bends the line).
+          var seg = function (e) {
+            var r = kept[e[0]], k1 = Math.round(best * 1.5), k2 = Math.round(best * 3); if (r.length <= k2) { k1 = Math.floor(r.length / 3); k2 = r.length - 1; }
+            var a = pt(e[1] ? r[r.length - 1 - k1] : r[k1]), b = pt(e[1] ? r[r.length - 1 - k2] : r[k2]); return k2 > k1 ? [a, unit(a[0] - b[0], a[1] - b[1])] : null;
+          };
+          var A = seg(m[0]), B = seg(m[1]); if (!A || !B) return;
+          var den = A[1][0] * B[1][1] - A[1][1] * B[1][0]; if (Math.abs(den) < 0.2) return;
+          var t = ((B[0][0] - A[0][0]) * B[1][1] - (B[0][1] - A[0][1]) * B[1][0]) / den, X = [A[0][0] + A[1][0] * t, A[0][1] + A[1][1] * t], N = pt(+n);
+          if (Math.hypot(X[0] - N[0], X[1] - N[1]) > w * 1.5) return;
+          // The bent part near the meeting goes; each arm runs straight to the crossing, which is a turn.
+          m.forEach(function (e) {
+            var ps = build[e[0]], keep = ps.filter(function (p) { return Math.hypot(p[0] - X[0], p[1] - X[1]) > w * 1.5; });
+            if (keep.length < 1) keep = [e[1] ? ps[0] : ps[ps.length - 1]];
+            build[e[0]] = e[1] ? keep.concat([X]) : [X].concat(keep);
+          });
+          joins.push(X);
+        });
+        // The turns: each corner once at its sharpest, and any point where the simplified line bends by more than 60 degrees.
+        var turnDots = [], addTurn = function (p) { if (!turnDots.some(function (o) { return Math.hypot(o[0] - p[0], o[1] - p[1]) < w * 2; })) turnDots.push(p); };
+        joins.forEach(addTurn);
+        corners.slice().sort(function (a, b) { return b.cos - a.cos; }).forEach(function (c) { addTurn(pt(c.q)); });
+        build.forEach(function (ps) { for (var k = 1; k < ps.length - 1; k++) { var u1 = unit(ps[k][0] - ps[k - 1][0], ps[k][1] - ps[k - 1][1]), u2 = unit(ps[k + 1][0] - ps[k][0], ps[k + 1][1] - ps[k][1]); if (u1[0] * u2[0] + u1[1] * u2[1] < 0.5) addTurn(ps[k]); } });
+        return { id: id, w: w, src: src, box: vb, end: end, corner: corner, thick: thick, build: { paths: build, ends: endsAt, turns: turnDots }, gap: gap ? { at: gap.mid, a: gap.ta, b: gap.tb, gap: gap.gap } : null };
       };
       var all = ids.slice(0, 24).map(function (id) { try { return read(id); } catch (e) { return null; } }).filter(Boolean);
       var out = null;
@@ -3687,7 +3805,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var pick = all.filter(function (a) { return a.end && a.corner && a.gap && a.w === wSet; })[0] || all.filter(function (a) { return a.end && a.corner && a.w === wSet; })[0] || all.filter(function (a) { return a.end || a.corner; })[0];
         if (pick) {
           var ends = all.filter(function (a) { return a.end; }), corners = all.filter(function (a) { return a.corner; });
-          out = { id: pick.id, w: pick.w, src: pick.src, box: pick.box, end: pick.end, corner: pick.corner, gap: pick.gap, thick: pick.thick,
+          out = { id: pick.id, w: pick.w, src: pick.src, box: pick.box, end: pick.end, corner: pick.corner, gap: pick.gap, thick: pick.thick, build: pick.build,
             set: { read: all.length, sameW: wCount[wSet], w: wSet, ends: ends.length, roundEnds: ends.filter(function (a) { return a.end.round; }).length, corners: corners.length, roundCorners: corners.filter(function (a) { return a.corner.round; }).length } };
         }
       }
