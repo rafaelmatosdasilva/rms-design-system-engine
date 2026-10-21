@@ -1697,7 +1697,9 @@ export function splitFindings(list = []) {
 // → [{ type: 'Prop'|'Token'|'Value', figma: { name, value } | null, code: { name, value } | null,
 //      status: 'match'|'differs'|'figma'|'code'|'paired', renamed?, defaultDiffers?: { figma, code }, at }], props first, then variables, then values. status figma:
 // only in Figma; code: only in code; paired: both sides have it, and the token check did not compare it (why says why). at: a value's time is since both sides agreed, or when it last moved.
-export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], codeProps = {}, allTokens = [], check = null, agreed = {}, propsAt = null, checkedAt = null, slotParts = [] } = {}) {
+// A compared value and where Figma's structure capture keeps the variable that sets it on the component's frame.
+const VALUE_VAR = { 'padding (left/right)': 'paddingVar.lr', 'padding (top/bottom)': 'paddingVar.tb', gap: 'gapVar', 'font size': 'fontSizeVar', 'font weight': 'fontWeightVar' };
+export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], codeProps = {}, allTokens = [], check = null, agreed = {}, propsAt = null, checkedAt = null, slotParts = [], structure = null, rootClass = null } = {}) {
   const lc = (x) => String(x ?? '').toLowerCase().replace(/[\s_-]+/g, '');
   const rows = [];
   // The code's props as the API reader gives them (a list, each with its name) or keyed by name.
@@ -1795,7 +1797,12 @@ export function parityRows({ name, propsSnap = {}, controls = [], unbuilt = [], 
   for (const [k, f] of Object.entries(agreed.seen ?? {}).filter(([k]) => k.startsWith(pre)).sort(([a], [b]) => a.localeCompare(b))) {
     const moves = f.moves ?? [];
     const at = f.same ? (agreed.facts?.[k]?.at ?? moves.at(-1)?.at ?? null) : (moves.at(-1)?.at ?? null);
-    rows.push({ type: 'Value', figma: { name: k.slice(pre.length), value: String(f.figma ?? '') }, code: { name: k.slice(pre.length), value: String(f.code ?? '') }, status: f.same ? 'match' : 'differs', at });
+    // Where it is: these values are the component's own, on its outer frame (its root element in the code); in Figma,
+    // the variable that sets it when the capture read one ("a fixed value" when it read none).
+    const prop = k.slice(pre.length), vk = VALUE_VAR[prop];
+    const fv = vk && structure ? vk.split('.').reduce((o, x) => (o == null ? o : o[x]), structure) : undefined;
+    const fWhere = 'Outer frame' + (fv === undefined ? '' : fv ? ` · ${fv}` : ' · a fixed value');
+    rows.push({ type: 'Value', figma: { name: prop, value: String(f.figma ?? ''), where: fWhere }, code: { name: prop, value: String(f.code ?? ''), where: rootClass ? `Root element · .${rootClass}` : 'Root element' }, status: f.same ? 'match' : 'differs', at });
   }
   return rows;
 }

@@ -928,7 +928,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-issues { table-layout: fixed; }
 /* Each kind's own columns: six for Parity and Accessibility, four for the rest. */
 .sg-issues th:nth-child(1) { width: 7%; }
-.sg-cols-7 th:nth-child(2) { width: 11%; } .sg-cols-7 th:nth-child(3) { width: 13%; } .sg-cols-7 th:nth-child(4) { width: 18%; } .sg-cols-7 th:nth-child(6) { width: 14%; } .sg-cols-7 th:nth-child(7) { width: 11%; }
+.sg-cols-7 th:nth-child(2) { width: 9%; } .sg-cols-7 th:nth-child(3) { width: 16%; } .sg-cols-7 th:nth-child(4) { width: 16%; } .sg-cols-7 th:nth-child(6) { width: 13%; } .sg-cols-7 th:nth-child(7) { width: 10%; }   /* Figma and the code side by side, as wide as each other */
 .sg-cols-6 th:nth-child(2) { width: 12%; } .sg-cols-6 th:nth-child(4) { width: 26%; } .sg-cols-6 th:nth-child(5) { width: 14%; } .sg-cols-6 th:nth-child(6) { width: 11%; }
 .sg-cols-5 th:nth-child(2) { width: 22%; } .sg-cols-5 th:nth-child(4) { width: 14%; } .sg-cols-5 th:nth-child(5) { width: 11%; }
 /* The widest column (what to do, what is written, what was found) takes the width the others leave; the row's arrow
@@ -6235,11 +6235,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var ISSUE_CELL = {
     no: function (r) { var n = isOpen(r) ? TODO_NO[r.key] : null; return '<td class="pg-par-type sg-todo-no" data-todo-key="' + esc(encodeURIComponent(r.key)) + '">' + (n || '') + '</td>'; },
     kind: function (r) { return '<td class="sg-todo-area">' + (r.kindHTML || esc(r.kind || '')) + '</td>'; },
-    figma: function (r) { return '<td>' + clip(r.figma) + '</td>'; },
+    // Figma and the code: the name and its value under it, to compare; a finding written out in full is the row panel's.
+    figma: function (r) { return '<td>' + clip(firstLine(r.figma)) + '</td>'; },
     // When it was last updated, in a column of its own: short, the full date and time on hover.
     updated: function (r) { return '<td class="pg-at-cell">' + (r.at ? '<span class="pg-at-date" title="' + esc(when(r.at)) + '">' + esc(whenShort(r.at)) + '</span>' : '') + '</td>'; },
     written: function (r) { return '<td class="pg-written">' + clip(r.written) + '</td>'; },
-    code: function (r) { return '<td>' + clip(r.code) + '</td>'; },
+    code: function (r) { return '<td>' + clip(firstLine(r.code)) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
     todo: function (r) { return '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (r.todo || '') + '</td>'; },
     // Where it was read, by name only (Figma, Intent layer, Code, Contract, Guidelines); the file and its path are in the
@@ -6272,6 +6273,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
   // opens in the side panel (openRowPanel).
+  function firstLine(html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.sg-panel-only'), function (n) { n.remove(); }); return d.innerHTML; }
   function clip(html) { html = html || ''; return /<(p|div|details|table|ul)\b/i.test(html) || html.replace(/<[^>]+>/g, '').length > 180 ? '<div class="sg-cell-clip">' + html + '</div>' : html; }
   var ROW_DETAIL = [];   // every row drawn, by its index: what its side panel shows
   function issueRowHTML(r, area) {
@@ -6436,7 +6438,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var x = di >= 0 ? diffs[di] : null; if (x) used[di] = 1;
       var ki = r.status !== 'differs' || x ? -1 : kept.findIndex(function (k, j) { return !keptUsed[j] && names(k, r); });
       var kx = ki >= 0 ? kept[ki] : null; if (kx) keptUsed[ki] = 1;
-      var row = { key: c.name + '\u0000' + (x ? x.what : 'p:' + r.type + ':' + name + ':' + i), area: 'Parity', kind: r.type, type: r.type, figma: side(r.figma), code: side(r.code, x ? whereOf(x) : ''), rel: PAR_REL[r.status] || r.status, at: r.at || (r.status !== 'match' ? at0 : null) };
+      var row = { key: c.name + '\u0000' + (x ? x.what : 'p:' + r.type + ':' + name + ':' + i), area: 'Parity', kind: r.type, type: r.type, figma: side(r.figma, r.figma && r.figma.where), code: side(r.code, (x && whereOf(x)) || (r.code && r.code.where) || ''), rel: PAR_REL[r.status] || r.status, at: r.at || (r.status !== 'match' ? at0 : null) };
       var nb = r.status === 'figma' && r.type === 'Prop' && notBuilt[String(name).toLowerCase()];
       if (x) { var d = diffRow(x); row.st = d.st; row.who = d.who; row.todo = d.todo; row.fresh = d.fresh; }
       else if (kx) { var kr = keptRow(kx); row.st = kr.st; row.who = kr.who; row.todo = kr.todo; row.rel = kr.rel; row.at = kr.at || row.at; }
@@ -6458,13 +6460,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     diffs.forEach(function (x, j) {
       if (used[j]) return;
       var d = diffRow(x);
-      out.push({ key: c.name + '\u0000' + x.what, area: 'Parity', kind: x.check || 'Difference', type: 'Other', figma: '', code: onWhat(c, x.plain || x.what), todo: d.todo, who: d.who, st: d.st, rel: PAR_REL.differs, fresh: d.fresh, at: at0 });
+      var sd = sidesOf(x.what), full = onWhat(c, x.plain || x.what);
+      out.push({ key: c.name + '\u0000' + x.what, area: 'Parity', kind: x.check || 'Difference', type: 'Other', figma: sd ? sd.figma : '', code: sd ? sd.code + '<span class="pg-par-val sg-panel-only">' + full + '</span>' : full, todo: d.todo, who: d.who, st: d.st, rel: PAR_REL.differs, fresh: d.fresh, at: at0 });
     });
     // A kept difference that is not one of the rows above: a row of its own, under the check that found it.
     kept.forEach(function (k, j) {
       if (keptUsed[j]) return;
       var kr = keptRow(k);
-      out.push({ key: c.name + '\u0000kept:' + k.what, area: 'Parity', kind: k.check || 'Difference', type: 'Other', figma: '', code: onWhat(c, k.plain || k.what), todo: kr.todo, who: kr.who, st: kr.st, rel: kr.rel, at: kr.at || at0 });
+      var ksd = sidesOf(k.what), kfull = onWhat(c, k.plain || k.what);
+      out.push({ key: c.name + '\u0000kept:' + k.what, area: 'Parity', kind: k.check || 'Difference', type: 'Other', figma: ksd ? ksd.figma : '', code: ksd ? ksd.code + '<span class="pg-par-val sg-panel-only">' + kfull + '</span>' : kfull, todo: kr.todo, who: kr.who, st: kr.st, rel: kr.rel, at: kr.at || at0 });
     });
     // A prop Figma has that the code does not build, when the table above has no row for it.
     (c.unbuilt || []).forEach(function (u) {
@@ -6722,6 +6726,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // (from the code capture and in a browser), what its code does, its role and what that role and Figma's notes ask.
   // { sc, label (as WCAG names it), st, html, from }
   // A text that does not name the component starts with it ("On badge, ...").
+  // A token's value checked against the code ("[color/Light] base/x/color → --base-x-color: CSS var not declared"): what
+  // Figma has (the token, its mode) and what the code has (not declared, else its variable), each in a few words.
+  function sidesOf(what) {
+    var m = /^\[([^\]\/]+)\/([^\]]+)\]\s+(\S+)\s+→\s+(--[\w-]+)(?::\s*(.+))?$/.exec(String(what || '').trim()); if (!m) return null;
+    var tok = m[3].replace(/^(advanced|base|semantic|primitives?|core|global)\//i, ''), mode = m[2] === '-' ? '' : m[2];
+    return { figma: '<code>' + esc(tok) + '</code>' + (mode ? '<span class="pg-par-val">' + esc(mode) + '</span>' : ''),
+      code: /not declared/i.test(m[5] || '') ? 'Not declared' : '<code>' + esc(m[4]) + '</code>' };
+  }
   function onWhat(c, text) {
     var t = String(text || '');
     return new RegExp('(^|[^\\w-])' + c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\w-]|$)', 'i').test(t) ? esc(t.replace(/^\w/, function (k) { return k.toUpperCase(); })) : 'On <b>' + esc(c.name) + '</b>, ' + esc(t.replace(/^[A-Z](?=[a-z]*[\s,])/, function (k) { return k.toLowerCase(); }));
