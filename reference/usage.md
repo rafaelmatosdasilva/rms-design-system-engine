@@ -1266,7 +1266,7 @@ scorecard's gate health).
 #### Accessibility check (advisory, from the render)
 
 A mechanical, agnostic accessibility pass (`a11y-check.mjs`) that reuses the Gate 22 CDP/headless-Chrome
-flow. It reports **WCAG AA contrast** per theme (computed `color` vs the background really painted behind the text: the layers at its centre in paint order, a sibling laid under it or a `::before` that covers its box included, not only its ancestors),
+flow. It reports **WCAG AA contrast** per theme (computed `color` vs the background really painted behind the text: the layers at its centre in paint order, a sibling laid under it or a `::before` or `::after` that covers its box included, not only its ancestors; in each declared colour mode and in each pair that can be on at once, such as dark with high contrast or a colour mode with another colour collection's modes),
 **accessible name + role** (interactive nodes from the accessibility tree — a component that never exposes
 aria), **visible focus** (a computed style change when focused **and** that change actually visible — the focus ring's colour has ≥ 3:1 contrast against its background, WCAG 1.4.11; a field whose frame shows its focus (`:focus-within` on the box around it, when it holds only that control) passes, its frame's ring measured the same way, as does a part beside it in that box (a radio's circle, a switch's track); a native checkbox or radio hidden under such a part is judged by it, a control that takes no focus (inside an inert thumbnail) is not judged, and a style that eases in or out is read where its transition ends), **state exposure** (an element whose state
 is shown only by a CSS class — `.selected` / `.checked` / `.disabled` / `.invalid` / … — with no matching
@@ -1443,6 +1443,15 @@ there, never a failure.
   `tab`, `link`…) that does nothing on Enter (and Space for buttons, checkboxes and switches). The click is
   caught before the element's own handler, so the check never navigates or submits.
 - **Arrow keys** — a radio group, tab list, menu or list box whose items do not move with the arrow keys.
+- **The keys of each pattern (ARIA Authoring Practices)** — where the component's own script runs (an app page, or a
+  style guide that inlines `systemScripts`): a tab list, menu or list box that moves with the arrows but not with Home
+  and End (`homeend`, 2.1.1); a combobox whose list does not open on Down or close on Escape with the focus kept in it
+  (`comboboxkeys`, 2.1.1). On a style guide the same run also presses Escape on a menu button and Tab in a modal, as
+  the audit does with real keys. Drawn as markup alone, nothing answers a key, so nothing is pressed.
+- **What a screen reader says** — each control's name, role and state, as NVDA and VoiceOver say them ("Bold,
+  button, pressed"), shown under 4.1.2 in the style guide. A name that says little fails 2.4.6 (`weakname`): a
+  placeholder word or a role ("icon", "button"), a file or an icon's name ("chevron-down"), the role said twice
+  ("Close button, button"). Two links with the same words going to different places fail 2.4.4 (`samename`).
 - **Dialogs and Escape** — an open dialog that does not close on Escape. Each control that opens a dialog, a
   menu or a list (`aria-haspopup`, or `aria-expanded` with `aria-controls`; up to 8 a page) is opened, Escape
   is pressed, and what it opened must close and give the focus back to that control. A link does not navigate
@@ -1626,8 +1635,10 @@ Example of one note: `Role: button. aria-label: Close dialog`.
 - **axe-core** is cached in `~/.cache/rms-design-system-engine` after the first download (or `a11y.axePath`
   points at a local copy), and is scoped to the checked components.
 
-**Not yet:** a component's contrast is measured in each mode the system declares (the system's text and background pairs
-are also checked in every combination of two switches, the `🎛` check, `modeCombinations` in config.md). The Figma side
+A component's text contrast is measured in each mode the system declares and in each pair of them that can be on at
+once (dark with high contrast); the style guide measures every combination of its colour switches, reading a sibling
+laid under the text and a `::before` or `::after` that covers a box. The system's text and background pairs are also
+checked in every combination of two switches (the `🎛` check, `modeCombinations` in config.md). The Figma side
 is read by `--figma-a11y` (contrast and target size on Figma's own screens) and its findings are pinned there by
 `--figma-edits`.
 

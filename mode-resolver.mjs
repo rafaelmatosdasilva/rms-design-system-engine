@@ -215,6 +215,42 @@ export function modeSwitchFor(mode) {
   return { unsupported: `unknown mode switch ${sel}` };
 }
 
+// Two colour modes on at once (dark with high contrast), where each switches something the other does not: two media
+// features of different names, two data attributes of different names, a media mode with a class or a data mode, and
+// each colour mode with each mode of another colour collection. Two classes are left apart: nothing says whether they
+// are one axis (light, dark) or two. → [{ name: 'Dark + High contrast', parts: [modeA, modeB] }]
+const BASE_MEDIA = { 'prefers-color-scheme': 'light', 'prefers-contrast': 'no-preference' };
+function axesOf(mode) {
+  const sel = mode.cssSelector ?? 'root';
+  if (sel.startsWith('class:')) return { kind: 'class', keys: [sel] };
+  if (sel.startsWith('data:')) return { kind: 'data', keys: ['data:' + sel.slice(5).split('=')[0].replace(/^data-/, '')] };
+  const sw = modeSwitchFor(mode);
+  if (sw.unsupported || sw.viewport) return null;
+  const keys = (sw.media ?? []).filter((f) => BASE_MEDIA[f.name] !== f.value).map((f) => f.name);
+  return keys.length ? { kind: 'media', keys } : null;
+}
+export function combinedModes(modes, collections = []) {
+  const out = [], seen = new Set();
+  const add = (a, b) => {
+    const x = axesOf(a), y = axesOf(b);
+    if (!x || !y || (x.kind === 'class' && y.kind === 'class') || x.keys.some((k) => y.keys.includes(k))) return;
+    const key = [a.snapshotKey ?? a.name, b.snapshotKey ?? b.name].sort().join('|');
+    if (seen.has(key)) return;
+    seen.add(key); out.push({ name: `${a.name} + ${b.name}`, parts: [a, b] });
+  };
+  modes.forEach((a, i) => modes.slice(i + 1).forEach((b) => add(a, b)));
+  for (const c of collections) for (const a of modes) for (const b of c.modes ?? []) add(a, b);
+  return out;
+}
+// One switch from several: the media features each sets, and each one's script, undone in reverse.
+export function mergeSwitches(sws) {
+  if (sws.some((s) => s.unsupported)) return { unsupported: sws.find((s) => s.unsupported).unsupported };
+  const media = { ...BASE_MEDIA };
+  for (const s of sws) for (const f of s.media ?? []) if (BASE_MEDIA[f.name] !== f.value || !(f.name in media)) media[f.name] = f.value;
+  const apply = sws.map((s) => s.apply).filter(Boolean), undo = sws.map((s) => s.undo).filter(Boolean).reverse();
+  return { media: Object.entries(media).map(([name, value]) => ({ name, value })), ...(apply.length ? { apply: apply.join('; ') } : {}), ...(undo.length ? { undo: undo.join('; ') } : {}) };
+}
+
 // The breakpoints Figma sets: its breakpoint collection (vars.breakpoints, { mode: { token: value } }), else a multi-mode
 // collection whose modes each give the viewport a width (a Sizing collection with Desktop and Phone, read into
 // modeVariants), as the same shape. Empty when the file sets no breakpoint.

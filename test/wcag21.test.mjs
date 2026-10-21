@@ -184,3 +184,89 @@ test('style guide: each Figma annotation says what it feeds, and one no check re
   assert.equal(of('Role: error').layer, 'Error');
   assert.match(of('Role: error').uses[0], /"Error" part \(errormessage\)/);
 });
+
+// The keys of the ARIA Authoring Practices, pressed as the component's own script hears them: a tab list that moves with
+// the arrows but not Home and End, a list box that does not move at all, a combobox that opens but does not close, a menu
+// button whose menu closes on Escape but leaves the focus elsewhere, a modal dialog that lets Tab out. The same, built
+// right, is left alone; with keys: false nothing is pressed.
+test('page: the keys of tab lists, list boxes, comboboxes, menu buttons and modal dialogs', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+  await inPage(async (ev) => {
+    const run = (keys) => ev(`(async () => {
+      const box = document.createElement('div');
+      box.innerHTML = '<div role="tablist" id="tabs"><button role="tab" aria-selected="true">One</button><button role="tab" aria-selected="false" tabindex="-1">Two</button><button role="tab" aria-selected="false" tabindex="-1">Three</button></div>'
+        + '<ul role="listbox" id="still" aria-label="Fruit"><li role="option" tabindex="0" aria-selected="true">Apple</li><li role="option" tabindex="-1">Pear</li></ul>'
+        + '<input role="combobox" id="combo" aria-expanded="false" aria-controls="combo-list" aria-label="City"><ul id="combo-list" role="listbox" hidden><li role="option">Lisbon</li></ul>'
+        + '<button type="button" id="opener" aria-haspopup="menu" aria-expanded="false">Actions</button><div role="menu" id="actions" hidden><button role="menuitem" tabindex="-1">Copy</button><button role="menuitem" tabindex="-1">Paste</button></div>'
+        + '<div role="dialog" aria-modal="true" aria-label="Edit" id="dlg" style="position:fixed;top:0;left:0"><button type="button">Save</button><button type="button">Cancel</button></div>';
+      document.body.appendChild(box);
+      const tabs = [...box.querySelectorAll('[role=tab]')];
+      box.querySelector('#tabs').addEventListener('keydown', (e) => { const i = tabs.indexOf(document.activeElement); if (e.key === 'ArrowRight') tabs[(i + 1) % tabs.length].focus(); });
+      const combo = box.querySelector('#combo'), list = box.querySelector('#combo-list');
+      combo.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { combo.setAttribute('aria-expanded', 'true'); list.hidden = false; } });
+      const opener = box.querySelector('#opener'), menu = box.querySelector('#actions');
+      opener.addEventListener('click', () => { const open = opener.getAttribute('aria-expanded') !== 'true'; opener.setAttribute('aria-expanded', String(open)); menu.hidden = !open; if (open) menu.querySelector('[role=menuitem]').focus(); });
+      menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { opener.setAttribute('aria-expanded', 'false'); menu.hidden = true; document.body.focus(); } });
+      const r = await window.__wcag21.interact(box, { wait: 50, triggers: 1, keys: ${keys} });
+      box.remove();
+      return r.findings.filter((f) => ['arrows', 'homeend', 'comboboxkeys', 'escape', 'focusreturn', 'modalescape'].includes(f.kind)).map((f) => f.kind + ': ' + f.desc);
+    })()`);
+    const bad = await run(true);
+    const has = (re) => assert.ok(bad.some((d) => re.test(d)), `${re} in ${JSON.stringify(bad)}`);
+    has(/^homeend: div#tabs .*Home and End do not go/);
+    has(/^arrows: ul#still .*ArrowDown does not move/);
+    has(/^comboboxkeys: input#combo .*Escape does not close its list/);
+    has(/^focusreturn: button#opener .*the focus goes to/);
+    has(/^modalescape: div#dlg .*Tab and Shift\+Tab can leave it/);
+    assert.ok(!bad.some((d) => /^arrows: div#tabs/.test(d)), 'the tabs move with the arrows');
+    assert.deepEqual(await run(false), []);
+  });
+});
+
+test('page: the same patterns built right are left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+  await inPage(async (ev) => {
+    const found = await ev(`(async () => {
+      const box = document.createElement('div');
+      box.innerHTML = '<div role="tablist" id="tabs"><button role="tab" aria-selected="true">One</button><button role="tab" tabindex="-1">Two</button></div>'
+        + '<input role="combobox" id="combo" aria-expanded="false" aria-label="City">'
+        + '<div role="dialog" aria-modal="true" aria-label="Edit" id="dlg" style="position:fixed;top:0;left:0"><button type="button" id="a">Save</button><button type="button" id="b">Cancel</button></div>';
+      document.body.appendChild(box);
+      const tabs = [...box.querySelectorAll('[role=tab]')];
+      box.querySelector('#tabs').addEventListener('keydown', (e) => { const i = tabs.indexOf(document.activeElement); const to = { ArrowRight: (i + 1) % 2, ArrowLeft: (i + 1) % 2, Home: 0, End: 1 }[e.key]; if (to != null) tabs[to].focus(); });
+      const combo = box.querySelector('#combo');
+      combo.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') combo.setAttribute('aria-expanded', 'true'); if (e.key === 'Escape') combo.setAttribute('aria-expanded', 'false'); });
+      const a = box.querySelector('#a'), b = box.querySelector('#b');
+      box.querySelector('#dlg').addEventListener('keydown', (e) => { if (e.key !== 'Tab') return; if (!e.shiftKey && document.activeElement === b) { e.preventDefault(); a.focus(); } if (e.shiftKey && document.activeElement === a) { e.preventDefault(); b.focus(); } });
+      const r = await window.__wcag21.interact(box, { wait: 50, triggers: 1, keys: true });
+      box.remove();
+      return { f: r.findings.map((f) => f.kind + ': ' + f.desc), ran: r.ran };
+    })()`);
+    assert.deepEqual(found.f.filter((d) => /^(arrows|homeend|comboboxkeys|modalescape)/.test(d)), []);
+    for (const k of ['arrows', 'homeend', 'comboboxkeys', 'modalescape']) assert.ok(found.ran.includes(k), k);
+  });
+});
+
+// What a screen reader says on each control (name, role, state), and the names that say little: a role, an icon's
+// name, the role said twice; two links with the same words going to different places.
+test('page: what a screen reader says, and names that say little or the same', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+  await inPage(async (ev) => {
+    const r = await ev(`(() => {
+      const box = document.createElement('div');
+      box.innerHTML = '<button type="button" aria-pressed="true">Bold</button><button type="button" aria-expanded="false" aria-haspopup="menu">More</button>'
+        + '<input type="checkbox" id="cb" checked><label for="cb">Remember me</label><input type="text" aria-label="Email" required>'
+        + '<button type="button" aria-label="icon"><svg></svg></button><button type="button" aria-label="chevron-down"><svg></svg></button><button type="button">Close button</button>'
+        + '<a href="/a">Edit</a><a href="/b">Edit</a><a href="/c">Open</a><a href="/c">Open</a>';
+      document.body.appendChild(box);
+      const out = window.__wcag21.check(box, { name: 'x' });
+      box.remove();
+      return { says: out.spoken.map((s) => s.says), f: out.findings.filter((f) => ['weakname', 'samename'].includes(f.kind)).map((f) => f.kind + ': ' + f.desc) };
+    })()`);
+    for (const s of ['Bold, button, pressed', 'More, button, collapsed, has popup', 'Remember me, checkbox, checked', 'Email, edit text, required']) assert.ok(r.says.includes(s), `${s} in ${JSON.stringify(r.says)}`);
+    const has = (re) => assert.ok(r.f.some((d) => re.test(d)), `${re} in ${JSON.stringify(r.f)}`);
+    has(/^weakname: .*"icon, button": the name says nothing/);
+    has(/^weakname: .*"chevron-down, button": the name is an icon's or a file's name/);
+    has(/^weakname: .*"Close button, button": the role is said twice/);
+    has(/^samename: .*2 links say "Edit" and go to different places/);
+    assert.equal(r.f.filter((d) => /samename/.test(d)).length, 1, 'two links to the same place are fine');
+    assert.equal(r.f.filter((d) => /weakname/.test(d)).length, 3, JSON.stringify(r.f));
+  });
+});

@@ -5517,10 +5517,42 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   function lum(c) { var f = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
   function over(top, under) { var a = top[3]; return [top[0] * a + under[0] * (1 - a), top[1] * a + under[1] * (1 - a), top[2] * a + under[2] * (1 - a), 1]; }
-  // What is behind an element: the backgrounds of it and every box above it, laid over each other.
+  // A ::before or ::after that covers its box and paints a background, laid over the box's own (::after on top).
+  function covers(n) {
+    var r = n.getBoundingClientRect(), out = [];
+    ['::after', '::before'].forEach(function (ps) {
+      var p = getComputedStyle(n, ps); if (!p || p.content === 'none' || p.display === 'none') return;
+      var b = rgba(p.backgroundColor); if (!b || !b[3]) return;
+      var fits = Math.abs(parseFloat(p.width) - r.width) < 2 && Math.abs(parseFloat(p.height) - r.height) < 2;
+      if (fits || (/absolute|fixed/.test(p.position) && p.top === '0px' && p.left === '0px' && p.right === '0px' && p.bottom === '0px')) out.push(b);
+    });
+    return out;
+  }
+  // A box laid under the element that is not one of its parents (a backdrop placed by its position, a sibling's
+  // fill): the last one drawn under the middle of its words, read by geometry, since the check runs out of sight.
+  function under(el) {
+    var host = el.closest('.pg-preview, .pg-offstage, .pg-frame, .pg-variants'); if (!host) return null;
+    var tn = Array.prototype.filter.call(el.childNodes, function (k) { return k.nodeType === 3 && k.textContent.trim(); })[0], r;
+    if (tn) { var rg = document.createRange(); rg.selectNodeContents(tn); r = rg.getBoundingClientRect(); } else r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    var x = r.left + r.width / 2, y = r.top + r.height / 2, hit = null;
+    Array.prototype.forEach.call(host.querySelectorAll('*'), function (b) {
+      if (b === el || b.contains(el) || el.contains(b)) return;
+      var q = b.getBoundingClientRect(); if (x < q.left || x > q.right || y < q.top || y > q.bottom) return;
+      var bg = rgba(getComputedStyle(b).backgroundColor);
+      if ((bg && bg[3] > 0) || covers(b).length) hit = b;
+    });
+    return hit;
+  }
+  // What is behind an element: the backgrounds of it and every box above it, laid over each other, with what covers a
+  // box (its ::before, its ::after) and a box laid under it that is not a parent.
   function behind(el) {
-    var layers = [];
-    for (var n = el; n && n.nodeType === 1; n = n.parentElement) { var b = rgba(getComputedStyle(n).backgroundColor); if (b && b[3] > 0) { layers.push(b); if (b[3] >= 1) break; } }
+    var layers = [], below = under(el), stop = false;
+    var add = function (n) { covers(n).concat([rgba(getComputedStyle(n).backgroundColor)]).forEach(function (b) { if (!stop && b && b[3] > 0) { layers.push(b); if (b[3] >= 1) stop = true; } }); };
+    for (var n = el; n && n.nodeType === 1 && !stop; n = n.parentElement) {
+      if (below && n !== el && n.contains(below)) { add(below); below = null; if (stop) break; }
+      add(n);
+    }
     var base = [255, 255, 255, 1];
     for (var i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
     return base;
@@ -6664,12 +6696,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
     // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.
     iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
-    aT.how = 'Every component Figma has; one not in the code yet is counted apart.' + SAME;
-    // Where the checks come from and how they run, said plainly: someone will ask.
+    // The standard it is checked against and the tools that check it, said plainly: someone will ask.
+    aT.how = 'Checked against WCAG 2.2, levels A and AA (the W3C\'s accessibility standard), in headless Chrome, on every variant and state.';
     aT.howParts = [
-      ['What each state means', 'Pass: every check it is tested on passes (its text reads at 4.5:1 or more, say). Issues: a check fails (a button with no name a screen reader can say). Review: only what a person must judge is left (whether a label describes its field). Untested: not opened in a browser yet.'],
-      ['Where the checks come from', 'WCAG 2.2, levels A and AA, the W3C\'s accessibility standard: every success criterion, each marked as checked automatically, in the code, or by a person.'],
-      ['How they are run', 'In a real browser (headless Chrome), on every variant and state (hover, focus, input): axe-core, Deque\'s open-source checker, the engine\'s own WCAG checks, and the browser\'s accessibility tree for names and roles. Contrast uses WCAG\'s own formula: 4.5:1 for text, 3:1 for large text and for the edges of controls, in every theme.']
+      ['axe-core', 'Deque\'s open-source accessibility checker: names, roles, ARIA, labels, landmarks.'],
+      ['The engine\'s WCAG checks', 'Keyboard: Tab order, focus shown, and the keys each pattern needs (arrows, Home and End, Escape, Tab kept in a dialog). Names: what a screen reader says on each control, and names that say little. Hover, focus, input and press.'],
+      ['The accessibility tree', 'The browser\'s own: each control\'s name, role and state, as assistive technology reads them.'],
+      ['Contrast', 'WCAG\'s formula: 4.5:1 for text, 3:1 for large text and control edges, in every theme and in two modes at once (dark with high contrast).']
     ];
     dT.how = 'Every component Figma has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
@@ -7734,7 +7767,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       colours.forEach(function (a) { var next = []; modeSets.forEach(function (ms) { a.values.forEach(function (v) { if (v.value) next.push(ms.concat([[a, v]])); }); }); if (next.length) modeSets = next; });
       // Colours read as they settle in each mode, never halfway through a component's own transition.
       play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false; preview.classList.add('pg-still');
-      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {};
+      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {}, spoken = {}, spokenOrder = [];
       // Each variant is drawn, then measured once the system's own scripts have answered the change: their observers add
       // roles, Tab stops, names and wiring a moment after it is drawn, as in a product, so it is never measured in the
       // same step it is drawn in. A message to the page itself is the next task without a timer's wait.
@@ -7765,6 +7798,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         if (window.__wcag21) try {
           var w = window.__wcag21.check(root, { name: c.name }), byKind = {};
           w.ran.forEach(function (k) { wran[k] = 1; });
+          // What a screen reader says on each control, gathered across the variants (the same words said once).
+          (w.spoken || []).forEach(function (sp) { if (!spoken[sp.says]) { spoken[sp.says] = []; spokenOrder.push(sp.says); } spoken[sp.says].push(cb.name); });
           w.findings.forEach(function (f) { (byKind[f.kind] = byKind[f.kind] || []).push(f.desc); });
           Object.keys(byKind).forEach(function (k) {
             wkinds[k] = Math.max(wkinds[k] || 0, byKind[k].length);
@@ -7807,6 +7842,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // A control with no name only where an on/off prop hides its words (an icon-only button, a box with no text): it
         // fails as it is, and what to do is said: the product that uses it that way names it there.
         liveItems = groups.map(function (g) { var say = g.st === 'todo' && /has no name a screen reader can read/.test(g.html) ? namedWhereUsed(g.sets, props) : ''; return { sc: scOfLabel(g.wcag), label: g.wcag, st: g.st, todo: esc(say), html: (g.mixed ? g.plain.replace(/: "…"/g, ', on what each variant shows').replace(/"…"/g, 'its control') : g.html) + esc(scope(g.where)), from: FROM_PAGE }; }).filter(function (it) { return it.sc; });
+        // What a screen reader says on its controls, in the variants tried: the words a person hears, name, role, state.
+        if (spokenOrder.length) liveItems.push({ sc: '4.1.2', label: wcagLabelOf('4.1.2'), st: 'done', from: FROM_PAGE,
+          html: 'A screen reader says ' + spokenOrder.slice(0, 8).map(function (t) { return '“' + esc(t) + '”' + (spoken[t].length < n && n > 1 ? ' (' + esc(spoken[t].slice(0, 2).join('; ') + (spoken[t].length > 2 ? ' and ' + (spoken[t].length - 2) + ' more' : '')) + ')' : ''); }).join(', ') + (spokenOrder.length > 8 ? ', and ' + (spokenOrder.length - 8) + ' more' : '') + '.' });
         if (lowest) liveItems.push({ sc: '1.4.3', label: 'WCAG 1.4.3 Contrast (Minimum) (AA)', st: failing ? 'todo' : 'done', from: FROM_PAGE, html: failing
           ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
           : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
@@ -7864,7 +7902,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var personOn = function () { var a = document.activeElement; return a && a !== document.body && a !== document.documentElement && !preview.contains(a) && !(a.closest && a.closest('.pg-offstage')) ? a : null; };
         var later = function () { setTimeout(function () { if (stopped) return; if (personOn()) later(); else next(i); }, 400); };
         if (personOn()) { combos.pop(); later(); return; }
-        window.__wcag21.interact(root, { wait: 200, triggers: 6 }).then(function (r) {
+        // Its keys (arrows, Home and End, Escape, Tab in a modal) only where the system's own script is on the page.
+        window.__wcag21.interact(root, { wait: 200, triggers: 6, keys: !!document.querySelector('script[data-system-script]') }).then(function (r) {
           r.ran.forEach(function (k) { live.ran[k] = 1; });
           r.findings.forEach(function (f) {
             var key = f.kind + '|' + f.desc;
