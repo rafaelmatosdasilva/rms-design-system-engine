@@ -37,7 +37,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 3;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15
+export const READER = 4;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations)
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -156,10 +156,15 @@ export function entityView(entity, file, group = '', shared = null) {
   let statusLine = null;
   const casesPurpose = [];   // a use-cases block's purpose: after what the sections say it is for
   // DSDS 0.15 writes documentBlocks; 0.23 writes sections: a section's freeform parts read as 0.15's sections, its
-  // guidelines (a rule each, a shared one through its ref) as a checklist.
+  // guidelines (a statement each, a shared one through its ref) by their title as a section's are: "When to use",
+  // "When not to use", "Common mistakes", "Limitations" as those, the rest ("Rules", "For agents") as a checklist.
   const v23 = (entity?.sections ?? []).flatMap((x) => {
     if (!x || typeof x !== 'object') return [];
-    if (x.kind === 'guidelines') return [{ kind: 'checklist', title: x.title, items: (x.items ?? []).map((it) => { const sh = it?.statement ? null : sharedStatement(it?.refs, shared); return { label: it?.statement ?? sh.text, level: it?.level ?? sh?.level ?? null }; }) }];
+    if (x.kind === 'guidelines') {
+      const items = (x.items ?? []).map((it) => { const sh = it?.statement ? null : sharedStatement(it?.refs, shared); return { label: it?.statement ?? sh.text, level: it?.level ?? sh?.level ?? null }; });
+      const key = keyOfTitle(x.title);
+      return [key && key !== 'purpose' ? { kind: 'guided', key, items } : { kind: 'checklist', title: x.title, items }];
+    }
     if (x.kind === 'section') return [{ kind: 'sections', items: (x.freeform ?? []).concat(x.body || x.content ? [{ title: x.title, body: x.body ?? x.content }] : []) }];
     return [x];
   });
@@ -185,6 +190,8 @@ export function entityView(entity, file, group = '', shared = null) {
         else if (/^(discouraged|dont|don't|avoid|prohibited|forbidden)$/i.test(it.stance ?? '')) view.whenNotToUse.push(d);
       }
       if (b.purpose) casesPurpose.push(String(b.purpose).trim());
+    } else if (b.kind === 'guided') {
+      for (const it of b.items ?? []) { const label = String(it?.label ?? '').trim(); if (label) view[b.key].push(label); }
     } else if (b.kind === 'checklist') {
       for (const it of b.items ?? []) {
         const label = String(it?.label ?? '').trim();
