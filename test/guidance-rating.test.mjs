@@ -3,7 +3,7 @@
 // guidance evaluation; and each component's rating in its Documentation area of the style guide.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -48,12 +48,16 @@ test('the system\'s facts from the Figma snapshots: each component with its prop
   assert.ok(facts.tokens.has('radius/control') && facts.tokens.has('status/neutral/color'));
 });
 
-test('a component is ready with what it is, when to use it and when not, its role, an example and its properties by name', () => {
+test('a component is ready with what it is, when to use it and when not, its role and an example; its properties are its contract\'s', () => {
   const { facts } = readFacts(HARBOR, cfgOf(HARBOR));
   const r = rateComponent('button', BUTTON, facts);
   assert.equal(r.cls, 'ready', JSON.stringify(r));
-  assert.deepEqual(r.props, { named: 3, total: 3, missing: [] });
   assert.deepEqual(r.unknown, []);
+  // No property named: still ready, and never asked to name them (the contract carries them from Figma and the code).
+  const unnamed = rateComponent('button', BUTTON.replace(/Its `variant`[^\n]*\n/, ''), facts);
+  assert.equal(unnamed.cls, 'ready', JSON.stringify(unnamed));
+  assert.equal(unnamed.props, undefined);
+  assert.ok(!unnamed.add.some((a) => /propert/.test(a)));
   // Nothing written: thin, and the first thing to add is its own section under its exact name.
   const none = rateComponent('iconButton', '', facts);
   assert.equal(none.cls, 'thin');
@@ -135,16 +139,25 @@ test('the guidelines are a level of the guidance evaluation', () => {
 
 test('each component\'s Documentation area says what an agent can take from its guidance, and what to add', () => {
   const dir = harbor();
+  // Its contract, as the engine writes it: its properties are read there, never asked for again.
+  mkdirSync(join(dir, 'contracts'), { recursive: true });
+  writeFileSync(join(dir, 'contracts', 'button.contract.json'), JSON.stringify({ id: 'button', props: [{ name: 'variant' }, { name: 'size' }, { name: 'label' }] }));
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: 250000 });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
   const data = JSON.parse(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/.exec(page)[1]);
   const of = (n) => (data.components ?? []).find((c) => c.name === n);
+  assert.deepEqual(of('button').contract, { file: join('contracts', 'button.contract.json'), href: 'contracts/button.contract.json', props: ['variant', 'size', 'label'] });
+  assert.match(page, /'props', 'Properties'/, 'its Properties row: done, the contract file named');
+  // Its Contract button opens the copy beside the guide.
+  assert.deepEqual(of('button').links.find((l) => l.label === 'Contract'), { label: 'Contract', url: 'contracts/button.contract.json' });
+  assert.ok(existsSync(join(dir, '.design-system-engine-out', 'styleguide', 'contracts', 'button.contract.json')));
+  assert.equal(of('badge').links.find((l) => l.label === 'Contract'), undefined, 'no contract, no button');
   assert.equal(of('button').agentRating.cls, 'ready');
   assert.equal(of('badge').agentRating.cls, 'partial');
   assert.deepEqual(of('badge').agentRating.from, ['guidelines.md', 'Figma']);   // every place it was read from
   assert.match(page, /'example', 'Example'/, 'its Example row in the template');
-  assert.match(page, /'props', 'Properties named'/, 'its Properties named row');
+  assert.doesNotMatch(page, /'Properties named'/, 'its properties are in its contract, never asked for again');
   assert.doesNotMatch(page, /kind: 'For agents'/, 'no row that repeats the others');
   assert.ok(existsSync(join(dir, 'guidelines.md')));
 });

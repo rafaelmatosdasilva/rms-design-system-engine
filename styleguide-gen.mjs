@@ -25,7 +25,7 @@ import { buildStamp, mayWrite, stampMeta } from './stamp.mjs';
 import { usedClasses } from './class-use.mjs';
 import { appDir } from './code-roots.mjs';
 import { codeSizeCSS, modeRootCSS, scopeView, attrModeCSS, colourAttrMode, modeScopes } from './styleguide-data.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, copyFileSync } from 'fs';
 import { findIconFolder, folderSymbols } from './icon-folder.mjs';
 import { join, dirname, resolve, relative, basename } from 'path';
 import { pathToFileURL, fileURLToPath } from 'url';
@@ -737,11 +737,25 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const byName = new Map(rating.components.map((r) => [r.name, r]));
         for (const c of view.components) {
           const r = byName.get(c.name); if (!r) continue;
-          c.agentRating = { cls: r.cls, pieces: r.pieces, props: { named: r.props.named, total: r.props.total, missing: r.props.missing }, unknown: r.unknown, add: r.add, from: [...gl.sources, 'Figma', ...(ilSnap ? ['the intent layer'] : [])], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
+          c.agentRating = { cls: r.cls, pieces: r.pieces, unknown: r.unknown, add: r.add, from: [...gl.sources, 'Figma', ...(ilSnap ? ['the intent layer'] : [])], ...(c.name in extracted ? { extracted: extracted[c.name] } : {}) };
         }
         view.agentRating = { cls: rating.cls, ready: rating.ready, partial: rating.partial, thin: rating.thin, total: rating.total };
       }
     } catch { /* no rating */ }
+    // Its properties: in its contract, the file the engine writes from Figma and the code on every run, so its
+    // Documentation says where an agent reads them and never asks for them again. A copy sits beside the guide, so its
+    // Contract button opens the file itself. { file, href, props: [names] }
+    try {
+      const dir = cfg.contracts?.out ? resolve(ROOT, cfg.contracts.out) : join(ROOT, 'contracts');
+      const beside = join(dirname(projectOut), 'contracts');
+      for (const c of view.components) {
+        const file = join(dir, c.name + '.contract.json');
+        const k = readJson(file); if (!k || !Array.isArray(k.props)) continue;
+        let href = null;
+        try { mkdirSync(beside, { recursive: true }); copyFileSync(file, join(beside, c.name + '.contract.json')); href = `contracts/${encodeURIComponent(c.name)}.contract.json`; } catch { /* no copy: no button */ }
+        c.contract = { file: relative(ROOT, file), ...(href ? { href } : {}), props: k.props.map((p) => p?.name).filter(Boolean) };
+      }
+    } catch { /* no contracts */ }
     const { segmentedUi, tabsUi, standInGaps, fieldUi, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } = await import('./styleguide-data.mjs');
     const systemCss = themeFiles.map(readText).join('\n');
     // The colours in the order a reader meets them: the primitive ramp (when the theme carries Figma's values for it in
@@ -1173,6 +1187,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.links = [
           { label: 'Figma', url: figmaLink(cfg.figmaFileKey, ids[c.name]) },
           { label: 'Code', url: w?.at ? fileUrl(repo, branch, w.at[0], w.at[1]) : null },
+          // Its page in the intent layer, and its contract (the copy beside the guide): straight to each.
+          { label: 'Intent layer', url: c.intentLayer?.url ?? null },
+          { label: 'Contract', url: c.contract?.href ?? null },
           ...(docsUrl ? [{ label: 'Documentation', url: String(docsUrl).replace(/\{name\}/g, encodeURIComponent(c.name)) }] : []),
           ...extra.map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })),
         ].filter((l) => l.url);

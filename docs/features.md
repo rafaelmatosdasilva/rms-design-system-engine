@@ -267,7 +267,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Variants | Every option of each prop, one per row, with Try it to set it in the Playground |
 | Parity | Every prop, token and value compared with Figma, each marked Done, To fix, To check or Not compared |
 | Accessibility | One table by WCAG 2.2 criterion, with what Figma states, what was found, what to do and who acts |
-| Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures, its role, an example and its properties named, with what is still to write |
+| Documentation | What it is, when to use it and when not, common mistakes, limitations, Do and Don't pictures, its role and an example, with what is still to write |
 | Motion | Everything that moves in it, the code's timing beside Figma's |
 | Built with | The system's components it is made of |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
@@ -305,9 +305,9 @@ Agents read your guidelines and Figma's descriptions to pick and use each compon
 | Partial | Some of it is there |
 | Thin | Little or nothing is there |
 
-- **What it looks for.** A section headed with the component's exact name, what it is, when to use it, when not to, its role, an example, and its properties by name.
+- **What it looks for.** A section headed with the component's exact name, what it is, when to use it, when not to, its role and an example. Its properties are not asked for: its contract carries them from Figma and the code.
 - **Names that mislead.** A token, property or component named in the text that the system does not have is listed first, to rename or take out. A name with a `*` (`--card-*`) is a family, there when one of the system's names starts with it.
-- **Where you see it.** In each component's Documentation area, one row per piece (Example, Properties named, Names that do not exist, beside What it is and When to use), and on the Status page's tasks under Documentation while something is missing.
+- **Where you see it.** In each component's Documentation area, one row per piece (Example; Properties, done, naming the contract file that holds them; Names that do not exist; beside What it is and When to use), and on the Status page's tasks under Documentation while something is missing.
 - **A test with a model, when you ask.** A model answers questions from your guidance alone, such as the options of each property, and the engine scores the answers against the real ones. It uses your model tokens.
 - **The whole document** gets a class too, from how many of its components are ready.
 

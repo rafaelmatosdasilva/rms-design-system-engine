@@ -215,11 +215,11 @@ reads one page and does not follow links inside it.
 
 **How much an agent can take from it** (`--guidance-rating`). Rates each component's guidance (its section in
 these files and Figma's description and annotations) for what an agent needs: a section headed with its exact name,
-what it is, when to use it, when not to, its role, an example, its properties by name, and no name the system does
-not have. Each component is ready, partial or thin; the document gets the same class from how many are ready. It
-prints what to add, writes `.design-system-engine-out/guidance-rating.json`, and the style guide shows what no other
-row of each component's Documentation area says: its Example and Properties named rows, and Names that do not exist
-when it gives one. `--extract` also runs the extraction test, which spends the
+what it is, when to use it, when not to, its role, an example, and no name the system does not have (its properties
+are not asked for: the contract carries them from Figma and the code). Each component is ready, partial or thin;
+the document gets the same class from how many are ready. It prints what to add, writes
+`.design-system-engine-out/guidance-rating.json`, and the style guide shows what no other row of each component's
+Documentation area says: its Example row, and Names that do not exist when it gives one. `--extract` also runs the extraction test, which spends the
 person's model tokens: a question for each property with options, answered by a model that sees only the guidance
 through `guidelines.extract.cmd` (the prompt on stdin, the answers on stdout; `claude -p` by default), scored against
 Figma's options. `guidelines` is also a level of `eval-run.mjs --levels`.
@@ -297,8 +297,8 @@ layer: the changes are the team's. The audit prints how many pages each decision
 
 A component's Documentation reads everything written about it, wherever it is written (its intent-layer page, its
 Figma description and annotations, a guidelines section headed with its name), one row per thing an agent needs: what
-it is, when to use it, when not to, its role, an **Example** and its **Properties named** as Figma names them, and
-**Names that do not exist** when the text gives a token, property or component the system does not have (a name with
+it is, when to use it, when not to, its role, an **Example**, its **Properties** (done: the row names its contract file, which the engine writes from
+Figma and the code, and lists them; never asked for again), and **Names that do not exist** when the text gives a token, property or component the system does not have (a name with
 a `*` is a family, there when one of the system's names starts with it). Each source is read the same way, so what is
 missing can be written in whichever the team keeps; nothing has to be in Figma. `--guidance-rating` reads the same
 sources.
@@ -439,8 +439,8 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   Documentation, Migration, Products, System, the page's own items and Accessibility last, each when it has any; no
   All), numbered in that order, so what the browser still tries is numbered after the rest and no other number moves:
   Parity's columns are the Parity area's, Accessibility's the Accessibility area's (Task nr, WCAG criterion, Figma
-  states, Found, What to do, Status), Documentation's the Documentation area's (Task nr, Kind, What is written, What to
-  do, Status), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
+  states, Found, What to do, Status), Documentation's the Documentation area's (Task nr, Kind, Status,
+  Last checked; what is written and what to do in the row's panel), only its kinds not written yet (`docRows`), and the rest Task nr, Where or Type, What to do and
   Status. The count at the top is the shown kind's, and every open row is numbered, Documentation's too. Under The system, what the tokens owe (`tokenTodos`, area System): the
   semantic tokens with no description in Figma (You in Figma), Figma variables that point at one no longer in the file
   (You in Figma), tokens in the code that point at one declared nowhere (Claude in the code), the same value written by
@@ -460,7 +460,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#status/documentation`). Its columns are Task nr, Kind, What is written, What to do (who writes it above it, You in Figma, and where) and Status (To fix, or Done with where it was written), one row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#status/documentation`). Its columns are Task nr, Kind, Status (To fix, or Done with where it was written) and Last checked; what is written and what to do (who writes it, You in Figma, and where) are in the row's panel (`PANEL_ONLY`). One row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role, Example, Properties: done, naming its contract file), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
@@ -541,8 +541,10 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **Links** (`component-changelog.mjs`): on the overview, the Figma file (`figmaFileKey`), the code repository
   (`package.json` repository, else the origin remote) and `styleguide.links` (`[{ "label", "url" }]`); on each
   component, its Figma node, its code (its own file, else the line of its rule in the theme stylesheet, on
-  `styleguide.branch` or the origin's default branch), `styleguide.componentDocs` (`"https://wiki/…/{name}"`),
-  `contract.authored.json` → `components.<name>.links`, as buttons at the top right of its header.
+  `styleguide.branch` or the origin's default branch), its page in the intent layer, its contract (a copy written
+  beside the guide, `contracts/<name>.contract.json`, so the button opens the file), `styleguide.componentDocs`
+  (`"https://wiki/…/{name}"`), `contract.authored.json` → `components.<name>.links`, as buttons at the top right of
+  its header.
 - **At a glance** (`factsOf`), under its name, on one line: its class (`.modal-card`), Version (the release its last
   change shipped in), Last changed, its date and time, and how to import it. How it stands with Figma and with accessibility is on those areas (their alert icons) and on its
   overview card, in one line, a fact that needs work marked with ! and in bold, never by colour alone.

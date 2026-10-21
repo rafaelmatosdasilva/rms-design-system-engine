@@ -6,8 +6,9 @@
 // right, read from that text alone:
 //   • a section of its own, under its exact name;
 //   • what it is, when to use it, when not to, its role, an example;
-//   • its properties named as Figma names them;
 //   • no name that exists nowhere (a token, a property or a component the system does not have: stale or invented).
+// Its properties are not asked for: they are facts the contract carries from Figma and the code, and a copy written by
+// hand goes out of date. What an option is for is when to use it.
 // The class says how far it goes: ready (an agent can pick it and use it from the text), partial (some of it), thin
 // (little or nothing). The document as a whole gets the same class, from how many of its components are ready.
 //
@@ -19,7 +20,6 @@ import { spawnSync } from 'node:child_process';
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const clean = (k) => String(k).replace(/#[\d:]+$/, '');
-const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // What the system has, from the Figma snapshots: each component with its properties (and a variant's options), and
 // every token's name. → { components: { name: { props: [{ name, type, options }] } }, tokens: Set }
@@ -49,13 +49,13 @@ const PIECES = [
 const namesIn = (t) => [...String(t).matchAll(/`([^`\n]{2,60})`/g)].map((m) => m[1].trim());
 
 // One component's guidance against the system. text: what the guidance says about it (its section and Figma's
-// description). → { name, cls, pieces: { key: bool }, props: { named, total, missing }, unknown: [], add: [] }
+// description). → { name, cls, pieces: { key: bool }, unknown: [], add: [] }
 export function rateComponent(name, text, facts) {
   const t = String(text ?? '').trim();
   const comp = facts.components?.[name] ?? { props: [] };
   const pieces = Object.fromEntries(PIECES.map(([k, , has]) => [k, !!t && has(t)]));
+  // Its properties and options only tell a name the text gives apart from one the system does not have.
   const propNames = [...new Set(comp.props.map((p) => p.name))];
-  const named = propNames.filter((p) => new RegExp(`(^|[^\\w])${esc(p)}([^\\w]|$)`, 'i').test(t));
   const known = new Set([...facts.tokens ?? [], ...propNames, ...comp.props.flatMap((p) => p.options), ...Object.keys(facts.components ?? {})].map(norm));
   // A name with a * in it is a family (`--card-*`, `color/brand/*`): it exists when a name the system has starts with
   // what comes before the *.
@@ -69,12 +69,9 @@ export function rateComponent(name, text, facts) {
   const add = unknown.map((u) => `\`${u}\` exists nowhere in the system: rename it or take it out`);
   if (!t) add.push(`a section headed ${name}, its exact name`);
   for (const [k, title] of PIECES) if (t && !pieces[k]) add.push(title.toLowerCase());
-  const missingProps = propNames.filter((p) => !named.includes(p));
-  if (t && missingProps.length) add.push(`its ${missingProps.length === 1 ? 'property' : 'properties'} by name: ${missingProps.slice(0, 6).join(', ')}${missingProps.length > 6 ? ', …' : ''}`);
   const core = ['what', 'whenToUse', 'whenNotToUse', 'role'].filter((k) => pieces[k]).length;
-  const propShare = propNames.length ? named.length / propNames.length : 1;
-  const cls = !t ? 'thin' : core === 4 && pieces.example && propShare >= 0.5 && !unknown.length ? 'ready' : core >= 2 ? 'partial' : 'thin';
-  return { name, cls, pieces, props: { named: named.length, total: propNames.length, missing: missingProps }, unknown, add };
+  const cls = !t ? 'thin' : core === 4 && pieces.example && !unknown.length ? 'ready' : core >= 2 ? 'partial' : 'thin';
+  return { name, cls, pieces, unknown, add };
 }
 
 // The whole guidance. sections: { component: text } (each component's own text), general: the rest. → { cls, ready,
