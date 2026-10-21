@@ -36,13 +36,13 @@ The title names the three strongest leanings, always in the chart's own order (B
 
 On the left of the tile, three lines describe the brand; the chart sits on the right.
 
-1. **The definition.** The brand described as a person would describe it, in one sentence:
-   - its two strongest leanings as adjectives (a safe, corporate brand);
+1. **The definition.** The brand described simply, in one sentence:
+   - its two strongest leanings (a warm and bold brand);
    - the character its tokens give it: a serif reads classic and traditional; thick lines or hard shadows read retro; soft far shadows with room, luxurious; very round corners on a warm hue, playful; colour on the backgrounds, colourful; white and grey with one accent, polished; hairlines, a light hand;
-   - how it comes across: its third leaning (precise and technological, cool-headed), and "straight to the point" when it is flat with thick lines.
+   - the feel of its third leaning (technological, reassuring, energetic…).
 
-   For example: "A warm, bold brand with a retro touch, straight to the point, precise and technological." Colour is not the subject: it shows in the proof.
-2. **What it does.** The three strongest leanings said as of a person, each as heavy as it leans. For example: "It means business, keeps a cool head and plays it safe."
+   For example: "A warm and bold brand, with a retro touch and a technological feel." Colour is not the subject: it shows in the proof.
+2. **What it does.** The three strongest leanings said as of a person, in one weight. For example: "It means business, keeps a cool head and plays it safe."
 3. **The proof.** One row for each of the three strongest leanings, with the signals behind it in plain words on a simple scale, never as raw values:
    - vivid, soft or muted colours;
    - very high, high, moderate or low contrast;

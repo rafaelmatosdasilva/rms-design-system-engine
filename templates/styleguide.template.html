@@ -4242,29 +4242,29 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var order = function (x) { for (var k = 0; k < AX.length; k++) if (AX[k][0] === x.pole || AX[k][1] === x.pole) return k; return 0; };
         var top3 = lean.slice(0, 3).filter(function (x) { return x.k >= 0.1; }).sort(function (x, y) { return order(x) - order(y); });
         var head = list(top3.map(function (x, i) { return i ? lc(x.pole) : x.pole; }));
-        // The title: the brand defined as one would describe it (a bold, technical brand with a retro touch, straight to
-        // the point): its two strongest leanings, the character its tokens give it, and how it comes across.
+        // The title: the brand defined as one would describe it (a warm and bold brand, with a retro touch and a
+        // technological feel).
         var c0 = COL[0], t3 = lean.filter(function (x) { return x.k >= 0.1; }).slice(0, 3), flat = 1 - 2 * dim;
         var ADJ = { Bold: 'bold', Quiet: 'understated', Flat: 'flat', Dimensional: 'tactile', Technical: 'technical', Human: 'human', Sharp: 'sharp', Soft: 'soft',
           Corporate: 'corporate', Friendly: 'friendly', Fast: 'energetic', Calm: 'calm', Premium: 'premium', Safe: 'safe', Warm: 'warm', Cool: 'cool' };
-        var MANNER = { Bold: 'impossible to miss', Quiet: 'never raising its voice', Flat: 'with nothing in the way', Dimensional: 'with depth you can feel', Technical: 'precise and technological', Human: 'close to people',
-          Sharp: 'straight to the point', Soft: 'easy on the eye', Corporate: 'all business', Friendly: 'easy to approach', Fast: 'quick on its feet', Calm: 'never in a hurry',
-          Premium: 'refined to the detail', Safe: 'never taking a risk', Warm: 'warm to the touch', Cool: 'cool-headed' };
+        var FEEL = { Bold: 'bold', Quiet: 'quiet', Flat: 'clean', Dimensional: 'tactile', Technical: 'technological', Human: 'human', Sharp: 'sharp', Soft: 'soft',
+          Corporate: 'corporate', Friendly: 'friendly', Fast: 'energetic', Calm: 'calm', Premium: 'premium', Safe: 'reassuring', Warm: 'warm', Cool: 'cool' };
         // Its character, from the tokens: a serif reads classic and traditional; thick lines or hard shadows read retro; soft far shadows and room, luxurious; very
         // round corners on a warm hue, playful; white and grey with one accent, polished; colour on the grounds, colourful.
         var touch = kind[0] === 'serif' ? 'with a classic, traditional touch' : mk >= 0.25 || thick >= 0.5 ? 'with a retro touch' : fd >= 0.3 && airy > 0.2 ? 'with a touch of luxury' : rPx > 16 && c0.warmth > 0.3 ? 'with a playful touch' :
           c0.tinted > 0.25 ? 'with colour to spare' : c0.neutral >= 0.5 && hueN <= 2 ? 'with a polished finish' : line <= 1 ? 'with a light hand' : '';
-        var manner = []; if (t3[2]) manner.push(MANNER[t3[2].pole]); if (flat > 0.2 && thick >= 0.5 && manner.indexOf(MANNER.Sharp) < 0) manner.unshift(MANNER.Sharp);
         var adjs = t3.slice(0, 2).map(function (x) { return ADJ[x.pole]; });
-        var claim = !adjs.length ? 'A balanced brand, ' + (touch || 'with nothing overdone') + '.' :
-          (/^[aeiou]/.test(adjs[0]) ? 'An ' : 'A ') + adjs.join(', ') + ' brand' + (touch ? ' ' + touch : '') + (manner.length ? ', ' + manner.join(', ') : '') + '.';
+        // Simple: its two strongest leanings, the character its tokens give it, and the feel of the third.
+        var feel = t3[2] ? 'a ' + FEEL[t3[2].pole] + ' feel' : '';
+        var claim = !adjs.length ? 'A balanced brand' + (touch ? ', ' + touch : '') + '.' :
+          (/^[aeiou]/.test(adjs[0]) ? 'An ' : 'A ') + adjs.join(' and ') + ' brand' + (touch && feel ? ', ' + touch + ' and ' + feel : touch ? ', ' + touch : feel ? ' with ' + feel : '') + '.';
         // The brand's weights, heaviest for the strongest.
         var wAt = function (i) { return weights.length ? 'font-weight:' + esc(bkCss(weights[Math.max(0, weights.length - 1 - i)])) + ';' : ''; };
         var chips = function (x) { return x.bits.slice(0, 5).map(function (t) { return '<span class="sg-bk-tick-pill">' + esc(t) + '</span>'; }).join(''); };
         var proof = top3.slice().sort(function (x, y) { return y.k - x.k; }).map(function (x, i) { return '<b style="' + fam + wAt(i) + '">' + esc(x.pole) + '</b><span>' + Math.round(x.k * 100) + '%</span><div class="sg-bk-pers-chips">' + chips(x) + '</div>'; }).join('');
         var DOES = { Bold: 'speaks up', Quiet: 'lowers its voice', Flat: 'keeps it simple', Dimensional: 'gives things weight', Technical: 'sweats the details', Human: 'tells you a story', Sharp: 'gets to the point', Soft: 'takes the edge off',
           Corporate: 'means business', Friendly: 'holds the door open', Fast: 'never keeps you waiting', Calm: 'takes its time', Premium: 'cares about the finish', Safe: 'plays it safe', Warm: 'makes you feel at home', Cool: 'keeps a cool head' };
-        var said = top3.slice().sort(function (x, y) { return y.k - x.k; }).map(function (x, i) { return '<span style="' + wAt(i) + '">' + esc(DOES[x.pole] || lc(x.pole)) + '</span>'; });
+        var said = top3.slice().sort(function (x, y) { return y.k - x.k; }).map(function (x) { return esc(DOES[x.pole] || lc(x.pole)); });   // one weight: a sentence, not a ranking
         var words = said.length ? 'It ' + (said.length > 1 ? said.slice(0, -1).join(', ') + ' and ' + said[said.length - 1] : said[0]) + '.' : '';
         PMAP = '<div class="sg-bk-bento"><div class="sg-bk-t w6 h5 sg-bk-block sg-bk-pers" ' + bg2 + ' role="group" aria-label="' + esc('Personality: ' + (head || 'balanced')) + '" data-axes="' + esc(JSON.stringify(AX.map(function (ax) { return [ax[0], ax[1], Math.round(ax[2] * 100), ax[3]]; }))) + '">' +
           '<div class="sg-bk-pers-top"><span class="sg-bk-pers-h">Personality · read from ' + BK_ALL.length + ' tokens' + (two ? ', in light and dark' : '') + '</span></div>' +
