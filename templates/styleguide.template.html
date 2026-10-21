@@ -1301,8 +1301,8 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens text { font-size: var(--sg-space-l); }
 .sg-bk-lens .sg-bk-lens-icon { color: var(--sg-text); }
 .sg-bk-lens .sg-bk-lens-num { fill: var(--bk-mark, var(--sg-accent)); font-size: calc(var(--sg-space-l) * 1.85); }
-.sg-bk-lens .sg-bk-lens-title { fill: var(--sg-text); font-size: calc(var(--sg-space-l) * 1.1); }
-.sg-bk-lens .sg-bk-lens-note { fill: var(--sg-muted); font-size: calc(var(--sg-space-l) * 0.85); }
+.sg-bk-lens .sg-bk-lens-title { fill: var(--sg-text); font-size: calc(var(--sg-space-l) * 2.2); }
+.sg-bk-lens .sg-bk-lens-note { fill: var(--sg-muted); font-size: calc(var(--sg-space-l) * 1.7); }
 .sg-bk-lens .sg-bk-lens-sub { fill: var(--sg-muted); }
 .sg-bk-keyline-t { --bk-grid: color-mix(in srgb, var(--sg-line-colour) 18%, transparent); background-image: repeating-linear-gradient(to right, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))), repeating-linear-gradient(to bottom, var(--bk-grid) 0 var(--bk-line-w, 1px), transparent var(--bk-line-w, 1px) calc(var(--sg-space-xl) + var(--sg-space-xs))); background-position: center; }   /* the grid fills the whole card, in the brand's line thickness */
 .sg-bk-pie { width: 100%; transform: rotate(-90deg); }
@@ -3388,7 +3388,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
       // In the order they sit on the icon, top to bottom: the corner, the open gap, the end.
       var lenses = [an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }, an.gap && { p: an.gap.at, kind: 'gap' }, an.end && { p: an.end.at, kind: 'end', round: an.end.round }].filter(Boolean);
-      var R = 55, LR = 70, out = '';
+      var R = 55, LR = 140, out = '';
       // The icon, large, on its pixel grid inside its own box.
       out += gridLines(40, 40, 40 + bx[2] * big, 40 + bx[3] * big, big, 'sg-bk-lens-grid') + '<rect x="40" y="40" width="' + (bx[2] * big) + '" height="' + (bx[3] * big) + '" class="sg-bk-lens-box"/>' + icon(40, 40, big);
       lenses.forEach(function (l) { var c = at(l.p); out += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + R + '" class="sg-bk-lens-ring"/>'; });
@@ -3403,7 +3403,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Each lens, large, side by side beside the icon: the icon drawn so the point sits in the middle, clipped to the
       // circle, its name and what it shows under it. The gap's lens is drawn at the scale that holds both its ends.
       lenses.forEach(function (l, i) {
-        var cx = 778 + i * 160, cy = 300, id = 'sg-bk-lens-' + i;
+        var cx = 728 + LR + i * (LR * 2 + 40), cy = 279, id = 'sg-bk-lens-' + i;
         var zoom = l.kind === 'gap' ? Math.min(LR * 2 / (an.w * 3.2), LR * 1.7 / (an.gap.gap + an.w * 3)) : LR * 2 / (an.w * 3.2), s1 = an.w * zoom / 2;
         var on = function (p) { return [cx + (p[0] - l.p[0]) * zoom, cy + (p[1] - l.p[1]) * zoom]; };
         // The icon's own pixel grid: a line at each whole unit of its drawing.
@@ -3412,27 +3412,28 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         out += '<clipPath id="' + id + '"><circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '"/></clipPath>' +
           '<g clip-path="url(#' + id + ')"><rect x="' + (cx - LR) + '" y="' + (cy - LR) + '" width="' + (LR * 2) + '" height="' + (LR * 2) + '" class="sg-bk-lens-ground"/>' + g0 + icon(o[0], o[1], zoom) + '</g>' +
           '<circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '" class="sg-bk-lens-ring"/>';
-        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="4" class="sg-bk-lens-dot"/>';
+        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="8" class="sg-bk-lens-dot"/>';
         if (l.kind === 'corner') out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + s1 + '" class="sg-bk-lens-mark"/>';
         if (l.kind === 'gap') {
           // The gap measured tip to tip.
           var ga = on(an.gap.a), gb = on(an.gap.b), gx = gb[0] - ga[0], gy = gb[1] - ga[1], gd = Math.hypot(gx, gy) || 1, vx = gx / gd, vy = gy / gd;
-          var t1 = [ga[0] + vx * s1, ga[1] + vy * s1], t2 = [gb[0] - vx * s1, gb[1] - vy * s1], nx = -vy * 10, ny = vx * 10;
+          var t1 = [ga[0] + vx * s1, ga[1] + vy * s1], t2 = [gb[0] - vx * s1, gb[1] - vy * s1], nx = -vy * 20, ny = vx * 20;
           out += '<g class="sg-bk-lens-measure"><line x1="' + t1[0] + '" y1="' + t1[1] + '" x2="' + t2[0] + '" y2="' + t2[1] + '"/>' +
             '<line x1="' + (t1[0] - nx) + '" y1="' + (t1[1] - ny) + '" x2="' + (t1[0] + nx) + '" y2="' + (t1[1] + ny) + '"/><line x1="' + (t2[0] - nx) + '" y1="' + (t2[1] - ny) + '" x2="' + (t2[0] + nx) + '" y2="' + (t2[1] + ny) + '"/></g>';
         }
         var title = l.kind === 'end' ? (l.round ? 'Round cap' : 'Flat cap') : l.kind === 'gap' ? 'Open stroke' : (l.round ? 'Round join' : 'Sharp join');
-        var sub = l.kind === 'end' ? (l.round ? 'half the stroke, r = ' + num(an.w / 2) + 'px' : 'ends cut square')
-          : l.kind === 'gap' ? 'the line breaks, ' + num(an.gap.gap) + 'px apart'
-          : (l.round ? 'turns in a curve, no points' : 'turns to a sharp point');
+        // Said in words, no measures: what a person sees.
+        var sub = l.kind === 'end' ? (l.round ? 'the line ends, in a soft round tip' : 'the line ends, cut square')
+          : l.kind === 'gap' ? 'the line breaks, then starts again'
+          : (l.round ? 'turns in a curve, no sharp points' : 'turns to a point, no curve');
         // Its name and what it shows under it, a line each side of the comma.
         var lines = sub.split(', ').map(function (t, k, all) { return t + (k < all.length - 1 ? ',' : ''); });
-        out += '<text x="' + cx + '" y="' + (cy + LR + 42) + '" text-anchor="middle" class="sg-bk-lens-title">' + esc(title) + '</text>' +
-          lines.map(function (t, k) { return '<text x="' + cx + '" y="' + (cy + LR + 74 + k * 26) + '" text-anchor="middle" class="sg-bk-lens-note">' + esc(t) + '</text>'; }).join('');
+        out += '<text x="' + cx + '" y="' + (cy + LR + 84) + '" text-anchor="middle" class="sg-bk-lens-title">' + esc(title) + '</text>' +
+          lines.map(function (t, k) { return '<text x="' + cx + '" y="' + (cy + LR + 148 + k * 52) + '" text-anchor="middle" class="sg-bk-lens-note">' + esc(t) + '</text>'; }).join('');
       });
-      var set = an.set, same = (set.sameW === set.read ? 'the same on all ' + set.read + ' icons read' : 'the same on ' + set.sameW + ' of ' + set.read + ' icons read') + (an.src === 'figma' ? ', as Figma draws it' : an.src === 'code' ? ', as its code draws it' : ', measured on its drawing');
-      return '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 1200 760" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out +
-        '<text x="40" y="' + (84 + bx[3] * big) + '" class="sg-bk-lens-sub">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  stroke ' + num(an.w) + 'px, ' + esc(same) + '</text></svg>';
+      var set = an.set, same = (set.sameW === set.read ? 'one stroke on all ' + set.read + ' icons' : 'one stroke on ' + set.sameW + ' of ' + set.read + ' icons') + (an.src === 'figma' ? ', as Figma draws it' : an.src === 'code' ? ', as its code draws it' : ', read on their drawing');
+      return '<svg class="sg-bk-geo sg-bk-lens" viewBox="0 0 1688 760" aria-hidden="true" data-stroke="' + an.w + '" data-cap="' + (an.end ? (an.end.round ? 'round' : 'flat') : '') + '" data-join="' + (an.corner ? (an.corner.round ? 'round' : 'sharp') : '') + '" data-gap="' + (an.gap ? num(an.gap.gap) : '') + '">' + out +
+        '<text x="40" y="' + (84 + bx[3] * big) + '" class="sg-bk-lens-sub">' + esc(String(an.id).replace(/^(ic|icon)[-_]/i, '').replace(/^[smlx]{1,2}-/i, '').replace(/-[smlx]{1,2}$/i, '')) + '  ·  ' + esc(same) + '</text></svg>';
     }
     var anatomyCache = {};
     function iconAnatomy(ids) {
