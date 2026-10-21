@@ -6630,7 +6630,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // doneWord: the word that counts as done, or several (Found and CSS only are both in the code).
     var card = function (title, parts, doneWord, outOf, of, next) { return { title: title, big: outOf ? [].concat(doneWord).reduce(function (t, w) { return t + countOf(parts, w); }, 0) : null, outOf: outOf || null, of: outOf ? of : 'nothing to measure yet', total: outOf, parts: parts, next: next }; };
     var tile = function (o) {
-      var tip = o.how ? tipHTML(o.how, 'How ' + o.title + ' is counted') : '';
+      var tip = o.how ? tipHTML(o.how, 'How ' + o.title + ' is counted', o.howParts ? { parts: o.howParts } : undefined) : '';
       var total = o.total || 0, parts = (o.parts || []).filter(function (x) { return x.n > 0; });
       var barHTML = '<span class="sg-health-bar" aria-hidden="true">' + (total ? parts.map(function (x) { return '<span class="is-' + x.cls + (x.word === 'Untested' ? ' is-untested' : '') + '" style="width:' + Math.max(1, Math.round(x.n / total * 100)) + '%"></span>'; }).join('') : '') + '</span>';
       var legend = '<p class="sg-health-legend">' + parts.map(function (x) { return '<span class="pg-par-status pg-par--' + ({ done: 'match', check: 'figma', fix: 'differs', none: 'none' })[x.cls] + (x.word === 'Untested' ? ' is-untested' : '') + '">' + (x.word === 'N/A' ? '' : '<span class="pg-par-sign" aria-hidden="true"></span>') + esc(x.say) + '</span>'; }).join('') + (o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</p>';
@@ -6664,7 +6664,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
     // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.
     iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
-    aT.how = 'Every component Figma has; one not in the code yet has nothing to try, and is counted apart.' + SAME + ' Pass: meets every WCAG 2.2 A and AA check it is tested on. Issues: a check fails. Review: only the checks a person makes are left. Untested: not tested in a browser yet.';
+    aT.how = 'Every component Figma has; one not in the code yet is counted apart.' + SAME;
+    // Where the checks come from and how they run, said plainly: someone will ask.
+    aT.howParts = [
+      ['What each state means', 'Pass: every check it is tested on passes (its text reads at 4.5:1 or more, say). Issues: a check fails (a button with no name a screen reader can say). Review: only what a person must judge is left (whether a label describes its field). Untested: not opened in a browser yet.'],
+      ['Where the checks come from', 'WCAG 2.2, levels A and AA, the W3C\'s accessibility standard: every success criterion, each marked as checked automatically, in the code, or by a person.'],
+      ['How they are run', 'In a real browser (headless Chrome), on every variant and state (hover, focus, input): axe-core, Deque\'s open-source checker, the engine\'s own WCAG checks, and the browser\'s accessibility tree for names and roles. Contrast uses WCAG\'s own formula: 4.5:1 for text, 3:1 for large text and for the edges of controls, in every theme.']
+    ];
     dT.how = 'Every component Figma has.' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
