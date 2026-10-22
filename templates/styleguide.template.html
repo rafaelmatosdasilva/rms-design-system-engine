@@ -3001,7 +3001,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilGets = function (p) { return ((p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>')
       + ((p.wrong || []).some(function (f) { return f.line && (f.kind === 'name' || f.kind === 'claim'); }) ? '<p class="pg-missing">Not the sentences the system contradicts: they are left out until they are fixed.</p>' : ''); };
     // A page kept as it is: its Keep says it all, so What to do and Why stay empty rather than repeat it on every row.
-    var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
+    // With a proposal still to answer, what to do is to answer it; the engine's own route is said only as the one if not.
+    var ilOpen = function (p) { return (p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || [])).filter(function (x) { return x.answer !== 'no'; }); };
+    var ilIfNot = function (p, html) { return ilOpen(p).length ? '<p class="sg-il-line"><strong>Say yes or no to the proposal above.</strong></p>' + (html ? '<p class="sg-il-line"><span class="pg-par-val">If not: ' + html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() + '</span></p>' : '') : html; };
+    var ilTodo = function (p) { return ilIfNot(p, (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('')) || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
     // system has instead, with where that comes from.
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
@@ -3028,7 +3031,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
     // Every row but Keep waits on a person: its status is Review, and what kind of review is said under it (a draft's
     // review is "Drafts", the others their decision: Move, Fix, Add…).
-    var labelOf = function (k) { if (k === 'review') return 'Drafts'; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
+    // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
+    // component, a name not in the system, a component with no page, drafts…
+    var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
+    var labelOf = function (k) { if (IL_TOPIC[k]) return IL_TOPIC[k]; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
     var decisionCell = function (k) { return k === 'keep' ? '<span class="pg-par-status pg-par--' + IL_DOT.keep + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'
       : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true"></span>Review</span><span class="pg-par-val">' + esc(labelOf(k)) + '</span>'; };
     // Each row's cells, once: the table shows For, File, Decision and when its file last changed; a click on the row (or
@@ -3037,7 +3043,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
     var ilCellsOf = function (p) {
       if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">No file</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
-        updated: '', reads: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
+        updated: '', reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
       return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
@@ -3053,8 +3059,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       panelShow(m, from);
     };
     var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
-    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(function (p) { return p.missingFor || p.action !== 'keep'; }).length; var kinds = labels.filter(function (l) { return l[0] !== 'keep' && counts[l[0]]; }).map(function (l) { return { key: l[0], label: labelOf(l[0]), n: counts[l[0]], dot: IL_DOT[l[0]] }; });
-      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(kinds, counts.keep ? [{ key: 'keep', label: 'Keep', n: counts.keep, dot: IL_DOT.keep }] : []); })() });
+    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(function (p) { return p.missingFor || p.action !== 'keep'; }).length;
+      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.keep ? [{ key: 'keep', label: 'Keep', n: counts.keep, dot: IL_DOT.keep }] : []); })() });
     // The review, downloaded: for Excel (a workbook with the table's own columns and rows) and for Claude (Markdown: what the
     // table is, how to work through it, then each page with its decision, why and each change), to hand to whoever fixes it.
     var ilText = function (html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = ' — ' + v.textContent; }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
