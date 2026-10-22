@@ -3024,7 +3024,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
     var labelOf = function (k) { var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
     var decisionCell = function (k) { return '<span class="pg-par-status pg-par--' + IL_DOT[k] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'; };
-    // Each row's cells, once: the table shows Decision, File, For and when its file last changed; a click on the row (or
+    // Each row's cells, once: the table shows For, File, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -3035,7 +3035,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"><td>' + c.decision + '</td><td>' + c.file + '</td><td>' + c.forWhat + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
@@ -3068,7 +3068,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var cell = function (r, i, text, style) { return '<c r="' + col(i) + r + '" t="inlineStr" s="' + style + '"><is><t xml:space="preserve">' + x(text) + '</t></is></c>'; };
       var links = [], rowsXml = ['<row r="1">' + head.map(function (h, i) { return cell(1, i, h, 1); }).join('') + '</row>'];
       body.forEach(function (cells, n) { var r = n + 2; rowsXml.push('<row r="' + r + '">' + cells.map(function (c, i) { if (c.url) links.push({ ref: col(i) + r, url: c.url }); return cell(r, i, c.text, c.url ? 2 : 0); }).join('') + '</row>'); });
-      var widths = [12, 36, 26, 20, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
+      var widths = [26, 36, 12, 20, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
       var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:' + last + '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + head.map(function (h, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (widths[i] || 30) + '" customWidth="1"/>'; }).join('') + '</cols><sheetData>' + rowsXml.join('') + '</sheetData><autoFilter ref="A1:' + last + '"/>' + (links.length ? '<hyperlinks>' + links.map(function (l, i) { return '<hyperlink ref="' + l.ref + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</hyperlinks>' : '') + '</worksheet>';
       var rel = function (rels) { return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>'; };
       var files = [
@@ -3109,7 +3109,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ilLinks.addEventListener('click', function (e) { var b = e.target.closest('[data-il-export]'); if (!b) return; if (b.getAttribute('data-il-export') === 'xlsx') ilSave(ilBase + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ilXlsx()); else ilSave(ilBase + '.md', 'text/markdown;charset=utf-8', ilMd()); });
     }
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>File</th><th>For</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>For</th><th>File</th><th>Decision</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
   }
