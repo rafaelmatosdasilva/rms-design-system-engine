@@ -180,3 +180,20 @@ test('reviewing drafts: approve takes the marker off, change writes the new text
   assert.match(r.files.get('specs/tile-one.md'), /- \*\*Draft:\*\* Use it on a dashboard\./, 'the refused change leaves the draft as it was');
   assert.match(describeReview(r), /^Drafts reviewed on 1 page: 1 approved, 0 changed, 1 dropped\./);
 });
+
+test('each run fixes the layer only where intentLayer.autoFix is "commit", never offline; --intent-autofix turns it on and off, the file\'s indentation kept', async () => {
+  const { autoFix } = await import('../intent-changes.mjs');
+  assert.equal(await autoFix('.', { intentLayer: 'https://gitlab.acme.test/ux/layer' }), null);
+  assert.equal(await autoFix('.', { intentLayer: { gitlab: 'https://gitlab.acme.test/ux/layer', autoFix: 'commit' } }, { offline: true }), null);
+  const { mkdtempSync, writeFileSync, readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const { spawnSync } = await import('node:child_process');
+  const root = mkdtempSync(join(tmpdir(), 'autofix-'));
+  writeFileSync(join(root, 'ds-config.json'), '{\n    "name": "Acme",\n    "intentLayer": "https://gitlab.acme.test/ux/layer"\n}\n');
+  const engine = new URL('../audit.mjs', import.meta.url).pathname;
+  assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'on'], { cwd: root, encoding: 'utf8' }).status, 0);
+  assert.equal(readFileSync(join(root, 'ds-config.json'), 'utf8'), '{\n    "name": "Acme",\n    "intentLayer": {\n        "gitlab": "https://gitlab.acme.test/ux/layer",\n        "autoFix": "commit"\n    }\n}\n');
+  assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'off'], { cwd: root, encoding: 'utf8' }).status, 0);
+  assert.equal(JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8')).intentLayer, 'https://gitlab.acme.test/ux/layer');
+});

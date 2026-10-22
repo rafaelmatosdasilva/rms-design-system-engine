@@ -97,6 +97,7 @@ rms-design-system-engine --watch-intent-layer [min]     # keep running: build th
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
 rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
+rms-design-system-engine --intent-autofix on|off        # whether each run of the audit and of the style guide fixes the intent layer and commits it straight on its branch (ds-config.json → intentLayer.autoFix "commit")
 rms-design-system-engine --review-drafts                 # every draft in the intent layer to review: its page, its section, its text
 rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
@@ -333,6 +334,17 @@ take out. Repeated is the same line on half the pages of a kind or more, the sam
 changed (its name, identifier, code file or `metadata.aliases`) on five or more, or a line that names nothing in code
 on a fifth of them or more. Sections written for people by their nature (Evidence, Examples, Cross-references,
 References, See also, Related, Changelog, History, Sources) stay as they are, never asked to be retitled.
+
+**Fixing the layer on each run: `--intent-autofix on`** (`intentLayer.autoFix: "commit"`). After the audit or the style
+guide reads the layer, what `--intent-changes` would change is changed and committed straight on the layer's branch,
+once a run, never offline and never failing the run: the lines written on every page taken out, sentences the system
+contradicts written again, what a page lacks drafted. A drafted line keeps its `**Draft:**` marker, so it waits for the
+team's review (the page's Review decision); what needs a person and no draft can settle (a name nothing in the system
+confirms, a page to add, move or delete) is never touched and stays on the Intent layer page. The run says what it did
+in one line, with the commit's link and `CHANGES.md`. The layer is read again at once, so the guide shows it as it is.
+When drafts cannot be written this run (the `claude` command not signed in), the mechanical changes are still made and
+the requests are written as `--intent-changes` writes them. It takes the person's word once, by turning it on; turn it
+off with `--intent-autofix off`.
 
 **Reviewing drafts: `--review-drafts`.** The words, everywhere: a line is a **draft** (its `**Draft:**` marker), what
 a person does with it is **review** it (the page's decision, the style guide's Drafts to review card). Each draft is

@@ -700,6 +700,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // Read again where it lives first (GitLab): nothing is fetched while its commit has not moved, and when it cannot be
       // read the copy kept is used and said, never silently.
       if (hasLayer && !opts.offline) { try { for (const r of await ilMod.syncSources(ROOT, cfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+      // intentLayer.autoFix "commit": the layer's fixes committed before the guide reads it (once a run, with the audit).
+      if (hasLayer && !opts.offline) { try { const fixed = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg); if (fixed) console.log('   ' + fixed); } catch { /* the guide is built from the layer as read */ } }
       const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
       const ilMatch = ilSnap ? ilMod.matchComponents(view.components.map((c) => c.name), ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
       // What the system contradicts on each page (intent-truth.mjs): left out of its documentation, and said.

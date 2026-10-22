@@ -187,7 +187,8 @@ export function jsonAdd(entry, where, line) {
 // ── What to change ──────────────────────────────────────────────────────────────────────────────────────────────────
 // report: useReport's, with the content check's findings (wrong) on each page. → [{ entity, page, remove, rewrite, need }]
 //   rewrite: [{ line (as written), finding }]; need: ['purpose' | 'whenToUse' | 'whenNotToUse' | 'differ']
-export function planOf(snap, report) {
+// leftForPeople: the lines a drafter said nothing in the system can say (kept, so they are not asked about again).
+export function planOf(snap, report, { leftForPeople = new Set() } = {}) {
   const byKey = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
   const out = [];
   for (const page of report.pages) {
@@ -199,6 +200,7 @@ export function planOf(snap, report) {
       if (f.kind !== 'name' && f.kind !== 'claim' || !f.line) continue;
       // The line as written that holds the sentence: a list item, or a line of a section's text.
       const held = linesOf(e).flatMap((l) => l.text.split('\n')).map((l) => l.replace(/^\s*[-*]\s+/, '').trim()).find((l) => flat(l).includes(flat(f.line)));
+      if (held && leftForPeople.has(flat(held))) continue;
       if (held && !rewrite.some((r) => r.line === held)) rewrite.push({ line: held, findings: [f] });
       else if (held) rewrite.find((r) => r.line === held).findings.push(f);
     }
@@ -455,4 +457,69 @@ export async function commitToBranch(access, { files, sha, target, message }) {
   if (!c.ok) return { error: c.status === 403 || c.status === 401 ? `GitLab refused (${c.status}) a commit on ${target} with the token in ${access.writesWith}: it is a protected branch, or the token may not create commits there` : `GitLab answered ${c.status} to the commit` };
   const out = await c.json();
   return { url: out?.web_url ?? null, sha: out?.id ?? null };
+}
+
+// ── The whole of it, for the command and for each run ───────────────────────────────────────────────────────────────
+// The layer as last read, checked, its changes planned, drafted (answers given, else the claude command; when neither
+// can, the requests are written for whoever runs the engine) and made in its files. → { snap, access, result, summary,
+// note, plan } or { error }. Nothing is sent.
+export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null, model } = {}) {
+  const il = await import('./intent-layer.mjs');
+  const truth = await import('./intent-truth.mjs');
+  const snap = il.readIntentLayer(ROOT, cfg);
+  if (!snap?._source?.sha) return { error: 'no intent layer read yet' };
+  const facts = truth.systemFacts(ROOT, cfg, { record: false });
+  const names = [...new Set([...il.systemNames(ROOT, cfg), ...Object.keys(facts.components)])];
+  const matched = il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg));
+  const found = truth.checkLayer(snap, matched, facts);
+  const report = il.useReport(snap, matched, { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, cfg), wrongOf: (e) => found.get(e) ?? [] });
+  const access = layerAccess(ROOT, cfg);
+  if (access.error) return { error: access.error };
+  const leftFile = resolve(ROOT, OUT_DIR, 'intent-left-for-people.json');
+  let left = []; try { left = JSON.parse(readFileSync(leftFile, 'utf8')); } catch { /* none yet */ }
+  const plan = planOf(snap, report, { leftForPeople: new Set(left.map((x) => flat(x.line))) });
+  if (!plan.length) return { snap, access, plan, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
+  let files; try { files = await layerFiles(access, snap._source.sha); } catch (e) { return { error: e.message }; }
+  let note = '';
+  if (drafts && draftJobs(plan, facts).length) {
+    if (answers) draftPlan(plan, facts, null, { answers, batch: Infinity });
+    else {
+      const run = claudeRunner({ model: model ?? ((typeof cfg.intentLayer === 'object' && cfg.intentLayer.draftModel) || undefined) });
+      try { if (!run) throw new Error('the claude command is not installed'); draftPlan(plan, facts, run); }
+      catch (e) {
+        for (const it of plan) Object.assign(it, { rewritten: [], drafted: [], dropped: [] });
+        const ask = resolve(ROOT, OUT_DIR, 'intent-draft-request.md');
+        mkdirSync(dirname(ask), { recursive: true });
+        writeFileSync(ask, draftPrompt(draftJobs(plan, facts).map((j) => j.ask)) + '\n');
+        note = `No drafts this run (${e.message}): the requests are in ${OUT_DIR}/intent-draft-request.md. Answer them as one JSON object in a file, then run --intent-changes --drafts-from <that file>.`;
+      }
+    }
+  }
+  const dropped = plan.flatMap((i) => (i.dropped ?? []).map((d) => ({ page: i.entity.name, ...d })));
+  const result = applyPlan(plan, files);
+  // What the drafter left for a person: kept, so later runs do not ask about it again (it stays on the page as Fix).
+  const now = plan.flatMap((i) => (i.rewritten ?? []).filter((r) => !r.text).map((r) => ({ page: i.entity.name, line: r.line, why: r.why ?? null })));
+  if (now.length) { mkdirSync(dirname(leftFile), { recursive: true }); writeFileSync(leftFile, JSON.stringify([...left, ...now.filter((n) => !left.some((l) => flat(l.line) === flat(n.line)))], null, 1) + '\n'); }
+  return { snap, access, plan, result, summary: describeChanges(result, { dropped }), note };
+}
+
+// On each run (the audit, the style guide), when ds-config.json → intentLayer.autoFix is "commit": what the engine can
+// fix in the layer is fixed and committed straight on its branch, drafted lines marked for the team to review, and what
+// it did is said in one line. Once per run; never when the run is offline; never fails the run. → the line, or null.
+let fixedThisRun = false;
+export async function autoFix(ROOT, cfg, { offline = false } = {}) {
+  const mode = typeof cfg.intentLayer === 'object' ? cfg.intentLayer.autoFix : null;
+  if (mode !== 'commit' || offline || fixedThisRun) return null;
+  fixedThisRun = true;
+  try {
+    const p = await prepareLayerFix(ROOT, cfg);
+    if (p.error) return `⚠️  Intent layer not fixed this run: ${p.error}`;
+    if (!p.result.files.size) return p.note ? `🔧 Intent layer: nothing to fix that needs no drafting. ${p.note}` : null;
+    writeLocal(ROOT, p.result.files, p.summary);
+    const done = await commitToBranch(p.access, { files: p.result.files, sha: p.snap._source.sha, target: p.snap._source.ref, message: 'Intent layer: fixed by the design-system engine (' + p.summary.split('\n')[0].replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+    if (done.error) return `⚠️  Intent layer not fixed this run: ${done.error}`;
+    // Read again, so what this run builds shows the layer as it is now.
+    try { const il = await import('./intent-layer.mjs'); await il.syncSources(ROOT, cfg); } catch { /* next run reads it */ }
+    return `🔧 Intent layer fixed and committed on ${p.snap._source.ref}: ${p.summary.split('\n')[0]} ${done.url ?? done.sha} (${OUT_DIR}/intent-changes/CHANGES.md says each change)${p.note ? `\n   ${p.note}` : ''}`;
+  } catch (e) { return `⚠️  Intent layer not fixed this run: ${e.message}`; }
 }

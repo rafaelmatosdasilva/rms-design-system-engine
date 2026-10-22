@@ -330,6 +330,26 @@ if (process.argv.includes('--check-intent')) {
   process.exit(1);
 }
 
+// ── --intent-autofix on|off: whether each run fixes the intent layer and commits it straight on its branch ──
+// Writes ds-config.json → intentLayer.autoFix ("commit", or taken out), keeping the file's own indentation.
+if (process.argv.includes('--intent-autofix')) {
+  const file = join(ROOT, 'ds-config.json');
+  let raw, pcfg; try { raw = readFileSync(file, 'utf8'); pcfg = JSON.parse(raw); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const v = String(process.argv[process.argv.indexOf('--intent-autofix') + 1] ?? '').toLowerCase();
+  if (!['on', 'off'].includes(v)) { console.log('Say on or off: rms-design-system-engine --intent-autofix on'); process.exit(2); }
+  if (!pcfg.intentLayer) { console.log('❌ ds-config.json names no intent layer: rms-design-system-engine --init --documentation=<its GitLab link> first.'); process.exit(2); }
+  const il = typeof pcfg.intentLayer === 'string' ? { gitlab: pcfg.intentLayer } : { ...pcfg.intentLayer };
+  if (v === 'on') il.autoFix = 'commit'; else delete il.autoFix;
+  pcfg.intentLayer = Object.keys(il).length === 1 && il.gitlab ? il.gitlab : il;
+  const indent = /\n(\t+)"/.exec(raw)?.[1]?.slice(0, 1) ?? ' '.repeat((/\n( +)"/.exec(raw)?.[1] ?? '  ').length);
+  writeFileSync(file, JSON.stringify(pcfg, null, indent) + '\n');
+  console.log(v === 'on'
+    ? '✅ Each run of the audit and of the style guide now fixes what the engine can in the intent layer and commits it straight on its branch (GITLAB_WRITE_TOKEN), drafts marked **Draft:** for the team to review; the run says what it did.'
+    : '✅ The intent layer is fixed only when asked (--intent-changes).');
+  console.log('NEXT: none');
+  process.exit(0);
+}
+
 // ── --intent-changes: the changes the Intent layer review asks for, made in the layer's own files ──
 // The lines written on every page alike taken out, each sentence the system contradicts written again with only what it
 // has (as a draft), and what a component page lacks drafted (intent-changes.mjs). Written to
@@ -344,42 +364,15 @@ if (process.argv.includes('--intent-changes')) {
   if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
   const snap = il.readIntentLayer(ROOT, pcfg);
   if (!snap?._source?.sha) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run again.'); process.exit(2); }
-  const facts = truth.systemFacts(ROOT, pcfg, { record: false });
-  const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
-  const matched = il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, pcfg));
-  const found = truth.checkLayer(snap, matched, facts);
-  const report = il.useReport(snap, matched, { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, pcfg), wrongOf: (e) => found.get(e) ?? [] });
-  const access = ch.layerAccess(ROOT, pcfg);
-  if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
-  let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
-  const plan = ch.planOf(snap, report);
-  let note = '';
-  // The drafts: from answers already written (--drafts-from <file>), else by the claude command; when neither can,
-  // the requests are written to DRAFT-REQUEST.md for whoever runs this to answer, and the mechanical changes are made.
-  const askFile = resolve(ROOT, ch.CHANGES_DIR, '..', 'intent-draft-request.md');
-  if (!process.argv.includes('--no-drafts') && ch.draftJobs(plan, facts).length) {
-    const from = process.argv.indexOf('--drafts-from');
-    const at = process.argv.indexOf('--model');
-    if (from > 0) {
-      let answers; try { answers = JSON.parse(readFileSync(resolve(process.argv[from + 1]), 'utf8')); } catch (e) { console.log(`❌ ${process.argv[from + 1]}: ${e.message}`); process.exit(2); }
-      ch.draftPlan(plan, facts, null, { answers, batch: Infinity });
-    } else {
-      const run = ch.claudeRunner({ model: at > 0 ? process.argv[at + 1] : (typeof pcfg.intentLayer === 'object' && pcfg.intentLayer.draftModel) || undefined });
-      try {
-        if (!run) throw new Error('the claude command is not installed');
-        console.log(`✍️  Drafting ${plan.reduce((t, i) => t + i.rewrite.length, 0)} sentences to write again and what ${plan.filter((i) => i.need.length).length} pages lack…`);
-        ch.draftPlan(plan, facts, run);
-      } catch (e) {
-        for (const it of plan) Object.assign(it, { rewritten: [], drafted: [], dropped: [] });
-        mkdirSync(dirname(askFile), { recursive: true });
-        writeFileSync(askFile, ch.draftPrompt(ch.draftJobs(plan, facts).map((j) => j.ask)) + '\n');
-        note = `No drafts this run (${e.message}): the requests are in ${relative(ROOT, askFile)}. Answer them as one JSON object in a file, then run --intent-changes --drafts-from <that file>.`;
-      }
-    }
-  }
-  const dropped = plan.flatMap((i) => (i.dropped ?? []).map((d) => ({ page: i.entity.name, ...d })));
-  const result = ch.applyPlan(plan, files);
-  const summary = ch.describeChanges(result, { dropped });
+  // The drafts: from answers already written (--drafts-from <file>), else by the claude command; when neither can, the
+  // requests are written for whoever runs this to answer, and the mechanical changes are made (intent-changes.mjs).
+  const from = process.argv.indexOf('--drafts-from'), at = process.argv.indexOf('--model');
+  let answers = null;
+  if (from > 0) { try { answers = JSON.parse(readFileSync(resolve(process.argv[from + 1]), 'utf8')); } catch (e) { console.log(`❌ ${process.argv[from + 1]}: ${e.message}`); process.exit(2); } }
+  const prep = await ch.prepareLayerFix(ROOT, pcfg, { drafts: !process.argv.includes('--no-drafts'), answers, model: at > 0 ? process.argv[at + 1] : undefined });
+  if (prep.error) { console.log(`❌ ${prep.error}`); process.exit(2); }
+  const { access, result, summary, note } = prep;
+  if (!summary) { console.log(`✅ Nothing in the intent layer the engine can fix.${note ? `\n   ${note}` : ''}`); console.log('NEXT: none'); process.exit(0); }
   const dir = ch.writeLocal(ROOT, result.files, summary);
   console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each change)${note ? `\n   ${note}` : ''}${result.held.length ? `\n   ${result.held.length} page${result.held.length === 1 ? '' : 's'} not changed: ${result.held.map((h) => h.name).join(', ')} (CHANGES.md says why)` : ''}`);
   if (!result.files.size) { console.log('NEXT: none'); process.exit(0); }
@@ -5168,6 +5161,10 @@ function reportFull(label, items, shown) {
     const il = await import('./intent-layer.mjs');
     docSources = il.configuredSources(cfg).length;
     for (const { result, line } of await il.syncSources(ROOT, cfg, { offline: process.argv.includes('--offline') })) if (line) console.log('\n' + (result?.error ? C.yellow(line) : line));
+    // ds-config.json → intentLayer.autoFix "commit": what the engine can fix in the layer is fixed and committed now,
+    // drafts marked for the team (intent-changes.mjs → autoFix).
+    const fixed = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg, { offline: process.argv.includes('--offline') });
+    if (fixed) console.log('\n' + fixed);
   } catch (e) { console.log(C.yellow('\n⚠️  Documentation sources: not read (' + e.message + ')')); }
 
   // ── Design-intent (adopt-aware OUTPUT, not a gate) ──────────────────────────
