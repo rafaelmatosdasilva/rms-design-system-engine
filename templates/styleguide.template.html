@@ -2971,7 +2971,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var b = e.target.closest('.sg-chip[data-chip]'); if (!b) return;
       var k = b.getAttribute('data-chip');
       Array.prototype.forEach.call(bar.querySelectorAll('.sg-chip[data-chip]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-      Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k; });
+      Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k && tr.getAttribute('data-chip-group') !== k; });   // a chip shows its own rows, or a group of them (data-chip-group)
       sec.dispatchEvent(new CustomEvent('sg-chip', { detail: k }));
     });
     return bar;
@@ -3026,8 +3026,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
     var rows = IL.pages.slice().sort(function (x, y) { return labels.findIndex(function (l) { return l[0] === x.action; }) - labels.findIndex(function (l) { return l[0] === y.action; }); })
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
-    var labelOf = function (k) { var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
-    var decisionCell = function (k) { return '<span class="pg-par-status pg-par--' + IL_DOT[k] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'; };
+    // Every row but Keep waits on a person: its status is Review, and what kind of review is said under it (a draft's
+    // review is "Drafts", the others their decision: Move, Fix, Add…).
+    var labelOf = function (k) { if (k === 'review') return 'Drafts'; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
+    var decisionCell = function (k) { return k === 'keep' ? '<span class="pg-par-status pg-par--' + IL_DOT.keep + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'
+      : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true"></span>Review</span><span class="pg-par-val">' + esc(labelOf(k)) + '</span>'; };
     // Each row's cells, once: the table shows For, File, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
@@ -3039,18 +3042,19 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"' + (p.missingFor || p.action !== 'keep' ? ' data-chip-group="toReview"' : '') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var body = card('Decision', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer', labelOf(p.missingFor ? 'missing' : p.action)], title: p.missingFor || p.name || p.file || 'Page', body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer'].concat(p.missingFor || p.action !== 'keep' ? ['Review', labelOf(p.missingFor ? 'missing' : p.action)] : ['Keep']), title: p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
     var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
-    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: labels.filter(function (l) { return counts[l[0]]; }).map(function (l) { return { key: l[0], label: l[1], n: counts[l[0]], dot: IL_DOT[l[0]] }; }) });
+    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(function (p) { return p.missingFor || p.action !== 'keep'; }).length; var kinds = labels.filter(function (l) { return l[0] !== 'keep' && counts[l[0]]; }).map(function (l) { return { key: l[0], label: labelOf(l[0]), n: counts[l[0]], dot: IL_DOT[l[0]] }; });
+      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(kinds, counts.keep ? [{ key: 'keep', label: 'Keep', n: counts.keep, dot: IL_DOT.keep }] : []); })() });
     // The review, downloaded: for Excel (a workbook with the table's own columns and rows) and for Claude (Markdown: what the
     // table is, how to work through it, then each page with its decision, why and each change), to hand to whoever fixes it.
     var ilText = function (html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = ' — ' + v.textContent; }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
