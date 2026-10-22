@@ -330,6 +330,35 @@ if (process.argv.includes('--check-intent')) {
   process.exit(1);
 }
 
+// ── --intent-decide [key,… yes|no]: the team's answer to the engine's proposals for the Intent layer's Fix, Add, Move ──
+// With nothing after it, lists each open proposal with its key and what it rests on. With keys ("all" for every open
+// one) and yes or no, records the answer in design-system-engine-intent-decisions.json: a yes is acted on from the next
+// run (intent-proposals.mjs), a no keeps the decision on the page.
+if (process.argv.includes('--intent-decide')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const pr = await import('./intent-proposals.mjs');
+  const d = await pr.decidedLayer(ROOT, pcfg);
+  if (!d) { console.log('❌ No intent layer read yet.'); process.exit(2); }
+  const open = [...d.proposals].filter(([k]) => !d.decisions[k]);
+  const at = process.argv.indexOf('--intent-decide'), keysArg = process.argv[at + 1], ans = String(process.argv[at + 2] ?? '').toLowerCase();
+  if (!keysArg || keysArg.startsWith('--')) {
+    if (!open.length) { console.log('✅ No proposal waits for an answer.'); console.log('NEXT: none'); process.exit(0); }
+    console.log(`📝 ${open.length} proposal${open.length === 1 ? '' : 's'} wait for the team's answer:`);
+    for (const [k, v] of open) console.log(`\n${k}\n  → ${v.proposal}\n${v.evidence.map((e) => '    · ' + e).join('\n')}`);
+    console.log('\nNEXT: ask the person yes or no for each (or for all); record it with --intent-decide "<key>[,<key>…]" yes|no; never answer for them.');
+    process.exit(0);
+  }
+  if (!['yes', 'no'].includes(ans)) { console.log('Say yes or no: rms-design-system-engine --intent-decide "<key>" yes'); process.exit(2); }
+  const keys = keysArg === 'all' ? open.map(([k]) => k) : keysArg.split(',').map((k) => k.trim()).filter(Boolean);
+  const unknown = keys.filter((k) => !d.proposals.has(k));
+  if (unknown.length) { console.log(`❌ No proposal is called ${unknown.join(', ')} (--intent-decide lists them).`); process.exit(2); }
+  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals));
+  console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans}${ans === 'yes' ? ': acted on from the next run, and the Intent layer page no longer asks them of the team' : ': they stay on the Intent layer page'} (${projectPath(ROOT, 'intentDecisions')}).`);
+  console.log('NEXT: rebuild the style guide to see it (--styleguide).');
+  process.exit(0);
+}
+
 // ── --intent-autofix on|off: whether each run fixes the intent layer and commits it straight on its branch ──
 // Writes ds-config.json → intentLayer.autoFix ("commit", or taken out), keeping the file's own indentation.
 if (process.argv.includes('--intent-autofix')) {

@@ -98,6 +98,8 @@ rms-design-system-engine --check-intent [file|folder]   # whether what intent-la
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
 rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
 rms-design-system-engine --intent-autofix on|off        # whether each run of the audit and of the style guide fixes the intent layer and commits it straight on its branch (ds-config.json → intentLayer.autoFix "commit")
+rms-design-system-engine --intent-decide                 # the engine's proposed answer to each of the team's decisions on the Intent layer page (Fix, Add, Move), with its key and what it rests on
+rms-design-system-engine --intent-decide "<key>[,<key>]" yes|no  # the team's answer ("all" for every open one), kept in design-system-engine-intent-decisions.json and acted on from the next run
 rms-design-system-engine --review-drafts                 # every draft in the intent layer to review: its page, its section, its text
 rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
@@ -345,6 +347,20 @@ in one line, with the commit's link and `CHANGES.md`. The layer is read again at
 When drafts cannot be written this run (the `claude` command not signed in), the mechanical changes are still made and
 the requests are written as `--intent-changes` writes them. It takes the person's word once, by turning it on; turn it
 off with `--intent-autofix off`.
+
+**Proposals for the team's decisions: `--intent-decide`** (`intent-proposals.mjs`). Each Fix, Add and Move on the
+Intent layer page carries the engine's proposed answer and what it rests on, in a Proposal card of its panel. Add: a
+component drawn from the same code file as a documented one has that page; a part of a documented component (its Figma
+name under it, or its code file beside it, used only by it) is documented in that page; else its page is to be written
+(only components the code has are asked a page: one only in Figma waits until it is built). Fix: a name the page itself
+gives as Figma's (a sentence of it says so, and every name listed beside such a name) is kept; a newer version of a
+name the system has (`tabGroupV2` of `tabGroup`, the older marked deprecated in Figma) is kept until the system has it;
+a name that is a code file's (an internal part) is kept. Move: a page of a part only its parent's code uses is kept in
+place, the layer writing it from its own file. A person says yes or no, in the chat or with `--intent-decide`; the
+answer is kept in `design-system-engine-intent-decisions.json`, and a yes is acted on everywhere from then on (a kept
+name is no longer a finding, nor left out of what the agents get; a documented part is no longer asked a page; a page
+kept in place is no longer asked to move). A no leaves the decision on the page. An agent records only what the person
+said, never answering for them.
 
 **Reviewing drafts: `--review-drafts`.** The words, everywhere: a line is a **draft** (its `**Draft:**` marker), what
 a person does with it is **review** it (the page's decision, the style guide's Drafts to review card). Each draft is

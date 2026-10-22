@@ -163,3 +163,8 @@ test('a value only Figma lists the options of is right when the component\'s own
   assert.equal(checkPage(page('toastOne', { rules: [{ text: 'Use `status="success"` when an action completed.' }] }), facts, { component: 'toastOne' }).length, 0);
   assert.equal(checkPage(page('toastOne', { rules: [{ text: 'Use `status="shiny"` when it shines.' }] }), facts, { component: 'toastOne' }).length, 1);
 });
+
+test('a name in a list under "Incorrect:" is an example not to follow, not a finding', () => {
+  const f = checkPage(page('tileOne', { sections: [{ title: 'Naming', text: 'Correct:\n- `tileOne`\n\nIncorrect:\n- `tile-one-old`\n- `tileOneOld`' }] }), FACTS(), { component: 'tileOne' });
+  assert.equal(f.length, 0);
+});

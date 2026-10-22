@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { codeSnapshotPath, OUT_DIR, ENGINE_DIRS } from './names.mjs';
 import { resolveStatus } from './decision-status.mjs';
 import { matchComponents, systemNames, codeFilesOf } from './intent-layer.mjs';
+import { readDecisions } from './intent-proposals.mjs';
 
 export const KINDS = { name: 'Not in the system', claim: 'Disagrees with the system', stale: 'Out of date', twin: 'Same as another page' };
 // What the engine keeps of each component's props between runs, to tell when one changed.
@@ -186,6 +187,13 @@ const SETS = /^:?([A-Za-z_][\w-]*)\s*=\s*["']?([^"'\s]*)["']?$/;
 const HTML_ATTR = /^(aria-[a-z]+|data-[\w-]+|role|tabindex|for|id|class|style|href|alt|title|type|name|value|disabled|readonly|required|autocomplete|inputmode)$/;
 const HTML_EL = /^(a|abbr|button|code|div|form|h[1-6]|img|input|label|li|nav|ol|option|p|pre|section|select|span|svg|table|tbody|td|textarea|th|thead|tr|ul)$/i;
 const WARNS = /^\s*(do not|don't|never|avoid)\b|\b(deprecated|removed|no longer|must not be used|not part of|invent(ed)?|misspel\w*|alias(es)? of|not an? (new )?(ds|design[- ]system) component|local (layout )?wrapper)\b/i;
+// A list item under a line that says what follows is wrong ("Incorrect:", "Don't:", "Avoid:"): examples not to follow.
+function underWrongList(text, at) {
+  const lines = text.slice(0, at).split('\n');
+  if (!/^\s*[-*]\s/.test(lines.at(-1))) return false;
+  for (let i = lines.length - 2; i >= 0; i--) { if (/^\s*[-*]\s/.test(lines[i]) || !lines[i].trim()) continue; return /^\s*(incorrect|wrong|bad|don'?t|do not|avoid|never)\b[^\n]*:\s*$/i.test(lines[i]); }
+  return false;
+}
 const NOT_THIS = /\b(not|never|avoid|instead of|rather than|named|called|nor|no)\s+(?:[\w-]+\s+){0,3}$|\b(not|never|avoid|instead of|rather than|named|called|nor|no)\s*$/i;
 const FIGMA_DRAWING = /\bfigma\b|\b(construction )?layers?\b|\bframes?\b/i;
 const camel = (s) => s.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
@@ -273,7 +281,7 @@ export function checkPage(e, facts, { component = null, strict = false } = {}) {
       // A name given as the one not to use ("not `icons/check-big`", "a component named `x`"), or in a sentence that warns
       // against it (do not use it, it is deprecated, removed, no longer there, not to be invented): the page says it is
       // not one, which is right.
-      if (!known && !strict && (NOT_THIS.test(text.slice(Math.max(0, m.index - 40), m.index)) || WARNS.test(line))) continue;
+      if (!known && !strict && (NOT_THIS.test(text.slice(Math.max(0, m.index - 40), m.index)) || WARNS.test(line) || underWrongList(text, m.index))) continue;
       // A name of Figma's own drawing (a frame, a layer, a reference screen): the engine reads Figma's components and
       // variables, not every frame, so it cannot say such a name is not there.
       if (!known && !strict && (FIGMA_DRAWING.test(line) || FIGMA_DRAWING.test(where))) continue;
@@ -385,7 +393,10 @@ export function checkedLayer(ROOT, cfg, snap) {
       const facts = systemFacts(ROOT, cfg);
       const names = [...new Set([...systemNames(ROOT, cfg), ...Object.keys(facts.components)])];
       const found = checkLayer(snap, matchComponents(names, snap.entities, codeFilesOf(ROOT, cfg)), facts);
-      byKey = new Map([...found].map(([e, f]) => [pageKey(e), f]));
+      // A name the team said to keep (intent-proposals.mjs → a yes to fix:<page>:<name>) is no longer a finding.
+      const decisions = readDecisions(ROOT);
+      const kept = (e, f) => f.kind === 'name' && decisions[`fix:${e.name}:${String(f.says).replace(/`/g, '')}`]?.answer === 'yes';
+      byKey = new Map([...found].map(([e, f]) => [pageKey(e), f.filter((x) => !kept(e, x))]).filter(([, f]) => f.length));
     } catch { /* not checked: nothing said, nothing left out */ }
     checked.set(k, byKey);
   }

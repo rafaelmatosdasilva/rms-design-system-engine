@@ -722,14 +722,16 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       if (snap) {
         // The components the agents get (the design intent's: Figma's, or with no Figma data the code's), not only the
         // ones this page shows, so the page and the audit judge each page alike.
-        const names = il.systemNames(ROOT, cfg);
         const from = il.namesFrom(ROOT, cfg);
         const truth = await import('./intent-truth.mjs');
-        const wrongOf = truth.checkedLayer(ROOT, cfg, snap);
-        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from, wrongOf });
+        // The layer checked, each of the team's decisions proposed an answer, and the answers given applied
+        // (intent-proposals.mjs): a row the team has settled is no longer asked of them.
+        const decided = await (await import('./intent-proposals.mjs')).decidedLayer(ROOT, cfg);
+        const report = decided.report, wrongOf = decided.wrongOf;
+        const counts = report.pages.reduce((t, p) => (t[p.action] = (t[p.action] ?? 0) + 1, t), {});
         const src = snap._source ?? {};
-        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
-          noPage: il.pagesToWrite(names, (n) => report.pages.some((p) => p.component === n), il.codeFilesOf(ROOT, cfg)) };
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
+          noPage: decided.noPage, addProposals: decided.addProposals };
       }
     } catch { /* no intent layer */ }
     // For agents: what an agent can take from the team's guidance for each component, its guidelines section and

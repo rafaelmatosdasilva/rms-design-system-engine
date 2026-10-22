@@ -3001,6 +3001,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
     // system has instead, with where that comes from.
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
+    // The engine's proposed answer to a decision that is the team's (Fix, Add, Move), what it rests on, and how to say
+    // yes or no to it (intent-proposals.mjs). A no keeps the decision on the page as it was.
+    var ilProposal = function (p) {
+      var list = p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || []);
+      return list.map(function (x) {
+        return '<p class="sg-il-line"><strong>' + esc(x.kind === 'fix' ? x.subject + ': ' : '') + esc(x.proposal) + '</strong></p>'
+          + (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join('')
+          + '<p class="sg-il-line"><span class="pg-par-val">' + (x.answer === 'no' ? 'Declined: it stays for the team to settle another way.' : 'Say yes or no to ' + esc(x.key) + ' (in the chat, or rms-design-system-engine --intent-decide "' + esc(x.key) + '" yes).') + '</span></p>';
+      }).join('');
+    };
     // What the agents read from it, word for word, by kind: the one place to see what reaches them.
     var IL_READ = [['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
     var ilReads = function (p) { var r = p.reads || {}; return IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<p class="sg-il-line"><strong>' + esc(k[1]) + '</strong></p>' + r[k[0]].map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join(''); };
@@ -3031,7 +3041,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      var body = card('Decision', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer', labelOf(p.missingFor ? 'missing' : p.action)], title: p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
