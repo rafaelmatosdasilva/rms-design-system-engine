@@ -6,7 +6,8 @@
 //
 // Kept beside the mirror's own record (.gitlab-history.json), per commit: a file asked again at the same commit is
 // never asked again; when the branch moves, GitLab's compare says which files moved and only those are asked again.
-// What a commit changed (its diff) and the release it shipped in never change once known, and are kept as they are.
+// What a commit changed (its diff), the release it shipped in and the day that release was tagged never change once
+// known, and are kept as they are.
 //
 // Every reader is synchronous, as the git ones it stands in for: a reader that finds something missing runs this
 // file once as a child process (`node gitlab-history.mjs '<request>'`), which fills the record, then reads it. A
@@ -33,7 +34,7 @@ export const mirrorRepo = (root) => { const st = mirrorState(root); return st ? 
 export const mirrorHead = (root) => mirrorState(root)?.sha ?? null;
 export const mirrorBranch = (root) => mirrorState(root)?.ref ?? null;
 
-const empty = (sha) => ({ sha, blame: {}, commits: {}, info: {}, diffs: {}, refs: {} });
+const empty = (sha) => ({ sha, blame: {}, commits: {}, info: {}, diffs: {}, refs: {}, tags: {} });
 export function readHistory(root) {
   const st = mirrorState(root);
   if (!st) return null;
@@ -55,8 +56,11 @@ export function missing(root, { blame = [], paths = [] } = {}, h = readHistory(r
     .filter((x) => !fresh || !(x.path in h.commits) || (x.pattern && (h.commits[x.path] ?? []).some((id) => !(h.diffs[id] && x.path in h.diffs[id])))
       // A commit whose release was not read (its request failed) is asked again, never left to read as unreleased.
       || (h.commits[x.path] ?? []).some((id) => !(id in h.refs)));
-  return b.length || p.length || !fresh ? { blame: b, paths: p } : null;
+  return b.length || p.length || undatedReleases(h).length || !fresh ? { blame: b, paths: p } : null;
 }
+
+// The releases a commit shipped in whose tag day is not known yet.
+const undatedReleases = (h) => [...new Set(Object.values(h.refs ?? {}).map((r) => r?.release).filter(Boolean))].filter((n) => !(n in (h.tags ?? {})));
 
 // Fill the record for a request, through the GitLab API. opts: { fetchImpl, env, from }.
 export async function fillHistory(root, req = {}, opts = {}) {
@@ -143,6 +147,18 @@ export async function fillHistory(root, req = {}, opts = {}) {
     const mr = mrs.find((x) => x.state === 'merged') ?? mrs[0];
     h.refs[id] = { release: tags[0] ?? null, mr: mr?.iid != null ? String(mr.iid) : null };
   });
+  // The day each of those releases was tagged (an annotated tag's own date, else its commit's), so a release is dated
+  // when it came out, never by the newest commit it holds. A tag GitLab does not list is kept as unknown.
+  const undated = undatedReleases(h);
+  let tagsRead = true;
+  for (let page = 1; undated.length && page <= 5; page++) {
+    const r = await get(`/repository/tags?per_page=100&page=${page}`);
+    if (!r) { tagsRead = false; break; }                       // not reachable now: asked again next time
+    const list = r.missing ? [] : (Array.isArray(r.body) ? r.body : []);
+    for (const t of list) if (t?.name) h.tags[t.name] = t.created_at ?? t.commit?.committed_date ?? t.commit?.created_at ?? null;
+    if (list.length < 100 || undated.every((n) => n in h.tags)) break;
+  }
+  if (tagsRead) for (const n of undated) if (!(n in h.tags)) h.tags[n] = null;
   writeFileSync(join(root, HISTORY_FILE), JSON.stringify(h) + '\n');
   return { asked, failed };
 }
@@ -189,8 +205,8 @@ export function blameOf(root, file) {
 }
 
 // The commits that changed a component's files, newest first, as component-changelog.mjs's git reader gives them:
-// [{ sha, short, date, subject, release, pr, changed? }]. With a pattern, only commits that changed a rule holding it,
-// each with what it changed in those rules.
+// [{ sha, short, date, subject, release, releasedAt, pr, changed? }], releasedAt the day its release was tagged. With a
+// pattern, only commits that changed a rule holding it, each with what it changed in those rules.
 export function commitsOf(root, files = [], { pattern = null, max = 100, ruleChanges = null } = {}) {
   if (!mirrorState(root) || !files.length) return null;
   const paths = files.map((f) => ({ path: rel(root, f), ...(pattern ? { pattern } : {}) }));
@@ -216,7 +232,7 @@ export function commitsOf(root, files = [], { pattern = null, max = 100, ruleCha
       }
       if (rows.has(id)) continue;
       const i = h.info[id] ?? {};
-      rows.set(id, { sha: id, short: id.slice(0, 7), date: i.time ?? null, subject: i.subject ?? '', release: h.refs[id]?.release ?? null, pr: h.refs[id]?.mr ?? null, ...(changed ? { changed } : {}) });
+      rows.set(id, { sha: id, short: id.slice(0, 7), date: i.time ?? null, subject: i.subject ?? '', release: h.refs[id]?.release ?? null, releasedAt: h.tags?.[h.refs[id]?.release] ?? null, pr: h.refs[id]?.mr ?? null, ...(changed ? { changed } : {}) });
     }
   }
   return [...rows.values()].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, max);

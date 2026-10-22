@@ -2,13 +2,13 @@
 // holds: its git history, its repository, its release tags and the Figma file key. No network.
 //
 // repoUrl(ROOT) → 'https://github.com/owner/repo' | null (package.json repository, else the origin remote)
-// changelogs(ROOT, comps, { max }) → { name: [{ sha, short, date, subject, release, pr, changed? }] }
+// changelogs(ROOT, comps, { max }) → { name: [{ sha, short, date, subject, release, releasedAt, pr, changed? }] }
 //   comps: [{ name, files, pattern?, ranges? }]: its own files, and when they are shared (a theme stylesheet), the line
 //   ranges of its own rules ([file, from, to], followed back through every commit with git log -L, so a change inside
 //   a rule counts) or else the pattern a changed line must hold (its class). changed: what the commit changed in those
 //   rules, in a few words (border-radius --radius-modal → --radii-modal; width 320px added).
-// figmaChangelogs(ROOT, { props, vars }, names, { max }) → { name: [{ sha, short, date, subject, release, changed }] }
-//   every commit that recorded a new read of Figma (its snapshots) and changed what Figma says of the component: its
+// figmaChangelogs(ROOT, { props, vars }, names, { max })
+//   → { name: [{ sha, short, date, subject, release, releasedAt, changed }] }: every commit that recorded a new read of Figma (its snapshots) and changed what Figma says of the component: its
 //   properties and options, and its variables in every mode.
 // commitUrl / prUrl: links in the repository's own host form (GitHub, GitLab).
 // A project read from GitLab (a mirror with no .git) gives the same through the GitLab API (gitlab-history.mjs).
@@ -102,7 +102,17 @@ export function figmaChangelogs(ROOT, { props = null, vars = null } = {}, names 
   if (shas.length) {
     const tags = git(ROOT, ['name-rev', '--tags', '--refs=v[0-9]*', '--name-only', ...shas]).split('\n');
     const rel = Object.fromEntries(shas.map((s, i) => [s, /^(v[\d.]+[\w.-]*?)(?:[~^]\d*)*$/.exec(tags[i] ?? '')?.[1] ?? null]));
-    for (const list of Object.values(out)) for (const r of list) r.release = rel[r.sha];
+    const day = tagDates(ROOT);
+    for (const list of Object.values(out)) for (const r of list) { r.release = rel[r.sha]; r.releasedAt = day[r.release] ?? null; }
+  }
+  return out;
+}
+
+// The day each version tag was made (an annotated tag's own date, else its commit's): { v1.2.0: '2026-02-10T…' }.
+function tagDates(ROOT) {
+  const out = {};
+  for (const line of git(ROOT, ['for-each-ref', '--format=%(refname:short)%09%(creatordate:iso-strict)', 'refs/tags/v[0-9]*']).split('\n')) {
+    const [name, date] = line.split('\t'); if (name && date) out[name] = date;
   }
   return out;
 }
@@ -145,6 +155,7 @@ export function changelogs(ROOT, comps = [], { max = 100 } = {}) {
     const [m, s] = line.split('\x1f'); const n = /#(\d+)/.exec(s)?.[1]; if (!n) continue;
     for (const sha of git(ROOT, ['rev-list', `${m}^1..${m}^2`]).split('\n').filter(Boolean)) pr[sha] ??= n;
   }
-  for (const list of Object.values(out)) for (const r of list) { r.release = release[r.sha]; r.pr = /\(#(\d+)\)/.exec(r.subject)?.[1] ?? pr[r.sha] ?? null; }
+  const day = tagDates(ROOT);
+  for (const list of Object.values(out)) for (const r of list) { r.release = release[r.sha]; r.releasedAt = day[r.release] ?? null; r.pr = /\(#(\d+)\)/.exec(r.subject)?.[1] ?? pr[r.sha] ?? null; }
   return out;
 }

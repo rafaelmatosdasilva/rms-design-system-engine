@@ -31,6 +31,8 @@ const ROUTES = {
   [`/repository/commits/${C}/merge_requests`]: [],
   [`/repository/commits/${A}/refs`]: [{ type: 'tag', name: 'v1.0.0' }],
   [`/repository/commits/${A}/merge_requests`]: [],
+  // v1.0.0 is a lightweight tag (dated by its commit); v1.2.0 an annotated one, tagged days after its last commit.
+  '/repository/tags': [{ name: 'v1.10.0', created_at: null, commit: { committed_date: '2026-04-01T10:00:00Z' } }, { name: 'v1.2.0', created_at: '2026-02-10T09:00:00Z', commit: { committed_date: '2026-02-01T10:00:00Z' } }, { name: 'v1.0.0', created_at: null, commit: { committed_date: '2026-01-01T10:00:00Z' } }],
   '/repository/compare': { diffs: [{ old_path: 'src/Button.vue', new_path: 'src/Button.vue' }] },
 };
 // One stand-in GitLab: answers ROUTES, records what it was asked and with which token.
@@ -72,7 +74,7 @@ test('blame, the commits of a file with a pattern, their releases and merge requ
   assert.equal(gl.calls.length, before, 'the same commit: nothing is asked again');
   // The commits that changed the card's own rule, with what changed, its earliest release and its merge request.
   assert.deepEqual(commitsOf(dir, ['src/theme.css'], { pattern: '\\.card[^a-zA-Z0-9_-]', ruleChanges }), [
-    { sha: B, short: B.slice(0, 7), date: '2026-02-01T10:00:00Z', subject: 'Card radius from Figma', release: 'v1.2.0', pr: '12', changed: ['border-radius 4px → --radius-m'] },
+    { sha: B, short: B.slice(0, 7), date: '2026-02-01T10:00:00Z', subject: 'Card radius from Figma', release: 'v1.2.0', releasedAt: '2026-02-10T09:00:00Z', pr: '12', changed: ['border-radius 4px → --radius-m'] },
   ]);
   assert.deepEqual(commitsOf(dir, ['src/Button.vue']).map((r) => [r.short, r.release, r.pr]), [[C.slice(0, 7), null, null]]);
   const b = blameOf(dir, 'src/theme.css');
@@ -155,4 +157,23 @@ test('a release that could not be read is asked again on the next run, never lef
   assert.ok(!gl.calls.some((c) => c.path === '/repository/commits?path=src/theme.css'), 'its commits are not listed again');
   assert.equal(commitsOf(dir, ['src/theme.css']).find((r) => r.sha === B).release, 'v1.2.0');
   assert.equal(missing(dir, req), null);
+});
+
+test('a record kept before releases were dated asks for the tags once, then never again', async () => {
+  const gl = standIn();
+  const fetchImpl = async (url, init) => { const r = gl.answer(url, init.headers?.['PRIVATE-TOKEN'] ?? null); return { ok: r.status === 200, status: r.status, json: async () => r.body }; };
+  const env = { GITLAB_TOKEN: 'secret', GITLAB_HOST: 'code.acme.example' };
+  const dir = mirror('https://code.acme.example', 'code.acme.example');
+  const req = { paths: [{ path: 'src/Button.vue' }] };
+  await fillHistory(dir, req, { fetchImpl, env });
+  // As an older engine left it: the releases known, their days not.
+  const h = readHistory(dir);
+  h.refs[A] = { release: 'v1.0.0', mr: null }; h.refs[B] = { release: 'v9.9.9', mr: null }; delete h.tags;
+  writeFileSync(join(dir, HISTORY_FILE), JSON.stringify(h));
+  assert.notEqual(missing(dir, req), null, 'undated releases are asked for');
+  const before = gl.calls.length;
+  await fillHistory(dir, req, { fetchImpl, env });
+  assert.deepEqual(gl.calls.slice(before).map((c) => c.path), ['/repository/tags'], 'one list of tags, nothing else');
+  assert.deepEqual(readHistory(dir).tags, { 'v1.10.0': '2026-04-01T10:00:00Z', 'v1.2.0': '2026-02-10T09:00:00Z', 'v1.0.0': '2026-01-01T10:00:00Z', 'v9.9.9': null });
+  assert.equal(missing(dir, req), null, 'a tag GitLab does not list is kept as unknown, not asked every run');
 });

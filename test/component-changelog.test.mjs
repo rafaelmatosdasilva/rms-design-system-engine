@@ -23,11 +23,13 @@ test('a change inside a rule counts, not only one to the line that names the cla
   const vars = (c) => JSON.stringify({ light: { 'chip/background': c } }, null, 2);
   writeFileSync(join(dir, 'theme.css'), css('8px')); writeFileSync(join(dir, 'props.json'), snap(['S'])); writeFileSync(join(dir, 'vars.json'), vars('#fff'));
   run(dir, 'add', '-A'); run(dir, 'commit', '-qm', 'first');
-  run(dir, 'tag', 'v1.0.0');
+  // An annotated tag made later than its commit: the release is dated by the tag.
+  spawnSync('git', ['tag', '-a', 'v1.0.0', '-m', 'v1.0.0'], { cwd: dir, env: { ...process.env, GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t', GIT_COMMITTER_DATE: '2030-01-02T10:00:00Z' } });
   writeFileSync(join(dir, 'theme.css'), css('12px')); run(dir, 'commit', '-qam', 'chip padding follows Figma');
   writeFileSync(join(dir, 'props.json'), snap(['S', 'M'])); writeFileSync(join(dir, 'vars.json'), vars('#f7f7f7')); run(dir, 'commit', '-qam', 'Figma read again');
   const code = changelogs(dir, [{ name: 'chip', files: ['theme.css'], ranges: [['theme.css', 2, 5]] }]).chip;
   assert.deepEqual(code.map((r) => [r.subject, r.release, r.changed]), [['chip padding follows Figma', null, ['padding 8px → 12px']], ['first', 'v1.0.0', ['padding 8px added', 'gap 4px added']]]);
+  assert.deepEqual(code.map((r) => (r.releasedAt ? new Date(r.releasedAt).toISOString() : null)), [null, '2030-01-02T10:00:00.000Z'], 'the day it was tagged, not its last commit');
   const fig = figmaChangelogs(dir, { props: 'props.json', vars: 'vars.json' }, ['chip']).chip;
   assert.deepEqual(fig.map((r) => r.changed), [['property Size VARIANT · S · S → VARIANT · S, M · S', 'chip/background light #fff → #f7f7f7'], ['read from Figma for the first time']]);
 });

@@ -2086,6 +2086,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     row.appendChild(vtag);
   }
   // Whether release a is later than release b (v2.10.01 after v2.9.3): their numbers compared one by one.
+  // The releases of a changelog in order: what is not released yet first, then the newest version (v2.12.00 before
+  // v2.11.01, whatever day each one's last commit was). g: { k: its tag, '' when none yet; at: its newest commit's date;
+  // on: the day it was tagged }.
+  function releaseOrder(a, b) { return (a.k ? 1 : 0) - (b.k ? 1 : 0) || (a.k && b.k && a.k !== b.k ? (versionAfter(a.k, b.k) ? -1 : 1) : (b.at > a.at ? 1 : b.at < a.at ? -1 : 0)); }
+  // Its head: the release and the day it came out (its tag's), else its newest commit's day.
+  function releaseHead(g, k) { return (k || esc(g.k || 'Merged, no release tag yet')) + '  ·  ' + (g.k && g.on ? 'released ' + esc(g.on.slice(0, 10)) : esc(String(g.at).slice(0, 10))); }
   function versionAfter(a, b) { var x = String(a).match(/\d+/g) || [], y = String(b).match(/\d+/g) || []; for (var i = 0; i < Math.max(x.length, y.length); i++) { var d = (+x[i] || 0) - (+y[i] || 0); if (d) return d > 0; } return false; }
 
   /* ── Mode engine: the system's mode collections as axes ─────────────────────────────────────────────────────────
@@ -2889,15 +2895,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     hr(); navLink('changelog', 'changelog');
     var wn = section('changelog', 'Changes', 'Changelog', '');
     var rel = {}, order = [];
-    CHANGES.forEach(function (x) { var k = x.r.release || ''; if (!rel[k]) { rel[k] = { k: k, rows: [], at: '' }; order.push(rel[k]); } rel[k].rows.push(x); if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); });
-    order.sort(function (a, b) { return (a.k ? 1 : 0) - (b.k ? 1 : 0) || (b.at > a.at ? 1 : b.at < a.at ? -1 : 0); });   // not released yet first, then newest
+    CHANGES.forEach(function (x) { var k = x.r.release || ''; if (!rel[k]) { rel[k] = { k: k, rows: [], at: '' }; order.push(rel[k]); } rel[k].rows.push(x); if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); if (x.r.releasedAt) rel[k].on = String(x.r.releasedAt); });
+    order.sort(releaseOrder);
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
     box.innerHTML = order.map(function (g) {
       // One row per commit: the components it changed, then what it says.
       var by = {}, commits = [];
       g.rows.forEach(function (x) { var k = x.r.sha || x.r.subject; if (!by[k]) { by[k] = { r: x.r, comps: [] }; commits.push(by[k]); } if (by[k].comps.indexOf(x.comp) < 0) by[k].comps.push(x.comp); });
       commits.sort(function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; });
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + esc(g.k || 'Merged, no release tag yet') + '  ·  ' + esc(g.at.slice(0, 10)) + '</div><table>' + commits.map(function (x) {
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table>' + commits.map(function (x) {
         var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short) + '</code>';
         var says = String(x.r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
         return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
@@ -6692,10 +6698,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Its code: every commit that changed it, by the release it shipped in (newest first), each linked, with its pull
     // request and what it changed in the component's own rules.
     var groups = [], by = {};
-    log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = []; groups.push(k); } by[k].push(r); });
-    return '<div class="pg-cards">' + out + groups.map(function (k) {
-      var rows = by[k], first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
-      return card((k ? (rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : esc(k)) : 'Merged, no release tag yet') + '  ·  ' + esc(String(first.date).slice(0, 10)), rows.map(function (r) {
+    log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = { k: k, rows: [], at: String(r.date), on: r.releasedAt || '' }; groups.push(by[k]); } by[k].rows.push(r); });
+    groups.sort(releaseOrder);
+    return '<div class="pg-cards">' + out + groups.map(function (g) {
+      var k = g.k, rows = g.rows, first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
+      return card(releaseHead(g, k && rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : null), rows.map(function (r) {
         var pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
         return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + what(r.changed) + '</td></tr>';
       }).join(''));
