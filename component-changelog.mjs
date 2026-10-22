@@ -12,7 +12,7 @@
 //   properties and options, and its variables in every mode.
 // commitUrl / prUrl: links in the repository's own host form (GitHub, GitLab).
 // A project read from GitLab (a mirror with no .git) gives the same through the GitLab API (gitlab-history.mjs).
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { mirrorState, mirrorRepo, mirrorBranch, commitsOf, ensureHistory } from './gitlab-history.mjs';
@@ -43,6 +43,47 @@ export const prUrl = (repo, n) => (repo && n ? `${repo}${gitlab(repo) ? '/-/merg
 export const fileUrl = (repo, branch, file, line) => (repo && file ? `${repo}${gitlab(repo) ? '/-' : ''}/blob/${branch}/${file}${line ? `#L${line}` : ''}` : null);
 // The branch the repository publishes from: the origin's default, else main.
 export const defaultBranch = (ROOT) => mirrorBranch(ROOT) ?? (git(ROOT, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).trim().replace(/^origin\//, '') || 'main');
+
+// The ticket a commit was made for, as the team writes it at the start of its subject: #121226 - fixed … (or a pattern
+// of the team's own, changelog.ticket: "[A-Z]+-\\d+" for a Jira key). → { ticket, ticketUrl, says } (says: the subject
+// without it), null when it names none. A pull request at its end ((#12)) is not a ticket. ticketUrl: from
+// changelog.ticketUrl ("https://issues.example/issues/{id}"), else as the project's own changelog links its tickets
+// ([#99826](https://issues.example/issues/99826)), else none.
+export function ticketOf(subject, cfg = {}, ROOT = null) {
+  const s = String(subject ?? '').trim();
+  const own = cfg?.changelog?.ticket;
+  let re;
+  try { re = own ? new RegExp(`^\\s*\\[?(${own})\\]?`) : /^\s*\[?(#\d+)\]?/; } catch { return null; }
+  const m = re.exec(s);
+  if (!m) return null;
+  const ticket = m[1], id = ticket.replace(/^#/, '');
+  const says = s.slice(m[0].length).replace(/^\s*[-–—:|]\s*/, '').trim();
+  const pattern = cfg?.changelog?.ticketUrl ?? (ROOT ? ticketLinks(ROOT) : null);
+  return { ticket, ticketUrl: pattern ? String(pattern).replace(/\{id\}/g, encodeURIComponent(id)) : null, says: says || s };
+}
+
+// How the project's own changelog links a ticket: its first [#n](…n) link, as a pattern ("https://…/issues/{id}").
+const linksFound = new Map();
+export function ticketLinks(ROOT) {
+  if (linksFound.has(ROOT)) return linksFound.get(ROOT);
+  let out = null;
+  const look = (dir, depth) => {
+    let names = [];
+    try { names = readdirSync(join(ROOT, dir), { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      if (out) return;
+      const rel = dir ? `${dir}/${e.name}` : e.name;
+      if (e.isDirectory() && depth > 0 && !/^(node_modules|\.|dist|build)/.test(e.name)) look(rel, depth - 1);
+      else if (e.isFile() && /changelog.*\.md$/i.test(e.name)) {
+        const m = /\[#(\d+)\]\((https?:\/\/[^)\s]*?)\1\)/.exec(readFileSync(join(ROOT, rel), 'utf8'));
+        if (m) out = `${m[2]}{id}`;
+      }
+    }
+  };
+  look('', 3);
+  linksFound.set(ROOT, out);
+  return out;
+}
 
 // What a commit's patch of a rule changed, in a few words: each declaration changed (old → new), added or removed.
 export function ruleChanges(patch = [], { most = 4 } = {}) {

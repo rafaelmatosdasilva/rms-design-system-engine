@@ -1149,9 +1149,14 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /\['log', 'Changelog'\]/);
   assert.match(tpl, /'<div class="pg-head"><h2>' \+ esc\(c\.name\) \+ '<\/h2>' \+ headLinksHTML\(c\.links\)/, 'its links at the top right, beside its name');
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
-  // Changelog: every component's changes by release, one row per commit with the components it touched.
+  // Changelog: every component's changes by release, newest version first, dated by its tag; one row per ticket (the
+  // team's unit of work) with the components its commits touched, each commit a line; a commit for no ticket on its own.
   assert.match(tpl, /navLink\('changelog', 'changelog'\)/);
-  assert.match(tpl, /One row per commit: the components it changed, then what it says\./);
+  assert.match(tpl, /One row per ticket \(the team's unit of work/);
+  assert.match(tpl, /byTicket\(commits, function \(x\) \{ return x\.r; \}\)/);
+  assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
+  assert.match(tpl, /order\.sort\(releaseOrder\)/);
+  assert.match(tpl, /'released ' \+ esc\(g\.on\.slice\(0, 10\)\)/);
   // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
   assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);
   assert.match(tpl, /selectionMoves\(st\);/);

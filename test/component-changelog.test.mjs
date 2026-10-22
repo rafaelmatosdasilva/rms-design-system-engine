@@ -33,3 +33,17 @@ test('a change inside a rule counts, not only one to the line that names the cla
   const fig = figmaChangelogs(dir, { props: 'props.json', vars: 'vars.json' }, ['chip']).chip;
   assert.deepEqual(fig.map((r) => r.changed), [['property Size VARIANT · S · S → VARIANT · S, M · S', 'chip/background light #fff → #f7f7f7'], ['read from Figma for the first time']]);
 });
+
+test('ticketOf: the ticket a commit was made for, its address, and what the commit says without it', async () => {
+  const { ticketOf, ticketLinks } = await import('../component-changelog.mjs');
+  assert.deepEqual(ticketOf('#4521 - fixed the chip padding', { changelog: { ticketUrl: 'https://issues.example/t/{id}' } }), { ticket: '#4521', ticketUrl: 'https://issues.example/t/4521', says: 'fixed the chip padding' });
+  assert.deepEqual(ticketOf('KIT-88: tile caption wraps', { changelog: { ticket: '[A-Z]+-\\d+' } }), { ticket: 'KIT-88', ticketUrl: null, says: 'tile caption wraps' });
+  assert.equal(ticketOf('Tile caption wraps (#12)'), null, 'a pull request at its end is not a ticket');
+  assert.equal(ticketOf('Fixed the menu position'), null);
+  // No address set: the project's own changelog says how it links a ticket.
+  const dir = mkdtempSync(join(tmpdir(), 'tickets-'));
+  spawnSync('mkdir', ['-p', join(dir, 'docs')]);
+  writeFileSync(join(dir, 'docs', 'CHANGELOG.md'), '## 1.0.0\n* [#77](https://tracker.example/issues/77) - first\n');
+  assert.equal(ticketLinks(dir), 'https://tracker.example/issues/{id}');
+  assert.equal(ticketOf('#4521 - x', {}, dir).ticketUrl, 'https://tracker.example/issues/4521');
+});

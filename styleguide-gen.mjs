@@ -1183,7 +1183,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with
     // the release it shipped in and its pull request. The system's own links go on the overview.
     try {
-      const { repoUrl, changelogs, figmaChangelogs, commitUrl, prUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
+      const { repoUrl, changelogs, figmaChangelogs, commitUrl, prUrl, fileUrl, defaultBranch, ticketOf } = await import('./component-changelog.mjs');
       const { figmaLink, figmaNodeIds } = await import('./figma-link.mjs');
       const { ruleLines } = await import('./styleguide-data.mjs');
       const repo = repoUrl(ROOT), branch = cfg.styleguide?.branch ?? defaultBranch(ROOT), ids = figmaNodeIds(ROOT, cfg);
@@ -1207,7 +1207,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const figmaLogs = figmaChangelogs(ROOT, { props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json', vars: cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json' }, view.components.map((c) => c.name));
       for (const c of view.components) {
         const w = found.get(c.name);
-        c.changelog = (logs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha), prUrl: prUrl(repo, r.pr) }));
+        // Each commit with the ticket it was made for (the team's own unit of work), so the changelog groups by it.
+        c.changelog = (logs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha), prUrl: prUrl(repo, r.pr), ...(ticketOf(r.subject, cfg, ROOT) ?? {}) }));
         c.figmaLog = (figmaLogs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha) }));
         const extra = Array.isArray(authored[c.name]?.links) ? authored[c.name].links.filter((l) => l?.url) : [];
         c.links = [
