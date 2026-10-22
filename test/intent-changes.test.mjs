@@ -128,3 +128,14 @@ test('the plan: repeated lines out, a wrong sentence written again (checked), a 
   assert.match(fam.held[0].why, /written from specs\/tiles\.md, which other pages are written from too/);
   assert.ok(!fam.files.get('specs/tiles.md').includes('maps to'));
 });
+
+test('the merge request is written with GITLAB_WRITE_TOKEN when there is one; everything else reads with GITLAB_TOKEN', async () => {
+  const { layerAccess, writeTokenFrom } = await import('../intent-changes.mjs');
+  const cfg = { intentLayer: 'https://gitlab.acme.test/ux/layer' };
+  assert.equal(layerAccess('.', cfg, { env: { GITLAB_HOST: 'gitlab.acme.test', GITLAB_TOKEN: 'reads', GITLAB_WRITE_TOKEN: 'writes' } }).writesWith, 'GITLAB_WRITE_TOKEN');
+  assert.equal(layerAccess('.', cfg, { env: { GITLAB_HOST: 'gitlab.acme.test', GITLAB_TOKEN: 'reads' } }).writesWith, 'GITLAB_TOKEN');
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const dir = mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'wt-'));
+  writeFileSync(dir + '/.env', 'GITLAB_TOKEN=reads\nGITLAB_WRITE_TOKEN="writes" # the layer only\n');
+  assert.equal(writeTokenFrom({}, [dir]), 'writes');
+});

@@ -346,8 +346,10 @@ When `claude` cannot draft (not installed, not signed in), the requests are writ
 `.design-system-engine-out/intent-draft-request.md`: whoever runs the engine answers them as one JSON object and runs
 `--intent-changes --drafts-from <that file>`. The changed files and `CHANGES.md` (each change, page by page) are written
 to `.design-system-engine-out/intent-changes/`; `--merge-request` sends them to the layer as one branch, one commit and
-one merge request from the commit they were made on, for the team to review (a token with the `api` scope and
-Developer access; `read_api` only reads). The engine never writes to the layer's branch itself.
+one merge request from the commit they were made on, for the team to review. It writes with `GITLAB_WRITE_TOKEN` when
+`.env` has one, else with `GITLAB_TOKEN`: give it a token that may write only where it should, the layer's own project
+access token or its group's (Developer, scope `api`), and keep `GITLAB_TOKEN` read-only (`read_api`) for everything the
+engine reads. The engine never writes to the layer's branch itself.
 
 A component's Documentation reads everything written about it, wherever it is written (its intent-layer page, its
 Figma description and annotations, a guidelines section headed with its name), one row per thing an agent needs: what

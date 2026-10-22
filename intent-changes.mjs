@@ -21,7 +21,7 @@
 
 import { gunzipSync } from 'node:zlib';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { OUT_DIR } from './names.mjs';
 import { intentLayerConfig } from './doc-source-dsds.mjs';
@@ -47,12 +47,22 @@ export function layerAccess(ROOT, cfg, { env = process.env } = {}) {
   if (!p) return { error: `${c.url} is not a GitLab project link` };
   const token = tokenFrom(e, folders);
   const headers = token && tokenAllowedFor(p.host, e) ? { 'PRIVATE-TOKEN': token } : {};
+  // What writes (the merge request) takes GITLAB_WRITE_TOKEN when there is one: a token that may write only where it is
+  // meant to (a project's or a group's own token), while GITLAB_TOKEN keeps reading everything the engine reads.
+  const write = writeTokenFrom(e, folders);
+  const writeHeaders = write && tokenAllowedFor(p.host, e) ? { 'PRIVATE-TOKEN': write } : headers;
   const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
   return {
-    p, base, hasToken: !!headers['PRIVATE-TOKEN'],
+    p, base, hasToken: !!headers['PRIVATE-TOKEN'], writesWith: writeHeaders === headers ? 'GITLAB_TOKEN' : 'GITLAB_WRITE_TOKEN',
     get: (path) => plainGet(base + path, { headers }),
-    send: (method, path, body) => plainSend(base + path, { method, headers, body }),
+    send: (method, path, body) => plainSend(base + path, { method, headers: writeHeaders, body }),
   };
+}
+// GITLAB_WRITE_TOKEN from the environment, else from a .env in one of the folders (as tokenFrom reads GITLAB_TOKEN).
+export function writeTokenFrom(env, folders = []) {
+  if (env.GITLAB_WRITE_TOKEN) return env.GITLAB_WRITE_TOKEN;
+  for (const d of folders) { try { const v = /^\s*GITLAB_WRITE_TOKEN\s*=\s*["']?([^\s"'#]+)/m.exec(readFileSync(join(d, '.env'), 'utf8'))?.[1]; if (v) return v; } catch { /* no .env */ } }
+  return '';
 }
 
 // Every text file of the layer at a commit. → Map(path → text)
@@ -352,7 +362,7 @@ export function writeLocal(ROOT, files, summary) {
 // → { url, branch } | { error }
 export async function openMergeRequest(access, { files, sha, target, title, description, branch, message }) {
   const b = await access.send('POST', `/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(sha)}`);
-  if (!b.ok) return { error: b.status === 403 ? 'GitLab refused (403): the token needs the api scope (read_api only reads) and Developer access to the layer' : `GitLab answered ${b.status} when making the branch` };
+  if (!b.ok) return { error: b.status === 403 || b.status === 401 ? `GitLab refused (${b.status}) the token in ${access.writesWith}: it needs the api scope and Developer access to the layer. Give it a token that writes only there: the layer's own (its Settings → Access tokens) or its group's, as GITLAB_WRITE_TOKEN in .env` : `GitLab answered ${b.status} when making the branch` };
   const c = await access.send('POST', '/repository/commits', { branch, commit_message: message, actions: [...files].map(([file_path, content]) => ({ action: 'update', file_path, content })) });
   if (!c.ok) return { error: `GitLab answered ${c.status} to the commit (the branch ${branch} was made; delete it before trying again)` };
   const m = await access.send('POST', '/merge_requests', { source_branch: branch, target_branch: target, title, description, remove_source_branch: true });
