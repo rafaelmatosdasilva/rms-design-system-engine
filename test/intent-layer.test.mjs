@@ -366,7 +366,8 @@ test('the usage report: what reaches the agents and where, what does not and why
   assert.equal(page('Button Main').component, 'buttonMain');
   assert.ok(page('Button Main').gets.find((g) => g.what === 'when not to use').to.includes('llms.txt (the first line)'));
   assert.ok(page('Button Main').notUsed.some((n) => /Tokens Used/.test(n.what) && n.reason === 'facts' && /Figma and the code/.test(n.why) && /^Yes/.test(n.remove)));
-  assert.ok(page('Button Main').notUsed.some((n) => /Token Notes/.test(n.what) && n.reason === 'unknownTitle' && /When not to use/.test(n.fix) && /^No/.test(n.remove)));
+  // Notes on its tokens are for people (the contracts carry the tokens): never asked to be retitled.
+  assert.ok(!page('Button Main').notUsed.some((n) => /Token Notes/.test(n.what)));
   assert.ok(page('Button Main').notUsed.some((n) => n.reason === 'repeated' && /every page of its kind/.test(n.why) && n.fix && n.remove));
   assert.equal(page('Filter Chip').verdict, 'thin');                // when not to use, but not what it is for
   assert.equal(page('Toast General').verdict, 'not used');          // only filler
@@ -632,4 +633,23 @@ test('the advice names the component as the system does: Figma\'s name, or the c
   assert.match(useReport({ _source: {}, entities: [odd] }, new Map(), { names, from: 'Figma' }).pages[0].todo[0], /named in Figma/);
   assert.equal(namesFrom(makeFixture({}), {}), 'the code');
   assert.equal(namesFrom(makeFixture({ 'figma-structure.snapshot.json': { components: { panel: {} } } }), {}), 'Figma');
+});
+
+test('a component page\'s Accessibility, "… Rule" and other prose sections are its rules; examples, mappings and token notes are for people, never retitled', () => {
+  const v = entityView({ kind: 'component', id: 'component-tile-one', name: 'Tile One', sections: [
+    { kind: 'section', title: 'Specification', freeform: [
+      { title: 'Accessibility', body: '- Give it a name a screen reader says.' },
+      { title: 'List Request Rule', body: '- Ask for one subject at a time.' },
+      { title: 'Design Request Examples', body: '- A tile on the home screen.' },
+      { title: 'Vue Implementation Mapping', body: 'TileOne.vue renders it.' },
+      { title: 'Grid Overflow', body: 'In a grid, the tiles wrap to the next row.' },
+      { title: 'Tile in a grid', body: '```vue\n<TileOne title="A" />\n```' },
+    ] },
+    { kind: 'guidelines', title: 'When to use', items: [{ level: 'should', statement: 'Use it for one subject.' }] },
+  ], description: 'A tile for one subject.' }, 'tile-one.dsds.json', 'components');
+  assert.deepEqual(v.rules.map((r) => r.text), ['Give it a name a screen reader says.', 'Ask for one subject at a time.', 'Grid Overflow: In a grid, the tiles wrap to the next row.']);
+  assert.deepEqual(v.sections.map((x) => x.title), ['Design Request Examples', 'Vue Implementation Mapping', 'Tile in a grid']);
+  const r = useReport({ entities: [v] }, new Map([['tileOne', v]]), { names: ['tileOne'] });
+  assert.equal(r.pages[0].action, 'keep');
+  assert.ok(!r.pages[0].notUsed.some((n) => n.reason === 'unknownTitle'));
 });

@@ -244,9 +244,11 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
         if (k === 'purpose' && n > 1) notUsed.push(notUsedItem(`${n - 1} more line${n === 2 ? '' : 's'} of what it is for`, 'morePurpose'));
       }
     }
-    // Sections written for people by their nature (where a fact was confirmed, examples, links to other pages): they
-    // stay on the page as they are, never retitled.
-    const forAgents = (e.sections ?? []).filter((x) => !FOR_PEOPLE.test(String(x.title).replace(/^\d+(\.\d+)*[.)]?\s+/, '').trim()));
+    // Sections written for people by their nature (where a fact was confirmed, examples, links to other pages, notes on
+    // tokens the contracts carry): they stay on the page as they are, never retitled.
+    // A section titled with a component's name is an example of it in use: for people too.
+    const isName = (t) => names.some((n) => norm(n) === norm(t));
+    const forAgents = (e.sections ?? []).filter((x) => { const t = String(x.title).replace(/^\d+(\.\d+)*[.)]?\s+/, '').trim(); return !FOR_PEOPLE.test(t) && !isExample(x.text) && !isName(t) && !isName(t.split(/\s+/)[0]); });
     if (e.sections?.length && reach.sections && !(comp && !component)) gets.push({ what: `${KIND_WORDS.sections} (${e.sections.map((x) => x.title).slice(0, 4).join(', ')}${e.sections.length > 4 ? ', …' : ''})`, lines: e.sections.length, to: reach.sections });
     else if (forAgents.length) notUsed.push(notUsedItem(`${forAgents.length} section${forAgents.length === 1 ? '' : 's'} (${forAgents.map((x) => x.title).slice(0, 4).join(', ')}${forAgents.length > 4 ? ', …' : ''})`, 'unknownTitle'));
     if (e.facts?.length) notUsed.push(notUsedItem(e.facts.join(', '), 'facts'));
@@ -277,8 +279,8 @@ export const ACTIONS = [
   ['delete', 'Delete'], ['move', 'Move'], ['rename', 'Rename'], ['name', 'Name'],
   ['fix', 'Fix'], ['review', 'Review'], ['write', 'Write'], ['improve', 'Improve'], ['keep', 'Keep'],
 ];
-// Section titles written for people (FOR_PEOPLE): never asked to be retitled.
-export const FOR_PEOPLE = /^(evidence|examples?|cross[- ]references?|references?|see also|related|related pages|changelog|history|sources?)$/i;
+// Section titles written for people, and examples (doc-source-dsds.mjs): never asked to be retitled.
+export const { FOR_PEOPLE, isExample } = dsds;
 const ORPHAN_ACTION = { emptyPage: 'delete', codeGone: 'delete', partSaid: 'delete', copy: 'delete', subPartAlone: 'delete', part: 'move', subPart: 'move', rename: 'rename', noComponent: 'name' };
 // → { action, decision, todo: [each change, as an instruction] }
 function decide(page, e, { comp, has }) {
