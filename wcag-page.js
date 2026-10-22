@@ -461,7 +461,8 @@
     var hurt = null, INTERRUPTED = { interrupted: true };
     // `own` is set while a key check moves the focus itself (a menu drawn at the end of the page takes it).
     var own = false;
-    var watch = function (e) { if (!own && e.target && e.target !== document.body && !root.contains(e.target) && !(e.target.closest && e.target.closest('.pg-offstage'))) hurt = e.target; };
+    // opts.person false: no one is on the page (a build trying it), so no focus is ever taken for theirs.
+    var watch = function (e) { if (opts.person !== false && !own && e.target && e.target !== document.body && !root.contains(e.target) && !(e.target.closest && e.target.closest('.pg-offstage'))) hurt = e.target; };
     document.addEventListener('focusin', watch, true);
     var nap = function (ms) { return sleep(ms).then(function () { if (hurt) throw INTERRUPTED; }); };
     var stopSubmit = function (e) { e.preventDefault(); submitted = true; };

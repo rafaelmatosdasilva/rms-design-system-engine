@@ -270,3 +270,21 @@ test('page: what a screen reader says, and names that say little or the same', {
     assert.equal(r.f.filter((d) => /weakname/.test(d)).length, 3, JSON.stringify(r.f));   // a visible "Field" is the design's own words: left alone
   });
 });
+
+// A build trying the page has no person on it (person: false): the focus a component's own script moves outside it is
+// never taken for a person's, so the try is never stopped (and never started again forever).
+test('page: with no person on the page, focus moved outside by the component\'s own script does not stop the try', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+  await inPage(async (ev) => {
+    const r = await ev(`(async () => {
+      const box = document.createElement('div'), away = document.createElement('button');
+      box.innerHTML = '<button type="button" id="mover">Next</button>'; away.textContent = 'Elsewhere';
+      document.body.appendChild(box); document.body.appendChild(away);
+      box.querySelector('#mover').addEventListener('click', () => away.focus());
+      const out = {};
+      try { await window.__wcag21.interact(box, { wait: 50, triggers: 2, person: false }); out.build = 'finished'; } catch (e) { out.build = e && e.interrupted ? 'interrupted' : 'error'; }
+      box.remove(); away.remove();
+      return out;
+    })()`);
+    assert.equal(r.build, 'finished');
+  });
+});
