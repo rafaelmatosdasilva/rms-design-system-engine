@@ -732,6 +732,25 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const src = snap._source ?? {};
         view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
           noPage: decided.noPage, addProposals: decided.addProposals };
+        // What else the agents read about each component, beside its intent-layer page, each with where it comes
+        // from: Figma's description and annotations, the code's own note. And the spec a page is written from, when
+        // the layer has one by its name (the page's own file else), so a line can be changed where it is written.
+        const compBy = new Map(view.components.map((c) => [c.name, c]));
+        const otherSources = (name) => {
+          const c = compBy.get(name); if (!c) return [];
+          const paras = (t) => String(t ?? '').split(/\n\s*\n|\r?\n(?=\s*[-*•])/).map((x) => x.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean);
+          return [['Figma description', paras(c.description)], ['Figma annotation', (c.annotations ?? []).map(String).filter(Boolean)], ['Code', paras(c.note)]].filter(([, l]) => l.length).map(([source, lines]) => ({ source, lines }));
+        };
+        const layerFiles = new Set((await import('./doc-source-dsds.mjs')).readSnapshot(ROOT, cfg)?.layerFiles ?? []);
+        const kebab = (x) => String(x ?? '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const dedupe = (n) => { const w = String(n).split(/\s+/); for (let k = Math.floor(w.length / 2); k > 0; k--) if (w.slice(-k).join(' ') === w.slice(-2 * k, -k).join(' ')) return w.slice(0, -k).join(' '); return n; };
+        const specOf = (p) => {
+          const code = String(p.code ?? '').split('/').pop().replace(/\.[^.]+$/, '');
+          for (const f of [kebab(p.name), kebab(dedupe(p.name)), kebab(code)].filter(Boolean)) for (const d of ['specs/components', 'specs/templates', 'specs/patterns', 'specs/foundations']) if (layerFiles.has(`${d}/${f}.md`)) return `${d}/${f}.md`;
+          return null;
+        };
+        for (const p of view.intentLayer.pages) { const sp = specOf(p); if (sp) p.spec = sp; if (p.component) { const o = otherSources(p.component); if (o.length) p.others = o; } }
+        view.intentLayer.noPageOthers = Object.fromEntries(decided.noPage.map((n) => [n, otherSources(n)]).filter(([, o]) => o.length));
       }
     } catch { /* no intent layer */ }
     // For agents: what an agent can take from the team's guidance for each component, its guidelines section and

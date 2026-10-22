@@ -263,7 +263,8 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     const verdict = !gets.length ? 'not used' : has('purpose') && how ? 'used' : 'thin';
     const wrong = wrongOf(e) ?? [];
     const drafts = e.drafts ?? [];
-    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}), ...(drafts.length ? { drafts } : {}) };
+    const about = comp && !component ? notUsed[0]?.about ?? null : null;
+    const page = { ...(about ? { about } : {}), name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}), ...(drafts.length ? { drafts } : {}) };
     Object.assign(page, decide(page, e, { comp, has }));
     pages.push(page);
   }
@@ -344,7 +345,8 @@ const shares = (a, b) => { const B = new Set(b); return a.length ? a.filter((x) 
 const pageOf = (x) => `${x.name} (${x.file})`;
 // from: where the system's component names come from ('Figma', or 'the code' with no Figma data), as the advice says it.
 export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = [], codeExists = null, from = 'Figma' } = {}) {
-  const say = (reason, why, fix, remove) => ({ reason, why, fix, remove });
+  // about: the component the page turns out to be about (its parent, for a part; its own, under another name).
+  const say = (reason, why, fix, remove, about = null) => ({ reason, why, fix, remove, ...(about ? { about } : {}) });
   const mine = linesOf(e);
   if (!mine.length) return say('emptyPage', 'It names no component of the system and, once the lines written on every page alike and the facts the engine reads from Figma and the code are left out, says nothing of its own.',
     'Delete this page.', 'Yes.');
@@ -370,10 +372,10 @@ export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = 
       const parentPage = [...forEntity].find(([, n]) => n === parentName)?.[0]
         ?? others.find((x) => !forEntity.has(x) && norm(x.name).includes(norm(parentName)) && wordsOfName(x.name).filter((w) => !norm(parentName).includes(w)).every((w) => GENERIC.test(w)));
       return parentPage
-        ? say('subPart', `It is about ${target}, a part of ${parentName}, not a component agents place on its own.${twinNote}`, `Move what is true of ${target} and not yet on ${pageOf(parentPage)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.')
-        : say('subPartAlone', `It is about ${target}, a part of ${parentName}, not a component agents place on its own, and no page documents ${parentName}.${twinNote}`, 'Delete this page, or, if what it says matters, make it the page of ' + parentName + ' first.', 'Yes.');
+        ? say('subPart', `It is about ${target}, a part of ${parentName}, not a component agents place on its own.${twinNote}`, `Move what is true of ${target} and not yet on ${pageOf(parentPage)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.', { partOf: parentName })
+        : say('subPartAlone', `It is about ${target}, a part of ${parentName}, not a component agents place on its own, and no page documents ${parentName}.${twinNote}`, 'Delete this page, or, if what it says matters, make it the page of ' + parentName + ' first.', 'Yes.', { partOf: parentName });
     }
-    return say('rename', `It names no component of the system as ${from} names it; ${target} is that component, under its own name, and no page documents ${target} yet.${twinNote}`, `Rename this page to ${target}, the component's name in ${from}.`, 'No.');
+    return say('rename', `It names no component of the system as ${from} names it; ${target} is that component, under its own name, and no page documents ${target} yet.${twinNote}`, `Rename this page to ${target}, the component's name in ${from}.`, 'No.', { is: target });
   }
   // A part of a component: its code file beside that component's, and its name (or its file's) holding the component's
   // name (PointListItem beside pointList). Its page belongs in that component's page.
@@ -385,9 +387,9 @@ export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = 
     const said = shares(mine, linesOf(parent));
     const short = e.code.split('/').pop();
     return said >= 0.8
-      ? say('partSaid', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in ${from}, and its page already says what this one says.${twinNote}`, 'Delete this page.', 'Yes.')
+      ? say('partSaid', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in ${from}, and its page already says what this one says.${twinNote}`, 'Delete this page.', 'Yes.', { partOf: forEntity.get(parent) })
       : say('part', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in ${from}, so no agent is given this page.${twinNote}`,
-        `Move what is true of this part and not yet on ${pageOf(parent)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.');
+        `Move what is true of this part and not yet on ${pageOf(parent)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.', { partOf: forEntity.get(parent) });
   }
   // The same words as a component's page.
   const copy = others.find((x) => forEntity.has(x) && shares(mine, linesOf(x)) >= 0.8);

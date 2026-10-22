@@ -1612,9 +1612,10 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
 /* Balanced at every width: the file (its name and path) takes what the others leave. */
-.sg-issues.sg-il th:nth-child(1) { width: 27%; }      /* For: a component's name or a layer */
-.sg-issues.sg-il th:nth-child(3) { width: 18%; }      /* Decision: one word with its dot */
-.sg-issues.sg-il th:nth-child(4) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
+.sg-issues.sg-il th:nth-child(1) { width: 22%; }      /* For: a component's name or a layer */
+.sg-issues.sg-il th:nth-child(3) { width: 16%; }      /* Sources: Intent layer, Figma, Code */
+.sg-issues.sg-il th:nth-child(4) { width: 15%; }      /* Decision: Review and its topic, or Keep */
+.sg-issues.sg-il th:nth-child(5) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
 /* File takes the rest: a page's name and its path. */
 /* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
 .sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
@@ -2991,6 +2992,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var compLink = function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; };
     var ilFor = function (p) {
       if (p.component) return compLink(p.component);
+      // A page that names no component but is about one: the one it belongs to (a part's), or the one it is (under
+      // another name).
+      if (p.about && p.about.partOf) return 'Part of ' + compLink(p.about.partOf);
+      if (p.about && p.about.is) return compLink(p.about.is);
       if (p.layer === 'components') return '<span class="pg-missing">No component</span>';
       if (p.layer === 'templates') {
         var built = p.code && COMPONENTS.filter(function (c) { return ((c.api && c.api.file) || '') === p.code; })[0];
@@ -3020,7 +3025,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     // What the agents read from it, word for word, by kind: the one place to see what reaches them.
     var IL_READ = [['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
-    var ilReads = function (p) { var r = p.reads || {}; return IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<p class="sg-il-line"><strong>' + esc(k[1]) + '</strong></p>' + r[k[0]].map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join(''); };
+    // Each source with where it is written (the intent layer's spec, else its page), then what else the agents read
+    // about the component: Figma's description and annotations, the code's note.
+    var ilSourceHead = function (name, where) { return '<p class="sg-il-line"><strong>' + esc(name) + '</strong>' + (where ? '<span class="pg-par-val">' + esc(where) + '</span>' : '') + '</p>'; };
+    var ilOthersOf = function (p) { return p.missingFor ? ((IL.noPageOthers || {})[p.missingFor] || []) : (p.others || []); };
+    var ilReads = function (p) {
+      var r = p.reads || {};
+      var own = IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(k[1]) + '</span></p>' + r[k[0]].map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
+      return (own ? ilSourceHead('Intent layer', p.spec || p.file) + own : '') + ilOthersOf(p).map(function (o) { return ilSourceHead(o.source) + o.lines.map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
+    };
+    // The sources a row's content comes from, in a word each, for the table.
+    var ilSources = function (p) { var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
     // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
     var ilDrafts = function (p) { return (p.drafts || []).map(function (d) { return '<p class="sg-il-line"><strong>Draft</strong> · ' + esc(d.where) + '<span class="pg-par-val">' + esc(d.text) + '</span></p>'; }).join(''); };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
@@ -3033,22 +3048,22 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // review is "Drafts", the others their decision: Move, Fix, Add…).
     // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
     // component, a name not in the system, a component with no page, drafts…
-    var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
+    var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No intent page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
     var labelOf = function (k) { if (IL_TOPIC[k]) return IL_TOPIC[k]; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
     var decisionCell = function (k) { return k === 'keep' ? '<span class="pg-par-status pg-par--' + IL_DOT.keep + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'
       : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true"></span>Review</span><span class="pg-par-val">' + esc(labelOf(k)) + '</span>'; };
-    // Each row's cells, once: the table shows For, File, Decision and when its file last changed; a click on the row (or
+    // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
     var ilCellsOf = function (p) {
-      if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">No file</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
+      if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: '', reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
       return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"' + (p.missingFor || p.action !== 'keep' ? ' data-chip-group="toReview"' : '') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"' + (p.missingFor || p.action !== 'keep' ? ' data-chip-group="toReview"' : '') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
@@ -3082,7 +3097,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var cell = function (r, i, text, style) { return '<c r="' + col(i) + r + '" t="inlineStr" s="' + style + '"><is><t xml:space="preserve">' + x(text) + '</t></is></c>'; };
       var links = [], rowsXml = ['<row r="1">' + head.map(function (h, i) { return cell(1, i, h, 1); }).join('') + '</row>'];
       body.forEach(function (cells, n) { var r = n + 2; rowsXml.push('<row r="' + r + '">' + cells.map(function (c, i) { if (c.url) links.push({ ref: col(i) + r, url: c.url }); return cell(r, i, c.text, c.url ? 2 : 0); }).join('') + '</row>'); });
-      var widths = [26, 36, 12, 20, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
+      var widths = [26, 36, 22, 16, 20, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
       var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:' + last + '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + head.map(function (h, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (widths[i] || 30) + '" customWidth="1"/>'; }).join('') + '</cols><sheetData>' + rowsXml.join('') + '</sheetData><autoFilter ref="A1:' + last + '"/>' + (links.length ? '<hyperlinks>' + links.map(function (l, i) { return '<hyperlink ref="' + l.ref + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</hyperlinks>' : '') + '</worksheet>';
       var rel = function (rels) { return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>'; };
       var files = [
@@ -3123,7 +3138,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ilLinks.addEventListener('click', function (e) { var b = e.target.closest('[data-il-export]'); if (!b) return; if (b.getAttribute('data-il-export') === 'xlsx') ilSave(ilBase + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ilXlsx()); else ilSave(ilBase + '.md', 'text/markdown;charset=utf-8', ilMd()); });
     }
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>For</th><th>File</th><th>Decision</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>For</th><th>File</th><th>Sources</th><th>Decision</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
   }
