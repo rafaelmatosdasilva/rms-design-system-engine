@@ -209,7 +209,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* The page's own tabs, when the system has none: words in a row, the chosen one in the text colour with a line under it. */
 .sg-tabs { display: flex; gap: var(--sg-space-xs); }   /* tabs 4px apart: each its own button, with its own line under it, so the line breaks between them */
 .sg-tabs::after { content: ''; flex: 1 1 auto; box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-a5); }   /* the tabs' line, clearer than a table's */   /* the line goes on after the last tab, to the row's end */
-.sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: calc(var(--sg-space-s) * 2) var(--sg-cell-x); border-radius: var(--sg-radius-s) var(--sg-radius-s) 0 0; font: inherit; font-size: calc(var(--sg-l) + var(--sg-space-xxs) / 2); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
+.sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: calc(var(--sg-space-s) * 2) var(--sg-cell-x); border-radius: var(--sg-radius-s) var(--sg-radius-s) 0 0; font: inherit; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
 .sg-tab:hover, .sg-tab.is-on { color: var(--sg-text); }
 .sg-tab { box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-a5); }   /* the tabs' line, clearer than a table's */
 .sg-tab:hover { background: var(--sg-hover-fill); }   /* under the pointer, the shared hover: a button of its own */
