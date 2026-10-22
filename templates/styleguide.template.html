@@ -3942,7 +3942,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         });
         // Each point is the stroke's true middle across it (sub-pixel), so a straight stretch is straight; where no clean
         // cross-section exists (at a fork), the line runs on straight to the fork.
-        var build = kept.map(function (r) {
+        var rawPts = [], build = kept.map(function (r) {
           var pts = [];
           for (var k = 0; k < r.length; k++) {
             var A = cen(r[Math.max(0, k - 3)]), B = cen(r[Math.min(r.length - 1, k + 3)]), C = cen(r[k]), m = across(C[0], C[1], unit(B[0] - A[0], B[1] - A[1]));
@@ -3958,29 +3958,43 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           var lineEnd = function (first) { var n = pts.length, a = first ? pts[0] : pts[n - 1], b = first ? pts[Math.min(n - 1, 4)] : pts[Math.max(0, n - 5)]; return n > 1 ? capOn(a, b) : null; };
           if (freeEnd(r[0])) { var e0 = lineEnd(true) || stretch(r, 0); pts.unshift(e0); endsAt.push(e0); } else if (pts.length > 1) { var f0 = onTo(pt(r[0]), pts[0], pts[1]); if (f0) pts.unshift(f0); }
           if (freeEnd(r[r.length - 1])) { var e1 = lineEnd(false) || stretch(r, 1); pts.push(e1); endsAt.push(e1); } else if (pts.length > 1) { var f1 = onTo(pt(r[r.length - 1]), pts[pts.length - 1], pts[pts.length - 2]); if (f1) pts.push(f1); }
+          rawPts.push(pts.slice());
           return simplify(pts, 0.03);
         });
-        // Where two strokes alone meet at a point (an arrow's tip), they join where their straight lines cross.
+        // Where strokes meet (an arrow's tip, a bar into a side) they join where their middle lines cross: a T's bar runs
+        // on to the side's own line, a tip sits where its two arms' lines meet (the thinning stops short of both).
         var meet = {}, joins = [];
         kept.forEach(function (r, k) { [[r[0], 0], [r[r.length - 1], 1]].forEach(function (e) { if (!freeEnd(e[0])) (meet[e[0]] = meet[e[0]] || []).push([k, e[1]]); }); });
         Object.keys(meet).forEach(function (n) {
-          var m = meet[n]; if (m.length !== 2) return;
-          // Each arm's line read from a stretch away from the meeting (near it, thinning bends the line).
+          var m = meet[n]; if (m.length < 2) return;
+          var N = pt(+n), near = m.length === 2 ? w * 1.5 : w;
+          // Each arm's line read on the stroke's true middle, a stroke or so out from the meeting (near it, thinning bends it).
           var seg = function (e) {
-            var r = kept[e[0]], k1 = Math.round(best * 1.5), k2 = Math.round(best * 3); if (r.length <= k2) { k1 = Math.floor(r.length / 3); k2 = r.length - 1; }
-            var a = pt(e[1] ? r[r.length - 1 - k1] : r[k1]), b = pt(e[1] ? r[r.length - 1 - k2] : r[k2]); return k2 > k1 ? [a, unit(a[0] - b[0], a[1] - b[1])] : null;
+            var ps = e[1] ? rawPts[e[0]].slice().reverse() : rawPts[e[0]], d = function (p) { return Math.hypot(p[0] - N[0], p[1] - N[1]); };
+            var a = ps.filter(function (p) { return d(p) > near; })[0], b = ps.filter(function (p) { return d(p) > near + w * 2; })[0] || ps[ps.length - 1];
+            return a && b && d(b) > d(a) ? [a, unit(a[0] - b[0], a[1] - b[1])] : null;
           };
-          var A = seg(m[0]), B = seg(m[1]); if (!A || !B) return;
-          var den = A[1][0] * B[1][1] - A[1][1] * B[1][0]; if (Math.abs(den) < 0.2) return;
-          var t = ((B[0][0] - A[0][0]) * B[1][1] - (B[0][1] - A[0][1]) * B[1][0]) / den, X = [A[0][0] + A[1][0] * t, A[0][1] + A[1][1] * t], N = pt(+n);
-          if (Math.hypot(X[0] - N[0], X[1] - N[1]) > w * 1.5) return;
-          // The bent part near the meeting goes; each arm runs straight to the crossing, which is a turn.
+          var arms = m.map(seg); if (arms.some(function (A) { return !A; })) return;
+          var crossAt = function (A, P, u) { var den = A[1][0] * u[1] - A[1][1] * u[0]; if (Math.abs(den) < 0.2) return null; var t = ((P[0] - A[0][0]) * u[1] - (P[1] - A[0][1]) * u[0]) / den; return [A[0][0] + A[1][0] * t, A[0][1] + A[1][1] * t]; };
+          var X;
+          if (m.length === 2) X = crossAt(arms[0], arms[1][0], arms[1][1]);   // a tip: its two arms' lines cross
+          else {
+            // A T: the side is the two arms most nearly opposite, its line through their points either side of the meeting
+            // (straight there, however it curves further on); each other arm runs on to it.
+            var pi = 0, pj = 1, lo = 2;
+            for (var i3 = 0; i3 < arms.length; i3++) for (var j3 = i3 + 1; j3 < arms.length; j3++) { var dd3 = arms[i3][1][0] * arms[j3][1][0] + arms[i3][1][1] * arms[j3][1][1]; if (dd3 < lo) { lo = dd3; pi = i3; pj = j3; } }
+            var P0 = arms[pi][0], su = unit(arms[pj][0][0] - P0[0], arms[pj][0][1] - P0[1]), hits = [];
+            arms.forEach(function (A, k3) { if (k3 !== pi && k3 !== pj) { var h = crossAt(A, P0, su); if (h) hits.push(h); } });
+            if (hits.length) X = [hits.reduce(function (s3, h) { return s3 + h[0]; }, 0) / hits.length, hits.reduce(function (s3, h) { return s3 + h[1]; }, 0) / hits.length];
+          }
+          if (!X || Math.hypot(X[0] - N[0], X[1] - N[1]) > w * 1.5) return;
+          // The bent part near the meeting goes; each arm runs straight to the crossing.
           m.forEach(function (e) {
-            var ps = build[e[0]], keep = ps.filter(function (p) { return Math.hypot(p[0] - X[0], p[1] - X[1]) > w * 1.5; });
+            var ps = build[e[0]], keep = ps.filter(function (p) { return Math.hypot(p[0] - X[0], p[1] - X[1]) > near; });
             if (keep.length < 1) keep = [e[1] ? ps[0] : ps[ps.length - 1]];
             build[e[0]] = e[1] ? keep.concat([X]) : [X].concat(keep);
           });
-          joins.push(X);
+          if (m.length === 2) joins.push(X);   // a tip is a turn; a T is not
         });
         // The turns: each corner once at its sharpest, and any point where the simplified line bends by more than 60 degrees.
         var turnDots = [], addTurn = function (p) { if (!turnDots.concat(endsAt).some(function (o) { return Math.hypot(o[0] - p[0], o[1] - p[1]) < w * (turnDots.indexOf(o) >= 0 ? 2 : 1.2); })) turnDots.push(p); };   // two strokes apart, never on an end
