@@ -2,20 +2,20 @@
 // holds: its git history, its repository, its release tags and the Figma file key. No network.
 //
 // repoUrl(ROOT) → 'https://github.com/owner/repo' | null (package.json repository, else the origin remote)
-// changelogs(ROOT, comps, { max }) → { name: [{ sha, short, date, subject, release, pr, changed? }] }
+// changelogs(ROOT, comps, { max }) → { name: [{ sha, short, date, subject, release, releasedAt, pr, changed? }] }
 //   comps: [{ name, files, pattern?, ranges? }]: its own files, and when they are shared (a theme stylesheet), the line
 //   ranges of its own rules ([file, from, to], followed back through every commit with git log -L, so a change inside
 //   a rule counts) or else the pattern a changed line must hold (its class). changed: what the commit changed in those
 //   rules, in a few words (border-radius --radius-modal → --radii-modal; width 320px added).
-// figmaChangelogs(ROOT, { props, vars }, names, { max }) → { name: [{ sha, short, date, subject, release, changed }] }
-//   every commit that recorded a new read of Figma (its snapshots) and changed what Figma says of the component: its
+// figmaChangelogs(ROOT, { props, vars }, names, { max })
+//   → { name: [{ sha, short, date, subject, release, releasedAt, changed }] }: every commit that recorded a new read of Figma (its snapshots) and changed what Figma says of the component: its
 //   properties and options, and its variables in every mode.
 // commitUrl / prUrl: links in the repository's own host form (GitHub, GitLab).
 // A project read from GitLab (a mirror with no .git) gives the same through the GitLab API (gitlab-history.mjs).
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { mirrorState, mirrorRepo, mirrorBranch, commitsOf, ensureHistory } from './gitlab-history.mjs';
+import { mirrorState, mirrorRepo, mirrorBranch, commitsOf, ensureHistory, releaseLogOf } from './gitlab-history.mjs';
 
 const git = (ROOT, args) => { const r = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }); return r.status === 0 ? r.stdout : ''; };
 
@@ -43,6 +43,64 @@ export const prUrl = (repo, n) => (repo && n ? `${repo}${gitlab(repo) ? '/-/merg
 export const fileUrl = (repo, branch, file, line) => (repo && file ? `${repo}${gitlab(repo) ? '/-' : ''}/blob/${branch}/${file}${line ? `#L${line}` : ''}` : null);
 // The branch the repository publishes from: the origin's default, else main.
 export const defaultBranch = (ROOT) => mirrorBranch(ROOT) ?? (git(ROOT, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).trim().replace(/^origin\//, '') || 'main');
+
+// The project's last releases, newest first (what is merged and not released yet first), each with every commit it holds
+// whatever it changed, merges left out: [{ release, releasedAt, commits: [{ sha, short, date, subject, author }] }]. A
+// release holds the commits from the version tag before it; a commit is shown once, in the first release that holds it.
+export function releaseLog(ROOT, { releases = 10 } = {}) {
+  if (mirrorState(ROOT)) return releaseLogOf(ROOT, { releases }) ?? [];
+  const tags = git(ROOT, ['tag', '-l', 'v[0-9]*', '--sort=v:refname']).split('\n').filter(Boolean);
+  const day = tagDates(ROOT);
+  const rangeOf = (from, to) => git(ROOT, ['log', '--no-merges', '--format=%H%x1f%aI%x1f%an%x1f%s', from ? `${from}..${to}` : to]).split('\n').filter(Boolean)
+    .map((l) => { const [sha, date, author, subject] = l.split('\x1f'); return { sha, short: sha.slice(0, 7), date, subject, author }; });
+  const out = [];
+  if (tags.length) { const now = rangeOf(tags.at(-1), 'HEAD'); if (now.length) out.push({ release: null, releasedAt: null, commits: now }); }
+  else { const now = rangeOf(null, 'HEAD').slice(0, 100); if (now.length) out.push({ release: null, releasedAt: null, commits: now }); }
+  for (let i = tags.length - 1; i >= Math.max(0, tags.length - releases); i--) out.push({ release: tags[i], releasedAt: day[tags[i]] ?? null, commits: rangeOf(tags[i - 1] ?? null, tags[i]).slice(0, 300) });
+  return out;
+}
+
+// The ticket a commit was made for, as the team writes it at the start of its subject: #121226 - fixed … (or a pattern
+// of the team's own, changelog.ticket: "[A-Z]+-\\d+" for a Jira key). → { ticket, ticketUrl, says } (says: the subject
+// without it), null when it names none. A pull request at its end ((#12)) is not a ticket. ticketUrl: from
+// changelog.ticketUrl ("https://issues.example/issues/{id}"), else as the project's own changelog links its tickets
+// ([#99826](https://issues.example/issues/99826)), else none.
+export function ticketOf(subject, cfg = {}, ROOT = null) {
+  const s = String(subject ?? '').trim();
+  const own = cfg?.changelog?.ticket;
+  let re;
+  // A list mark before it (* #120770 - …) is part of how the team writes it, not of the ticket.
+  try { re = own ? new RegExp(`^\\s*(?:[*-]\\s+)?\\[?(${own})\\]?`) : /^\s*(?:[*-]\s+)?\[?(#\d+)\]?/; } catch { return null; }
+  const m = re.exec(s);
+  if (!m) return null;
+  const ticket = m[1], id = ticket.replace(/^#/, '');
+  const says = s.slice(m[0].length).replace(/^\s*[-–—:|]\s*/, '').trim();
+  const pattern = cfg?.changelog?.ticketUrl ?? (ROOT ? ticketLinks(ROOT) : null);
+  return { ticket, ticketUrl: pattern ? String(pattern).replace(/\{id\}/g, encodeURIComponent(id)) : null, says: says || s };
+}
+
+// How the project's own changelog links a ticket: its first [#n](…n) link, as a pattern ("https://…/issues/{id}").
+const linksFound = new Map();
+export function ticketLinks(ROOT) {
+  if (linksFound.has(ROOT)) return linksFound.get(ROOT);
+  let out = null;
+  const look = (dir, depth) => {
+    let names = [];
+    try { names = readdirSync(join(ROOT, dir), { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      if (out) return;
+      const rel = dir ? `${dir}/${e.name}` : e.name;
+      if (e.isDirectory() && depth > 0 && !/^(node_modules|\.|dist|build)/.test(e.name)) look(rel, depth - 1);
+      else if (e.isFile() && /changelog.*\.md$/i.test(e.name)) {
+        const m = /\[#(\d+)\]\((https?:\/\/[^)\s]*?)\1\)/.exec(readFileSync(join(ROOT, rel), 'utf8'));
+        if (m) out = `${m[2]}{id}`;
+      }
+    }
+  };
+  look('', 3);
+  linksFound.set(ROOT, out);
+  return out;
+}
 
 // What a commit's patch of a rule changed, in a few words: each declaration changed (old → new), added or removed.
 export function ruleChanges(patch = [], { most = 4 } = {}) {
@@ -102,7 +160,17 @@ export function figmaChangelogs(ROOT, { props = null, vars = null } = {}, names 
   if (shas.length) {
     const tags = git(ROOT, ['name-rev', '--tags', '--refs=v[0-9]*', '--name-only', ...shas]).split('\n');
     const rel = Object.fromEntries(shas.map((s, i) => [s, /^(v[\d.]+[\w.-]*?)(?:[~^]\d*)*$/.exec(tags[i] ?? '')?.[1] ?? null]));
-    for (const list of Object.values(out)) for (const r of list) r.release = rel[r.sha];
+    const day = tagDates(ROOT);
+    for (const list of Object.values(out)) for (const r of list) { r.release = rel[r.sha]; r.releasedAt = day[r.release] ?? null; }
+  }
+  return out;
+}
+
+// The day each version tag was made (an annotated tag's own date, else its commit's): { v1.2.0: '2026-02-10T…' }.
+function tagDates(ROOT) {
+  const out = {};
+  for (const line of git(ROOT, ['for-each-ref', '--format=%(refname:short)%09%(creatordate:iso-strict)', 'refs/tags/v[0-9]*']).split('\n')) {
+    const [name, date] = line.split('\t'); if (name && date) out[name] = date;
   }
   return out;
 }
@@ -145,6 +213,7 @@ export function changelogs(ROOT, comps = [], { max = 100 } = {}) {
     const [m, s] = line.split('\x1f'); const n = /#(\d+)/.exec(s)?.[1]; if (!n) continue;
     for (const sha of git(ROOT, ['rev-list', `${m}^1..${m}^2`]).split('\n').filter(Boolean)) pr[sha] ??= n;
   }
-  for (const list of Object.values(out)) for (const r of list) { r.release = release[r.sha]; r.pr = /\(#(\d+)\)/.exec(r.subject)?.[1] ?? pr[r.sha] ?? null; }
+  const day = tagDates(ROOT);
+  for (const list of Object.values(out)) for (const r of list) { r.release = release[r.sha]; r.releasedAt = day[r.release] ?? null; r.pr = /\(#(\d+)\)/.exec(r.subject)?.[1] ?? pr[r.sha] ?? null; }
   return out;
 }

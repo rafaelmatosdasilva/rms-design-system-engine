@@ -94,6 +94,16 @@ rms-design-system-engine --docs                          # ALSO build the styleg
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
 rms-design-system-engine --watch-intent-layer [min]     # keep running: build the style guide again each time the intent layer gets a new commit (checks every 5 min)
+rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
+rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
+rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
+rms-design-system-engine --intent-autofix on|off        # whether each run of the audit and of the style guide fixes the intent layer and commits it straight on its branch (ds-config.json → intentLayer.autoFix "commit")
+rms-design-system-engine --intent-decide                 # the engine's proposed answer to each of the team's decisions on the Intent layer page (Fix, Add, Move), with its key and what it rests on
+rms-design-system-engine --intent-decide "<key>[,<key>]" yes|no  # the team's answer ("all" for every open one), kept in design-system-engine-intent-decisions.json and acted on from the next run
+rms-design-system-engine --review-drafts                 # every draft in the intent layer to review: its page, its section, its text
+rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
+rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
+rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
@@ -293,9 +303,94 @@ change, most urgent first, the decisions as chips that filter the table (a compo
 or a component's page already says it), **Move** (it is about a part of a component that has its
 own page: `PointListItem` beside `pointList`), **Rename** (a component's name with a generic word added, as
 "Panel General" for `panel`, when no page documents that component yet), **Name** (as in Figma) (it matches
-no component the engine can find), **Write**, **Improve** (it exists and says something; each change it takes is listed: what to add, what to retitle, what to
+no component the engine can find), **Fix** (it says something the system contradicts: below), **Review** (it has drafted lines to read: below), **Write**, **Improve** (it exists and says something; each change it takes is listed: what to add, what to retitle, what to
 remove) or **Keep**; each with why, each change it takes and what the agents get from it. The engine never changes the
 layer: the changes are the team's. The audit prints how many pages each decision has.
+
+**What a page says is checked against the system, on every run** (`intent-truth.mjs`, no flag): every name it writes as
+code (`tileOne`, `dense`, `--tile-color`, `icons/check`, a file) must be one the system has (a component, a prop,
+a token, a Figma variable, an icon, a file, a word of its code), unless the page gives it as the one not to use ("not
+`x`"); a flow's or a page's own screens are the product's, so there only tokens and near misses of a system name are
+held to it. A prop it sets (`prop="value"`) must be one some component has, and the value one the prop takes (its
+options in the code or Figma, true or false for an on-off one); a list of values given for a prop must be its values.
+What it says the component does for accessibility ("is keyboard accessible", "is announced") must not be what the
+accessibility check found broken (by WCAG criterion). The code file it names must be the component's, and a page that
+calls a deprecated component stable is wrong. **Out of date**: the component's props (names, and the values each
+takes, in the code or Figma) changed after the page was last edited; the engine keeps them from run to run in
+`.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
+history dates its file too). **Twins**: two components' pages that say the same (their own names aside, lines a template
+writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
+with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
+the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
+of everything the engine writes for the agents (`design-intent.json`, the contracts, a component's Documentation),
+listed under `wrong`, until the page is fixed. Before a page is written to the layer (by a person or an agent),
+`--check-intent <file or folder>` checks it in the layer it will join and exits 1 on any finding: write it only once it
+passes. It checks what is stated, not how well it is written. A name a sentence warns against (do not use it, it is deprecated, removed, no longer
+there, not to be invented, not a component of the system), and a name of Figma's own drawing (a frame, a layer, a
+reference screen: the engine reads Figma's components and variables, not every frame) are not findings; a page that
+names the other one of a pair and says when to use which is no twin.
+
+**Repeated lines and shared rules.** A rule a page gives by reference to one the system shares (DSDS `refs` with
+`same-as`) is the system's, set on every page on purpose: it is left out of the page and never counted as a line to
+take out. Repeated is the same line on half the pages of a kind or more, the same line with only the page's own names
+changed (its name, identifier, code file or `metadata.aliases`) on five or more, or a line that names nothing in code
+on a fifth of them or more. Sections written for people by their nature (Evidence, Examples, Cross-references,
+References, See also, Related, Changelog, History, Sources) stay as they are, never asked to be retitled.
+
+**Fixing the layer on each run: `--intent-autofix on`** (`intentLayer.autoFix: "commit"`). After the audit or the style
+guide reads the layer, what `--intent-changes` would change is changed and committed straight on the layer's branch,
+once a run, never offline and never failing the run: the lines written on every page taken out, sentences the system
+contradicts written again, what a page lacks drafted. A drafted line keeps its `**Draft:**` marker, so it waits for the
+team's review (the page's Review decision); what needs a person and no draft can settle (a name nothing in the system
+confirms, a page to add, move or delete) is never touched and stays on the Intent layer page. The run says what it did
+in one line, with the commit's link and `CHANGES.md`. The layer is read again at once, so the guide shows it as it is.
+When drafts cannot be written this run (the `claude` command not signed in), the mechanical changes are still made and
+the requests are written as `--intent-changes` writes them. It takes the person's word once, by turning it on; turn it
+off with `--intent-autofix off`.
+
+**Proposals for the team's decisions: `--intent-decide`** (`intent-proposals.mjs`). Each Fix, Add and Move on the
+Intent layer page carries the engine's proposed answer and what it rests on, in a Proposal card of its panel. Add: a
+component drawn from the same code file as a documented one has that page; a part of a documented component (its Figma
+name under it, or its code file beside it, used only by it) is documented in that page; else its page is to be written
+(only components the code has are asked a page: one only in Figma waits until it is built). Fix: a name the page itself
+gives as Figma's (a sentence of it says so, and every name listed beside such a name) is kept; a newer version of a
+name the system has (`tabGroupV2` of `tabGroup`, the older marked deprecated in Figma) is kept until the system has it;
+a name that is a code file's (an internal part) is kept. Move: a page of a part only its parent's code uses is kept in
+place, the layer writing it from its own file. A person says yes or no, in the chat or with `--intent-decide`; the
+answer is kept in `design-system-engine-intent-decisions.json`, and a yes is acted on everywhere from then on (a kept
+name is no longer a finding, nor left out of what the agents get; a documented part is no longer asked a page; a page
+kept in place is no longer asked to move). A no leaves the decision on the page. An agent records only what the person
+said, never answering for them.
+
+**Reviewing drafts: `--review-drafts`.** The words, everywhere: a line is a **draft** (its `**Draft:**` marker), what
+a person does with it is **review** it (the page's decision, the style guide's Drafts to review card). Each draft is
+approved (its marker comes off), changed (its new text, checked against the system as a drafted line is, and the marker
+off) or dropped (the line deleted), in the page's spec and its DSDS page alike. With no file the command lists every
+draft; with a file of the person's decisions it makes them, writes `CHANGES.md`, and `--commit` or `--merge-request`
+sends them. An agent writes that file only from what the person said for each line, never deciding for them; the
+same can be done in the layer by hand (remove the marker to approve, delete the line to drop).
+
+**Making the changes: `--intent-changes`** (`intent-changes.mjs`). The review's changes made in the layer's own files:
+the repeated lines taken out; each sentence the content check finds wrong written again with only what the system has;
+what a component page lacks (what it is for, when to use it, when not to) drafted. A change goes into the page's
+source when the page is generated from one (a Markdown spec whose metadata names the page's code file as `Source`, or
+whose title is its name) and into the page itself, so both say the same until the layer is generated again; a spec
+that several pages are written from (a family's) takes what is true of all of them, never a draft for one page, which
+is said. **A drafted line starts with `**Draft:**`**: the engine reads it apart from the page (`drafts`), no agent gets
+it, and the page's decision is **Review** until a person reads it, changes what is not right and removes the marker (or
+deletes the line to turn it down). Drafts are written by the `claude` command, told only what the system has (each
+component's props and the values they take, its code file, what its page says), and each is kept only when the
+content check finds nothing in it; a sentence nothing in the system can say is left for a person, never taken out.
+When `claude` cannot draft (not installed, not signed in), the requests are written to
+`.design-system-engine-out/intent-draft-request.md`: whoever runs the engine answers them as one JSON object and runs
+`--intent-changes --drafts-from <that file>`. The changed files and `CHANGES.md` (each change, page by page) are written
+to `.design-system-engine-out/intent-changes/`; `--merge-request` sends them to the layer as one branch, one commit and
+one merge request from the commit they were made on, for the team to review. It writes with `GITLAB_WRITE_TOKEN` when
+`.env` has one, else with `GITLAB_TOKEN`: give it a token that may write only where it should, the layer's own project
+access token or its group's (Developer, scope `api`), and keep `GITLAB_TOKEN` read-only (`read_api`) for everything the
+engine reads. `--commit` writes the same as one commit straight on the layer's branch instead, for a team that reviews
+in the layer itself: only while the branch is still at the commit the changes were made on (else it says to run again),
+and drafted lines keep their marker, so no agent gets them before a person has read them.
 
 A component's Documentation reads everything written about it, wherever it is written (its intent-layer page, its
 Figma description and annotations, a guidelines section headed with its name), one row per thing an agent needs: what

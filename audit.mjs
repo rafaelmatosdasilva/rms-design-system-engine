@@ -286,6 +286,202 @@ if (process.argv.includes('--summary')) {
   process.exit(2);
 }
 
+// ── --check-intent [file or folder]: whether what intent-layer pages say is true of the system ──
+// A page written or changed (a DSDS file, or a folder of them) checked before it goes into the layer; with none named,
+// the whole layer as last read. Each name it writes as code must be one the system has, each prop it sets one the
+// component takes with a value it takes, and what it says of accessibility not what the accessibility check found
+// broken; a page whose component changed since it was edited, or that says what another component's page says, is said
+// too (intent-truth.mjs). Exits 1 when anything is found, so a page is written only once it passes.
+if (process.argv.includes('--check-intent')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--check-intent'), given = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? resolve(process.argv[at + 1]) : null;
+  const il = await import('./intent-layer.mjs');
+  const truth = await import('./intent-truth.mjs');
+  const layer = il.readIntentLayer(ROOT, pcfg) ?? { entities: [] };
+  let mine = null;
+  if (given) {
+    if (!existsSync(given)) { console.log(`❌ ${given} does not exist.`); process.exit(2); }
+    const files = new Map();
+    const add = (p) => { try { files.set(relative(ROOT, p), JSON.parse(readFileSync(p, 'utf8'))); } catch { /* not JSON: not a page */ } };
+    const walkJson = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) { if (f !== 'node_modules' && !f.startsWith('.')) walkJson(p); } else if (/\.json$/i.test(f)) add(p); } };
+    if (statSync(given).isDirectory()) walkJson(given); else add(given);
+    // Each file one page ({ kind, id, … }), several ({ entries: [] }) or one under entity; its layer from the folder.
+    mine = [];
+    for (const [file, doc] of files) {
+      const group = file.split('/').slice(0, -1).reverse().find((s) => /^(components|patterns|templates|foundations|flows|pages|product-pages|tokens)$/.test(s)) ?? '';
+      for (const e of doc?.entries ?? (doc?.kind ? [doc] : doc?.entity ? [doc.entity] : [])) if (e?.kind && e.kind !== 'system') mine.push(il.entityView(e, file, group));
+    }
+    if (!mine.length) { console.log(`❌ No DSDS page in ${relative(ROOT, given) || given}: nothing to check.`); process.exit(2); }
+  }
+  // The pages checked in the layer they will join: a page of the same identifier (or name) replaces the one read last.
+  const key = (e) => String(e.id ?? e.name).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const entities = mine ? [...mine, ...layer.entities.filter((e) => !mine.some((m) => key(m) === key(e)))] : layer.entities;
+  const snap = { ...layer, entities };
+  const facts = truth.systemFacts(ROOT, pcfg, { record: false });
+  const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
+  const found = truth.checkLayer(snap, il.matchComponents(names, entities, il.codeFilesOf(ROOT, pcfg)), facts);
+  const shown = [...found].filter(([e]) => !mine || mine.includes(e)).map(([e, f]) => [`${e.name} (${e.file})`, f]);
+  const { n, text } = truth.report(shown);
+  const pages = mine ? mine.length : entities.length;
+  if (!n) { console.log(`✅ ${pages} page${pages === 1 ? '' : 's'} checked: nothing on ${pages === 1 ? 'it' : 'them'} is contradicted by the system.`); console.log(mine ? 'NEXT: the page can be written to the intent layer.' : 'NEXT: none'); process.exit(0); }
+  console.log(`❌ ${n} finding${n === 1 ? '' : 's'} on ${shown.length} of ${pages} page${pages === 1 ? '' : 's'}:${text}`);
+  console.log(mine ? '\nNEXT: fix each finding in the page, then run --check-intent on it again; write it to the intent layer only once it passes.' : '\nNEXT: fix each finding in its page in the intent layer (the Intent layer page of the style guide lists them under Fix).');
+  process.exit(1);
+}
+
+// ── --intent-decide [key,… yes|no]: the team's answer to the engine's proposals for the Intent layer's Fix, Add, Move ──
+// With nothing after it, lists each open proposal with its key and what it rests on. With keys ("all" for every open
+// one) and yes or no, records the answer in design-system-engine-intent-decisions.json: a yes is acted on from the next
+// run (intent-proposals.mjs), a no keeps the decision on the page.
+if (process.argv.includes('--intent-decide')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const pr = await import('./intent-proposals.mjs');
+  const d = await pr.decidedLayer(ROOT, pcfg);
+  if (!d) { console.log('❌ No intent layer read yet.'); process.exit(2); }
+  const open = [...d.proposals].filter(([k]) => !d.decisions[k]);
+  const at = process.argv.indexOf('--intent-decide'), keysArg = process.argv[at + 1], ans = String(process.argv[at + 2] ?? '').toLowerCase();
+  if (!keysArg || keysArg.startsWith('--')) {
+    if (!open.length) { console.log('✅ No proposal waits for an answer.'); console.log('NEXT: none'); process.exit(0); }
+    console.log(`📝 ${open.length} proposal${open.length === 1 ? '' : 's'} wait for the team's answer:`);
+    for (const [k, v] of open) console.log(`\n${k}\n  → ${v.proposal}\n${v.evidence.map((e) => '    · ' + e).join('\n')}`);
+    console.log('\nNEXT: ask the person yes or no for each (or for all); record it with --intent-decide "<key>[,<key>…]" yes|no; never answer for them.');
+    process.exit(0);
+  }
+  if (!['yes', 'no'].includes(ans)) { console.log('Say yes or no: rms-design-system-engine --intent-decide "<key>" yes'); process.exit(2); }
+  const keys = keysArg === 'all' ? open.map(([k]) => k) : keysArg.split(',').map((k) => k.trim()).filter(Boolean);
+  const unknown = keys.filter((k) => !d.proposals.has(k));
+  if (unknown.length) { console.log(`❌ No proposal is called ${unknown.join(', ')} (--intent-decide lists them).`); process.exit(2); }
+  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals));
+  console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans}${ans === 'yes' ? ': acted on from the next run, and the Intent layer page no longer asks them of the team' : ': they stay on the Intent layer page'} (${projectPath(ROOT, 'intentDecisions')}).`);
+  console.log('NEXT: rebuild the style guide to see it (--styleguide).');
+  process.exit(0);
+}
+
+// ── --intent-autofix on|off: whether each run fixes the intent layer and commits it straight on its branch ──
+// Writes ds-config.json → intentLayer.autoFix ("commit", or taken out), keeping the file's own indentation.
+if (process.argv.includes('--intent-autofix')) {
+  const file = join(ROOT, 'ds-config.json');
+  let raw, pcfg; try { raw = readFileSync(file, 'utf8'); pcfg = JSON.parse(raw); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const v = String(process.argv[process.argv.indexOf('--intent-autofix') + 1] ?? '').toLowerCase();
+  if (!['on', 'off'].includes(v)) { console.log('Say on or off: rms-design-system-engine --intent-autofix on'); process.exit(2); }
+  if (!pcfg.intentLayer) { console.log('❌ ds-config.json names no intent layer: rms-design-system-engine --init --documentation=<its GitLab link> first.'); process.exit(2); }
+  const il = typeof pcfg.intentLayer === 'string' ? { gitlab: pcfg.intentLayer } : { ...pcfg.intentLayer };
+  if (v === 'on') il.autoFix = 'commit'; else delete il.autoFix;
+  pcfg.intentLayer = Object.keys(il).length === 1 && il.gitlab ? il.gitlab : il;
+  const indent = /\n(\t+)"/.exec(raw)?.[1]?.slice(0, 1) ?? ' '.repeat((/\n( +)"/.exec(raw)?.[1] ?? '  ').length);
+  writeFileSync(file, JSON.stringify(pcfg, null, indent) + '\n');
+  console.log(v === 'on'
+    ? '✅ Each run of the audit and of the style guide now fixes what the engine can in the intent layer and commits it straight on its branch (GITLAB_WRITE_TOKEN), drafts marked **Draft:** for the team to review; the run says what it did.'
+    : '✅ The intent layer is fixed only when asked (--intent-changes).');
+  console.log('NEXT: none');
+  process.exit(0);
+}
+
+// ── --intent-changes: the changes the Intent layer review asks for, made in the layer's own files ──
+// The lines written on every page alike taken out, each sentence the system contradicts written again with only what it
+// has (as a draft), and what a component page lacks drafted (intent-changes.mjs). Written to
+// .design-system-engine-out/intent-changes/ to read first; with --merge-request, sent to the layer as one merge request
+// for the team to review: its branch is never written to directly. --no-drafts: only the mechanical changes.
+if (process.argv.includes('--intent-changes')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const il = await import('./intent-layer.mjs');
+  const truth = await import('./intent-truth.mjs');
+  const ch = await import('./intent-changes.mjs');
+  if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+  const snap = il.readIntentLayer(ROOT, pcfg);
+  if (!snap?._source?.sha) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run again.'); process.exit(2); }
+  // The drafts: from answers already written (--drafts-from <file>), else by the claude command; when neither can, the
+  // requests are written for whoever runs this to answer, and the mechanical changes are made (intent-changes.mjs).
+  const from = process.argv.indexOf('--drafts-from'), at = process.argv.indexOf('--model');
+  let answers = null;
+  if (from > 0) { try { answers = JSON.parse(readFileSync(resolve(process.argv[from + 1]), 'utf8')); } catch (e) { console.log(`❌ ${process.argv[from + 1]}: ${e.message}`); process.exit(2); } }
+  const prep = await ch.prepareLayerFix(ROOT, pcfg, { drafts: !process.argv.includes('--no-drafts'), answers, model: at > 0 ? process.argv[at + 1] : undefined });
+  if (prep.error) { console.log(`❌ ${prep.error}`); process.exit(2); }
+  const { access, result, summary, note } = prep;
+  if (!summary) { console.log(`✅ Nothing in the intent layer the engine can fix.${note ? `\n   ${note}` : ''}`); console.log('NEXT: none'); process.exit(0); }
+  const dir = ch.writeLocal(ROOT, result.files, summary);
+  console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each change)${note ? `\n   ${note}` : ''}${result.held.length ? `\n   ${result.held.length} page${result.held.length === 1 ? '' : 's'} not changed: ${result.held.map((h) => h.name).join(', ')} (CHANGES.md says why)` : ''}`);
+  if (!result.files.size) { console.log('NEXT: none'); process.exit(0); }
+  // --commit: one commit straight on the layer's branch (only while it is still where it was read); --merge-request: one
+  // merge request for the team. Neither unless the person asks.
+  if (process.argv.includes('--commit')) {
+    const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message: 'Intent layer review: ' + summary.split('\n')[0] + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+    if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
+    console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
+    console.log('NEXT: the Intent layer page lists each draft under Review until its marker is removed.');
+    process.exit(0);
+  }
+  if (!process.argv.includes('--merge-request')) { console.log('NEXT: read the changes; to send them to the layer: rms-design-system-engine --intent-changes --commit (straight on its branch) or --merge-request (for the team to review), only when the person asks'); process.exit(0); }
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/intent-review-${stamp}`,
+    title: 'Intent layer review: lines written on every page, sentences the system contradicts, drafts to review',
+    description: summary + '\n\nMade by the design-system engine from its Intent layer review. Nothing marked **Draft:** reaches an agent until a person removes the marker.',
+    message: 'Intent layer review: repeated lines taken out, contradicted sentences written again as drafts\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+  if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
+  console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
+  console.log('NEXT: the team reviews and merges it; then the Intent layer page lists each draft under Review until its marker is removed.');
+  process.exit(0);
+}
+
+// ── --review-drafts [decisions.json]: a person's review of the drafted lines in the intent layer ──
+// With no file, lists every draft (its page, its section, its text). With a file of decisions ({ page, line, do:
+// approve | change | drop, to }), makes them in the layer's own files: an approved line loses its **Draft:** marker,
+// a changed one takes its new text (checked against the system first), a dropped one is deleted. Written to
+// .design-system-engine-out/intent-changes/ to read first; --commit or --merge-request sends them, only when asked.
+if (process.argv.includes('--review-drafts')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const il = await import('./intent-layer.mjs');
+  const truth = await import('./intent-truth.mjs');
+  const ch = await import('./intent-changes.mjs');
+  if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+  const snap = il.readIntentLayer(ROOT, pcfg);
+  if (!snap?._source?.sha) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run again.'); process.exit(2); }
+  const withDrafts = snap.entities.filter((e) => (e.drafts ?? []).length);
+  const at = process.argv.indexOf('--review-drafts'), given = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? resolve(process.argv[at + 1]) : null;
+  if (!given) {
+    if (!withDrafts.length) { console.log('✅ No drafts to review in the intent layer.'); console.log('NEXT: none'); process.exit(0); }
+    console.log(`📝 ${withDrafts.reduce((t, e) => t + e.drafts.length, 0)} drafts to review on ${withDrafts.length} page${withDrafts.length === 1 ? '' : 's'}:`);
+    for (const e of withDrafts) { console.log(`\n${e.name} (${e.file})`); for (const d of e.drafts) console.log(`  · ${d.where}: "${d.text}"`); }
+    console.log('\nNEXT: ask the person what to do with each (approve, change or drop); write their decisions as [{ "page", "line", "do", "to" }] in a file and run --review-drafts <file>; never decide for them.');
+    process.exit(0);
+  }
+  let decisions; try { const j = JSON.parse(readFileSync(given, 'utf8')); decisions = Array.isArray(j) ? j : j.decisions ?? []; } catch (e) { console.log(`❌ ${relative(ROOT, given) || given}: ${e.message}`); process.exit(2); }
+  const facts = truth.systemFacts(ROOT, pcfg, { record: false });
+  const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
+  const forEntity = new Map([...il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, pcfg))].map(([n, e]) => [e, n]));
+  // A changed line is held to the system as a drafted one is: nothing named that the system does not have.
+  const check = (e, text) => { const f = truth.checkPage({ ...e, purpose: [], whenToUse: [text], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [] }, facts, { component: forEntity.get(e) ?? null, strict: true }).find((x) => x.kind === 'name' || x.kind === 'claim'); return f ? `${f.says}: ${f.truth}` : null; };
+  const access = ch.layerAccess(ROOT, pcfg);
+  if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
+  let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+  const result = ch.reviewPlan(snap, decisions, files, { check });
+  const summary = ch.describeReview(result);
+  const dir = ch.writeLocal(ROOT, result.files, summary);
+  console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each one)${result.problems.length ? `\n   Not done: ${result.problems.join('; ')}` : ''}`);
+  if (!result.files.size) { console.log('NEXT: none'); process.exit(result.problems.length ? 1 : 0); }
+  const message = 'Intent layer: drafts reviewed (' + summary.split('\n')[0].replace(/^Drafts reviewed on /, '').replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
+  if (process.argv.includes('--commit')) {
+    const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message });
+    if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
+    console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
+    console.log('NEXT: the approved lines reach the agents on the next run; the style guide shows them in each component\'s Documentation.');
+    process.exit(0);
+  }
+  if (process.argv.includes('--merge-request')) {
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-reviewed-${stamp}`, title: 'Intent layer: drafts reviewed', description: summary, message });
+    if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
+    console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
+    process.exit(0);
+  }
+  console.log('NEXT: read the changes; to send them: rms-design-system-engine --review-drafts <file> --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
+  process.exit(0);
+}
+
 // ── --contracts-out <dir>: the component contracts, published for a shared repository (an intent layer) ──
 // Only what belongs in a shared repository: one contract per code file, the schema, and a README. No token values,
 // no catalog, no copy of the intent layer's own text. Contracts the code no longer has are removed. Nothing is pushed.
@@ -4994,6 +5190,10 @@ function reportFull(label, items, shown) {
     const il = await import('./intent-layer.mjs');
     docSources = il.configuredSources(cfg).length;
     for (const { result, line } of await il.syncSources(ROOT, cfg, { offline: process.argv.includes('--offline') })) if (line) console.log('\n' + (result?.error ? C.yellow(line) : line));
+    // ds-config.json → intentLayer.autoFix "commit": what the engine can fix in the layer is fixed and committed now,
+    // drafts marked for the team (intent-changes.mjs → autoFix).
+    const fixed = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg, { offline: process.argv.includes('--offline') });
+    if (fixed) console.log('\n' + fixed);
   } catch (e) { console.log(C.yellow('\n⚠️  Documentation sources: not read (' + e.message + ')')); }
 
   // ── Design-intent (adopt-aware OUTPUT, not a gate) ──────────────────────────
@@ -5026,9 +5226,9 @@ function reportFull(label, items, shown) {
         try {
           const il = await import('./intent-layer.mjs');
           const snap = il.readIntentLayer(ROOT, cfg);
-          const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)), { names: Object.keys(r.intent.components), codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, cfg) });
+          const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)), { names: Object.keys(r.intent.components), codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, cfg), wrongOf: (await import('./intent-truth.mjs')).checkedLayer(ROOT, cfg, snap) });
           const todo = il.ACTIONS.filter(([k]) => !['keep', 'improve'].includes(k) && rep.actions[k]).map(([k, label]) => `${rep.actions[k]} ${label.toLowerCase()}`);
-          console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${todo.length ? `\n   To do in the intent layer: ${todo.join(', ')} (each page with why and what to change: the style guide's Intent layer page, --docs)` : ''}`);
+          console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${todo.length ? `\n   To do in the intent layer: ${todo.join(', ')} (each page with why and what to change: the style guide's Intent layer page, --docs)` : ''}${rep.actions.fix ? `\n   ${rep.actions.fix} page${rep.actions.fix === 1 ? ' says' : 's say'} something the system contradicts: those sentences are left out of what the agents get until fixed (--check-intent lists each)` : ''}`);
         } catch { /* the line above already says how many pages */ }
       }
     } catch (e) {

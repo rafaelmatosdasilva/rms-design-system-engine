@@ -16,6 +16,7 @@ export const PROJECT = {
   checkResult: { now: 'design-system-engine-check-result.json' },
   checked:     { now: 'design-system-engine-checked.json' },
   census:      { now: 'design-system-engine-census.json' },
+  intentDecisions: { now: 'design-system-engine-intent-decisions.json' },
 };
 
 // The engine's output folder, and where the code capture goes in it by default.

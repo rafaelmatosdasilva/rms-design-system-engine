@@ -700,10 +700,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // Read again where it lives first (GitLab): nothing is fetched while its commit has not moved, and when it cannot be
       // read the copy kept is used and said, never silently.
       if (hasLayer && !opts.offline) { try { for (const r of await ilMod.syncSources(ROOT, cfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+      // intentLayer.autoFix "commit": the layer's fixes committed before the guide reads it (once a run, with the audit).
+      if (hasLayer && !opts.offline) { try { const fixed = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg); if (fixed) console.log('   ' + fixed); } catch { /* the guide is built from the layer as read */ } }
       const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
       const ilMatch = ilSnap ? ilMod.matchComponents(view.components.map((c) => c.name), ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
+      // What the system contradicts on each page (intent-truth.mjs): left out of its documentation, and said.
+      const ilWrong = (await import('./intent-truth.mjs')).checkedLayer(ROOT, cfg, ilSnap);
       for (const c of view.components) {
-        const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
+        const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source, ilWrong(ilMatch.get(c.name))) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
         // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
         // the contract); the Intent layer page reviews every page of it apart.
         if (!il && hasLayer) c.intentLayer = { none: true };
@@ -718,12 +722,35 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       if (snap) {
         // The components the agents get (the design intent's: Figma's, or with no Figma data the code's), not only the
         // ones this page shows, so the page and the audit judge each page alike.
-        const names = il.systemNames(ROOT, cfg);
         const from = il.namesFrom(ROOT, cfg);
-        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from });
+        const truth = await import('./intent-truth.mjs');
+        // The layer checked, each of the team's decisions proposed an answer, and the answers given applied
+        // (intent-proposals.mjs): a row the team has settled is no longer asked of them.
+        const decided = await (await import('./intent-proposals.mjs')).decidedLayer(ROOT, cfg);
+        const report = decided.report, wrongOf = decided.wrongOf;
+        const counts = report.pages.reduce((t, p) => (t[p.action] = (t[p.action] ?? 0) + 1, t), {});
         const src = snap._source ?? {};
-        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages,
-          noPage: names.filter((n) => !report.pages.some((p) => p.component === n)) };
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
+          noPage: decided.noPage, addProposals: decided.addProposals };
+        // What else the agents read about each component, beside its intent-layer page, each with where it comes
+        // from: Figma's description and annotations, the code's own note. And the spec a page is written from, when
+        // the layer has one by its name (the page's own file else), so a line can be changed where it is written.
+        const compBy = new Map(view.components.map((c) => [c.name, c]));
+        const otherSources = (name) => {
+          const c = compBy.get(name); if (!c) return [];
+          const paras = (t) => String(t ?? '').split(/\n\s*\n|\r?\n(?=\s*[-*•])/).map((x) => x.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean);
+          return [['Figma description', paras(c.description)], ['Figma annotation', (c.annotations ?? []).map(String).filter(Boolean)], ['Code', paras(c.note)]].filter(([, l]) => l.length).map(([source, lines]) => ({ source, lines }));
+        };
+        const layerFiles = new Set((await import('./doc-source-dsds.mjs')).readSnapshot(ROOT, cfg)?.layerFiles ?? []);
+        const kebab = (x) => String(x ?? '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const dedupe = (n) => { const w = String(n).split(/\s+/); for (let k = Math.floor(w.length / 2); k > 0; k--) if (w.slice(-k).join(' ') === w.slice(-2 * k, -k).join(' ')) return w.slice(0, -k).join(' '); return n; };
+        const specOf = (p) => {
+          const code = String(p.code ?? '').split('/').pop().replace(/\.[^.]+$/, '');
+          for (const f of [kebab(p.name), kebab(dedupe(p.name)), kebab(code)].filter(Boolean)) for (const d of ['specs/components', 'specs/templates', 'specs/patterns', 'specs/foundations']) if (layerFiles.has(`${d}/${f}.md`)) return `${d}/${f}.md`;
+          return null;
+        };
+        for (const p of view.intentLayer.pages) { const sp = specOf(p); if (sp) p.spec = sp; if (p.component) { const o = otherSources(p.component); if (o.length) p.others = o; } }
+        view.intentLayer.noPageOthers = Object.fromEntries(decided.noPage.map((n) => [n, otherSources(n)]).filter(([, o]) => o.length));
       }
     } catch { /* no intent layer */ }
     // For agents: what an agent can take from the team's guidance for each component, its guidelines section and
@@ -1179,7 +1206,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with
     // the release it shipped in and its pull request. The system's own links go on the overview.
     try {
-      const { repoUrl, changelogs, figmaChangelogs, commitUrl, prUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
+      const { repoUrl, changelogs, figmaChangelogs, commitUrl, prUrl, fileUrl, defaultBranch, ticketOf, releaseLog } = await import('./component-changelog.mjs');
       const { figmaLink, figmaNodeIds } = await import('./figma-link.mjs');
       const { ruleLines } = await import('./styleguide-data.mjs');
       const repo = repoUrl(ROOT), branch = cfg.styleguide?.branch ?? defaultBranch(ROOT), ids = figmaNodeIds(ROOT, cfg);
@@ -1203,7 +1230,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const figmaLogs = figmaChangelogs(ROOT, { props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json', vars: cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json' }, view.components.map((c) => c.name));
       for (const c of view.components) {
         const w = found.get(c.name);
-        c.changelog = (logs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha), prUrl: prUrl(repo, r.pr) }));
+        // Each commit with the ticket it was made for (the team's own unit of work), so the changelog groups by it.
+        c.changelog = (logs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha), prUrl: prUrl(repo, r.pr), ...(ticketOf(r.subject, cfg, ROOT) ?? {}) }));
         c.figmaLog = (figmaLogs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha) }));
         const extra = Array.isArray(authored[c.name]?.links) ? authored[c.name].links.filter((l) => l?.url) : [];
         c.links = [
@@ -1216,6 +1244,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           ...extra.map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })),
         ].filter((l) => l.url);
       }
+      // Everything the developers did, release by release, whatever it changed: the Changelog page lists it all, each
+      // commit with the components it changed (from their changelogs) when it changed any.
+      view.releaseLog = releaseLog(ROOT).map((g) => ({ ...g, commits: g.commits.map((r) => ({ ...r, url: commitUrl(repo, r.sha), ...(ticketOf(r.subject, cfg, ROOT) ?? {}) })) }));
       view.links = [
         { label: 'Figma file', url: cfg.figmaFileKey ? `https://www.figma.com/design/${cfg.figmaFileKey}` : null },
         { label: 'Code repository', url: repo },

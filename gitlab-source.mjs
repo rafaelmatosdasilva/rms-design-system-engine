@@ -70,6 +70,18 @@ export function tokenFrom(env, folders = []) {
   return '';
 }
 
+// GITLAB_WRITE_TOKEN from the environment, else from a .env in one of the folders: a token that writes only where it is
+// meant to (a project's own), which also reads that project when GITLAB_TOKEN is refused.
+export function writeTokenFrom(env, folders = []) {
+  if (env.GITLAB_WRITE_TOKEN) return env.GITLAB_WRITE_TOKEN;
+  for (const d of folders) {
+    let text; try { text = readFileSync(join(d, '.env'), 'utf8'); } catch { continue; }
+    const m = text.match(/^\s*GITLAB_WRITE_TOKEN\s*=(.*)$/m);
+    if (m && envValue(m[1])) return envValue(m[1]);
+  }
+  return '';
+}
+
 // GITLAB_HOST from the environment, else from a .env in one of the folders (so a project's .env can name its host).
 export function hostEnvFrom(env, folders = []) {
   if (env.GITLAB_HOST) return env.GITLAB_HOST;
@@ -133,6 +145,24 @@ export function plainGet(url, { headers = {}, signal } = {}, hops = 5) {
       });
     });
     req.on('error', fail);
+    req.end();
+  });
+}
+
+// A request that changes something (POST, PUT), with a JSON body, through Node's own http(s) as plainGet: no
+// redirect is followed, so the token goes nowhere but the host. → { ok, status, json() }
+export function plainSend(url, { method = 'POST', headers = {}, body = null } = {}) {
+  return new Promise((ok, fail) => {
+    const u = new URL(url);
+    const data = body == null ? null : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method, headers: { ...headers, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {}) } }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('error', fail);
+      res.on('end', () => { const b = Buffer.concat(chunks).toString('utf8'); ok({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode ?? 0, json: async () => JSON.parse(b || 'null') }); });
+    });
+    req.on('error', fail);
+    if (data) req.write(data);
     req.end();
   });
 }

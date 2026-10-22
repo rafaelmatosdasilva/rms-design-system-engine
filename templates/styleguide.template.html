@@ -62,7 +62,7 @@
   /* The default type: its text a step above the browser's (500), its headings 800, its lines 1.4 apart. The page has
      two weights only: the text weight (--sg-m-weight) for every word, the heading weight for titles, tabs and names. */
   --sg-xs: 0.75rem; --sg-s: 0.8125rem; --sg-s-weight: 500; --sg-m: 0.875rem; --sg-m-weight: 500; --sg-l: 0.9375rem; --sg-l-weight: 800;
-  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4;
+  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4; --sg-lh-read: 1.6;
   /* The page's two weights: every word a step above the system's text weight (readable on a screen), titles, tabs and
      names in its heading weight. */
   --sg-text-weight: calc(var(--sg-m-weight) + 100);
@@ -787,7 +787,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every column wide enough that a short value keeps to one or two lines; the long ones take the rest. */
 @media (min-width: 721px) { .pg-par-table th, .pg-par-table td { min-width: calc(var(--sg-space-xxl) * 3.5); } .pg-par-table .sg-todo-no, .pg-par-table .sg-todo-no-head { min-width: 0; } }
 .pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
-.pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; }
+.pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; line-height: var(--sg-lh-read); }   /* body text with room to read */
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
 .pg-par-table td, .pg-inspect td { height: var(--sg-row-h); vertical-align: middle; }
 .pg-par-table th { vertical-align: middle; }   /* a table's own head as tall as the card's head above it, the shorter of the two */
@@ -1306,6 +1306,9 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens .sg-bk-lens-measure { stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
 .sg-bk-lens text { font-size: var(--sg-space-l); }
 .sg-bk-lens .sg-bk-lens-icon { color: var(--sg-text); }
+/* The mask that thins the lens icon: each outline stroked in the mask's black (set on the group), eating into the fill,
+   its width in the icon's own units (not the page's non-scaling hairline, which would barely touch it). */
+.sg-bk .sg-bk-lens .sg-bk-lens-erode * { fill: none; stroke: currentColor; stroke-width: var(--bk-line-w); stroke-linejoin: miter; stroke-miterlimit: 8; vector-effect: none; }
 .sg-bk-lens .sg-bk-lens-num { fill: var(--bk-mark, var(--sg-accent)); font-size: calc(var(--sg-space-l) * 1.85); }
 /* The drawing as large as the tile holds it (five rows, as tall as the type card, less the padding) at its own proportions, so the words laid over it
    stay under their lenses; the words in the page's sizes. */
@@ -1608,10 +1611,13 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 /* The Intent layer and For agents pages: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
+.sg-il-partof { margin-right: var(--sg-space-s); }   /* "Part of" and the component's chip, apart */
 /* Balanced at every width: the file (its name and path) takes what the others leave. */
-.sg-issues.sg-il th:nth-child(1) { width: 13%; }      /* Decision */
-.sg-issues.sg-il th:nth-child(3) { width: 21%; }      /* For */
-.sg-issues.sg-il th:nth-child(4) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
+.sg-issues.sg-il th:nth-child(1) { width: 22%; }      /* For: a component's name or a layer */
+.sg-issues.sg-il th:nth-child(3) { width: 16%; }      /* Sources: Intent layer, Figma, Code */
+.sg-issues.sg-il th:nth-child(4) { width: 15%; }      /* Decision: Review and its topic, or Keep */
+.sg-issues.sg-il th:nth-child(5) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
+/* File takes the rest: a page's name and its path. */
 /* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
 .sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
 .sg-h2-links > .pg-head-links { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); }
@@ -1620,7 +1626,9 @@ tr.sg-row-open { cursor: pointer; }
 tr.sg-row-open:hover > td { background: var(--sg-a3); }
 tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: -2px; }
 .sg-cell-clip { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); }
-.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh); font-weight: var(--sg-text-weight); color: var(--sg-text); }
+.sg-doc-notes { margin: var(--sg-space-xs) 0 var(--sg-space-s); padding-inline-start: 1.2em; }   /* the points to cover, for this component */
+.sg-doc-notes li + li { margin-top: var(--sg-space-xxs); }
+.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh-read); font-weight: var(--sg-text-weight); color: var(--sg-text); }
 /* A panel's card in the page's running text, the table's own: one size and one line height for all it holds, each
    finding a paragraph of its own (its sign, a table's mark, left to the table). */
 .sg-row-detail-body :is(.pg-a11y-item, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }   /* a secondary line (pg-par-val) keeps the table's own size and colour */
@@ -1643,6 +1651,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
 .pg-inspect tr:last-child td { border-bottom: none; }
+/* The Changelog's tables: the issue (its commits under it) first, then what it affects; named in a head. */
+.sg-log th { text-align: left; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
+/* Its head stays in view under the card's head as the rows scroll by, as a token table's does, drawing its own line. */
+.sg-log thead th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); z-index: 5; background: var(--sg-bg-2); box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid); }
+.sg-log td:first-child { color: var(--sg-text); width: 62%; }
+.sg-log td:last-child { word-break: normal; }
 /* A section of the documentation as one of these tables: its title the head, each row a name and its text. */
 .pg-inspect-head > h3 { font: inherit; color: inherit; margin: 0; }
 /* Every table's head stays in view as its rows scroll by, under whatever sticks at the top of its page (the page's
@@ -2084,6 +2098,31 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     row.appendChild(vtag);
   }
   // Whether release a is later than release b (v2.10.01 after v2.9.3): their numbers compared one by one.
+  // The releases of a changelog in order: what is not released yet first, then the newest version (v2.12.00 before
+  // v2.11.01, whatever day each one's last commit was). g: { k: its tag, '' when none yet; at: its newest commit's date;
+  // on: the day it was tagged }.
+  function releaseOrder(a, b) { return (a.k ? 1 : 0) - (b.k ? 1 : 0) || (a.k && b.k && a.k !== b.k ? (versionAfter(a.k, b.k) ? -1 : 1) : (b.at > a.at ? 1 : b.at < a.at ? -1 : 0)); }
+  // Commits grouped by the ticket each was made for (r.ticket, read from its subject), in the order given (newest first);
+  // a commit for no ticket is a group of its own. → [{ ticket, ticketUrl, items }]
+  function byTicket(list, rOf) {
+    var out = [], at = {};
+    list.forEach(function (x) { var r = rOf(x), k = r.ticket ? 't:' + r.ticket : 'c:' + (r.sha || r.subject); if (!at[k]) { at[k] = { ticket: r.ticket || null, ticketUrl: r.ticketUrl || null, items: [] }; out.push(at[k]); } at[k].items.push(x); });
+    return out;
+  }
+  // What a commit says (without its ticket, its pull request and any co-author line) and its link.
+  function commitLine(r, extra) {
+    var sha = r.url ? '<a class="sg-uses-link" href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>';
+    var says = String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
+    return esc(says) + ' ' + sha + (extra || '');
+  }
+  // A ticket's cell: the ticket (linked to its issue), then each of its commits on a line; a commit for no ticket, alone.
+  function ticketHTML(t, line) {
+    if (!t.ticket) return line(t.items[0]);
+    var head = t.ticketUrl ? '<a class="sg-uses-link" href="' + esc(t.ticketUrl) + '" target="_blank" rel="noopener"><strong>' + esc(t.ticket) + '</strong></a>' : '<strong>' + esc(t.ticket) + '</strong>';
+    return '<p class="sg-il-line">' + head + '</p>' + t.items.map(function (x) { return '<p class="sg-il-line">' + line(x) + '</p>'; }).join('');
+  }
+  // Its head: the release and the day it came out (its tag's), else its newest commit's day.
+  function releaseHead(g, k) { return (k || esc(g.k || 'Merged, no release tag yet')) + '  ·  ' + (g.k && g.on ? 'released ' + esc(g.on.slice(0, 10)) : esc(String(g.at).slice(0, 10))); }
   function versionAfter(a, b) { var x = String(a).match(/\d+/g) || [], y = String(b).match(/\d+/g) || []; for (var i = 0; i < Math.max(x.length, y.length); i++) { var d = (+x[i] || 0) - (+y[i] || 0); if (d) return d > 0; } return false; }
 
   /* ── Mode engine: the system's mode collections as axes ─────────────────────────────────────────────────────────
@@ -2883,23 +2922,35 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
   COMPONENTS.forEach(function (c) { (c.changelog || []).forEach(function (r) { CHANGES.push({ comp: c.name, r: r }); }); });
-  if (CHANGES.length) {
+  // Everything the developers did, release by release (DATA.releaseLog: every commit, whatever it changed); without it,
+  // the commits that changed a component, from the components' changelogs.
+  var RLOG = DATA.releaseLog || [];
+  if (CHANGES.length || RLOG.length) {
     hr(); navLink('changelog', 'changelog');
     var wn = section('changelog', 'Changes', 'Changelog', '');
-    var rel = {}, order = [];
-    CHANGES.forEach(function (x) { var k = x.r.release || ''; if (!rel[k]) { rel[k] = { k: k, rows: [], at: '' }; order.push(rel[k]); } rel[k].rows.push(x); if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); });
-    order.sort(function (a, b) { return (a.k ? 1 : 0) - (b.k ? 1 : 0) || (b.at > a.at ? 1 : b.at < a.at ? -1 : 0); });   // not released yet first, then newest
+    // The components each commit changed, from their changelogs.
+    var compsOf = {};
+    CHANGES.forEach(function (x) { var k = x.r.sha || x.r.subject, l = compsOf[k] = compsOf[k] || []; if (l.indexOf(x.comp) < 0) l.push(x.comp); });
+    var newestFirst = function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; };
+    var order = [];
+    if (RLOG.length) order = RLOG.map(function (g) {
+      var commits = (g.commits || []).map(function (r) { return { r: r, comps: compsOf[r.sha] || [] }; }).sort(newestFirst);
+      return { k: g.release || '', on: g.releasedAt || '', at: commits.length ? String(commits[0].r.date) : '', commits: commits };
+    }).filter(function (g) { return g.commits.length; });
+    else {
+      var rel = {}, seen = {};
+      CHANGES.forEach(function (x) { var k = x.r.release || '', id = x.r.sha || x.r.subject; if (!rel[k]) { rel[k] = { k: k, commits: [], at: '' }; order.push(rel[k]); } if (!seen[id]) { seen[id] = 1; rel[k].commits.push({ r: x.r, comps: compsOf[id] }); } if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); if (x.r.releasedAt) rel[k].on = String(x.r.releasedAt); });
+      order.forEach(function (g) { g.commits.sort(newestFirst); });
+    }
+    order.sort(releaseOrder);
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
     box.innerHTML = order.map(function (g) {
-      // One row per commit: the components it changed, then what it says.
-      var by = {}, commits = [];
-      g.rows.forEach(function (x) { var k = x.r.sha || x.r.subject; if (!by[k]) { by[k] = { r: x.r, comps: [] }; commits.push(by[k]); } if (by[k].comps.indexOf(x.comp) < 0) by[k].comps.push(x.comp); });
-      commits.sort(function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; });
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + esc(g.k || 'Merged, no release tag yet') + '  ·  ' + esc(g.at.slice(0, 10)) + '</div><table>' + commits.map(function (x) {
-        var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short) + '</code>';
-        var says = String(x.r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
-        return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
-      }).join('') + '</table></div>';
+      // One row per issue (the team's unit of work: its commits, whatever each changed), then what it affects: the
+      // components its commits changed (none for a change outside them). A commit made for no issue is a row of its own.
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">Issue</th><th scope="col">Affects</th></tr></thead><tbody>' + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
+        var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
+        return '<tr><td>' + (t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">No issue</span></p><p class="sg-il-line">') + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>') + '</td><td>' + (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
     }).join('');
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
@@ -2922,7 +2973,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var b = e.target.closest('.sg-chip[data-chip]'); if (!b) return;
       var k = b.getAttribute('data-chip');
       Array.prototype.forEach.call(bar.querySelectorAll('.sg-chip[data-chip]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-      Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k; });
+      Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k && tr.getAttribute('data-chip-group') !== k; });   // a chip shows its own rows, or a group of them (data-chip-group)
       sec.dispatchEvent(new CustomEvent('sg-chip', { detail: k }));
     });
     return bar;
@@ -2942,6 +2993,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var compLink = function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; };
     var ilFor = function (p) {
       if (p.component) return compLink(p.component);
+      // A page that names no component but is about one: the one it belongs to (a part's), or the one it is (under
+      // another name).
+      if (p.about && p.about.partOf) return '<span class="sg-il-partof">Part of</span>' + compLink(p.about.partOf);
+      if (p.about && p.about.is) return compLink(p.about.is);
       if (p.layer === 'components') return '<span class="pg-missing">No component</span>';
       if (p.layer === 'templates') {
         var built = p.code && COMPONENTS.filter(function (c) { return ((c.api && c.api.file) || '') === p.code; })[0];
@@ -2949,44 +3004,83 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       }
       return esc(IL_LAYER[p.layer] || capital(String(p.layer || '').replace(/s$/, '')));
     };
-    var ilGets = function (p) { return (p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>'; };
+    var ilGets = function (p) { return ((p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>')
+      + ((p.wrong || []).some(function (f) { return f.line && (f.kind === 'name' || f.kind === 'claim'); }) ? '<p class="pg-missing">Not the sentences the system contradicts: they are left out until they are fixed.</p>' : ''); };
     // A page kept as it is: its Keep says it all, so What to do and Why stay empty rather than repeat it on every row.
-    var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
-    var ilWhy = function (p) { return p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'; };
+    // With a proposal still to answer, what to do is to answer it; the engine's own route is said only as the one if not.
+    var ilOpen = function (p) { return (p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || [])).filter(function (x) { return x.answer !== 'no'; }); };
+    var ilIfNot = function (p, html) { return ilOpen(p).length ? '<p class="sg-il-line"><strong>Say yes or no to the proposal above.</strong></p>' + (html ? '<p class="sg-il-line"><span class="pg-par-val">If not: ' + html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() + '</span></p>' : '') : html; };
+    var ilTodo = function (p) { return ilIfNot(p, (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('')) || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
+    // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
+    // system has instead, with where that comes from.
+    var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
+    // The engine's proposed answer to a decision that is the team's (Fix, Add, Move), what it rests on, and how to say
+    // yes or no to it (intent-proposals.mjs). A no keeps the decision on the page as it was.
+    var ilProposal = function (p) {
+      var list = p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || []);
+      return list.map(function (x) {
+        return '<p class="sg-il-line"><strong>' + esc(x.kind === 'fix' ? x.subject + ': ' : '') + esc(x.proposal) + '</strong></p>'
+          + (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join('')
+          + '<p class="sg-il-line"><span class="pg-par-val">' + (x.answer === 'no' ? 'Declined: it stays for the team to settle another way.' : 'Say yes or no to ' + esc(x.key) + ' (in the chat, or rms-design-system-engine --intent-decide "' + esc(x.key) + '" yes).') + '</span></p>';
+      }).join('');
+    };
+    // What the agents read from it, word for word, by kind: the one place to see what reaches them.
+    var IL_READ = [['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
+    // Each source with where it is written (the intent layer's spec, else its page), then what else the agents read
+    // about the component: Figma's description and annotations, the code's note.
+    var ilSourceHead = function (name, where) { return '<p class="sg-il-line"><strong>' + esc(name) + '</strong>' + (where ? '<span class="pg-par-val">' + esc(where) + '</span>' : '') + '</p>'; };
+    var ilOthersOf = function (p) { return p.missingFor ? ((IL.noPageOthers || {})[p.missingFor] || []) : (p.others || []); };
+    var ilReads = function (p) {
+      var r = p.reads || {};
+      var own = IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(k[1]) + '</span></p>' + r[k[0]].map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
+      return (own ? ilSourceHead('Intent layer', p.spec || p.file) + own : '') + ilOthersOf(p).map(function (o) { return ilSourceHead(o.source) + o.lines.map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
+    };
+    // The sources a row's content comes from, in a word each, for the table.
+    var ilSources = function (p) { var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
+    // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
+    var ilDrafts = function (p) { return (p.drafts || []).map(function (d) { return '<p class="sg-il-line"><strong>Draft</strong> · ' + esc(d.where) + '<span class="pg-par-val">' + esc(d.text) + '</span></p>'; }).join(''); };
+    var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
-    var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
+    var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', review: 'figma', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
     var rows = IL.pages.slice().sort(function (x, y) { return labels.findIndex(function (l) { return l[0] === x.action; }) - labels.findIndex(function (l) { return l[0] === y.action; }); })
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
-    var labelOf = function (k) { var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
-    var decisionCell = function (k) { return '<span class="pg-par-status pg-par--' + IL_DOT[k] + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'; };
-    // Each row's cells, once: the table shows Decision, File, For and when its file last changed; a click on the row (or
+    // Every row but Keep waits on a person: its status is Review, and what kind of review is said under it (a draft's
+    // review is "Drafts", the others their decision: Move, Fix, Add…).
+    // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
+    // component, a name not in the system, a component with no page, drafts…
+    var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No intent page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
+    var labelOf = function (k) { if (IL_TOPIC[k]) return IL_TOPIC[k]; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
+    var decisionCell = function (k) { return k === 'keep' ? '<span class="pg-par-status pg-par--' + IL_DOT.keep + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'
+      : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true"></span>Review</span><span class="pg-par-val">' + esc(labelOf(k)) + '</span>'; };
+    // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
     var ilCellsOf = function (p) {
-      if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">No file</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
-        updated: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
-      return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
+      if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
+        updated: '', reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
+      return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"><td>' + c.decision + '</td><td>' + c.file + '</td><td>' + c.forWhat + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"' + (p.missingFor || p.action !== 'keep' ? ' data-chip-group="toReview"' : '') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Why', c.why) + card('What the agents get', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer', labelOf(p.missingFor ? 'missing' : p.action)], title: p.missingFor || p.name || p.file || 'Page', body: body });
+      var body = card('Decision', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer'].concat(p.missingFor || p.action !== 'keep' ? ['Review', labelOf(p.missingFor ? 'missing' : p.action)] : ['Keep']), title: p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
     var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
-    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: labels.filter(function (l) { return counts[l[0]]; }).map(function (l) { return { key: l[0], label: l[1], n: counts[l[0]], dot: IL_DOT[l[0]] }; }) });
+    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(function (p) { return p.missingFor || p.action !== 'keep'; }).length;
+      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.keep ? [{ key: 'keep', label: 'Keep', n: counts.keep, dot: IL_DOT.keep }] : []); })() });
     // The review, downloaded: for Excel (a workbook with the table's own columns and rows) and for Claude (Markdown: what the
     // table is, how to work through it, then each page with its decision, why and each change), to hand to whoever fixes it.
     var ilText = function (html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = ' — ' + v.textContent; }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
-    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '' } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilWhy(p)), gets: ilText(ilGets(p)) }; }); };
+    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '' } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilDrafts(p) + ilWhy(p)), gets: ilText(ilGets(p)) }; }); };
     var ilSave = function (name, type, content) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([].concat(content), { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); };
     var ilBase = String(DATA.title || 'design-system').replace(/[^\w-]+/g, '-').toLowerCase() + '-intent-layer-review';
     // For Excel: a real workbook (.xlsx), never a CSV, which Excel splits on the wrong character in many languages and
@@ -2996,15 +3090,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilXlsx = function () {
       // The table's columns (its open arrow left out), then what to do, why and what the agents get, which the table leaves
       // to the side panel.
-      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Why', 'What the agents get']);
-      var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = ilCellsOf(rows[i])[k]; return ilCells(d); };
-      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
+      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Why', 'What the agents read', 'Where it goes']);
+      var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = (k === 'why' && !rows[i].missingFor ? ilDrafts(rows[i]) : '') + ilCellsOf(rows[i])[k]; return ilCells(d); };
+      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'reads'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
       var x = function (v) { return String(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
       var col = function (i) { return String.fromCharCode(65 + i); };
       var cell = function (r, i, text, style) { return '<c r="' + col(i) + r + '" t="inlineStr" s="' + style + '"><is><t xml:space="preserve">' + x(text) + '</t></is></c>'; };
       var links = [], rowsXml = ['<row r="1">' + head.map(function (h, i) { return cell(1, i, h, 1); }).join('') + '</row>'];
       body.forEach(function (cells, n) { var r = n + 2; rowsXml.push('<row r="' + r + '">' + cells.map(function (c, i) { if (c.url) links.push({ ref: col(i) + r, url: c.url }); return cell(r, i, c.text, c.url ? 2 : 0); }).join('') + '</row>'); });
-      var widths = [12, 36, 26, 20, 60, 50, 42], last = col(head.length - 1) + (body.length + 1);
+      var widths = [26, 36, 22, 16, 20, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
       var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:' + last + '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + head.map(function (h, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (widths[i] || 30) + '" customWidth="1"/>'; }).join('') + '</cols><sheetData>' + rowsXml.join('') + '</sheetData><autoFilter ref="A1:' + last + '"/>' + (links.length ? '<hyperlinks>' + links.map(function (l, i) { return '<hyperlink ref="' + l.ref + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</hyperlinks>' : '') + '</worksheet>';
       var rel = function (rels) { return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>'; };
       var files = [
@@ -3045,7 +3139,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       ilLinks.addEventListener('click', function (e) { var b = e.target.closest('[data-il-export]'); if (!b) return; if (b.getAttribute('data-il-export') === 'xlsx') ilSave(ilBase + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ilXlsx()); else ilSave(ilBase + '.md', 'text/markdown;charset=utf-8', ilMd()); });
     }
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
-    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>Decision</th><th>File</th><th>For</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
+    ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>For</th><th>File</th><th>Sources</th><th>Decision</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
   }
@@ -3079,14 +3173,25 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // What its first source says, then each other source that says it too, under its name: where each line came from.
       function (c) { var s = guideOf(c, key), page = function (u) { return u ? ' <a class="sg-uses-link" href="' + esc(u) + '" target="_blank" rel="noopener">Open its page</a>' : ''; };
         return paras(s.text) + (s.url ? '<p class="pg-par-val">' + page(s.url) + '</p>' : '') + (s.also || []).map(function (a) { return '<p class="pg-par-val">Also in ' + esc(a.from) + ':' + page(a.url) + '</p>' + paras(a.text); }).join(''); },
-      function (c) { var s = guideOf(c, key); return [s].concat(s.also || []).map(function (x) { return /^[\w-]+\.\w/.test(x.from) ? x.from : capital(x.from); }).join(' · '); }, 'Not written yet.'];
+      function (c) { var s = guideOf(c, key); return [s].concat(s.also || []).map(function (x) { return /^[\w-]+\.\w/.test(x.from) ? x.from : capital(x.from); }).join(' · '); }, 'Not written yet.',
+      function (c) { var s = guideOf(c, key); return [s].concat(s.also || []).map(function (x) { return { where: /^[\w-]+\.\w/.test(x.from) ? x.from : capital(x.from), url: x.url || (/figma/i.test(x.from) ? figmaUrlOf(c) : null), html: paras(x.text) }; }); }];
+  };
+  // What each source says, apart: one part per place it was read (its Figma description, its page in the intent layer,
+  // the code's note), each with that place and a link to it, so two sources are never read as one.
+  var figmaUrlOf = function (c) { return ((c.links || []).filter(function (l) { return l.label === 'Figma'; })[0] || {}).url || null; };
+  var whatParts = function (c) {
+    var out = [], note = (c.note || '').trim();
+    if (figmaWhat(c)) out.push({ where: 'Its Figma description', url: figmaUrlOf(c), html: paras([figmaWhat(c)]) });
+    else if (note) out.push({ where: 'The code', url: null, html: paras([note]) });
+    if (ilWhat(c)) out.push({ where: 'Its page in the intent layer (' + c.intentLayer.file + ')', url: c.intentLayer.url || null, html: paras([ilWhat(c)]) });
+    return out;
   };
   var roleFrom = function (a) { return a.roleFrom === 'figma' ? 'Figma' : a.roleFrom === 'contract' ? 'The contract' : 'The code'; };
   var KNOW = [
     // What Figma or the code says it is, then what its intent-layer page says it is for, each under its source.
     ['What it is', function (c) { return figmaWhat(c) ? 'Figma' : (c.note || '').trim() ? 'The code' : ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') : ''; },
       function (c) { var own = figmaWhat(c) || (c.note || '').trim(); return paras([own || ilWhat(c)]) + (own && ilWhat(c) ? '<p class="pg-par-val">Also in ' + esc(c.intentLayer.source || 'the intent layer') + ' (' + esc(c.intentLayer.file) + '):</p>' + paras([ilWhat(c)]) : ''); },
-      function (c) { var own = figmaWhat(c) ? 'From its Figma description' : (c.note || '').trim() ? 'From the code' : ''; var il = ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : ''; return [own, il].filter(Boolean).join(' · '); }, 'Not written yet.'],
+      function (c) { var own = figmaWhat(c) ? 'From its Figma description' : (c.note || '').trim() ? 'From the code' : ''; var il = ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : ''; return [own, il].filter(Boolean).join(' · '); }, 'Not written yet.', whatParts],
     guideKind('whenToUse', 'When to use'),
     guideKind('whenNotToUse', 'When not to use'),
     guideKind('mistakes', 'Common mistakes'),
@@ -3130,6 +3235,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ex = !!(a.pieces || {}).example;
     if (c.agentRating) rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
       'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
+    // Still to write: a ready example from its own import and props, to start from.
+    if (rows.length && !ex) rows[rows.length - 1].todo = notesHTML(docNotes('Example', c), 'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE());
     // Its properties, in its contract. The one everybody reads is in the intent layer: done while it still lists what the
     // code and Figma have, a task to publish again when it does not. Only the engine's local one: a task to publish it.
     var k = c.contract;
@@ -3194,11 +3301,42 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var tok = tokenDocRow(c), ag = agentRows(c), ir = intentRow(c), lr = leftRow(c);
     return docRowsOf(c, tok, ag, ir, lr).map(writeTo);
   }
+  // What to write, for this component: the points the system already knows that belong under that kind, each from what was
+  // read (its controls, its code API, its Figma description, its own guidance), so the person writes from facts, not from
+  // a blank page. [] when nothing specific is known: the general advice stands alone.
+  function roleOfTag(t) { return ({ button: 'button', a: 'link', nav: 'navigation', ul: 'list', ol: 'list', table: 'table', dialog: 'dialog', select: 'combobox', textarea: 'textbox', form: 'form' })[t] || null; }
+  function sentencesOf(text) { return String(text || '').replace(/@\w+/g, '').split(/(?<=[.!?])\s+|\n+/).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function docNotes(kind, c) {
+    var api = c.api || {}, props = api.props || [], ctl = c.controls || [], out = [];
+    var propOf = function (n) { return props.filter(function (p) { return p.name === n; })[0] || null; };
+    var g = function (key) { var x = guideOf(c, key); return x ? [].concat(x.text || []) : []; };
+    if (kind === 'Limitations') {
+      ctl.forEach(function (k) { (k.onlyWith || []).forEach(function (w) { out.push(k.label + ' applies only while ' + w.label + ' is ' + (w.on ? 'on' : 'off') + '.'); }); });
+      ctl.forEach(function (k) { var p = propOf(k.prop), fig = (k.options || []).map(function (o) { return String(o.label); }); var extra = p && fig.length ? (p.values || []).filter(function (v) { return fig.indexOf(String(v)) < 0; }) : []; if (extra.length) out.push('The code also accepts ' + k.prop + ' ' + extra.join(', ') + '; Figma does not draw ' + (extra.length > 1 ? 'them' : 'it') + '.'); });
+      props.filter(function (p) { return p.required; }).forEach(function (p) { out.push(p.name + ' must always be given.'); });
+      if (api.file && !(api.slots || []).length) { var txt = props.filter(function (p) { return /string/.test(p.type || '') && /label|text|title|content|icon/i.test(p.name); }).map(function (p) { return p.name; }); out.push('It takes no content of its own' + (txt.length ? ': only ' + txt.join(' and ') : '') + '.'); }
+    } else if (kind === 'Example' && c.import && c.import.line) {
+      var tag = (/import\s+(\w+)/.exec(c.import.line) || [])[1], words = ((c.renders || [])[0] || {}).props || {};
+      var text = ctl.filter(function (k) { return k.type === 'TEXT' && propOf(k.prop); }).map(function (k) { return k.prop + '="' + (words[k.label] || k.default || k.label) + '"'; });
+      if (tag) out.push(c.import.line + '  <' + tag + (text.length ? ' ' + text.join(' ') : '') + ' />');
+    } else if (kind === 'Role') {
+      var root = c.source && /<template>\s*<([a-zA-Z-]+)/.exec(c.source.text || ''), role = root && roleOfTag(root[1].toLowerCase());
+      if (role) out.push('Its root is a <' + root[1] + '>: add the annotation "Role: ' + role + '" to it in Figma.');
+    } else if (kind === 'Do and don\'t') {
+      g('whenNotToUse').concat(g('mistakes')).slice(0, 3).forEach(function (t) { out.push('A picture of this, as a don\'t, beside the right use: ' + t); });
+    } else if (kind === 'When to use' || kind === 'When not to use') {
+      var re = kind === 'When to use' ? /^use\b/i : /^(do not|don't|avoid|never)\b/i;
+      sentencesOf(c.description).filter(function (t) { return re.test(t); }).slice(0, 3).forEach(function (t) { out.push('From its Figma description: ' + t); });
+    }
+    return out.slice(0, 5);
+  }
+  // The points to cover, then how to write them.
+  function notesHTML(notes, how) { return (notes.length ? '<strong>Points to cover</strong></p><ul class="sg-doc-notes">' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><p class="pg-par-val">' : '') + esc(how); }
   function docRowsOf(c, tok, ag, ir, lr) {
     return (ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
-      var has = !!k[1](c), body = has ? k[2](c) : '', weak = has && k[0] !== 'Do and don\'t' && k[0] !== 'Role' && WEAK(body);   // a role is one word by nature
+      var has = !!k[1](c), body = has ? k[2](c) : '', parts = has && k[5] ? k[5](c).filter(function (p) { return p.html; }) : null, weak = has && k[0] !== 'Do and don\'t' && k[0] !== 'Role' && WEAK(body);   // a role is one word by nature
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
-        todo: has && !weak ? '' : esc((weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
+        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
     })).concat(ag).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
@@ -3456,14 +3594,33 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var at = function (p) { return [ox + p[0] * big, oy + p[1] * big]; }, num = function (n) { return String(Math.round(n * 100) / 100); };
       // The icon's own drawing in the words' colour (its fills from a class would not reach a <use>).
       var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
-      var icon = function (x, y, k) { return '<svg x="' + x + '" y="' + y + '" width="' + (bx[2] * k) + '" height="' + (bx[3] * k) + '" viewBox="' + bx.join(' ') + '" class="sg-bk-lens-icon" fill="currentColor" overflow="visible">' + body + '</svg>'; };
+      // Drawn large, its stroke lighter than the icon's (read heavy at that size): 48% in the lenses, 62% in the big icon.
+      // Each outline eaten into by a mask, square at its corners so an inside corner stays sharp, as drawn. The measures
+      // below are of the stroke as drawn where they sit (cut and wd in the lenses, bigCut and bigWd on the big icon).
+      var THIN = 0.48, cut = an.w * (1 - THIN) / 2, wd = an.w * THIN, BIG_THIN = 0.62, bigCut = an.w * (1 - BIG_THIN) / 2, bigWd = an.w * BIG_THIN;
+      var icon = function (x, y, k, c) {
+        if (c == null) c = cut;
+        var m = 'sg-bk-lens-thin-' + (lensTile.n = (lensTile.n || 0) + 1);
+        return '<svg x="' + x + '" y="' + y + '" width="' + (bx[2] * k) + '" height="' + (bx[3] * k) + '" viewBox="' + bx.join(' ') + '" class="sg-bk-lens-icon" fill="currentColor" overflow="visible">' +
+          '<mask id="' + m + '" maskUnits="userSpaceOnUse" x="' + (bx[0] - bx[2]) + '" y="' + (bx[1] - bx[3]) + '" width="' + (bx[2] * 3) + '" height="' + (bx[3] * 3) + '"><g style="color:#fff">' + body + '</g><g class="sg-bk-lens-erode" style="color:#000;--bk-line-w:' + (c * 2) + 'px">' + body + '</g></mask>' +
+          '<g mask="url(#' + m + ')">' + body + '</g></svg>';
+      };
       var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
+      // The stroke's edges and the gap's tips where the thinner stroke has them: each edge half the cut in, each tip half the cut back.
+      var edgesAt = function (t) { return an.thick && [0, 1].map(function (k) { var e = k ? an.thick.e2 : an.thick.e1, o2 = k ? an.thick.e1 : an.thick.e2; return [e[0] + (o2[0] - e[0]) / 2 * (1 - t), e[1] + (o2[1] - e[1]) / 2 * (1 - t)]; }); }, thickAt = edgesAt(THIN);
+      var gapAt = an.gap && (function () { var a = an.gap.a, b = an.gap.b, d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / d * cut, uy = (b[1] - a[1]) / d * cut; return [[a[0] - ux, a[1] - uy], [b[0] + ux, b[1] + uy]]; })();
+      // The join's two outer edges, where they meet, moved in toward its curve's centre.
+      var cornerEdge = function (c) {
+        if (c == null) c = cut;
+        var oo = an.corner.o, ta = an.corner.ta, tb = an.corner.tb, sideX = Math.abs(ta[0] - oo[0]) > Math.abs(ta[1] - oo[1]), p = [sideX ? ta[0] : tb[0], sideX ? tb[1] : ta[1]];
+        return [p[0] + Math.sign(oo[0] - p[0]) * c, p[1] + Math.sign(oo[1] - p[1]) * c];
+      };
       // Two by two at the left, the icon at the right, as they sit on it: the corner and the open gap above, the stroke's thickness and the end below.
       var lenses = [an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }, an.gap && { p: an.gap.at, kind: 'gap' }, an.thick && { p: an.thick.at, kind: 'thick' }, an.end && { p: an.end.at, kind: 'end', round: an.end.round }].filter(Boolean);
       var R = 55, LR = 95, out = '', caps = '', VW = 1440, VH = 680;
       // The icon, large, on its pixel grid inside its own box.
       // Its frame is drawn by the page (lensFrame below), in the brand's own corner radius.
-      out += icon(frameX, frameY, big);
+      out += icon(frameX, frameY, big, bigCut);
       // The construction line over it: the line each stroke is drawn on, a ring at each end, a dot at each turn.
       if (an.build) {
         // Drawn through its points as they are: a straight stays straight, a rounded turn is its many short steps.
@@ -3474,23 +3631,22 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       }
       lenses.forEach(function (l) { var c = at(l.p); out += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + R + '" class="sg-bk-lens-ring"/>'; });
       // Each lens, large, side by side beside the icon: the icon drawn so the point sits in the middle, clipped to the
-      // circle, its name and what it shows under it. The gap's lens is drawn at the scale that holds both its ends.
+      // circle, its name and what it shows under it.
+      // One scale for all four, so the stroke is as thick in each: the one that holds both ends of the gap, if smaller.
+      var lensZoom = Math.min(LR * 2 / (an.w * 3.2), an.gap ? LR * 1.8 / (an.gap.gap + cut * 2 + wd) : Infinity);
       lenses.forEach(function (l, i) {
         // The group, lenses and their words, centred on the icon's frame.
         var cx = 345 + (i % 2) * (LR * 2 + 80), cy = 57 + LR + Math.floor(i / 2) * (LR * 2 + 95 + 28), id = 'sg-bk-lens-' + i;
-        var zoom = l.kind === 'gap' ? Math.min(LR * 2 / (an.w * 3.2), LR * 1.7 / (an.gap.gap + an.w * 3)) : LR * 2 / (an.w * 3.2), s1 = an.w * zoom / 2;
+        var zoom = lensZoom;
         var on = function (p) { return [cx + (p[0] - l.p[0]) * zoom, cy + (p[1] - l.p[1]) * zoom]; };
         // The icon's own pixel grid: a line at each whole unit of its drawing.
         // The grid, half a stroke apart, laid on the stroke's own edges: a line runs along each edge of a straight stretch.
         // Anchored on the edge this lens shows: the cap's centre (its edges and tip half a stroke out), the gap's first tip
         // and the line's middle, the thickness's edge, the join's two outer edges.
-        var step = an.w / 2, anchor = l.p;
-        if (l.kind === 'thick') anchor = an.thick.e1;
-        else if (l.kind === 'gap') anchor = an.gap.a;
-        else if (l.kind === 'corner' && an.corner.ta) {
-          var oo = an.corner.o, sideX = function (t) { return Math.abs(t[0] - oo[0]) > Math.abs(t[1] - oo[1]); };
-          anchor = [sideX(an.corner.ta) ? an.corner.ta[0] : an.corner.tb[0], sideX(an.corner.ta) ? an.corner.tb[1] : an.corner.ta[1]];
-        }
+        var step = wd / 2, anchor = l.p;
+        if (l.kind === 'thick') anchor = thickAt[0];
+        else if (l.kind === 'gap') anchor = gapAt[0];
+        else if (l.kind === 'corner' && an.corner.ta) anchor = cornerEdge();
         var ga = on(anchor), gs = step * zoom, gx0 = ga[0] - Math.ceil((ga[0] - (cx - LR)) / gs) * gs, gy0 = ga[1] - Math.ceil((ga[1] - (cy - LR)) / gs) * gs;
         var g0 = gridLines(gx0, gy0, cx + LR, cy + LR, gs, 'sg-bk-lens-grid');
         var o = on([bx[0], bx[1]]);
@@ -3498,25 +3654,25 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           '<g clip-path="url(#' + id + ')"><rect x="' + (cx - LR) + '" y="' + (cy - LR) + '" width="' + (LR * 2) + '" height="' + (LR * 2) + '" class="sg-bk-lens-ground"/>' + g0 + icon(o[0], o[1], zoom) + '</g>' +
           '<circle cx="' + cx + '" cy="' + cy + '" r="' + LR + '" class="sg-bk-lens-ring"/>';
         // The cap: a circle as wide as the stroke on the cap's centre. The join: the circle its outer curve is drawn on.
-        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((an.end.wid || an.w) * zoom / 2) + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="8" class="sg-bk-lens-dot"/>';
+        if (l.kind === 'end' && l.round) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (((an.end.wid || an.w) / 2 - cut) * zoom) + '" class="sg-bk-lens-mark"/><circle cx="' + cx + '" cy="' + cy + '" r="8" class="sg-bk-lens-dot"/>';
         if (l.kind === 'corner') {
           if (an.corner.r > an.w * 0.1 && an.corner.ta) {
             // The outer curve itself, dashed over it from one arm's edge to the other's.
             // Drawn just outside the curve, on its centre, so the dashes are not lost on the edge.
-            var oc = on(an.corner.o), rr = an.corner.r * zoom + 6, grow = function (p) { var q = on(p), k = rr / (Math.hypot(q[0] - oc[0], q[1] - oc[1]) || 1); return [oc[0] + (q[0] - oc[0]) * k, oc[1] + (q[1] - oc[1]) * k]; };
+            var oc = on(an.corner.o), rr = Math.max(an.corner.r - cut, 0) * zoom + 6, grow = function (p) { var q = on(p), k = rr / (Math.hypot(q[0] - oc[0], q[1] - oc[1]) || 1); return [oc[0] + (q[0] - oc[0]) * k, oc[1] + (q[1] - oc[1]) * k]; };
             var p1 = grow(an.corner.ta), p2 = grow(an.corner.tb), sw = ((p1[0] - oc[0]) * (p2[1] - oc[1]) - (p1[1] - oc[1]) * (p2[0] - oc[0])) > 0 ? 1 : 0;
             out += '<path d="M' + p1[0] + ' ' + p1[1] + ' A' + rr + ' ' + rr + ' 0 0 ' + sw + ' ' + p2[0] + ' ' + p2[1] + '" class="sg-bk-lens-mark"/>';
           } else out += '<circle cx="' + cx + '" cy="' + cy + '" r="8" class="sg-bk-lens-dot"/>';
         }
         if (l.kind === 'gap') {
           // The gap measured tip to tip.
-          var t1 = on(an.gap.a), t2 = on(an.gap.b), gx = t2[0] - t1[0], gy = t2[1] - t1[1], gd = Math.hypot(gx, gy) || 1, vx = gx / gd, vy = gy / gd, nx = -vy * 20, ny = vx * 20;
+          var t1 = on(gapAt[0]), t2 = on(gapAt[1]), gx = t2[0] - t1[0], gy = t2[1] - t1[1], gd = Math.hypot(gx, gy) || 1, vx = gx / gd, vy = gy / gd, nx = -vy * 20, ny = vx * 20;
           out += '<g class="sg-bk-lens-measure"><line x1="' + t1[0] + '" y1="' + t1[1] + '" x2="' + t2[0] + '" y2="' + t2[1] + '"/>' +
             '<line x1="' + (t1[0] - nx) + '" y1="' + (t1[1] - ny) + '" x2="' + (t1[0] + nx) + '" y2="' + (t1[1] + ny) + '"/><line x1="' + (t2[0] - nx) + '" y1="' + (t2[1] - ny) + '" x2="' + (t2[0] + nx) + '" y2="' + (t2[1] + ny) + '"/></g>';
         }
         if (l.kind === 'thick') {
           // The stroke measured edge to edge, across the line.
-          var k1 = on(an.thick.e1), k2 = on(an.thick.e2), dx3 = an.thick.dir[0] * 28, dy3 = an.thick.dir[1] * 28;
+          var k1 = on(thickAt[0]), k2 = on(thickAt[1]), dx3 = an.thick.dir[0] * 28, dy3 = an.thick.dir[1] * 28;
           out += '<g class="sg-bk-lens-measure"><line x1="' + k1[0] + '" y1="' + k1[1] + '" x2="' + k2[0] + '" y2="' + k2[1] + '"/>' +
             '<line x1="' + (k1[0] - dx3) + '" y1="' + (k1[1] - dy3) + '" x2="' + (k1[0] + dx3) + '" y2="' + (k1[1] + dy3) + '"/><line x1="' + (k2[0] - dx3) + '" y1="' + (k2[1] - dy3) + '" x2="' + (k2[0] + dx3) + '" y2="' + (k2[1] + dy3) + '"/></g>';
         }
@@ -3531,8 +3687,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       });
       // The icon's frame, drawn by the page at its own size (so its dashes keep their spacing and its corner the brand's
       // radius), with a grid behind the icon half a stroke apart, laid on the icon's own outer edges, clipped to the frame.
-      var gStep = an.w / 2, gAt = an.thick ? an.thick.e1 : an.end ? an.end.at : [bx[0], bx[1]];
-      if (an.corner && an.corner.ta) { var go = an.corner.o, gx = function (t) { return Math.abs(t[0] - go[0]) > Math.abs(t[1] - go[1]); }; gAt = [gx(an.corner.ta) ? an.corner.ta[0] : an.corner.tb[0], gx(an.corner.ta) ? an.corner.tb[1] : an.corner.ta[1]]; }
+      var gStep = bigWd / 2, gAt = an.thick ? edgesAt(BIG_THIN)[0] : an.end ? an.end.at : [bx[0], bx[1]];
+      if (an.corner && an.corner.ta) gAt = cornerEdge(bigCut);
       var gLines = '', pct = function (v, o, n) { return ((v - o) / n * 100) + '%'; };
       for (var gv = gAt[0] - Math.floor((gAt[0] - bx[0]) / gStep) * gStep; gv <= bx[0] + bx[2] + 1e-6; gv += gStep) gLines += '<line x1="' + pct(gv, bx[0], bx[2]) + '" y1="0" x2="' + pct(gv, bx[0], bx[2]) + '" y2="100%"/>';
       for (var gh = gAt[1] - Math.floor((gAt[1] - bx[1]) / gStep) * gStep; gh <= bx[1] + bx[3] + 1e-6; gh += gStep) gLines += '<line x1="0" y1="' + pct(gh, bx[1], bx[3]) + '" x2="100%" y2="' + pct(gh, bx[1], bx[3]) + '"/>';
@@ -3812,7 +3968,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         });
         // Each point is the stroke's true middle across it (sub-pixel), so a straight stretch is straight; where no clean
         // cross-section exists (at a fork), the line runs on straight to the fork.
-        var build = kept.map(function (r) {
+        var rawPts = [], build = kept.map(function (r) {
           var pts = [];
           for (var k = 0; k < r.length; k++) {
             var A = cen(r[Math.max(0, k - 3)]), B = cen(r[Math.min(r.length - 1, k + 3)]), C = cen(r[k]), m = across(C[0], C[1], unit(B[0] - A[0], B[1] - A[1]));
@@ -3828,29 +3984,43 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           var lineEnd = function (first) { var n = pts.length, a = first ? pts[0] : pts[n - 1], b = first ? pts[Math.min(n - 1, 4)] : pts[Math.max(0, n - 5)]; return n > 1 ? capOn(a, b) : null; };
           if (freeEnd(r[0])) { var e0 = lineEnd(true) || stretch(r, 0); pts.unshift(e0); endsAt.push(e0); } else if (pts.length > 1) { var f0 = onTo(pt(r[0]), pts[0], pts[1]); if (f0) pts.unshift(f0); }
           if (freeEnd(r[r.length - 1])) { var e1 = lineEnd(false) || stretch(r, 1); pts.push(e1); endsAt.push(e1); } else if (pts.length > 1) { var f1 = onTo(pt(r[r.length - 1]), pts[pts.length - 1], pts[pts.length - 2]); if (f1) pts.push(f1); }
+          rawPts.push(pts.slice());
           return simplify(pts, 0.03);
         });
-        // Where two strokes alone meet at a point (an arrow's tip), they join where their straight lines cross.
+        // Where strokes meet (an arrow's tip, a bar into a side) they join where their middle lines cross: a T's bar runs
+        // on to the side's own line, a tip sits where its two arms' lines meet (the thinning stops short of both).
         var meet = {}, joins = [];
         kept.forEach(function (r, k) { [[r[0], 0], [r[r.length - 1], 1]].forEach(function (e) { if (!freeEnd(e[0])) (meet[e[0]] = meet[e[0]] || []).push([k, e[1]]); }); });
         Object.keys(meet).forEach(function (n) {
-          var m = meet[n]; if (m.length !== 2) return;
-          // Each arm's line read from a stretch away from the meeting (near it, thinning bends the line).
+          var m = meet[n]; if (m.length < 2) return;
+          var N = pt(+n), near = m.length === 2 ? w * 1.5 : w;
+          // Each arm's line read on the stroke's true middle, a stroke or so out from the meeting (near it, thinning bends it).
           var seg = function (e) {
-            var r = kept[e[0]], k1 = Math.round(best * 1.5), k2 = Math.round(best * 3); if (r.length <= k2) { k1 = Math.floor(r.length / 3); k2 = r.length - 1; }
-            var a = pt(e[1] ? r[r.length - 1 - k1] : r[k1]), b = pt(e[1] ? r[r.length - 1 - k2] : r[k2]); return k2 > k1 ? [a, unit(a[0] - b[0], a[1] - b[1])] : null;
+            var ps = e[1] ? rawPts[e[0]].slice().reverse() : rawPts[e[0]], d = function (p) { return Math.hypot(p[0] - N[0], p[1] - N[1]); };
+            var a = ps.filter(function (p) { return d(p) > near; })[0], b = ps.filter(function (p) { return d(p) > near + w * 2; })[0] || ps[ps.length - 1];
+            return a && b && d(b) > d(a) ? [a, unit(a[0] - b[0], a[1] - b[1])] : null;
           };
-          var A = seg(m[0]), B = seg(m[1]); if (!A || !B) return;
-          var den = A[1][0] * B[1][1] - A[1][1] * B[1][0]; if (Math.abs(den) < 0.2) return;
-          var t = ((B[0][0] - A[0][0]) * B[1][1] - (B[0][1] - A[0][1]) * B[1][0]) / den, X = [A[0][0] + A[1][0] * t, A[0][1] + A[1][1] * t], N = pt(+n);
-          if (Math.hypot(X[0] - N[0], X[1] - N[1]) > w * 1.5) return;
-          // The bent part near the meeting goes; each arm runs straight to the crossing, which is a turn.
+          var arms = m.map(seg); if (arms.some(function (A) { return !A; })) return;
+          var crossAt = function (A, P, u) { var den = A[1][0] * u[1] - A[1][1] * u[0]; if (Math.abs(den) < 0.2) return null; var t = ((P[0] - A[0][0]) * u[1] - (P[1] - A[0][1]) * u[0]) / den; return [A[0][0] + A[1][0] * t, A[0][1] + A[1][1] * t]; };
+          var X;
+          if (m.length === 2) X = crossAt(arms[0], arms[1][0], arms[1][1]);   // a tip: its two arms' lines cross
+          else {
+            // A T: the side is the two arms most nearly opposite, its line through their points either side of the meeting
+            // (straight there, however it curves further on); each other arm runs on to it.
+            var pi = 0, pj = 1, lo = 2;
+            for (var i3 = 0; i3 < arms.length; i3++) for (var j3 = i3 + 1; j3 < arms.length; j3++) { var dd3 = arms[i3][1][0] * arms[j3][1][0] + arms[i3][1][1] * arms[j3][1][1]; if (dd3 < lo) { lo = dd3; pi = i3; pj = j3; } }
+            var P0 = arms[pi][0], su = unit(arms[pj][0][0] - P0[0], arms[pj][0][1] - P0[1]), hits = [];
+            arms.forEach(function (A, k3) { if (k3 !== pi && k3 !== pj) { var h = crossAt(A, P0, su); if (h) hits.push(h); } });
+            if (hits.length) X = [hits.reduce(function (s3, h) { return s3 + h[0]; }, 0) / hits.length, hits.reduce(function (s3, h) { return s3 + h[1]; }, 0) / hits.length];
+          }
+          if (!X || Math.hypot(X[0] - N[0], X[1] - N[1]) > w * 1.5) return;
+          // The bent part near the meeting goes; each arm runs straight to the crossing.
           m.forEach(function (e) {
-            var ps = build[e[0]], keep = ps.filter(function (p) { return Math.hypot(p[0] - X[0], p[1] - X[1]) > w * 1.5; });
+            var ps = build[e[0]], keep = ps.filter(function (p) { return Math.hypot(p[0] - X[0], p[1] - X[1]) > near; });
             if (keep.length < 1) keep = [e[1] ? ps[0] : ps[ps.length - 1]];
             build[e[0]] = e[1] ? keep.concat([X]) : [X].concat(keep);
           });
-          joins.push(X);
+          if (m.length === 2) joins.push(X);   // a tip is a turn; a T is not
         });
         // The turns: each corner once at its sharpest, and any point where the simplified line bends by more than 60 degrees.
         var turnDots = [], addTurn = function (p) { if (!turnDots.concat(endsAt).some(function (o) { return Math.hypot(o[0] - p[0], o[1] - p[1]) < w * (turnDots.indexOf(o) >= 0 ? 2 : 1.2); })) turnDots.push(p); };   // two strokes apart, never on an end
@@ -4309,6 +4479,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           var onHue = Object.keys(swByHex).filter(function (h) { return (bkRatio(h, h1x) || 0) >= 3; }).sort(function (a, b) { return swByHex[b].n - swByHex[a].n; })[0];
           iconSw[3] = { bg: HUE1, fg: onHue ? bkCss(swByHex[onHue].t) : onC1big };
         } else iconSw.push(iconSw.splice(iconSw.findIndex(function (o) { return o.bg === HUE1; }), 1)[0]);
+        // One in the primary itself, third, linked to its token (not a component's that only shares its value in one
+        // mode or brand), on the neutral ground it reads best on.
+        var hueOn = [{ css: INK, hex: ink }, { css: PAPER, hex: paper }].sort(function (a, b) { return (bkRatio(h1x, b.hex) || 0) - (bkRatio(h1x, a.hex) || 0); })[0];
+        iconSw = iconSw.filter(function (o) { return o.bg === HUE1 || String(bkCssHex(o.fg)).toLowerCase() !== String(h1x).toLowerCase(); });
+        iconSw.splice(Math.min(2, iconSw.length - 1), 0, { bg: hueOn.css, fg: HUE1 });
+        iconSw = iconSw.slice(0, 3).concat(iconSw.slice(-1));
+        // The first two on the two neutrals, in every mode: the light one first, then the dark one with a light icon.
+        // An icon colour of the system's on each is kept; a square missing is the neutrals' own pair.
+        if (iconSw.length > 3) {
+          var inkDark = (bkRatio(ink, '#ffffff') || 0) >= (bkRatio(paper, '#ffffff') || 0), LIGHT = inkDark ? PAPER : INK, DARK = inkDark ? INK : PAPER;
+          if (iconSw[0].bg !== LIGHT && iconSw[1].bg === LIGHT) iconSw.splice(0, 2, iconSw[1], iconSw[0]);
+          if (iconSw[0].bg !== LIGHT) iconSw[0] = { bg: LIGHT, fg: DARK };
+          if (iconSw[1].bg !== DARK) iconSw[1] = { bg: DARK, fg: LIGHT };
+        }
         if (an) addI('w6 h5 sg-bk-bare-pad sg-bk-lens-t', bg2, lensTile(an, iconSw));
       }
       ICON = '<div class="sg-bk-bento">' + IT.join('') + '</div>'; IT = [];   // the charts follow, at the end of the kit
@@ -6275,7 +6459,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   function statusLine(r) {
     var how = function (x) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, r.st === 'done' ? 'Checked by a person' : 'To check by a person'); };
-    return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || how((r.src || []).filter(Boolean)[0]);
+    return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || (r.writeTo || r.area === 'Documentation' ? '' : how((r.src || []).filter(Boolean)[0]));   // a Documentation row's Source says where
   }
   function statusHTML(st, sub, area) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(rowWord(st, area)) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
@@ -6350,11 +6534,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A source in the intent layer opens there: the component's own page, or the layer itself when no page is written yet.
     var ilHref = function (x) { if (!/intent layer/i.test(x)) return null; var own = HAS_PAGE[comp] && HAS_PAGE[comp].intentLayer; return (own && own.url) || (DATA.intentLayer && DATA.intentLayer.source && DATA.intentLayer.source.url) || null; };
     var ilFile = function (url) { var m = /\/-\/blob\/[^/]+\/(.+)$/.exec(url); return m ? decodeURIComponent(m[1]) : url.replace(/^https?:\/\//, ''); };
+    // Each source on its own line, linked to where it is: its page in the intent layer (with its file), the component in
+    // Figma; the row's own link when it carries one.
+    var figmaOf = function () { var c0 = HAS_PAGE[comp]; return c0 ? figmaUrlOf(c0) : null; };
+    var srcLines = function () { return (r.src || []).filter(Boolean).map(function (x, i) { var url = (r.srcLinks || [])[i] || ilHref(x) || (/figma/i.test(x) ? figmaOf() : null), file = url && /intent layer/i.test(x) && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join(''); };
+    var hasSource = colsOf(d.area).some(function (col) { return col[1] === 'source'; });
     var body = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; }).map(function (col) {
       var k = col[1];
+      // Its source, said once: what it was read from, or, still to write, nothing yet and where it belongs.
+      if (k === 'source') return card(col[0], r.writeTo ? '<p class="pg-missing">Nothing yet.</p><p>Write it in:</p>' + srcLines() : srcLines() || '<p class="pg-missing">Nothing.</p>');
+      // Written in two places: what each says, apart, under where it was read.
+      if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
       if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : ''));   // nothing to do: no card
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
-      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + card(r.writeTo ? 'Where to write it' : 'Where it was read', (r.src || []).filter(Boolean).map(function (x) { var url = ilHref(x), file = url && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join('')); }
+      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');
@@ -6401,13 +6594,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
   }
-  // A click on a row (not on a link or a button in it), or Enter on it, opens it in full.
+  // A click on a row (not on a link or a button in it), or Enter on it, opens it in full. Only a row this panel holds (it
+  // carries its number): a table with a panel of its own (the Intent layer's) opens that one alone.
   document.addEventListener('click', function (e) {
-    var tr = e.target.closest && e.target.closest('tr.sg-row-open'); if (!tr) return;
+    var tr = e.target.closest && e.target.closest('tr.sg-row-open[data-row-detail]'); if (!tr) return;
     if (e.target.closest('a, button, input, select, textarea, summary, label, [contenteditable]') || String(window.getSelection && window.getSelection()).length) return;
     openRowPanel(+tr.getAttribute('data-row-detail'), tr);
   });
-  document.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr.sg-row-open'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRowPanel(+tr.getAttribute('data-row-detail'), tr); } });
+  document.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr.sg-row-open[data-row-detail]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRowPanel(+tr.getAttribute('data-row-detail'), tr); } });
   // Each open row's task number, as the Status page numbers it.
   function fillTodoNos(root) {
     Array.prototype.forEach.call(root.querySelectorAll('.sg-todo-no[data-todo-key]'), function (el) {
@@ -6630,12 +6824,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Its code: every commit that changed it, by the release it shipped in (newest first), each linked, with its pull
     // request and what it changed in the component's own rules.
     var groups = [], by = {};
-    log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = []; groups.push(k); } by[k].push(r); });
-    return '<div class="pg-cards">' + out + groups.map(function (k) {
-      var rows = by[k], first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
-      return card((k ? (rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : esc(k)) : 'Merged, no release tag yet') + '  ·  ' + esc(String(first.date).slice(0, 10)), rows.map(function (r) {
-        var pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
-        return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + what(r.changed) + '</td></tr>';
+    log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = { k: k, rows: [], at: String(r.date), on: r.releasedAt || '' }; groups.push(by[k]); } by[k].rows.push(r); });
+    groups.sort(releaseOrder);
+    return '<div class="pg-cards">' + out + groups.map(function (g) {
+      var k = g.k, rows = g.rows, first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
+      // One row per ticket, each of its commits a line (what it says, its commit, its day, what it changed); a commit for
+      // no ticket keeps its own row, its commit and pull request on the left.
+      return card(releaseHead(g, k && rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : null), byTicket(rows, function (r) { return r; }).map(function (t) {
+        if (t.ticket) return '<tr><td>' + (t.ticketUrl ? '<a class="sg-uses-link" href="' + esc(t.ticketUrl) + '" target="_blank" rel="noopener">' + esc(t.ticket) + '</a>' : esc(t.ticket)) + '</td><td>' + t.items.map(function (r) { return '<p class="sg-il-line">' + commitLine(r, ' ' + day(r.date) + what(r.changed)) + '</p>'; }).join('') + '</td></tr>';
+        var r = t.items[0], pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
+        return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + what(r.changed) + '</td></tr>';
       }).join(''));
     }).join('') + '</div>';
   }
