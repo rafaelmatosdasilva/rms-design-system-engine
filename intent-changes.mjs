@@ -54,7 +54,8 @@ export function layerAccess(ROOT, cfg, { env = process.env } = {}) {
   const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
   return {
     p, base, hasToken: !!headers['PRIVATE-TOKEN'], writesWith: writeHeaders === headers ? 'GITLAB_TOKEN' : 'GITLAB_WRITE_TOKEN',
-    get: (path) => plainGet(base + path, { headers }),
+    // A read refused with GITLAB_TOKEN (revoked, expired) is asked again with the write token, which reads its project.
+    get: async (path) => { const r = await plainGet(base + path, { headers }); return (r.status === 401 || r.status === 403) && writeHeaders !== headers ? plainGet(base + path, { headers: writeHeaders }) : r; },
     send: (method, path, body) => plainSend(base + path, { method, headers: writeHeaders, body }),
   };
 }
