@@ -3568,30 +3568,33 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var at = function (p) { return [ox + p[0] * big, oy + p[1] * big]; }, num = function (n) { return String(Math.round(n * 100) / 100); };
       // The icon's own drawing in the words' colour (its fills from a class would not reach a <use>).
       var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
-      // Drawn large, its stroke 48% of the icon's (read heavy at that size): each outline eaten into by a
-      // mask, square at its corners so an inside corner stays sharp, as drawn. The measures below are of the stroke as drawn here.
-      var THIN = 0.48, cut = an.w * (1 - THIN) / 2, wd = an.w * THIN;
-      var icon = function (x, y, k) {
+      // Drawn large, its stroke lighter than the icon's (read heavy at that size): 48% in the lenses, 62% in the big icon.
+      // Each outline eaten into by a mask, square at its corners so an inside corner stays sharp, as drawn. The measures
+      // below are of the stroke as drawn where they sit (cut and wd in the lenses, bigCut and bigWd on the big icon).
+      var THIN = 0.48, cut = an.w * (1 - THIN) / 2, wd = an.w * THIN, BIG_THIN = 0.62, bigCut = an.w * (1 - BIG_THIN) / 2, bigWd = an.w * BIG_THIN;
+      var icon = function (x, y, k, c) {
+        if (c == null) c = cut;
         var m = 'sg-bk-lens-thin-' + (lensTile.n = (lensTile.n || 0) + 1);
         return '<svg x="' + x + '" y="' + y + '" width="' + (bx[2] * k) + '" height="' + (bx[3] * k) + '" viewBox="' + bx.join(' ') + '" class="sg-bk-lens-icon" fill="currentColor" overflow="visible">' +
-          '<mask id="' + m + '" maskUnits="userSpaceOnUse" x="' + (bx[0] - bx[2]) + '" y="' + (bx[1] - bx[3]) + '" width="' + (bx[2] * 3) + '" height="' + (bx[3] * 3) + '"><g style="color:#fff">' + body + '</g><g class="sg-bk-lens-erode" style="color:#000;--bk-line-w:' + (cut * 2) + 'px">' + body + '</g></mask>' +
+          '<mask id="' + m + '" maskUnits="userSpaceOnUse" x="' + (bx[0] - bx[2]) + '" y="' + (bx[1] - bx[3]) + '" width="' + (bx[2] * 3) + '" height="' + (bx[3] * 3) + '"><g style="color:#fff">' + body + '</g><g class="sg-bk-lens-erode" style="color:#000;--bk-line-w:' + (c * 2) + 'px">' + body + '</g></mask>' +
           '<g mask="url(#' + m + ')">' + body + '</g></svg>';
       };
       var gridLines = function (x0, y0, x1, y1, step, cls) { var g = ''; for (var gx = x0; gx <= x1 + 0.1; gx += step) g += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + y1 + '"/>'; for (var gy = y0; gy <= y1 + 0.1; gy += step) g += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + x1 + '" y2="' + gy + '"/>'; return '<g class="' + cls + '">' + g + '</g>'; };
       // The stroke's edges and the gap's tips where the thinner stroke has them: each edge half the cut in, each tip half the cut back.
-      var thickAt = an.thick && [0, 1].map(function (k) { var e = k ? an.thick.e2 : an.thick.e1, o2 = k ? an.thick.e1 : an.thick.e2; return [e[0] + (o2[0] - e[0]) / 2 * (1 - THIN), e[1] + (o2[1] - e[1]) / 2 * (1 - THIN)]; });
+      var edgesAt = function (t) { return an.thick && [0, 1].map(function (k) { var e = k ? an.thick.e2 : an.thick.e1, o2 = k ? an.thick.e1 : an.thick.e2; return [e[0] + (o2[0] - e[0]) / 2 * (1 - t), e[1] + (o2[1] - e[1]) / 2 * (1 - t)]; }); }, thickAt = edgesAt(THIN);
       var gapAt = an.gap && (function () { var a = an.gap.a, b = an.gap.b, d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / d * cut, uy = (b[1] - a[1]) / d * cut; return [[a[0] - ux, a[1] - uy], [b[0] + ux, b[1] + uy]]; })();
       // The join's two outer edges, where they meet, moved in toward its curve's centre.
-      var cornerEdge = function () {
+      var cornerEdge = function (c) {
+        if (c == null) c = cut;
         var oo = an.corner.o, ta = an.corner.ta, tb = an.corner.tb, sideX = Math.abs(ta[0] - oo[0]) > Math.abs(ta[1] - oo[1]), p = [sideX ? ta[0] : tb[0], sideX ? tb[1] : ta[1]];
-        return [p[0] + Math.sign(oo[0] - p[0]) * cut, p[1] + Math.sign(oo[1] - p[1]) * cut];
+        return [p[0] + Math.sign(oo[0] - p[0]) * c, p[1] + Math.sign(oo[1] - p[1]) * c];
       };
       // Two by two at the left, the icon at the right, as they sit on it: the corner and the open gap above, the stroke's thickness and the end below.
       var lenses = [an.corner && { p: an.corner.at, kind: 'corner', round: an.corner.round }, an.gap && { p: an.gap.at, kind: 'gap' }, an.thick && { p: an.thick.at, kind: 'thick' }, an.end && { p: an.end.at, kind: 'end', round: an.end.round }].filter(Boolean);
       var R = 55, LR = 95, out = '', caps = '', VW = 1440, VH = 680;
       // The icon, large, on its pixel grid inside its own box.
       // Its frame is drawn by the page (lensFrame below), in the brand's own corner radius.
-      out += icon(frameX, frameY, big);
+      out += icon(frameX, frameY, big, bigCut);
       // The construction line over it: the line each stroke is drawn on, a ring at each end, a dot at each turn.
       if (an.build) {
         // Drawn through its points as they are: a straight stays straight, a rounded turn is its many short steps.
@@ -3658,8 +3661,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       });
       // The icon's frame, drawn by the page at its own size (so its dashes keep their spacing and its corner the brand's
       // radius), with a grid behind the icon half a stroke apart, laid on the icon's own outer edges, clipped to the frame.
-      var gStep = wd / 2, gAt = an.thick ? thickAt[0] : an.end ? an.end.at : [bx[0], bx[1]];
-      if (an.corner && an.corner.ta) gAt = cornerEdge();
+      var gStep = bigWd / 2, gAt = an.thick ? edgesAt(BIG_THIN)[0] : an.end ? an.end.at : [bx[0], bx[1]];
+      if (an.corner && an.corner.ta) gAt = cornerEdge(bigCut);
       var gLines = '', pct = function (v, o, n) { return ((v - o) / n * 100) + '%'; };
       for (var gv = gAt[0] - Math.floor((gAt[0] - bx[0]) / gStep) * gStep; gv <= bx[0] + bx[2] + 1e-6; gv += gStep) gLines += '<line x1="' + pct(gv, bx[0], bx[2]) + '" y1="0" x2="' + pct(gv, bx[0], bx[2]) + '" y2="100%"/>';
       for (var gh = gAt[1] - Math.floor((gAt[1] - bx[1]) / gStep) * gStep; gh <= bx[1] + bx[3] + 1e-6; gh += gStep) gLines += '<line x1="0" y1="' + pct(gh, bx[1], bx[3]) + '" x2="100%" y2="' + pct(gh, bx[1], bx[3]) + '"/>';
@@ -4442,6 +4445,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         iconSw = iconSw.filter(function (o) { return o.bg === HUE1 || String(bkCssHex(o.fg)).toLowerCase() !== String(h1x).toLowerCase(); });
         iconSw.splice(Math.min(2, iconSw.length - 1), 0, { bg: hueOn.css, fg: HUE1 });
         iconSw = iconSw.slice(0, 3).concat(iconSw.slice(-1));
+        // The first two on the two neutrals, in every mode: the light one first, then the dark one with a light icon.
+        // An icon colour of the system's on each is kept; a square missing is the neutrals' own pair.
+        if (iconSw.length > 3) {
+          var inkDark = (bkRatio(ink, '#ffffff') || 0) >= (bkRatio(paper, '#ffffff') || 0), LIGHT = inkDark ? PAPER : INK, DARK = inkDark ? INK : PAPER;
+          if (iconSw[0].bg !== LIGHT && iconSw[1].bg === LIGHT) iconSw.splice(0, 2, iconSw[1], iconSw[0]);
+          if (iconSw[0].bg !== LIGHT) iconSw[0] = { bg: LIGHT, fg: DARK };
+          if (iconSw[1].bg !== DARK) iconSw[1] = { bg: DARK, fg: LIGHT };
+        }
         if (an) addI('w6 h5 sg-bk-bare-pad sg-bk-lens-t', bg2, lensTile(an, iconSw));
       }
       ICON = '<div class="sg-bk-bento">' + IT.join('') + '</div>'; IT = [];   // the charts follow, at the end of the kit
