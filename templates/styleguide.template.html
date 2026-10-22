@@ -8542,7 +8542,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // Any control of the page a person is on (a field, a list, the Status page's filter, a menu it opened), not only a
         // field: wherever the focus is outside what is being tried, it stays there.
         var busy = document.activeElement, inPage = busy && busy !== document.body && busy !== document.documentElement && !preview.contains(busy) && !(busy.closest && busy.closest('.pg-offstage'));
-        if (inPage) { busy.addEventListener('blur', function () { setTimeout(function () { measure(cb); }, 50); }, { once: true }); return; }
+        // The build's own run has no person on the page: nothing to wait for.
+        if (inPage && !BAKING) { busy.addEventListener('blur', function () { setTimeout(function () { measure(cb); }, 50); }, { once: true }); return; }
         var root = preview.firstElementChild || cur, tb = document.createElement('tbody');
         // Whether it holds anything a person acts on, or a field, in any variant: what asks of controls and fields only
         // applies then.
@@ -8643,6 +8644,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       };
       // Leaving the area, or a new mode, ends it at once: the Playground is drawn again as set.
       wcagStop = function () { done(); };
+      var retried = {};   // how many times each variant was started again after a person stopped it
       (function next(i) {
         if (stopped) return;
         if (i >= all.length || combos.length >= 6) { if (!combos.length && all.length) combos.push(all[0]); return done(); }
@@ -8655,11 +8657,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var cb = all[i];
         // Never while a person is on a control of the page outside it: tried once they leave it; one they take mid-way
         // stops the try, which runs again from this variant once they leave.
-        var personOn = function () { var a = document.activeElement; return a && a !== document.body && a !== document.documentElement && !preview.contains(a) && !(a.closest && a.closest('.pg-offstage')) ? a : null; };
-        var later = function () { setTimeout(function () { if (stopped) return; if (personOn()) later(); else next(i); }, 400); };
+        // The build's own run has no person: the focus its component's script moves is never taken for one.
+        var personOn = function () { if (BAKING) return null; var a = document.activeElement; return a && a !== document.body && a !== document.documentElement && !preview.contains(a) && !(a.closest && a.closest('.pg-offstage')) ? a : null; };
+        // A variant stopped by a person is tried again once they leave, three times at most: then it is left untried and
+        // the rest go on, so a component whose own script keeps moving the focus never holds the others up.
+        retried[i] = (retried[i] || 0);
+        var later = function () { if (++retried[i] > 3) { setTimeout(function () { if (!stopped) next(i + 1); }, 0); return; } setTimeout(function () { if (stopped) return; if (personOn()) later(); else next(i); }, 400); };
         if (personOn()) { combos.pop(); later(); return; }
         // Its keys (arrows, Home and End, Escape, Tab in a modal) only where the system's own script is on the page.
-        window.__wcag21.interact(root, { wait: 200, triggers: 6, keys: !!document.querySelector('script[data-system-script]') }).then(function (r) {
+        window.__wcag21.interact(root, { wait: 200, triggers: 6, keys: !!document.querySelector('script[data-system-script]'), person: !BAKING }).then(function (r) {
           r.ran.forEach(function (k) { live.ran[k] = 1; });
           r.findings.forEach(function (f) {
             var key = f.kind + '|' + f.desc;
