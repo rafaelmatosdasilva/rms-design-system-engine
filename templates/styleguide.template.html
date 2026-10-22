@@ -1306,8 +1306,9 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens .sg-bk-lens-measure { stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
 .sg-bk-lens text { font-size: var(--sg-space-l); }
 .sg-bk-lens .sg-bk-lens-icon { color: var(--sg-text); }
-/* The mask that thins the lens icon: each outline stroked in the mask's black (set on the group), eating into the fill. */
-.sg-bk-lens .sg-bk-lens-erode * { fill: none; stroke: currentColor; stroke-width: var(--bk-line-w); stroke-linejoin: round; }
+/* The mask that thins the lens icon: each outline stroked in the mask's black (set on the group), eating into the fill,
+   its width in the icon's own units (not the page's non-scaling hairline, which would barely touch it). */
+.sg-bk .sg-bk-lens .sg-bk-lens-erode * { fill: none; stroke: currentColor; stroke-width: var(--bk-line-w); stroke-linejoin: round; vector-effect: none; }
 .sg-bk-lens .sg-bk-lens-num { fill: var(--bk-mark, var(--sg-accent)); font-size: calc(var(--sg-space-l) * 1.85); }
 /* The drawing as large as the tile holds it (five rows, as tall as the type card, less the padding) at its own proportions, so the words laid over it
    stay under their lenses; the words in the page's sizes. */
@@ -3567,9 +3568,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var at = function (p) { return [ox + p[0] * big, oy + p[1] * big]; }, num = function (n) { return String(Math.round(n * 100) / 100); };
       // The icon's own drawing in the words' colour (its fills from a class would not reach a <use>).
       var body = String(document.getElementById(an.id).innerHTML).replace(/(fill|stroke)="(?!none)[^"]*"/gi, '$1="currentColor"').replace(/(fill|stroke):\s*(?!none)[^;"]+/gi, '$1:currentColor');
-      // Drawn large, its stroke a third lighter than the icon's (read heavy at that size): each outline eaten into by a
+      // Drawn large, its stroke 40% of the icon's (read heavy at that size): each outline eaten into by a
       // mask, so caps and joins keep their shape. The measures below are of the stroke as drawn here.
-      var THIN = 0.7, cut = an.w * (1 - THIN) / 2, wd = an.w * THIN;
+      var THIN = 0.4, cut = an.w * (1 - THIN) / 2, wd = an.w * THIN;
       var icon = function (x, y, k) {
         var m = 'sg-bk-lens-thin-' + (lensTile.n = (lensTile.n || 0) + 1);
         return '<svg x="' + x + '" y="' + y + '" width="' + (bx[2] * k) + '" height="' + (bx[3] * k) + '" viewBox="' + bx.join(' ') + '" class="sg-bk-lens-icon" fill="currentColor" overflow="visible">' +
