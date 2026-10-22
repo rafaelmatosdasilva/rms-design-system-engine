@@ -1183,7 +1183,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with
     // the release it shipped in and its pull request. The system's own links go on the overview.
     try {
-      const { repoUrl, changelogs, figmaChangelogs, commitUrl, prUrl, fileUrl, defaultBranch, ticketOf } = await import('./component-changelog.mjs');
+      const { repoUrl, changelogs, figmaChangelogs, commitUrl, prUrl, fileUrl, defaultBranch, ticketOf, releaseLog } = await import('./component-changelog.mjs');
       const { figmaLink, figmaNodeIds } = await import('./figma-link.mjs');
       const { ruleLines } = await import('./styleguide-data.mjs');
       const repo = repoUrl(ROOT), branch = cfg.styleguide?.branch ?? defaultBranch(ROOT), ids = figmaNodeIds(ROOT, cfg);
@@ -1221,6 +1221,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           ...extra.map((l) => ({ label: String(l.label ?? 'Link'), url: String(l.url) })),
         ].filter((l) => l.url);
       }
+      // Everything the developers did, release by release, whatever it changed: the Changelog page lists it all, each
+      // commit with the components it changed (from their changelogs) when it changed any.
+      view.releaseLog = releaseLog(ROOT).map((g) => ({ ...g, commits: g.commits.map((r) => ({ ...r, url: commitUrl(repo, r.sha), ...(ticketOf(r.subject, cfg, ROOT) ?? {}) })) }));
       view.links = [
         { label: 'Figma file', url: cfg.figmaFileKey ? `https://www.figma.com/design/${cfg.figmaFileKey}` : null },
         { label: 'Code repository', url: repo },

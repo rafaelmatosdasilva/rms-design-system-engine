@@ -1153,7 +1153,9 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   // team's unit of work) with the components its commits touched, each commit a line; a commit for no ticket on its own.
   assert.match(tpl, /navLink\('changelog', 'changelog'\)/);
   assert.match(tpl, /One row per ticket \(the team's unit of work/);
-  assert.match(tpl, /byTicket\(commits, function \(x\) \{ return x\.r; \}\)/);
+  assert.match(tpl, /byTicket\(g\.commits, function \(x\) \{ return x\.r; \}\)/);
+  assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
+  assert.match(tpl, /'<span class="pg-log-date">No component<\/span>'/);
   assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
   assert.match(tpl, /order\.sort\(releaseOrder\)/);
   assert.match(tpl, /'released ' \+ esc\(g\.on\.slice\(0, 10\)\)/);

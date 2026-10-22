@@ -6,7 +6,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { ruleChanges, changelogs, figmaChangelogs } from '../component-changelog.mjs';
+import { ruleChanges, changelogs, figmaChangelogs, releaseLog } from '../component-changelog.mjs';
 
 test('ruleChanges: each declaration changed, added or removed, in a few words', () => {
   const patch = ['   .chip {', '-    padding: var(--padding-s); /* old */', '+    padding: var(--padding-m);', '+    gap: 4px;', '-    color: red;', '   }'];
@@ -30,6 +30,8 @@ test('a change inside a rule counts, not only one to the line that names the cla
   const code = changelogs(dir, [{ name: 'chip', files: ['theme.css'], ranges: [['theme.css', 2, 5]] }]).chip;
   assert.deepEqual(code.map((r) => [r.subject, r.release, r.changed]), [['chip padding follows Figma', null, ['padding 8px → 12px']], ['first', 'v1.0.0', ['padding 8px added', 'gap 4px added']]]);
   assert.deepEqual(code.map((r) => (r.releasedAt ? new Date(r.releasedAt).toISOString() : null)), [null, '2030-01-02T10:00:00.000Z'], 'the day it was tagged, not its last commit');
+  // The release log: every commit, whatever it changed, by release; what is not released yet first.
+  assert.deepEqual(releaseLog(dir).map((g) => [g.release, g.commits.map((c) => c.subject)]), [[null, ['Figma read again', 'chip padding follows Figma']], ['v1.0.0', ['first']]]);
   const fig = figmaChangelogs(dir, { props: 'props.json', vars: 'vars.json' }, ['chip']).chip;
   assert.deepEqual(fig.map((r) => r.changed), [['property Size VARIANT · S · S → VARIANT · S, M · S', 'chip/background light #fff → #f7f7f7'], ['read from Figma for the first time']]);
 });

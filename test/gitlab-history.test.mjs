@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
-import { fillHistory, blameOf, commitsOf, readHistory, missing, HISTORY_FILE } from '../gitlab-history.mjs';
+import { fillHistory, blameOf, commitsOf, readHistory, missing, releaseLogOf, HISTORY_FILE } from '../gitlab-history.mjs';
 import { STATE_FILE } from '../gitlab-source.mjs';
 import { codeReason, reasonLine } from '../change-reason.mjs';
 import { changelogs, repoUrl, defaultBranch, ruleChanges } from '../component-changelog.mjs';
@@ -176,4 +176,29 @@ test('a record kept before releases were dated asks for the tags once, then neve
   assert.deepEqual(gl.calls.slice(before).map((c) => c.path), ['/repository/tags'], 'one list of tags, nothing else');
   assert.deepEqual(readHistory(dir).tags, { 'v1.10.0': '2026-04-01T10:00:00Z', 'v1.2.0': '2026-02-10T09:00:00Z', 'v1.0.0': '2026-01-01T10:00:00Z', 'v9.9.9': null });
   assert.equal(missing(dir, req), null, 'a tag GitLab does not list is kept as unknown, not asked every run');
+});
+
+test('a release log: every commit of each of the last releases, whatever it changed, merges left out, asked once', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const u = new URL(url), p = u.pathname.replace(/^\/api\/v4\/projects\/[^/]+/, '');
+    calls.push(p + (u.searchParams.get('from') ? `?${u.searchParams.get('from')}..${u.searchParams.get('to')}` : ''));
+    const body = p === '/repository/tags' ? [{ name: 'v1.1.0', created_at: '2026-03-02T09:00:00Z' }, { name: 'v1.0.0', created_at: null, commit: { committed_date: '2026-01-02T09:00:00Z' } }, { name: 'nightly', created_at: null }]
+      : p === '/repository/compare' && u.searchParams.get('from') === 'v1.0.0' ? { commits: [commit(B, '#41 - tile caption wraps', '2026-02-01T10:00:00Z'), commit(NEXT, 'Merge branch x', '2026-03-01T10:00:00Z', 2), commit(C, 'Versioning', '2026-03-01T11:00:00Z')] }
+      : p === '/repository/compare' ? { commits: [commit(HEAD, '#42 - network retries', '2026-03-05T10:00:00Z')] }
+      : p === '/repository/commits' ? [commit(A, 'First', '2026-01-01T10:00:00Z')] : null;
+    return body ? { ok: true, status: 200, json: async () => body } : { ok: false, status: 404, json: async () => ({}) };
+  };
+  const dir = mirror('https://code.acme.example', 'code.acme.example');
+  await fillHistory(dir, { releases: 5 }, { fetchImpl, env: {} });
+  const log = releaseLogOf(dir, { releases: 5 });
+  assert.deepEqual(log.map((g) => [g.release, g.releasedAt, g.commits.map((c) => c.subject)]), [
+    [null, null, ['#42 - network retries']],
+    ['v1.1.0', '2026-03-02T09:00:00Z', ['Versioning', '#41 - tile caption wraps']],
+    ['v1.0.0', '2026-01-02T09:00:00Z', ['First']],
+  ]);
+  const before = calls.length;
+  assert.equal(missing(dir, { releases: 5 }), null, 'all of it kept for this commit');
+  await fillHistory(dir, { releases: 5 }, { fetchImpl, env: {} });
+  assert.equal(calls.length, before, 'nothing asked again');
 });

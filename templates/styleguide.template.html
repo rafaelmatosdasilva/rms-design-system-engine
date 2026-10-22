@@ -2910,22 +2910,34 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // the components it changed and what each change says, linked to its commit.
   var CHANGES = [];
   COMPONENTS.forEach(function (c) { (c.changelog || []).forEach(function (r) { CHANGES.push({ comp: c.name, r: r }); }); });
-  if (CHANGES.length) {
+  // Everything the developers did, release by release (DATA.releaseLog: every commit, whatever it changed); without it,
+  // the commits that changed a component, from the components' changelogs.
+  var RLOG = DATA.releaseLog || [];
+  if (CHANGES.length || RLOG.length) {
     hr(); navLink('changelog', 'changelog');
     var wn = section('changelog', 'Changes', 'Changelog', '');
-    var rel = {}, order = [];
-    CHANGES.forEach(function (x) { var k = x.r.release || ''; if (!rel[k]) { rel[k] = { k: k, rows: [], at: '' }; order.push(rel[k]); } rel[k].rows.push(x); if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); if (x.r.releasedAt) rel[k].on = String(x.r.releasedAt); });
+    // The components each commit changed, from their changelogs.
+    var compsOf = {};
+    CHANGES.forEach(function (x) { var k = x.r.sha || x.r.subject, l = compsOf[k] = compsOf[k] || []; if (l.indexOf(x.comp) < 0) l.push(x.comp); });
+    var newestFirst = function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; };
+    var order = [];
+    if (RLOG.length) order = RLOG.map(function (g) {
+      var commits = (g.commits || []).map(function (r) { return { r: r, comps: compsOf[r.sha] || [] }; }).sort(newestFirst);
+      return { k: g.release || '', on: g.releasedAt || '', at: commits.length ? String(commits[0].r.date) : '', commits: commits };
+    }).filter(function (g) { return g.commits.length; });
+    else {
+      var rel = {}, seen = {};
+      CHANGES.forEach(function (x) { var k = x.r.release || '', id = x.r.sha || x.r.subject; if (!rel[k]) { rel[k] = { k: k, commits: [], at: '' }; order.push(rel[k]); } if (!seen[id]) { seen[id] = 1; rel[k].commits.push({ r: x.r, comps: compsOf[id] }); } if (String(x.r.date) > rel[k].at) rel[k].at = String(x.r.date); if (x.r.releasedAt) rel[k].on = String(x.r.releasedAt); });
+      order.forEach(function (g) { g.commits.sort(newestFirst); });
+    }
     order.sort(releaseOrder);
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
     box.innerHTML = order.map(function (g) {
-      // One row per ticket (the team's unit of work: its commits, whatever components each changed), the components on
-      // the left; a commit made for no ticket is a row of its own.
-      var by = {}, commits = [];
-      g.rows.forEach(function (x) { var k = x.r.sha || x.r.subject; if (!by[k]) { by[k] = { r: x.r, comps: [] }; commits.push(by[k]); } if (by[k].comps.indexOf(x.comp) < 0) by[k].comps.push(x.comp); });
-      commits.sort(function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; });
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table>' + byTicket(commits, function (x) { return x.r; }).map(function (t) {
+      // One row per ticket (the team's unit of work: its commits, whatever each changed), the components they changed on
+      // the left (none for a change outside the components); a commit made for no ticket is a row of its own.
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table>' + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
         var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
-        return '<tr><td>' + comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + ticketHTML(t, function (x) { return commitLine(x.r); }) + '</td></tr>';
+        return '<tr><td>' + (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '<span class="pg-log-date">No component</span>') + '</td><td>' + ticketHTML(t, function (x) { return commitLine(x.r); }) + '</td></tr>';
       }).join('') + '</table></div>';
     }).join('');
   }
