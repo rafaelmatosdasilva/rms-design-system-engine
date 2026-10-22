@@ -100,7 +100,7 @@ and the skill), `personality` (how the style guide reads a brand's personality f
 
 **Writing a page of the intent layer.** Run `rms-design-system-engine --check-intent <the file>` first and fix what it
 prints; write the page only once it passes. Never name what the system does not have. Never remove a `**Draft:**`
-marker yourself. The review's changes: `--intent-changes`; `--merge-request` only when the person asks.
+marker yourself. The review's changes: `--intent-changes`; `--commit` or `--merge-request` only when asked.
 
 ## How to run this skill (read first)
 

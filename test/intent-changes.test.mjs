@@ -139,3 +139,15 @@ test('the merge request is written with GITLAB_WRITE_TOKEN when there is one; ev
   writeFileSync(dir + '/.env', 'GITLAB_TOKEN=reads\nGITLAB_WRITE_TOKEN="writes" # the layer only\n');
   assert.equal(writeTokenFrom({}, [dir]), 'writes');
 });
+
+test('a commit straight on the branch only while the branch is where the changes were made', async () => {
+  const { commitToBranch } = await import('../intent-changes.mjs');
+  const sent = [];
+  const access = (head) => ({ writesWith: 'GITLAB_WRITE_TOKEN', get: async () => ({ ok: true, json: async () => ({ id: head }) }), send: async (m, p, b) => { sent.push([m, p, b]); return { ok: true, json: async () => ({ id: 'c0ffee', web_url: 'https://gitlab.acme.test/c0ffee' }) }; } });
+  const files = new Map([['specs/a.md', 'text']]);
+  assert.match((await commitToBranch(access('abc999'), { files, sha: 'abc123', target: 'main', message: 'm' })).error, /main moved since the layer was read/);
+  assert.equal(sent.length, 0);
+  assert.equal((await commitToBranch(access('abc123def'), { files, sha: 'abc123', target: 'main', message: 'm' })).url, 'https://gitlab.acme.test/c0ffee');
+  assert.deepEqual(sent[0][2].actions, [{ action: 'update', file_path: 'specs/a.md', content: 'text' }]);
+  assert.equal(sent[0][2].branch, 'main');
+});

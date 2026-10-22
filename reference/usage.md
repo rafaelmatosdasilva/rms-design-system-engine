@@ -96,7 +96,8 @@ rms-design-system-engine --contracts-out <dir>          # publish the contracts 
 rms-design-system-engine --watch-intent-layer [min]     # keep running: build the style guide again each time the intent layer gets a new commit (checks every 5 min)
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
-rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review (never to its branch); only when the person asks
+rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
+rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
@@ -349,7 +350,9 @@ to `.design-system-engine-out/intent-changes/`; `--merge-request` sends them to 
 one merge request from the commit they were made on, for the team to review. It writes with `GITLAB_WRITE_TOKEN` when
 `.env` has one, else with `GITLAB_TOKEN`: give it a token that may write only where it should, the layer's own project
 access token or its group's (Developer, scope `api`), and keep `GITLAB_TOKEN` read-only (`read_api`) for everything the
-engine reads. The engine never writes to the layer's branch itself.
+engine reads. `--commit` writes the same as one commit straight on the layer's branch instead, for a team that reviews
+in the layer itself: only while the branch is still at the commit the changes were made on (else it says to run again),
+and drafted lines keep their marker, so no agent gets them before a person has read them.
 
 A component's Documentation reads everything written about it, wherever it is written (its intent-layer page, its
 Figma description and annotations, a guidelines section headed with its name), one row per thing an agent needs: what

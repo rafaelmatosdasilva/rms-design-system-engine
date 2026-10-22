@@ -365,3 +365,17 @@ export async function openMergeRequest(access, { files, sha, target, title, desc
   if (!m.ok) return { error: `GitLab answered ${m.status} to the merge request (the branch ${branch} holds the changes)` };
   return { url: (await m.json())?.web_url ?? null, branch };
 }
+
+// The same changes as one commit straight on the layer's branch, for a team that reviews in the layer itself rather
+// than in a merge request: only when the branch is still at the commit the changes were made on, so nothing written
+// since is overwritten. Drafted lines keep their marker either way. → { url, sha } | { error }
+export async function commitToBranch(access, { files, sha, target, message }) {
+  const h = await access.get(`/repository/commits/${encodeURIComponent(target)}`);
+  if (!h.ok) return { error: `GitLab answered ${h.status} for ${target}` };
+  const head = String((await h.json())?.id ?? '');
+  if (!head.startsWith(sha) && !sha.startsWith(head)) return { error: `${target} moved since the layer was read (now ${head.slice(0, 8)}): run --intent-changes again, so the changes are made on what is there now` };
+  const c = await access.send('POST', '/repository/commits', { branch: target, commit_message: message, actions: [...files].map(([file_path, content]) => ({ action: 'update', file_path, content })) });
+  if (!c.ok) return { error: c.status === 403 || c.status === 401 ? `GitLab refused (${c.status}) a commit on ${target} with the token in ${access.writesWith}: it is a protected branch, or the token may not create commits there` : `GitLab answered ${c.status} to the commit` };
+  const out = await c.json();
+  return { url: out?.web_url ?? null, sha: out?.id ?? null };
+}

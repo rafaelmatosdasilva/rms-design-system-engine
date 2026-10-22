@@ -383,7 +383,16 @@ if (process.argv.includes('--intent-changes')) {
   const dir = ch.writeLocal(ROOT, result.files, summary);
   console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each change)${note ? `\n   ${note}` : ''}${result.held.length ? `\n   ${result.held.length} page${result.held.length === 1 ? '' : 's'} not changed: ${result.held.map((h) => h.name).join(', ')} (CHANGES.md says why)` : ''}`);
   if (!result.files.size) { console.log('NEXT: none'); process.exit(0); }
-  if (!process.argv.includes('--merge-request')) { console.log('NEXT: read the changes; to send them to the layer for review: rms-design-system-engine --intent-changes --merge-request (only when the person asks)'); process.exit(0); }
+  // --commit: one commit straight on the layer's branch (only while it is still where it was read); --merge-request: one
+  // merge request for the team. Neither unless the person asks.
+  if (process.argv.includes('--commit')) {
+    const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message: 'Intent layer review: ' + summary.split('\n')[0] + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+    if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
+    console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
+    console.log('NEXT: the Intent layer page lists each draft under Review until its marker is removed.');
+    process.exit(0);
+  }
+  if (!process.argv.includes('--merge-request')) { console.log('NEXT: read the changes; to send them to the layer: rms-design-system-engine --intent-changes --commit (straight on its branch) or --merge-request (for the team to review), only when the person asks'); process.exit(0); }
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
   const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/intent-review-${stamp}`,
     title: 'Intent layer review: lines written on every page, sentences the system contradicts, drafts to review',
