@@ -79,6 +79,8 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
   for (const n of Object.keys(structure)) if (!/^[_.\s]/.test(n)) add(n);
   for (const [n, a] of Object.entries(code.api ?? {})) {
     const c = add(n); if (a?.file) c.file = a.file;
+    // The words of its own code file: a value the code takes but the capture did not list (a status the code names).
+    if (a?.file) { try { c.codeWords = [...new Set(readFileSync(resolve(ROOT, a.file), 'utf8').match(/[A-Za-z_][\w-]*/g) ?? [])]; } catch { /* not read */ } }
     for (const [p, d] of Object.entries(a?.props ?? {})) c.props[p] = { type: d?.type ?? null, options: Array.isArray(d?.options) ? d.options.map(String) : null, from: 'the code' };
     for (const s of a?.slots?.named ?? []) c.slots = [...(c.slots ?? []), s];
   }
@@ -203,6 +205,9 @@ function lev(a, b) {
   return d[a.length][b.length];
 }
 
+// A value the prop takes: one of its options, or, when only Figma lists them (Figma names a variant one way, the code
+// another: positive and success), a word of the component's own code file.
+const takes = (facts, n, prop, v) => prop.options.some((o) => norm(o) === norm(v)) || (prop.from !== 'the code' && (facts.components[n]?.codeWords ?? []).includes(v));
 const propsOf = (facts, n) => facts.components[n]?.props ?? {};
 const propOf = (facts, n, p) => { const ps = propsOf(facts, n); return ps[p] ?? ps[camel(p)] ?? Object.entries(ps).find(([k]) => norm(k) === norm(p))?.[1] ?? null; };
 
@@ -244,7 +249,7 @@ export function checkPage(e, facts, { component = null, strict = false } = {}) {
         }
         const prop = subject ? propOf(facts, subject, p) : null;
         const vals = v.split(/[/|]/).filter(Boolean);
-        const bad = prop?.options?.length ? vals.filter((x) => !prop.options.some((o) => norm(o) === norm(x))) : [];
+        const bad = prop?.options?.length ? vals.filter((x) => !takes(facts, subject, prop, x)) : [];
         if (bad.length) {
           push({ kind: 'claim', where, line, says: `\`${p}\` = \`${v}\` on ${subject}`, truth: `\`${p}\` takes ${list(prop.options, 12)}.`, source: prop.from ?? 'the code', fix: `Use one of the values \`${p}\` takes, or add \`${bad[0]}\` to the component first.` });
         } else if (prop && v && prop.type === 'boolean' && !vals.every((x) => BOOL.has(x.toLowerCase()))) {
@@ -283,7 +288,7 @@ export function checkPage(e, facts, { component = null, strict = false } = {}) {
       const subject = own; if (!subject) continue;
       const prop = propOf(facts, subject, m[1]); if (!prop?.options?.length) continue;
       const vals = [...m[2].matchAll(/`([^`\n]+)`/g)].map((x) => x[1].trim());
-      const bad = vals.filter((v) => !prop.options.some((o) => norm(o) === norm(v)));
+      const bad = vals.filter((v) => !takes(facts, own, prop, v));
       if (bad.length) push({ kind: 'claim', where, line: sentenceOf(text, m.index), says: `\`${m[1]}\` takes ${list(bad)}`, truth: `\`${m[1]}\` takes ${list(prop.options, 12)}.`, source: prop.from ?? 'the code', fix: `List only the values \`${m[1]}\` takes, or add ${bad.length === 1 ? 'that one' : 'those'} to the component first.` });
     }
     // What it says the component does for accessibility, against what the accessibility check found.

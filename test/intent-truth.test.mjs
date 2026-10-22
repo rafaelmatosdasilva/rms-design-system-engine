@@ -157,3 +157,9 @@ test('the same wrong name in two sentences is two findings, one for each sentenc
   assert.equal(f.length, 2);
   assert.deepEqual(f.map((x) => x.where), ['When to use', 'Rules']);
 });
+
+test('a value only Figma lists the options of is right when the component\'s own code takes it (Figma\'s positive is the code\'s success)', () => {
+  const facts = factsFrom({ components: { toastOne: { file: 'src/Toast.vue', props: { status: { type: 'variant', options: ['positive', 'info'], from: 'Figma' } }, codeWords: ['info', 'success'] } } });
+  assert.equal(checkPage(page('toastOne', { rules: [{ text: 'Use `status="success"` when an action completed.' }] }), facts, { component: 'toastOne' }).length, 0);
+  assert.equal(checkPage(page('toastOne', { rules: [{ text: 'Use `status="shiny"` when it shines.' }] }), facts, { component: 'toastOne' }).length, 1);
+});
