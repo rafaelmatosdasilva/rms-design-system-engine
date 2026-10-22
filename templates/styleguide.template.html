@@ -1611,6 +1611,7 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 /* The Intent layer and For agents pages: a card's line under its head, and its rows read from the top. */
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
+.sg-il-partof { margin-right: var(--sg-space-xs); }   /* "Part of" and the component's chip, apart */
 /* Balanced at every width: the file (its name and path) takes what the others leave. */
 .sg-issues.sg-il th:nth-child(1) { width: 22%; }      /* For: a component's name or a layer */
 .sg-issues.sg-il th:nth-child(3) { width: 16%; }      /* Sources: Intent layer, Figma, Code */
@@ -2994,7 +2995,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (p.component) return compLink(p.component);
       // A page that names no component but is about one: the one it belongs to (a part's), or the one it is (under
       // another name).
-      if (p.about && p.about.partOf) return 'Part of ' + compLink(p.about.partOf);
+      if (p.about && p.about.partOf) return '<span class="sg-il-partof">Part of</span>' + compLink(p.about.partOf);
       if (p.about && p.about.is) return compLink(p.about.is);
       if (p.layer === 'components') return '<span class="pg-missing">No component</span>';
       if (p.layer === 'templates') {
