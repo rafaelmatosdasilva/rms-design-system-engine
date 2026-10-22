@@ -1609,9 +1609,10 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
 /* Balanced at every width: the file (its name and path) takes what the others leave. */
-.sg-issues.sg-il th:nth-child(1) { width: 13%; }      /* Decision */
-.sg-issues.sg-il th:nth-child(3) { width: 21%; }      /* For */
+.sg-issues.sg-il th:nth-child(1) { width: 27%; }      /* For: a component's name or a layer */
+.sg-issues.sg-il th:nth-child(3) { width: 18%; }      /* Decision: one word with its dot */
 .sg-issues.sg-il th:nth-child(4) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
+/* File takes the rest: a page's name and its path. */
 /* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
 .sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
 .sg-h2-links > .pg-head-links { font-size: var(--sg-m); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); }
