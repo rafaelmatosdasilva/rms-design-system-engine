@@ -1152,7 +1152,8 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   // Changelog: every component's changes by release, newest version first, dated by its tag; one row per ticket (the
   // team's unit of work) with the components its commits touched, each commit a line; a commit for no ticket on its own.
   assert.match(tpl, /navLink\('changelog', 'changelog'\)/);
-  assert.match(tpl, /One row per ticket \(the team's unit of work/);
+  assert.match(tpl, /One row per issue \(the team's unit of work/);
+  assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">Issue<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'the issue first, then what it affects, each column named');
   assert.match(tpl, /byTicket\(g\.commits, function \(x\) \{ return x\.r; \}\)/);
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
   assert.match(tpl, /'<span class="pg-log-date">No component<\/span>'/);

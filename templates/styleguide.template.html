@@ -1645,6 +1645,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
 .pg-inspect tr:last-child td { border-bottom: none; }
+/* The Changelog's tables: the issue (its commits under it) first, then what it affects; named in a head. */
+.sg-log th { text-align: left; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
+/* Its head stays in view under the card's head as the rows scroll by, as a token table's does, drawing its own line. */
+.sg-log thead th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); z-index: 5; background: var(--sg-bg-2); box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid); }
+.sg-log td:first-child { color: var(--sg-text); width: 62%; }
+.sg-log td:last-child { word-break: normal; }
 /* A section of the documentation as one of these tables: its title the head, each row a name and its text. */
 .pg-inspect-head > h3 { font: inherit; color: inherit; margin: 0; }
 /* Every table's head stays in view as its rows scroll by, under whatever sticks at the top of its page (the page's
@@ -2933,12 +2939,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     order.sort(releaseOrder);
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
     box.innerHTML = order.map(function (g) {
-      // One row per ticket (the team's unit of work: its commits, whatever each changed), the components they changed on
-      // the left (none for a change outside the components); a commit made for no ticket is a row of its own.
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table>' + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
+      // One row per issue (the team's unit of work: its commits, whatever each changed), then what it affects: the
+      // components its commits changed (none for a change outside them). A commit made for no issue is a row of its own.
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">Issue</th><th scope="col">Affects</th></tr></thead><tbody>' + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
         var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
-        return '<tr><td>' + (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '<span class="pg-log-date">No component</span>') + '</td><td>' + ticketHTML(t, function (x) { return commitLine(x.r); }) + '</td></tr>';
-      }).join('') + '</table></div>';
+        return '<tr><td>' + (t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">No issue</span></p><p class="sg-il-line">') + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>') + '</td><td>' + (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
     }).join('');
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
