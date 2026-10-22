@@ -244,8 +244,11 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
         if (k === 'purpose' && n > 1) notUsed.push(notUsedItem(`${n - 1} more line${n === 2 ? '' : 's'} of what it is for`, 'morePurpose'));
       }
     }
+    // Sections written for people by their nature (where a fact was confirmed, examples, links to other pages): they
+    // stay on the page as they are, never retitled.
+    const forAgents = (e.sections ?? []).filter((x) => !FOR_PEOPLE.test(String(x.title).replace(/^\d+(\.\d+)*[.)]?\s+/, '').trim()));
     if (e.sections?.length && reach.sections && !(comp && !component)) gets.push({ what: `${KIND_WORDS.sections} (${e.sections.map((x) => x.title).slice(0, 4).join(', ')}${e.sections.length > 4 ? ', …' : ''})`, lines: e.sections.length, to: reach.sections });
-    else if (e.sections?.length) notUsed.push(notUsedItem(`${e.sections.length} section${e.sections.length === 1 ? '' : 's'} (${e.sections.map((x) => x.title).slice(0, 4).join(', ')}${e.sections.length > 4 ? ', …' : ''})`, 'unknownTitle'));
+    else if (forAgents.length) notUsed.push(notUsedItem(`${forAgents.length} section${forAgents.length === 1 ? '' : 's'} (${forAgents.map((x) => x.title).slice(0, 4).join(', ')}${forAgents.length > 4 ? ', …' : ''})`, 'unknownTitle'));
     if (e.facts?.length) notUsed.push(notUsedItem(e.facts.join(', '), 'facts'));
     if (e.repeated) notUsed.push(notUsedItem(`${e.repeated} repeated line${e.repeated === 1 ? '' : 's'}`, 'repeated'));
     // A page that names no component: nothing else on it matters until it is named.
@@ -257,7 +260,8 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     const how = has('whenToUse') || has('whenNotToUse') || (!comp && (e.kind === 'token' || has('rules') || has('sections') || has('mistakes')));
     const verdict = !gets.length ? 'not used' : has('purpose') && how ? 'used' : 'thin';
     const wrong = wrongOf(e) ?? [];
-    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}) };
+    const drafts = e.drafts ?? [];
+    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}), ...(drafts.length ? { drafts } : {}) };
     Object.assign(page, decide(page, e, { comp, has }));
     pages.push(page);
   }
@@ -271,8 +275,10 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
 // What the team does with each page, most urgent first, in one word (its row says each change): [key, the decision].
 export const ACTIONS = [
   ['delete', 'Delete'], ['move', 'Move'], ['rename', 'Rename'], ['name', 'Name'],
-  ['fix', 'Fix'], ['write', 'Write'], ['improve', 'Improve'], ['keep', 'Keep'],
+  ['fix', 'Fix'], ['review', 'Review'], ['write', 'Write'], ['improve', 'Improve'], ['keep', 'Keep'],
 ];
+// Section titles written for people (FOR_PEOPLE): never asked to be retitled.
+export const FOR_PEOPLE = /^(evidence|examples?|cross[- ]references?|references?|see also|related|related pages|changelog|history|sources?)$/i;
 const ORPHAN_ACTION = { emptyPage: 'delete', codeGone: 'delete', partSaid: 'delete', copy: 'delete', subPartAlone: 'delete', part: 'move', subPart: 'move', rename: 'rename', noComponent: 'name' };
 // → { action, decision, todo: [each change, as an instruction] }
 function decide(page, e, { comp, has }) {
@@ -296,6 +302,9 @@ function decide(page, e, { comp, has }) {
   // What on it the system contradicts, first: fix it before anything is added to it.
   const fix = (page.wrong ?? []).map((f) => (f.kind === 'name' || f.kind === 'claim' ? `${f.says}: ${f.fix}` : f.fix));
   if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...todo] };
+  // Lines drafted for it, not the team's word yet: each read, edited as needed, its marker removed (or the line deleted).
+  const drafts = page.drafts ?? [];
+  if (drafts.length) return { action: 'review', decision: label('review'), todo: [`Review ${drafts.length === 1 ? 'the drafted line' : `the ${drafts.length} drafted lines`}: change what is not right, then remove the **Draft:** marker; delete a line to turn it down. No agent gets ${drafts.length === 1 ? 'it' : 'them'} until then.`, ...todo] };
   // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
   // retitle or remove); keep it only when there is nothing to change.
   const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';

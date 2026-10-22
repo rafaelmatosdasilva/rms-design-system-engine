@@ -330,6 +330,71 @@ if (process.argv.includes('--check-intent')) {
   process.exit(1);
 }
 
+// ── --intent-changes: the changes the Intent layer review asks for, made in the layer's own files ──
+// The lines written on every page alike taken out, each sentence the system contradicts written again with only what it
+// has (as a draft), and what a component page lacks drafted (intent-changes.mjs). Written to
+// .design-system-engine-out/intent-changes/ to read first; with --merge-request, sent to the layer as one merge request
+// for the team to review: its branch is never written to directly. --no-drafts: only the mechanical changes.
+if (process.argv.includes('--intent-changes')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const il = await import('./intent-layer.mjs');
+  const truth = await import('./intent-truth.mjs');
+  const ch = await import('./intent-changes.mjs');
+  if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+  const snap = il.readIntentLayer(ROOT, pcfg);
+  if (!snap?._source?.sha) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run again.'); process.exit(2); }
+  const facts = truth.systemFacts(ROOT, pcfg, { record: false });
+  const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
+  const matched = il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, pcfg));
+  const found = truth.checkLayer(snap, matched, facts);
+  const report = il.useReport(snap, matched, { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, pcfg), wrongOf: (e) => found.get(e) ?? [] });
+  const access = ch.layerAccess(ROOT, pcfg);
+  if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
+  let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+  const plan = ch.planOf(snap, report);
+  let note = '';
+  // The drafts: from answers already written (--drafts-from <file>), else by the claude command; when neither can,
+  // the requests are written to DRAFT-REQUEST.md for whoever runs this to answer, and the mechanical changes are made.
+  const askFile = resolve(ROOT, ch.CHANGES_DIR, '..', 'intent-draft-request.md');
+  if (!process.argv.includes('--no-drafts') && ch.draftJobs(plan, facts).length) {
+    const from = process.argv.indexOf('--drafts-from');
+    const at = process.argv.indexOf('--model');
+    if (from > 0) {
+      let answers; try { answers = JSON.parse(readFileSync(resolve(process.argv[from + 1]), 'utf8')); } catch (e) { console.log(`❌ ${process.argv[from + 1]}: ${e.message}`); process.exit(2); }
+      ch.draftPlan(plan, facts, null, { answers, batch: Infinity });
+    } else {
+      const run = ch.claudeRunner({ model: at > 0 ? process.argv[at + 1] : (typeof pcfg.intentLayer === 'object' && pcfg.intentLayer.draftModel) || undefined });
+      try {
+        if (!run) throw new Error('the claude command is not installed');
+        console.log(`✍️  Drafting ${plan.reduce((t, i) => t + i.rewrite.length, 0)} sentences to write again and what ${plan.filter((i) => i.need.length).length} pages lack…`);
+        ch.draftPlan(plan, facts, run);
+      } catch (e) {
+        for (const it of plan) Object.assign(it, { rewritten: [], drafted: [], dropped: [] });
+        mkdirSync(dirname(askFile), { recursive: true });
+        writeFileSync(askFile, ch.draftPrompt(ch.draftJobs(plan, facts).map((j) => j.ask)) + '\n');
+        note = `No drafts this run (${e.message}): the requests are in ${relative(ROOT, askFile)}. Answer them as one JSON object in a file, then run --intent-changes --drafts-from <that file>.`;
+      }
+    }
+  }
+  const dropped = plan.flatMap((i) => (i.dropped ?? []).map((d) => ({ page: i.entity.name, ...d })));
+  const result = ch.applyPlan(plan, files);
+  const summary = ch.describeChanges(result, { dropped });
+  const dir = ch.writeLocal(ROOT, result.files, summary);
+  console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each change)${note ? `\n   ${note}` : ''}${result.held.length ? `\n   ${result.held.length} page${result.held.length === 1 ? '' : 's'} not changed: ${result.held.map((h) => h.name).join(', ')} (CHANGES.md says why)` : ''}`);
+  if (!result.files.size) { console.log('NEXT: none'); process.exit(0); }
+  if (!process.argv.includes('--merge-request')) { console.log('NEXT: read the changes; to send them to the layer for review: rms-design-system-engine --intent-changes --merge-request (only when the person asks)'); process.exit(0); }
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/intent-review-${stamp}`,
+    title: 'Intent layer review: lines written on every page, sentences the system contradicts, drafts to review',
+    description: summary + '\n\nMade by the design-system engine from its Intent layer review. Nothing marked **Draft:** reaches an agent until a person removes the marker.',
+    message: 'Intent layer review: repeated lines taken out, contradicted sentences written again as drafts\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+  if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
+  console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
+  console.log('NEXT: the team reviews and merges it; then the Intent layer page lists each draft under Review until its marker is removed.');
+  process.exit(0);
+}
+
 // ── --contracts-out <dir>: the component contracts, published for a shared repository (an intent layer) ──
 // Only what belongs in a shared repository: one contract per code file, the schema, and a README. No token values,
 // no catalog, no copy of the intent layer's own text. Contracts the code no longer has are removed. Nothing is pushed.

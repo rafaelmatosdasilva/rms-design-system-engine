@@ -183,7 +183,9 @@ const SETS = /^:?([A-Za-z_][\w-]*)\s*=\s*["']?([^"'\s]*)["']?$/;
 // The web's own names, not the system's: ARIA and data attributes, and the HTML elements a page may name.
 const HTML_ATTR = /^(aria-[a-z]+|data-[\w-]+|role|tabindex|for|id|class|style|href|alt|title|type|name|value|disabled|readonly|required|autocomplete|inputmode)$/;
 const HTML_EL = /^(a|abbr|button|code|div|form|h[1-6]|img|input|label|li|nav|ol|option|p|pre|section|select|span|svg|table|tbody|td|textarea|th|thead|tr|ul)$/i;
-const NOT_THIS = /\b(not|never|avoid|instead of|rather than|named|called|nor|no)\s*$/i;
+const WARNS = /^\s*(do not|don't|never|avoid)\b|\b(deprecated|removed|no longer|must not be used|not part of|invent(ed)?|misspel\w*|alias(es)? of|not an? (new )?(ds|design[- ]system) component|local (layout )?wrapper)\b/i;
+const NOT_THIS = /\b(not|never|avoid|instead of|rather than|named|called|nor|no)\s+(?:[\w-]+\s+){0,3}$|\b(not|never|avoid|instead of|rather than|named|called|nor|no)\s*$/i;
+const FIGMA_DRAWING = /\bfigma\b|\b(construction )?layers?\b|\bframes?\b/i;
 const camel = (s) => s.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
 const BOOL = new Set(['true', 'false']);
 
@@ -215,7 +217,8 @@ const A11Y = [
 const NOT_ITS_OWN = /\b(not|no|never|don't|do not|parent|owns?|consumer|caller|you|your)\b/i;
 
 // → [finding]. component: the system's component this page documents (null for a page of another layer).
-export function checkPage(e, facts, { component = null } = {}) {
+// strict: no leniency for a name the line warns against or says is Figma's (a drafted line names only what there is).
+export function checkPage(e, facts, { component = null, strict = false } = {}) {
   const out = [];
   const seen = new Set();
   const push = (f) => { const k = `${f.kind}|${f.says}`; if (!seen.has(k)) { seen.add(k); out.push(f); } };
@@ -254,14 +257,20 @@ export function checkPage(e, facts, { component = null } = {}) {
       let known = true, what = '';
       if (/^--[\w-]+$/.test(span)) { known = facts.tokens.has(span) || facts.text.includes(span); what = 'token'; }
       else if (HTML_ATTR.test(span)) continue;
-      else if (PATH.test(span) && !span.split('/').some((s) => PLACEHOLDER.test(s)) && span.split('/').some((s) => s.length > 2) && !span.split('/').every((s) => HTML_EL.test(s))) {
+      // A label written as Title/Case (a state, a screen: `Data/Content`) is a name for people, not a path.
+      else if (PATH.test(span) && !span.split('/').every((s) => /^[A-Z][a-z]+$/.test(s)) && !span.split('/').some((s) => PLACEHOLDER.test(s)) && span.split('/').some((s) => s.length > 2) && !span.split('/').every((s) => HTML_EL.test(s))) {
         const inLayer = facts.layerFiles && [...facts.layerFiles].some((f) => f === span.replace(/\.[\w]+$/, '') || f.endsWith('/' + span.replace(/\.[\w]+$/, '')));
         const layerFolder = !facts.layerFiles && /\.(md|json)$/i.test(span) && String(e.file ?? '').split('/')[0] === span.split('/')[0];
         known = inLayer || layerFolder || facts.hasFile(span) || facts.text.includes(span) || facts.comps.has(norm(span)); what = 'file, icon or variable';
       } else if (CODE_NAME.test(span)) { known = facts.comps.has(norm(span)) || facts.allProps.has(span) || facts.allProps.has(camel(span)) || facts.words.has(norm(span)); what = 'name'; }
       else continue;
-      // A name given as the one not to use ("not `icons/check-big`", "a component named `x`"): the page says it is not one.
-      if (!known && NOT_THIS.test(text.slice(Math.max(0, m.index - 40), m.index))) continue;
+      // A name given as the one not to use ("not `icons/check-big`", "a component named `x`"), or in a sentence that warns
+      // against it (do not use it, it is deprecated, removed, no longer there, not to be invented): the page says it is
+      // not one, which is right.
+      if (!known && !strict && (NOT_THIS.test(text.slice(Math.max(0, m.index - 40), m.index)) || WARNS.test(line))) continue;
+      // A name of Figma's own drawing (a frame, a layer, a reference screen): the engine reads Figma's components and
+      // variables, not every frame, so it cannot say such a name is not there.
+      if (!known && !strict && (FIGMA_DRAWING.test(line) || FIGMA_DRAWING.test(where))) continue;
       if (!known) {
         const near = closest(span, facts);
         if (product && what !== 'token' && !near) continue;
@@ -329,6 +338,10 @@ export function twins(pages) {
       if (a === b || a.comp === b.comp || a.e === b.e) continue;
       const B = new Set(b.lines);
       const same = a.own.filter((l) => B.has(l)).length;
+      // A page that names the other one (its name, or its code file's) says when to use which: not a twin.
+      const raw = linesOf(a.e).map((l) => l.text).join('\n');
+      const otherNames = [b.comp, b.e.name, String(b.e.code ?? '').split('/').pop()].filter(Boolean);
+      if (otherNames.some((n) => raw.includes(n) || norm(raw).includes(norm(n)) && norm(n).length > 6)) continue;
       if (same >= 2 && same / a.own.length >= 0.8) {
         (out.get(a.e) ?? out.set(a.e, []).get(a.e)).push({ kind: 'twin', where: 'The whole page', line: null, says: `${same} of its ${a.own.length} lines`, truth: `${b.comp}'s page (${b.e.file}) says the same, so an agent cannot tell from them when to use one and not the other.`, source: 'the intent layer', fix: `Say what is particular to ${a.comp}: when to use it rather than ${b.comp}, and when not to.`, other: b.comp });
       }

@@ -40,7 +40,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 6;   // 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
+export const READER = 9;   // 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -152,6 +152,8 @@ export function entityView(entity, file, group = '', shared = null) {
     status: null, file, code: codeFileOf(entity), summary: null,
     purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [],
     facts: [], repeated: 0,   // what was left out: the sections that are facts (by title), the lines repeated on every page
+    // The other names it goes by (Figma's, the code's): a line that differs from another page's only by them is one line.
+    aliases: (Array.isArray(entity?.metadata?.aliases) ? entity.metadata.aliases : []).map(String).filter(Boolean),
   };
   const desc = String(entity?.description ?? '').trim();
   const summary = String(entity?.metadata?.summary ?? '').trim();
@@ -164,7 +166,8 @@ export function entityView(entity, file, group = '', shared = null) {
   const v23 = (entity?.sections ?? []).flatMap((x) => {
     if (!x || typeof x !== 'object') return [];
     if (x.kind === 'guidelines') {
-      const items = (x.items ?? []).map((it) => { const sh = it?.statement ? null : sharedStatement(it?.refs, shared); return { label: it?.statement ?? sh.text, level: it?.level ?? sh?.level ?? null }; });
+      // A rule given by reference to one the system shares (refs: same-as) is the system's, set on every page on purpose.
+      const items = (x.items ?? []).map((it) => { const sh = it?.statement ? null : sharedStatement(it?.refs, shared); return { label: it?.statement ?? sh.text, level: it?.level ?? sh?.level ?? null, shared: !it?.statement && !!sh?.text }; });
       const key = keyOfTitle(x.title);
       return [key && key !== 'purpose' ? { kind: 'guided', key, items } : { kind: 'checklist', title: x.title, items }];
     }
@@ -198,7 +201,7 @@ export function entityView(entity, file, group = '', shared = null) {
     } else if (b.kind === 'checklist') {
       for (const it of b.items ?? []) {
         const label = String(it?.label ?? '').trim();
-        if (label) view.rules.push({ text: label, level: it.level ?? null });
+        if (label) view.rules.push({ text: label, level: it.level ?? null, ...(it.shared ? { shared: true } : {}) });
       }
     }
   }
@@ -206,8 +209,24 @@ export function entityView(entity, file, group = '', shared = null) {
   if (desc) view.purpose.push(desc);
   const st = entity?.metadata?.status;
   view.status = statusLine ?? (st && typeof st === 'object' ? st.status ?? null : st) ?? null;
+  // A line written as a draft ("**Draft:** …", by the engine or a person) is not the team's word yet: it is set apart
+  // for review and reaches no agent until its marker is removed.
+  for (const [k, where] of [['purpose', 'Purpose'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules']]) {
+    const keep = [];
+    for (const it of view[k]) { const t = String(it?.text ?? it); if (DRAFT.test(t)) (view.drafts ??= []).push({ where, text: t.replace(DRAFT, '').trim() }); else keep.push(it); }
+    view[k] = keep;
+  }
+  // In a section's text too: a line that starts with the marker, as a list item or on its own.
+  for (const x of view.sections) {
+    const lines = x.text.split('\n'), keep = [];
+    for (const l of lines) { const t = l.replace(/^\s*[-*]\s+/, ''); if (DRAFT.test(t)) (view.drafts ??= []).push({ where: x.title, text: t.replace(DRAFT, '').trim() }); else keep.push(l); }
+    x.text = keep.join('\n').trim();
+  }
+  view.sections = view.sections.filter((x) => x.text);
   return view;
 }
+// The marker of a drafted line, at its start: **Draft:**, __Draft:__ or Draft:.
+export const DRAFT = /^\s*(?:\*\*|__)?draft(?::(?:\*\*|__)|(?:\*\*|__):|:)\s*/i;
 
 // The index and its entity files → { system: { name, version, sections }, entities: [view] }.
 // files: Map(path → parsed JSON). entry: the index's path, or null to take every file with an entity.
@@ -274,12 +293,16 @@ export function readDsds(files, entry = null) {
 }
 
 // Drop the text a generator writes on every entity of a kind with only the name changed. → number of items dropped.
+// A rule the system shares by reference is not one of them: it is left out of the page (the system's own rules carry it)
+// and never counted as one to take out. Repeated is: the same line on half the pages of a kind or more; for any page but
+// a token's, the same line with only its own name changed on five or more, or one that names nothing in code on a fifth.
 export function dropBoilerplate(entities) {
   const shape = (e, t) => {
     let s = String(t);
-    for (const w of [e.code, e.name, e.id].filter(Boolean)) s = s.split(w).join('{}');
+    for (const w of [e.code, e.name, e.id, ...(e.aliases ?? [])].filter(Boolean).sort((a, b) => b.length - a.length)) s = s.split(w).join('{}');
     return s.toLowerCase().replace(/\s+/g, ' ').trim();
   };
+  for (const e of entities) { const n = e.rules.length; e.rules = e.rules.filter((r) => !r?.shared); if (n > e.rules.length) e.sharedRules = n - e.rules.length; }
   const FIELDS = ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules'];
   const byKind = new Map();
   for (const e of entities) { if (!byKind.has(e.kind)) byKind.set(e.kind, []); byKind.get(e.kind).push(e); }
@@ -293,10 +316,18 @@ export function dropBoilerplate(entities) {
       for (const k of own) count.set(k, (count.get(k) ?? 0) + 1);
     }
     const min = Math.max(5, Math.ceil(list.length / 2));
+    const repeated = (e, f, it) => {
+      const k = shape(e, it.text ?? it), n = count.get(f + '\u0000' + k) ?? 0;
+      // A token's one line is written from a template by nature (what it colours, of which component): only the first.
+      if (e.kind === 'token') return n >= min;
+      return n >= min || (k.includes('{}') && n >= 5) || (!/`/.test(k) && n >= Math.max(10, Math.ceil(list.length / 5)));
+    };
     for (const e of list) for (const f of FIELDS) {
-      const keep = e[f].filter((it) => (count.get(f + '\u0000' + shape(e, it.text ?? it)) ?? 0) < min);
+      const keep = e[f].filter((it) => !repeated(e, f, it));
       dropped += e[f].length - keep.length;
       e.repeated = (e.repeated ?? 0) + e[f].length - keep.length;
+      // Which lines, as written, so a change to the layer can take them out where they are written.
+      for (const it of e[f]) if (!keep.includes(it)) (e.repeatedLines ??= []).push(String(it.text ?? it));
       e[f] = keep;
     }
   }
@@ -371,9 +402,10 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     const folder = c.entry && posix.dirname(c.entry) !== '.' ? posix.dirname(c.entry) : null;
     const a = await get(`${base}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}${folder ? `&path=${encodeURIComponent(folder)}` : ''}`);
     if (!a.ok) return fail(a);
-    const files = new Map();
+    const files = new Map(), layerFiles = [];
     const keep = (archive) => {
       for (const f of untar(gunzipSync(Buffer.from(archive)))) {
+        layerFiles.push(f.path);   // every file's path, so a page that names another file of the layer can be checked
         if (!/\.json$/i.test(f.path)) continue;
         try { files.set(f.path, JSON.parse(f.data.toString('utf8'))); } catch { /* not JSON: not read */ }
       }
@@ -416,6 +448,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
       _source: source, _reader: READER, system, boilerplate, entities,
       contracts: contractSummaries(files, (f) => fileUrl(source, f)),
       fileDates,
+      layerFiles: [...new Set(layerFiles)].sort(),
     };
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(snap, null, 2) + '\n');

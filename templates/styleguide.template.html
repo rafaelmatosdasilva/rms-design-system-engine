@@ -2958,9 +2958,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
     // system has instead, with where that comes from.
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
-    var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
+    // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
+    var ilDrafts = function (p) { return (p.drafts || []).map(function (d) { return '<p class="sg-il-line"><strong>Draft</strong> · ' + esc(d.where) + '<span class="pg-par-val">' + esc(d.text) + '</span></p>'; }).join(''); };
+    var ilWhy = function (p) { return ilWrong(p) + ilDrafts(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
-    var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
+    var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', review: 'figma', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
     var rows = IL.pages.slice().sort(function (x, y) { return labels.findIndex(function (l) { return l[0] === x.action; }) - labels.findIndex(function (l) { return l[0] === y.action; }); })
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
@@ -6460,13 +6462,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
   }
-  // A click on a row (not on a link or a button in it), or Enter on it, opens it in full.
+  // A click on a row (not on a link or a button in it), or Enter on it, opens it in full. Only a row this panel holds (it
+  // carries its number): a table with a panel of its own (the Intent layer's) opens that one alone.
   document.addEventListener('click', function (e) {
-    var tr = e.target.closest && e.target.closest('tr.sg-row-open'); if (!tr) return;
+    var tr = e.target.closest && e.target.closest('tr.sg-row-open[data-row-detail]'); if (!tr) return;
     if (e.target.closest('a, button, input, select, textarea, summary, label, [contenteditable]') || String(window.getSelection && window.getSelection()).length) return;
     openRowPanel(+tr.getAttribute('data-row-detail'), tr);
   });
-  document.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr.sg-row-open'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRowPanel(+tr.getAttribute('data-row-detail'), tr); } });
+  document.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr.sg-row-open[data-row-detail]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); openRowPanel(+tr.getAttribute('data-row-detail'), tr); } });
   // Each open row's task number, as the Status page numbers it.
   function fillTodoNos(root) {
     Array.prototype.forEach.call(root.querySelectorAll('.sg-todo-no[data-todo-key]'), function (el) {

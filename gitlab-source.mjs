@@ -137,6 +137,24 @@ export function plainGet(url, { headers = {}, signal } = {}, hops = 5) {
   });
 }
 
+// A request that changes something (POST, PUT), with a JSON body, through Node's own http(s) as plainGet: no
+// redirect is followed, so the token goes nowhere but the host. → { ok, status, json() }
+export function plainSend(url, { method = 'POST', headers = {}, body = null } = {}) {
+  return new Promise((ok, fail) => {
+    const u = new URL(url);
+    const data = body == null ? null : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method, headers: { ...headers, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {}) } }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('error', fail);
+      res.on('end', () => { const b = Buffer.concat(chunks).toString('utf8'); ok({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode ?? 0, json: async () => JSON.parse(b || 'null') }); });
+    });
+    req.on('error', fail);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
 // What a failed response means, in words the person can act on (never the token).
 function why(status, host) {
   if (status === 401) return 'GitLab did not accept the token (401): check GITLAB_TOKEN - wrong, expired or revoked';

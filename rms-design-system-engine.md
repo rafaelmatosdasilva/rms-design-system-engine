@@ -98,9 +98,9 @@ Reference (`rms-design-system-engine --reference <name>`): `usage` (every comman
 (`ds-config.json`, snapshot files, naming), `gates` (gate-specific rules), `maintainers` (changing the engine
 and the skill), `personality` (how the style guide reads a brand's personality from its tokens).
 
-**Writing a page of the intent layer.** Before a page is written or changed in the intent layer (a DSDS file), run
-`rms-design-system-engine --check-intent <the file>` and fix every finding it prints; write the page only once it
-passes. Never name a component, prop, value, token, icon or file on a page that the system does not have.
+**Writing a page of the intent layer.** Run `rms-design-system-engine --check-intent <the file>` first and fix what it
+prints; write the page only once it passes. Never name what the system does not have. Never remove a `**Draft:**`
+marker yourself. The review's changes: `--intent-changes`; `--merge-request` only when the person asks.
 
 ## How to run this skill (read first)
 
