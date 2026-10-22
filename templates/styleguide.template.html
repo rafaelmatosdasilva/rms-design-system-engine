@@ -62,7 +62,7 @@
   /* The default type: its text a step above the browser's (500), its headings 800, its lines 1.4 apart. The page has
      two weights only: the text weight (--sg-m-weight) for every word, the heading weight for titles, tabs and names. */
   --sg-xs: 0.75rem; --sg-s: 0.8125rem; --sg-s-weight: 500; --sg-m: 0.875rem; --sg-m-weight: 500; --sg-l: 0.9375rem; --sg-l-weight: 800;
-  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4;
+  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4; --sg-lh-read: 1.6;
   /* The page's two weights: every word a step above the system's text weight (readable on a screen), titles, tabs and
      names in its heading weight. */
   --sg-text-weight: calc(var(--sg-m-weight) + 100);
@@ -787,7 +787,7 @@ a.pg-usage-name { color: var(--sg-text); }
 /* Every column wide enough that a short value keeps to one or two lines; the long ones take the rest. */
 @media (min-width: 721px) { .pg-par-table th, .pg-par-table td { min-width: calc(var(--sg-space-xxl) * 3.5); } .pg-par-table .sg-todo-no, .pg-par-table .sg-todo-no-head { min-width: 0; } }
 .pg-par-table th { text-align: left; font-weight: var(--sg-heading-weight); color: var(--sg-text-2); padding: var(--sg-space-xs) var(--sg-space-m); border-bottom: var(--sg-line); white-space: nowrap; position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 5; background: var(--sg-bg); }
-.pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; }
+.pg-par-table td { padding: var(--sg-space-s) var(--sg-space-m); border-bottom: var(--sg-line); vertical-align: middle; color: var(--sg-text); overflow-wrap: anywhere; line-height: var(--sg-lh-read); }   /* body text with room to read */
 /* Every table on the page: rows of one height at least, taller only for what they hold, their content centred in it. */
 .pg-par-table td, .pg-inspect td { height: var(--sg-row-h); vertical-align: middle; }
 .pg-par-table th { vertical-align: middle; }   /* a table's own head as tall as the card's head above it, the shorter of the two */
@@ -1620,7 +1620,9 @@ tr.sg-row-open { cursor: pointer; }
 tr.sg-row-open:hover > td { background: var(--sg-a3); }
 tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: -2px; }
 .sg-cell-clip { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); }
-.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh); font-weight: var(--sg-text-weight); color: var(--sg-text); }
+.sg-doc-notes { margin: var(--sg-space-xs) 0 var(--sg-space-s); padding-inline-start: 1.2em; }   /* the points to cover, for this component */
+.sg-doc-notes li + li { margin-top: var(--sg-space-xxs); }
+.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh-read); font-weight: var(--sg-text-weight); color: var(--sg-text); }
 /* A panel's card in the page's running text, the table's own: one size and one line height for all it holds, each
    finding a paragraph of its own (its sign, a table's mark, left to the table). */
 .sg-row-detail-body :is(.pg-a11y-item, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }   /* a secondary line (pg-par-val) keeps the table's own size and colour */
@@ -3083,14 +3085,25 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // What its first source says, then each other source that says it too, under its name: where each line came from.
       function (c) { var s = guideOf(c, key), page = function (u) { return u ? ' <a class="sg-uses-link" href="' + esc(u) + '" target="_blank" rel="noopener">Open its page</a>' : ''; };
         return paras(s.text) + (s.url ? '<p class="pg-par-val">' + page(s.url) + '</p>' : '') + (s.also || []).map(function (a) { return '<p class="pg-par-val">Also in ' + esc(a.from) + ':' + page(a.url) + '</p>' + paras(a.text); }).join(''); },
-      function (c) { var s = guideOf(c, key); return [s].concat(s.also || []).map(function (x) { return /^[\w-]+\.\w/.test(x.from) ? x.from : capital(x.from); }).join(' · '); }, 'Not written yet.'];
+      function (c) { var s = guideOf(c, key); return [s].concat(s.also || []).map(function (x) { return /^[\w-]+\.\w/.test(x.from) ? x.from : capital(x.from); }).join(' · '); }, 'Not written yet.',
+      function (c) { var s = guideOf(c, key); return [s].concat(s.also || []).map(function (x) { return { where: /^[\w-]+\.\w/.test(x.from) ? x.from : capital(x.from), url: x.url || (/figma/i.test(x.from) ? figmaUrlOf(c) : null), html: paras(x.text) }; }); }];
+  };
+  // What each source says, apart: one part per place it was read (its Figma description, its page in the intent layer,
+  // the code's note), each with that place and a link to it, so two sources are never read as one.
+  var figmaUrlOf = function (c) { return ((c.links || []).filter(function (l) { return l.label === 'Figma'; })[0] || {}).url || null; };
+  var whatParts = function (c) {
+    var out = [], note = (c.note || '').trim();
+    if (figmaWhat(c)) out.push({ where: 'Its Figma description', url: figmaUrlOf(c), html: paras([figmaWhat(c)]) });
+    else if (note) out.push({ where: 'The code', url: null, html: paras([note]) });
+    if (ilWhat(c)) out.push({ where: 'Its page in the intent layer (' + c.intentLayer.file + ')', url: c.intentLayer.url || null, html: paras([ilWhat(c)]) });
+    return out;
   };
   var roleFrom = function (a) { return a.roleFrom === 'figma' ? 'Figma' : a.roleFrom === 'contract' ? 'The contract' : 'The code'; };
   var KNOW = [
     // What Figma or the code says it is, then what its intent-layer page says it is for, each under its source.
     ['What it is', function (c) { return figmaWhat(c) ? 'Figma' : (c.note || '').trim() ? 'The code' : ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') : ''; },
       function (c) { var own = figmaWhat(c) || (c.note || '').trim(); return paras([own || ilWhat(c)]) + (own && ilWhat(c) ? '<p class="pg-par-val">Also in ' + esc(c.intentLayer.source || 'the intent layer') + ' (' + esc(c.intentLayer.file) + '):</p>' + paras([ilWhat(c)]) : ''); },
-      function (c) { var own = figmaWhat(c) ? 'From its Figma description' : (c.note || '').trim() ? 'From the code' : ''; var il = ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : ''; return [own, il].filter(Boolean).join(' · '); }, 'Not written yet.'],
+      function (c) { var own = figmaWhat(c) ? 'From its Figma description' : (c.note || '').trim() ? 'From the code' : ''; var il = ilWhat(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : ''; return [own, il].filter(Boolean).join(' · '); }, 'Not written yet.', whatParts],
     guideKind('whenToUse', 'When to use'),
     guideKind('whenNotToUse', 'When not to use'),
     guideKind('mistakes', 'Common mistakes'),
@@ -3134,6 +3147,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ex = !!(a.pieces || {}).example;
     if (c.agentRating) rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
       'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
+    // Still to write: a ready example from its own import and props, to start from.
+    if (rows.length && !ex) rows[rows.length - 1].todo = notesHTML(docNotes('Example', c), 'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE());
     // Its properties, in its contract. The one everybody reads is in the intent layer: done while it still lists what the
     // code and Figma have, a task to publish again when it does not. Only the engine's local one: a task to publish it.
     var k = c.contract;
@@ -3198,11 +3213,42 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var tok = tokenDocRow(c), ag = agentRows(c), ir = intentRow(c), lr = leftRow(c);
     return docRowsOf(c, tok, ag, ir, lr).map(writeTo);
   }
+  // What to write, for this component: the points the system already knows that belong under that kind, each from what was
+  // read (its controls, its code API, its Figma description, its own guidance), so the person writes from facts, not from
+  // a blank page. [] when nothing specific is known: the general advice stands alone.
+  function roleOfTag(t) { return ({ button: 'button', a: 'link', nav: 'navigation', ul: 'list', ol: 'list', table: 'table', dialog: 'dialog', select: 'combobox', textarea: 'textbox', form: 'form' })[t] || null; }
+  function sentencesOf(text) { return String(text || '').replace(/@\w+/g, '').split(/(?<=[.!?])\s+|\n+/).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function docNotes(kind, c) {
+    var api = c.api || {}, props = api.props || [], ctl = c.controls || [], out = [];
+    var propOf = function (n) { return props.filter(function (p) { return p.name === n; })[0] || null; };
+    var g = function (key) { var x = guideOf(c, key); return x ? [].concat(x.text || []) : []; };
+    if (kind === 'Limitations') {
+      ctl.forEach(function (k) { (k.onlyWith || []).forEach(function (w) { out.push(k.label + ' applies only while ' + w.label + ' is ' + (w.on ? 'on' : 'off') + '.'); }); });
+      ctl.forEach(function (k) { var p = propOf(k.prop), fig = (k.options || []).map(function (o) { return String(o.label); }); var extra = p && fig.length ? (p.values || []).filter(function (v) { return fig.indexOf(String(v)) < 0; }) : []; if (extra.length) out.push('The code also accepts ' + k.prop + ' ' + extra.join(', ') + '; Figma does not draw ' + (extra.length > 1 ? 'them' : 'it') + '.'); });
+      props.filter(function (p) { return p.required; }).forEach(function (p) { out.push(p.name + ' must always be given.'); });
+      if (api.file && !(api.slots || []).length) { var txt = props.filter(function (p) { return /string/.test(p.type || '') && /label|text|title|content|icon/i.test(p.name); }).map(function (p) { return p.name; }); out.push('It takes no content of its own' + (txt.length ? ': only ' + txt.join(' and ') : '') + '.'); }
+    } else if (kind === 'Example' && c.import && c.import.line) {
+      var tag = (/import\s+(\w+)/.exec(c.import.line) || [])[1], words = ((c.renders || [])[0] || {}).props || {};
+      var text = ctl.filter(function (k) { return k.type === 'TEXT' && propOf(k.prop); }).map(function (k) { return k.prop + '="' + (words[k.label] || k.default || k.label) + '"'; });
+      if (tag) out.push(c.import.line + '  <' + tag + (text.length ? ' ' + text.join(' ') : '') + ' />');
+    } else if (kind === 'Role') {
+      var root = c.source && /<template>\s*<([a-zA-Z-]+)/.exec(c.source.text || ''), role = root && roleOfTag(root[1].toLowerCase());
+      if (role) out.push('Its root is a <' + root[1] + '>: add the annotation "Role: ' + role + '" to it in Figma.');
+    } else if (kind === 'Do and don\'t') {
+      g('whenNotToUse').concat(g('mistakes')).slice(0, 3).forEach(function (t) { out.push('A picture of this, as a don\'t, beside the right use: ' + t); });
+    } else if (kind === 'When to use' || kind === 'When not to use') {
+      var re = kind === 'When to use' ? /^use\b/i : /^(do not|don't|avoid|never)\b/i;
+      sentencesOf(c.description).filter(function (t) { return re.test(t); }).slice(0, 3).forEach(function (t) { out.push('From its Figma description: ' + t); });
+    }
+    return out.slice(0, 5);
+  }
+  // The points to cover, then how to write them.
+  function notesHTML(notes, how) { return (notes.length ? '<strong>Points to cover</strong></p><ul class="sg-doc-notes">' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><p class="pg-par-val">' : '') + esc(how); }
   function docRowsOf(c, tok, ag, ir, lr) {
     return (ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
-      var has = !!k[1](c), body = has ? k[2](c) : '', weak = has && k[0] !== 'Do and don\'t' && k[0] !== 'Role' && WEAK(body);   // a role is one word by nature
+      var has = !!k[1](c), body = has ? k[2](c) : '', parts = has && k[5] ? k[5](c).filter(function (p) { return p.html; }) : null, weak = has && k[0] !== 'Do and don\'t' && k[0] !== 'Role' && WEAK(body);   // a role is one word by nature
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
-        todo: has && !weak ? '' : esc((weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? [k[3](c)] : [] };
+        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
     })).concat(ag).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
@@ -6279,7 +6325,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   function statusLine(r) {
     var how = function (x) { return String(x || '').replace(/^Tested (on .+|now|at the last audit)$/, 'Tested in a browser').replace(/^Checked by a person$/, r.st === 'done' ? 'Checked by a person' : 'To check by a person'); };
-    return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || how((r.src || []).filter(Boolean)[0]);
+    return (r.st === 'done' ? '' : r.rel) || (r.fresh && isOpen(r) ? 'New in the last audit' : '') || (r.writeTo || r.area === 'Documentation' ? '' : how((r.src || []).filter(Boolean)[0]));   // a Documentation row's Source says where
   }
   function statusHTML(st, sub, area) { var x = STATUS[st] || STATUS.none; return '<span class="pg-par-status pg-par--' + x[2] + '"><span class="pg-par-sign" aria-hidden="true">' + x[0] + '</span>' + esc(rowWord(st, area)) + '</span>' + (sub ? '<span class="pg-par-val">' + esc(sub) + '</span>' : ''); }
   // Each kind of issue in a table of its own shape: Parity compares Figma with the code, Accessibility a criterion with
@@ -6354,11 +6400,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A source in the intent layer opens there: the component's own page, or the layer itself when no page is written yet.
     var ilHref = function (x) { if (!/intent layer/i.test(x)) return null; var own = HAS_PAGE[comp] && HAS_PAGE[comp].intentLayer; return (own && own.url) || (DATA.intentLayer && DATA.intentLayer.source && DATA.intentLayer.source.url) || null; };
     var ilFile = function (url) { var m = /\/-\/blob\/[^/]+\/(.+)$/.exec(url); return m ? decodeURIComponent(m[1]) : url.replace(/^https?:\/\//, ''); };
+    // Each source on its own line, linked to where it is: its page in the intent layer (with its file), the component in
+    // Figma; the row's own link when it carries one.
+    var figmaOf = function () { var c0 = HAS_PAGE[comp]; return c0 ? figmaUrlOf(c0) : null; };
+    var srcLines = function () { return (r.src || []).filter(Boolean).map(function (x, i) { var url = (r.srcLinks || [])[i] || ilHref(x) || (/figma/i.test(x) ? figmaOf() : null), file = url && /intent layer/i.test(x) && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join(''); };
+    var hasSource = colsOf(d.area).some(function (col) { return col[1] === 'source'; });
     var body = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; }).map(function (col) {
       var k = col[1];
+      // Its source, said once: what it was read from, or, still to write, nothing yet and where it belongs.
+      if (k === 'source') return card(col[0], r.writeTo ? '<p class="pg-missing">Nothing yet.</p><p>Write it in:</p>' + srcLines() : srcLines() || '<p class="pg-missing">Nothing.</p>');
+      // Written in two places: what each says, apart, under where it was read.
+      if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
       if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : ''));   // nothing to do: no card
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
-      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + card(r.writeTo ? 'Where to write it' : 'Where it was read', (r.src || []).filter(Boolean).map(function (x) { var url = ilHref(x), file = url && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join('')); }
+      if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
       var v = k === 'where' ? (r.where || r.code || '') : k === 'written' && r.writtenFull ? r.writtenFull : r[k];
       return card(col[0], v || '<p class="pg-missing">Nothing.</p>');

@@ -1104,6 +1104,11 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
     // The page's lines a little more open than the system's body text (its line height and 2px), so a list of names
     // that wraps still reads as lines.
     if (m.lh?.var) roles.lh = `calc(var(${m.lh.var}) + 2px)`;
+    // Body text to read (a row's words, a side panel's): the smallest of the system's line heights at least one and a half
+    // times the page's text, so a paragraph that wraps has room between its lines and still uses the system's own measure.
+    const page = TYPE_ROLES.find(([r]) => r === 'm')[1];
+    const up = type.find((t) => t.lh?.var && parseFloat(t.lh.value) >= 1.5 * page);
+    if (up) roles['lh-read'] = `var(${up.lh.var})`;
     // A page's title: the system's own heading style when it has one clearly larger than its body text (at least 20px
     // and 1.6 times it), as it is; else the page scales the largest style up (--sg-title in the template).
     const lPx = parseFloat(l.size.value), mPx = parseFloat(m.size.value);
