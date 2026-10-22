@@ -404,6 +404,62 @@ if (process.argv.includes('--intent-changes')) {
   process.exit(0);
 }
 
+// ── --review-drafts [decisions.json]: a person's review of the drafted lines in the intent layer ──
+// With no file, lists every draft (its page, its section, its text). With a file of decisions ({ page, line, do:
+// approve | change | drop, to }), makes them in the layer's own files: an approved line loses its **Draft:** marker,
+// a changed one takes its new text (checked against the system first), a dropped one is deleted. Written to
+// .design-system-engine-out/intent-changes/ to read first; --commit or --merge-request sends them, only when asked.
+if (process.argv.includes('--review-drafts')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const il = await import('./intent-layer.mjs');
+  const truth = await import('./intent-truth.mjs');
+  const ch = await import('./intent-changes.mjs');
+  if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+  const snap = il.readIntentLayer(ROOT, pcfg);
+  if (!snap?._source?.sha) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run again.'); process.exit(2); }
+  const withDrafts = snap.entities.filter((e) => (e.drafts ?? []).length);
+  const at = process.argv.indexOf('--review-drafts'), given = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? resolve(process.argv[at + 1]) : null;
+  if (!given) {
+    if (!withDrafts.length) { console.log('✅ No drafts to review in the intent layer.'); console.log('NEXT: none'); process.exit(0); }
+    console.log(`📝 ${withDrafts.reduce((t, e) => t + e.drafts.length, 0)} drafts to review on ${withDrafts.length} page${withDrafts.length === 1 ? '' : 's'}:`);
+    for (const e of withDrafts) { console.log(`\n${e.name} (${e.file})`); for (const d of e.drafts) console.log(`  · ${d.where}: "${d.text}"`); }
+    console.log('\nNEXT: ask the person what to do with each (approve, change or drop); write their decisions as [{ "page", "line", "do", "to" }] in a file and run --review-drafts <file>; never decide for them.');
+    process.exit(0);
+  }
+  let decisions; try { const j = JSON.parse(readFileSync(given, 'utf8')); decisions = Array.isArray(j) ? j : j.decisions ?? []; } catch (e) { console.log(`❌ ${relative(ROOT, given) || given}: ${e.message}`); process.exit(2); }
+  const facts = truth.systemFacts(ROOT, pcfg, { record: false });
+  const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
+  const forEntity = new Map([...il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, pcfg))].map(([n, e]) => [e, n]));
+  // A changed line is held to the system as a drafted one is: nothing named that the system does not have.
+  const check = (e, text) => { const f = truth.checkPage({ ...e, purpose: [], whenToUse: [text], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [] }, facts, { component: forEntity.get(e) ?? null, strict: true }).find((x) => x.kind === 'name' || x.kind === 'claim'); return f ? `${f.says}: ${f.truth}` : null; };
+  const access = ch.layerAccess(ROOT, pcfg);
+  if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
+  let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+  const result = ch.reviewPlan(snap, decisions, files, { check });
+  const summary = ch.describeReview(result);
+  const dir = ch.writeLocal(ROOT, result.files, summary);
+  console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each one)${result.problems.length ? `\n   Not done: ${result.problems.join('; ')}` : ''}`);
+  if (!result.files.size) { console.log('NEXT: none'); process.exit(result.problems.length ? 1 : 0); }
+  const message = 'Intent layer: drafts reviewed (' + summary.split('\n')[0].replace(/^Drafts reviewed on /, '').replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
+  if (process.argv.includes('--commit')) {
+    const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message });
+    if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
+    console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
+    console.log('NEXT: the approved lines reach the agents on the next run; the style guide shows them in each component\'s Documentation.');
+    process.exit(0);
+  }
+  if (process.argv.includes('--merge-request')) {
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-reviewed-${stamp}`, title: 'Intent layer: drafts reviewed', description: summary, message });
+    if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
+    console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
+    process.exit(0);
+  }
+  console.log('NEXT: read the changes; to send them: rms-design-system-engine --review-drafts <file> --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
+  process.exit(0);
+}
+
 // ── --contracts-out <dir>: the component contracts, published for a shared repository (an intent layer) ──
 // Only what belongs in a shared repository: one contract per code file, the schema, and a README. No token values,
 // no catalog, no copy of the intent layer's own text. Contracts the code no longer has are removed. Nothing is pushed.

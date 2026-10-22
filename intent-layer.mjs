@@ -304,7 +304,7 @@ function decide(page, e, { comp, has }) {
   if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...todo] };
   // Lines drafted for it, not the team's word yet: each read, edited as needed, its marker removed (or the line deleted).
   const drafts = page.drafts ?? [];
-  if (drafts.length) return { action: 'review', decision: label('review'), todo: [`Review ${drafts.length === 1 ? 'the drafted line' : `the ${drafts.length} drafted lines`}: change what is not right, then remove the **Draft:** marker; delete a line to turn it down. No agent gets ${drafts.length === 1 ? 'it' : 'them'} until then.`, ...todo] };
+  if (drafts.length) return { action: 'review', decision: label('review'), todo: [`Review ${drafts.length === 1 ? 'its draft' : `its ${drafts.length} drafts`}: approve, change or drop each (rms-design-system-engine --review-drafts; in the layer itself, remove the **Draft:** marker to approve, delete the line to drop). No agent gets ${drafts.length === 1 ? 'it' : 'them'} until then.`, ...todo] };
   // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
   // retitle or remove); keep it only when there is nothing to change.
   const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';

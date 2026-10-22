@@ -97,6 +97,8 @@ rms-design-system-engine --watch-intent-layer [min]     # keep running: build th
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
 rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
+rms-design-system-engine --review-drafts                 # every draft in the intent layer to review: its page, its section, its text
+rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
@@ -331,6 +333,14 @@ take out. Repeated is the same line on half the pages of a kind or more, the sam
 changed (its name, identifier, code file or `metadata.aliases`) on five or more, or a line that names nothing in code
 on a fifth of them or more. Sections written for people by their nature (Evidence, Examples, Cross-references,
 References, See also, Related, Changelog, History, Sources) stay as they are, never asked to be retitled.
+
+**Reviewing drafts: `--review-drafts`.** The words, everywhere: a line is a **draft** (its `**Draft:**` marker), what
+a person does with it is **review** it (the page's decision, the style guide's Drafts to review card). Each draft is
+approved (its marker comes off), changed (its new text, checked against the system as a drafted line is, and the marker
+off) or dropped (the line deleted), in the page's spec and its DSDS page alike. With no file the command lists every
+draft; with a file of the person's decisions it makes them, writes `CHANGES.md`, and `--commit` or `--merge-request`
+sends them. An agent writes that file only from what the person said for each line, never deciding for them; the
+same can be done in the layer by hand (remove the marker to approve, delete the line to drop).
 
 **Making the changes: `--intent-changes`** (`intent-changes.mjs`). The review's changes made in the layer's own files:
 the repeated lines taken out; each sentence the content check finds wrong written again with only what the system has;

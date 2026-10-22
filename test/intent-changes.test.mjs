@@ -151,3 +151,32 @@ test('a commit straight on the branch only while the branch is where the changes
   assert.deepEqual(sent[0][2].actions, [{ action: 'update', file_path: 'specs/a.md', content: 'text' }]);
   assert.equal(sent[0][2].branch, 'main');
 });
+
+test('reviewing drafts: approve takes the marker off, change writes the new text, drop deletes the line; in the spec and the page alike', async () => {
+  const { mdReview, jsonReview, reviewPlan, describeReview } = await import('../intent-changes.mjs');
+  const md = '# Tile One\n\n- Source: `src/tiles/TileOne.vue`\n\n## When to use\n\n- **Draft:** Use it for one subject.\n- **Draft:** Use it on a dashboard.\n\n## When not to use\n\n- **Draft:** Not for a list.\n\n## Evidence\n\n- Seen.\n';
+  assert.match(mdReview(md, 'Use it for one subject.'), /^- Use it for one subject\.$/m);
+  assert.match(mdReview(md, 'Use it on a dashboard.', 'Use it on a home screen.'), /^- Use it on a home screen\.$/m);
+  const dropped = mdReview(md, 'Not for a list.', null);
+  assert.ok(!/When not to use/.test(dropped), 'a heading left empty goes');
+  assert.equal(mdReview(md, 'A line it does not have.'), md);
+  const page = { kind: 'component', id: 'component-tile-one', name: 'Tile One', sections: [{ kind: 'guidelines', title: 'When to use', items: [{ level: 'should', statement: '**Draft:** Use it for one subject.' }] }, { kind: 'guidelines', title: 'When not to use', items: [{ level: 'should-not', statement: '**Draft:** Not for a list.' }] }] };
+  const doc = JSON.parse(JSON.stringify(page));
+  assert.equal(jsonReview(doc, 'Use it for one subject.'), 1);
+  assert.equal(doc.sections[0].items[0].statement, 'Use it for one subject.');
+  assert.equal(jsonReview(doc, 'Not for a list.', null), 1);
+  assert.deepEqual(doc.sections.map((s) => s.title), ['When to use']);
+  // The plan: by page and line, a change checked first, what cannot be done said.
+  const e = { kind: 'component', layer: 'components', name: 'Tile One', id: 'component-tile-one', file: 'specs/dsds/tile-one.dsds.json', code: 'src/tiles/TileOne.vue', drafts: [{ where: 'When to use', text: 'Use it for one subject.' }, { where: 'When to use', text: 'Use it on a dashboard.' }, { where: 'When not to use', text: 'Not for a list.' }] };
+  const files = new Map([['specs/tile-one.md', md], ['specs/dsds/tile-one.dsds.json', JSON.stringify(page, null, 2) + '\n']]);
+  const r = reviewPlan({ entities: [e] }, [
+    { page: 'Tile One', line: 'Use it for one subject.', do: 'approve' },
+    { page: 'Tile One', line: 'Use it on a dashboard.', do: 'change', to: 'Use `glowMode` on a dashboard.' },
+    { page: 'Tile One', line: 'Not for a list.', do: 'drop' },
+    { page: 'Tile Nine', do: 'approve' },
+  ], files, { check: (x, t) => (/glowMode/.test(t) ? '`glowMode` is not in the system' : null) });
+  assert.deepEqual(r.problems, ['Tile One, "Use it on a dashboard.": the new text is not kept: `glowMode` is not in the system', 'Tile Nine: no page of that name has drafts']);
+  assert.match(r.files.get('specs/tile-one.md'), /^- Use it for one subject\.$/m);
+  assert.match(r.files.get('specs/tile-one.md'), /- \*\*Draft:\*\* Use it on a dashboard\./, 'the refused change leaves the draft as it was');
+  assert.match(describeReview(r), /^Drafts reviewed on 1 page: 1 approved, 0 changed, 1 dropped\./);
+});

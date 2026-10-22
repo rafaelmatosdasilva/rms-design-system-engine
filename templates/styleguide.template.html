@@ -2090,6 +2090,25 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // v2.11.01, whatever day each one's last commit was). g: { k: its tag, '' when none yet; at: its newest commit's date;
   // on: the day it was tagged }.
   function releaseOrder(a, b) { return (a.k ? 1 : 0) - (b.k ? 1 : 0) || (a.k && b.k && a.k !== b.k ? (versionAfter(a.k, b.k) ? -1 : 1) : (b.at > a.at ? 1 : b.at < a.at ? -1 : 0)); }
+  // Commits grouped by the ticket each was made for (r.ticket, read from its subject), in the order given (newest first);
+  // a commit for no ticket is a group of its own. → [{ ticket, ticketUrl, items }]
+  function byTicket(list, rOf) {
+    var out = [], at = {};
+    list.forEach(function (x) { var r = rOf(x), k = r.ticket ? 't:' + r.ticket : 'c:' + (r.sha || r.subject); if (!at[k]) { at[k] = { ticket: r.ticket || null, ticketUrl: r.ticketUrl || null, items: [] }; out.push(at[k]); } at[k].items.push(x); });
+    return out;
+  }
+  // What a commit says (without its ticket, its pull request and any co-author line) and its link.
+  function commitLine(r, extra) {
+    var sha = r.url ? '<a class="sg-uses-link" href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>';
+    var says = String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
+    return esc(says) + ' ' + sha + (extra || '');
+  }
+  // A ticket's cell: the ticket (linked to its issue), then each of its commits on a line; a commit for no ticket, alone.
+  function ticketHTML(t, line) {
+    if (!t.ticket) return line(t.items[0]);
+    var head = t.ticketUrl ? '<a class="sg-uses-link" href="' + esc(t.ticketUrl) + '" target="_blank" rel="noopener"><strong>' + esc(t.ticket) + '</strong></a>' : '<strong>' + esc(t.ticket) + '</strong>';
+    return '<p class="sg-il-line">' + head + '</p>' + t.items.map(function (x) { return '<p class="sg-il-line">' + line(x) + '</p>'; }).join('');
+  }
   // Its head: the release and the day it came out (its tag's), else its newest commit's day.
   function releaseHead(g, k) { return (k || esc(g.k || 'Merged, no release tag yet')) + '  ·  ' + (g.k && g.on ? 'released ' + esc(g.on.slice(0, 10)) : esc(String(g.at).slice(0, 10))); }
   function versionAfter(a, b) { var x = String(a).match(/\d+/g) || [], y = String(b).match(/\d+/g) || []; for (var i = 0; i < Math.max(x.length, y.length); i++) { var d = (+x[i] || 0) - (+y[i] || 0); if (d) return d > 0; } return false; }
@@ -2899,14 +2918,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     order.sort(releaseOrder);
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
     box.innerHTML = order.map(function (g) {
-      // One row per commit: the components it changed, then what it says.
+      // One row per ticket (the team's unit of work: its commits, whatever components each changed), the components on
+      // the left; a commit made for no ticket is a row of its own.
       var by = {}, commits = [];
       g.rows.forEach(function (x) { var k = x.r.sha || x.r.subject; if (!by[k]) { by[k] = { r: x.r, comps: [] }; commits.push(by[k]); } if (by[k].comps.indexOf(x.comp) < 0) by[k].comps.push(x.comp); });
       commits.sort(function (a, b) { return String(b.r.date) > String(a.r.date) ? 1 : String(b.r.date) < String(a.r.date) ? -1 : 0; });
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table>' + commits.map(function (x) {
-        var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short) + '</code>';
-        var says = String(x.r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
-        return '<tr><td>' + x.comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + esc(says) + ' ' + sha + '</td></tr>';
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table>' + byTicket(commits, function (x) { return x.r; }).map(function (t) {
+        var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
+        return '<tr><td>' + comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') + '</td><td>' + ticketHTML(t, function (x) { return commitLine(x.r); }) + '</td></tr>';
       }).join('') + '</table></div>';
     }).join('');
   }
@@ -2966,7 +2985,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
     // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
     var ilDrafts = function (p) { return (p.drafts || []).map(function (d) { return '<p class="sg-il-line"><strong>Draft</strong> · ' + esc(d.where) + '<span class="pg-par-val">' + esc(d.text) + '</span></p>'; }).join(''); };
-    var ilWhy = function (p) { return ilWrong(p) + ilDrafts(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
+    var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
     var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', review: 'figma', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
@@ -2991,7 +3010,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Why', c.why) + card('What the agents get', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('Why', c.why) + card('What the agents get', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer', labelOf(p.missingFor ? 'missing' : p.action)], title: p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
@@ -3000,7 +3019,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // The review, downloaded: for Excel (a workbook with the table's own columns and rows) and for Claude (Markdown: what the
     // table is, how to work through it, then each page with its decision, why and each change), to hand to whoever fixes it.
     var ilText = function (html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = ' — ' + v.textContent; }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
-    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '' } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilWhy(p)), gets: ilText(ilGets(p)) }; }); };
+    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '' } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilDrafts(p) + ilWhy(p)), gets: ilText(ilGets(p)) }; }); };
     var ilSave = function (name, type, content) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([].concat(content), { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); };
     var ilBase = String(DATA.title || 'design-system').replace(/[^\w-]+/g, '-').toLowerCase() + '-intent-layer-review';
     // For Excel: a real workbook (.xlsx), never a CSV, which Excel splits on the wrong character in many languages and
@@ -3011,7 +3030,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // The table's columns (its open arrow left out), then what to do, why and what the agents get, which the table leaves
       // to the side panel.
       var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Why', 'What the agents get']);
-      var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = ilCellsOf(rows[i])[k]; return ilCells(d); };
+      var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = (k === 'why' && !rows[i].missingFor ? ilDrafts(rows[i]) : '') + ilCellsOf(rows[i])[k]; return ilCells(d); };
       var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
       var x = function (v) { return String(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
       var col = function (i) { return String.fromCharCode(65 + i); };
@@ -6702,9 +6721,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     groups.sort(releaseOrder);
     return '<div class="pg-cards">' + out + groups.map(function (g) {
       var k = g.k, rows = g.rows, first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
-      return card(releaseHead(g, k && rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : null), rows.map(function (r) {
-        var pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
-        return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + what(r.changed) + '</td></tr>';
+      // One row per ticket, each of its commits a line (what it says, its commit, its day, what it changed); a commit for
+      // no ticket keeps its own row, its commit and pull request on the left.
+      return card(releaseHead(g, k && rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : null), byTicket(rows, function (r) { return r; }).map(function (t) {
+        if (t.ticket) return '<tr><td>' + (t.ticketUrl ? '<a class="sg-uses-link" href="' + esc(t.ticketUrl) + '" target="_blank" rel="noopener">' + esc(t.ticket) + '</a>' : esc(t.ticket)) + '</td><td>' + t.items.map(function (r) { return '<p class="sg-il-line">' + commitLine(r, ' ' + day(r.date) + what(r.changed)) + '</p>'; }).join('') + '</td></tr>';
+        var r = t.items[0], pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
+        return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + what(r.changed) + '</td></tr>';
       }).join(''));
     }).join('') + '</div>';
   }

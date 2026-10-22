@@ -24,7 +24,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { OUT_DIR } from './names.mjs';
-import { intentLayerConfig } from './doc-source-dsds.mjs';
+import { intentLayerConfig, DRAFT } from './doc-source-dsds.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, plainSend, untar } from './gitlab-source.mjs';
 export { writeTokenFrom };
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
@@ -325,6 +325,83 @@ export function applyPlan(plan, files) {
     if (did.removed.length || did.rewritten.length || did.drafted.length) pages.push(did);
   }
   return { files: next, pages, held };
+}
+
+// ── Reviewing drafts ────────────────────────────────────────────────────────────────────────────────────────────────
+// What a person decides for each draft: approve it (its marker comes off), change it (new text, marker off) or drop it
+// (the line is deleted). In the page's spec and its DSDS page alike, as the changes are made.
+const draftOf = (raw, text) => DRAFT.test(raw) && flat(raw.replace(DRAFT, '')) === flat(text);
+// to: undefined approves, a string changes, null drops.
+export function mdReview(src, text, to) {
+  let hit = false;
+  const out = [];
+  for (const l of src.split('\n')) {
+    const m = /^(\s*[-*]\s+)?(.*)$/.exec(l);
+    if (!draftOf(m[2], text)) { out.push(l); continue; }
+    hit = true;
+    if (to !== null) out.push((m[1] ?? '') + (to ?? m[2].replace(DRAFT, '').trim()));
+  }
+  return !hit ? src : (to === null ? dropEmptyHeadings(out) : out).join('\n');
+}
+export function jsonReview(entry, text, to) {
+  let n = 0;
+  const next = (s) => to ?? String(s).replace(DRAFT, '').trim();
+  entry.sections = (entry.sections ?? []).filter((s) => {
+    if (Array.isArray(s.items)) {
+      s.items = s.items.filter((it) => { if (!draftOf(String(it.statement ?? ''), text)) return true; n++; if (to === null) return false; it.statement = next(it.statement); return true; });
+      if (s.kind === 'guidelines' && !s.items.length) return false;
+    }
+    for (const f of s.freeform ?? []) if (typeof f.body === 'string') f.body = f.body.split('\n').flatMap((l) => { const m = /^(\s*[-*]\s+)?(.*)$/.exec(l); if (!draftOf(m[2], text)) return [l]; n++; return to === null ? [] : [(m[1] ?? '') + next(m[2])]; }).join('\n');
+    return true;
+  });
+  if (draftOf(String(entry.description ?? ''), text)) { n++; if (to === null) delete entry.description; else entry.description = next(entry.description); }
+  return n;
+}
+// decisions: [{ page (its name or file), line (a draft's text; left out: every draft of the page), do: 'approve' |
+// 'change' | 'drop', to (change's new text) }]. check(entity, text) → why the new text is wrong, or null.
+// → { files: Map(path → new text), pages: [{ name, file, spec, approved, changed, dropped }], problems: [why not] }
+export function reviewPlan(snap, decisions, files, { check = () => null } = {}) {
+  const idx = specIndex(files);
+  const next = new Map();
+  const text = (f) => next.get(f) ?? files.get(f);
+  const byPage = new Map(), problems = [];
+  for (const d of decisions) {
+    const say = (why) => problems.push(`${d.page}${d.line ? `, "${d.line}"` : ''}: ${why}`);
+    if (!['approve', 'change', 'drop'].includes(d.do)) { say('say approve, change or drop'); continue; }
+    const e = snap.entities.find((x) => (norm(x.name) === norm(d.page) || (d.page && String(x.file).endsWith(d.page))) && (x.drafts ?? []).length);
+    if (!e) { say('no page of that name has drafts'); continue; }
+    const lines = d.line ? e.drafts.filter((x) => flat(x.text) === flat(d.line)) : e.drafts;
+    if (!lines.length) { say('the page has no draft with that text (--review-drafts lists them)'); continue; }
+    if (d.do === 'change' && (!d.line || !flat(d.to))) { say('a change takes the line and its new text (to)'); continue; }
+    if (d.do === 'change') { const why = check(e, flat(d.to)); if (why) { say(`the new text is not kept: ${why}`); continue; } }
+    const src = specOf(e, idx);
+    const page = files.has(e.file) ? e.file : null;
+    const did = byPage.get(e) ?? byPage.set(e, { name: e.name, file: e.file, spec: src?.spec ?? null, approved: [], changed: [], dropped: [] }).get(e);
+    for (const l of lines) {
+      const to = d.do === 'approve' ? undefined : d.do === 'drop' ? null : flat(d.to);
+      if (src) { const t = text(src.spec), n = mdReview(t, l.text, to); if (n !== t) next.set(src.spec, n); }
+      if (page) {
+        const before = text(page); let doc; try { doc = JSON.parse(before); } catch { doc = null; }
+        const entry = doc && (entriesOf(doc).find((x) => (x.id ?? x.name) === (e.id ?? e.name)) ?? entriesOf(doc)[0]);
+        if (entry && jsonReview(entry, l.text, to)) next.set(page, jsonText(doc, files.get(page)));
+      }
+      if (d.do === 'approve') did.approved.push(l.text); else if (d.do === 'drop') did.dropped.push(l.text); else did.changed.push({ line: l.text, to: flat(d.to) });
+    }
+  }
+  return { files: next, pages: [...byPage.values()], problems };
+}
+export function describeReview({ pages, problems }) {
+  const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
+  const out = [`Drafts reviewed on ${pages.length} page${pages.length === 1 ? '' : 's'}: ${n('approved')} approved, ${n('changed')} changed, ${n('dropped')} dropped.`, ''];
+  for (const p of pages) {
+    out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
+    for (const l of p.approved) out.push(`- Approved: "${l}"`);
+    for (const c of p.changed) out.push(`- Changed: "${c.line}" → "${c.to}"`);
+    for (const l of p.dropped) out.push(`- Dropped: "${l}"`);
+    out.push('');
+  }
+  if (problems.length) out.push('### Not done', '', ...problems.map((p) => `- ${p}`), '');
+  return out.join('\n');
 }
 
 // What changed, for the person and for the merge request's description.
