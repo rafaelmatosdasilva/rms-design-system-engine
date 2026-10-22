@@ -91,7 +91,7 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
       const p = k.split('#')[0];
       const options = Array.isArray(d?.variantOptions) ? d.variantOptions.map(String) : null;
       const had = c.props[p];
-      c.props[p] = had ? { ...had, options: had.options ?? options } : { type: d?.type === 'BOOLEAN' ? 'boolean' : d?.type === 'VARIANT' ? 'variant' : String(d?.type ?? '').toLowerCase() || null, options, from: 'Figma' };
+      c.props[p] = had ? { ...had, options: had.options ?? options, ...(had.options || !options ? {} : { optionsFrom: 'Figma' }) } : { type: d?.type === 'BOOLEAN' ? 'boolean' : d?.type === 'VARIANT' ? 'variant' : String(d?.type ?? '').toLowerCase() || null, options, from: 'Figma' };
     }
     const st = resolveStatus(authored[n], x.description);
     if (st) c.status = st.state;
@@ -207,7 +207,7 @@ function lev(a, b) {
 
 // A value the prop takes: one of its options, or, when only Figma lists them (Figma names a variant one way, the code
 // another: positive and success), a word of the component's own code file.
-const takes = (facts, n, prop, v) => prop.options.some((o) => norm(o) === norm(v)) || (prop.from !== 'the code' && (facts.components[n]?.codeWords ?? []).includes(v));
+const takes = (facts, n, prop, v) => prop.options.some((o) => norm(o) === norm(v)) || ((prop.optionsFrom ?? prop.from) !== 'the code' && (facts.components[n]?.codeWords ?? []).includes(v));
 const propsOf = (facts, n) => facts.components[n]?.props ?? {};
 const propOf = (facts, n, p) => { const ps = propsOf(facts, n); return ps[p] ?? ps[camel(p)] ?? Object.entries(ps).find(([k]) => norm(k) === norm(p))?.[1] ?? null; };
 
