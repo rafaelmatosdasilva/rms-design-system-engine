@@ -702,8 +702,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       if (hasLayer && !opts.offline) { try { for (const r of await ilMod.syncSources(ROOT, cfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
       const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
       const ilMatch = ilSnap ? ilMod.matchComponents(view.components.map((c) => c.name), ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
+      // What the system contradicts on each page (intent-truth.mjs): left out of its documentation, and said.
+      const ilWrong = (await import('./intent-truth.mjs')).checkedLayer(ROOT, cfg, ilSnap);
       for (const c of view.components) {
-        const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
+        const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source, ilWrong(ilMatch.get(c.name))) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
         // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
         // the contract); the Intent layer page reviews every page of it apart.
         if (!il && hasLayer) c.intentLayer = { none: true };
@@ -720,9 +722,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         // ones this page shows, so the page and the audit judge each page alike.
         const names = il.systemNames(ROOT, cfg);
         const from = il.namesFrom(ROOT, cfg);
-        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from });
+        const truth = await import('./intent-truth.mjs');
+        const wrongOf = truth.checkedLayer(ROOT, cfg, snap);
+        const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from, wrongOf });
         const src = snap._source ?? {};
-        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages,
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages,
           noPage: names.filter((n) => !report.pages.some((p) => p.component === n)) };
       }
     } catch { /* no intent layer */ }

@@ -29,6 +29,7 @@ import { resolveStatus } from './decision-status.mjs';
 import { loadLocator } from './component-locator.mjs';
 import { slugForUrl } from './gitlab-fetch.mjs';
 import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, fileUrl } from './intent-layer.mjs';
+import { checkedLayer } from './intent-truth.mjs';
 import { codeComponents } from './component-source.mjs';
 
 const LAYERS = ['system', 'foundations', 'components', 'patterns', 'templates', 'pages', 'flows'];
@@ -255,12 +256,14 @@ export async function generateIntent(ROOT, cfg, opts = {}) {
   if (IL) {
     const src = IL._source ?? {};
     const matched = matchComponents(Object.keys(intent.components), IL.entities, codeFilesOf(ROOT, cfg));
-    for (const [name, e] of matched) intent.components[name].intentLayer = componentIntent(e, src);
+    // What the system contradicts on each page (intent-truth.mjs): those lines never reach the agents.
+    const wrongOf = checkedLayer(ROOT, cfg, IL);
+    for (const [name, e] of matched) intent.components[name].intentLayer = componentIntent(e, src, wrongOf(e));
     withIntentLayer = matched.size;
     const used = new Set(matched.values());
     for (const L of LAYERS) {
       if (L === 'components') continue;
-      const own = IL.entities.filter((e) => e.layer === L).map((e) => componentIntent(e, src));
+      const own = IL.entities.filter((e) => e.layer === L).map((e) => componentIntent(e, src, wrongOf(e)));
       if (own.length) intent[L].intentLayer = own;
     }
     intent.intentLayer = {
@@ -270,6 +273,8 @@ export async function generateIntent(ROOT, cfg, opts = {}) {
       repeatedLinesLeftOut: IL.boilerplate ?? 0,
       noComponent: IL.entities.filter((e) => e.layer === 'components' && !used.has(e)).map((e) => ({ name: e.name, file: e.file, url: fileUrl(src, e.file) })),
       noPage: Object.keys(intent.components).filter((n) => !matched.has(n)),
+      // The pages that say something the system contradicts, and what: the lines left out above.
+      wrong: IL.entities.map((e) => ({ name: e.name, file: e.file, findings: wrongOf(e).length })).filter((x) => x.findings),
     };
   }
 

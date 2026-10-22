@@ -35,6 +35,7 @@ import { readableOn } from './token-pairs.mjs';
 import { primitiveGuideLines } from './primitives.mjs';
 import { authorityLines } from './authority.mjs';
 import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, layerPages, short } from './intent-layer.mjs';
+import { checkedLayer } from './intent-truth.mjs';
 import { codeHalf, codeSlots, figmaStatesVariants, stateTokens, accessibilityOf } from './contract-code.mjs';
 import { roleWord } from './role-markup.mjs';
 import { execFileSync } from 'node:child_process';
@@ -1001,6 +1002,8 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // The intent layer's page for each component, when ds-config.json names one (intent-layer.mjs).
   const IL = readIntentLayer(ROOT, cfg);
   const intentPages = IL ? matchComponents(targets, IL.entities, codeFilesOf(ROOT, cfg)) : new Map();
+  // What the system contradicts on each page (intent-truth.mjs): those lines are not written into a contract.
+  const wrongOf = checkedLayer(ROOT, cfg, IL);
   const stateBindings = readJSON(resolve(ROOT, paths.stateBindings || 'component-state-bindings.json')) || {};
   const stateTokensFile = readJSON(resolve(ROOT, paths.stateTokens || 'component-state-tokens.json'))?._components || {};
   // Laid out by the code, one contract per code file: when several Figma components are drawn of one file (two states
@@ -1022,7 +1025,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     const prev = readJSON(file);                                              // previous emit (for the diff)
     let text = ''; try { if (api?.file) text = readFileSync(resolve(ROOT, api.file), 'utf8'); } catch { /* unreadable */ }
     const codePart = apiReader ? { api, text, aliases: cfg.componentPropAliases?.[name] ?? null, stateBindings: stateBindings[name] ?? null, componentTokens: stateTokensFile[name]?.tokens ?? null, publish, idPrefix: cc.idPrefix, schemaRef: relative(dirname(file), schemaOut).split(/[\\/]+/).join('/').replace(/^(?!\.)/, './'), figmaFile: cfg.figmaFileKey || undefined, commit: publish ? lastCommitOf(ROOT, api?.file) : null } : null;
-    const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source) : null, code: codePart });
+    const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source, wrongOf(intentPages.get(name))) : null, code: codePart });
     // From the code alone, no description is a placeholder saying it came from Figma.
     if ((codeOnly || !(props[name] || structure[name])) && /— captured from Figma by rms-design-system-engine\.$/.test(contract.description)) contract.description = '';
     if (lives[name] && !publish) contract.livesIn = lives[name];

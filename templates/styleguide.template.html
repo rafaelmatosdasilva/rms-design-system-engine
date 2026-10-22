@@ -2949,12 +2949,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       }
       return esc(IL_LAYER[p.layer] || capital(String(p.layer || '').replace(/s$/, '')));
     };
-    var ilGets = function (p) { return (p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>'; };
+    var ilGets = function (p) { return ((p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line">' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '<span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>')
+      + ((p.wrong || []).some(function (f) { return f.line && (f.kind === 'name' || f.kind === 'claim'); }) ? '<p class="pg-missing">Not the sentences the system contradicts: they are left out until they are fixed.</p>' : ''); };
     // A page kept as it is: its Keep says it all, so What to do and Why stay empty rather than repeat it on every row.
     var ilTodo = function (p) { return (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('') || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
-    var ilWhy = function (p) { return p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'; };
+    // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
+    // system has instead, with where that comes from.
+    var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
+    var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
-    var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
+    var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
     var rows = IL.pages.slice().sort(function (x, y) { return labels.findIndex(function (l) { return l[0] === x.action; }) - labels.findIndex(function (l) { return l[0] === y.action; }); })
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));

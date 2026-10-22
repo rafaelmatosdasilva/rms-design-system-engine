@@ -111,10 +111,15 @@ export function codeFilesOf(ROOT, cfg = {}) {
   return out;
 }
 
-// What a component carries from the layer, for the design intent, the contracts and the style guide.
-export function componentIntent(e, src) {
+// What a component carries from the layer, for the design intent, the contracts and the style guide. wrong: what the
+// content check found on its page (intent-truth.mjs): the lines it says are wrong are left out, and it is listed.
+export function componentIntent(e, src, wrong = []) {
+  const bad = new Set(wrong.filter((f) => (f.kind === 'name' || f.kind === 'claim') && f.line).map((f) => norm(f.line)));
+  const ok = (t) => !bad.size || ![...bad].some((b) => b && norm(t).includes(b));
+  if (bad.size) e = { ...e, purpose: e.purpose.filter(ok), whenToUse: e.whenToUse.filter(ok), whenNotToUse: e.whenNotToUse.filter(ok), mistakes: e.mistakes.filter(ok), limitations: e.limitations.filter(ok), rules: e.rules.filter((r) => ok(r.text ?? r)), sections: e.sections.filter((x) => ok(x.text)) };
   const list = (a) => (a.length ? a : null);
   return {
+    ...(wrong.length ? { wrong: wrong.map(({ kind, where, line, truth, fix }) => ({ kind, where, line, truth, fix })) } : {}),
     name: e.name, file: e.file, url: e.url ?? fileUrl(src, e.file), status: e.status ?? null, source: e.source?.label ?? src?.label ?? 'the intent layer',
     purpose: e.purpose[0] ?? null, whenToUse: list(e.whenToUse), whenNotToUse: list(e.whenNotToUse),
     mistakes: list(e.mistakes), limitations: list(e.limitations),
@@ -217,7 +222,8 @@ const KIND_WORDS = { purpose: 'what it is for', whenToUse: 'when to use', whenNo
 //   not used: nothing of it reaches them
 // matched: Map(component → entity) from matchComponents. → { pages: [...], counts: { used, thin, notUsed } }
 // opts: { names: the system's components, codeExists(file): is that code file in the project }.
-export function useReport(snap, matched = new Map(), { names = [], codeExists = null, from = 'Figma' } = {}) {
+// wrongOf(entity) → [finding]: what on the page the system contradicts (intent-truth.mjs → checkedLayer).
+export function useReport(snap, matched = new Map(), { names = [], codeExists = null, from = 'Figma', wrongOf = () => [] } = {}) {
   const forEntity = new Map([...matched].map(([n, e]) => [e, n]));
   const pages = [];
   for (const e of snap?.entities ?? []) {
@@ -250,7 +256,8 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     // and gives a rule or a section to compose by.
     const how = has('whenToUse') || has('whenNotToUse') || (!comp && (e.kind === 'token' || has('rules') || has('sections') || has('mistakes')));
     const verdict = !gets.length ? 'not used' : has('purpose') && how ? 'used' : 'thin';
-    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}) };
+    const wrong = wrongOf(e) ?? [];
+    const page = { name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}) };
     Object.assign(page, decide(page, e, { comp, has }));
     pages.push(page);
   }
@@ -264,7 +271,7 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
 // What the team does with each page, most urgent first, in one word (its row says each change): [key, the decision].
 export const ACTIONS = [
   ['delete', 'Delete'], ['move', 'Move'], ['rename', 'Rename'], ['name', 'Name'],
-  ['write', 'Write'], ['improve', 'Improve'], ['keep', 'Keep'],
+  ['fix', 'Fix'], ['write', 'Write'], ['improve', 'Improve'], ['keep', 'Keep'],
 ];
 const ORPHAN_ACTION = { emptyPage: 'delete', codeGone: 'delete', partSaid: 'delete', copy: 'delete', subPartAlone: 'delete', part: 'move', subPart: 'move', rename: 'rename', noComponent: 'name' };
 // → { action, decision, todo: [each change, as an instruction] }
@@ -286,6 +293,9 @@ function decide(page, e, { comp, has }) {
     if (n.reason === 'repeated') todo.push(`Remove the ${n.what.replace(/ repeated lines?$/, '')} lines written on every page alike, in whatever writes them.`);
     if (n.reason === 'morePurpose') todo.push('Put the sentence that matters most first in what it is for: agents read that one.');
   }
+  // What on it the system contradicts, first: fix it before anything is added to it.
+  const fix = (page.wrong ?? []).map((f) => (f.kind === 'name' || f.kind === 'claim' ? `${f.says}: ${f.fix}` : f.fix));
+  if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...todo] };
   // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
   // retitle or remove); keep it only when there is nothing to change.
   const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';

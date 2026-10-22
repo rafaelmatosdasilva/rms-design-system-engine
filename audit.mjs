@@ -286,6 +286,50 @@ if (process.argv.includes('--summary')) {
   process.exit(2);
 }
 
+// ── --check-intent [file or folder]: whether what intent-layer pages say is true of the system ──
+// A page written or changed (a DSDS file, or a folder of them) checked before it goes into the layer; with none named,
+// the whole layer as last read. Each name it writes as code must be one the system has, each prop it sets one the
+// component takes with a value it takes, and what it says of accessibility not what the accessibility check found
+// broken; a page whose component changed since it was edited, or that says what another component's page says, is said
+// too (intent-truth.mjs). Exits 1 when anything is found, so a page is written only once it passes.
+if (process.argv.includes('--check-intent')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--check-intent'), given = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? resolve(process.argv[at + 1]) : null;
+  const il = await import('./intent-layer.mjs');
+  const truth = await import('./intent-truth.mjs');
+  const layer = il.readIntentLayer(ROOT, pcfg) ?? { entities: [] };
+  let mine = null;
+  if (given) {
+    if (!existsSync(given)) { console.log(`❌ ${given} does not exist.`); process.exit(2); }
+    const files = new Map();
+    const add = (p) => { try { files.set(relative(ROOT, p), JSON.parse(readFileSync(p, 'utf8'))); } catch { /* not JSON: not a page */ } };
+    const walkJson = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) { if (f !== 'node_modules' && !f.startsWith('.')) walkJson(p); } else if (/\.json$/i.test(f)) add(p); } };
+    if (statSync(given).isDirectory()) walkJson(given); else add(given);
+    // Each file one page ({ kind, id, … }), several ({ entries: [] }) or one under entity; its layer from the folder.
+    mine = [];
+    for (const [file, doc] of files) {
+      const group = file.split('/').slice(0, -1).reverse().find((s) => /^(components|patterns|templates|foundations|flows|pages|product-pages|tokens)$/.test(s)) ?? '';
+      for (const e of doc?.entries ?? (doc?.kind ? [doc] : doc?.entity ? [doc.entity] : [])) if (e?.kind && e.kind !== 'system') mine.push(il.entityView(e, file, group));
+    }
+    if (!mine.length) { console.log(`❌ No DSDS page in ${relative(ROOT, given) || given}: nothing to check.`); process.exit(2); }
+  }
+  // The pages checked in the layer they will join: a page of the same identifier (or name) replaces the one read last.
+  const key = (e) => String(e.id ?? e.name).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const entities = mine ? [...mine, ...layer.entities.filter((e) => !mine.some((m) => key(m) === key(e)))] : layer.entities;
+  const snap = { ...layer, entities };
+  const facts = truth.systemFacts(ROOT, pcfg, { record: false });
+  const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
+  const found = truth.checkLayer(snap, il.matchComponents(names, entities, il.codeFilesOf(ROOT, pcfg)), facts);
+  const shown = [...found].filter(([e]) => !mine || mine.includes(e)).map(([e, f]) => [`${e.name} (${e.file})`, f]);
+  const { n, text } = truth.report(shown);
+  const pages = mine ? mine.length : entities.length;
+  if (!n) { console.log(`✅ ${pages} page${pages === 1 ? '' : 's'} checked: nothing on ${pages === 1 ? 'it' : 'them'} is contradicted by the system.`); console.log(mine ? 'NEXT: the page can be written to the intent layer.' : 'NEXT: none'); process.exit(0); }
+  console.log(`❌ ${n} finding${n === 1 ? '' : 's'} on ${shown.length} of ${pages} page${pages === 1 ? '' : 's'}:${text}`);
+  console.log(mine ? '\nNEXT: fix each finding in the page, then run --check-intent on it again; write it to the intent layer only once it passes.' : '\nNEXT: fix each finding in its page in the intent layer (the Intent layer page of the style guide lists them under Fix).');
+  process.exit(1);
+}
+
 // ── --contracts-out <dir>: the component contracts, published for a shared repository (an intent layer) ──
 // Only what belongs in a shared repository: one contract per code file, the schema, and a README. No token values,
 // no catalog, no copy of the intent layer's own text. Contracts the code no longer has are removed. Nothing is pushed.
@@ -5026,9 +5070,9 @@ function reportFull(label, items, shown) {
         try {
           const il = await import('./intent-layer.mjs');
           const snap = il.readIntentLayer(ROOT, cfg);
-          const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)), { names: Object.keys(r.intent.components), codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, cfg) });
+          const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)), { names: Object.keys(r.intent.components), codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, cfg), wrongOf: (await import('./intent-truth.mjs')).checkedLayer(ROOT, cfg, snap) });
           const todo = il.ACTIONS.filter(([k]) => !['keep', 'improve'].includes(k) && rep.actions[k]).map(([k, label]) => `${rep.actions[k]} ${label.toLowerCase()}`);
-          console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${todo.length ? `\n   To do in the intent layer: ${todo.join(', ')} (each page with why and what to change: the style guide's Intent layer page, --docs)` : ''}`);
+          console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${todo.length ? `\n   To do in the intent layer: ${todo.join(', ')} (each page with why and what to change: the style guide's Intent layer page, --docs)` : ''}${rep.actions.fix ? `\n   ${rep.actions.fix} page${rep.actions.fix === 1 ? ' says' : 's say'} something the system contradicts: those sentences are left out of what the agents get until fixed (--check-intent lists each)` : ''}`);
         } catch { /* the line above already says how many pages */ }
       }
     } catch (e) {

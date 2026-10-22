@@ -94,6 +94,7 @@ rms-design-system-engine --docs                          # ALSO build the styleg
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
 rms-design-system-engine --watch-intent-layer [min]     # keep running: build the style guide again each time the intent layer gets a new commit (checks every 5 min)
+rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
@@ -293,9 +294,29 @@ change, most urgent first, the decisions as chips that filter the table (a compo
 or a component's page already says it), **Move** (it is about a part of a component that has its
 own page: `PointListItem` beside `pointList`), **Rename** (a component's name with a generic word added, as
 "Panel General" for `panel`, when no page documents that component yet), **Name** (as in Figma) (it matches
-no component the engine can find), **Write**, **Improve** (it exists and says something; each change it takes is listed: what to add, what to retitle, what to
+no component the engine can find), **Fix** (it says something the system contradicts: below), **Write**, **Improve** (it exists and says something; each change it takes is listed: what to add, what to retitle, what to
 remove) or **Keep**; each with why, each change it takes and what the agents get from it. The engine never changes the
 layer: the changes are the team's. The audit prints how many pages each decision has.
+
+**What a page says is checked against the system, on every run** (`intent-truth.mjs`, no flag): every name it writes as
+code (`tileOne`, `dense`, `--tile-color`, `icons/check`, a file) must be one the system has (a component, a prop,
+a token, a Figma variable, an icon, a file, a word of its code), unless the page gives it as the one not to use ("not
+`x`"); a flow's or a page's own screens are the product's, so there only tokens and near misses of a system name are
+held to it. A prop it sets (`prop="value"`) must be one some component has, and the value one the prop takes (its
+options in the code or Figma, true or false for an on-off one); a list of values given for a prop must be its values.
+What it says the component does for accessibility ("is keyboard accessible", "is announced") must not be what the
+accessibility check found broken (by WCAG criterion). The code file it names must be the component's, and a page that
+calls a deprecated component stable is wrong. **Out of date**: the component's props (names, and the values each
+takes, in the code or Figma) changed after the page was last edited; the engine keeps them from run to run in
+`.design-system-engine-out/component-changes.json` and dates the run that first saw them differ (the code's own git
+history dates its file too). **Twins**: two components' pages that say the same (their own names aside, lines a template
+writes on three pages or more left out), so an agent cannot tell from them when to use one and not the other. A page
+with any of these is **Fix**, above every other decision but those that remove or rename it; its panel says each finding,
+the sentence it is in, what the system has instead and where that comes from. The sentences found wrong are left out
+of everything the engine writes for the agents (`design-intent.json`, the contracts, a component's Documentation),
+listed under `wrong`, until the page is fixed. Before a page is written to the layer (by a person or an agent),
+`--check-intent <file or folder>` checks it in the layer it will join and exits 1 on any finding: write it only once it
+passes. It checks what is stated, not how well it is written.
 
 A component's Documentation reads everything written about it, wherever it is written (its intent-layer page, its
 Figma description and annotations, a guidelines section headed with its name), one row per thing an agent needs: what
