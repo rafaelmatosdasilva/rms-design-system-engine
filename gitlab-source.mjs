@@ -70,6 +70,18 @@ export function tokenFrom(env, folders = []) {
   return '';
 }
 
+// GITLAB_WRITE_TOKEN from the environment, else from a .env in one of the folders: a token that writes only where it is
+// meant to (a project's own), which also reads that project when GITLAB_TOKEN is refused.
+export function writeTokenFrom(env, folders = []) {
+  if (env.GITLAB_WRITE_TOKEN) return env.GITLAB_WRITE_TOKEN;
+  for (const d of folders) {
+    let text; try { text = readFileSync(join(d, '.env'), 'utf8'); } catch { continue; }
+    const m = text.match(/^\s*GITLAB_WRITE_TOKEN\s*=(.*)$/m);
+    if (m && envValue(m[1])) return envValue(m[1]);
+  }
+  return '';
+}
+
 // GITLAB_HOST from the environment, else from a .env in one of the folders (so a project's .env can name its host).
 export function hostEnvFrom(env, folders = []) {
   if (env.GITLAB_HOST) return env.GITLAB_HOST;

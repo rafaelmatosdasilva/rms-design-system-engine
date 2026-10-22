@@ -32,7 +32,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname, posix } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { parseGitlabProject, tokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE } from './gitlab-source.mjs';
+import { parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { contractSummaries } from './shared-contracts.mjs';
 
@@ -376,10 +376,16 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
   const headers = token && tokenAllowedFor(p.host, env) ? { 'PRIVATE-TOKEN': token } : {};
   const notSent = token && !headers['PRIVATE-TOKEN'] ? `; a GITLAB_TOKEN is set but not sent to ${p.host}: add GITLAB_HOST=${p.host} to .env` : '';
   const fetchImpl = opts.fetchImpl ?? plainGet;
+  // A read GITLAB_TOKEN refuses (revoked, expired) is asked again with the layer's own GITLAB_WRITE_TOKEN, which reads it.
+  const write = writeTokenFrom(env, folders);
+  const again = write && write !== token && tokenAllowedFor(p.host, env) ? { 'PRIVATE-TOKEN': write } : null;
   // Every call is a GET: the layer is read, never changed.
   const get = async (url) => {
     const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined;
-    try { return await fetchImpl(url, { method: 'GET', headers, signal }); } catch { return { ok: false, status: 0 }; }
+    try {
+      const r = await fetchImpl(url, { method: 'GET', headers, signal });
+      return (r.status === 401 || r.status === 403) && again ? await fetchImpl(url, { method: 'GET', headers: again, signal }) : r;
+    } catch { return { ok: false, status: 0 }; }
   };
   const fail = (r) => kept(r.status ? why(r.status, p.host) + notSent : `could not reach ${p.host}`);
   const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;

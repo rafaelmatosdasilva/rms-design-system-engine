@@ -221,7 +221,8 @@ const NOT_ITS_OWN = /\b(not|no|never|don't|do not|parent|owns?|consumer|caller|y
 export function checkPage(e, facts, { component = null, strict = false } = {}) {
   const out = [];
   const seen = new Set();
-  const push = (f) => { const k = `${f.kind}|${f.says}`; if (!seen.has(k)) { seen.add(k); out.push(f); } };
+  // One finding per sentence: the same wrong name in two sentences is two places to fix.
+  const push = (f) => { const k = `${f.kind}|${f.says}|${f.line ?? ''}`; if (!seen.has(k)) { seen.add(k); out.push(f); } };
   const own = component && facts.components[component] ? component : null;
   for (const { where, text } of linesOf(e)) {
     for (const m of text.matchAll(/`([^`\n]+)`/g)) {

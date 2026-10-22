@@ -25,7 +25,8 @@ import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node
 import { resolve, join, dirname } from 'node:path';
 import { OUT_DIR } from './names.mjs';
 import { intentLayerConfig } from './doc-source-dsds.mjs';
-import { STATE_FILE, parseGitlabProject, tokenFrom, hostEnvFrom, plainGet, plainSend, untar } from './gitlab-source.mjs';
+import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, plainSend, untar } from './gitlab-source.mjs';
+export { writeTokenFrom };
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { linesOf, checkPage } from './intent-truth.mjs';
 
@@ -58,12 +59,6 @@ export function layerAccess(ROOT, cfg, { env = process.env } = {}) {
     get: async (path) => { const r = await plainGet(base + path, { headers }); return (r.status === 401 || r.status === 403) && writeHeaders !== headers ? plainGet(base + path, { headers: writeHeaders }) : r; },
     send: (method, path, body) => plainSend(base + path, { method, headers: writeHeaders, body }),
   };
-}
-// GITLAB_WRITE_TOKEN from the environment, else from a .env in one of the folders (as tokenFrom reads GITLAB_TOKEN).
-export function writeTokenFrom(env, folders = []) {
-  if (env.GITLAB_WRITE_TOKEN) return env.GITLAB_WRITE_TOKEN;
-  for (const d of folders) { try { const v = /^\s*GITLAB_WRITE_TOKEN\s*=\s*["']?([^\s"'#]+)/m.exec(readFileSync(join(d, '.env'), 'utf8'))?.[1]; if (v) return v; } catch { /* no .env */ } }
-  return '';
 }
 
 // Every text file of the layer at a commit. → Map(path → text)

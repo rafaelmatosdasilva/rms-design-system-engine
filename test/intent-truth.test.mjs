@@ -151,3 +151,9 @@ test('--check-intent checks a page before it is written, and exits 1 on a findin
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /1 page checked: nothing on it is contradicted by the system/);
 });
+
+test('the same wrong name in two sentences is two findings, one for each sentence to fix', () => {
+  const f = checkPage(page('tileOne', { whenToUse: ['Set `showBadgeCount` to show a count.'], rules: [{ text: 'With `showBadgeCount` the count shows.' }] }), FACTS(), { component: 'tileOne' });
+  assert.equal(f.length, 2);
+  assert.deepEqual(f.map((x) => x.where), ['When to use', 'Rules']);
+});
