@@ -314,6 +314,23 @@ function decide(page, e, { comp, has }) {
 }
 
 
+// What the agents read from a page, word for word, by kind (what the readers above take): what it is for (its first
+// line), when (not) to use it, its mistakes, limitations and rules, and, on a page of another layer, its other sections.
+// The lines the content check found wrong and the drafts are not in it: no agent gets them. wrong: its findings.
+export function agentText(e, src, wrong = []) {
+  const ci = componentIntent(e, src, wrong);
+  const out = { purpose: ci.purpose ? [ci.purpose] : [], whenToUse: ci.whenToUse ?? [], whenNotToUse: ci.whenNotToUse ?? [], mistakes: ci.mistakes ?? [], limitations: ci.limitations ?? [], rules: ci.rules ?? [] };
+  if (e.layer !== 'components') out.sections = (ci.sections ?? []).map((x) => `${x.title}: ${x.text}`);
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v.length));
+}
+
+// The components a page is to be written for: those the code has (a code file) and no page names. One only in Figma
+// is not built yet: its page waits until it is (the Parity shows it as not built). With no code read at all, every one.
+export function pagesToWrite(names, documented, codeFiles = {}) {
+  const built = Object.keys(codeFiles).length ? (n) => !!codeFiles[n] : () => true;
+  return names.filter((n) => !documented(n) && built(n));
+}
+
 // ── A page that names no component: what to do with it ──────────────────────────────────────────────────────────────
 // One decision, said plainly, from what the page is: nothing of its own once filler and facts are out (delete it); the
 // page of a code file that is gone (delete it); a component's name with a generic word added, for a component no page

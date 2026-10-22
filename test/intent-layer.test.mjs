@@ -353,7 +353,8 @@ test('the design intent carries each component\'s page with its link, each layer
   assert.equal(it.patterns.intentLayer[0].name, 'Saving');
   assert.equal(it.templates.intentLayer[0].name, 'Checkout');
   assert.deepEqual(it.intentLayer.noComponent.map((x) => x.name), ['Ghost Widget']);
-  assert.deepEqual(it.intentLayer.noPage, ['iconOnly']);
+  // iconOnly is only in Figma here (the code has no file for it): no page to write until it is built.
+  assert.deepEqual(it.intentLayer.noPage, []);
   assert.equal(it.components.iconOnly.intentLayer, undefined);
 });
 
@@ -652,4 +653,18 @@ test('a component page\'s Accessibility, "… Rule" and other prose sections are
   const r = useReport({ entities: [v] }, new Map([['tileOne', v]]), { names: ['tileOne'] });
   assert.equal(r.pages[0].action, 'keep');
   assert.ok(!r.pages[0].notUsed.some((n) => n.reason === 'unknownTitle'));
+});
+
+test('a page is to be written only for a component the code has; one only in Figma waits until it is built', async () => {
+  const { pagesToWrite } = await import('../intent-layer.mjs');
+  const documented = (n) => n === 'tileOne';
+  assert.deepEqual(pagesToWrite(['tileOne', 'tileTwo', 'figmaOnly'], documented, { tileOne: 'src/TileOne.vue', tileTwo: 'src/TileTwo.vue' }), ['tileTwo']);
+  assert.deepEqual(pagesToWrite(['tileOne', 'tileTwo'], documented, {}), ['tileTwo'], 'no code read: every one');
+});
+
+test('what the agents read from a page, word for word by kind, leaves out the lines found wrong and the drafts', async () => {
+  const { agentText } = await import('../intent-layer.mjs');
+  const e = { kind: 'component', layer: 'components', name: 'Tile One', file: 'tile.dsds.json', purpose: ['A tile for one subject.', 'More words.'], whenToUse: ['Use it for one subject.', 'Set `glowMode` on it.'], whenNotToUse: [], mistakes: [], limitations: [], rules: [{ text: 'Keep its title short.', level: 'should' }], sections: [{ title: 'Examples', text: 'A tile.' }], drafts: [{ where: 'When to use', text: 'Use it on a dashboard.' }] };
+  assert.deepEqual(agentText(e, {}, [{ kind: 'name', line: 'Set `glowMode` on it.' }]), { purpose: ['A tile for one subject.'], whenToUse: ['Use it for one subject.'], rules: ['Keep its title short. (should)'] });
+  assert.deepEqual(agentText({ ...e, layer: 'patterns', whenToUse: [] }).sections, ['Examples: A tile.']);
 });

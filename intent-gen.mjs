@@ -28,7 +28,7 @@ import { createHash } from 'node:crypto';
 import { resolveStatus } from './decision-status.mjs';
 import { loadLocator } from './component-locator.mjs';
 import { slugForUrl } from './gitlab-fetch.mjs';
-import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, fileUrl } from './intent-layer.mjs';
+import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, fileUrl, pagesToWrite } from './intent-layer.mjs';
 import { checkedLayer } from './intent-truth.mjs';
 import { codeComponents } from './component-source.mjs';
 
@@ -272,7 +272,7 @@ export async function generateIntent(ROOT, cfg, opts = {}) {
       pages: IL.entities.length,
       repeatedLinesLeftOut: IL.boilerplate ?? 0,
       noComponent: IL.entities.filter((e) => e.layer === 'components' && !used.has(e)).map((e) => ({ name: e.name, file: e.file, url: fileUrl(src, e.file) })),
-      noPage: Object.keys(intent.components).filter((n) => !matched.has(n)),
+      noPage: pagesToWrite(Object.keys(intent.components), (n) => matched.has(n), codeFilesOf(ROOT, cfg)),
       // The pages that say something the system contradicts, and what: the lines left out above.
       wrong: IL.entities.map((e) => ({ name: e.name, file: e.file, findings: wrongOf(e).length })).filter((x) => x.findings),
     };

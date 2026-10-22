@@ -3001,6 +3001,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
     // system has instead, with where that comes from.
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
+    // What the agents read from it, word for word, by kind: the one place to see what reaches them.
+    var IL_READ = [['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
+    var ilReads = function (p) { var r = p.reads || {}; return IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<p class="sg-il-line"><strong>' + esc(k[1]) + '</strong></p>' + r[k[0]].map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join(''); };
     // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
     var ilDrafts = function (p) { return (p.drafts || []).map(function (d) { return '<p class="sg-il-line"><strong>Draft</strong> · ' + esc(d.where) + '<span class="pg-par-val">' + esc(d.text) + '</span></p>'; }).join(''); };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
@@ -3017,8 +3020,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
     var ilCellsOf = function (p) {
       if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">No file</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
-        updated: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
-      return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
+        updated: '', reads: '', todo: '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>', why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
+      return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
@@ -3028,7 +3031,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('Why', c.why) + card('What the agents get', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      var body = card('Decision', '<p>' + c.decision + '</p>') + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer', labelOf(p.missingFor ? 'missing' : p.action)], title: p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
@@ -3047,15 +3050,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilXlsx = function () {
       // The table's columns (its open arrow left out), then what to do, why and what the agents get, which the table leaves
       // to the side panel.
-      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Why', 'What the agents get']);
+      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Why', 'What the agents read', 'Where it goes']);
       var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = (k === 'why' && !rows[i].missingFor ? ilDrafts(rows[i]) : '') + ilCellsOf(rows[i])[k]; return ilCells(d); };
-      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
+      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'reads'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
       var x = function (v) { return String(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
       var col = function (i) { return String.fromCharCode(65 + i); };
       var cell = function (r, i, text, style) { return '<c r="' + col(i) + r + '" t="inlineStr" s="' + style + '"><is><t xml:space="preserve">' + x(text) + '</t></is></c>'; };
       var links = [], rowsXml = ['<row r="1">' + head.map(function (h, i) { return cell(1, i, h, 1); }).join('') + '</row>'];
       body.forEach(function (cells, n) { var r = n + 2; rowsXml.push('<row r="' + r + '">' + cells.map(function (c, i) { if (c.url) links.push({ ref: col(i) + r, url: c.url }); return cell(r, i, c.text, c.url ? 2 : 0); }).join('') + '</row>'); });
-      var widths = [12, 36, 26, 20, 60, 50, 42], last = col(head.length - 1) + (body.length + 1);
+      var widths = [12, 36, 26, 20, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
       var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:' + last + '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + head.map(function (h, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (widths[i] || 30) + '" customWidth="1"/>'; }).join('') + '</cols><sheetData>' + rowsXml.join('') + '</sheetData><autoFilter ref="A1:' + last + '"/>' + (links.length ? '<hyperlinks>' + links.map(function (l, i) { return '<hyperlink ref="' + l.ref + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</hyperlinks>' : '') + '</worksheet>';
       var rel = function (rels) { return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>'; };
       var files = [

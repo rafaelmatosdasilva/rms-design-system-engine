@@ -728,8 +728,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const wrongOf = truth.checkedLayer(ROOT, cfg, snap);
         const report = il.useReport(snap, il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg)), { names, codeExists: (f) => existsSync(resolve(ROOT, f)), from, wrongOf });
         const src = snap._source ?? {};
-        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages,
-          noPage: names.filter((n) => !report.pages.some((p) => p.component === n)) };
+        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: report.actions, actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
+          noPage: il.pagesToWrite(names, (n) => report.pages.some((p) => p.component === n), il.codeFilesOf(ROOT, cfg)) };
       }
     } catch { /* no intent layer */ }
     // For agents: what an agent can take from the team's guidance for each component, its guidelines section and
