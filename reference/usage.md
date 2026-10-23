@@ -104,6 +104,13 @@ rms-design-system-engine --review-drafts                 # every draft in the in
 rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
+rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, style guide, decisions) and what this person may do there, as GitLab answers
+rms-design-system-engine --store <part>.read=<link|folder> [--store <part>.write=<link|folder|nowhere>] [--store <part>.read.path=<folder in it>]   # name where a part lives (ds-config.json → stores); never whether this person may write it
+rms-design-system-engine --profile <link|file>           # set up from the company's profile (or take its new version): the shared setup and the stores, nothing asked; kept in ds-config.json and read again each run
+rms-design-system-engine --profile-new [file] [--name <company>]     # ask where each part lives (a terminal; else --store), then write this setup as the company's profile
+rms-design-system-engine --profile-export [file] [--name <company>]  # write this setup as the company's profile as it is: no token, nothing one person set for themself
+rms-design-system-engine --make-command <client> --profile <link> [--dir <folder>]   # write the command the team installs, /rms-design-system-engine-<client>: the engine with that profile
+rms-design-system-engine --refresh-snapshots             # send the snapshots this folder holds to the snapshots store, when GitLab lets this person write it
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
@@ -344,6 +351,8 @@ contradicts written again, what a page lacks drafted. A drafted line keeps its `
 team's review (the page's Review decision); what needs a person and no draft can settle (a name nothing in the system
 confirms, a page to add, move or delete) is never touched and stays on the Intent layer page. The run says what it did
 in one line, with the commit's link and `CHANGES.md`. The layer is read again at once, so the guide shows it as it is.
+It commits only when GitLab lets the write token push to the layer's branch (see Where each part lives); a protected
+branch or a read-only token skips it with one line, and `--intent-changes --merge-request` sends the fixes for review.
 When drafts cannot be written this run (the `claude` command not signed in), the mechanical changes are still made and
 the requests are written as `--intent-changes` writes them. It takes the person's word once, by turning it on; turn it
 off with `--intent-autofix off`.
@@ -885,6 +894,51 @@ as they are CSS. Type a component's props with it (`const check: ChipFigmaProps 
 it as the props type) and `tsc` shows prop drift in the editor and in CI. `contracts/` stays local, so set
 `contracts.propTypesOut` to a committed path when CI should check it.
 
+#### Where each part lives: stores and a company's profile (`--store`, `--profile`)
+
+A team keeps each part of the engine's own files where it chose: the Figma and code snapshots, the intent layer, the
+contracts, the style guide and its decisions (answers to proposals, kept and accepted differences, checks made by
+hand), each in a GitLab project (a folder in it, a branch of it) or a folder (`stores.mjs`). `ds-config.json → stores`
+names the place of each; the configuration reference has the format. Each run reads the snapshots and the decisions
+from their stores when the store's commit moved, never over a file changed on this computer since it was last read
+(that one is kept, and said). The contracts (`--contracts-out` with no folder), the style guide
+(`--publish-styleguide`), the decisions (after `--intent-decide`, `--keep`, `--checked`), the snapshots
+(`--refresh-snapshots`) and the intent layer (`--intent-changes --commit`, `--review-drafts --commit`, the fixes made on
+each run) are written to theirs. A store brings into the project only its own kind of file (a snapshots store only
+`*.snapshot.json`), never a `.env` or a hook.
+
+**Who may write is GitLab's answer, never the setup's.** Before the first write to a place in a run the engine asks
+GitLab, with the token that would write: the token's role in the project (Developer or more writes), whether it may
+push to the branch (a protected branch it may not push takes a merge request instead), and a commit with nothing in it,
+which a token that may write sees refused as empty (400) and a read-only token as forbidden (403), since a
+fine-grained token cannot be asked for its scopes. Nothing is written by that. When GitLab says no, nothing is sent and
+one line says why and who can grant it; the run goes on. A write is refused when the branch moved since the run read
+the store, so nothing written meanwhile is overwritten. The engine runs on each person's computer and could be edited:
+GitLab's roles, protected branches and per-project tokens are the lock, and they stay one even if it is bypassed.
+
+**Tokens stay in each person's `.env`.** A place may name its own variable (`tokenEnv`, one token per project, the
+least each needs); else `GITLAB_TOKEN` reads and `GITLAB_WRITE_TOKEN` writes. A token goes only to gitlab.com or a host
+named in `GITLAB_HOST`.
+
+**A company's profile** (`profile.mjs`): the shared setup (`config`: the Figma file, the paths, everything but what one
+person sets for themself), where the code is (`project`), and the stores, in one JSON
+(`design-system-engine-profile.json`) its maintainers keep in a private repository everyone can read and only they can
+change. `--profile-new` asks where each part lives (in a terminal; else takes `--store`) and writes it from this
+setup; `--profile-export` writes it as it is. Neither ever writes a token or a personal key (`intentLayer.autoFix`,
+`intentLayer.draftModel`, `codeRoots`, `pluginDirs`, `codeReading.hookBrowser`, `webhook`, `hooks`,
+`styleguide.modules`), and nothing named like a secret. `--profile <link or file>` writes it into this folder's
+`ds-config.json`: its shared keys and stores win, what the person set for themself stays, keys it does not name stay,
+and `profile` remembers where it came from. Each later run reads it again (with the person's own `GITLAB_TOKEN`) and
+takes a new version when its maintainers changed it; `--offline` keeps the one there. Setup by a profile asks nothing:
+the run says what GitLab lets this person do with each part.
+
+**The company's command**: `--make-command <client> --profile <link>` writes
+`~/.claude/skills/rms-design-system-engine-<client>/SKILL.md` (or into `--dir`, to share it in the company's private
+repository): the engine run with that profile. Each colleague installs the engine and that command, puts their own
+tokens in `.env`, and runs `/rms-design-system-engine-<client>`: nothing else to set up, and a location changed in the
+profile reaches everyone on their next run. One profile and one command per client, side by side; none of it is ever
+in the engine.
+
 #### Publishing the contracts to a shared repository (`--contracts-out <dir>`)
 
 The local `contracts/` stay local. To give a team one shared contract per component (beside its intent layer, say),
@@ -894,7 +948,9 @@ configuration reference), `contract.schema.json`, and a generated `README.md` (w
 comes from, coverage counts, and the Figma components with no file of their own). No token values, catalog,
 `llms.txt` or `.gitignore`; no copy of the intent layer's text (`intentPage` links to the page). A contract the code
 no longer has is removed. The same inputs give the same files, so an unchanged system gives no diff. The engine never
-commits or pushes: review the diff, commit it on a branch, and open a merge request. The published contracts are
+commits or pushes a folder it was given: review the diff, commit it on a branch, and open a merge request. With no
+folder, the contracts store gets them (`stores.contracts`), as one commit or a merge request when GitLab lets this person
+write it (see Where each part lives). The published contracts are
 generated: changes go into the code, Figma or `contract.authored.json`, never into the files.
 
 Each published contract carries, beside the Figma half: `bindings.code` per property (the code prop or slot, who

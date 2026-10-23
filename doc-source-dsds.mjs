@@ -49,11 +49,15 @@ const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // ── Config ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 // → { url, entry, out } | null
+// The layer's place may come from ds-config.json → stores.intentLayer (a company's profile, stores.mjs) instead; its
+// other settings (entry, out, contracts) stay in intentLayer.
 export function intentLayerConfig(cfg) {
   const raw = cfg?.intentLayer;
-  if (!raw) return null;
-  const o = typeof raw === 'string' ? { gitlab: raw } : raw;
-  const url = String(o.gitlab ?? o.url ?? '').trim();
+  const st = cfg?.stores?.intentLayer, read = st && typeof st === 'object' && 'read' in st ? st.read : st;
+  const storeUrl = typeof read === 'string' ? read : read?.gitlab ? `${String(read.gitlab).replace(/\/+$/, '')}${read.branch ? `/-/tree/${read.branch}` : ''}` : null;
+  if ((!raw && !storeUrl) || (st && typeof st === 'object' && 'read' in st && st.read == null)) return null;   // read nowhere: no layer
+  const o = typeof raw === 'string' ? { gitlab: raw } : (raw ?? {});
+  const url = String(storeUrl ?? o.gitlab ?? o.url ?? '').trim();
   if (!url) return null;
   return { url, entry: o.entry ? String(o.entry).replace(/^\/+/, '') : null, out: o.out || DEFAULT_OUT, contracts: o.contracts ? String(o.contracts).replace(/^\/+|\/+$/g, '') : null };
 }

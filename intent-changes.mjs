@@ -463,6 +463,17 @@ export async function commitToBranch(access, { files, sha, target, message }) {
 // The layer as last read, checked, its changes planned, drafted (answers given, else the claude command; when neither
 // can, the requests are written for whoever runs the engine) and made in its files. → { snap, access, result, summary,
 // note, plan } or { error }. Nothing is sent.
+// May this person send changes to the layer, as a commit on its branch or a merge request? GitLab answers, from the
+// write token's role in the layer and whether it may push to the branch (stores.mjs → writeAccess); what the setup or
+// the person says is never enough. → { ok } | { ok: false, why, mergeRequest? (a merge request would be accepted) }
+export async function mayWrite(ROOT, cfg, want = 'commit', opts = {}) {
+  const { writeAccess } = await import('./stores.mjs');
+  const a = await writeAccess(ROOT, cfg, 'intentLayer', opts);
+  if (!a.mode) return { ok: false, why: a.why };
+  if (want === 'commit' && a.mode === 'merge-request' && a.why) return { ok: false, why: a.why, mergeRequest: true };
+  return { ok: true };
+}
+
 export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null, model } = {}) {
   const il = await import('./intent-layer.mjs');
   const truth = await import('./intent-truth.mjs');
@@ -512,6 +523,8 @@ export async function autoFix(ROOT, cfg, { offline = false } = {}) {
   if (mode !== 'commit' || offline || fixedThisRun) return null;
   fixedThisRun = true;
   try {
+    const may = await mayWrite(ROOT, cfg, 'commit');
+    if (!may.ok) return `ℹ️  Intent layer not fixed this run: ${may.why}${may.mergeRequest ? ' (--intent-changes --merge-request sends the fixes for review)' : ''}.`;
     const p = await prepareLayerFix(ROOT, cfg);
     if (p.error) return `⚠️  Intent layer not fixed this run: ${p.error}`;
     if (!p.result.files.size) return p.note ? `🔧 Intent layer: nothing to fix that needs no drafting. ${p.note}` : null;

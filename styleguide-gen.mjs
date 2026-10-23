@@ -686,7 +686,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const PRODUCT_MISUSE = /hand-built|look-?alike|Nested components keep|Templates compose/i;
       const seenIn = (c) => (c.differences ?? []).filter((d) => PRODUCT_MISUSE.test(d.check ?? '') || / laid over it /.test(d.what ?? '')).map((d) => d.plain ?? d.what);
       const ilNow = designIntent().components ?? {};
-      const hasLayer = !!cfg.intentLayer;
+      const hasLayer = !!(cfg.intentLayer || cfg.stores?.intentLayer);
       // What of its notes (Figma's annotations, the code's notes) no agent is given, with why, what to do and whether to
       // remove it: the same choice the prototype context makes (prototype-context.mjs → notesOf).
       const { notesOf, intentText } = await import('./prototype-context.mjs');
