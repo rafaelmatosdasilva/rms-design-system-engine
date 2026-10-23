@@ -87,7 +87,8 @@ export async function readProfile(source, { from = process.cwd(), env = process.
   } catch (e) { return { error: e.code === 'ENOENT' ? `no file at ${src}` : e.message }; }
   let profile;
   try { profile = validate(JSON.parse(text)); } catch (e) { return { error: e instanceof SyntaxError ? `${src} is not JSON: ${e.message}` : e.message }; }
-  return { profile, source: src, sha: hashOf(text) };
+  // A file is remembered by its full path: later runs start in the code's folder, not where it was given.
+  return { profile, source: /^https?:\/\//i.test(src) ? src : resolve(from, src.replace(/^~(?=\/|$)/, homedir())), sha: hashOf(text) };
 }
 
 // The profile written into a person's ds-config.json: its shared keys and stores win, what the person set for themself
