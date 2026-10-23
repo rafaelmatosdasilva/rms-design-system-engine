@@ -436,7 +436,8 @@ if (process.argv.includes('--profile-new') || process.argv.includes('--profile-e
   const dest = resolve(PROJECT_FROM, out ?? pf.PROFILE_FILE);
   writeFileSync(dest, JSON.stringify(prof, null, 2) + '\n');
   console.log(`✅ Profile written: ${dest}`);
-  console.log(`   ${Object.keys(prof.stores ?? {}).length} part${Object.keys(prof.stores ?? {}).length === 1 ? '' : 's'} with a store; no token and nothing one person set for themself.`);
+  const placed = Object.entries(st.storesOf({ ...prof.config, stores: prof.stores })).filter(([, v]) => v.read || v.write).map(([k]) => st.LABEL[k].toLowerCase());
+  console.log(`   ${placed.length ? `Where it says each part lives: ${placed.join(', ')}` : 'No part has a place of its own: each stays in the folder it is used in'}; no token and nothing one person set for themself.`);
   console.log('   Before sharing it, in GitLab: protect the default branch of each store, give Developer only to the people who write it, and let only maintainers change the repository the profile is kept in. The engine stays inside what GitLab allows; GitLab is the lock.');
   console.log(`NEXT: the person commits it to a private repository of the company everyone can read; then rms-design-system-engine --make-command <client> --profile <its link>.`);
   process.exit(0);
