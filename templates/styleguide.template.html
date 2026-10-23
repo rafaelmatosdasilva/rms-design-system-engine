@@ -7454,9 +7454,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var iT = card('Code Implementation', codeP, 'Found', figmaRows.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'), figmaRows.length ? Math.floor(countOf(codeP, 'Found') / figmaRows.length * 100) : null, 'built');
     var aT = card('Accessibility', accP, 'Pass', accRows.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'To review', 'AccessibilityReview'), pctOf(accRows, 'acc'), 'passed');
     var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'), pctOf(docRows, 'doc'), 'written');
+    // The big number says how much is done, so no line under it repeats a count; the legend says the done state in the
+    // big number's word (131 built, 3 matched), the rest in the table's.
+    [[pT, 'Match'], [iT, 'Found'], [aT, 'Pass'], [dT, 'Ready']].forEach(function (c) {
+      if (c[0].total) c[0].of = '';
+      c[0].parts.forEach(function (x) { if (x.word === c[1]) x.say = x.n + ' ' + c[0].pctWord; });
+    });
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    var PCT = function (what) { return ' The percentage: of every ' + what + ', how many are done; under it, the components with all of theirs done.'; };
+    var PCT = function (what) { return ' The percentage: of every ' + what + ', how many are done; the legend counts the components, each in its state.'; };
     pT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation); one with nothing to compare is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.' + PCT('prop, token and value compared');
     // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
     // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.

@@ -1409,22 +1409,23 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
-    // The big number is the share of checks done; under it, the components with all of theirs done.
-    assert.match(tiles[0][1], /^\d+%matched\|\d+ of \d+ components fully matched$/, 'parity: the share matched, then the components that fully match');
+    // The big number is the share of checks done, no line under it; the legend counts the components, the done state
+    // in the big number's word.
+    assert.match(tiles[0][1], /^\d+%matched\|$/, 'parity: the share matched, nothing under it');
     // Implementation counts over Figma's components; Parity, Accessibility and Documentation only over what the code has
     // built (one not built yet is the Implementation card's to say), and never say "not in the code yet".
-    const totals = tiles.map((x) => +/of (\d+)/.exec(x[1])[1]), found = +/\|(\d+) of/.exec(tiles[1][1])[1];
+    const totals = tiles.map((x) => [...x[2].matchAll(/(\d+) /g)].reduce((t, m) => t + +m[1], 0)), found = +/(\d+) built/.exec(tiles[1][2])[1];
     for (const k of [0, 2, 3]) assert.equal(totals[k], found, `${tiles[k][0]} counts the components the code has`);
     for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what implementation says');
-    assert.match(tiles[1][1], /^\d+%built\|\d+ of \d+ components found in code$/, 'the components the code has, of every component Figma has');
+    assert.match(tiles[1][1], /^\d+%built\|$/, 'the share of Figma\'s components the code has, no line repeating the legend');
     assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(found / totals[1] * 100), 'implementation\'s share is its count over its total');
-    assert.match(tiles[1][2], /2 found/, 'the table\'s own words: Found, Unsure, Missing');
-    assert.match(tiles[2][1], /^(\d+%passed|–)\|\d+ of \d+ components that pass$/);
+    assert.match(tiles[1][2], /2 built/, 'Found said as built, as the big number says it');
+    assert.match(tiles[2][1], /^(\d+%passed|–)\|$/);
     // Each card counts what its column's filter counts: every row whose state there applies, of the components the code
     // has built.
-    assert.match(tiles[3][1], /^\d+%written\|\d+ of \d+ components fully documented$/);
-    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = +/of (\\d+)/.exec(tile.textContent)[1]; const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent) && tr.dataset.stCode !== 'Missing'); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has that the code has built');
-    assert.match(tiles[3][2], /\d+ (ready|partial|missing)/, 'the Documentation column\'s states: Ready, Partial, Missing');
+    assert.match(tiles[3][1], /^\d+%written\|$/);
+    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = [...tile.querySelector('.sg-health-legend').textContent.matchAll(/(\\d+) /g)].reduce((t, m) => t + +m[1], 0); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent) && tr.dataset.stCode !== 'Missing'); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has that the code has built');
+    assert.match(tiles[3][2], /\d+ (written|partial|missing)/, 'the Documentation column\'s states: Ready (said written), Partial, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
