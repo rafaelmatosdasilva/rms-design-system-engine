@@ -105,9 +105,9 @@ rms-design-system-engine --review-drafts <file>          # a person's review of 
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
 rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, style guide, decisions) and what this person may do there, as GitLab answers
-rms-design-system-engine --store <part>.read=<link|folder> [--store <part>.write=<link|folder|nowhere>] [--store <part>.read.path=<folder in it>]   # name where a part lives (ds-config.json → stores); never whether this person may write it
+rms-design-system-engine --store <part>=<link|folder|nowhere> [--store <part>.path=<folder in it>] [--store <part>.branch=<branch>]   # name where a part lives (ds-config.json → stores); who may change it is GitLab's answer, never asked
 rms-design-system-engine --profile <link|file>           # set up from the company's profile (or take its new version): the shared setup and the stores, nothing asked; kept in ds-config.json and read again each run
-rms-design-system-engine --profile-new [file] [--name <company>]     # ask where each part lives (a terminal; else --store), then write this setup as the company's profile
+rms-design-system-engine --profile-new [file] [--name <company>]     # ask where each part lives, one question a part (a terminal; else --store), then write this setup as the company's profile
 rms-design-system-engine --profile-export [file] [--name <company>]  # write this setup as the company's profile as it is: no token, nothing one person set for themself
 rms-design-system-engine --make-command <client> --profile <link> [--dir <folder>]   # write the command the team installs, /rms-design-system-engine-<client>: the engine with that profile
 rms-design-system-engine --refresh-snapshots             # send the snapshots this folder holds to the snapshots store, when GitLab lets this person write it
@@ -923,8 +923,9 @@ named in `GITLAB_HOST`.
 **A company's profile** (`profile.mjs`): the shared setup (`config`: the Figma file, the paths, everything but what one
 person sets for themself), where the code is (`project`), and the stores, in one JSON
 (`design-system-engine-profile.json`) its maintainers keep in a private repository everyone can read and only they can
-change. `--profile-new` asks where each part lives (in a terminal; else takes `--store`) and writes it from this
-setup; `--profile-export` writes it as it is. Neither ever writes a token or a personal key (`intentLayer.autoFix`,
+change. `--profile-new` asks one thing a part, where it lives (a GitLab link with the folder and branch in it, a
+folder, or nowhere; in a terminal, else it takes `--store <part>=<place>`), never who may read or write it, and writes
+it from this setup; `--profile-export` writes it as it is. Neither ever writes a token or a personal key (`intentLayer.autoFix`,
 `intentLayer.draftModel`, `codeRoots`, `pluginDirs`, `codeReading.hookBrowser`, `webhook`, `hooks`,
 `styleguide.modules`), and nothing named like a secret. `--profile <link or file>` writes it into this folder's
 `ds-config.json`: its shared keys and stores win, what the person set for themself stays, keys it does not name stay,

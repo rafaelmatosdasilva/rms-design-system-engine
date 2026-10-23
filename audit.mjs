@@ -369,14 +369,18 @@ function applyStoreFlags(scfg, raw, file, st) {
   scfg.stores = scfg.stores ?? {};
   for (const s of sets) {
     const [lhs, ...rest] = s.split('='); const v = rest.join('=').trim();
-    const [part, side, key] = lhs.trim().split('.');
-    if (!st.PARTS.includes(part) || !['read', 'write', 'mode'].includes(side) || (side === 'mode' && key)) { console.log(`❌ --store ${s}: say <part>.read=, <part>.write= or <part>.mode= (parts: ${st.PARTS.join(', ')})`); process.exit(2); }
+    // <part>=<place> and <part>.path=… say where the part lives (read there, written there); .read and .write stay for
+    // the rare part read in one place and written in another.
+    let [part, side, key] = lhs.trim().split('.');
+    if (!side) side = 'read';
+    else if (['path', 'branch', 'tokenEnv', 'writeTokenEnv'].includes(side)) { key = side; side = 'read'; }
+    if (!st.PARTS.includes(part) || !['read', 'write', 'mode'].includes(side) || (side === 'mode' && key)) { console.log(`❌ --store ${s}: say <part>=<link, folder or nowhere>, then <part>.path= or <part>.branch= (parts: ${st.PARTS.join(', ')})`); process.exit(2); }
     const was = scfg.stores[part];
     const e = scfg.stores[part] = was && typeof was === 'object' && ('read' in was || 'write' in was || 'mode' in was) ? was : (was ? { read: was } : {});
     if (side === 'mode') { if (!['commit', 'merge-request'].includes(v)) { console.log('❌ <part>.mode is commit or merge-request'); process.exit(2); } e.mode = v; continue; }
-    if (!key) { e[side] = /^(nowhere|none|null)$/i.test(v) ? null : /^https?:\/\//i.test(v) ? { gitlab: v } : { folder: v }; continue; }
+    if (!key) { const none = /^(nowhere|none|null)$/i.test(v); e[side] = none ? null : /^https?:\/\//i.test(v) ? { gitlab: v } : { folder: v }; if (none && side === 'read' && !lhs.includes('.')) e.write = null; continue; }
     if (!['path', 'branch', 'tokenEnv', 'writeTokenEnv'].includes(key)) { console.log(`❌ --store ${s}: a place takes path, branch or tokenEnv`); process.exit(2); }
-    if (!e[side] || typeof e[side] !== 'object') { console.log(`❌ --store ${s}: say ${part}.${side}=<link or folder> first`); process.exit(2); }
+    if (!e[side] || typeof e[side] !== 'object') { console.log(`❌ --store ${s}: say ${part}=<link or folder> first`); process.exit(2); }
     e[side][key] = v;
   }
   const indent = /\n(\t+)"/.exec(raw)?.[1]?.slice(0, 1) ?? ' '.repeat((/\n( +)"/.exec(raw)?.[1] ?? '  ').length);
@@ -389,7 +393,7 @@ if ((process.argv.includes('--store') || process.argv.includes('--stores')) && !
   let raw, scfg; try { raw = readFileSync(file, 'utf8'); scfg = JSON.parse(raw); } catch { console.error('❌ ds-config.json not found at project root: set the project up first (rms-design-system-engine --init, or --profile <the company\'s profile>).'); process.exit(1); }
   const st = await import('./stores.mjs');
   applyStoreFlags(scfg, raw, file, st);
-  console.log('Where each part lives, and what this person may do there (for a GitLab project, as GitLab answers):');
+  console.log('Where each part lives, and whether this person may change it there (GitLab\'s answer):');
   const lines = await st.accessLines(ROOT, scfg, { offline: process.argv.includes('--offline') });
   console.log(lines.length ? lines.join('\n') : '   No part has a store: everything stays in this folder.');
   console.log('NEXT: tell the person the lines above; a part they cannot write is written by whoever GitLab lets.');
@@ -409,26 +413,28 @@ if (process.argv.includes('--profile-new') || process.argv.includes('--profile-e
   if (asking && process.stdin.isTTY && !_argValues('--store').length) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const q = (t) => new Promise((ok) => rl.question(t, (a) => ok(a.trim())));
-    console.log('Where each part lives, for everyone who uses this profile. A GitLab link, a folder, or "nowhere". Whether each person may write it is GitLab\'s answer, never asked here.\n');
+    // One question a part: where it lives. Who may change it is GitLab's answer (its roles and protected branches), so
+    // nothing about reading or writing is asked: a change goes there as a commit, or a merge request where the branch
+    // is protected.
+    console.log('Where each part lives, for everyone who uses this profile: a GitLab link, a folder, or "nowhere" (Enter keeps what is there). Who may change it is set in GitLab.\n');
     scfg.stores = scfg.stores ?? {};
     const now = st.storesOf(scfg);
     for (const part of st.PARTS) {
-      const was = now[part];
-      const r = await q(`${st.LABEL[part]}: read from${was.read ? ` [${st.describePlace(was.read)}]` : ''}? `);
-      const read = !r ? (scfg.stores[part]?.read ?? null) : /^nowhere$/i.test(r) ? null : /^https?:\/\//i.test(r) ? { gitlab: r } : { folder: r };
-      const w = await q(`${st.LABEL[part]}: written to (Enter: the same place)? `);
-      const write = !w ? read : /^nowhere$/i.test(w) ? null : /^https?:\/\//i.test(w) ? { gitlab: w } : { folder: w };
-      if (read?.gitlab) { const sub = await q('  The folder inside it (Enter: its root)? '); if (sub) read.path = sub; const br = await q('  The branch (Enter: its default)? '); if (br) read.branch = br; }
-      if (!read && !write) { delete scfg.stores[part]; continue; }
-      scfg.stores[part] = { read, ...(write === read ? {} : { write }) };
-      if (write?.gitlab) { const m = await q('  Sent as a commit or a merge request (Enter: commit)? '); if (/merge/i.test(m)) scfg.stores[part].mode = 'merge-request'; }
+      const was = now[part].read ?? now[part].write;
+      const r = await q(`${st.LABEL[part]}: where does it live?${was ? ` [${st.describePlace(was)}]` : ''} `);
+      if (!r) continue;
+      if (/^nowhere$/i.test(r)) { scfg.stores[part] = { read: null, write: null }; continue; }
+      const place = /^https?:\/\//i.test(r) ? { gitlab: r } : { folder: r };
+      const sub = await q('  The folder inside it (Enter: its root)? '); if (sub) place.path = sub;
+      if (place.gitlab) { const br = await q('  The branch (Enter: its default)? '); if (br) place.branch = br; }
+      scfg.stores[part] = { read: place };
     }
     rl.close();
     const indent = /\n(\t+)"/.exec(raw)?.[1]?.slice(0, 1) ?? ' '.repeat((/\n( +)"/.exec(raw)?.[1] ?? '  ').length);
     writeFileSync(file, JSON.stringify(scfg, null, indent) + '\n');
   } else if (asking && _argValues('--store').length) applyStoreFlags(scfg, raw, file, st);
   else if (asking && !scfg.stores) {
-    console.log('Say where each part lives with --store (no terminal to ask in): --profile-new --store snapshots.read=<link> --store intentLayer.read=<link> …');
+    console.log('Say where each part lives with --store (no terminal to ask in): --profile-new --store snapshots=<link> --store intentLayer=<link> …');
     process.exit(2);
   }
   const project = GITLAB_SOURCE ? `${(() => { try { return JSON.parse(readFileSync(join(ROOT, '.gitlab-source.json'), 'utf8')).source; } catch { return null; } })()}` : null;

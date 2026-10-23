@@ -165,6 +165,6 @@ test('a folder store: read and written on this computer; the lines say what each
   assert.equal(sent.ok, true);
   assert.equal(readFileSync(join(shared, 'team', 'design-system-engine-kept.json'), 'utf8'), '[{"reason":"brand"}]');
   const lines = (await accessLines(ROOT, cfg, { env, offline: true })).join('\n');
-  assert.match(lines, /Snapshots: reads design\/snapshots; read only: this setup reads snapshots from design\/snapshots and writes it nowhere/);
-  assert.match(lines, /Style guide: reads nothing; writes the folder/);
+  assert.match(lines, /Snapshots: lives in design\/snapshots; you can only read it: this setup reads snapshots from design\/snapshots and writes it nowhere/);
+  assert.match(lines, /Style guide: lives in the folder .*site; you can change it/);
 });

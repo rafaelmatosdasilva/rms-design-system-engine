@@ -351,11 +351,12 @@ export async function accessLines(ROOT, cfg, opts = {}) {
     const { read, write } = s[part];
     if (!read && !write) continue;
     const a = await writeAccess(ROOT, cfg, part, opts);
-    const r = read ? `reads ${describePlace(read)}` : 'reads nothing';
-    const w = a.mode === 'commit' ? `writes ${describePlace(a.place)} (a commit on ${a.branch})`
-      : a.mode === 'merge-request' ? `writes ${describePlace(a.place)} as a merge request into ${a.branch}`
-        : a.mode === 'folder' ? `writes ${describePlace(a.place)}` : `read only: ${a.why}`;
-    out.push(`   ${LABEL[part]}: ${r}; ${w}`);
+    const same = read && write && keyOf(read) === keyOf(write);
+    const where = same || !write ? `lives in ${describePlace(read)}` : read ? `read from ${describePlace(read)}, written to ${describePlace(write)}` : `lives in ${describePlace(write)}`;
+    const may = a.mode === 'commit' ? `you can change it (a commit on ${a.branch})`
+      : a.mode === 'merge-request' ? `you can change it through a merge request into ${a.branch}`
+        : a.mode === 'folder' ? 'you can change it' : `you can only read it: ${a.why}`;
+    out.push(`   ${LABEL[part]}: ${where}; ${may}`);
   }
   return out;
 }
