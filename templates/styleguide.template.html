@@ -3139,20 +3139,23 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+    // When a row with no file of its own (the Tokens, a component with no page or no intent layer) was last checked: its
+    // documentation's latest check, else the build's.
+    var docAt = function (p) { var at = null, c = !p.tokens && docComp(p); if (c) try { docIssueRows(c).forEach(function (r) { if (r.at && (!at || r.at > at)) at = r.at; }); } catch (e) { /* none */ } at = at || DATA.builtAt; return at ? esc(ilWhen(at)) : ''; };
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
-        return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: '', reads: '',
+        return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
           left: tm.length ? '<p class="sg-il-line"><strong>Their descriptions</strong><span class="pg-par-val">Write it in Figma, in each variable\'s description: what the token is for. Agents read it, through tokens.json, to pick the right token.</span></p><p class="sg-il-line">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join(', ') + '</p>' : '',
           todo: tm.length ? '<p class="sg-il-line"><strong>Describe ' + tm.length + ' of the ' + tn + ' tokens the components use, in Figma.</strong></p>' : '',
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
-        updated: '', reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
-      if (p.noLayer) return { decision: decisionCell('keep', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: '' };
+        updated: docAt(p), reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
+      if (p.noLayer) return { decision: decisionCell('keep', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
       return { decision: decisionCell(p.action, p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
