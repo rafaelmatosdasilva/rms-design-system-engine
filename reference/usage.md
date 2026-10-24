@@ -931,7 +931,8 @@ each run) are written to theirs. A store brings into the project only its own ki
 `*.snapshot.json`), never a `.env` or a hook.
 
 **The team's themes** (`stores.themes`, often a `themes` folder in the style guide's own repository): the themes a
-style guide module lets people make (one folder a system, `<system>/<name>.theme.json`). Each run reads them into the
+style guide module lets people make: one system's themes, flat (`<name>.theme.json` in the folder its `path` names; a
+store several systems share points `path` at the system's own folder). Each run reads them into the
 engine's own folder (`.design-system-engine-out/themes`), never the project's, and the style guide shows them in its
 Theme choice, with the themes in the person's own module data folder beside them (the store's when both have one).
 Each style guide build sends the themes this person keeps (their module data folder, or saved beside the page) that the store lacks, or holds an older version of, when GitLab lets them write it: a theme made reaches everyone with no step of its own, and a newer one a colleague sent is never replaced. `--share-theme <file>` sends one by hand.

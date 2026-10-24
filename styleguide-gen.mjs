@@ -1470,7 +1470,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const dataDir = join(entry && typeof entry === 'object' && entry.data ? home(entry.data) : join(dir, 'data'), sys);
     // The team's themes store (stores.themes), read into the engine's own folder on each run, comes first; the person's
     // own folder adds what it lacks. A theme is one by its id, else by its file name.
-    const dirs = [...(storesOf(cfg).themes?.read ? [join(ROOT, THEMES_DIR, sys)] : []), dataDir];
+    const dirs = [...(storesOf(cfg).themes?.read ? [join(ROOT, THEMES_DIR)] : []), dataDir];
     const readDir = (d) => { try { return readdirSync(d).filter((f) => /\.json$/i.test(f)).sort().map((f) => { try { return { file: f, ...JSON.parse(readFileSync(join(d, f), 'utf8')) }; } catch { return null; } }).filter(Boolean); } catch { return []; } };
     const data = [], seen = new Set();
     for (const d of dirs) for (const x of readDir(d)) { const k = x.id ? `id:${x.id}` : `file:${x.file}`; if (!seen.has(k)) { seen.add(k); data.push(x); } }

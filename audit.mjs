@@ -494,7 +494,7 @@ if (process.argv.includes('--share-theme')) {
   for (const f of given) {
     let t; try { t = JSON.parse(readFileSync(resolve(f), 'utf8')); } catch (e) { console.log(`❌ ${f}: not a theme file (${e.message.split('\n')[0]})`); process.exit(2); }
     if (!t || !t.id || !t.name) { console.log(`❌ ${f}: a theme file has an id and a name`); process.exit(2); }
-    files.set(`${sys}/${basename(f)}`, Buffer.from(JSON.stringify(t, null, 2) + '\n'));
+    files.set(basename(f), Buffer.from(JSON.stringify(t, null, 2) + '\n'));
   }
   const r = await st.pushStore(ROOT, tcfg, 'themes', files, `Theme${files.size === 1 ? '' : 's'} shared with the design-system engine: ${[...files.keys()].map((k) => k.split('/').pop()).join(', ')}`, { offline: STORE_OFFLINE });
   console.log(r.line);

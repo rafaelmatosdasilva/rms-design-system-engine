@@ -28,7 +28,8 @@ import { tokenAllowedFor } from './gitlab-fetch.mjs';
 export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'styleguide', 'decisions', 'themes'];
 export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
 export const STATE = `${OUT_DIR}/stores.json`;
-// The team's themes (a style guide module's data, one folder a system: <system>/<name>.theme.json), read into the
+// The team's themes (a style guide module's data: one system's themes, flat, <name>.theme.json in the folder the place's
+// path names; a store several systems share points its path at the system's own folder), read into the
 // engine's own folder, never the project's: the build reads them there with the person's own (styleguide-gen.mjs).
 export const THEMES_DIR = `${OUT_DIR}/themes`;
 // The team's decisions: the files people write by deciding (answers to proposals, kept and accepted differences,
@@ -40,7 +41,7 @@ const TAKES = {
   decisions: (rel) => DECISION_FILES.includes(rel),
   contracts: (rel) => /\.(json|md)$/i.test(rel),
   styleguide: (rel) => /\.(html|css|js|mjs|svg|png|jpe?g|webp|gif|woff2?|json|txt)$/i.test(rel),
-  themes: (rel) => /^[\w.-]+\/[^/]+\.json$/i.test(rel),
+  themes: (rel) => /^[^/]+\.json$/i.test(rel),
 };
 const ROLE = { 0: 'no access', 5: 'Minimal access', 10: 'Guest', 15: 'Planner', 20: 'Reporter', 30: 'Developer', 40: 'Maintainer', 50: 'Owner' };
 const roleOf = (n) => ROLE[n] ?? `access level ${n}`;
@@ -204,17 +205,17 @@ export function localFiles(ROOT, cfg, part, { intentOut } = {}) {
 // The files of a folder the engine built (the contracts, the style guide), by the part's own kinds. → Map(rel → Buffer)
 // The themes on this computer that the team's store lacks, or holds an older version of (by the theme's changed date):
 // what a style guide build sends, so a theme someone makes reaches everyone with no step of its own. A newer one a
-// colleague sent is never replaced. dirs: the folders this person keeps theme files in. → Map(<system>/<file> → Buffer)
+// colleague sent is never replaced. dirs: the folders this person keeps theme files in. → Map(<file> → Buffer)
 export function themesToShare(ROOT, dirs, sys) {
   const read = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
   const list = (d) => { try { return readdirSync(d).filter((f) => /\.json$/i.test(f)).sort(); } catch { return []; } };
-  const theirs = new Map(), storeDir = join(ROOT, THEMES_DIR, sys);
+  const theirs = new Map(), storeDir = join(ROOT, THEMES_DIR);
   for (const f of list(storeDir)) { const t = read(join(storeDir, f)); if (t?.id) theirs.set(t.id, String(t.changed ?? '')); }
   const out = new Map();
   for (const d of dirs) for (const f of list(d)) {
     const t = read(join(d, f));
     if (!t?.id || !t.name || (theirs.has(t.id) && !(String(t.changed ?? '') > theirs.get(t.id)))) continue;
-    out.set(`${sys}/${f}`, Buffer.from(JSON.stringify(t, null, 2) + '\n')); theirs.set(t.id, String(t.changed ?? ''));
+    out.set(f, Buffer.from(JSON.stringify(t, null, 2) + '\n')); theirs.set(t.id, String(t.changed ?? ''));
   }
   return out;
 }
