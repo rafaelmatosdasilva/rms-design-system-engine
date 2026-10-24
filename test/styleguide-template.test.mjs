@@ -635,14 +635,14 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(await rowOf('1.3.3'), /^done\|.*Checked by QA on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
     assert.match(await rowOf('3.3.7'), /^check\|.*Checked by QA on 2026-09-01, before chip changed\..*Once someone has checked it, record it as checked and this row reads Done\./s);
     assert.match(await rowOf('1.4.5'), /^check\|.*Once someone has checked it, record it as checked and this row reads Done\./s);
-    // No Documentation page of its own: what is written lives on the Status page (#status/documentation), and an old link
-    // to Documentation or Coverage opens it there, sorted by Documentation, the address saying so; one to the To do page
-    // (its old name) opens Status.
-    assert.equal(await run(`!!document.getElementById('documentation') || !!document.querySelector('nav a[href="#documentation"]')`), false);
-    for (const old of ['#documentation', '#coverage']) {
+    // A system with no intent layer has a Documentation page too: one row a component, from Figma and the code, the File
+    // column left out, a note no agent reads flagged Remove; an old link to Coverage, For agents or the Intent layer opens it.
+    assert.equal(await run(`!!document.getElementById('documentation') && !!document.querySelector('nav a[href="#documentation"]') && !document.getElementById('for-agents')`), true);
+    assert.equal(await run(`[...document.querySelectorAll('#documentation thead th')].some((t) => t.textContent.trim() === 'File')`), false, 'no File column without an intent layer');
+    assert.ok(await run(`document.querySelectorAll('#documentation tbody tr').length`) > 1, 'one row a component');
+    for (const old of ['#coverage', '#for-agents', '#intent-layer']) {
       await run(`location.hash = '${old}'`); await new Promise((r) => setTimeout(r, 200));
-      assert.equal(await run(`location.hash`), '#status/documentation', `an old ${old} link`);
-      assert.equal(await run(`document.querySelector('#status .sg-matrix th[data-sort="Documentation"]').getAttribute('aria-sort')`), 'descending');
+      assert.equal(await run(`location.hash`), '#documentation', `an old ${old} link`);
     }
     await run(`location.hash = '#todo/accessibility'`); await new Promise((r) => setTimeout(r, 200));
     assert.equal(await run(`location.hash`), '#status/accessibility', 'an old #todo link');
