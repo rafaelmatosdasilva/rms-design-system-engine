@@ -133,5 +133,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-24-each-style-guide-build-sends` | The 21 guide tasks on Haiku (engine 4713436) | "Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced" |
 | `2026-10-24-merge-remote-tracking-branch-origin-3` | The 21 guide tasks on Haiku (engine 75c8ac8) | "Merge remote-tracking branch 'origin/main' into styleguide-themes-store" |
 | `2026-10-24-merge-remote-tracking-branch-origin-4` | The 21 guide tasks on Haiku (engine 88b78a0) | "Merge remote-tracking branch 'origin/main' into gitlab-path-resolve" |
+| `2026-10-24-intent-layer-drafts-sent-in` | The 21 guide tasks on Haiku (engine 92415e4) | "Intent layer drafts sent in parts (GitLab closes a request too large), each on the one before; a role written "Role: …" after the written sections, as a spec checked for its order wants; a section with a draft waiting counts as Review, not Missing; one status a row on the Documentation page; markup is no name the check calls unknown" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

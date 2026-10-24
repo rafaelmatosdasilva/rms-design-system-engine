@@ -1618,8 +1618,7 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 .sg-il-lead { margin: 0; padding: var(--sg-space-s) var(--sg-cell-x); color: var(--sg-muted); font-size: var(--sg-s); border-bottom: var(--sg-line); }
 .sg-il td { vertical-align: top; }
 .sg-il-partof { margin-right: var(--sg-space-s); }   /* "Part of" and the component's chip, apart */
-.sg-il-status { display: block; }   /* Review and Missing, each with what it means under it, one under the other */
-.sg-il-status + .sg-il-status { margin-top: var(--sg-space-s); }
+.sg-il-status { display: block; }   /* its one status, with what it means under it */
 /* Balanced at every width: the file (its name and path) takes what the others leave. */
 .sg-issues.sg-il th:nth-child(1) { width: 22%; }      /* For: a component's name or a layer */
 .sg-issues.sg-il th:nth-child(3) { width: 16%; }      /* Sources: Intent layer, Figma, Code */
@@ -3072,7 +3071,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var docLeft = function (p) {
       if (p._left) return p._left;
       var c = docComp(p), out = [];
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents') out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      // A part with a draft waiting on its page is the draft's to review, never also missing.
+      var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
@@ -3113,9 +3114,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No intent page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
     // A page with nothing left to do reads Done here (the intent layer's own decision for it is Keep).
     var labelOf = function (k) { if (k === 'keep') return 'Done'; if (IL_TOPIC[k]) return IL_TOPIC[k]; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
-    // Review (yellow) with what to decide under it, Missing (red) with where to write it, or Keep: each status apart.
+    // One status a row: Review (yellow) when a person decides or checks anything, with what under it (and, when there is
+    // also something to write, where); else Missing (red), with where to write it; else Done.
     var statusPill = function (cls, word, under) { return '<span class="sg-il-status"><span class="pg-par-status pg-par--' + cls + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(word) + '</span>' + (under ? '<span class="pg-par-val">' + esc(under) + '</span>' : '') + '</span>'; };
-    var decisionCell = function (k, p) { return isKeep(p) ? statusPill(IL_DOT.keep, labelOf('keep')) : (needsReview(p) ? statusPill('figma', 'Review', reviewTopic(p)) : '') + (needsWrite(p) ? statusPill('differs', 'Missing', docTopic(p)) : '') + (needsRemove(p) ? statusPill('differs', 'Remove', removeTopic(p)) : ''); };
+    // One status a row: Review, else Missing, else Remove, else Done; what else the row has is said under it.
+    var statusOf = function (p) { return isKeep(p) ? 'keep' : needsReview(p) ? 'review' : needsWrite(p) ? 'write' : 'remove'; };
+    // A row with notes no agent reads says Remove under its status, and is found by the Remove chip whatever its status.
+    var removeUnder = function (p) { return needsRemove(p) ? ['Remove ' + removeTopic(p)] : []; };
+    var decisionCell = function (k, p) { var st = statusOf(p); return st === 'keep' ? statusPill(IL_DOT.keep, labelOf('keep'))
+      : st === 'review' ? statusPill('figma', 'Review', [reviewTopic(p)].concat(needsWrite(p) ? ['Missing ' + docTopic(p).charAt(0).toLowerCase() + docTopic(p).slice(1)] : [], removeUnder(p)).join(' · '))
+      : st === 'write' ? statusPill('differs', 'Missing', [docTopic(p)].concat(removeUnder(p)).join(' · ')) : statusPill('differs', 'Remove', removeTopic(p)); };
     // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
@@ -3133,17 +3141,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [needsReview(p) ? 'toReview' : '', needsWrite(p) ? 'toWrite' : '', needsRemove(p) ? 'toRemove' : ''].filter(Boolean).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Still to write', c.left) + card('To remove', c.remove) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(needsReview(p) ? ['Review', reviewTopic(p)] : needsWrite(p) ? ['Missing'] : needsRemove(p) ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || 'Page', body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
-    var counts = { keep: rows.filter(isKeep).length, write: rows.filter(needsWrite).length, remove: rows.filter(needsRemove).length };
+    var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
     pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(needsReview).length;
       return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
     // The review, downloaded: for Excel (a workbook with the table's own columns and rows) and for Claude (Markdown: what the
@@ -3260,7 +3268,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var out = [];
     ilTexts(c).forEach(function (x) {
       if (/^do'?s?\s*(and|&)\s*don'?t'?s?$/i.test(x.title.trim())) out = out.concat(x.text.split(/\n+/).map(function (t) { return t.replace(/^\s*[-*]\s*/, '').trim(); }).filter(Boolean));
-      else if (/^\s*(do|don'?t|do not)\s*:/i.test(x.text)) out.push(x.text.trim());
+      else { var t = x.text.replace(/^\s*do'?s?\s*(and|&)\s*don'?t'?s?\s*:\s*/i, ''); if (/^\s*(do|don'?t|do not)\s*:/i.test(t)) out.push(t.trim()); }   // a section the reader made a rule of: "Do and don't: Do: …"
     });
     return out;
   };

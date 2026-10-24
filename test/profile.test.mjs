@@ -48,7 +48,7 @@ test('read from a file or a GitLab link (with the person\'s own token); a file t
   writeFileSync(join(d, PROFILE_FILE), JSON.stringify({ profile: 1, name: 'Acme', config: {} }));
   writeFileSync(join(d, 'other.json'), '{"name":"x"}');
   assert.equal((await readProfile(PROFILE_FILE, { from: d })).profile.name, 'Acme');
-  assert.match((await readProfile('other.json', { from: d })).error, /not a design-system engine profile/);
+  assert.match((await readProfile('other.json', { from: d })).error, /not an rms-design-system-engine profile/);
   assert.match((await readProfile('../nope.json', { from: d })).error, /no file at/);
   const seen = [];
   const http = { get: async (url, { headers }) => { seen.push([url, headers['PRIVATE-TOKEN']]); const ok = url.includes('/repository/files/setup%2Fprofile.json/raw?ref=main'); const b = Buffer.from(JSON.stringify({ profile: 1, name: 'Acme' })); return { ok, status: ok ? 200 : 404, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; } };
