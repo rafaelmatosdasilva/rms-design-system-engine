@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Merge remote-tracking branch 'origin/main' into docs-fold-for-agents (continuous evaluation)
+
+What changed since the entry below (engine 92415e4): Identity in dark mode: the personality's dark reading drawn on top, in the words' colour, dashed with hollow points (the key says when both read the same); the icon's construction line and turns cut into the stroke in the card's colour, so both read on any brand, light or dark; Documentation page for every system (one row a component when there is no intent layer, no File column), and a note no agent reads flagged Remove on its component's row, its chip, panel and downloads; the For agents page is gone, its link opens Documentation. The guide changed in `cookbook/guidelines-links.md`, `reference/usage.md`.
+
+Guide set measured: `71ac898f2809` · Project measured: `13d811a9d668`
+
+| Haiku, engine 6bfa0b9 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.057 | $0.062 |
+| Input a run | 106k | 127k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 127k a run against 106k. Records: `records/2026-10-24-merge-remote-tracking-branch-origin-5`.
+
 ## 2026-10: Intent layer drafts sent in parts (GitLab closes a request too large), each on the one before; a role written "Role: …" after the written sections, as a spec checked for its order wants; a section with a draft waiting counts as Review, not Missing; one status a row on the Documentation page; markup is no name the check calls unknown (continuous evaluation)
 
 What changed since the entry below (engine 88b78a0): The project found from a link gives its default branch, so a read asks it no second time: the intent layer's first read is three calls again, a read of the same commit one; Intent layer drafts: what a component page lacks is written too: its role (from the element its code renders) and an example (its tag and its own props) as the team's, its common mistakes, limitations and do and don't as drafts to review; the drafts' answers kept so a commit sends what was read; the engine named rms-design-system-engine in what it writes; Intent layer drafts sent in parts (GitLab closes a request too large), each on the one before; a role written "Role: …" after the written sections, as a spec checked for its order wants; a section with a draft waiting counts as Review, not Missing; one status a row on the Documentation page; markup is no name the check calls unknown.
