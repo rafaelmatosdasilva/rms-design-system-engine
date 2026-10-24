@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Merge remote-tracking branch 'origin/main' into styleguide-themes-store (continuous evaluation)
+
+What changed since the entry below (engine 7f33bfa): The team's themes in a store of their own (stores.themes, often a themes folder in the style guide's repository): read on each run into the engine's folder, shown in the Theme choice with each person's own; --share-theme sends a saved theme there when GitLab lets the person write it; Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced; Profile: a part this engine does not know yet is left unused and named, never a refusal of the whole profile; A profile run from inside the code's GitLab copy uses that copy where it is, with the .env of the folder that holds it, never a copy inside itself; A themes store holds one system's themes, flat, in the folder its path names; a store several systems share points its path at the system's own folder. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `a5fec4a0fa81` · Project measured: `13d811a9d668`
+
+| Haiku, engine 75c8ac8 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.064 | $0.059 |
+| Input a run | 137k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 137k. Records: `records/2026-10-24-merge-remote-tracking-branch-origin-3`.
+
 ## 2026-10: Merge remote-tracking branch 'origin/main' into kept-differences (continuous evaluation)
 
 What changed since the entry below (engine f69e3e0): Kept differences, a part of their own and a rule agents follow: each contract lists its component's (the side that is right, why), the prototype context says them, and a team keeps them with its intent layer; Guidelines link not read: the NEXT line says the person makes the fix, a token by their hand in .env, never asked for in the chat; Status cards: the bar half as far under the big number, a word wrapped under it keeping its room. The guide changed in `reference/config.md`, `reference/usage.md`.
