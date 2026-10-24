@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Prototype catalog: what the request needs, the code's own props, and where a component goes (continuous evaluation)
+
+What changed since the entry below (engine 6bfa0b9): Documentation page with no intent layer: each component's panel shows what the agents read, its own documentation grouped by where each piece is written, each under its kind; the panel is titled with the component; Documentation page with no intent layer: each row leaves out the File cell its header has not, so Sources, Status and Last updated sit under their own headings; Documentation page with no intent layer: each row has the header's columns again (no stray File cell), and every row says when it was last updated (its documentation's latest check); Intent layer reader: a line already led by its section's title ("Role: button" under Role) keeps the title once, and a drafted line in a prose section stays a draft instead of a rule with the title before its marker; READER 12; Status cards: 4px less between the legend's items (20px on an 8px system); Prototype catalog: what the request needs, the code's own props, and where a component goes. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `210347352e6f` · Project measured: `13d811a9d668`
+
+| Haiku, engine 8f07cf3 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.061 |
+| Input a run | 127k | 120k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 127k. Records: `records/2026-10-24-prototype-catalog-what-the-request`.
+
 ## 2026-10: Merge remote-tracking branch 'origin/main' into docs-fold-for-agents (continuous evaluation)
 
 What changed since the entry below (engine 92415e4): Identity in dark mode: the personality's dark reading drawn on top, in the words' colour, dashed with hollow points (the key says when both read the same); the icon's construction line and turns cut into the stroke in the card's colour, so both read on any brand, light or dark; Documentation page for every system (one row a component when there is no intent layer, no File column), and a note no agent reads flagged Remove on its component's row, its chip, panel and downloads; the For agents page is gone, its link opens Documentation. The guide changed in `cookbook/guidelines-links.md`, `reference/usage.md`.
