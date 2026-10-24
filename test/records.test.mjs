@@ -18,7 +18,7 @@ test('a record keeps the run as scored, without private tasks, installed package
   assert.match(r.files['big.css'], /more characters left out of the record\)$/);
 });
 
-test('every record in the repository: no private task, no installed package, and its README names it', () => {
+test('every record in the repository: no private task, no installed package, and its README names it', async () => {
   if (!existsSync(RECORDS)) return;
   const readme = readFileSync(join(RECORDS, 'README.md'), 'utf8');
   for (const dir of readdirSync(RECORDS).filter((f) => statSync(join(RECORDS, f)).isDirectory())) {
@@ -30,7 +30,7 @@ test('every record in the repository: no private task, no installed package, and
         assert.ok(!Object.keys(row.files ?? {}).some((p) => /node_modules\//.test(p)), `${f}: an installed package`);
       }
     }
-    assert.match(summarize(readFolder(join(RECORDS, dir))), /\| Side \| Pass \|/);
+    assert.match(await summarize(readFolder(join(RECORDS, dir))), /\| Side \| Pass \|/);
   }
 });
 

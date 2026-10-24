@@ -16,7 +16,7 @@ import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, ENGINE, DEMO } from './lib.mjs';
+import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, ENGINE, DEMO, cliOf, cliChange, cliLine } from './lib.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { HELDOUT } from './heldout.mjs';
@@ -88,7 +88,7 @@ async function one({ t, run }) {
   try { taskChecks = error ? [{ name: 'the run finished', ok: false, detail: error }] : await t.score(ctx); }
   catch (e) { taskChecks = [{ name: 'the scorer ran', ok: false, detail: e.message }]; }
   const rules = globalChecks(ctx, t);
-  const row = { ...meta, task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, at: new Date().toISOString() };
+  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, at: new Date().toISOString() };
   writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   appendFileSync(resultsFile(t), JSON.stringify(row) + '\n');
   cleanup(dir, home);
@@ -109,6 +109,14 @@ await Promise.all(Array.from({ length: Math.max(1, JOBS) }, async () => {
 }));
 const cost = rows.reduce((k, r) => k + r.usage.cost, 0);
 console.log(`\n${rows.filter((r) => r.pass).length}/${rows.length} passed · $${cost.toFixed(2)}`);
+// The agent's bundled skills, against the last recorded evaluation's: a new command line is said, never read as the guide.
+try {
+  const { readFolder } = await import('./summarize.mjs');
+  const prev = /Records: `records\/([^`]+)`/.exec(readFileSync(join(HERE, 'RESULTS.md'), 'utf8'))?.[1];
+  const before = prev && existsSync(join(HERE, 'records', prev)) ? readFolder(join(HERE, 'records', prev)).flatMap((x) => x.rows) : [];
+  const said = cliLine(cliChange(rows, before));
+  if (said) console.log(`⚠️  ${said}`);
+} catch { /* no record to compare with */ }
 const left = jobs.length - rows.length;
 // A run with no login never gets one by waiting: stop, so continuous.mjs does not wait out a usage limit that is not there.
 if (refused && /not logged in/i.test(refused)) { console.log('✗ a run is not logged in: its fresh HOME holds no login (macOS keeps it in the keychain). Run `claude setup-token` and set CLAUDE_CODE_OAUTH_TOKEN, or ANTHROPIC_API_KEY.'); process.exit(2); }

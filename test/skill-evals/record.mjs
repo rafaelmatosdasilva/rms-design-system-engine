@@ -64,12 +64,13 @@ export function runStats(rows = []) {
 }
 
 // The RESULTS.md entry for one recorded evaluation. `now` and `before` are { model: runStats } (before may be empty).
-export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', guideSet, now, before = {}, name, date = new Date().toISOString().slice(0, 7) }) {
+export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', guideSet, now, before = {}, name, cli = '', date = new Date().toISOString().slice(0, 7) }) {
   const k = (x) => `${Math.round(x / 1000)}k`, usd = (x) => `$${x.toFixed(3)}`;
   const out = [`## ${date}: ${title} (continuous evaluation)`, ''];
   out.push(`What changed since the entry below${prevEngine ? ` (engine ${prevEngine})` : ''}: ${what}${/[.!?]$/.test(what) ? '' : '.'}${guideFiles.length ? ` The guide changed in ${guideFiles.map((f) => `\`${f}\``).join(', ')}.` : ''}`, '');
   const project = Object.values(now)[0]?.project ?? '';
   out.push(`Guide set measured: \`${guideSet}\` · Project measured: \`${project}\``, '');
+  if (cli) out.push(`**The agent's command line changed.** ${cli.charAt(0).toUpperCase()}${cli.slice(1)}`, '');
   const reading = [];
   for (const [model, s] of Object.entries(now)) {
     const b = before[model];
@@ -129,7 +130,11 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
     const guideFiles = sh(['diff', '--name-only', ...range.split('..'), '--', ...GUIDE_PATHS], ENGINE).split('\n').filter(Boolean);
     const title = opt('title') ?? sh(['log', '-1', '--format=%s', engines[0]], ENGINE);
     const what = opt('what') ?? subjects.join('; ');
-    const entry = resultsEntry({ title, what, guideFiles, prevEngine, guideSet: guideSetHash(ENGINE), now, before, name });
+    // The agent's bundled skills against the entry before's: a new command line is said in the entry, apart from the guide.
+    const { cliChange, cliLine } = await import('./lib.mjs');
+    const rowsOf = (dir) => (dir && existsSync(dir) ? readFolder(dir).filter((x) => x.set === 'guide').flatMap((x) => x.rows) : []);
+    const cli = cliLine(cliChange(rowsOf(join(HERE, 'records', name)), rowsOf(prevName && join(HERE, 'records', prevName))));
+    const entry = resultsEntry({ title, what, guideFiles, prevEngine, guideSet: guideSetHash(ENGINE), now, before, name, cli });
     const at = results.indexOf('\n## ');
     writeFileSync(join(HERE, 'RESULTS.md'), at < 0 ? `${results.trimEnd()}\n\n${entry}` : `${results.slice(0, at + 1)}${entry}\n${results.slice(at + 1)}`);
     const readmePath = join(HERE, 'records', 'README.md');

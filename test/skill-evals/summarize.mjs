@@ -35,7 +35,7 @@ export function sideStats(s) {
   };
 }
 
-export function summarize(sides) {
+export async function summarize(sides) {
   const out = [];
   for (const set of [...new Set(sides.map((s) => s.set))]) {
     const group = sides.filter((s) => s.set === set).sort((a, b) => a.model.localeCompare(b.model) || (a.variant === 'mcp' ? -1 : 1));
@@ -47,6 +47,12 @@ export function summarize(sides) {
     const fails = new Map();
     for (const s of group) for (const r of s.rows) for (const c of [...(r.checks ?? []), ...(r.rules ?? [])]) if (!c.ok) { const k = `${sideStats(s).side}: ${c.name}`; fails.set(k, (fails.get(k) ?? 0) + 1); }
     if (fails.size) { out.push('', 'Checks that failed most:', ''); for (const [k, n] of [...fails].sort((a, b) => b[1] - a[1]).slice(0, 12)) out.push(`- ${k} (${n})`); }
+    // The same request, the same page: across the sessions that drew it, which components, spacing and text styles
+    // every one used, side by side.
+    if (set === 'prototype') {
+      const { consistencyLines } = await import('./proto-tasks.mjs');
+      for (const s of group) { const lines = consistencyLines(s.rows); if (lines.length) out.push('', `The same request, the same page (${sideStats(s).side}):`, '', ...lines); }
+    }
     out.push('');
   }
   return out.join('\n');
@@ -55,5 +61,5 @@ export function summarize(sides) {
 if (process.argv[1] && process.argv[1].endsWith('summarize.mjs')) {
   const dir = process.argv[2];
   if (!dir || !existsSync(dir)) { console.log('Usage: node test/skill-evals/summarize.mjs <folder of result files>'); process.exit(2); }
-  process.stdout.write(summarize(readFolder(dir)) + '\n');
+  process.stdout.write(await summarize(readFolder(dir)) + '\n');
 }
