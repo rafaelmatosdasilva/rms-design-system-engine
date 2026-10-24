@@ -693,7 +693,7 @@ test('a state set on an earlier part is set there: the checkbox input is ticked,
   const { optionEffect } = await import('../styleguide-data.mjs');
   assert.deepEqual(optionEffect('.checkbox', '.checkbox-input:checked + .checkbox-box'), { add: [], attrs: { checked: '' }, target: '.checkbox-input' });
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
-  assert.match(tpl, /if \(!effect\.target && e\.querySelector\('\.' \+ k\)\) return;/);
+  assert.match(tpl, /if \(!effect\.target && e\.querySelector\(clsSel\(k\)\)\) return;/);
 });
 
 test('choosing the option already set does nothing, and a slot is documented with how Figma lets it be filled', () => {
@@ -709,7 +709,8 @@ test('choosing the option already set does nothing, and a slot is documented wit
 test('using the component in the playground sets its props: a box ticked, a switch flipped, a value typed', () => {
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('function effectHolds'), tpl.indexOf('function partsOf'));
-  const effectHolds = new Function(src + 'return effectHolds;')();
+  const clsSel = /function clsSel\(cls\) \{[^\n]*\}/.exec(tpl)[0];
+  const effectHolds = new Function('window', clsSel + src + 'return effectHolds;')({});
   const el = (cls = [], props = {}, attrs = {}) => ({ classList: { contains: (k) => cls.includes(k) }, getAttribute: (a) => attrs[a] ?? null, matches: () => false, querySelector: () => null, ...props });
   const input = el([], { checked: true });
   const root = { ...el(['switch']), querySelector: (s) => (s === '.switch-input' ? input : s === '.switch-track' ? {} : null) };
