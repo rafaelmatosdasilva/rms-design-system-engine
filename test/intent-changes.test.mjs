@@ -104,13 +104,14 @@ test('the plan: repeated lines out, a wrong sentence written again (checked), a 
   assert.equal(plan.length, 1);
   assert.deepEqual(plan[0].remove, ['The task maps to `tileOne` in the manifest.']);
   assert.equal(plan[0].rewrite[0].line, 'Set `tone="bright"` for alerts.');
-  assert.deepEqual(plan[0].need, ['whenNotToUse', { differ: 'tileTwo' }]);
+  assert.deepEqual(plan[0].need, ['whenNotToUse', 'mistakes', 'limitations', 'example', 'role', 'doDont', { differ: 'tileTwo' }]);
   // The drafter answers; what names nothing the system has is kept, the rest dropped.
   const asked = [];
   draftPlan(plan, facts, (prompt) => { asked.push(prompt); return JSON.stringify({ '0.r0': { text: 'Set `tone="loud"` for alerts.' }, '0.d': { whenToUse: ['Use it rather than `tileTwo` for one subject.'], whenNotToUse: ['For two subjects use `tileTwo`.', 'Not with `glowMode`.'] } }); });
   assert.match(asked[0], /"task": "rewrite"/);
   assert.deepEqual(plan[0].rewritten, [{ line: 'Set `tone="bright"` for alerts.', text: 'Set `tone="loud"` for alerts.' }]);
-  assert.deepEqual(plan[0].drafted.map((d) => d.text), ['Use it rather than `tileTwo` for one subject.', 'For two subjects use `tileTwo`.']);
+  assert.deepEqual(plan[0].drafted.filter((d) => !d.sure).map((d) => d.text), ['Use it rather than `tileTwo` for one subject.', 'For two subjects use `tileTwo`.']);
+  assert.deepEqual(plan[0].drafted.filter((d) => d.sure).map((d) => d.text), ['`<TileOne tone="calm" />`'], 'an example from its own props, its root unknown so no role');
   assert.equal(plan[0].dropped[0].text, 'Not with `glowMode`.');
   const spec = '# Tile One\n\n- Source: `src/tiles/TileOne.vue`\n\n## When to use\n\n- Set `tone="bright"` for alerts.\n- The task maps to `tileOne` in the manifest.\n';
   const page = JSON.stringify({ kind: 'component', id: 'component-tile-one', name: 'Tile One', sections: [{ kind: 'guidelines', title: 'When to use', items: [{ level: 'should', statement: 'Set `tone="bright"` for alerts.' }, { level: 'should', statement: 'The task maps to `tileOne` in the manifest.' }] }] }, null, 2) + '\n';
@@ -121,7 +122,7 @@ test('the plan: repeated lines out, a wrong sentence written again (checked), a 
   assert.ok(!md.includes('maps to'));
   assert.match(md, /## When not to use\n\n- \*\*Draft:\*\* For two subjects use `tileTwo`\./);
   const json = JSON.parse(r.files.get('specs/dsds/tile-one.dsds.json'));
-  assert.deepEqual(json.sections.map((s) => s.title), ['When to use', 'When not to use']);
+  assert.deepEqual(json.sections.map((s) => s.title), ['When to use', 'When not to use', 'Example']);
   assert.match(describeChanges(r), /1 sentence the system contradicts written again as drafts/);
   // From a family's spec, the same page takes the line out but no draft of its own.
   const fam = applyPlan(plan, new Map([['specs/tiles.md', '# Tiles\n\n- Source: `src/tiles/`\n\n## When to use\n\n- The task maps to `tileOne` in the manifest.\n']]));
@@ -196,4 +197,23 @@ test('each run fixes the layer only where intentLayer.autoFix is "commit", never
   assert.equal(readFileSync(join(root, 'ds-config.json'), 'utf8'), '{\n    "name": "Acme",\n    "intentLayer": {\n        "gitlab": "https://gitlab.acme.test/ux/layer",\n        "autoFix": "commit"\n    }\n}\n');
   assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'off'], { cwd: root, encoding: 'utf8' }).status, 0);
   assert.equal(JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8')).intentLayer, 'https://gitlab.acme.test/ux/layer');
+});
+
+test('what else a component page lacks: its role and an example written from the code as the team\'s; mistakes, limitations, do and don\'t drafted for review', () => {
+  const facts = factsFrom({ components: { chipOne: { file: 'src/chips/ChipOne.vue', root: 'button', props: { size: { options: ['s', 'm'] } } } } });
+  const e = { kind: 'component', layer: 'components', name: 'Chip One', id: 'component-chip-one', file: 'specs/dsds/chip-one.dsds.json', code: 'src/chips/ChipOne.vue', purpose: ['A chip for one choice.'], whenToUse: ['Use it for one choice.'], whenNotToUse: ['Not for navigation.'], mistakes: [], limitations: [], rules: [], sections: [] };
+  const snap = { _source: {}, entities: [e] };
+  const report = useReport(snap, new Map([['chipOne', e]]), { names: ['chipOne'], wrongOf: () => [] });
+  const plan = planOf(snap, report);
+  assert.deepEqual(plan[0].need, ['mistakes', 'limitations', 'example', 'role', 'doDont']);
+  const asked = [];
+  draftPlan(plan, facts, (prompt) => { asked.push(prompt); return JSON.stringify({ '0.d': { mistakes: ['Using `chipOne` for a list of links; use a link instead.'], limitations: ['It takes one choice only.'], example: 'never asked', doDont: ['Do: keep its label short.', "Don't: put two chips' choices in one."] } }); });
+  assert.match(asked[0], /"need": \[\s*"mistakes",\s*"limitations",\s*"doDont"\s*\]/, 'its role and an example are never asked');
+  assert.deepEqual(plan[0].drafted.map((d) => `${d.sure ? 'sure ' : ''}${d.where}: ${d.text}`), ['sure Role: button', 'sure Example: `<ChipOne size="s" />`', 'Common mistakes: Using `chipOne` for a list of links; use a link instead.', 'Limitations: It takes one choice only.', "Do and don't: Do: keep its label short.", "Do and don't: Don't: put two chips' choices in one."]);
+  const md = applyPlan(plan, new Map([['specs/chip-one.md', '# Chip One\n\n- Source: `src/chips/ChipOne.vue`\n\n## Purpose\n\nA chip for one choice.\n']])).files.get('specs/chip-one.md');
+  assert.match(md, /## Role\n\n- button\n/, 'from the code: no Draft marker');
+  assert.match(md, /## Example\n\n- `<ChipOne size="s" \/>`/);
+  assert.match(md, /## Limitations\n\n- \*\*Draft:\*\* It takes one choice only\./, 'judged: a Draft');
+  assert.match(md, /## Do and don't\n\n- \*\*Draft:\*\* Do: keep its label short\./);
+  assert.ok(md.indexOf('## Role') < md.indexOf('## Common mistakes') && md.indexOf('## Common mistakes') < md.indexOf('## Example'), 'each part in its place');
 });

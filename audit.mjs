@@ -91,7 +91,7 @@ async function sendDecisions(part = 'decisions') {
   let c; try { c = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { return null; }
   const st = await import('./stores.mjs');
   if (!st.storesOf(c)[part].write) return null;
-  const r = await st.pushStore(ROOT, c, part, st.localFiles(ROOT, c, part), part === 'kept' ? 'Differences kept on purpose, recorded with the design-system engine' : 'Design-system decisions, recorded with the design-system engine', { offline: STORE_OFFLINE });
+  const r = await st.pushStore(ROOT, c, part, st.localFiles(ROOT, c, part), part === 'kept' ? 'Differences kept on purpose, recorded with rms-design-system-engine' : 'Design-system decisions, recorded with rms-design-system-engine', { offline: STORE_OFFLINE });
   console.log(r.line);
   return r.ok;
 }
@@ -475,7 +475,7 @@ if (process.argv.includes('--refresh-snapshots')) {
   if (!st.storesOf(scfg).snapshots.write) { console.log('ℹ️  No snapshots store: the snapshots stay in this folder (ds-config.json → stores.snapshots names one).'); console.log('NEXT: none'); process.exit(0); }
   const { intentLayerConfig } = await import('./doc-source-dsds.mjs');
   const files = st.localFiles(ROOT, scfg, 'snapshots', { intentOut: intentLayerConfig(scfg)?.out });
-  const r = await st.pushStore(ROOT, scfg, 'snapshots', files, `Snapshots refreshed with the design-system engine (${files.size} file${files.size === 1 ? '' : 's'})`, { offline: STORE_OFFLINE });
+  const r = await st.pushStore(ROOT, scfg, 'snapshots', files, `Snapshots refreshed with rms-design-system-engine (${files.size} file${files.size === 1 ? '' : 's'})`, { offline: STORE_OFFLINE });
   console.log(r.line);
   console.log(r.ok ? 'NEXT: everyone\'s next run reads them.' : 'NEXT: tell the person the line above; the snapshots stay in this folder.');
   process.exit(r.ok ? 0 : 1);
@@ -571,11 +571,17 @@ if (process.argv.includes('--intent-changes')) {
   const from = process.argv.indexOf('--drafts-from'), at = process.argv.indexOf('--model');
   let answers = null;
   if (from > 0) { try { answers = JSON.parse(readFileSync(resolve(process.argv[from + 1]), 'utf8')); } catch (e) { console.log(`❌ ${process.argv[from + 1]}: ${e.message}`); process.exit(2); } }
+  // Sending what was read before (--commit, --merge-request): the drafts that run made, never new ones, while the layer is
+  // still at the commit they were made on.
+  if (!answers && (process.argv.includes('--commit') || process.argv.includes('--merge-request'))) {
+    try { const k = JSON.parse(readFileSync(resolve(ROOT, OUT_DIR, 'intent-changes', 'answers.json'), 'utf8')); if (k.sha === snap._source.sha && k.answers) { answers = k.answers; console.log('   The drafts from the last --intent-changes, as they were read.'); } } catch { /* none kept */ }
+  }
   const prep = await ch.prepareLayerFix(ROOT, pcfg, { drafts: !process.argv.includes('--no-drafts'), answers, model: at > 0 ? process.argv[at + 1] : undefined });
   if (prep.error) { console.log(`❌ ${prep.error}`); process.exit(2); }
   const { access, result, summary, note } = prep;
   if (!summary) { console.log(`✅ Nothing in the intent layer the engine can fix.${note ? `\n   ${note}` : ''}`); console.log('NEXT: none'); process.exit(0); }
   const dir = ch.writeLocal(ROOT, result.files, summary);
+  if (Object.keys(prep.answers ?? {}).length) writeFileSync(join(dir, 'answers.json'), JSON.stringify({ sha: snap._source.sha, answers: prep.answers }, null, 1) + '\n');
   console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each change)${note ? `\n   ${note}` : ''}${result.held.length ? `\n   ${result.held.length} page${result.held.length === 1 ? '' : 's'} not changed: ${result.held.map((h) => h.name).join(', ')} (CHANGES.md says why)` : ''}`);
   if (!result.files.size) { console.log('NEXT: none'); process.exit(0); }
   // --commit: one commit straight on the layer's branch (only while it is still where it was read); --merge-request: one
@@ -585,7 +591,7 @@ if (process.argv.includes('--intent-changes')) {
     const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message: 'Intent layer review: ' + summary.split('\n')[0] + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
-    console.log('NEXT: the Intent layer page lists each draft under Review until its marker is removed.');
+    console.log('NEXT: the Documentation page lists each draft under Review until its marker is removed.');
     process.exit(0);
   }
   if (!process.argv.includes('--merge-request')) { console.log('NEXT: read the changes; to send them to the layer: rms-design-system-engine --intent-changes --commit (straight on its branch) or --merge-request (for the team to review), only when the person asks'); process.exit(0); }
@@ -593,11 +599,11 @@ if (process.argv.includes('--intent-changes')) {
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
   const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/intent-review-${stamp}`,
     title: 'Intent layer review: lines written on every page, sentences the system contradicts, drafts to review',
-    description: summary + '\n\nMade by the design-system engine from its Intent layer review. Nothing marked **Draft:** reaches an agent until a person removes the marker.',
+    description: summary + '\n\nMade by rms-design-system-engine from its review of the intent layer. Nothing marked **Draft:** reaches an agent until a person removes the marker.',
     message: 'Intent layer review: repeated lines taken out, contradicted sentences written again as drafts\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
   if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
   console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
-  console.log('NEXT: the team reviews and merges it; then the Intent layer page lists each draft under Review until its marker is removed.');
+  console.log('NEXT: the team reviews and merges it; then the Documentation page lists each draft under Review until its marker is removed.');
   process.exit(0);
 }
 
@@ -676,7 +682,7 @@ if (process.argv.includes('--contracts-out')) {
   if (!dir) { console.log('Give the folder: rms-design-system-engine --contracts-out <dir>  (for example <intent layer clone>/specs/contracts), or name the contracts store (--store contracts.write=<link or folder>)'); process.exit(2); }
   const { generateContracts } = await import('./contract-gen.mjs');
   const r = await generateContracts(ROOT, pcfg, { publishTo: dir, force: true });
-  if (toStore && !cstore.folder && !r.invalid.length) { const sent = await st.pushStore(ROOT, pcfg, 'contracts', st.folderFiles(dir, 'contracts'), `Contracts published with the design-system engine (${r.components.length})`, { offline: STORE_OFFLINE }); console.log(sent.line); }
+  if (toStore && !cstore.folder && !r.invalid.length) { const sent = await st.pushStore(ROOT, pcfg, 'contracts', st.folderFiles(dir, 'contracts'), `Contracts published with rms-design-system-engine (${r.components.length})`, { offline: STORE_OFFLINE }); console.log(sent.line); }
   console.log(`📐 Contracts published → ${r.outDir}  (${r.components.length} contract${r.components.length === 1 ? '' : 's'}${r.removed?.length ? ` · ${r.removed.length} removed` : ''}${r.skipped?.length ? ` · ${r.skipped.length} not written, listed in README.md` : ''})`);
   for (const i of r.invalid.slice(0, 20)) console.log(`   ❌ ${i.name}: ${i.errs.slice(0, 3).join('; ')}`);
   if (r.undefinedRefs?.length) console.log(`   ⚠️  ${r.undefinedRefs.length} token(s) Figma binds that the variables do not have, listed in README.md: fix them in Figma`);
@@ -1539,7 +1545,7 @@ if (process.argv.includes('--styleguide')) {
           writeFileSync(savedPath, next);
           const st = await import('./stores.mjs');
           if (st.storesOf(sgConfig).snapshots.write) {
-            const sent = await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[RESULTS_FILE, Buffer.from(next)]]), `Accessibility results saved with the design-system engine (${b.tried - (b.reused || 0)} component${b.tried - (b.reused || 0) === 1 ? '' : 's'} tried)`, { offline: STORE_OFFLINE });
+            const sent = await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[RESULTS_FILE, Buffer.from(next)]]), `Accessibility results saved with rms-design-system-engine (${b.tried - (b.reused || 0)} component${b.tried - (b.reused || 0) === 1 ? '' : 's'} tried)`, { offline: STORE_OFFLINE });
             console.log(sent.line);
           } else console.log(`   Saved in ${RESULTS_FILE}: the next build here tries only what changes (ds-config.json → stores.snapshots shares it with the team).`);
         }
@@ -1556,7 +1562,7 @@ if (process.argv.includes('--styleguide')) {
           const next = JSON.stringify({ at: new Date().toISOString(), since }, null, 1) + '\n';
           writeFileSync(openPath, next);
           const st = await import('./stores.mjs');
-          if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[OPEN_FILE, Buffer.from(next)]]), 'When each open task was first found, saved with the design-system engine', { offline: STORE_OFFLINE })).line);
+          if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[OPEN_FILE, Buffer.from(next)]]), 'When each open task was first found, saved with rms-design-system-engine', { offline: STORE_OFFLINE })).line);
         }
       }
     }
@@ -1608,7 +1614,7 @@ if (process.argv.includes('--publish-styleguide')) {
     if (st.storesOf(pcfg).styleguide.write && !process.argv.includes('--print') && !_argValue('--host')) {
       const page = resolve(ROOT, pcfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html');
       if (!existsSync(page)) { console.log(`❌ No style guide built yet at ${relative(ROOT, page)}: rms-design-system-engine --styleguide first.`); process.exit(1); }
-      const r = await st.pushStore(ROOT, pcfg, 'styleguide', st.pageFiles(page), 'Style guide published with the design-system engine', { offline: STORE_OFFLINE });
+      const r = await st.pushStore(ROOT, pcfg, 'styleguide', st.pageFiles(page), 'Style guide published with rms-design-system-engine', { offline: STORE_OFFLINE });
       console.log(r.line);
       console.log(r.ok ? 'NEXT: tell the person where it went (the line above).' : 'NEXT: tell the person the line above; nothing was sent.');
       process.exit(r.ok ? 0 : 1);

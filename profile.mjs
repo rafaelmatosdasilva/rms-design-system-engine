@@ -46,7 +46,7 @@ const withoutPersonal = (cfg) => { const c = clone(cfg) ?? {}; for (const p of P
 // Is this a profile? → the profile, or throws with what is wrong. A part this engine does not know yet (a profile
 // written for a newer engine) is not an error: it is kept, left unused, and named (unknownParts), so the rest works.
 export function validate(p) {
-  if (!isObj(p) || p.profile !== 1) throw new Error('not a design-system engine profile ("profile": 1 is missing)');
+  if (!isObj(p) || p.profile !== 1) throw new Error('not an rms-design-system-engine profile ("profile": 1 is missing)');
   if (p.stores != null && !isObj(p.stores)) throw new Error('"stores" is not an object');
   if (p.config != null && !isObj(p.config)) throw new Error('"config" is not an object');
   return p;
@@ -142,7 +142,7 @@ export function commandSkill(client, source, { name } = {}) {
   const q = `'${String(source).replace(/'/g, `'\\''`)}'`;
   return `---
 name: ${cmd}
-description: The design-system engine set up for ${who}. Use it for any request about ${who}'s design system (check a component, the style guide, the intent layer, a prototype); it reads ${who}'s profile, so nobody sets up where anything is.
+description: rms-design-system-engine set up for ${who}. Use it for any request about ${who}'s design system (check a component, the style guide, the intent layer, a prototype); it reads ${who}'s profile, so nobody sets up where anything is.
 ---
 
 # /${cmd}

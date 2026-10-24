@@ -81,7 +81,8 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
   for (const [n, a] of Object.entries(code.api ?? {})) {
     const c = add(n); if (a?.file) c.file = a.file;
     // The words of its own code file: a value the code takes but the capture did not list (a status the code names).
-    if (a?.file) { try { c.codeWords = [...new Set(readFileSync(resolve(ROOT, a.file), 'utf8').match(/[A-Za-z_][\w-]*/g) ?? [])]; } catch { /* not read */ } }
+    // Its root element too (<button>, <nav>…): the role a person writes for it starts from it.
+    if (a?.file) { try { const src = readFileSync(resolve(ROOT, a.file), 'utf8'); c.codeWords = [...new Set(src.match(/[A-Za-z_][\w-]*/g) ?? [])]; c.root = /<template>\s*<([a-zA-Z][\w-]*)/.exec(src)?.[1]?.toLowerCase() ?? null; } catch { /* not read */ } }
     for (const [p, d] of Object.entries(a?.props ?? {})) c.props[p] = { type: d?.type ?? null, options: Array.isArray(d?.options) ? d.options.map(String) : null, from: 'the code' };
     for (const s of a?.slots?.named ?? []) c.slots = [...(c.slots ?? []), s];
   }

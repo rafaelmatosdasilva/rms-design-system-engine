@@ -3255,7 +3255,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var out = [];
     ilTexts(c).forEach(function (x) {
       if (/^do'?s?\s*(and|&)\s*don'?t'?s?$/i.test(x.title.trim())) out = out.concat(x.text.split(/\n+/).map(function (t) { return t.replace(/^\s*[-*]\s*/, '').trim(); }).filter(Boolean));
-      else if (/^\s*(do|don'?t|do not)\s*:/i.test(x.text)) out.push(x.text.trim());
+      else { var t = x.text.replace(/^\s*do'?s?\s*(and|&)\s*don'?t'?s?\s*:\s*/i, ''); if (/^\s*(do|don'?t|do not)\s*:/i.test(t)) out.push(t.trim()); }   // a section the reader made a rule of: "Do and don't: Do: …"
     });
     return out;
   };
