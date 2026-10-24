@@ -130,5 +130,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-24-guidelines-link-not-read-the` | The 21 guide tasks on Haiku (engine 8b893e6) | "Guidelines link not read: the NEXT line says the person makes the fix, a token by their hand in .env, never asked for in the chat" |
 | `2026-10-24-merge-remote-tracking-branch-origin` | The 21 guide tasks on Haiku (engine 44de2d4) | "Merge remote-tracking branch 'origin/main' into kept-differences" |
 | `2026-10-24-merge-remote-tracking-branch-origin-2` | The 21 guide tasks on Haiku (engine 7f33bfa) | "Merge remote-tracking branch 'origin/main' into kept-differences" |
+| `2026-10-24-each-style-guide-build-sends` | The 21 guide tasks on Haiku (engine 4713436) | "Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced" |
+| `2026-10-24-merge-remote-tracking-branch-origin-3` | The 21 guide tasks on Haiku (engine 75c8ac8) | "Merge remote-tracking branch 'origin/main' into styleguide-themes-store" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

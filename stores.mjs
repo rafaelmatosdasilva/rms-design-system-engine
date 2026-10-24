@@ -25,9 +25,13 @@ import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 
-export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions'];
-export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions' };
+export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes'];
+export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
 export const STATE = `${OUT_DIR}/stores.json`;
+// The team's themes (a style guide module's data: one system's themes, flat, <name>.theme.json in the folder the place's
+// path names; a store several systems share points its path at the system's own folder), read into the
+// engine's own folder, never the project's: the build reads them there with the person's own (styleguide-gen.mjs).
+export const THEMES_DIR = `${OUT_DIR}/themes`;
 // The team's decisions: the files people write by deciding (answers to proposals, accepted differences, checks made
 // by hand). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it, nobody decides it.
 export const DECISION_FILES = ['intentDecisions', 'baseline', 'checked'].map((k) => PROJECT[k].now);
@@ -42,6 +46,7 @@ const TAKES = {
   kept: (rel) => KEPT_FILES.includes(rel),
   contracts: (rel) => /\.(json|md)$/i.test(rel),
   styleguide: (rel) => /\.(html|css|js|mjs|svg|png|jpe?g|webp|gif|woff2?|json|txt)$/i.test(rel),
+  themes: (rel) => /^[^/]+\.json$/i.test(rel),
 };
 const ROLE = { 0: 'no access', 5: 'Minimal access', 10: 'Guest', 15: 'Planner', 20: 'Reporter', 30: 'Developer', 40: 'Maintainer', 50: 'Owner' };
 const roleOf = (n) => ROLE[n] ?? `access level ${n}`;
@@ -204,6 +209,23 @@ export function localFiles(ROOT, cfg, part, { intentOut } = {}) {
   return out;
 }
 // The files of a folder the engine built (the contracts, the style guide), by the part's own kinds. → Map(rel → Buffer)
+// The themes on this computer that the team's store lacks, or holds an older version of (by the theme's changed date):
+// what a style guide build sends, so a theme someone makes reaches everyone with no step of its own. A newer one a
+// colleague sent is never replaced. dirs: the folders this person keeps theme files in. → Map(<file> → Buffer)
+export function themesToShare(ROOT, dirs, sys) {
+  const read = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
+  const list = (d) => { try { return readdirSync(d).filter((f) => /\.json$/i.test(f)).sort(); } catch { return []; } };
+  const theirs = new Map(), storeDir = join(ROOT, THEMES_DIR);
+  for (const f of list(storeDir)) { const t = read(join(storeDir, f)); if (t?.id) theirs.set(t.id, String(t.changed ?? '')); }
+  const out = new Map();
+  for (const d of dirs) for (const f of list(d)) {
+    const t = read(join(d, f));
+    if (!t?.id || !t.name || (theirs.has(t.id) && !(String(t.changed ?? '') > theirs.get(t.id)))) continue;
+    out.set(f, Buffer.from(JSON.stringify(t, null, 2) + '\n')); theirs.set(t.id, String(t.changed ?? ''));
+  }
+  return out;
+}
+
 // The page and what it links to beside it (another page, a picture, a stylesheet), followed from each page sent: never
 // the rest of its folder, where a person may keep files of their own (a theme saved from the page).
 export function pageFiles(page) {
@@ -262,10 +284,11 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
     }
   } catch (e) { return { line: `⚠️  ${label} not read from ${describePlace(place)}: ${e.message}`, changed: false, written: [] }; }
   const written = [], kept = [], files = { ...(prev.files ?? {}) };
+  const base = resolve(ROOT, part === 'themes' ? THEMES_DIR : '.');
   for (const [rel, data] of remote) {
     if (!safeRel(rel) || !TAKES[part]?.(rel)) continue;
-    const fp = resolve(ROOT, rel);
-    if (!fp.startsWith(resolve(ROOT) + sep)) continue;
+    const fp = resolve(base, rel);
+    if (!fp.startsWith(base + sep)) continue;
     const there = hash(data);
     const here = existsSync(fp) ? hash(readFileSync(fp)) : null;
     if (here === there) { files[rel] = there; continue; }
@@ -321,7 +344,8 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     const head = String((await h.json())?.id ?? '');
     const st = readState(ROOT), prev = st[part] ?? {};
     // A part the project reads from the same place (the snapshots, the decisions) is sent on the commit it was read at.
-    const expect = opts.expectSha ?? (TAKES_ON_RUN.includes(part) && keyOf(storesOf(cfg)[part].read) === keyOf(place) ? prev.sha : null);
+    // Not the themes: each is a file of its own, and the page published beside them moves the branch they are read at.
+    const expect = opts.expectSha ?? (part !== 'themes' && TAKES_ON_RUN.includes(part) && keyOf(storesOf(cfg)[part].read) === keyOf(place) ? prev.sha : null);
     if (expect && head && !head.startsWith(expect)) return { ok: false, line: `⚠️  ${label} not sent: ${a.branch} moved since it was read (now ${head.slice(0, 8)}): run again, so the store is read first` };
     const pre = place.path ? place.path + '/' : '';
     const there = new Set();
@@ -359,7 +383,7 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
 // ── On each run: the stores the project reads from, brought in ─────────────────────────────────────────────────────
 // The snapshots and the team's decisions (the parts the checks read); the contracts and the style guide are only
 // written. → [line]
-const TAKES_ON_RUN = ['snapshots', 'kept', 'decisions'];
+const TAKES_ON_RUN = ['snapshots', 'kept', 'decisions', 'themes'];
 export async function pullOnRun(ROOT, cfg, opts = {}) {
   const lines = [];
   for (const part of TAKES_ON_RUN) {
