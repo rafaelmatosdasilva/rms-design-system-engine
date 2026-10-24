@@ -1829,12 +1829,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var COMP_DATA = {};
   COMPONENTS.forEach(function (c) {
     var a = {}; Object.keys(c.a11y || {}).forEach(function (k) { if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k]; });
-    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(c.renders ? [c.renders] : []));
+    // Where a render was placed on the page it was measured in (top: 112665px) is not the component: left out.
+    var renders = c.renders ? JSON.parse(JSON.stringify(c.renders).replace(/\b(top|left|right|bottom|inset)\s*:\s*-?[\d.]+px/g, '$1:*')) : null;
+    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(renders ? [renders] : []));
   });
+  // The system's CSS as its rules, in any order: a bundler can write the same rules in another order on each build
+  // (the project's Vite does), which changes nothing a result rests on.
+  function cssSigText(css) { return String(css).split('}').map(function (x) { return x.trim(); }).filter(Boolean).sort().join('}'); }
   // What a component's accessibility result rests on beyond its own data: the system's CSS and the checks themselves
   // (wcag-page.js). Never the page's own code, its data or what a build measures, which change with every build: a
   // result kept in this browser holds until the code, Figma or the checks change, and only what changed is tried again.
-  var PAGE_SIG = sigOf(Array.prototype.filter.call(document.querySelectorAll('style[data-system], script:not([type="application/json"])'), function (s) { return s.tagName === 'STYLE' || /wcag-page\.js/.test(s.textContent.slice(0, 200)); }).map(function (s) { return s.textContent; }).join('\u0000'));
+  var PAGE_SIG = sigOf(Array.prototype.filter.call(document.querySelectorAll('style[data-system], script:not([type="application/json"])'), function (s) { return s.tagName === 'STYLE' || /wcag-page\.js/.test(s.textContent.slice(0, 200)); }).map(function (s) { return s.tagName === 'STYLE' ? cssSigText(s.textContent) : s.textContent; }).join('\u0000'));
   var html = document.documentElement, main = document.getElementById('sg-main'), nav = document.getElementById('sg-nav');
   // Opened in the Status page's panel (?embed): the component's page alone, no menu and no bar.
   if (/[?&]embed\b/.test(location.search)) html.classList.add('sg-embed');
@@ -7744,8 +7749,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     c.__a11y = { items: (c.a11y ? a11yStaticItems(c) : []).concat(k.items || []), live: k.live || null, liveItems: k.items || [], baked: !!baked };
     if (k.parts) c.__textParts = k.parts;   // its text parts, as drawn when it was tried, named in what a person checks
   }
+  // Results kept from an earlier build (the page's own, or saved with the snapshots) count wherever the component is the
+  // same as when it was tried, the build included: it tries only what changed since.
+  COMPONENTS.forEach(function (c) { useKept(c, BAKED && BAKED.results && BAKED.results[c.name], true); });
   if (!BAKING) {
-    COMPONENTS.forEach(function (c) { useKept(c, BAKED && BAKED.results && BAKED.results[c.name], true); });
     try { var kept = JSON.parse(localStorage.getItem(A11Y_KEY) || 'null') || {}; COMPONENTS.forEach(function (c) { if (!c.__a11y) useKept(c, kept[c.name], false); }); } catch (e) { /* none kept */ }
   }
   function keepA11y() {

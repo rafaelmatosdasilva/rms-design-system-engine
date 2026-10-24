@@ -763,6 +763,13 @@ says Not checked for what is not tried yet, and the menu shows no count; then Ac
 without it; without Chrome it is skipped and said, and a script error the page throws while trying is printed
 under the count.
 
+**The results are saved with the snapshots** (`a11y-results.snapshot.json`), each under its component's signature
+(its code, the system's CSS, the check itself). The next build puts them in the page first and tries only the
+components whose signature changed: nothing changed, nothing tried again. A build that tried something saves the file
+and, when the team keeps its snapshots in a store (`stores.snapshots`), sends it there as one commit when GitLab lets
+this person, or the pipeline's token, write it; so everyone's build, and the page the team publishes, start from the
+same results. With no store the file stays in the folder.
+
 **The page is checked against the system it shows.** After building it, `--styleguide` checks the page's own CSS
 (every `<style>` but the system's, which the template marks `data-system`): a colour, font, text size, weight, line
 height, corner radius or space that is not one of the system's tokens fails it, and so does what the static

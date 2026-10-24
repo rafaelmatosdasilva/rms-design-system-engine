@@ -1502,11 +1502,27 @@ if (process.argv.includes('--styleguide')) {
     // the final results at once, nothing running while they read (styleguide-bake.mjs). --no-a11y-bake builds the page
     // without it (a page only measured, as a CI's first build is); styleguide.bakeA11y: false in ds-config.json too.
     if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false) {
-      const { bakeA11y } = await import('./styleguide-bake.mjs');
-      console.log('   Trying every component\'s accessibility in a browser, to keep the results in the page...');
-      const b = await bakeA11y(resolve(ROOT, r.out)).catch((e) => ({ skipped: String(e.message).split('\n')[0] }));
+      const { bakeA11y, readSaved, RESULTS_FILE } = await import('./styleguide-bake.mjs');
+      // The results saved with the snapshots: a component unchanged since is not tried again.
+      const savedPath = join(ROOT, RESULTS_FILE), saved = readSaved(savedPath);
+      console.log(`   Trying the accessibility of ${Object.keys(saved).length ? 'each component changed since the saved results' : 'every component'} in a browser, to keep the results in the page...`);
+      const b = await bakeA11y(resolve(ROOT, r.out), { saved }).catch((e) => ({ skipped: String(e.message).split('\n')[0] }));
       console.log(b.skipped ? `   Accessibility not tried while building (${b.skipped}): a browser that opens the page tries it and keeps what it finds.`
-        : `♿ Accessibility tried in a browser: ${b.tried} of ${b.of} components, every variant, kept in the page (${Math.round(b.ms / 1000)}s)${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
+        : `♿ Accessibility in the page: ${b.tried} of ${b.of} components, every variant${b.reused ? ` (${b.reused} unchanged since the saved results, ${b.tried - b.reused} tried now)` : ''}, ${Math.round(b.ms / 1000)}s${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
+      // Saved with the snapshots, and sent to the team's snapshots store when GitLab lets this person (or the pipeline)
+      // write it: everyone's next build, and the page the team publishes, start from them.
+      if (!b.skipped && !b.dead && b.results && Object.keys(b.results).length) {
+        const next = JSON.stringify({ at: new Date().toISOString(), results: b.results }, null, 1) + '\n';
+        const same = (() => { try { return JSON.stringify(JSON.parse(readFileSync(savedPath, 'utf8')).results) === JSON.stringify(b.results); } catch { return false; } })();
+        if (!same) {
+          writeFileSync(savedPath, next);
+          const st = await import('./stores.mjs');
+          if (st.storesOf(sgConfig).snapshots.write) {
+            const sent = await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[RESULTS_FILE, Buffer.from(next)]]), `Accessibility results saved with the design-system engine (${b.tried - (b.reused || 0)} component${b.tried - (b.reused || 0) === 1 ? '' : 's'} tried)`, { offline: STORE_OFFLINE });
+            console.log(sent.line);
+          } else console.log(`   Saved in ${RESULTS_FILE}: the next build here tries only what changes (ds-config.json → stores.snapshots shares it with the team).`);
+        }
+      }
       for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
       // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
       if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
