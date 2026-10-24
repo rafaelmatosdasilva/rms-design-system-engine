@@ -1200,7 +1200,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk .sg-bk-pers-svg.sg-bk-pers-svg .sg-bk-pers-shape, .sg-bk .sg-bk-pers-kl.sg-bk-pers-kl line { stroke-width: var(--pers-w); }
 .sg-bk-pers-svg .sg-bk-pers-dot { r: calc(1.5px + var(--pers-w) * 0.9); }   /* the points grow with the line, so they still show on it */
 .sg-bk-pers-svg .sg-bk-pers-ring { stroke-linecap: round; stroke-dasharray: 0 calc(max(1px, var(--pers-w) / 2) * 3); }   /* the balance ring dotted, its gaps as small as the line allows */
-.sg-bk-pers-kl.is-dark line, .sg-bk-pers-svg .is-dark { stroke-dasharray: max(var(--sg-space-xs), calc(var(--pers-w) * 4)) calc(var(--pers-w) * 2); }   /* the dash grows with the line, so it reads however thick */
+.sg-bk-pers-kl.is-dark line, .sg-bk-pers-svg .sg-bk-pers-shape.is-dark { stroke-dasharray: max(var(--sg-space-xs), calc(var(--pers-w) * 4)) calc(var(--pers-w) * 2); }   /* the dash grows with the line, so it reads however thick */
 .sg-bk-pers-t { margin: 0; font-size: calc(var(--sg-title) * 0.62 + var(--sg-space-l) + var(--sg-space-xxs)); line-height: normal; text-wrap: balance; color: var(--sg-text); }   /* the claim */
 .sg-bk-pers-words { display: flex; flex-direction: column; gap: var(--sg-space-l); min-width: 0; }
 .sg-bk-pers-w { margin: 0; font-size: calc(var(--sg-title) * 0.42); line-height: normal; color: var(--sg-text); text-wrap: balance; }   /* what it does, each part as heavy as it leans */
@@ -1307,7 +1307,10 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .sg-bk-lens .sg-bk-lens-ground { fill: var(--bk-card); }
 .sg-bk-lens .sg-bk-lens-mark { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
 .sg-bk-lens .sg-bk-lens-dot { fill: var(--bk-mark, var(--sg-accent)); }
-.sg-bk-lens .sg-bk-lens-build { fill: none; stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+/* The construction line and its turns lie inside the icon's strokes: drawn in the card's colour, cut into the stroke, so
+   they read on any icon colour, in light and dark (in the mark's colour they vanish where it is the icon's). */
+.sg-bk-lens .sg-bk-lens-turn { fill: var(--bk-card); }
+.sg-bk-lens .sg-bk-lens-build { fill: none; stroke: var(--bk-card); stroke-width: 1.6px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .sg-bk-lens .sg-bk-lens-end { fill: var(--bk-card); stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
 .sg-bk-lens .sg-bk-lens-measure { stroke: var(--bk-mark, var(--sg-accent)); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
 .sg-bk-lens text { font-size: var(--sg-space-l); }
@@ -3706,7 +3709,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var curve = function (ps) { return ps.map(function (p, k) { var c = at(p); return (k ? 'L' : 'M') + c[0].toFixed(2) + ' ' + c[1].toFixed(2); }).join(''); };
         out += '<g class="sg-bk-lens-build">' + an.build.paths.map(function (ps) { return '<path d="' + curve(ps) + '"/>'; }).join('') + '</g>' +
           an.build.ends.map(function (p) { var c = at(p); return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + (an.w * big * 0.3) + '" class="sg-bk-lens-end"/>'; }).join('') +
-          an.build.turns.map(function (p) { var c = at(p); return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + (an.w * big * 0.22) + '" class="sg-bk-lens-dot"/>'; }).join('');
+          an.build.turns.map(function (p) { var c = at(p); return '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + (an.w * big * 0.22) + '" class="sg-bk-lens-turn"/>'; }).join('');
       }
       lenses.forEach(function (l) { var c = at(l.p); out += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + R + '" class="sg-bk-lens-ring"/>'; });
       // Each lens, large, side by side beside the icon: the icon drawn so the point sits in the middle, clipped to the
@@ -5019,11 +5022,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           var lx = (C + Math.cos(a) * (R + 22)) / 340 * 100, ly = (C + Math.sin(a) * (R + 22)) / 340 * 100, lead = topPoles.indexOf(ax[side]) >= 0;
           lab += '<span class="sg-bk-pers-l' + (lead ? ' is-lead' : str >= 0.5 ? '' : ' is-faint') + '" style="left:' + lx.toFixed(1) + '%;top:' + ly.toFixed(1) + '%' + (lead ? ';color:' + esc(ac1) : '') + '">' + esc(ax[side]) + '</span>';
         }); });
-        var poly = function (p, dark) { return '<polygon points="' + p.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '" fill="' + esc(ac1) + '" fill-opacity="' + (dark ? '.06' : '.2') + '" stroke="' + esc(ac1) + '" class="sg-bk-pers-shape' + (dark ? ' is-dark' : '') + '" vector-effect="non-scaling-stroke" stroke-linejoin="round"' + '/>' +
-          (dark ? '' : p.map(function (q) { return '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="2.5" class="sg-bk-pers-dot" fill="' + esc(ac1) + '"/>'; }).join('')); };
-        var shape = two ? poly(ptsOf(AXM[1]), true) + poly(ptsOf(AXM[0])) : poly(ptsOf(AXM[0]));
-        var keyLine = function (dark) { return '<svg class="sg-bk-pers-kl' + (dark ? ' is-dark' : '') + '" aria-hidden="true"><line x1="0" y1="50%" x2="100%" y2="50%" stroke="' + esc(ac1) + '"/></svg>'; };
-        var key = two ? '<div class="sg-bk-pers-h sg-bk-pers-key">' + keyLine() + 'Light' + keyLine(true) + 'Dark</div>' : '';
+        // Light: filled in the accent, solid, its points filled. Dark: on top of it, in the words' colour (never the
+        // accent, which may be the same in both), dashed, its points hollow, so it shows even where the two lie close.
+        var poly = function (p, dark) { var ink = dark ? 'currentColor' : esc(ac1); return '<polygon points="' + p.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '" fill="' + (dark ? 'none' : ink) + '" fill-opacity="' + (dark ? '0' : '.2') + '" stroke="' + ink + '" class="sg-bk-pers-shape' + (dark ? ' is-dark' : '') + '" vector-effect="non-scaling-stroke" stroke-linejoin="round"' + '/>' +
+          p.map(function (q) { return '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="2.5" class="sg-bk-pers-dot' + (dark ? ' is-dark' : '') + '" fill="' + (dark ? 'var(--bk-card, var(--sg-bg))' : ink) + '"' + (dark ? ' stroke="currentColor" vector-effect="non-scaling-stroke"' : '') + '/>'; }).join(''); };
+        // The two readings the same (no point a pixel apart): one shape, and the key says so.
+        var same = two && ptsOf(AXM[0]).every(function (q, i) { var d = ptsOf(AXM[1])[i]; return Math.abs(q[0] - d[0]) < 1 && Math.abs(q[1] - d[1]) < 1; });
+        var shape = two && !same ? poly(ptsOf(AXM[0])) + poly(ptsOf(AXM[1]), true) : poly(ptsOf(AXM[0]));
+        var keyLine = function (dark) { return '<svg class="sg-bk-pers-kl' + (dark ? ' is-dark' : '') + '" aria-hidden="true"><line x1="0" y1="50%" x2="100%" y2="50%" stroke="' + (dark ? 'currentColor' : esc(ac1)) + '"/></svg>'; };
+        var key = two ? '<div class="sg-bk-pers-h sg-bk-pers-key">' + (same ? keyLine() + 'Light and dark read the same' : keyLine() + 'Light' + keyLine(true) + 'Dark') + '</div>' : '';
         // In words: one claim (the strongest leaning, as a person would say it), the three strongest in plain words (each
         // as heavy as it leans), then the proof: each one's tokens.
         var lean = AX.map(function (ax) { return { pole: ax[2] >= 0 ? ax[0] : ax[1], k: Math.abs(ax[2]), why: ax[3], bits: ax[4] || [] }; }).sort(function (x, y) { return y.k - x.k; });
