@@ -25,20 +25,25 @@ import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 
-export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'styleguide', 'decisions', 'themes'];
-export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
+export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes'];
+export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
 export const STATE = `${OUT_DIR}/stores.json`;
 // The team's themes (a style guide module's data: one system's themes, flat, <name>.theme.json in the folder the place's
 // path names; a store several systems share points its path at the system's own folder), read into the
 // engine's own folder, never the project's: the build reads them there with the person's own (styleguide-gen.mjs).
 export const THEMES_DIR = `${OUT_DIR}/themes`;
-// The team's decisions: the files people write by deciding (answers to proposals, kept and accepted differences,
-// checks made by hand). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it, nobody decides it.
-export const DECISION_FILES = ['intentDecisions', 'kept', 'baseline', 'checked'].map((k) => PROJECT[k].now);
+// The team's decisions: the files people write by deciding (answers to proposals, accepted differences, checks made
+// by hand). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it, nobody decides it.
+export const DECISION_FILES = ['intentDecisions', 'baseline', 'checked'].map((k) => PROJECT[k].now);
+// The differences kept on purpose are a part of their own: a design rule agents follow (which side is right, and why),
+// so a team keeps them with what agents read (its intent layer); the contracts carry each one (contract-gen.mjs).
+// A setup that names no place for them keeps them with the decisions.
+export const KEPT_FILES = [PROJECT.kept.now];
 // What a store may put in the project, by part: nothing else is ever written from it (not a .env, not a hook).
 const TAKES = {
   snapshots: (rel) => /\.snapshot\.json$/i.test(rel),
   decisions: (rel) => DECISION_FILES.includes(rel),
+  kept: (rel) => KEPT_FILES.includes(rel),
   contracts: (rel) => /\.(json|md)$/i.test(rel),
   styleguide: (rel) => /\.(html|css|js|mjs|svg|png|jpe?g|webp|gif|woff2?|json|txt)$/i.test(rel),
   themes: (rel) => /^[^/]+\.json$/i.test(rel),
@@ -75,6 +80,7 @@ export function storesOf(cfg) {
   for (const part of PARTS) {
     let e = s[part];
     if (e != null && (typeof e !== 'object' || !('read' in e || 'write' in e))) e = { read: e };
+    if (!e && part === 'kept' && s.decisions) e = s.decisions;
     if (!e && part === 'intentLayer' && cfg?.intentLayer) {
       const il = typeof cfg.intentLayer === 'string' ? { gitlab: cfg.intentLayer } : cfg.intentLayer;
       const url = il.gitlab ?? il.url;
@@ -185,7 +191,7 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'coverage', OUT_DIR, REFS_
 // → Map(rel → Buffer): the snapshots (every *.snapshot.json, but the intent layer's own) or the decisions files.
 export function localFiles(ROOT, cfg, part, { intentOut } = {}) {
   const out = new Map();
-  if (part === 'decisions') { for (const f of DECISION_FILES) if (existsSync(join(ROOT, f))) out.set(f, readFileSync(join(ROOT, f))); return out; }
+  if (part === 'decisions' || part === 'kept') { for (const f of part === 'kept' ? KEPT_FILES : DECISION_FILES) if (existsSync(join(ROOT, f))) out.set(f, readFileSync(join(ROOT, f))); return out; }
   if (part !== 'snapshots') return out;
   const skipFile = new Set([cleanPath(intentOut ?? 'intent-layer.snapshot.json')]);
   const walk = (d, depth) => {
@@ -377,7 +383,7 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
 // ── On each run: the stores the project reads from, brought in ─────────────────────────────────────────────────────
 // The snapshots and the team's decisions (the parts the checks read); the contracts and the style guide are only
 // written. → [line]
-const TAKES_ON_RUN = ['snapshots', 'decisions', 'themes'];
+const TAKES_ON_RUN = ['snapshots', 'kept', 'decisions', 'themes'];
 export async function pullOnRun(ROOT, cfg, opts = {}) {
   const lines = [];
   for (const part of TAKES_ON_RUN) {

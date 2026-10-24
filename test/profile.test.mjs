@@ -89,3 +89,12 @@ test('the command a team installs is named after the engine', () => {
   assert.throws(() => writeCommand('', 'p.json', { home }), /client's name/);
   assert.ok(!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine-')));
 });
+
+test('a part this engine does not know yet is left unused and named, never a refusal of the whole profile', async () => {
+  const d = mkdtempSync(join(tmpdir(), 'profile-'));
+  writeFileSync(join(d, 'p.json'), JSON.stringify({ profile: 1, name: 'Acme', stores: { snapshots: { read: 'x' }, futurePart: { read: 'y' } }, config: {} }));
+  const r = await refreshProfile(d, { given: 'p.json' });
+  assert.equal(r.applied, true);
+  assert.match(r.lines.join('\n'), /names a part this engine does not know yet \(futurePart\)/);
+  assert.ok(JSON.parse(readFileSync(join(d, 'ds-config.json'), 'utf8')).stores.futurePart, 'kept for a newer engine');
+});

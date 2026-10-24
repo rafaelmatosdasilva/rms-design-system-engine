@@ -43,14 +43,15 @@ function dropSecrets(v) {
 }
 const withoutPersonal = (cfg) => { const c = clone(cfg) ?? {}; for (const p of PERSONAL) delPath(c, p); return c; };
 
-// Is this a profile? → the profile, or throws with what is wrong.
+// Is this a profile? → the profile, or throws with what is wrong. A part this engine does not know yet (a profile
+// written for a newer engine) is not an error: it is kept, left unused, and named (unknownParts), so the rest works.
 export function validate(p) {
   if (!isObj(p) || p.profile !== 1) throw new Error('not a design-system engine profile ("profile": 1 is missing)');
   if (p.stores != null && !isObj(p.stores)) throw new Error('"stores" is not an object');
-  for (const k of Object.keys(p.stores ?? {})) if (!PARTS.includes(k)) throw new Error(`"stores" names an unknown part: ${k} (known: ${PARTS.join(', ')})`);
   if (p.config != null && !isObj(p.config)) throw new Error('"config" is not an object');
   return p;
 }
+export const unknownParts = (p) => Object.keys(p?.stores ?? {}).filter((k) => !PARTS.includes(k));
 
 // Read a profile from a file or a link (a GitLab file link, read with the person's GITLAB_TOKEN; any other https link,
 // read as it is). opts: { from, env, http }. → { profile, source, sha } | { error }
@@ -128,7 +129,9 @@ export async function refreshProfile(ROOT, { given = null, read = null, env, htt
   const indent = raw ? (/^\{\n(\s+)"/.exec(raw)?.[1] ?? '  ') : '  ';
   writeFileSync(file, JSON.stringify(next, null, indent) + '\n');
   const who = r.profile.name ? `${r.profile.name}'s profile` : 'the profile';
-  return { applied: true, cfg: next, first: !cfg.profile, lines: [`🏢 ${cfg.profile ? `${who} changed: ds-config.json updated from it` : `Set up from ${who}`} (${r.source})`] };
+  const unknown = unknownParts(r.profile);
+  const later = unknown.length ? [`ℹ️  ${who} names ${unknown.length === 1 ? 'a part' : 'parts'} this engine does not know yet (${unknown.join(', ')}): left unused until the engine is updated (rms-design-system-engine --update)`] : [];
+  return { applied: true, cfg: next, first: !cfg.profile, lines: [...later, `🏢 ${cfg.profile ? `${who} changed: ds-config.json updated from it` : `Set up from ${who}`} (${r.source})`] };
 }
 
 // ── The company's command ───────────────────────────────────────────────────────────────────────────────────────────
