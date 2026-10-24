@@ -396,3 +396,9 @@ test('a request that has a part open another owes an "opens"; a state alone is n
   assert.ok(!requestFindings(ctx, 'a page that opens with a heading', []).some((f) => f.said === 'opens'));
   assert.ok(requestFindings(ctx, 'a row whose More button opens a small menu', []).some((f) => f.said === 'opens'));
 });
+
+test('a difference kept on purpose reaches the agent as the side the team chose', async () => {
+  const { contextFrom: cf, purposeLines: pl } = await import('../prototype-context.mjs');
+  const ctx = cf({ components: { tileOne: { props: {} } } }, null, null, { kept: [{ component: 'tileOne', what: 'radius 8 where Figma has 4', truth: 'code', reason: 'the product\'s cards' }] });
+  assert.match(pl(ctx, ['tileOne']).join('\n'), /kept on purpose radius 8 where Figma has 4 \(the code is right\): the product's cards/);
+});

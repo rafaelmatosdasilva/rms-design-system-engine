@@ -159,12 +159,24 @@ test('a folder store: read and written on this computer; the lines say what each
   mkdirSync(join(shared, 'team'), { recursive: true });
   writeFileSync(join(shared, 'team', 'design-system-engine-kept.json'), '[]');
   const cfg = cfgWith({ decisions: { read: { folder: shared, path: 'team' } }, styleguide: { write: { folder: join(shared, 'site') } }, snapshots: { read: LINK, write: null } });
-  assert.deepEqual((await pullStore(ROOT, cfg, 'decisions')).written, ['design-system-engine-kept.json']);
+  assert.deepEqual((await pullStore(ROOT, cfg, 'kept')).written, ['design-system-engine-kept.json'], 'kept with the decisions: the setup names no place of their own');
   writeFileSync(join(ROOT, 'design-system-engine-kept.json'), '[{"reason":"brand"}]');
-  const sent = await pushStore(ROOT, cfg, 'decisions', localFiles(ROOT, cfg, 'decisions'), 'm');
+  const sent = await pushStore(ROOT, cfg, 'kept', localFiles(ROOT, cfg, 'kept'), 'm');
   assert.equal(sent.ok, true);
   assert.equal(readFileSync(join(shared, 'team', 'design-system-engine-kept.json'), 'utf8'), '[{"reason":"brand"}]');
   const lines = (await accessLines(ROOT, cfg, { env, offline: true })).join('\n');
   assert.match(lines, /Snapshots: lives in design\/snapshots; you can only read it: this setup reads snapshots from design\/snapshots and writes it nowhere/);
   assert.match(lines, /Style guide: lives in the folder .*site; you can change it/);
+});
+
+test('the differences kept on purpose are a part of their own, kept with the decisions when the setup names no place', () => {
+  const both = storesOf({ stores: { decisions: { read: LINK, }, kept: { read: { gitlab: `https://${HOST}/design/intent`, path: 'decisions' } } } });
+  assert.equal(both.kept.read.path, 'decisions');
+  assert.equal(both.decisions.read.gitlab, LINK);
+  assert.equal(storesOf({ stores: { decisions: { read: LINK } } }).kept.read.gitlab, LINK);
+  const ROOT = project();
+  writeFileSync(join(ROOT, 'design-system-engine-kept.json'), '{}');
+  writeFileSync(join(ROOT, 'design-system-engine-checked.json'), '{}');
+  assert.deepEqual([...localFiles(ROOT, {}, 'kept').keys()], ['design-system-engine-kept.json']);
+  assert.deepEqual([...localFiles(ROOT, {}, 'decisions').keys()], ['design-system-engine-checked.json']);
 });

@@ -208,7 +208,9 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
   }
   for (const n of linkNotes.filter((x) => x.status === 'not fetched yet')) sources.push({ what: 'guidelines', detail: `${n.provider} link ${n.url}: not fetched yet (its token goes in .env; the engine names it when it runs)`, missing: true });
 
-  const ctx = contextFrom(catalog, intent, sections, { authored: authoredJson, examples });
+  const kept = (await import('./kept.mjs')).readKept(ROOT);
+  if (kept.length) sources.push({ what: 'kept differences', detail: `${kept.length} kept on purpose (design-system-engine-kept.json)` });
+  const ctx = contextFrom(catalog, intent, sections, { authored: authoredJson, examples, kept });
   return { ...ctx, sources, templates, screens, screensFile, productScreens, breakpoints: breakpointsOf(vars), linkNotes };
 }
 
@@ -230,7 +232,7 @@ export function breakpointsOf(vars = {}) {
 
 // { components: { name: { purpose, role, notes, notFor, useInstead, status, guidelines, options } }, rules, limits }
 // extra: { authored: contract.authored.json, examples: { name: [{ kind: 'do' | 'dont', caption }] } }
-export function contextFrom(catalog = { components: {} }, intent = null, sections = null, { authored = null, examples = {} } = {}) {
+export function contextFrom(catalog = { components: {} }, intent = null, sections = null, { authored = null, examples = {}, kept = [] } = {}) {
   const components = {};
   const names = Object.keys(catalog.components ?? {});
   const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
@@ -282,6 +284,8 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
       useInstead: c.useInstead ?? i.guidance?.useInstead ?? null,
       status: c.status ?? (i.status?.state && i.status.state !== 'current' ? i.status.state : null),
       guidelines,
+      // The differences the team kept on purpose (kept.mjs): the side it chose, which an agent follows, never "fixes".
+      kept: kept.filter((d) => d.component === name),
     };
   }
   // Without the sections themselves (an older caller), the intent's general block stands for them.
@@ -345,7 +349,7 @@ export function limitsFrom(components, rules, names) {
   return out.filter((l) => !seen.has(l.component) && seen.add(l.component));
 }
 
-const said = (k) => k && (k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length || k.intentLayer);
+const said = (k) => k && (k.kept?.length || k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length || k.intentLayer);
 
 // One block per component for the catalog: what it is for, its role, its options' meaning, when not to use it, the
 // team's notes and its guidelines.
@@ -368,6 +372,7 @@ export function purposeLines(ctx, names, { width = 400 } = {}) {
     for (const d of k.donts ?? []) more('don\'t', d);
     for (const note of k.notes.slice(0, NOTES_SHOWN)) more('note', note);
     if (k.guidelines) more('guidelines', k.guidelines);
+    for (const d of k.kept ?? []) more('kept on purpose', `${d.what}${d.truth ? ` (${d.truth === 'code' ? 'the code' : 'Figma'} is right)` : ''}: ${d.reason}`);
     // The intent layer, under its own name.
     const il = k.intentLayer;
     if (il) {
