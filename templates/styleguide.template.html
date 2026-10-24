@@ -349,7 +349,9 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-num { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--sg-space-s); }
 .sg-health-out { font-size: calc(var(--sg-s) + var(--sg-space-s)); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }   /* of 133, 8px over the text size */
 .sg-health-desc { font-size: calc(var(--sg-s) + var(--sg-space-xxs) / 2); color: var(--sg-text-2); }   /* what the count counts, under it, 1px over the text size */
-.sg-health-num, .sg-health-num.sg-health-num { line-height: normal; }   /* the big count's own line, so a wrapped "of" line never runs into it */   /* the count, then what it is out of on its baseline; wrapped, under it */
+.sg-health-num, .sg-health-num.sg-health-num { line-height: normal; }
+.sg-health-count + .sg-health-bar { margin-top: calc(-1 * var(--sg-space-l)); }   /* the bar half as far under the big number: its line keeps room below the digits (and a wrapped word) that they never use */   /* the big count's own line, so a wrapped "of" line never runs into it */   /* the count, then what it is out of on its baseline; wrapped, under it */
+.sg-health-num > .sg-health-out { margin-bottom: var(--sg-space-l); }   /* a word wrapped under the number takes back the room the bar is pulled up by (on the number's own line it changes nothing: the digits are taller) */
 .sg-health-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--sg-space-l) + var(--sg-space-s)); margin-bottom: calc(var(--sg-space-l) + var(--sg-space-s)); }
 @media (max-width: 1200px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .sg-health-tiles { grid-template-columns: minmax(0, 1fr); } }
