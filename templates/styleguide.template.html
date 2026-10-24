@@ -3061,6 +3061,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var own = IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(k[1]) + '</span></p>' + r[k[0]].map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
       return (own ? ilSourceHead('Intent layer', p.spec || p.file) + own : '') + ilOthersOf(p).map(function (o) { return ilSourceHead(o.source) + o.lines.map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
     };
+    // A component with no intent layer: what the agents read about it is its own documentation, as written, grouped by
+    // where each piece is written (Figma's description or annotation, the code, the contract, the guidelines), each under
+    // its kind, as an intent-layer page's reads are.
+    var noLayerReads = function (p) {
+      var c = docComp(p), by = {}, order = [];
+      try { docIssueRows(c).forEach(function (r) { if (r.st !== 'done' || !r.written || r.kind === 'Intent layer') return; var w = srcNames(r.src || []).join(' · ') || 'The system'; if (!by[w]) { by[w] = []; order.push(w); } by[w].push(r); }); } catch (e) { /* its own area says it */ }
+      return order.map(function (w) { return ilSourceHead(w) + by[w].map(function (r) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(r.kind) + '</span></p>' + r.written; }).join(''); }).join('');
+    };
     // The sources a row's content comes from, in a word each, for the table.
     var ilSources = function (p) { if (p.tokens) return 'Figma';
       if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0.length ? esc(w0.join(', ')) : '<span class="pg-missing">None</span>'; } var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
@@ -3139,7 +3147,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: '', reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
-      if (p.noLayer) return { decision: decisionCell('keep', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '', forWhat: ilFor(p), todo: '', why: '', reads: '', gets: '', updated: '' };
+      if (p.noLayer) return { decision: decisionCell('keep', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: '' };
       return { decision: decisionCell(p.action, p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
@@ -3151,7 +3159,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Still to write', c.left) + card('To remove', c.remove) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || 'Page', body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
     var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
