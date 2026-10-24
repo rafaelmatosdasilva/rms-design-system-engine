@@ -40,7 +40,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 11;   // 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
+export const READER = 12;   // 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -203,7 +203,12 @@ export function entityView(entity, file, group = '', shared = null) {
         else if (key) view[key].push(...itemsOf(body));
         // Any other prose a component page gives under a title of its own is a rule of it, said with that title
         // ("Legend Overflow: …"): the team's titles are theirs, the engine reads them. Examples and notes for people stay.
-        else if (view.layer === 'components' && !FOR_PEOPLE.test(titleWords(title)) && !isExample(body)) view.rules.push(...itemsOf(body).map((text) => ({ text: `${titleWords(title)}: ${text}`, level: null })));
+        // A line already led by the title ("Role: button" under Role) keeps it once; a drafted line stays a draft, set
+        // apart below, never read as a rule with the title in front of its marker.
+        else if (view.layer === 'components' && !FOR_PEOPLE.test(titleWords(title)) && !isExample(body)) view.rules.push(...itemsOf(body).map((text) => {
+          const own = titleWords(title), led = text.toLowerCase().startsWith(own.toLowerCase() + ':');
+          return DRAFT.test(text) ? { text, level: null, draftOf: own } : { text: led ? text : `${own}: ${text}`, level: null };
+        }));
         else view.sections.push({ title, text: body });
       }
     } else if (b.kind === 'use-cases') {
@@ -230,7 +235,7 @@ export function entityView(entity, file, group = '', shared = null) {
   // for review and reaches no agent until its marker is removed.
   for (const [k, where] of [['purpose', 'Purpose'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules']]) {
     const keep = [];
-    for (const it of view[k]) { const t = String(it?.text ?? it); if (DRAFT.test(t)) (view.drafts ??= []).push({ where, text: t.replace(DRAFT, '').trim() }); else keep.push(it); }
+    for (const it of view[k]) { const t = String(it?.text ?? it); if (DRAFT.test(t)) (view.drafts ??= []).push({ where: it?.draftOf ?? where, text: t.replace(DRAFT, '').trim() }); else keep.push(it); }
     view[k] = keep;
   }
   // In a section's text too: a line that starts with the marker, as a list item or on its own.

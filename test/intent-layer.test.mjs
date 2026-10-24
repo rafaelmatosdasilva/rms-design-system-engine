@@ -668,3 +668,20 @@ test('what the agents read from a page, word for word by kind, leaves out the li
   assert.deepEqual(agentText(e, {}, [{ kind: 'name', line: 'Set `glowMode` on it.' }]), { purpose: ['A tile for one subject.'], whenToUse: ['Use it for one subject.'], rules: ['Keep its title short. (should)'] });
   assert.deepEqual(agentText({ ...e, layer: 'patterns', whenToUse: [] }).sections, ['Examples: A tile.']);
 });
+
+test('a page the layer\'s generator wrote: a titled line keeps its title once, and a draft in a prose section stays a draft', async () => {
+  const { entityView } = await import('../doc-source-dsds.mjs');
+  const page = { kind: 'component', name: 'Chip One', sections: [
+    { kind: 'section', for: 'all', title: 'Limitations', freeform: [{ title: 'Limitations', body: '- **Draft:** It takes one choice only.' }] },
+    { kind: 'section', for: 'all', title: 'Specification', freeform: [
+      { title: 'Role', body: '- Role: button' },
+      { title: "Do and don't", body: "- **Draft:** Do: keep its label short.\n- Don't: put two choices in one." },
+    ] },
+  ] };
+  const v = entityView(page, 'specs/dsds/components/chips/one.dsds.json', 'components');
+  const rules = v.rules.map((r) => r.text);
+  assert.ok(rules.includes('Role: button'), rules.join(' | '));
+  assert.ok(rules.includes("Do and don't: Don't: put two choices in one."));
+  assert.ok(!rules.some((r) => /draft/i.test(r)), 'no draft read as a rule');
+  assert.deepEqual(v.drafts.map((d) => `${d.where}: ${d.text}`).sort(), ["Do and don't: Do: keep its label short.", 'Limitations: It takes one choice only.']);
+});
