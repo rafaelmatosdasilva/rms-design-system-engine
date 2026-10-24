@@ -80,9 +80,11 @@ if [ -n "$CLIENT" ]; then
     echo "    To make it:"
     echo "      1. Open https://${HOST:-gitlab.com}/-/user_settings/personal_access_tokens"
     echo "         (older GitLab: your avatar → Edit profile → Access tokens)"
-    echo "      2. Add new token. Name: design-system engine. Expiration date: as your company allows."
-    echo "      3. Scope: read_api if you only read; api if you also change the intent layer, the decisions or the snapshots."
-    echo "         GitLab lets it change only the projects where your role allows."
+    echo "      2. Add new token, fine-grained. Name: <your name> · design system engine. Expiration date: as your company allows."
+    echo "      3. Projects: the company's design-system projects (its code, intent layer, snapshots, style guide)."
+    echo "         Permissions: Project, Repository, Branch and Repository tag: Read; Code: Read and Download;"
+    echo "         Commit and Merge request: Read and Create. Nothing else."
+    echo "         GitLab lets it change only the projects where your role allows: with Reporter it only reads."
     echo "      4. Create personal access token, then copy it (GitLab shows it once)."
     echo "    Paste it below: nothing shows as you paste."
     if has GITLAB_TOKEN; then echo "    Already there: kept."
@@ -92,7 +94,7 @@ if [ -n "$CLIENT" ]; then
     fi
     unset T; exec 3<&-
   else
-    has GITLAB_TOKEN || echo "ℹ️  No terminal to ask in: make a token at https://${HOST:-gitlab.com}/-/user_settings/personal_access_tokens (scope read_api, or api to change things) and add GITLAB_TOKEN=<it> to $ENV_FILE yourself."
+    has GITLAB_TOKEN || echo "ℹ️  No terminal to ask in: make a token at https://${HOST:-gitlab.com}/-/user_settings/personal_access_tokens (fine-grained: Read on the company's design-system projects, Commit and Merge request Create to change them) and add GITLAB_TOKEN=<it> to $ENV_FILE yourself."
   fi
   echo ""
   # The engine's own lines, without the NEXT line it writes for an agent.

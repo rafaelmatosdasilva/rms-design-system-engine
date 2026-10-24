@@ -437,7 +437,7 @@ export function writeLocal(ROOT, files, summary) {
 // → { url, branch } | { error }
 export async function openMergeRequest(access, { files, sha, target, title, description, branch, message }) {
   const b = await access.send('POST', `/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(sha)}`);
-  if (!b.ok) return { error: b.status === 403 || b.status === 401 ? `GitLab refused (${b.status}) the token in ${access.writesWith}: it needs the api scope and Developer access to the layer. Give it a token that writes only there: the layer's own (its Settings → Access tokens) or its group's, as GITLAB_WRITE_TOKEN in .env` : `GitLab answered ${b.status} when making the branch` };
+  if (!b.ok) return { error: b.status === 403 || b.status === 401 ? `GitLab refused (${b.status}) the token in ${access.writesWith}: it needs Commit Create (and Merge request Create) on the layer, and your role there Developer or more. Add the layer to your token's projects, or ask a Maintainer of it for the role` : `GitLab answered ${b.status} when making the branch` };
   const c = await access.send('POST', '/repository/commits', { branch, commit_message: message, actions: [...files].map(([file_path, content]) => ({ action: 'update', file_path, content })) });
   if (!c.ok) return { error: `GitLab answered ${c.status} to the commit (the branch ${branch} was made; delete it before trying again)` };
   const m = await access.send('POST', '/merge_requests', { source_branch: branch, target_branch: target, title, description, remove_source_branch: true });
