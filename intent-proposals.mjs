@@ -1,4 +1,4 @@
-// intent-proposals.mjs - for each decision on the Intent layer page that is the team's (Fix, Add, Move), the answer the
+// intent-proposals.mjs - for each decision on the Documentation page that is the team's (Fix, Add, Move), the answer the
 // engine proposes and what it rests on, for a person to say yes or no to. A yes is kept in the project
 // (design-system-engine-intent-decisions.json) and the engine acts on it from then on: a component documented in
 // another's page is not asked a page of its own, a name the team keeps is no longer a finding, a page the team keeps

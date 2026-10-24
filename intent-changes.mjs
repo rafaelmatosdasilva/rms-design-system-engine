@@ -410,7 +410,7 @@ export function describeReview({ pages, problems }) {
 export function describeChanges({ pages, held }, { dropped = [] } = {}) {
   const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
   const out = [`${pages.length} page${pages.length === 1 ? '' : 's'} changed: ${n('removed')} line${n('removed') === 1 ? '' : 's'} written on every page alike taken out, ${n('rewritten')} sentence${n('rewritten') === 1 ? '' : 's'} the system contradicts written again as drafts, ${n('drafted')} line${n('drafted') === 1 ? '' : 's'} drafted.`,
-    '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). The design-system engine lists each under Review on the Intent layer page.', ''];
+    '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). The design-system engine lists each under Review on the Documentation page.', ''];
   for (const p of pages) {
     out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
     for (const r of p.rewritten) out.push(`- Written again (draft): "${r.line}" → "${r.text}"`);

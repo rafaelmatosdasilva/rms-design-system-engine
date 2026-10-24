@@ -709,7 +709,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) {
         const il = ilMatch.has(c.name) ? ilMod.componentIntent(ilMatch.get(c.name), ilSnap._source, ilWrong(ilMatch.get(c.name))) : ilSnap ? null : (ilNow[c.name]?.intentLayer ?? null);
         // The intent layer merged into its documentation, each line under its source (Figma, the code, the intent layer,
-        // the contract); the Intent layer page reviews every page of it apart.
+        // the contract); the Documentation page reviews every page of it apart.
         if (!il && hasLayer) c.intentLayer = { none: true };
         if (il) c.intentLayer = { source: il.source ?? 'the intent layer', file: il.file, url: il.url, purpose: il.purpose ?? null, status: il.status ?? null, whenToUse: il.whenToUse ?? null, whenNotToUse: il.whenNotToUse ?? null, mistakes: il.mistakes ?? null, limitations: il.limitations ?? null, rules: il.rules ?? null, sections: il.sections ?? null, facts: il.facts ?? null, repeated: il.repeated ?? 0 };
         c.guidance = guidanceView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.guidance, seen: seenIn(c), intentLayer: il });
@@ -769,6 +769,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const rating = gr.rateGuidance(gr.sectionsFrom(gl, facts, words), facts);
         const last = readJson(join(OUT_DIR, 'guidance-rating.json'));
         const extracted = Object.fromEntries((last?.components ?? []).filter((x) => typeof x.extracted === 'number').map((x) => [x.name, x.extracted]));
+        // A name it calls unknown counts only when the content check also finds it nowhere in the system (its code,
+        // Figma, its files): the same answer as the Documentation page's.
+        let truth = null; try { const it = await import('./intent-truth.mjs'); const f = it.systemFacts(ROOT, cfg, { record: false }); truth = (n) => it.inSystem(f, n); } catch { /* the rating's own answer */ }
+        if (truth) for (const r of rating.components) { const known = (r.unknown ?? []).filter(truth); r.unknown = (r.unknown ?? []).filter((n) => !known.includes(n)); r.add = (r.add ?? []).filter((x) => !known.some((n) => x.startsWith('`' + n + '`'))); }
         const byName = new Map(rating.components.map((r) => [r.name, r]));
         for (const c of view.components) {
           const r = byName.get(c.name); if (!r) continue;
