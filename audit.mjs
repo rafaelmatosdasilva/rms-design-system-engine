@@ -481,6 +481,27 @@ if (process.argv.includes('--refresh-snapshots')) {
   process.exit(r.ok ? 0 : 1);
 }
 
+// --share-theme <file>…: a theme saved from the style guide (its .theme.json) sent to the team's themes store, in this
+// system's folder, when GitLab lets this person write it; everyone's next build shows it in the Theme choice.
+if (process.argv.includes('--share-theme')) {
+  let tcfg; try { tcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const st = await import('./stores.mjs');
+  if (!st.storesOf(tcfg).themes.write) { console.log('ℹ️  No themes store: themes stay in each person\'s own folder (ds-config.json → stores.themes names one).'); console.log('NEXT: none'); process.exit(0); }
+  const at = process.argv.indexOf('--share-theme'), given = process.argv.slice(at + 1).filter((a) => !a.startsWith('--'));
+  if (!given.length) { console.log('❌ --share-theme <file.theme.json>…: the theme files to share (saved from the style guide\'s Theme choice).'); process.exit(2); }
+  const sys = String(tcfg.name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
+  const files = new Map();
+  for (const f of given) {
+    let t; try { t = JSON.parse(readFileSync(resolve(f), 'utf8')); } catch (e) { console.log(`❌ ${f}: not a theme file (${e.message.split('\n')[0]})`); process.exit(2); }
+    if (!t || !t.id || !t.name) { console.log(`❌ ${f}: a theme file has an id and a name`); process.exit(2); }
+    files.set(`${sys}/${basename(f)}`, Buffer.from(JSON.stringify(t, null, 2) + '\n'));
+  }
+  const r = await st.pushStore(ROOT, tcfg, 'themes', files, `Theme${files.size === 1 ? '' : 's'} shared with the design-system engine: ${[...files.keys()].map((k) => k.split('/').pop()).join(', ')}`, { offline: STORE_OFFLINE });
+  console.log(r.line);
+  console.log(r.ok ? 'NEXT: everyone\'s next style guide build shows it in the Theme choice.' : 'NEXT: tell the person the line above; the theme stays on this computer.');
+  process.exit(r.ok ? 0 : 1);
+}
+
 // ── --intent-decide [key,… yes|no]: the team's answer to the engine's proposals for the Intent layer's Fix, Add, Move ──
 // With nothing after it, lists each open proposal with its key and what it rests on. With keys ("all" for every open
 // one) and yes or no, records the answer in design-system-engine-intent-decisions.json: a yes is acted on from the next

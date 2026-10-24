@@ -25,9 +25,12 @@ import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 
-export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'styleguide', 'decisions'];
-export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', styleguide: 'Style guide', decisions: 'Team decisions' };
+export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'styleguide', 'decisions', 'themes'];
+export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
 export const STATE = `${OUT_DIR}/stores.json`;
+// The team's themes (a style guide module's data, one folder a system: <system>/<name>.theme.json), read into the
+// engine's own folder, never the project's: the build reads them there with the person's own (styleguide-gen.mjs).
+export const THEMES_DIR = `${OUT_DIR}/themes`;
 // The team's decisions: the files people write by deciding (answers to proposals, kept and accepted differences,
 // checks made by hand). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it, nobody decides it.
 export const DECISION_FILES = ['intentDecisions', 'kept', 'baseline', 'checked'].map((k) => PROJECT[k].now);
@@ -37,6 +40,7 @@ const TAKES = {
   decisions: (rel) => DECISION_FILES.includes(rel),
   contracts: (rel) => /\.(json|md)$/i.test(rel),
   styleguide: (rel) => /\.(html|css|js|mjs|svg|png|jpe?g|webp|gif|woff2?|json|txt)$/i.test(rel),
+  themes: (rel) => /^[\w.-]+\/[^/]+\.json$/i.test(rel),
 };
 const ROLE = { 0: 'no access', 5: 'Minimal access', 10: 'Guest', 15: 'Planner', 20: 'Reporter', 30: 'Developer', 40: 'Maintainer', 50: 'Owner' };
 const roleOf = (n) => ROLE[n] ?? `access level ${n}`;
@@ -256,10 +260,11 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
     }
   } catch (e) { return { line: `⚠️  ${label} not read from ${describePlace(place)}: ${e.message}`, changed: false, written: [] }; }
   const written = [], kept = [], files = { ...(prev.files ?? {}) };
+  const base = resolve(ROOT, part === 'themes' ? THEMES_DIR : '.');
   for (const [rel, data] of remote) {
     if (!safeRel(rel) || !TAKES[part]?.(rel)) continue;
-    const fp = resolve(ROOT, rel);
-    if (!fp.startsWith(resolve(ROOT) + sep)) continue;
+    const fp = resolve(base, rel);
+    if (!fp.startsWith(base + sep)) continue;
     const there = hash(data);
     const here = existsSync(fp) ? hash(readFileSync(fp)) : null;
     if (here === there) { files[rel] = there; continue; }
@@ -315,7 +320,8 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     const head = String((await h.json())?.id ?? '');
     const st = readState(ROOT), prev = st[part] ?? {};
     // A part the project reads from the same place (the snapshots, the decisions) is sent on the commit it was read at.
-    const expect = opts.expectSha ?? (TAKES_ON_RUN.includes(part) && keyOf(storesOf(cfg)[part].read) === keyOf(place) ? prev.sha : null);
+    // Not the themes: each is a file of its own, and the page published beside them moves the branch they are read at.
+    const expect = opts.expectSha ?? (part !== 'themes' && TAKES_ON_RUN.includes(part) && keyOf(storesOf(cfg)[part].read) === keyOf(place) ? prev.sha : null);
     if (expect && head && !head.startsWith(expect)) return { ok: false, line: `⚠️  ${label} not sent: ${a.branch} moved since it was read (now ${head.slice(0, 8)}): run again, so the store is read first` };
     const pre = place.path ? place.path + '/' : '';
     const there = new Set();
@@ -353,7 +359,7 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
 // ── On each run: the stores the project reads from, brought in ─────────────────────────────────────────────────────
 // The snapshots and the team's decisions (the parts the checks read); the contracts and the style guide are only
 // written. → [line]
-const TAKES_ON_RUN = ['snapshots', 'decisions'];
+const TAKES_ON_RUN = ['snapshots', 'decisions', 'themes'];
 export async function pullOnRun(ROOT, cfg, opts = {}) {
   const lines = [];
   for (const part of TAKES_ON_RUN) {
