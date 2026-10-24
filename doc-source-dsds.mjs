@@ -407,8 +407,8 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
   const fail = (r) => kept(r.status ? why(r.status, p.host) + notSent : `could not reach ${p.host}`);
   try {
     // The layer by its id, found from the link even when it moved or names the project.
-    const { base } = await projectApi(p.origin, p.path, get);
-    let ref = p.ref;
+    const { base, project } = await projectApi(p.origin, p.path, get);
+    let ref = p.ref || project?.default_branch;
     if (!ref) {
       const r = await get(base);
       if (!r.ok) return fail(r);

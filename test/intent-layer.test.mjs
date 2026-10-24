@@ -235,11 +235,11 @@ test('read through the API into its snapshot; the token goes to the named host; 
   assert.equal(snap._source.ref, 'main');
   assert.equal(snap._source.entry, 'docs/dsds/system.dsds.json');
   assert.match(describeSync(r), /8 pages .* read →/);
-  // Same commit: two calls, no archive.
+  // Same commit: one call, no archive.
   const again = fakeGitlab();
   const r2 = await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: again.fetchImpl });
   assert.equal(r2.changed, false);
-  assert.equal(again.calls.length, 2);
+  assert.equal(again.calls.length, 1);   // the project, found once a run, gave its default branch: only the commit is asked
   // An entry given: only its folder is asked for.
   const sub = fakeGitlab({ sha: 'fff1234def5678' });
   await syncIntentLayer(dir, { intentLayer: { gitlab: LINK, entry: 'docs/dsds/system.dsds.json' } }, { env: ENV, fetchImpl: sub.fetchImpl });

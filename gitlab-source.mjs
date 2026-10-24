@@ -140,26 +140,28 @@ export function untar(buf) {
 // A project as GitLab knows it now, from a link that may be old or loose: the project moved or was renamed (GitLab
 // answers the old path with the project, by its id), or the link names it by its name instead of its path (the one
 // project of that name in that group). Every call after it goes to the project by its id, which a move never changes.
-// get(url) → a response, with the token. → { base, path, how: 'same' | 'moved' | 'name' }; said once a run when the
-// link is not the project's path (projectNote).
+// get(url) → a response, with the token. → { base, path, how: 'same' | 'moved' | 'name', project: GitLab's answer
+// (its default_branch, so the caller asks no second time) | null }; said once a run when the link is not the
+// project's path (projectNote).
 const PROJECTS = new Map();
 export async function projectApi(origin, path, get) {
   const key = `${origin}|${path}`;
   if (PROJECTS.has(key)) return PROJECTS.get(key);
   const byPath = `${origin}/api/v4/projects/${encodeURIComponent(path)}`;
-  let out = { base: byPath, path, how: 'same' };
+  let out = { base: byPath, path, how: 'same', project: null };
   try {
     const r = await get(byPath);
     if (r?.ok) {
       const j = await r.json();
-      if (j?.id) out = { base: `${origin}/api/v4/projects/${j.id}`, path: j.path_with_namespace || path, how: j.path_with_namespace && j.path_with_namespace.toLowerCase() !== path.toLowerCase() ? 'moved' : 'same' };
+      out.project = j ?? null;
+      if (j?.id) out = { base: `${origin}/api/v4/projects/${j.id}`, path: j.path_with_namespace || path, how: j.path_with_namespace && j.path_with_namespace.toLowerCase() !== path.toLowerCase() ? 'moved' : 'same', project: j };
     } else if (r?.status === 404) {
       const parts = path.split('/'), leaf = parts.pop(), group = parts.join('/').toLowerCase();
       const s = await get(`${origin}/api/v4/projects?search=${encodeURIComponent(leaf)}&simple=true&per_page=100`);
       if (s?.ok) {
         const n = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const hit = (await s.json() ?? []).filter((x) => String(x.path_with_namespace ?? '').split('/').slice(0, -1).join('/').toLowerCase() === group && (n(x.name) === n(leaf) || n(x.path) === n(leaf)));
-        if (hit.length === 1) out = { base: `${origin}/api/v4/projects/${hit[0].id}`, path: hit[0].path_with_namespace, how: 'name' };
+        if (hit.length === 1) out = { base: `${origin}/api/v4/projects/${hit[0].id}`, path: hit[0].path_with_namespace, how: 'name', project: null };
       }
     }
   } catch { /* the link as given */ }
@@ -251,8 +253,9 @@ export async function syncGitlab(p, opts = {}) {
   };
   try {
     // The project by its id, found from the link even when it moved or names the project.
-    base = (await projectApi(p.origin, p.path, get)).base;
-    let ref = p.ref;
+    const found = await projectApi(p.origin, p.path, get);
+    base = found.base;
+    let ref = p.ref || found.project?.default_branch;
     if (!ref) {
       const r = await get(base);
       if (!r.ok) return cached(r.status ? why(r.status, p.host) + notSent : `could not reach ${p.host}`);
