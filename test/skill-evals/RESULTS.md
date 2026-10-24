@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: One token per person: the installer asks for a fine-grained token (Read on the system's projects, Commit and Merge request Create), and a refused write says what that token needs instead of asking for a second one (continuous evaluation)
+
+What changed since the entry below (engine de2a613): Status cards: the big number is the share done (of every check, or of Figma's components for Implementation), the count of components all done under it; Status cards: no line under the percentage; the legend says the done state in its word (131 built, 3 matched, passed, written); Profile: a file given by a relative path is remembered by its full path; Profile export: names the parts it places, the intent layer named the old way among them; Setup asks one thing a part, where it lives: who may change it is GitLab's answer, never asked; Decisions store: only what people decide, not the record every run rewrites; Status cards: each legend leads with a muted Components, so its counts read as components and the percentage as checks; Installer: one line sets a company's person up (the engine, its command, their GitLab token asked in the terminal, a work folder from its profile); Documentation page (once Intent layer): each row also says what is still to write about its component, from every source, and where (Figma, the intent layer); the documentation rating calls a name unknown only when the content check does; Accessibility results saved with the snapshots (a11y-results.snapshot.json): each build reuses every component unchanged since and tries only the rest, then sends the file to the snapshots store when GitLab lets it write; the signature ignores the order a bundler writes the system's CSS in and where a render was placed; One token per person: the installer asks for a fine-grained token (Read on the system's projects, Commit and Merge request Create), and a refused write says what that token needs instead of asking for a second one. The guide changed in `cookbook/first-setup.md`, `reference/usage.md`.
+
+Guide set measured: `bf67321fc050` · Project measured: `13d811a9d668`
+
+| Haiku, engine c15a00a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.063 | $0.060 |
+| Input a run | 124k | 109k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 109k a run against 124k. Records: `records/2026-10-24-one-token-per-person-the`.
+
 ## 2026-10: Where each part lives, and who may write it: stores, a company's profile and its command (continuous evaluation)
 
 What changed since the entry below (engine 4c73986): Style guide tabs: their words 1px smaller, the large text size; Accessibility try in the build: no person to wait for, so a component whose script moves the focus no longer starts its variant again forever; a variant a person stops is retried three times at most; Where each part lives, and who may write it: stores, a company's profile and its command. The guide changed in `cookbook/first-setup.md`, `cookbook/publish-styleguide.md`, `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
