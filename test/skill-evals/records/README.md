@@ -125,5 +125,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-22-intent-layer-page-part-of` | The 21 guide tasks on Haiku (engine 4c73986) | "Intent layer page: Part of and its component 8px apart" |
 | `2026-10-23-where-each-part-lives-and` | The 21 guide tasks on Haiku (engine de2a613) | "Where each part lives, and who may write it: stores, a company's profile and its command" |
 | `2026-10-24-one-token-per-person-the` | The 21 guide tasks on Haiku (engine c15a00a) | "One token per person: the installer asks for a fine-grained token (Read on the system's projects, Commit and Merge request Create), and a refused write says what that token needs instead of asking for a second one" |
+| `2026-10-24-publishing-the-style-guide-to` | The 21 guide tasks on Haiku (engine bd53684) | "Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
