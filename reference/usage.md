@@ -410,12 +410,12 @@ a `*` is a family, there when one of the system's names starts with it). Each so
 missing can be written in whichever the team keeps; nothing has to be in Figma. `--guidance-rating` reads the same
 sources.
 
-The **For agents** page does the same for Figma and the code: a component's Figma description, its When to use and When not to use
+The **Documentation** page does the same for Figma and the code (a system with no intent layer has it too, one row a component): a component's Figma description, its When to use and When not to use
 lines and the contract reach the agents in full, while its notes (Figma annotations, the code's note and the
 comment above its CSS rule) reach only the prototype context, the first three of them printed. A note that repeats
 the description or another note, one that is only a link or only says how the component is built, and a note past
-the first three are listed with why, what to do so the agents get it, and whether to remove it, on the page and as
-a Not given to agents row in the component's Documentation, for whoever wrote it.
+the first three are flagged **Remove** on the component's row, listed with why, what to do so the agents get it, and
+whether to remove it, and kept as a Not given to agents row in the component's Documentation, for whoever wrote it.
 
 Because the file is regenerated every run, the generator is **merge-aware**: it reads the existing
 file and **preserves everything you authored** — each layer's `authored` string, and every
