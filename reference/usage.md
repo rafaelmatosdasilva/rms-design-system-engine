@@ -98,7 +98,7 @@ rms-design-system-engine --check-intent [file|folder]   # whether what intent-la
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
 rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
 rms-design-system-engine --intent-autofix on|off        # whether each run of the audit and of the style guide fixes the intent layer and commits it straight on its branch (ds-config.json → intentLayer.autoFix "commit")
-rms-design-system-engine --intent-decide                 # the engine's proposed answer to each of the team's decisions on the Intent layer page (Fix, Add, Move), with its key and what it rests on
+rms-design-system-engine --intent-decide                 # the engine's proposed answer to each of the team's decisions on the Documentation page (Fix, Add, Move), with its key and what it rests on
 rms-design-system-engine --intent-decide "<key>[,<key>]" yes|no  # the team's answer ("all" for every open one), kept in design-system-engine-intent-decisions.json and acted on from the next run
 rms-design-system-engine --review-drafts                 # every draft in the intent layer to review: its page, its section, its text
 rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
@@ -275,7 +275,7 @@ component's `guidelines` in `design-intent.json`, the rest in the global block, 
 source is an adapter (`intent-layer.mjs` → `SOURCES`) that reads its own format, read-only, into a snapshot in one
 shape: pages, each with what it is for, when to use it, when not to, common mistakes, limitations, rules, its other
 sections and what was left out. Everything that reads it (the design intent, the contracts, `llms.txt`, the
-prototypes, the style guide and its Intent layer page) takes only that shape and names each line by its source, so
+prototypes, the style guide and its Documentation page) takes only that shape and names each line by its source, so
 another source (a design tool's own specs, another format) is one adapter, nothing else changed. Where two sources
 document one component, the first configured one is its page. The first source is the intent layer below.
 
@@ -349,7 +349,7 @@ guide reads the layer, what `--intent-changes` would change is changed and commi
 once a run, never offline and never failing the run: the lines written on every page taken out, sentences the system
 contradicts written again, what a page lacks drafted. A drafted line keeps its `**Draft:**` marker, so it waits for the
 team's review (the page's Review decision); what needs a person and no draft can settle (a name nothing in the system
-confirms, a page to add, move or delete) is never touched and stays on the Intent layer page. The run says what it did
+confirms, a page to add, move or delete) is never touched and stays on the Documentation page. The run says what it did
 in one line, with the commit's link and `CHANGES.md`. The layer is read again at once, so the guide shows it as it is.
 It commits only when GitLab lets the write token push to the layer's branch (see Where each part lives); a protected
 branch or a read-only token skips it with one line, and `--intent-changes --merge-request` sends the fixes for review.
@@ -358,7 +358,7 @@ the requests are written as `--intent-changes` writes them. It takes the person'
 off with `--intent-autofix off`.
 
 **Proposals for the team's decisions: `--intent-decide`** (`intent-proposals.mjs`). Each Fix, Add and Move on the
-Intent layer page carries the engine's proposed answer and what it rests on, in a Proposal card of its panel. Add: a
+Documentation page carries the engine's proposed answer and what it rests on, in a Proposal card of its panel. Add: a
 component drawn from the same code file as a documented one has that page; a part of a documented component (its Figma
 name under it, or its code file beside it, used only by it) is documented in that page; else its page is to be written
 (only components the code has are asked a page: one only in Figma waits until it is built). Fix: a name the page itself
@@ -932,6 +932,12 @@ it from this setup; `--profile-export` writes it as it is. Neither ever writes a
 and `profile` remembers where it came from. Each later run reads it again (with the person's own `GITLAB_TOKEN`) and
 takes a new version when its maintainers changed it; `--offline` keeps the one there. Setup by a profile asks nothing:
 the run says what GitLab lets this person do with each part.
+
+**One line for a company's people**: `curl -fsSL …/install.sh | bash -s -- --client <client> --profile <link>
+[--folder <work folder>]` installs the engine, writes the company's command, asks for the person's GitLab token in the
+terminal (hidden, with how to make one: `read_api` to read, `api` to also change things; one token for every project,
+since GitLab lets it write only where the person's role allows) and keeps it in the work folder's `.env` (mode 600),
+then sets the folder up from the profile. The token is never on the command line.
 
 **The company's command**: `--make-command <client> --profile <link>` writes
 `~/.claude/skills/rms-design-system-engine-<client>/SKILL.md` (or into `--dir`, to share it in the company's private

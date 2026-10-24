@@ -81,7 +81,7 @@ if (!STORE_QUIET) {
   const r = await pf.refreshProfile(ROOT, { given, read: given ? PROFILE_READ : null, offline: STORE_OFFLINE });
   for (const l of r.lines) console.error(l);
   const st = await import('./stores.mjs');
-  if (r.applied) for (const l of await st.accessLines(ROOT, r.cfg, { offline: STORE_OFFLINE })) console.error(l);
+  if (r.applied && !process.argv.includes('--store')) for (const l of await st.accessLines(ROOT, r.cfg, { offline: STORE_OFFLINE })) console.error(l);   // --store says them itself
   let scfg = null; try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* not set up yet, or said where it is read */ }
   if (scfg) for (const l of await st.pullOnRun(ROOT, scfg, { offline: STORE_OFFLINE })) console.error(l);
 }
@@ -462,7 +462,7 @@ if (process.argv.includes('--make-command')) {
   const link = /^https?:\/\//i.test(source) ? source : resolve(PROJECT_FROM, source);
   const out = pf.writeCommand(client, link, { dir: dir ? resolve(PROJECT_FROM, dir) : undefined, name: r.profile.name });
   console.log(`✅ /${pf.commandName(client)} written: ${out}`);
-  console.log(`   It runs the engine with ${link}; each person keeps their own tokens in .env and writes only where GitLab lets them.`);
+  console.log(`   It runs the engine with ${link}; each person keeps their own GitLab token in .env and writes only where GitLab lets them.`);
   console.log(`NEXT: ${dir ? 'the person shares that folder in the company\'s private repository; each colleague copies it into ~/.claude/skills/' : `the person shares ${dirname(out)} with the team (a private repository); each colleague puts it in ~/.claude/skills/`} and runs /${pf.commandName(client)}.`);
   process.exit(0);
 }
