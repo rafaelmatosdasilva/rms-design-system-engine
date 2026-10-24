@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced (continuous evaluation)
+
+What changed since the entry below (engine bd53684): The team's themes in a store of their own (stores.themes, often a themes folder in the style guide's repository): read on each run into the engine's folder, shown in the Theme choice with each person's own; --share-theme sends a saved theme there when GitLab lets the person write it; Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `50e4c1e21ddd` · Project measured: `13d811a9d668`
+
+| Haiku, engine 4713436 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.067 | $0.061 |
+| Input a run | 145k | 122k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 122k a run against 145k. Records: `records/2026-10-24-each-style-guide-build-sends`.
+
 ## 2026-10: Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own (continuous evaluation)
 
 What changed since the entry below (engine c15a00a): A component class with a bracket, a space or a date in it is escaped wherever it becomes a selector (clsSel), so it never stops the accessibility pass or the lookup that runs over every component; Skill evaluation: each run keeps the agent command line's version and bundled skills; a change since the runs before, or between this evaluation's runs, is said in the console and in the RESULTS.md entry, never read as a change in the guide; The prototype evaluation says whether one request gives the same page across sessions: the components, spacing tokens and text styles every session used, and what only some did, per task and side; Template tests read the escaped class selectors (clsSel); Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own. The guide changed in `cookbook/publish-styleguide.md`.
