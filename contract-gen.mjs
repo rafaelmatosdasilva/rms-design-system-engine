@@ -547,6 +547,7 @@ const CONTRACT_SCHEMA = {
       properties: { source: str, purpose: str, whenToUse: strs, whenNotToUse: strs, mistakes: strs, limitations: strs, rules: strs },
     },
     intentPage: { type: 'string', description: 'Its page in the intent layer, linked (a published contract never copies it).' },
+    kept: { type: 'array', description: 'Differences between Figma and the code the team kept on purpose: follow the side it says is right.', items: { type: 'object', required: ['what', 'reason'], properties: { check: str, what: str, truth: { enum: ['figma', 'code'] }, reason: str, at: str } } },
     relationships: { type: 'object', properties: { composesWith: strs, neverCombineWith: strs } },
     usage: { type: 'object', properties: { element: str, props: { type: 'object' } } },
     slots: { type: 'array', items: { type: 'object', required: ['name'] } },
@@ -821,7 +822,8 @@ export function publishedReadme(built, skipped = [], { schema = 'contract.schema
     '| `states[]`, `variants` | Its states (Figma\'s state axis and the code\'s pseudo-classes) and other variants | Figma, code |',
     '| `anatomy`, `tokens` | Its root and inner frames (padding, gap, radius, height, text style; `borderInset` where Figma\'s padding is the room for a border) and the tokens each state uses | Figma |',
     '| `accessibility` | Its element, role, ARIA and keyboard, each value with where it was read | Figma annotations, code, authored |',
-    '| `intentPage` | The component\'s page in the intent layer (what it is for, when to use it) | intent layer |', '',
+    '| `intentPage` | The component\'s page in the intent layer (what it is for, when to use it) | intent layer |',
+    '| `kept[]` | Differences between Figma and the code the team kept on purpose: what differs, which side is right (`truth`) and why. Follow that side; never change it back | the team\'s decisions |', '',
     '## Coverage', '',
     '| | |', '|---|---|',
     `| Contracts | ${cs.length} |`,
@@ -833,6 +835,7 @@ export function publishedReadme(built, skipped = [], { schema = 'contract.schema
     `| With events | ${n((c) => c.events?.length)} |`,
     `| With accessibility | ${n((c) => c.accessibility && Object.keys(c.accessibility).length)} |`,
     `| With an intent layer page | ${n((c) => c.intentPage)} |`,
+    `| With differences kept on purpose | ${n((c) => c.kept?.length)} |`,
     ...(figmaFile ? ['', `Figma file: \`${figmaFile}\`.`] : []),
   ];
   // A token Figma binds that the captured variables do not have (a variable of another library, a renamed one): kept as
@@ -863,6 +866,9 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // Optional composition snapshot ({ "<Component>": ["Child", ...] }) drives relationships.composesWith.
   // Absent → relationships are simply omitted (additive, never an error).
   const composition = readJSON(resolve(ROOT, paths.compositionSnapshot || 'component-composition.snapshot.json')) || {};
+  // The differences the team kept on purpose (kept.mjs): each contract carries its own, so an agent follows the side the
+  // team chose instead of "fixing" it to the other.
+  const keptAll = (await import('./kept.mjs')).readKept(ROOT);
 
   let CONTRACT = {};
   const contractPath = resolve(ROOT, cfg.paths?.structureContract || 'structure-contract.mjs');
@@ -1026,6 +1032,8 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     let text = ''; try { if (api?.file) text = readFileSync(resolve(ROOT, api.file), 'utf8'); } catch { /* unreadable */ }
     const codePart = apiReader ? { api, text, aliases: cfg.componentPropAliases?.[name] ?? null, stateBindings: stateBindings[name] ?? null, componentTokens: stateTokensFile[name]?.tokens ?? null, publish, idPrefix: cc.idPrefix, schemaRef: relative(dirname(file), schemaOut).split(/[\\/]+/).join('/').replace(/^(?!\.)/, './'), figmaFile: cfg.figmaFileKey || undefined, commit: publish ? lastCommitOf(ROOT, api?.file) : null } : null;
     const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source, wrongOf(intentPages.get(name))) : null, code: codePart });
+    const keptHere = keptAll.filter((d) => d.component === name);
+    if (keptHere.length) contract.kept = keptHere.map((d) => ({ check: d.check, what: d.what, ...(d.truth ? { truth: d.truth } : {}), reason: d.reason, ...(d.at ? { at: String(d.at).slice(0, 10) } : {}) }));
     // From the code alone, no description is a placeholder saying it came from Figma.
     if ((codeOnly || !(props[name] || structure[name])) && /— captured from Figma by rms-design-system-engine\.$/.test(contract.description)) contract.description = '';
     if (lives[name] && !publish) contract.livesIn = lives[name];

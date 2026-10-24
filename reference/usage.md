@@ -919,12 +919,14 @@ it as the props type) and `tsc` shows prop drift in the editor and in CI. `contr
 #### Where each part lives: stores and a company's profile (`--store`, `--profile`)
 
 A team keeps each part of the engine's own files where it chose: the Figma and code snapshots, the intent layer, the
-contracts, the style guide and its decisions (answers to proposals, kept and accepted differences, checks made by
-hand), each in a GitLab project (a folder in it, a branch of it) or a folder (`stores.mjs`). `ds-config.json → stores`
-names the place of each; the configuration reference has the format. Each run reads the snapshots and the decisions
-from their stores when the store's commit moved, never over a file changed on this computer since it was last read
+contracts, the style guide, the differences kept on purpose (`kept`: a design rule agents follow, so a team keeps them
+with its intent layer; with the decisions when the setup names no place for them) and the other decisions (answers to
+proposals, accepted debt, checks made by hand), each in a GitLab project (a folder in it, a branch of it) or a folder (`stores.mjs`). `ds-config.json → stores`
+names the place of each; the configuration reference has the format. Each run reads the snapshots, the kept
+differences and the decisions from their stores when the store's commit moved, never over a file changed on this computer since it was last read
 (that one is kept, and said). The contracts (`--contracts-out` with no folder), the style guide
-(`--publish-styleguide`), the decisions (after `--intent-decide`, `--keep`, `--checked`), the snapshots
+(`--publish-styleguide`), the kept differences (after `--keep`), the decisions (after `--intent-decide`, `--checked`),
+the snapshots
 (`--refresh-snapshots`) and the intent layer (`--intent-changes --commit`, `--review-drafts --commit`, the fixes made on
 each run) are written to theirs. A store brings into the project only its own kind of file (a snapshots store only
 `*.snapshot.json`), never a `.env` or a hook.
@@ -1451,7 +1453,9 @@ reason, and it leaves the open differences: `differences.md` lists it under Kept
 Parity area shows it with the status Kept on purpose. What is kept is that difference with those values, matched by its
 check and its words (a file's line number and the severity icon aside): when a value changes on either side, it is open
 again and the decision is listed as no longer found, to drop with `--unkeep --match <words>` or to keep again. A kept
-difference whose review date has come is To check in the style guide. `--keep` alone lists the decisions. Only the
+difference whose review date has come is To check in the style guide. Agents get each one as a rule: its component's
+contract lists it under `kept` (what differs, the side that is right, why; never who), and the prototype context says
+it beside the component, so an agent follows the side the team chose. `--keep` alone lists the decisions. Only the
 person keeps a difference: the project's hooks ask before `--keep` or an edit of the file unless their latest message
 says to keep it.
 

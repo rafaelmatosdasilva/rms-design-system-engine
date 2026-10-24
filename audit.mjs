@@ -87,11 +87,11 @@ if (!STORE_QUIET) {
 }
 // A decision just recorded goes to the team's decisions store when the setup names one: GitLab decides whether this
 // person may write it there, and the line says what happened. → true when sent, false when not, null with no store.
-async function sendDecisions() {
+async function sendDecisions(part = 'decisions') {
   let c; try { c = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { return null; }
   const st = await import('./stores.mjs');
-  if (!st.storesOf(c).decisions.write) return null;
-  const r = await st.pushStore(ROOT, c, 'decisions', st.localFiles(ROOT, c, 'decisions'), 'Design-system decisions, recorded with the design-system engine', { offline: STORE_OFFLINE });
+  if (!st.storesOf(c)[part].write) return null;
+  const r = await st.pushStore(ROOT, c, part, st.localFiles(ROOT, c, part), part === 'kept' ? 'Differences kept on purpose, recorded with the design-system engine' : 'Design-system decisions, recorded with the design-system engine', { offline: STORE_OFFLINE });
   console.log(r.line);
   return r.ok;
 }
@@ -1088,7 +1088,7 @@ if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
     if (!gone.length) { console.log(`No kept difference matches${component ? ` in ${component.join(', ')}` : ''}${words.length ? ` "${words.join(', ')}"` : ''}.`); process.exit(1); }
     console.log(`✓ ${gone.length} difference${gone.length === 1 ? '' : 's'} no longer kept: the next audit lists ${gone.length === 1 ? 'it' : 'them'} as open again.`);
     for (const d of gone) console.log(`   • ${km.keptLine(d)}`);
-    if (await sendDecisions() == null) console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`); else console.log('NEXT: run rms-design-system-engine');
+    if (await sendDecisions('kept') == null) console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`); else console.log('NEXT: run rms-design-system-engine');
     process.exit(0);
   }
   const all = km.readKept(ROOT);
@@ -1119,7 +1119,7 @@ if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
   console.log(`✓ Kept on purpose: ${added.length} difference${added.length === 1 ? '' : 's'}, in ${file}.`);
   for (const d of added) console.log(`   • ${km.keptLine(d)}`);
   console.log('   While the values stay as they are, they never fail a run and the differences list and the style guide show them as kept, with the reason. When a value changes, the difference is open again.');
-  if (await sendDecisions() == null) console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`); else console.log('NEXT: run rms-design-system-engine');
+  if (await sendDecisions('kept') == null) console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`); else console.log('NEXT: run rms-design-system-engine');
   process.exit(0);
 }
 
@@ -1322,7 +1322,8 @@ if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWi
       }
     }
   }
-  console.log(failed ? `\nNEXT: make the fix named above, then run rms-design-system-engine --guidelines ${links.join(' ')} again` : '\nNEXT: rms-design-system-engine   (every run refreshes these pages and folds them into the design intent)');
+  // The fix is the person's: a token goes into .env by their hand, never through the chat.
+  console.log(failed ? `\nNEXT: tell the person the fix named above; they make it themselves (a token goes into .env by their hand: never ask for it in the chat). Once they say it is done, run rms-design-system-engine --guidelines ${links.join(' ')} again` : '\nNEXT: rms-design-system-engine   (every run refreshes these pages and folds them into the design intent)');
   process.exit(failed ? 1 : 0);
 }
 

@@ -188,3 +188,16 @@ test('anatomy: a gap on a frame of one item is not spacing, padding of a border\
   assert.equal(two.anatomy.root.gapToken, '{spacing.gap.s}', 'three items: their spacing');
   assert.deepEqual(two.anatomy.root.inset, { blockToken: '{spacing.padding.s}' });
 });
+
+test('a difference the team kept on purpose is in its component\'s contract, with the side that is right and why', async () => {
+  const dir = makeFixture(files());
+  writeFileSync(join(dir, 'design-system-engine-kept.json'), JSON.stringify({ version: 1, decisions: [
+    { key: 'Props :: tileOne tone default', check: 'Props', what: 'tileOne tone default: Figma Loud, code calm', component: 'tileOne', reason: 'calm reads better in lists', by: 'Design', at: '2026-10-01T10:00:00Z', truth: 'code' },
+    { key: 'Props :: otherThing', check: 'Props', what: 'otherThing', component: 'otherThing', reason: 'not this one', at: '2026-10-01T10:00:00Z' },
+  ] }));
+  const r = await generateContracts(dir, cfg(), { force: true });
+  assert.deepEqual(r.invalid, [], JSON.stringify(r.invalid));
+  const c = JSON.parse(readFileSync(join(r.outDir, 'tileOne.contract.json'), 'utf8'));
+  assert.deepEqual(c.kept, [{ check: 'Props', what: 'tileOne tone default: Figma Loud, code calm', truth: 'code', reason: 'calm reads better in lists', at: '2026-10-01' }]);
+  assert.ok(!JSON.stringify(c.kept).includes('Design'), 'who kept it stays in the team\'s decisions, not in what agents read');
+});
