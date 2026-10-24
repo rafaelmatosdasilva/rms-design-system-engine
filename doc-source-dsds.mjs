@@ -32,7 +32,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname, posix } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE } from './gitlab-source.mjs';
+import { parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { contractSummaries } from './shared-contracts.mjs';
 
@@ -405,8 +405,9 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     } catch { return { ok: false, status: 0 }; }
   };
   const fail = (r) => kept(r.status ? why(r.status, p.host) + notSent : `could not reach ${p.host}`);
-  const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
   try {
+    // The layer by its id, found from the link even when it moved or names the project.
+    const { base } = await projectApi(p.origin, p.path, get);
     let ref = p.ref;
     if (!ref) {
       const r = await get(base);

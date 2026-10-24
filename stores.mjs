@@ -22,7 +22,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSy
 import { join, resolve, dirname, relative, sep, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
-import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend } from './gitlab-source.mjs';
+import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 
 export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions'];
@@ -112,16 +112,19 @@ export function gitlabApi(ROOT, place, { env = process.env, http } = {}) {
   const wName = place.writeTokenEnv || place.tokenEnv || 'GITLAB_WRITE_TOKEN';
   const writeTok = envFrom(wName, e, folders) || (wName === 'GITLAB_WRITE_TOKEN' ? writeTokenFrom(e, folders) : '') || readTok;
   const h = (t) => (t && allowed ? { 'PRIVATE-TOKEN': t } : {});
-  const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
   const hr = h(readTok), hw = h(writeTok);
+  // The project by its id, found from the link even when it moved or names the project (gitlab-source.mjs).
+  let ready = null;
+  const base = () => (ready ??= projectApi(p.origin, p.path, (u) => get0(u, { headers: hr['PRIVATE-TOKEN'] ? hr : hw })).then((x) => x.base));
   return {
-    p, base, writesWith: writeTok && writeTok !== readTok ? wName : (place.tokenEnv || 'GITLAB_TOKEN'),
+    p, writesWith: writeTok && writeTok !== readTok ? wName : (place.tokenEnv || 'GITLAB_TOKEN'),
     hasWriteToken: !!hw['PRIVATE-TOKEN'], notSent: !!(readTok || writeTok) && !allowed,
     get: async (path, { write = false } = {}) => {
-      const r = await get0(base + path, { headers: write ? hw : hr });
-      return !write && (r.status === 401 || r.status === 403 || r.status === 404) && hw['PRIVATE-TOKEN'] && hw['PRIVATE-TOKEN'] !== hr['PRIVATE-TOKEN'] ? get0(base + path, { headers: hw }) : r;
+      const b = await base();
+      const r = await get0(b + path, { headers: write ? hw : hr });
+      return !write && (r.status === 401 || r.status === 403 || r.status === 404) && hw['PRIVATE-TOKEN'] && hw['PRIVATE-TOKEN'] !== hr['PRIVATE-TOKEN'] ? get0(b + path, { headers: hw }) : r;
     },
-    send: (method, path, body) => send0(base + path, { method, headers: hw, body }),
+    send: async (method, path, body) => send0((await base()) + path, { method, headers: hw, body }),
   };
 }
 

@@ -940,6 +940,11 @@ one line says why and who can grant it; the run goes on. A write is refused when
 the store, so nothing written meanwhile is overwritten. The engine runs on each person's computer and could be edited:
 GitLab's roles, protected branches and per-project tokens are the lock, and they stay one even if it is bypassed.
 
+**A link that moved still works.** Each GitLab link (the code, the intent layer, a store, the profile) is asked of
+GitLab first: a project that moved or was renamed is found where it is now, and a link that names the project by its
+name instead of its path finds the one project of that name in that group. Every call then goes to the project by its
+id, which a move never changes, and the run says once which path to write instead.
+
 **Tokens stay in each person's `.env`.** A place may name its own variable (`tokenEnv`, one token per project, the
 least each needs); else `GITLAB_TOKEN` reads and `GITLAB_WRITE_TOKEN` writes. A token goes only to gitlab.com or a host
 named in `GITLAB_HOST`.

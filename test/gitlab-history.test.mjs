@@ -123,7 +123,7 @@ test('the readers the engine already has read GitLab in a mirror (changelog, rea
     const { agreed } = recordAgreed(dir, [{ key: 'card · radius', figma: '8px', code: '8px', same: true }]);
     assert.equal(agreed.facts['card · radius'].commit, HEAD.slice(0, 7));
     const { readdirSync, readFileSync } = await import('node:fs');
-    assert.ok(readFileSync(join(work, 'calls.txt'), 'utf8').trim().split('\n').every((l) => l.endsWith(' secret')), 'every call carries the token');
+    assert.ok(readFileSync(join(work, 'calls.txt'), 'utf8').split('\n').filter(Boolean).every((l) => l.endsWith(' secret')), 'every call carries the token (the first, to the project itself, too)');
     assert.ok(readdirSync(dir).includes(HISTORY_FILE));
   } finally {
     server.close();

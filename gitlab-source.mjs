@@ -137,6 +137,41 @@ export function untar(buf) {
 // Sec-Fetch-Mode: cors, and GitLab answers 406 to an archive download that carries it (the project and commit calls
 // pass, so the run fails only at the download). Follows up to 5 redirects; the token goes no further than the host
 // it was meant for. → { ok, status, json(), arrayBuffer() }, the part of a fetch Response the mirror reads.
+// A project as GitLab knows it now, from a link that may be old or loose: the project moved or was renamed (GitLab
+// answers the old path with the project, by its id), or the link names it by its name instead of its path (the one
+// project of that name in that group). Every call after it goes to the project by its id, which a move never changes.
+// get(url) → a response, with the token. → { base, path, how: 'same' | 'moved' | 'name' }; said once a run when the
+// link is not the project's path (projectNote).
+const PROJECTS = new Map();
+export async function projectApi(origin, path, get) {
+  const key = `${origin}|${path}`;
+  if (PROJECTS.has(key)) return PROJECTS.get(key);
+  const byPath = `${origin}/api/v4/projects/${encodeURIComponent(path)}`;
+  let out = { base: byPath, path, how: 'same' };
+  try {
+    const r = await get(byPath);
+    if (r?.ok) {
+      const j = await r.json();
+      if (j?.id) out = { base: `${origin}/api/v4/projects/${j.id}`, path: j.path_with_namespace || path, how: j.path_with_namespace && j.path_with_namespace.toLowerCase() !== path.toLowerCase() ? 'moved' : 'same' };
+    } else if (r?.status === 404) {
+      const parts = path.split('/'), leaf = parts.pop(), group = parts.join('/').toLowerCase();
+      const s = await get(`${origin}/api/v4/projects?search=${encodeURIComponent(leaf)}&simple=true&per_page=100`);
+      if (s?.ok) {
+        const n = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const hit = (await s.json() ?? []).filter((x) => String(x.path_with_namespace ?? '').split('/').slice(0, -1).join('/').toLowerCase() === group && (n(x.name) === n(leaf) || n(x.path) === n(leaf)));
+        if (hit.length === 1) out = { base: `${origin}/api/v4/projects/${hit[0].id}`, path: hit[0].path_with_namespace, how: 'name' };
+      }
+    }
+  } catch { /* the link as given */ }
+  PROJECTS.set(key, out);
+  if (out.how !== 'same') console.log(`ℹ️  ${projectNote(`${origin}/${path}`, out)}`);
+  return out;
+}
+export function projectNote(given, r) {
+  return r.how === 'moved' ? `${given} has moved: GitLab has it at ${r.path} now, which the engine uses. Change the link to it where it is written (ds-config.json, the profile).`
+    : r.how === 'name' ? `${given} names the project by its name: its path in GitLab is ${r.path}, which the engine uses. Change the link to it where it is written (ds-config.json, the profile).` : '';
+}
+
 export function plainGet(url, { headers = {}, signal } = {}, hops = 5) {
   return new Promise((ok, fail) => {
     const u = new URL(url);
@@ -204,7 +239,7 @@ export async function syncGitlab(p, opts = {}) {
   const send = token && tokenAllowedFor(p.host, env);
   const headers = send ? { 'PRIVATE-TOKEN': token } : {};
   const fetchImpl = opts.fetchImpl ?? plainGet;
-  const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
+  let base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
   const cached = (warning) => state?.sha && existsSync(dir)
     ? { dir, path: p.path, ref: state.ref, sha: state.sha, title: state.title, committedAt: state.committedAt, changed: false, stale: true, warning }
     : { dir: null, path: p.path, error: warning };
@@ -215,6 +250,8 @@ export async function syncGitlab(p, opts = {}) {
     try { return await fetchImpl(url, { headers, signal }); } catch (e) { return { ok: false, status: 0, error: e }; }
   };
   try {
+    // The project by its id, found from the link even when it moved or names the project.
+    base = (await projectApi(p.origin, p.path, get)).base;
     let ref = p.ref;
     if (!ref) {
       const r = await get(base);

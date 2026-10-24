@@ -25,7 +25,7 @@ import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node
 import { resolve, join, dirname } from 'node:path';
 import { OUT_DIR } from './names.mjs';
 import { intentLayerConfig, DRAFT } from './doc-source-dsds.mjs';
-import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, plainSend, untar } from './gitlab-source.mjs';
+import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, plainSend, untar, projectApi } from './gitlab-source.mjs';
 export { writeTokenFrom };
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { linesOf, checkPage } from './intent-truth.mjs';
@@ -52,12 +52,14 @@ export function layerAccess(ROOT, cfg, { env = process.env } = {}) {
   // meant to (a project's or a group's own token), while GITLAB_TOKEN keeps reading everything the engine reads.
   const write = writeTokenFrom(e, folders);
   const writeHeaders = write && tokenAllowedFor(p.host, e) ? { 'PRIVATE-TOKEN': write } : headers;
-  const base = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
+  // The layer by its id, found from the link even when it moved or names the project (gitlab-source.mjs).
+  let ready = null;
+  const base = () => (ready ??= projectApi(p.origin, p.path, (u) => plainGet(u, { headers: headers['PRIVATE-TOKEN'] ? headers : writeHeaders })).then((x) => x.base));
   return {
-    p, base, hasToken: !!headers['PRIVATE-TOKEN'], writesWith: writeHeaders === headers ? 'GITLAB_TOKEN' : 'GITLAB_WRITE_TOKEN',
+    p, hasToken: !!headers['PRIVATE-TOKEN'], writesWith: writeHeaders === headers ? 'GITLAB_TOKEN' : 'GITLAB_WRITE_TOKEN',
     // A read refused with GITLAB_TOKEN (revoked, expired) is asked again with the write token, which reads its project.
-    get: async (path) => { const r = await plainGet(base + path, { headers }); return (r.status === 401 || r.status === 403) && writeHeaders !== headers ? plainGet(base + path, { headers: writeHeaders }) : r; },
-    send: (method, path, body) => plainSend(base + path, { method, headers: writeHeaders, body }),
+    get: async (path) => { const b = await base(); const r = await plainGet(b + path, { headers }); return (r.status === 401 || r.status === 403) && writeHeaders !== headers ? plainGet(b + path, { headers: writeHeaders }) : r; },
+    send: async (method, path, body) => plainSend((await base()) + path, { method, headers: writeHeaders, body }),
   };
 }
 
