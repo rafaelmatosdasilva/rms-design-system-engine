@@ -566,7 +566,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   label edit writes only its words into its part. An option the contract maps to another element's selector (a
   product's own markup) is not the component's (`ownSelector`): a chosen state (Selected, Checked, On) falls back to
   the component's own `:checked` rule, and an option the code does not build is offered as not built.
-- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (there is no Documentation page of its own; an old `#documentation` or `#coverage` link opens `#status/documentation`). Its columns are Task nr, Kind, Source (where it was read, by name only: Figma, Intent layer, Code, Contract, Guidelines; the file in the row's panel), Status and Last checked; what is written and what to do (who writes it, You in Figma, and where) are in the row's panel (`PANEL_ONLY`). One row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role, Example, Properties: done, naming its contract file), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
+- **Documentation** (its first card): the table every task shares (`docIssueRows`, `ISSUE_COLS.Documentation`), as Parity and Accessibility are, a count of each status above it (with an intent layer, the Documentation page gathers it for every component, its rows Review, Missing or Keep; `#documentation`, `#intent-layer` and `#coverage` open it, else `#status/documentation`). Role and Do and don't are read from its page in the intent layer first (a rule `Role: button`; a section titled Do and don't, or rules that start `Do:` / `Don't:`), where agents read them without Figma, and a missing one is to write there; Figma's role annotation naming another role is to check, and its do and don't pictures stay for people. Its columns are Task nr, Kind, Source (where it was read, by name only: Figma, Intent layer, Code, Contract, Guidelines; the file in the row's panel), Status and Last checked; what is written and what to do (who writes it, You in Figma, and where) are in the row's panel (`PANEL_ONLY`). One row for every kind (What it is, When to use, When not to use, Common mistakes, Limitations, Do and don't, Role, Example, Properties: done, naming its contract file), what is still to write first; the Status page's Documentation shows the same rows, only those still to write, under the same numbers. Then the API, and Details (Figma's notes, the slots, the code's own note). Where the component is used is its own area, Used in. The usage kinds (`guidanceView`): When to use, When not to use, Common mistakes, Limitations, from a
   line of Figma's description or annotations or the code's note that starts with the section's name, else
   `contract.authored.json` → `components.<name>.guidance` (`whenToUse`, `whenNotToUse`, `mistakes`, `limitations`, a
   string or a list); a missing one is said in its Documentation. Common mistakes the team has not written are what the
@@ -769,6 +769,21 @@ components whose signature changed: nothing changed, nothing tried again. A buil
 and, when the team keeps its snapshots in a store (`stores.snapshots`), sends it there as one commit when GitLab lets
 this person, or the pipeline's token, write it; so everyone's build, and the page the team publishes, start from the
 same results. With no store the file stays in the folder.
+
+**How long each task has been open** (`open-since.snapshot.json`): the same build asks the page for every open task and
+keeps, for each, the day a build first found it (a closed one leaves; one found again starts again), with the snapshots
+and sent to their store as the results are. The page shows it under each open task's status (Open 3 days, Open 5
+weeks), so what is stuck shows apart from what is new; a build without the browser shows the record as of the last
+one that had it.
+
+**Downloads** (the Documentation page's, the tokens, the icons, a component's file) go through one helper; in a page
+shown inside another one (a shared viewer, a sandboxed frame) that may not hand files over, a note says so, with the
+page's own address to open it alone and, for a text file, a button to copy it instead.
+
+**Who decided, and when**: every decision the engine records keeps the person with the day: an answer to a proposal
+(`--intent-decide`), each line accepted as debt (`--baseline`, under `accepted`), a difference kept on purpose
+(`--keep`), a check made by hand (`--checked`). The name is `--by "<name>"`, else the one git uses (`git config
+user.name`); the Documentation page says who declined a proposal and when.
 
 **The page is checked against the system it shows.** After building it, `--styleguide` checks the page's own CSS
 (every `<style>` but the system's, which the template marks `data-system`): a colour, font, text size, weight, line

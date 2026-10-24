@@ -30,9 +30,9 @@ const base = (f) => noExt(f).split('/').pop();
 export const DECISIONS = (ROOT) => resolve(ROOT, projectPath(ROOT, 'intentDecisions'));
 export function readDecisions(ROOT) { try { return JSON.parse(readFileSync(DECISIONS(ROOT), 'utf8')); } catch { return {}; } }
 // keys: [key]; answer: 'yes' | 'no'. proposals: { key: proposal } to keep each one's words with its answer.
-export function decide(ROOT, keys, answer, proposals = {}, { now = new Date().toISOString() } = {}) {
+export function decide(ROOT, keys, answer, proposals = {}, { now = new Date().toISOString(), by = null } = {}) {
   const d = readDecisions(ROOT);
-  for (const k of keys) d[k] = { answer, proposal: proposals[k]?.proposal ?? d[k]?.proposal ?? null, at: now };
+  for (const k of keys) d[k] = { answer, proposal: proposals[k]?.proposal ?? d[k]?.proposal ?? null, by: by || null, at: now };
   writeFileSync(DECISIONS(ROOT), JSON.stringify(d, null, 2) + '\n');
   return d;
 }
@@ -114,6 +114,8 @@ export function proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPa
 // place takes off its Move. → { noPage, pages } with each page's proposal attached (proposal: { key, …, answer }).
 export function applyDecisions({ report, noPage, proposals, decisions }) {
   const answer = (k) => decisions[k]?.answer ?? null;
+  // Who answered it and when, beside the answer: the page says it.
+  const said = (k) => decisions[k] ? { by: decisions[k].by ?? null, at: decisions[k].at ?? null } : {};
   const left = noPage.filter((n) => !(accepted(decisions, `add:${n}`) && proposals.get(`add:${n}`)?.effect === 'documented'));
   const pages = report.pages.map((p) => {
     let q = { ...p };
@@ -122,10 +124,10 @@ export function applyDecisions({ report, noPage, proposals, decisions }) {
       if (kept.length !== q.wrong.length) { q.wrong = kept; if (!kept.length && q.action === 'fix') { q.action = 'keep'; q.decision = 'Keep'; q.todo = []; } }
     }
     if (q.action === 'move' && accepted(decisions, `move:${p.name}`)) { q.action = 'keep'; q.decision = 'Keep'; q.todo = []; }
-    q.proposals = [...proposals.values()].filter((x) => x.page === p.name && (x.kind !== 'fix' || (p.wrong ?? []).some((f) => String(f.says).replace(/`/g, '') === x.subject))).map((x) => ({ ...x, key: [...proposals].find(([, v]) => v === x)[0], answer: answer([...proposals].find(([, v]) => v === x)[0]) }));
+    q.proposals = [...proposals.values()].filter((x) => x.page === p.name && (x.kind !== 'fix' || (p.wrong ?? []).some((f) => String(f.says).replace(/`/g, '') === x.subject))).map((x) => ({ ...x, key: [...proposals].find(([, v]) => v === x)[0], answer: answer([...proposals].find(([, v]) => v === x)[0]), ...said([...proposals].find(([, v]) => v === x)[0]) }));
     return q;
   });
-  const addProposals = Object.fromEntries(left.map((n) => [n, proposals.has(`add:${n}`) ? { ...proposals.get(`add:${n}`), key: `add:${n}`, answer: answer(`add:${n}`) } : null]));
+  const addProposals = Object.fromEntries(left.map((n) => [n, proposals.has(`add:${n}`) ? { ...proposals.get(`add:${n}`), key: `add:${n}`, answer: answer(`add:${n}`), ...said(`add:${n}`) } : null]));
   return { noPage: left, pages, addProposals };
 }
 

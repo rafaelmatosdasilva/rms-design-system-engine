@@ -86,7 +86,9 @@ export function classifyBaseline(gates, baselineLabels, acceptedFindings = null)
 // replacing it; the debt of every other component stays accepted. An unscoped run rewrites it.
 // match: only the findings whose line (or gate) contains one of these words are accepted ("the radius, not the
 // rest"): it implies findings, and a gate with no ❌ line is accepted only when its name matches.
-export function writeBaseline(path, gates, { findings = false, merge = false, match = null, from = path } = {}) {
+// by: who accepted it (decided-by.mjs). Each line accepted keeps who accepted it and when (accepted: { line: { by, at } }),
+// the lines accepted before keeping theirs.
+export function writeBaseline(path, gates, { findings = false, merge = false, match = null, from = path, by = null, now = new Date().toISOString() } = {}) {
   const words = (match ?? []).map((w) => String(w).toLowerCase()).filter(Boolean);
   const hit = (text) => !words.length || words.some((w) => String(text).replace(ANSI, '').toLowerCase().includes(w));
   if (words.length) findings = true;
@@ -96,13 +98,16 @@ export function writeBaseline(path, gates, { findings = false, merge = false, ma
   let lines = findings ? failing.flatMap((g) => { const keys = findingKeys(g); const own = keys.filter((k) => !COUNT.test(k) && hit(k)); return words.length ? (own.length ? [...keys.filter((k) => COUNT.test(k)), ...own] : []) : keys; }) : [];
   let labels = findings ? failing.filter((g) => !findingKeys(g).length && hit(g.label)).map((g) => g.label) : currentFailingLabels(gates);
   if (words.length && merge === false) merge = true;   // accepting some lines never drops the ones accepted before
+  let oldWho = {};
   if (merge && existsSync(from)) {
     let old = {};
     try { old = JSON.parse(readFileSync(from, 'utf8')); } catch { /* unreadable: nothing to keep */ }
     labels = [...new Set([...(Array.isArray(old.gates) ? old.gates : []), ...labels])];
     lines = [...new Set([...(Array.isArray(old.findings) ? old.findings : []), ...lines])];
     if (!findings && Array.isArray(old.findings)) findings = old.findings.length > 0;
+    if (old.accepted && typeof old.accepted === 'object') oldWho = old.accepted;
   }
+  const accepted = Object.fromEntries([...labels, ...(findings ? lines : [])].map((k) => [k, oldWho[k] ?? { by: by || null, at: now }]));
   const doc = {
     $note: findings
       ? 'rms-design-system-engine adoption baseline (finding-level accepted debt). Each listed finding is a known ❌ line, accepted as debt; a failing gate whose ❌ lines are all listed does not fail the run. Any other ❌ line, including a listed one whose value changed, is a regression. A listed finding that is fixed is reported so you can re-run --baseline --findings to drop it. COMMIT this file.'
@@ -110,6 +115,7 @@ export function writeBaseline(path, gates, { findings = false, merge = false, ma
     created: new Date().toISOString(),
     gates: labels,
     ...(findings ? { findings: lines } : {}),
+    accepted,
   };
   writeFileSync(path, JSON.stringify(doc, null, 2) + '\n');
   return findings ? [...labels, ...lines] : labels;
