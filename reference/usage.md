@@ -919,7 +919,7 @@ each run) are written to theirs. A store brings into the project only its own ki
 style guide module lets people make (one folder a system, `<system>/<name>.theme.json`). Each run reads them into the
 engine's own folder (`.design-system-engine-out/themes`), never the project's, and the style guide shows them in its
 Theme choice, with the themes in the person's own module data folder beside them (the store's when both have one).
-`--share-theme <file>` sends a theme someone saved to the store, when GitLab lets them write it.
+Each style guide build sends the themes this person keeps (their module data folder, or saved beside the page) that the store lacks, or holds an older version of, when GitLab lets them write it: a theme made reaches everyone with no step of its own, and a newer one a colleague sent is never replaced. `--share-theme <file>` sends one by hand.
 
 **Who may write is GitLab's answer, never the setup's.** Before the first write to a place in a run the engine asks
 GitLab, with the token that would write: the token's role in the project (Developer or more writes), whether it may

@@ -199,3 +199,16 @@ test('the team\'s themes: read into the engine\'s own folder, never the project\
   assert.ok(existsSync(join(shared, 'themes', 'acme', 'sunset.theme.json')));
   assert.equal(existsSync(join(shared, 'themes', 'acme', '.env')), false, 'only theme files are sent');
 });
+
+test('a style guide build shares the themes the store lacks, or holds older; a colleague\'s newer one is kept', async () => {
+  const { themesToShare, THEMES_DIR } = await import('../stores.mjs');
+  const ROOT = project(), mine = project();
+  mkdirSync(join(ROOT, THEMES_DIR, 'acme'), { recursive: true });
+  writeFileSync(join(ROOT, THEMES_DIR, 'acme', 'ocean.theme.json'), '{"id":"t1","name":"Ocean","changed":"2026-02-01"}');
+  writeFileSync(join(ROOT, THEMES_DIR, 'acme', 'sand.theme.json'), '{"id":"t3","name":"Sand","changed":"2026-01-01"}');
+  writeFileSync(join(mine, 'ocean.theme.json'), '{"id":"t1","name":"Ocean","changed":"2026-01-15"}');   // older than the store's: kept there
+  writeFileSync(join(mine, 'sand.theme.json'), '{"id":"t3","name":"Sand","changed":"2026-03-01"}');    // newer: sent
+  writeFileSync(join(mine, 'sunset.theme.json'), '{"id":"t2","name":"Sunset"}');                       // new: sent
+  writeFileSync(join(mine, 'notes.json'), '{"a":1}');                                                  // not a theme
+  assert.deepEqual([...themesToShare(ROOT, [mine], 'acme').keys()].sort(), ['acme/sand.theme.json', 'acme/sunset.theme.json']);
+});

@@ -202,6 +202,23 @@ export function localFiles(ROOT, cfg, part, { intentOut } = {}) {
   return out;
 }
 // The files of a folder the engine built (the contracts, the style guide), by the part's own kinds. → Map(rel → Buffer)
+// The themes on this computer that the team's store lacks, or holds an older version of (by the theme's changed date):
+// what a style guide build sends, so a theme someone makes reaches everyone with no step of its own. A newer one a
+// colleague sent is never replaced. dirs: the folders this person keeps theme files in. → Map(<system>/<file> → Buffer)
+export function themesToShare(ROOT, dirs, sys) {
+  const read = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
+  const list = (d) => { try { return readdirSync(d).filter((f) => /\.json$/i.test(f)).sort(); } catch { return []; } };
+  const theirs = new Map(), storeDir = join(ROOT, THEMES_DIR, sys);
+  for (const f of list(storeDir)) { const t = read(join(storeDir, f)); if (t?.id) theirs.set(t.id, String(t.changed ?? '')); }
+  const out = new Map();
+  for (const d of dirs) for (const f of list(d)) {
+    const t = read(join(d, f));
+    if (!t?.id || !t.name || (theirs.has(t.id) && !(String(t.changed ?? '') > theirs.get(t.id)))) continue;
+    out.set(`${sys}/${f}`, Buffer.from(JSON.stringify(t, null, 2) + '\n')); theirs.set(t.id, String(t.changed ?? ''));
+  }
+  return out;
+}
+
 // The page and what it links to beside it (another page, a picture, a stylesheet), followed from each page sent: never
 // the rest of its folder, where a person may keep files of their own (a theme saved from the page).
 export function pageFiles(page) {

@@ -1548,6 +1548,17 @@ if (process.argv.includes('--styleguide')) {
       // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
       if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
     }
+    // The themes this person keeps (their module data folder, or saved beside the page) that the team's themes store
+    // lacks, or holds older: sent with each build when GitLab lets them write it, so a theme made reaches everyone.
+    { const st = await import('./stores.mjs');
+      if (st.storesOf(sgConfig).themes.write) {
+        const sys = String(sgConfig.name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
+        const { homedir } = await import('os');
+        const home = (p) => resolve(ROOT, String(p).replace(/^~(?=$|\/)/, homedir()));
+        const dirs = (Array.isArray(sgConfig.styleguide?.modules) ? sgConfig.styleguide.modules : []).map((m) => (m && typeof m === 'object' && m.data ? home(m.data) : join(home(m && typeof m === 'object' ? m.path : m), 'data'))).map((d) => join(d, sys));
+        const files = st.themesToShare(ROOT, [...dirs, dirname(resolve(ROOT, r.out))], sys);
+        if (files.size) console.log((await st.pushStore(ROOT, sgConfig, 'themes', files, `Theme${files.size === 1 ? '' : 's'} shared by a style guide build: ${[...files.keys()].map((k) => k.split('/').pop()).join(', ')}`, { offline: STORE_OFFLINE })).line);
+      } }
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
     const found = checkFile(r.out);
