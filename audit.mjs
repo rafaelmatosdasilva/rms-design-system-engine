@@ -1551,13 +1551,13 @@ if (process.argv.includes('--styleguide-check')) {
 if (process.argv.includes('--publish-styleguide')) {
   let pcfg = {};
   try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
-  // A style guide store (ds-config.json → stores.styleguide): the page built last, and the pages beside it, sent there,
+  // A style guide store (ds-config.json → stores.styleguide): the page built last, and what it links to beside it (never the rest of its folder), sent there,
   // when GitLab lets this person write it; the team's own pipeline serves it from there.
   { const st = await import('./stores.mjs');
     if (st.storesOf(pcfg).styleguide.write && !process.argv.includes('--print') && !_argValue('--host')) {
       const page = resolve(ROOT, pcfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html');
       if (!existsSync(page)) { console.log(`❌ No style guide built yet at ${relative(ROOT, page)}: rms-design-system-engine --styleguide first.`); process.exit(1); }
-      const r = await st.pushStore(ROOT, pcfg, 'styleguide', st.folderFiles(dirname(page), 'styleguide'), 'Style guide published with the design-system engine', { offline: STORE_OFFLINE });
+      const r = await st.pushStore(ROOT, pcfg, 'styleguide', st.pageFiles(page), 'Style guide published with the design-system engine', { offline: STORE_OFFLINE });
       console.log(r.line);
       console.log(r.ok ? 'NEXT: tell the person where it went (the line above).' : 'NEXT: tell the person the line above; nothing was sent.');
       process.exit(r.ok ? 0 : 1);

@@ -168,3 +168,18 @@ test('a folder store: read and written on this computer; the lines say what each
   assert.match(lines, /Snapshots: lives in design\/snapshots; you can only read it: this setup reads snapshots from design\/snapshots and writes it nowhere/);
   assert.match(lines, /Style guide: lives in the folder .*site; you can change it/);
 });
+
+test('publishing the style guide sends the page and what it links to, never the rest of its folder', async () => {
+  const { pageFiles } = await import('../stores.mjs');
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const d = mkdtempSync(join(tmpdir(), 'sg-pub-'));
+  mkdirSync(join(d, 'img'));
+  writeFileSync(join(d, 'index.html'), '<a href="chip.html#top">Chip</a><img src="img/logo.svg"><a href="https://acme.example/x.html">x</a><a href="#status">s</a>');
+  writeFileSync(join(d, 'chip.html'), '<img src="img/logo.svg"><a href="index.html">back</a>');
+  writeFileSync(join(d, 'img', 'logo.svg'), '<svg/>');
+  writeFileSync(join(d, 'my.theme.json'), '{}');
+  writeFileSync(join(d, 'notes.txt'), 'mine');
+  assert.deepEqual([...pageFiles(join(d, 'index.html')).keys()].sort(), ['chip.html', 'img/logo.svg', 'index.html']);
+});
