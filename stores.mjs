@@ -19,7 +19,7 @@
 // GITLAB_HOST. Nothing here throws to the run: a store that cannot be read or written says so in one line.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, accessSync, constants } from 'node:fs';
-import { join, resolve, dirname, relative, sep } from 'node:path';
+import { join, resolve, dirname, relative, sep, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend } from './gitlab-source.mjs';
@@ -204,6 +204,25 @@ export function localFiles(ROOT, cfg, part, { intentOut } = {}) {
   return out;
 }
 // The files of a folder the engine built (the contracts, the style guide), by the part's own kinds. → Map(rel → Buffer)
+// The page and what it links to beside it (another page, a picture, a stylesheet), followed from each page sent: never
+// the rest of its folder, where a person may keep files of their own (a theme saved from the page).
+export function pageFiles(page) {
+  const dir = dirname(page), out = new Map(), todo = [basename(page)];
+  while (todo.length) {
+    const rel = todo.shift();
+    if (out.has(rel) || !TAKES.styleguide(rel)) continue;
+    const p = join(dir, rel); let buf; try { buf = readFileSync(p); } catch { continue; }
+    out.set(rel, buf);
+    if (!/\.html?$/i.test(rel)) continue;
+    for (const m of buf.toString('utf8').matchAll(/\b(?:src|href)="([^"#?]+)/g)) {
+      const ref = m[1]; if (/^([a-z][\w+.-]*:|\/\/|\/)/i.test(ref)) continue;
+      const next = relative(dir, join(dirname(p), decodeURIComponent(ref))).split(sep).join('/');
+      if (!next.startsWith('..')) todo.push(next);
+    }
+  }
+  return out;
+}
+
 export function folderFiles(dir, part) {
   const out = new Map();
   const walk = (d) => {

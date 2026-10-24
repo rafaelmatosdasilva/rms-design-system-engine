@@ -1,19 +1,19 @@
 # Skill evaluation results
 
-## 2026-10: Guidelines link not read: the NEXT line says the person makes the fix, a token by their hand in .env, never asked for in the chat (continuous evaluation)
+## 2026-10: Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own (continuous evaluation)
 
-What changed since the entry below (engine c15a00a): A component class with a bracket, a space or a date in it is escaped wherever it becomes a selector (clsSel), so it never stops the accessibility pass or the lookup that runs over every component; Skill evaluation: each run keeps the agent command line's version and bundled skills; a change since the runs before, or between this evaluation's runs, is said in the console and in the RESULTS.md entry, never read as a change in the guide; The prototype evaluation says whether one request gives the same page across sessions: the components, spacing tokens and text styles every session used, and what only some did, per task and side; Template tests read the escaped class selectors (clsSel); Kept differences, a part of their own and a rule agents follow: each contract lists its component's (the side that is right, why), the prototype context says them, and a team keeps them with its intent layer; Guidelines link not read: the NEXT line says the person makes the fix, a token by their hand in .env, never asked for in the chat. The guide changed in `reference/config.md`, `reference/usage.md`.
+What changed since the entry below (engine c15a00a): A component class with a bracket, a space or a date in it is escaped wherever it becomes a selector (clsSel), so it never stops the accessibility pass or the lookup that runs over every component; Skill evaluation: each run keeps the agent command line's version and bundled skills; a change since the runs before, or between this evaluation's runs, is said in the console and in the RESULTS.md entry, never read as a change in the guide; The prototype evaluation says whether one request gives the same page across sessions: the components, spacing tokens and text styles every session used, and what only some did, per task and side; Template tests read the escaped class selectors (clsSel); Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own. The guide changed in `cookbook/publish-styleguide.md`.
 
-Guide set measured: `8d43e6f94fea` · Project measured: `13d811a9d668`
+Guide set measured: `0c03129d2f56` · Project measured: `13d811a9d668`
 
-| Haiku, engine 8b893e6 | Entry below | This version |
+| Haiku, engine bd53684 | Entry below | This version |
 |---|---|---|
 | The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
-| Mean cost a run | $0.060 | $0.061 |
-| Input a run | 109k | 125k |
+| Mean cost a run | $0.060 | $0.067 |
+| Input a run | 109k | 145k |
 | Rule violations | 0 | 0 |
 
-**Reading.** Haiku: every task passes and no rule is broken; runs read 125k a run against 109k. Records: `records/2026-10-24-guidelines-link-not-read-the`.
+**Reading.** Haiku: every task passes and no rule is broken; runs read 145k a run against 109k. Records: `records/2026-10-24-publishing-the-style-guide-to`.
 
 ## 2026-10: One token per person: the installer asks for a fine-grained token (Read on the system's projects, Commit and Merge request Create), and a refused write says what that token needs instead of asking for a second one (continuous evaluation)
 

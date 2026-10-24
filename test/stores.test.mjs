@@ -180,3 +180,18 @@ test('the differences kept on purpose are a part of their own, kept with the dec
   assert.deepEqual([...localFiles(ROOT, {}, 'kept').keys()], ['design-system-engine-kept.json']);
   assert.deepEqual([...localFiles(ROOT, {}, 'decisions').keys()], ['design-system-engine-checked.json']);
 });
+
+test('publishing the style guide sends the page and what it links to, never the rest of its folder', async () => {
+  const { pageFiles } = await import('../stores.mjs');
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const d = mkdtempSync(join(tmpdir(), 'sg-pub-'));
+  mkdirSync(join(d, 'img'));
+  writeFileSync(join(d, 'index.html'), '<a href="chip.html#top">Chip</a><img src="img/logo.svg"><a href="https://acme.example/x.html">x</a><a href="#status">s</a>');
+  writeFileSync(join(d, 'chip.html'), '<img src="img/logo.svg"><a href="index.html">back</a>');
+  writeFileSync(join(d, 'img', 'logo.svg'), '<svg/>');
+  writeFileSync(join(d, 'my.theme.json'), '{}');
+  writeFileSync(join(d, 'notes.txt'), 'mine');
+  assert.deepEqual([...pageFiles(join(d, 'index.html')).keys()].sort(), ['chip.html', 'img/logo.svg', 'index.html']);
+});
