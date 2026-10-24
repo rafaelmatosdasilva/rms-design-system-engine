@@ -1420,6 +1420,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     assert.match(tiles[1][1], /^\d+%built\|$/, 'the share of Figma\'s components the code has, no line repeating the legend');
     assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(found / totals[1] * 100), 'implementation\'s share is its count over its total');
     assert.match(tiles[1][2], /2 built/, 'Found said as built, as the big number says it');
+    for (const x of tiles) assert.match(x[2], /^Components\d/, 'each legend says first that it counts components');
     assert.match(tiles[2][1], /^(\d+%passed|–)\|$/);
     // Each card counts what its column's filter counts: every row whose state there applies, of the components the code
     // has built.

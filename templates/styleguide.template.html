@@ -398,6 +398,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) calc(var(--sg-card-gap) - var(--sg-space-s)); font-size: var(--sg-s); color: var(--sg-text-2); }
 .sg-health-bar + .sg-health-legend { margin-top: calc(-1 * var(--sg-space-s)); }   /* the legend 8px closer to its bar */
 .sg-health-legend .pg-par-status { font-weight: var(--sg-text-weight); color: var(--sg-text-2); }
+.sg-health-lead { color: var(--sg-muted); }   /* what the legend counts (Components), quieter than its counts */
 .sg-health-bar > span + span { background: var(--sg-a5); }
 .sg-health-bar > span + span + span { background: repeating-linear-gradient(135deg, var(--sg-a5) 0 2px, transparent 2px 4px); }
 .sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
@@ -7425,7 +7426,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var tip = o.how ? tipHTML(o.how, 'How ' + o.title + ' is counted', o.howParts ? { parts: o.howParts } : undefined) : '';
       var total = o.total || 0, parts = (o.parts || []).filter(function (x) { return x.n > 0; });
       var barHTML = '<span class="sg-health-bar" aria-hidden="true">' + (total ? parts.map(function (x) { return '<span class="is-' + x.cls + (x.word === 'Untested' ? ' is-untested' : '') + '" style="width:' + Math.max(1, Math.round(x.n / total * 100)) + '%"></span>'; }).join('') : '') + '</span>';
-      var legend = '<p class="sg-health-legend">' + parts.map(function (x) { return '<span class="pg-par-status pg-par--' + ({ done: 'match', check: 'figma', fix: 'differs', none: 'none' })[x.cls] + (x.word === 'Untested' ? ' is-untested' : '') + '">' + (x.word === 'N/A' ? '' : '<span class="pg-par-sign" aria-hidden="true"></span>') + esc(x.say) + '</span>'; }).join('') + (o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</p>';
+      // The legend counts components (the big number counts checks): it says so first, once, quieter than its counts.
+      var legend = '<p class="sg-health-legend">' + (parts.length ? '<span class="sg-health-lead">Components</span>' : '') + parts.map(function (x) { return '<span class="pg-par-status pg-par--' + ({ done: 'match', check: 'figma', fix: 'differs', none: 'none' })[x.cls] + (x.word === 'Untested' ? ' is-untested' : '') + '">' + (x.word === 'N/A' ? '' : '<span class="pg-par-sign" aria-hidden="true"></span>') + esc(x.say) + '</span>'; }).join('') + (o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</p>';
       // Its next step, a button alone at its foot (See 130 components): the table below on what is left there.
       // Its next step: under a line, a link that goes down to the table with that filter on (an anchor: its arrow points down).
       var next = o.next && o.next.area ? '<div class="sg-health-go"><button type="button" class="sg-health-anchor" data-go-area="' + esc(o.next.area) + '">' + esc(o.next.say || 'See ' + plural(o.next.n, 'component', 'components')) +
