@@ -15,6 +15,21 @@ Guide set measured: `50e4c1e21ddd` · Project measured: `13d811a9d668`
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 122k a run against 145k. Records: `records/2026-10-24-each-style-guide-build-sends`.
 
+## 2026-10: Status: the cards named Parity, Code, Accessibility and Documentation, each with a short plain tip; each open task says how long it has been open (open-since.snapshot.json, kept by the build's browser); every decision keeps who made it and when (--by, else git's name); a download in a page shown inside another one says how else to get the file (continuous evaluation)
+
+What changed since the entry below (engine bd53684): Documentation page: Review (a person decides or checks), Missing (only to write, and where) and Keep, apart; Role and Do and don't read from the intent layer first and written there, Figma's role annotation naming another role to check; Documentation page: the tokens' descriptions are one Tokens row (every token the components use without one, written once each in Figma), never repeated on each component's row; Status: the cards named Parity, Code, Accessibility and Documentation, each with a short plain tip; each open task says how long it has been open (open-since.snapshot.json, kept by the build's browser); every decision keeps who made it and when (--by, else git's name); a download in a page shown inside another one says how else to get the file. The guide changed in `reference/usage.md`.
+
+Guide set measured: `a1a2586a673c` · Project measured: `13d811a9d668`
+
+| Haiku, engine f69e3e0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.067 | $0.060 |
+| Input a run | 145k | 112k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 112k a run against 145k. Records: `records/2026-10-24-status-the-cards-named-parity`.
+
 ## 2026-10: Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own (continuous evaluation)
 
 What changed since the entry below (engine c15a00a): A component class with a bracket, a space or a date in it is escaped wherever it becomes a selector (clsSel), so it never stops the accessibility pass or the lookup that runs over every component; Skill evaluation: each run keeps the agent command line's version and bundled skills; a change since the runs before, or between this evaluation's runs, is said in the console and in the RESULTS.md entry, never read as a change in the guide; The prototype evaluation says whether one request gives the same page across sessions: the components, spacing tokens and text styles every session used, and what only some did, per task and side; Template tests read the escaped class selectors (clsSel); Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own. The guide changed in `cookbook/publish-styleguide.md`.
