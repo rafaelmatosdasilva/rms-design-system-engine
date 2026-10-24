@@ -183,3 +183,32 @@ test('publishing the style guide sends the page and what it links to, never the 
   writeFileSync(join(d, 'notes.txt'), 'mine');
   assert.deepEqual([...pageFiles(join(d, 'index.html')).keys()].sort(), ['chip.html', 'img/logo.svg', 'index.html']);
 });
+
+test('the team\'s themes: read into the engine\'s own folder, never the project\'s; only theme files go either way', async () => {
+  const { THEMES_DIR } = await import('../stores.mjs');
+  const ROOT = project(), shared = project();
+  mkdirSync(join(shared, 'themes', 'acme'), { recursive: true });
+  writeFileSync(join(shared, 'themes', 'acme', 'ocean.theme.json'), '{"id":"t1","name":"Ocean"}');
+  writeFileSync(join(shared, 'themes', 'notes.md'), 'not a theme');
+  const cfg = cfgWith({ themes: { read: { folder: shared, path: 'themes' }, write: { folder: shared, path: 'themes' } } });
+  assert.deepEqual((await pullStore(ROOT, cfg, 'themes')).written, ['acme/ocean.theme.json']);
+  assert.ok(existsSync(join(ROOT, THEMES_DIR, 'acme', 'ocean.theme.json')));
+  assert.equal(existsSync(join(ROOT, 'acme')), false, 'nothing in the project folder');
+  const sent = await pushStore(ROOT, cfg, 'themes', new Map([['acme/sunset.theme.json', Buffer.from('{"id":"t2","name":"Sunset"}')], ['acme/.env', Buffer.from('X=1')]]), 'm');
+  assert.equal(sent.ok, true);
+  assert.ok(existsSync(join(shared, 'themes', 'acme', 'sunset.theme.json')));
+  assert.equal(existsSync(join(shared, 'themes', 'acme', '.env')), false, 'only theme files are sent');
+});
+
+test('a style guide build shares the themes the store lacks, or holds older; a colleague\'s newer one is kept', async () => {
+  const { themesToShare, THEMES_DIR } = await import('../stores.mjs');
+  const ROOT = project(), mine = project();
+  mkdirSync(join(ROOT, THEMES_DIR, 'acme'), { recursive: true });
+  writeFileSync(join(ROOT, THEMES_DIR, 'acme', 'ocean.theme.json'), '{"id":"t1","name":"Ocean","changed":"2026-02-01"}');
+  writeFileSync(join(ROOT, THEMES_DIR, 'acme', 'sand.theme.json'), '{"id":"t3","name":"Sand","changed":"2026-01-01"}');
+  writeFileSync(join(mine, 'ocean.theme.json'), '{"id":"t1","name":"Ocean","changed":"2026-01-15"}');   // older than the store's: kept there
+  writeFileSync(join(mine, 'sand.theme.json'), '{"id":"t3","name":"Sand","changed":"2026-03-01"}');    // newer: sent
+  writeFileSync(join(mine, 'sunset.theme.json'), '{"id":"t2","name":"Sunset"}');                       // new: sent
+  writeFileSync(join(mine, 'notes.json'), '{"a":1}');                                                  // not a theme
+  assert.deepEqual([...themesToShare(ROOT, [mine], 'acme').keys()].sort(), ['acme/sand.theme.json', 'acme/sunset.theme.json']);
+});

@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced (continuous evaluation)
+
+What changed since the entry below (engine bd53684): The team's themes in a store of their own (stores.themes, often a themes folder in the style guide's repository): read on each run into the engine's folder, shown in the Theme choice with each person's own; --share-theme sends a saved theme there when GitLab lets the person write it; Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `50e4c1e21ddd` · Project measured: `13d811a9d668`
+
+| Haiku, engine 4713436 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.067 | $0.061 |
+| Input a run | 145k | 122k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 122k a run against 145k. Records: `records/2026-10-24-each-style-guide-build-sends`.
+
 ## 2026-10: Status: the cards named Parity, Code, Accessibility and Documentation, each with a short plain tip; each open task says how long it has been open (open-since.snapshot.json, kept by the build's browser); every decision keeps who made it and when (--by, else git's name); a download in a page shown inside another one says how else to get the file (continuous evaluation)
 
 What changed since the entry below (engine bd53684): Documentation page: Review (a person decides or checks), Missing (only to write, and where) and Keep, apart; Role and Do and don't read from the intent layer first and written there, Figma's role annotation naming another role to check; Documentation page: the tokens' descriptions are one Tokens row (every token the components use without one, written once each in Figma), never repeated on each component's row; Status: the cards named Parity, Code, Accessibility and Documentation, each with a short plain tip; each open task says how long it has been open (open-since.snapshot.json, kept by the build's browser); every decision keeps who made it and when (--by, else git's name); a download in a page shown inside another one says how else to get the file. The guide changed in `reference/usage.md`.

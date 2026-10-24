@@ -104,13 +104,14 @@ rms-design-system-engine --review-drafts                 # every draft in the in
 rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
-rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, style guide, decisions) and what this person may do there, as GitLab answers
+rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, style guide, decisions, themes) and what this person may do there, as GitLab answers
 rms-design-system-engine --store <part>=<link|folder|nowhere> [--store <part>.path=<folder in it>] [--store <part>.branch=<branch>]   # name where a part lives (ds-config.json → stores); who may change it is GitLab's answer, never asked
 rms-design-system-engine --profile <link|file>           # set up from the company's profile (or take its new version): the shared setup and the stores, nothing asked; kept in ds-config.json and read again each run
 rms-design-system-engine --profile-new [file] [--name <company>]     # ask where each part lives, one question a part (a terminal; else --store), then write this setup as the company's profile
 rms-design-system-engine --profile-export [file] [--name <company>]  # write this setup as the company's profile as it is: no token, nothing one person set for themself
 rms-design-system-engine --make-command <client> --profile <link> [--dir <folder>]   # write the command the team installs, /rms-design-system-engine-<client>: the engine with that profile
 rms-design-system-engine --refresh-snapshots             # send the snapshots this folder holds to the snapshots store, when GitLab lets this person write it
+rms-design-system-engine --share-theme <file.theme.json>…  # send a theme saved from the style guide to the team's themes store, for everyone's Theme choice
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
 rms-design-system-engine --baseline --findings           # the same, each failing ❌ line accepted on its own
 rms-design-system-engine --keep --match <words> [--component <name>] --reason "<why>" [--by <name>] [--truth figma|code] [--review <date|90d>]   # keep the open differences of the last full audit that match, on purpose, with the person's reason (commit design-system-engine-kept.json)
@@ -928,6 +929,12 @@ from their stores when the store's commit moved, never over a file changed on th
 (`--refresh-snapshots`) and the intent layer (`--intent-changes --commit`, `--review-drafts --commit`, the fixes made on
 each run) are written to theirs. A store brings into the project only its own kind of file (a snapshots store only
 `*.snapshot.json`), never a `.env` or a hook.
+
+**The team's themes** (`stores.themes`, often a `themes` folder in the style guide's own repository): the themes a
+style guide module lets people make (one folder a system, `<system>/<name>.theme.json`). Each run reads them into the
+engine's own folder (`.design-system-engine-out/themes`), never the project's, and the style guide shows them in its
+Theme choice, with the themes in the person's own module data folder beside them (the store's when both have one).
+Each style guide build sends the themes this person keeps (their module data folder, or saved beside the page) that the store lacks, or holds an older version of, when GitLab lets them write it: a theme made reaches everyone with no step of its own, and a newer one a colleague sent is never replaced. `--share-theme <file>` sends one by hand.
 
 **Who may write is GitLab's answer, never the setup's.** Before the first write to a place in a run the engine asks
 GitLab, with the token that would write: the token's role in the project (Developer or more writes), whether it may

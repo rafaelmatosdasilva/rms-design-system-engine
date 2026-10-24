@@ -32,6 +32,7 @@ import { pathToFileURL, fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { homedir } from 'os';
 import { OUT_DIR } from './names.mjs';
+import { storesOf, THEMES_DIR } from './stores.mjs';
 
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
 // The engine's own template, used when the project has none (ds-config.json → styleguide.template wins).
@@ -1467,8 +1468,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // project; the page reads them as SG.moduleData['<module>'].
     const sys = String(cfg.name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
     const dataDir = join(entry && typeof entry === 'object' && entry.data ? home(entry.data) : join(dir, 'data'), sys);
-    let data = [];
-    try { data = readdirSync(dataDir).filter((f) => /\.json$/i.test(f)).sort().map((f) => { try { return { file: f, ...JSON.parse(readFileSync(join(dataDir, f), 'utf8')) }; } catch { return null; } }).filter(Boolean); } catch { /* no data for this system */ }
+    // The team's themes store (stores.themes), read into the engine's own folder on each run, comes first; the person's
+    // own folder adds what it lacks. A theme is one by its id, else by its file name.
+    const dirs = [...(storesOf(cfg).themes?.read ? [join(ROOT, THEMES_DIR, sys)] : []), dataDir];
+    const readDir = (d) => { try { return readdirSync(d).filter((f) => /\.json$/i.test(f)).sort().map((f) => { try { return { file: f, ...JSON.parse(readFileSync(join(d, f), 'utf8')) }; } catch { return null; } }).filter(Boolean); } catch { return []; } };
+    const data = [], seen = new Set();
+    for (const d of dirs) for (const x of readDir(d)) { const k = x.id ? `id:${x.id}` : `file:${x.file}`; if (!seen.has(k)) { seen.add(k); data.push(x); } }
     const dataTag = `<script data-sg-module-data="${name}">\n(window.SG.moduleData = window.SG.moduleData || {})[${JSON.stringify(name)}] = { system: ${JSON.stringify(sys)}, files: ${JSON.stringify(data).replace(/<\/script/gi, '<\\/script')} };\n</script>\n`;
     return dataTag + (css ? `<style data-sg-module="${name}">\n${css.replace(/<\/style/gi, '<\\/style')}\n</style>\n` : '') + `<script data-sg-module="${name}">\n${js.replace(/<\/script/gi, '<\\/script')}\n</script>`;
   }).join('\n');
