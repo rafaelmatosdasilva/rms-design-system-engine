@@ -17,7 +17,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname, resolve, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { STATE_FILE, plainGet, tokenFrom, hostEnvFrom } from './gitlab-source.mjs';
+import { STATE_FILE, plainGet, tokenFrom, hostEnvFrom, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 
 export const HISTORY_FILE = '.gitlab-history.json';
@@ -104,7 +104,8 @@ export async function fillHistory(root, req = {}, opts = {}) {
   const token = tokenFrom(env, folders);
   const headers = token && tokenAllowedFor(st.host, env) ? { 'PRIVATE-TOKEN': token } : {};
   const fetchImpl = opts.fetchImpl ?? plainGet;
-  const base = `${st.origin}/api/v4/projects/${encodeURIComponent(st.path)}`;
+  // The project by its id, found from the link even when it moved or names the project.
+  const { base } = await projectApi(st.origin, st.path, (u) => fetchImpl(u, { headers }));
   let asked = 0, failed = 0;
   const get = async (path) => {
     asked++;

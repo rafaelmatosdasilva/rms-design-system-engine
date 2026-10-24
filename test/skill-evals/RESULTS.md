@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Merge remote-tracking branch 'origin/main' into gitlab-path-resolve (continuous evaluation)
+
+What changed since the entry below (engine 75c8ac8): A GitLab link that moved, or names the project by its name, is found where the project is now: every call then goes to the project by its id, and the run says once which path to write instead; Documentation page: a page with nothing left to do reads Done (its chip, its row, its panel and the downloads), not Keep. The guide changed in `reference/usage.md`.
+
+Guide set measured: `ee90f874d765` · Project measured: `13d811a9d668`
+
+| Haiku, engine 88b78a0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.059 | $0.060 |
+| Input a run | 111k | 125k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below, 1 rule violation. Failed: new-ui-saved #8: reports in the chat, not in a file (no reply). Records: `records/2026-10-24-merge-remote-tracking-branch-origin-4`.
+
 ## 2026-10: Merge remote-tracking branch 'origin/main' into styleguide-themes-store (continuous evaluation)
 
 What changed since the entry below (engine 7f33bfa): The team's themes in a store of their own (stores.themes, often a themes folder in the style guide's repository): read on each run into the engine's folder, shown in the Theme choice with each person's own; --share-theme sends a saved theme there when GitLab lets the person write it; Each style guide build sends the themes a person keeps that the team's themes store lacks, or holds older, when GitLab lets them write it; a colleague's newer one is never replaced; Profile: a part this engine does not know yet is left unused and named, never a refusal of the whole profile; A profile run from inside the code's GitLab copy uses that copy where it is, with the .env of the folder that holds it, never a copy inside itself; A themes store holds one system's themes, flat, in the folder its path names; a store several systems share points its path at the system's own folder. The guide changed in `reference/config.md`, `reference/usage.md`.

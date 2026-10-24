@@ -19,7 +19,7 @@ import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { SKILL } from './names.mjs';
 import { parseGitlabUrl, refCandidates, tokenAllowedFor } from './gitlab-fetch.mjs';
-import { tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, STATE_FILE } from './gitlab-source.mjs';
+import { tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, STATE_FILE, projectApi } from './gitlab-source.mjs';
 import { PARTS } from './stores.mjs';
 
 export const PROFILE_FILE = 'design-system-engine-profile.json';
@@ -70,7 +70,7 @@ export async function readProfile(source, { from = process.cwd(), env = process.
       if (p?.kind === 'file') {
         const token = tokenFrom(e, folders) || writeTokenFrom(e, folders);
         const headers = token && tokenAllowedFor(p.host, e) ? { 'PRIVATE-TOKEN': token } : {};
-        const api = `${p.origin}/api/v4/projects/${encodeURIComponent(p.path)}`;
+        const { base: api } = await projectApi(p.origin, p.path, (u) => get(u, { headers }));
         let last = 0;
         for (const { ref, file } of refCandidates(p.refAndPath)) {
           const r = await get(`${api}/repository/files/${encodeURIComponent(file)}/raw?ref=${encodeURIComponent(ref)}`, { headers });

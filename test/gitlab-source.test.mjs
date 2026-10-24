@@ -250,3 +250,23 @@ test('a folder that is already the copy of the project is used where it is, neve
   assert.equal(isMirrorOf(dir, parseGitlabProject('https://gitlab.acme.test/web/other')), false);
   assert.equal(isMirrorOf(mkdtempSync(join(tmpdir(), 'plain-')), parseGitlabProject('https://gitlab.acme.test/web/library')), false);
 });
+
+test('a project link that moved, or names the project, is found: every call then goes to the project by its id', async () => {
+  const { projectApi } = await import('../gitlab-source.mjs');
+  const res = (status, body) => ({ ok: status === 200, status, json: async () => body });
+  const O = 'https://git.acme.example';
+  const moved = await projectApi(O, 'design/old-name', async () => res(200, { id: 7, path_with_namespace: 'design/new-name' }));
+  assert.deepEqual({ ...moved, project: undefined }, { base: `${O}/api/v4/projects/7`, path: 'design/new-name', how: 'moved', project: undefined });
+  assert.equal(moved.project.id, 7, 'GitLab\'s answer comes back, so its default branch is not asked again');
+  const same = await projectApi(O, 'design/kit', async () => res(200, { id: 8, path_with_namespace: 'design/kit' }));
+  assert.equal(same.how, 'same');
+  assert.equal(same.base, `${O}/api/v4/projects/8`);
+  const asked = [];
+  const named = await projectApi(O, 'design/acme-intent-layer', async (u) => { asked.push(u); return /search=/.test(u)
+    ? res(200, [{ id: 9, name: 'acme-intent-layer', path: 'intent-layer', path_with_namespace: 'design/intent-layer' }, { id: 10, name: 'acme-intent-layer', path: 'x', path_with_namespace: 'other/x' }])
+    : res(404, {}); });
+  assert.deepEqual(named, { base: `${O}/api/v4/projects/9`, path: 'design/intent-layer', how: 'name', project: null });
+  assert.match(asked[1], /search=acme-intent-layer/);
+  const lost = await projectApi(O, 'design/nothing', async () => res(404, []));
+  assert.deepEqual(lost, { base: `${O}/api/v4/projects/${encodeURIComponent('design/nothing')}`, path: 'design/nothing', how: 'same', project: null });
+});
