@@ -290,6 +290,42 @@ const withFlowGuidelines = (dir) => {
 };
 
 const base = { mayChangeAll: true, mayWriteHtml: true, setup: withSystem, source: TIDEPOOL };
+// What a drawn page is made of, by name: the system's components, its spacing tokens and its text styles, from the
+// composition (component, padding, gap, style) or the markup and CSS (a component's tag or class, var(--…)).
+export function drawnWith(ctx) {
+  const text = madeText(ctx);
+  const comps = new Set(), space = new Set(), type = new Set();
+  for (const m of text.matchAll(/"component"\s*:\s*"([\w-]+)"/g)) comps.add(m[1].toLowerCase());
+  for (const m of text.matchAll(/<([A-Z][\w]*)\b/g)) comps.add(m[1].toLowerCase());
+  for (const m of text.matchAll(/class(?:Name)?=["'{]([^"'}]*)/g)) for (const k of m[1].split(/\s+/)) if (SYSTEM_CLASSES.has(k) && !k.includes('__')) comps.add(k.toLowerCase());   // a part's class (chip__icon) is its component's
+  for (const m of text.matchAll(/"(?:padding|gap)"\s*:\s*"([^"]+)"/g)) space.add(spaceName(m[1]));
+  for (const m of text.matchAll(/var\(--((?:padding|spacing|gap|space)[\w-]*)\)/g)) space.add(m[1].replace(/^padding-/, 'padding/'));
+  for (const m of text.matchAll(/"style"\s*:\s*"([^"]+)"/g)) type.add(m[1]);
+  for (const m of text.matchAll(/var\(--((?:font|text|type)[\w-]*)\)/g)) type.add(m[1]);
+  return { components: [...comps].sort(), spacing: [...space].filter((x) => x && x !== 'none').sort(), text: [...type].sort() };
+}
+
+// One request drawn in separate sessions (the runs of one task): what every run used, and what only some runs did.
+// rows: result rows (their changed files kept). → [{ task, runs, same, differ: { kind: [[name, in how many runs]] } }]
+export const KINDS = { components: 'components', spacing: 'spacing tokens', text: 'text styles' };
+export function consistency(rows) {
+  const byTask = new Map();
+  for (const r of rows) { if (!r.files) continue; (byTask.get(r.task) ?? byTask.set(r.task, []).get(r.task)).push(drawnWith({ changed: r.changed ?? Object.keys(r.files), read: (p) => r.files[p] ?? null })); }
+  return [...byTask].filter(([, runs]) => runs.length > 1).map(([task, runs]) => {
+    const differ = {};
+    for (const k of Object.keys(KINDS)) {
+      const count = new Map(); for (const d of runs) for (const n of d[k]) count.set(n, (count.get(n) ?? 0) + 1);
+      const some = [...count].filter(([, n]) => n < runs.length).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      if (some.length) differ[k] = some;
+    }
+    return { task, runs: runs.length, same: !Object.keys(differ).length, differ };
+  });
+}
+export function consistencyLines(rows) {
+  return consistency(rows).map((c) => `- ${c.task} (${c.runs} sessions): ${c.same ? 'the same components, spacing tokens and text styles in every session'
+    : Object.entries(c.differ).map(([k, list]) => `${KINDS[k]} differ (${list.map(([n, i]) => `${n} in ${i} of ${c.runs}`).join(', ')})`).join('; ')}`);
+}
+
 export const PROTO = [
   {
     ...base, id: 'proto-settings',
