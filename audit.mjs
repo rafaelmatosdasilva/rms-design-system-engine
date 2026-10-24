@@ -1323,7 +1323,8 @@ if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWi
       }
     }
   }
-  console.log(failed ? `\nNEXT: make the fix named above, then run rms-design-system-engine --guidelines ${links.join(' ')} again` : '\nNEXT: rms-design-system-engine   (every run refreshes these pages and folds them into the design intent)');
+  // The fix is the person's: a token goes into .env by their hand, never through the chat.
+  console.log(failed ? `\nNEXT: tell the person the fix named above; they make it themselves (a token goes into .env by their hand: never ask for it in the chat). Once they say it is done, run rms-design-system-engine --guidelines ${links.join(' ')} again` : '\nNEXT: rms-design-system-engine   (every run refreshes these pages and folds them into the design intent)');
   process.exit(failed ? 1 : 0);
 }
 
