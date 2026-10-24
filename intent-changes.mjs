@@ -95,7 +95,18 @@ export function specOf(e, idx) {
 }
 
 // ── Editing a Markdown spec ─────────────────────────────────────────────────────────────────────────────────────────
-const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations'];
+// The written sections first, in the order a spec keeps them (Purpose to Limitations), then the reference ones (its role,
+// do and don't, an example): a spec checked for its section order takes a new one in its place.
+const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example'];
+// The role of the element a component's code renders, as a screen reader names it (none for an element with no role).
+// An example of a component in use: its tag, and each prop that takes named values with the first of them (up to three),
+// so every name and value in it is one the code takes.
+export function exampleOf(b) {
+  // Only the code's own props (a name only Figma uses is not one the component takes).
+  const set = Object.entries(b.props ?? {}).filter(([p, v]) => (!b.codeProps || b.codeProps.includes(p)) && Array.isArray(v) && v.length && v.every((x) => typeof x === 'string' && !/^(true|false)$/.test(x))).slice(0, 3);
+  return '`<' + b.tag + set.map(([p, v]) => ` ${p}="${v[0]}"`).join('') + ' />`';
+}
+const ROLE_OF = { button: 'button', a: 'link', nav: 'navigation', ul: 'list', ol: 'list', table: 'table', dialog: 'dialog', select: 'combobox', textarea: 'textbox', form: 'form', header: 'banner', footer: 'contentinfo', aside: 'complementary', progress: 'progressbar' };
 const headKey = (h) => h.replace(/^#+\s*/, '').replace(/^\d+(\.\d+)*[.)]?\s+/, '').trim().toLowerCase();
 // Take a line out (a list item or a paragraph line equal to it); a heading left with nothing under it goes too.
 export function mdRemove(text, line) {
@@ -128,10 +139,12 @@ export function mdReplace(text, line, next) {
   return done ? out.join('\n') : text;
 }
 // Add a drafted line under its heading (made where it belongs in the spec's order when it is not there).
-export function mdAdd(text, where, line) {
+// sure: a line taken from the code or Figma as it is (a role, an example from its own props): written as the team's,
+// with no Draft marker, since nothing in it was judged.
+export function mdAdd(text, where, line, { sure = false } = {}) {
   const lines = text.split('\n');
-  const key = where.toLowerCase();
-  const bullet = key === 'purpose' ? MARK + line : `- ${MARK}${line}`;
+  const key = where.toLowerCase(), mark = sure ? '' : MARK;
+  const bullet = key === 'purpose' ? mark + line : `- ${mark}${line}`;
   const at = lines.findIndex((l) => /^##\s/.test(l) && headKey(l) === key);
   if (at >= 0) {
     let end = at + 1; while (end < lines.length && !/^#{1,2}\s/.test(lines[end])) end++;
@@ -171,9 +184,9 @@ export function jsonReplace(entry, line, next) {
   if (flat(entry.description) === want) { entry.description = MARK + next; n++; }
   return n;
 }
-export function jsonAdd(entry, where, line) {
-  const key = where.toLowerCase();
-  if (key === 'purpose') { if (!flat(entry.description)) entry.description = MARK + line; return; }
+export function jsonAdd(entry, where, line, { sure = false } = {}) {
+  const key = where.toLowerCase(), mark = sure ? '' : MARK;
+  if (key === 'purpose') { if (!flat(entry.description)) entry.description = mark + line; return; }
   const [framing, level] = SECTION[key] ?? ['how-to-use', 'should'];
   entry.sections ??= [];
   let s = entry.sections.find((x) => x.kind === 'guidelines' && String(x.title ?? '').toLowerCase() === key);
@@ -183,12 +196,13 @@ export function jsonAdd(entry, where, line) {
     const later = entry.sections.findIndex((x) => x.kind !== 'guidelines' || ORDER.indexOf(String(x.title ?? '').toLowerCase()) > rank);
     entry.sections.splice(later < 0 ? entry.sections.length : later, 0, s);
   }
-  s.items.push({ level, statement: MARK + line });
+  s.items.push({ level, statement: mark + line });
 }
 
 // ── What to change ──────────────────────────────────────────────────────────────────────────────────────────────────
 // report: useReport's, with the content check's findings (wrong) on each page. → [{ entity, page, remove, rewrite, need }]
-//   rewrite: [{ line (as written), finding }]; need: ['purpose' | 'whenToUse' | 'whenNotToUse' | 'differ']
+//   rewrite: [{ line (as written), finding }]; need: ['purpose' | 'whenToUse' | 'whenNotToUse' | 'mistakes' | 'limitations'
+//   | 'example' | 'role' | 'doDont' | 'differ']
 // leftForPeople: the lines a drafter said nothing in the system can say (kept, so they are not asked about again).
 export function planOf(snap, report, { leftForPeople = new Set() } = {}) {
   const byKey = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
@@ -211,6 +225,12 @@ export function planOf(snap, report, { leftForPeople = new Set() } = {}) {
       if (!e.purpose.length) need.push('purpose');
       if (!e.whenToUse.length) need.push('whenToUse');
       if (!e.whenNotToUse.length) need.push('whenNotToUse');
+      if (!e.mistakes.length) need.push('mistakes');
+      if (!e.limitations.length) need.push('limitations');
+      const said = linesOf(e).map((l) => `${l.where}: ${l.text}`);
+      if (!said.some((t) => /^examples?\b/i.test(t) || /```|`<[A-Za-z][\w-]*[\s/>]/.test(t))) need.push('example');
+      if (!said.some((t) => /(^|:\s*)role\s*[:\u2014-]|^(accessibility )?role\b/i.test(t))) need.push('role');
+      if (!said.some((t) => /^do'?s?\s*(and|&)\s*don'?t'?s?\b/i.test(t) || /(^|:\s*)(do|don'?t|do not)\s*:/i.test(t))) need.push('doDont');
       const twin = (page.wrong ?? []).find((f) => f.kind === 'twin');
       if (twin) need.push({ differ: twin.other });
     }
@@ -226,6 +246,9 @@ export function briefOf(name, facts, e = null) {
   const c = facts.components[name] ?? {};
   return {
     component: name, file: c.file ?? null, status: c.status ?? null,
+    // The tag an example writes it with (its file's name), and the element it renders: what its role starts from.
+    tag: c.file ? String(c.file).split('/').pop().replace(/\.[^.]+$/, '') : null, root: c.root ?? null,
+    codeProps: Object.values(c.props ?? {}).some((d) => d.from) ? Object.keys(c.props).filter((p) => c.props[p].from === 'the code') : null,
     props: Object.fromEntries(Object.entries(c.props ?? {}).map(([p, d]) => [p, d.options?.length ? d.options : d.type ?? 'any'])),
     page: e ? linesOf(e).map((l) => `${l.where}: ${l.text}`).slice(0, 40) : [],
   };
@@ -254,7 +277,8 @@ export function draftJobs(plan, facts) {
   for (const [i, it] of plan.entries()) {
     const name = it.page.component;
     for (const [j, r] of it.rewrite.entries()) jobs.push({ key: `${i}.r${j}`, kind: 'rewrite', it, r, ask: { key: `${i}.r${j}`, task: 'rewrite', line: r.line, problems: r.findings.map((f) => f.truth), facts: name ? briefOf(name, facts) : null, layer: it.entity.layer, page: it.entity.name } });
-    const parts = it.need.filter((n) => typeof n === 'string');
+    // Its role and an example are taken from the code, never asked (draftPlan).
+    const parts = it.need.filter((n) => typeof n === 'string' && n !== 'role' && n !== 'example');
     const differ = it.need.find((n) => n?.differ)?.differ;
     if (name && (parts.length || differ)) jobs.push({ key: `${i}.d`, kind: 'draft', it, ask: { key: `${i}.d`, task: 'draft', need: parts, differFrom: differ ?? null, facts: briefOf(name, facts, it.entity), other: differ ? briefOf(differ, facts) : null } });
   }
@@ -265,7 +289,7 @@ export function draftPrompt(asks) {
   return `You write the documentation of a design system's components, for the people and agents who build with it. Answer with one JSON object and nothing else: { "<key>": <answer> } for every key below.
 
 For a "rewrite": the line has the problems listed. Write it again so that it says what it meant with only what the facts have: { "text": "<the line>" }. If nothing in the facts can say it, { "text": null, "why": "<one short sentence>" }.
-For a "draft": write the parts listed in need, for the component in facts: { "purpose": "<one sentence: what it is for>", "whenToUse": ["<line>", …], "whenNotToUse": ["<line>", …] } (2 or 3 lines each, only the parts asked). With differFrom: also say when to use this one and not the other component (facts in other), in whenToUse, and when to use the other one instead, in whenNotToUse, naming it in backticks.
+For a "draft": write the parts listed in need, for the component in facts: { "purpose": "<one sentence: what it is for>", "whenToUse": ["<line>", …], "whenNotToUse": ["<line>", …], "mistakes": ["<a mistake people make with it, and what to do instead>", …], "limitations": ["<what it does not do, or only does when a prop is set>", …], "doDont": ["Do: <line>", "Don't: <line>"] } (2 or 3 lines each, only the parts asked). With differFrom: also say when to use this one and not the other component (facts in other), in whenToUse, and when to use the other one instead, in whenNotToUse, naming it in backticks.
 
 ${RULES}
 
@@ -274,12 +298,24 @@ ${JSON.stringify(asks, null, 1)}`;
 // Each rewrite and each missing part drafted (run: prompt → text; or answers: { key: answer } already given), and
 // checked: a line the content check finds anything in is not kept.
 // → plan items with { rewritten: [{ line, text|null, why }], drafted: [{ where, text }], dropped: [{ text, why }] }
+// plan.answers: every answer the drafter gave, by key, so the same drafts can be sent later (--drafts-from) instead of
+// asked again.
 export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {}) {
   const jobs = draftJobs(plan, facts);
+  plan.answers = {};
   for (const it of plan) Object.assign(it, { rewritten: [], drafted: [], dropped: [] });
+  // What the code says as it is, written as the team's (sure): its role, from the element it renders, and an example
+  // of it with its own tag and props, each value one it takes. Nothing in them is judged, so nothing to review.
+  for (const it of plan) {
+    const name = it.page.component, b = name ? briefOf(name, facts) : null; if (!b) continue;
+    // Written "Role: button", not "button": a reader that keeps a section's lines as rules, and not its title, still says what it is.
+    if (it.need.includes('role') && ROLE_OF[b.root]) it.drafted.push({ where: 'Role', text: `Role: ${ROLE_OF[b.root]}`, sure: true });
+    if (it.need.includes('example') && b.tag) it.drafted.push({ where: 'Example', text: exampleOf(b), sure: true });
+  }
   for (let k = 0; k < jobs.length; k += batch) {
     const part = jobs.slice(k, k + batch);
     const answer = answers ?? jsonIn(run(draftPrompt(part.map((j) => j.ask)))) ?? {};
+    for (const j of part) if (answer[j.key] !== undefined) plan.answers[j.key] = answer[j.key];
     for (const j of part) {
       const a = answer[j.key]; const name = j.it.page.component;
       const ok = (text) => !checkPage({ kind: 'component', layer: j.it.entity.layer, name: j.it.entity.name, file: j.it.entity.file, purpose: [], whenToUse: [text], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [] }, facts, { component: name, strict: true }).some((f) => f.kind === 'name' || f.kind === 'claim');
@@ -290,7 +326,8 @@ export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {})
         else j.it.dropped.push({ text: text ?? j.r.line, why: text ? 'the rewrite still names what the system does not have' : 'no answer' });
         continue;
       }
-      for (const [k, where] of [['purpose', 'Purpose'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use']]) {
+      for (const [k, where] of [['purpose', 'Purpose'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['doDont', 'Do and don\'t']]) {
+        if (!j.ask.need.includes(k) && !['purpose', 'whenToUse', 'whenNotToUse'].includes(k)) continue;   // these three also say how it differs from its twin
         for (const t of [a?.[k]].flat().filter((x) => typeof x === 'string').map(flat).filter(Boolean)) (ok(t) ? j.it.drafted : j.it.dropped).push(ok(t) ? { where, text: t } : { text: t, why: 'it names what the system does not have' });
       }
     }
@@ -325,7 +362,7 @@ export function applyPlan(plan, files) {
       else held.push({ name: e.name, why: `"${r.line}" names what the system does not have, and nothing it has says it: ${r.why ?? 'a person decides'}` });
     }
     if ((it.drafted ?? []).length && src?.shared) held.push({ name: e.name, why: `it is written from ${src.spec}, which other pages are written from too: give it a spec of its own, then draft it` });
-    else for (const d of it.drafted ?? []) { edit((t) => mdAdd(t, d.where, d.text), (x) => (jsonAdd(x, d.where, d.text), true)); did.drafted.push(d); }
+    else for (const d of it.drafted ?? []) { edit((t) => mdAdd(t, d.where, d.text, { sure: d.sure }), (x) => (jsonAdd(x, d.where, d.text, { sure: d.sure }), true)); did.drafted.push(d); }
     if (did.removed.length || did.rewritten.length || did.drafted.length) pages.push(did);
   }
   return { files: next, pages, held };
@@ -412,11 +449,11 @@ export function describeReview({ pages, problems }) {
 export function describeChanges({ pages, held }, { dropped = [] } = {}) {
   const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
   const out = [`${pages.length} page${pages.length === 1 ? '' : 's'} changed: ${n('removed')} line${n('removed') === 1 ? '' : 's'} written on every page alike taken out, ${n('rewritten')} sentence${n('rewritten') === 1 ? '' : 's'} the system contradicts written again as drafts, ${n('drafted')} line${n('drafted') === 1 ? '' : 's'} drafted.`,
-    '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). The design-system engine lists each under Review on the Documentation page.', ''];
+    '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). rms-design-system-engine lists each under Review on the Documentation page.', ''];
   for (const p of pages) {
     out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
     for (const r of p.rewritten) out.push(`- Written again (draft): "${r.line}" → "${r.text}"`);
-    for (const d of p.drafted) out.push(`- Drafted, ${d.where}: "${d.text}"`);
+    for (const d of p.drafted) out.push(d.sure ? `- Written from the code, ${d.where}: "${d.text}"` : `- Drafted, ${d.where}: "${d.text}"`);
     if (p.removed.length) out.push(`- Taken out, written on every page alike: ${p.removed.map((l) => `"${l}"`).join(', ')}`);
     out.push('');
   }
@@ -455,10 +492,23 @@ export async function commitToBranch(access, { files, sha, target, message }) {
   if (!h.ok) return { error: `GitLab answered ${h.status} for ${target}` };
   const head = String((await h.json())?.id ?? '');
   if (!head.startsWith(sha) && !sha.startsWith(head)) return { error: `${target} moved since the layer was read (now ${head.slice(0, 8)}): run --intent-changes again, so the changes are made on what is there now` };
-  const c = await access.send('POST', '/repository/commits', { branch: target, commit_message: message, actions: [...files].map(([file_path, content]) => ({ action: 'update', file_path, content })) });
-  if (!c.ok) return { error: c.status === 403 || c.status === 401 ? `GitLab refused (${c.status}) a commit on ${target} with the token in ${access.writesWith}: it is a protected branch, or the token may not create commits there` : `GitLab answered ${c.status} to the commit` };
-  const out = await c.json();
-  return { url: out?.web_url ?? null, sha: out?.id ?? null };
+  // A large change goes as several commits, one after another (GitLab closes a request that is too large): each made on
+  // the one before it, and none once someone else committed in between.
+  const parts = [], LIMIT = 400000;
+  for (const [file_path, content] of files) {
+    const last = parts.at(-1);
+    if (!last || last.size + content.length > LIMIT || last.actions.length >= 40) parts.push({ size: 0, actions: [] });
+    parts.at(-1).actions.push({ action: 'update', file_path, content }); parts.at(-1).size += content.length;
+  }
+  let base = head, out = null;
+  for (const [k, part] of parts.entries()) {
+    if (k) { const now = await access.get(`/repository/commits/${encodeURIComponent(target)}`); const at = now.ok ? String((await now.json())?.id ?? '') : ''; if (at !== base) return { error: `${target} moved while the changes were sent (${k} of ${parts.length} parts sent): run --intent-changes again for the rest`, sent: k }; }
+    let c; try { c = await access.send('POST', '/repository/commits', { branch: target, commit_message: parts.length > 1 ? `${message.split('\n')[0]} (part ${k + 1} of ${parts.length})${message.includes('\n') ? '\n' + message.split('\n').slice(1).join('\n') : ''}` : message, actions: part.actions }); }
+    catch (e) { return { error: `the connection to GitLab broke while sending part ${k + 1} of ${parts.length} (${e.code ?? e.message}): run again to send what is left`, sent: k }; }
+    if (!c.ok) return { error: c.status === 403 || c.status === 401 ? `GitLab refused (${c.status}) a commit on ${target} with the token in ${access.writesWith}: it is a protected branch, or the token may not create commits there` : `GitLab answered ${c.status} to the commit` };
+    out = await c.json(); base = String(out?.id ?? '');
+  }
+  return { url: out?.web_url ?? null, sha: out?.id ?? null, parts: parts.length };
 }
 
 // ── The whole of it, for the command and for each run ───────────────────────────────────────────────────────────────
@@ -491,7 +541,7 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   const leftFile = resolve(ROOT, OUT_DIR, 'intent-left-for-people.json');
   let left = []; try { left = JSON.parse(readFileSync(leftFile, 'utf8')); } catch { /* none yet */ }
   const plan = planOf(snap, report, { leftForPeople: new Set(left.map((x) => flat(x.line))) });
-  if (!plan.length) return { snap, access, plan, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
+  if (!plan.length) return { snap, access, plan, answers: {}, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
   let files; try { files = await layerFiles(access, snap._source.sha); } catch (e) { return { error: e.message }; }
   let note = '';
   if (drafts && draftJobs(plan, facts).length) {
@@ -513,7 +563,7 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   // What the drafter left for a person: kept, so later runs do not ask about it again (it stays on the page as Fix).
   const now = plan.flatMap((i) => (i.rewritten ?? []).filter((r) => !r.text).map((r) => ({ page: i.entity.name, line: r.line, why: r.why ?? null })));
   if (now.length) { mkdirSync(dirname(leftFile), { recursive: true }); writeFileSync(leftFile, JSON.stringify([...left, ...now.filter((n) => !left.some((l) => flat(l.line) === flat(n.line)))], null, 1) + '\n'); }
-  return { snap, access, plan, result, summary: describeChanges(result, { dropped }), note };
+  return { snap, access, plan, answers: plan.answers ?? {}, result, summary: describeChanges(result, { dropped }), note };
 }
 
 // On each run (the audit, the style guide), when ds-config.json → intentLayer.autoFix is "commit": what the engine can
@@ -531,7 +581,7 @@ export async function autoFix(ROOT, cfg, { offline = false } = {}) {
     if (p.error) return `⚠️  Intent layer not fixed this run: ${p.error}`;
     if (!p.result.files.size) return p.note ? `🔧 Intent layer: nothing to fix that needs no drafting. ${p.note}` : null;
     writeLocal(ROOT, p.result.files, p.summary);
-    const done = await commitToBranch(p.access, { files: p.result.files, sha: p.snap._source.sha, target: p.snap._source.ref, message: 'Intent layer: fixed by the design-system engine (' + p.summary.split('\n')[0].replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+    const done = await commitToBranch(p.access, { files: p.result.files, sha: p.snap._source.sha, target: p.snap._source.ref, message: 'Intent layer: fixed by rms-design-system-engine (' + p.summary.split('\n')[0].replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
     if (done.error) return `⚠️  Intent layer not fixed this run: ${done.error}`;
     // Read again, so what this run builds shows the layer as it is now.
     try { const il = await import('./intent-layer.mjs'); await il.syncSources(ROOT, cfg); } catch { /* next run reads it */ }

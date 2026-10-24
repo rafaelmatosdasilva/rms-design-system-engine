@@ -81,7 +81,8 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
   for (const [n, a] of Object.entries(code.api ?? {})) {
     const c = add(n); if (a?.file) c.file = a.file;
     // The words of its own code file: a value the code takes but the capture did not list (a status the code names).
-    if (a?.file) { try { c.codeWords = [...new Set(readFileSync(resolve(ROOT, a.file), 'utf8').match(/[A-Za-z_][\w-]*/g) ?? [])]; } catch { /* not read */ } }
+    // Its root element too (<button>, <nav>…): the role a person writes for it starts from it.
+    if (a?.file) { try { const src = readFileSync(resolve(ROOT, a.file), 'utf8'); c.codeWords = [...new Set(src.match(/[A-Za-z_][\w-]*/g) ?? [])]; c.root = /<template>\s*<([a-zA-Z][\w-]*)/.exec(src)?.[1]?.toLowerCase() ?? null; } catch { /* not read */ } }
     for (const [p, d] of Object.entries(a?.props ?? {})) c.props[p] = { type: d?.type ?? null, options: Array.isArray(d?.options) ? d.options.map(String) : null, from: 'the code' };
     for (const s of a?.slots?.named ?? []) c.slots = [...(c.slots ?? []), s];
   }
@@ -233,6 +234,7 @@ const NOT_ITS_OWN = /\b(not|no|never|don't|do not|parent|owns?|consumer|caller|y
 // content check does not call "not in the system". The documentation rating asks the same, so both say the same.
 export function inSystem(facts, n) {
   const w = String(n ?? '').trim(), bare = w.replace(/^--/, ''), k = norm(bare);
+  if (/^<[A-Za-z]/.test(w)) return true;   // markup (an example), not a name: its tag and props are the content check's
   if (!k || PLACEHOLDER.test(bare) || HTML_ATTR.test(bare) || HTML_EL.test(bare) || BOOL.has(bare)) return true;
   if (facts.comps.has(k) || [...facts.allProps].some((p) => norm(p) === k) || facts.tokens.has(bare) || facts.tokens.has(w)) return true;
   if (PATH.test(bare) || /\.\w{1,5}$/.test(bare)) return facts.hasFile(bare) || (facts.layerFiles?.has(bare.replace(/\.[\w]+$/, '')) ?? false) || facts.words.has(k);

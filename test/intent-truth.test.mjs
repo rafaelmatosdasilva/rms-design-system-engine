@@ -172,6 +172,6 @@ test('a name in a list under "Incorrect:" is an example not to follow, not a fin
 test('a name is in the system when the code, Figma or the project has it: the documentation rating asks the same', async () => {
   const { inSystem } = await import('../intent-truth.mjs');
   const f = factsFrom({ components: { tileOne: { props: { size: {} } } }, tokens: ['--acme-space-s'], text: 'props: { errorMessage: String }', files: ['src/tiles/Tile.vue'], layerFiles: ['specs/guide.md'] });
-  for (const n of ['tileOne', 'size', '--acme-space-s', 'errorMessage', 'src/tiles/Tile.vue', 'specs/guide.md', 'aria-label', 'button']) assert.equal(inSystem(f, n), true, n);
+  for (const n of ['tileOne', 'size', '--acme-space-s', 'errorMessage', 'src/tiles/Tile.vue', 'specs/guide.md', 'aria-label', 'button', '<TileOne size="s" />']) assert.equal(inSystem(f, n), true, n);
   for (const n of ['tileTwo', 'warningMessage', 'src/tiles/Gone.vue']) assert.equal(inSystem(f, n), false, n);
 });
