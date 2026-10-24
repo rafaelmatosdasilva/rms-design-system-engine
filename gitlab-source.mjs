@@ -266,6 +266,13 @@ export function projectFromState(dir) {
   return { origin: st.origin, host: st.host, path: st.path, ref: st.branch ?? null };
 }
 
+// Is this folder already the copy of that project (its state file names the same one)? Then it is brought up to date
+// where it is, never copied again inside itself: a run from inside the copy, given the project by a profile or --project.
+export function isMirrorOf(dir, p) {
+  const here = projectFromState(dir);
+  return !!here && !!p && here.origin === p.origin && here.path.toLowerCase() === p.path.toLowerCase();
+}
+
 // One line for the person: which GitLab commit this run checks.
 export function describe(r) {
   if (r.error) return `❌ GitLab: ${r.path}: ${r.error}`;

@@ -9,7 +9,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, plainGet, STATE_FILE } from '../gitlab-source.mjs';
+import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, plainGet, isMirrorOf, STATE_FILE } from '../gitlab-source.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -241,4 +241,12 @@ test('the mirror downloads with a plain GET: no browser headers, redirects follo
     const missing = await plainGet('http://127.0.0.1:1/', {}).catch((e) => e);
     assert.ok(missing instanceof Error, 'a refused connection is an error the caller turns into "could not reach"');
   } finally { server.close(); other.close(); }
+});
+
+test('a folder that is already the copy of the project is used where it is, never copied again inside itself', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mirror-'));
+  writeFileSync(join(dir, STATE_FILE), JSON.stringify({ origin: 'https://gitlab.acme.test', host: 'gitlab.acme.test', path: 'web/Library', branch: null }));
+  assert.equal(isMirrorOf(dir, parseGitlabProject('https://gitlab.acme.test/web/library')), true);
+  assert.equal(isMirrorOf(dir, parseGitlabProject('https://gitlab.acme.test/web/other')), false);
+  assert.equal(isMirrorOf(mkdtempSync(join(tmpdir(), 'plain-')), parseGitlabProject('https://gitlab.acme.test/web/library')), false);
 });
