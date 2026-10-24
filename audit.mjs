@@ -504,7 +504,7 @@ if (process.argv.includes('--intent-decide')) {
   const keys = keysArg === 'all' ? open.map(([k]) => k) : keysArg.split(',').map((k) => k.trim()).filter(Boolean);
   const unknown = keys.filter((k) => !d.proposals.has(k));
   if (unknown.length) { console.log(`❌ No proposal is called ${unknown.join(', ')} (--intent-decide lists them).`); process.exit(2); }
-  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals));
+  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals), { by: (await import('./decided-by.mjs')).decidedBy(ROOT) });
   console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans}${ans === 'yes' ? ': acted on from the next run, and the Intent layer page no longer asks them of the team' : ': they stay on the Intent layer page'} (${projectPath(ROOT, 'intentDecisions')}).`);
   await sendDecisions();
   console.log('NEXT: rebuild the style guide to see it (--styleguide).');
@@ -1114,8 +1114,7 @@ if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
     for (const x of near.slice(0, 10)) console.log(`   • ${x.check}: ${x.what}`);
     process.exit(1);
   }
-  const git = spawnSync('git', ['config', 'user.name'], { cwd: ROOT, encoding: 'utf8' });
-  const by = argOf('--by') || String(git.stdout ?? '').trim() || null;
+  const by = (await import('./decided-by.mjs')).decidedBy(ROOT);
   const added = km.recordKept(ROOT, chosen, { reason, by, truth, review });
   console.log(`✓ Kept on purpose: ${added.length} difference${added.length === 1 ? '' : 's'}, in ${file}.`);
   for (const d of added) console.log(`   • ${km.keptLine(d)}`);
@@ -1526,6 +1525,25 @@ if (process.argv.includes('--styleguide')) {
       for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
       // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
       if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
+      // When each open task was first found: the open ones this build saw keep their first date, a new one starts today, a
+      // closed one leaves. Kept with the snapshots, as the accessibility results are.
+      if (!b.skipped && Array.isArray(b.open)) {
+        const { OPEN_FILE, readOpenSince, ageOpen } = await import('./styleguide-bake.mjs');
+        const openPath = join(ROOT, OPEN_FILE), prev = readOpenSince(openPath), since = ageOpen(prev, b.open);
+        if (JSON.stringify(prev) !== JSON.stringify(since)) {
+          const next = JSON.stringify({ at: new Date().toISOString(), since }, null, 1) + '\n';
+          writeFileSync(openPath, next);
+          const st = await import('./stores.mjs');
+          if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[OPEN_FILE, Buffer.from(next)]]), 'When each open task was first found, saved with the design-system engine', { offline: STORE_OFFLINE })).line);
+        }
+      }
+    }
+    // Each open task's age in the page (how long since an audit first found it), from the record a build with the browser
+    // keeps: also in a page built without it, as of that build.
+    {
+      const { OPEN_FILE, readOpenSince, withOpenSince } = await import('./styleguide-bake.mjs');
+      const since = readOpenSince(join(ROOT, OPEN_FILE));
+      if (Object.keys(since).length) { const page = resolve(ROOT, r.out), html = readFileSync(page, 'utf8'), next = withOpenSince(html, since); if (next !== html) writeFileSync(page, next); }
     }
     // The page is held to the system it shows: its own CSS uses the system's tokens and nothing else.
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
@@ -4447,7 +4465,7 @@ function reportFull(label, items, shown) {
     const mi = process.argv.indexOf('--match');
     const match = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : null;
     const perFinding = process.argv.includes('--findings') || !!match?.length;
-    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0, match, from: BASELINE_READ });
+    const written = writeBaseline(BASELINE_PATH, gates, { findings: perFinding, merge: _scopeNames.length > 0, match, from: BASELINE_READ, by: (await import('./decided-by.mjs')).decidedBy(ROOT) });
     baselineInfo = { mode: 'write', written, path: BASELINE_PATH, perFinding };
     anyFail = false;   // capturing the baseline is not a failing run
   } else if (!BASELINE_OFF) {

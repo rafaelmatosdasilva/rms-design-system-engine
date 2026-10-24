@@ -1326,7 +1326,7 @@ test('a Tokens page as Figma keeps them: collections, a tree of groups, the coll
   assert.match(tpl, /prefers-reduced-motion: reduce\) \{ \.sg-bk-bento \*/, 'still when the person asks for less motion');
   assert.match(tpl, /class="sg-link-pill sg-tk-alias" data-alias="/, 'an alias as Figma shows it, opening the token it points at');
   assert.match(tpl, /sysButton\('button', 'Download all tokens'/);
-  assert.match(tpl, /a\.download = 'tokens\.json'/);
+  assert.match(tpl, /saveFile\('tokens\.json'/);
 });
 
 test('a foundation shows every mode at once: a column per mode, no switch, the columns lined up from table to table', () => {
@@ -1409,7 +1409,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     // Accessibility waits until every component is tried in this browser; then each card is a count over a total.
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
-    assert.deepEqual(tiles.map((x) => x[0]), ['Figma × Code Parity', 'Code Implementation', 'Accessibility', 'AI-ready Documentation'], errors.join('\n'));
+    assert.deepEqual(tiles.map((x) => x[0]), ['Parity', 'Code', 'Accessibility', 'Documentation'], errors.join('\n'));
     // The big number is the share of checks done, no line under it; the legend counts the components, the done state
     // in the big number's word.
     assert.match(tiles[0][1], /^\d+%matched\|$/, 'parity: the share matched, nothing under it');
@@ -1431,7 +1431,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
-    assert.match(how[0][1], /^Every component Figma has that the code has built \(one not built yet is on Code Implementation\); one with nothing to compare is counted apart\. A part \(chartBars\/bar\) counts with its parent\. Match: all its props, tokens and values are the same in Figma and in the code\. Partial:/);
+    assert.match(how[0][1], /^How closely the code matches Figma\. The percentage counts every property, token and value compared; the legend counts components\./, 'said simply, in a sentence or two');
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
     if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Found', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');

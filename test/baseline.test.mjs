@@ -115,3 +115,13 @@ test('--match: only the findings that name the difference, with their gate\'s co
   assert.deepEqual(cls.debt, ['[3] Token values  (color · sizing)']);
   assert.ok(cls.regressions.includes('[15] Component props match Figma  (names)'));
 });
+
+test('each line accepted as debt keeps who accepted it and when; one accepted before keeps its own', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'baseline-'));
+  const path = join(dir, 'design-system-engine-baseline.json');
+  writeBaseline(path, [G('B', false)], { by: 'Acme Designer', now: '2026-01-01T00:00:00Z' });
+  writeBaseline(path, [G('B', false), G('D', false)], { merge: true, by: 'Acme Developer', now: '2026-02-01T00:00:00Z' });
+  const doc = JSON.parse(readFileSync(path, 'utf8'));
+  assert.deepEqual(doc.accepted.B, { by: 'Acme Designer', at: '2026-01-01T00:00:00Z' });
+  assert.deepEqual(doc.accepted.D, { by: 'Acme Developer', at: '2026-02-01T00:00:00Z' });
+});

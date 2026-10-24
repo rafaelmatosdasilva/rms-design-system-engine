@@ -2,7 +2,7 @@
 // in once, replace an earlier build's, and never close the page's own script early.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withBaked, withoutBaked, BAKED_ID } from '../styleguide-bake.mjs';
+import { withBaked, withoutBaked, BAKED_ID, ageOpen, withOpenSince, OPEN_ID } from '../styleguide-bake.mjs';
 
 test('the results are kept in the page right after its data, before its script reads them; an earlier build\'s replaced', () => {
   const page = '<html><body><main></main><script type="application/json" id="sg-data">{}</script><script>var x = 1;</script></body></html>';
@@ -62,4 +62,13 @@ test('saved results go into the page before it tries anything, so it tries only 
     assert.deepEqual(Object.keys(readSaved(join(dir, RESULTS_FILE))).sort(), ['chip', 'tag']);
     assert.deepEqual(readSaved(join(dir, 'none.json')), {});
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('each open task keeps the day it was first found; a new one starts now, a closed one leaves', () => {
+  assert.deepEqual(ageOpen({ 'chip\u0000a': '2026-01-01', 'chip\u0000gone': '2026-01-02' }, ['chip\u0000a', 'chip\u0000b'], '2026-03-01'), { 'chip\u0000a': '2026-01-01', 'chip\u0000b': '2026-03-01' });
+  const page = '<script id="sg-data" type="application/json">{}</script><script>run()</script>';
+  const once = withOpenSince(page, { a: '2026-01-01' }), twice = withOpenSince(once, { b: '</script>' });
+  assert.match(once, new RegExp(`id="sg-data"[^>]*>{}</script><script id="${OPEN_ID}"`));
+  assert.equal((twice.match(new RegExp(OPEN_ID, 'g')) || []).length, 1, 'replaced, never added twice');
+  assert.doesNotMatch(twice, /"<\/script>"/, 'a value never closes the tag');
 });
