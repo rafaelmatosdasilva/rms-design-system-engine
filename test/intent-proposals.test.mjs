@@ -58,3 +58,13 @@ test('a yes is kept and acted on; a no keeps the decision on the page', () => {
   assert.equal(pg('Search').proposals[0].key, 'fix:Search:searchRow');
   assert.ok(JSON.parse(readFileSync(join(ROOT, 'design-system-engine-intent-decisions.json'), 'utf8'))['move:Picker']);
 });
+
+test('a decision keeps who made it and when, and the page is given both', () => {
+  const P = proposalsFor({ ROOT, report, snap, names: ['listMain', 'tileOne', 'tileTwo', 'tabGroup'], codeFiles, facts, noPage: ['listMain/Row', 'tileTwo', 'newThing'] });
+  decide(ROOT, ['add:tileTwo'], 'no', Object.fromEntries(P), { by: 'Acme Designer', now: '2026-02-03T10:00:00Z' });
+  const d = readDecisions(ROOT);
+  assert.deepEqual([d['add:tileTwo'].by, d['add:tileTwo'].at], ['Acme Designer', '2026-02-03T10:00:00Z']);
+  const r = applyDecisions({ report, noPage: ['listMain/Row', 'tileTwo', 'newThing'], proposals: P, decisions: d });
+  assert.equal(r.addProposals.tileTwo.by, 'Acme Designer');
+  assert.equal(r.addProposals.tileTwo.at, '2026-02-03T10:00:00Z');
+});

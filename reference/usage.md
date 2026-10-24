@@ -770,6 +770,21 @@ and, when the team keeps its snapshots in a store (`stores.snapshots`), sends it
 this person, or the pipeline's token, write it; so everyone's build, and the page the team publishes, start from the
 same results. With no store the file stays in the folder.
 
+**How long each task has been open** (`open-since.snapshot.json`): the same build asks the page for every open task and
+keeps, for each, the day a build first found it (a closed one leaves; one found again starts again), with the snapshots
+and sent to their store as the results are. The page shows it under each open task's status (Open 3 days, Open 5
+weeks), so what is stuck shows apart from what is new; a build without the browser shows the record as of the last
+one that had it.
+
+**Downloads** (the Documentation page's, the tokens, the icons, a component's file) go through one helper; in a page
+shown inside another one (a shared viewer, a sandboxed frame) that may not hand files over, a note says so, with the
+page's own address to open it alone and, for a text file, a button to copy it instead.
+
+**Who decided, and when**: every decision the engine records keeps the person with the day: an answer to a proposal
+(`--intent-decide`), each line accepted as debt (`--baseline`, under `accepted`), a difference kept on purpose
+(`--keep`), a check made by hand (`--checked`). The name is `--by "<name>"`, else the one git uses (`git config
+user.name`); the Documentation page says who declined a proposal and when.
+
 **The page is checked against the system it shows.** After building it, `--styleguide` checks the page's own CSS
 (every `<style>` but the system's, which the template marks `data-system`): a colour, font, text size, weight, line
 height, corner radius or space that is not one of the system's tokens fails it, and so does what the static

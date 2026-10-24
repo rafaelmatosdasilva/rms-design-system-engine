@@ -32,6 +32,27 @@ export function withBaked(html, baked) {
 }
 export function withoutBaked(html) { return html.replace(BAKED_RE, ''); }
 
+// When each task still open was first found: { key: ISO date }, kept with the snapshots so it follows the team, and put
+// in the page (<script id="sg-open-since">), which says how long each open task has been open. A task found closed
+// (gone from the open ones) leaves it; one found again starts again.
+export const OPEN_FILE = 'open-since.snapshot.json';
+export const OPEN_ID = 'sg-open-since';
+export function readOpenSince(path) { try { const j = JSON.parse(readFileSync(path, 'utf8')); return j && typeof j.since === 'object' ? j.since : {}; } catch { return {}; } }
+export function ageOpen(prev = {}, keys = [], now = new Date().toISOString()) {
+  const out = {};
+  for (const k of [...new Set(keys)].sort()) out[k] = prev[k] ?? now;
+  return out;
+}
+const OPEN_RE = new RegExp(`<script id="${OPEN_ID}" type="application/json">[\\s\\S]*?<\\/script>`);
+export function withOpenSince(html, since) {
+  const tag = `<script id="${OPEN_ID}" type="application/json">${JSON.stringify(since ?? {}).replace(/</g, '\\u003c')}</script>`;
+  if (OPEN_RE.test(html)) return html.replace(OPEN_RE, () => tag);
+  const data = DATA_RE.exec(html);
+  if (data) return html.slice(0, data.index + data[0].length) + tag + html.slice(data.index + data[0].length);
+  const at = html.search(/<script(?![^>]*application\/json)/);
+  return at < 0 ? html + tag : html.slice(0, at) + tag + html.slice(at);
+}
+
 // Try every component of the page at file in Chrome and keep the results in it. jobs: pages trying at once.
 // → { tried, of, unfinished, dead, errors, ms } | { skipped: why }. errors: each script error the page threw while trying,
 // once; dead: the page's script stopped before it could try anything.
@@ -62,12 +83,17 @@ export async function bakeA11y(file, { saved = null, chromePath = process.env.CH
       let results = {};
       try { results = JSON.parse(r?.result?.value || '{}'); } catch { results = {}; }
       const n = await send('Runtime.evaluate', { expression: "(JSON.parse((document.getElementById('sg-data') || {}).textContent || '{}').components || []).length", returnByValue: true }, sessionId).catch(() => null);
-      return { done, results, of: n?.result?.value ?? 0 };
+      // Every task this page found open (all of the page's, and the accessibility of the components it tried).
+      const k = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.__sgOpenKeys ? window.__sgOpenKeys() : null)', returnByValue: true }, sessionId).catch(() => null);
+      let open = null; try { open = JSON.parse(k?.result?.value || 'null'); } catch { open = null; }
+      return { done, results, of: n?.result?.value ?? 0, open };
     }));
     close();
     const results = Object.assign({}, ...parts.map((p) => p.results));
     writeFileSync(file, withBaked(readFileSync(file, 'utf8'), { at: new Date().toISOString(), results }));
     const reused = saved ? Object.keys(results).filter((n) => saved[n] && saved[n].sig === results[n].sig).length : 0;
-    return { results, reused, tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, dead: parts.some((p) => p.dead), errors: [...errors], ms: Date.now() - t0 };
+    // The open tasks, only when every page said them: a page that could not leaves the record as it was.
+    const open = parts.every((p) => Array.isArray(p.open)) ? [...new Set(parts.flatMap((p) => p.open))] : null;
+    return { results, open, reused, tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, dead: parts.some((p) => p.dead), errors: [...errors], ms: Date.now() - t0 };
   } finally { kill(); }
 }
