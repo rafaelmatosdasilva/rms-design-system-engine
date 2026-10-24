@@ -397,7 +397,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-anchor:hover { text-decoration: underline; text-underline-offset: 3px; }
 .sg-health-anchor:hover > svg { transform: translateY(var(--sg-space-xxs)); }
 .sg-health-anchor:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
-.sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) calc(var(--sg-card-gap) - var(--sg-space-s)); font-size: var(--sg-s); color: var(--sg-text-2); }
+.sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) calc(var(--sg-card-gap) - var(--sg-space-s) - var(--sg-space-xs)); font-size: var(--sg-s); color: var(--sg-text-2); }   /* 20px between items on an 8px system */
 .sg-health-bar + .sg-health-legend { margin-top: calc(-1 * var(--sg-space-s)); }   /* the legend 8px closer to its bar */
 .sg-health-legend .pg-par-status { font-weight: var(--sg-text-weight); color: var(--sg-text-2); }
 .sg-health-lead { color: var(--sg-muted); }   /* what the legend counts (Components), quieter than its counts */
