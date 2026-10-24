@@ -29,8 +29,8 @@ export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'styleguide', 'de
 export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', styleguide: 'Style guide', decisions: 'Team decisions' };
 export const STATE = `${OUT_DIR}/stores.json`;
 // The team's decisions: the files people write by deciding (answers to proposals, kept and accepted differences,
-// checks made by hand).
-export const DECISION_FILES = ['intentDecisions', 'kept', 'baseline', 'agreed', 'checked'].map((k) => PROJECT[k].now);
+// checks made by hand). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it, nobody decides it.
+export const DECISION_FILES = ['intentDecisions', 'kept', 'baseline', 'checked'].map((k) => PROJECT[k].now);
 // What a store may put in the project, by part: nothing else is ever written from it (not a .env, not a hook).
 const TAKES = {
   snapshots: (rel) => /\.snapshot\.json$/i.test(rel),
