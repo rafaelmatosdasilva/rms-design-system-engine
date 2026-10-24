@@ -129,5 +129,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-24-status-the-cards-named-parity` | The 21 guide tasks on Haiku (engine f69e3e0) | "Status: the cards named Parity, Code, Accessibility and Documentation, each with a short plain tip; each open task says how long it has been open (open-since.snapshot.json, kept by the build's browser); every decision keeps who made it and when (--by, else git's name); a download in a page shown inside another one says how else to get the file" |
 | `2026-10-24-guidelines-link-not-read-the` | The 21 guide tasks on Haiku (engine 8b893e6) | "Guidelines link not read: the NEXT line says the person makes the fix, a token by their hand in .env, never asked for in the chat" |
 | `2026-10-24-merge-remote-tracking-branch-origin` | The 21 guide tasks on Haiku (engine 44de2d4) | "Merge remote-tracking branch 'origin/main' into kept-differences" |
+| `2026-10-24-merge-remote-tracking-branch-origin-2` | The 21 guide tasks on Haiku (engine 7f33bfa) | "Merge remote-tracking branch 'origin/main' into kept-differences" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
