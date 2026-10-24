@@ -640,6 +640,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.getElementById('documentation') && !!document.querySelector('nav a[href="#documentation"]') && !document.getElementById('for-agents')`), true);
     assert.equal(await run(`[...document.querySelectorAll('#documentation thead th')].some((t) => t.textContent.trim() === 'File')`), false, 'no File column without an intent layer');
     assert.ok(await run(`document.querySelectorAll('#documentation tbody tr').length`) > 1, 'one row a component');
+    assert.equal(await run(`(() => { const n = document.querySelectorAll('#documentation thead th').length; return [...document.querySelectorAll('#documentation tbody tr')].every((tr) => tr.cells.length === n); })()`), true, 'each row has the header\'s cells: no column shifted under the wrong heading');
     for (const old of ['#coverage', '#for-agents', '#intent-layer']) {
       await run(`location.hash = '${old}'`); await new Promise((r) => setTimeout(r, 200));
       assert.equal(await run(`location.hash`), '#documentation', `an old ${old} link`);
