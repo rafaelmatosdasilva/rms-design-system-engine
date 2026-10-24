@@ -209,11 +209,28 @@ test('what else a component page lacks: its role and an example written from the
   const asked = [];
   draftPlan(plan, facts, (prompt) => { asked.push(prompt); return JSON.stringify({ '0.d': { mistakes: ['Using `chipOne` for a list of links; use a link instead.'], limitations: ['It takes one choice only.'], example: 'never asked', doDont: ['Do: keep its label short.', "Don't: put two chips' choices in one."] } }); });
   assert.match(asked[0], /"need": \[\s*"mistakes",\s*"limitations",\s*"doDont"\s*\]/, 'its role and an example are never asked');
-  assert.deepEqual(plan[0].drafted.map((d) => `${d.sure ? 'sure ' : ''}${d.where}: ${d.text}`), ['sure Role: button', 'sure Example: `<ChipOne size="s" />`', 'Common mistakes: Using `chipOne` for a list of links; use a link instead.', 'Limitations: It takes one choice only.', "Do and don't: Do: keep its label short.", "Do and don't: Don't: put two chips' choices in one."]);
+  assert.deepEqual(plan[0].drafted.map((d) => `${d.sure ? 'sure ' : ''}${d.where}: ${d.text}`), ['sure Role: Role: button', 'sure Example: `<ChipOne size="s" />`', 'Common mistakes: Using `chipOne` for a list of links; use a link instead.', 'Limitations: It takes one choice only.', "Do and don't: Do: keep its label short.", "Do and don't: Don't: put two chips' choices in one."]);
   const md = applyPlan(plan, new Map([['specs/chip-one.md', '# Chip One\n\n- Source: `src/chips/ChipOne.vue`\n\n## Purpose\n\nA chip for one choice.\n']])).files.get('specs/chip-one.md');
-  assert.match(md, /## Role\n\n- button\n/, 'from the code: no Draft marker');
+  assert.match(md, /## Role\n\n- Role: button\n/, 'from the code: no Draft marker');
   assert.match(md, /## Example\n\n- `<ChipOne size="s" \/>`/);
   assert.match(md, /## Limitations\n\n- \*\*Draft:\*\* It takes one choice only\./, 'judged: a Draft');
   assert.match(md, /## Do and don't\n\n- \*\*Draft:\*\* Do: keep its label short\./);
-  assert.ok(md.indexOf('## Role') < md.indexOf('## Common mistakes') && md.indexOf('## Common mistakes') < md.indexOf('## Example'), 'each part in its place');
+  assert.ok(md.indexOf('## Common mistakes') < md.indexOf('## Limitations') && md.indexOf('## Limitations') < md.indexOf('## Role') && md.indexOf('## Role') < md.indexOf('## Example'), 'the written sections first, then the reference ones');
+});
+
+test('a large change goes as several commits, each made on the one before, and stops when someone else committed between', async () => {
+  const { commitToBranch } = await import('../intent-changes.mjs');
+  const files = new Map(Array.from({ length: 90 }, (_, i) => [`specs/page-${i}.md`, 'x'.repeat(100)]));
+  let head = 'abc123', n = 0;
+  const sent = [];
+  const access = { writesWith: 'GITLAB_TOKEN', get: async () => ({ ok: true, json: async () => ({ id: head }) }), send: async (m, p, body) => { sent.push(body); head = `c${++n}`; return { ok: true, json: async () => ({ id: head, web_url: `u/${head}` }) }; } };
+  const r = await commitToBranch(access, { files, sha: 'abc123', target: 'master', message: 'Intent layer review\n\nCo-Authored-By: x' });
+  assert.deepEqual([r.parts, sent.map((b) => b.actions.length)], [3, [40, 40, 10]]);
+  assert.match(sent[1].commit_message, /^Intent layer review \(part 2 of 3\)\n\nCo-Authored-By: x$/);
+  // Someone commits after the first part: the rest is not sent.
+  head = 'abc123'; n = 0; sent.length = 0;
+  const moving = { ...access, get: async () => ({ ok: true, json: async () => ({ id: sent.length ? 'theirs' : head }) }) };
+  const r2 = await commitToBranch(moving, { files, sha: 'abc123', target: 'master', message: 'm' });
+  assert.equal(sent.length, 1);
+  assert.match(r2.error, /moved while the changes were sent \(1 of 3 parts sent\)/);
 });

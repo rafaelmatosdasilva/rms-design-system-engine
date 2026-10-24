@@ -95,7 +95,9 @@ export function specOf(e, idx) {
 }
 
 // ── Editing a Markdown spec ─────────────────────────────────────────────────────────────────────────────────────────
-const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'role', 'common mistakes', 'limitations', 'do and don\'t', 'example'];
+// The written sections first, in the order a spec keeps them (Purpose to Limitations), then the reference ones (its role,
+// do and don't, an example): a spec checked for its section order takes a new one in its place.
+const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example'];
 // The role of the element a component's code renders, as a screen reader names it (none for an element with no role).
 // An example of a component in use: its tag, and each prop that takes named values with the first of them (up to three),
 // so every name and value in it is one the code takes.
@@ -306,7 +308,8 @@ export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {})
   // of it with its own tag and props, each value one it takes. Nothing in them is judged, so nothing to review.
   for (const it of plan) {
     const name = it.page.component, b = name ? briefOf(name, facts) : null; if (!b) continue;
-    if (it.need.includes('role') && ROLE_OF[b.root]) it.drafted.push({ where: 'Role', text: ROLE_OF[b.root], sure: true });
+    // Written "Role: button", not "button": a reader that keeps a section's lines as rules, and not its title, still says what it is.
+    if (it.need.includes('role') && ROLE_OF[b.root]) it.drafted.push({ where: 'Role', text: `Role: ${ROLE_OF[b.root]}`, sure: true });
     if (it.need.includes('example') && b.tag) it.drafted.push({ where: 'Example', text: exampleOf(b), sure: true });
   }
   for (let k = 0; k < jobs.length; k += batch) {
@@ -489,10 +492,23 @@ export async function commitToBranch(access, { files, sha, target, message }) {
   if (!h.ok) return { error: `GitLab answered ${h.status} for ${target}` };
   const head = String((await h.json())?.id ?? '');
   if (!head.startsWith(sha) && !sha.startsWith(head)) return { error: `${target} moved since the layer was read (now ${head.slice(0, 8)}): run --intent-changes again, so the changes are made on what is there now` };
-  const c = await access.send('POST', '/repository/commits', { branch: target, commit_message: message, actions: [...files].map(([file_path, content]) => ({ action: 'update', file_path, content })) });
-  if (!c.ok) return { error: c.status === 403 || c.status === 401 ? `GitLab refused (${c.status}) a commit on ${target} with the token in ${access.writesWith}: it is a protected branch, or the token may not create commits there` : `GitLab answered ${c.status} to the commit` };
-  const out = await c.json();
-  return { url: out?.web_url ?? null, sha: out?.id ?? null };
+  // A large change goes as several commits, one after another (GitLab closes a request that is too large): each made on
+  // the one before it, and none once someone else committed in between.
+  const parts = [], LIMIT = 400000;
+  for (const [file_path, content] of files) {
+    const last = parts.at(-1);
+    if (!last || last.size + content.length > LIMIT || last.actions.length >= 40) parts.push({ size: 0, actions: [] });
+    parts.at(-1).actions.push({ action: 'update', file_path, content }); parts.at(-1).size += content.length;
+  }
+  let base = head, out = null;
+  for (const [k, part] of parts.entries()) {
+    if (k) { const now = await access.get(`/repository/commits/${encodeURIComponent(target)}`); const at = now.ok ? String((await now.json())?.id ?? '') : ''; if (at !== base) return { error: `${target} moved while the changes were sent (${k} of ${parts.length} parts sent): run --intent-changes again for the rest`, sent: k }; }
+    let c; try { c = await access.send('POST', '/repository/commits', { branch: target, commit_message: parts.length > 1 ? `${message.split('\n')[0]} (part ${k + 1} of ${parts.length})${message.includes('\n') ? '\n' + message.split('\n').slice(1).join('\n') : ''}` : message, actions: part.actions }); }
+    catch (e) { return { error: `the connection to GitLab broke while sending part ${k + 1} of ${parts.length} (${e.code ?? e.message}): run again to send what is left`, sent: k }; }
+    if (!c.ok) return { error: c.status === 403 || c.status === 401 ? `GitLab refused (${c.status}) a commit on ${target} with the token in ${access.writesWith}: it is a protected branch, or the token may not create commits there` : `GitLab answered ${c.status} to the commit` };
+    out = await c.json(); base = String(out?.id ?? '');
+  }
+  return { url: out?.web_url ?? null, sha: out?.id ?? null, parts: parts.length };
 }
 
 // ── The whole of it, for the command and for each run ───────────────────────────────────────────────────────────────

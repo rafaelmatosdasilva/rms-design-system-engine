@@ -234,6 +234,7 @@ const NOT_ITS_OWN = /\b(not|no|never|don't|do not|parent|owns?|consumer|caller|y
 // content check does not call "not in the system". The documentation rating asks the same, so both say the same.
 export function inSystem(facts, n) {
   const w = String(n ?? '').trim(), bare = w.replace(/^--/, ''), k = norm(bare);
+  if (/^<[A-Za-z]/.test(w)) return true;   // markup (an example), not a name: its tag and props are the content check's
   if (!k || PLACEHOLDER.test(bare) || HTML_ATTR.test(bare) || HTML_EL.test(bare) || BOOL.has(bare)) return true;
   if (facts.comps.has(k) || [...facts.allProps].some((p) => norm(p) === k) || facts.tokens.has(bare) || facts.tokens.has(w)) return true;
   if (PATH.test(bare) || /\.\w{1,5}$/.test(bare)) return facts.hasFile(bare) || (facts.layerFiles?.has(bare.replace(/\.[\w]+$/, '')) ?? false) || facts.words.has(k);
