@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Merge remote-tracking branch 'origin/main' into kept-differences (continuous evaluation)
+
+What changed since the entry below (engine bd53684): Kept differences, a part of their own and a rule agents follow: each contract lists its component's (the side that is right, why), the prototype context says them, and a team keeps them with its intent layer; Guidelines link not read: the NEXT line says the person makes the fix, a token by their hand in .env, never asked for in the chat. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `73ec73fd2e51` · Project measured: `13d811a9d668`
+
+| Haiku, engine 44de2d4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.067 | $0.060 |
+| Input a run | 145k | 109k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 109k a run against 145k. Records: `records/2026-10-24-merge-remote-tracking-branch-origin`.
+
 ## 2026-10: Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own (continuous evaluation)
 
 What changed since the entry below (engine c15a00a): A component class with a bracket, a space or a date in it is escaped wherever it becomes a selector (clsSel), so it never stops the accessibility pass or the lookup that runs over every component; Skill evaluation: each run keeps the agent command line's version and bundled skills; a change since the runs before, or between this evaluation's runs, is said in the console and in the RESULTS.md entry, never read as a change in the guide; The prototype evaluation says whether one request gives the same page across sessions: the components, spacing tokens and text styles every session used, and what only some did, per task and side; Template tests read the escaped class selectors (clsSel); Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own. The guide changed in `cookbook/publish-styleguide.md`.

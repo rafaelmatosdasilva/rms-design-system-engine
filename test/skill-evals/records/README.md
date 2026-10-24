@@ -127,5 +127,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-24-one-token-per-person-the` | The 21 guide tasks on Haiku (engine c15a00a) | "One token per person: the installer asks for a fine-grained token (Read on the system's projects, Commit and Merge request Create), and a refused write says what that token needs instead of asking for a second one" |
 | `2026-10-24-publishing-the-style-guide-to` | The 21 guide tasks on Haiku (engine bd53684) | "Publishing the style guide to its store sends the page and what it links to, never the rest of its folder, where a person may keep files of their own" |
 | `2026-10-24-guidelines-link-not-read-the` | The 21 guide tasks on Haiku (engine 8b893e6) | "Guidelines link not read: the NEXT line says the person makes the fix, a token by their hand in .env, never asked for in the chat" |
+| `2026-10-24-merge-remote-tracking-branch-origin` | The 21 guide tasks on Haiku (engine 44de2d4) | "Merge remote-tracking branch 'origin/main' into kept-differences" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
