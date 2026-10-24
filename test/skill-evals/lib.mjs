@@ -108,6 +108,34 @@ export function childEnv(env, extra = {}) {
 
 // A run that did not run: the API refused it (a usage limit, a 429, an overload) or it spent nothing and
 // called nothing. It says nothing about the guide, so it is never scored; the evaluation stops and resumes.
+// The agent's command line a run had: its version and the skills it bundles (never the variant's own guide), from the
+// run's first event. A new version that bundles another skill can change what the agent does: kept with each run, so
+// such a change is said apart and never read as a change in the guide (cliChange).
+export function cliOf(events) {
+  const init = events.find((e) => e.type === 'system' && e.subtype === 'init');
+  if (!init) return null;
+  return { version: init.claude_code_version ?? null, skills: [...new Set((init.skills ?? []).map(String).filter((s) => !/^rms-design-system-engine/.test(s)))].sort() };
+}
+// What changed in the bundled skills: between the runs of one evaluation (within), and since the runs before (added,
+// removed). → { within, added, removed, versions, was } | null when nothing changed or nothing was recorded.
+export function cliChange(rows, before = []) {
+  const now = rows.filter((r) => r.cli), was = before.filter((r) => r.cli);
+  const all = (rs) => new Set(rs.flatMap((r) => r.cli.skills ?? []));
+  const within = new Set(now.map((r) => (r.cli.skills ?? []).join(','))).size > 1;
+  const a = all(now), b = all(was);
+  const added = was.length ? [...a].filter((k) => !b.has(k)) : [], removed = was.length ? [...b].filter((k) => !a.has(k)) : [];
+  if (!within && !added.length && !removed.length) return null;
+  return { within, added, removed, versions: [...new Set(now.map((r) => r.cli.version))], was: [...new Set(was.map((r) => r.cli.version))] };
+}
+// The change, in one sentence for the console and RESULTS.md.
+export function cliLine(c) {
+  if (!c) return '';
+  const parts = [];
+  if (c.added.length || c.removed.length) parts.push(`the agent's command line bundles other skills than in the runs before (${c.was.join(', ') || '?'} → ${c.versions.join(', ')}${c.added.length ? `; added ${c.added.join(', ')}` : ''}${c.removed.length ? `; removed ${c.removed.join(', ')}` : ''})`);
+  if (c.within) parts.push('the runs of this evaluation did not all have the same bundled skills');
+  return `${parts.join(', and ')}: a change in the results may come from them, not from the guide.`;
+}
+
 export function infraFailure(events) {
   const result = events.filter((e) => e.type === 'result').at(-1);
   if (!result) return null;
