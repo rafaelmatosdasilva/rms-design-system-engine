@@ -3048,7 +3048,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return (own ? ilSourceHead('Intent layer', p.spec || p.file) + own : '') + ilOthersOf(p).map(function (o) { return ilSourceHead(o.source) + o.lines.map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
     };
     // The sources a row's content comes from, in a word each, for the table.
-    var ilSources = function (p) { var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
+    var ilSources = function (p) { if (p.tokens) return 'Figma'; var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
     // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
     var ilDrafts = function (p) { return (p.drafts || []).map(function (d) { return '<p class="sg-il-line"><strong>Draft</strong> · ' + esc(d.where) + '<span class="pg-par-val">' + esc(d.text) + '</span></p>'; }).join(''); };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
@@ -3059,18 +3059,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var docLeft = function (p) {
       if (p._left) return p._left;
       var c = docComp(p), out = [];
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer') out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens') out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
+    // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
+    // their own, the Tokens row, never repeated on each component's.
     // Where what is missing is written: "in Figma", "in the intent layer", or both.
     var docWhere = function (p, st) { var w = []; docLeft(p).filter(function (x) { return !st || x.st === st; }).forEach(function (x) { String(x.where || '').split(' · ').forEach(function (s) { if (s && w.indexOf(s) < 0) w.push(s); }); }); return w; };
     // Where what is missing is to be written, said under Missing: In Figma, In the intent layer, or both.
-    var docTopic = function (p) { var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
+    var docTopic = function (p) { if (p.tokens) return 'In Figma'; var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
     var docLeftHTML = function (p) { return docLeft(p).map(function (x) { return '<p class="sg-il-line"><strong>' + esc(x.kind) + '</strong>' + (x.st === 'check' ? ' (to check)' : '') + (x.where ? '<span class="pg-par-val">' + esc((x.st === 'check' ? 'In ' : 'Write it in ') + x.where.split(' · ').map(function (w) { return /^(Intent layer|The code|The contract)$/.test(w) ? 'the ' + w.replace(/^The /, '').toLowerCase() : w; }).join(' or ')) + (x.todo ? '. ' + esc(x.todo) : '') + '</span>' : (x.todo ? '<span class="pg-par-val">' + esc(x.todo) + '</span>' : '')) + '</p>'; }).join(''); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
-    var needsReview = function (p) { return !!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; }); };
-    var needsWrite = function (p) { return docLeft(p).some(function (x) { return x.st === 'todo'; }); };
+    var needsReview = function (p) { return !p.tokens && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
+    var needsWrite = function (p) { return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p); };
     var reviewTopic = function (p) { return p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
@@ -3078,6 +3080,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
     var rows = IL.pages.slice().sort(function (x, y) { return labels.findIndex(function (l) { return l[0] === x.action; }) - labels.findIndex(function (l) { return l[0] === y.action; }); })
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }));
+    // The Tokens row, first: every token a component uses, and those whose variable in Figma has no description yet.
+    (function () {
+      var used = {}, missing = {};
+      COMPONENTS.forEach(function (c) { var t = c.tokenDocs; if (!t || !t.total) return; (t.missing || []).forEach(function (m) { missing[m] = 1; used[m] = 1; }); (t.described || []).forEach(function (d) { used[d.figma] = 1; }); });
+      var total = Object.keys(used).length; if (!total && !Object.keys(missing).length) return;
+      rows.unshift({ action: 'keep', tokens: { missing: Object.keys(missing).sort(), total: Math.max(total, Object.keys(missing).length) } });
+    })();
     // Every row but Keep waits on a person: its status is Review, and what kind of review is said under it (a draft's
     // review is "Drafts", the others their decision: Move, Fix, Add…).
     // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
@@ -3092,20 +3101,25 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
     var ilCellsOf = function (p) {
+      if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
+        return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: '', reads: '',
+          left: tm.length ? '<p class="sg-il-line"><strong>Their descriptions</strong><span class="pg-par-val">Write it in Figma, in each variable\'s description: what the token is for. Agents read it, through tokens.json, to pick the right token.</span></p><p class="sg-il-line">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join(', ') + '</p>' : '',
+          todo: tm.length ? '<p class="sg-il-line"><strong>Describe ' + tm.length + ' of the ' + tn + ' tokens the components use, in Figma.</strong></p>' : '',
+          why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: '', reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
       return { decision: decisionCell(p.action, p), left: docLeftHTML(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [needsReview(p) ? 'toReview' : '', needsWrite(p) ? 'toWrite' : ''].filter(Boolean).join(' ') + '"') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [needsReview(p) ? 'toReview' : '', needsWrite(p) ? 'toWrite' : ''].filter(Boolean).join(' ') + '"') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Still to write', c.left) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(needsReview(p) ? ['Review', reviewTopic(p)] : needsWrite(p) ? ['Missing'] : ['Keep']), title: p.missingFor || p.name || p.file || 'Page', body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(needsReview(p) ? ['Review', reviewTopic(p)] : needsWrite(p) ? ['Missing'] : ['Keep']), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
     var counts = { keep: rows.filter(isKeep).length, write: rows.filter(needsWrite).length };
@@ -3114,7 +3128,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // The review, downloaded: for Excel (a workbook with the table's own columns and rows) and for Claude (Markdown: what the
     // table is, how to work through it, then each page with its decision, why and each change), to hand to whoever fixes it.
     var ilText = function (html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = ' — ' + v.textContent; }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
-    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '', left: ilText(docLeftHTML(p)) } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilDrafts(p) + ilWhy(p)), gets: ilText(ilGets(p)), left: ilText(docLeftHTML(p)) }; }); };
+    var ilRecords = function () { return rows.map(function (p) { return p.tokens ? { decision: labelOf('keep'), page: '', file: '', link: '', forWhat: 'Tokens', todo: ilText(ilCellsOf(p).todo), why: ilText(ilCellsOf(p).why), gets: '', left: ilText(ilCellsOf(p).left) } : p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '', left: ilText(docLeftHTML(p)) } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilDrafts(p) + ilWhy(p)), gets: ilText(ilGets(p)), left: ilText(docLeftHTML(p)) }; }); };
     var ilSave = function (name, type, content) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([].concat(content), { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); };
     var ilBase = String(DATA.title || 'design-system').replace(/[^\w-]+/g, '-').toLowerCase() + '-documentation-review';
     // For Excel: a real workbook (.xlsx), never a CSV, which Excel splits on the wrong character in many languages and
