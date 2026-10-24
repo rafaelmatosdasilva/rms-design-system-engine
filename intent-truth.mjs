@@ -229,6 +229,17 @@ const A11Y = [
 ];
 const NOT_ITS_OWN = /\b(not|no|never|don't|do not|parent|owns?|consumer|caller|you|your)\b/i;
 
+// Whether a name written as code is one the system has, or the web's own, or a file or folder of the project: what the
+// content check does not call "not in the system". The documentation rating asks the same, so both say the same.
+export function inSystem(facts, n) {
+  const w = String(n ?? '').trim(), bare = w.replace(/^--/, ''), k = norm(bare);
+  if (!k || PLACEHOLDER.test(bare) || HTML_ATTR.test(bare) || HTML_EL.test(bare) || BOOL.has(bare)) return true;
+  if (facts.comps.has(k) || [...facts.allProps].some((p) => norm(p) === k) || facts.tokens.has(bare) || facts.tokens.has(w)) return true;
+  if (PATH.test(bare) || /\.\w{1,5}$/.test(bare)) return facts.hasFile(bare) || (facts.layerFiles?.has(bare.replace(/\.[\w]+$/, '')) ?? false) || facts.words.has(k);
+  if (bare.includes('*')) { const head = norm(bare.split('*')[0]); return head.length >= 3 && [...facts.words].some((x) => x.startsWith(head)); }
+  return facts.words.has(k);
+}
+
 // → [finding]. component: the system's component this page documents (null for a page of another layer).
 // strict: no leniency for a name the line warns against or says is Figma's (a drafted line names only what there is).
 export function checkPage(e, facts, { component = null, strict = false } = {}) {

@@ -293,7 +293,7 @@ Also on each component.
 
 ### The intent layer
 
-Your intent layer (why each piece exists and how to use it, as DSDS pages on GitLab) is read on every run. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Intent layer page reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer. The For agents page does the same for Figma's annotations and the code's notes: a note that repeats the description, is only a link, or is past the three an agent is shown.
+Your intent layer (why each piece exists and how to use it, as DSDS pages on GitLab) is read on every run. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). The For agents page does the same for Figma's annotations and the code's notes: a note that repeats the description, is only a link, or is past the three an agent is shown.
 
 ### Guidance for agents
 

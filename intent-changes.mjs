@@ -410,7 +410,7 @@ export function describeReview({ pages, problems }) {
 export function describeChanges({ pages, held }, { dropped = [] } = {}) {
   const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
   const out = [`${pages.length} page${pages.length === 1 ? '' : 's'} changed: ${n('removed')} line${n('removed') === 1 ? '' : 's'} written on every page alike taken out, ${n('rewritten')} sentence${n('rewritten') === 1 ? '' : 's'} the system contradicts written again as drafts, ${n('drafted')} line${n('drafted') === 1 ? '' : 's'} drafted.`,
-    '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). The design-system engine lists each under Review on the Intent layer page.', ''];
+    '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). The design-system engine lists each under Review on the Documentation page.', ''];
   for (const p of pages) {
     out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
     for (const r of p.rewritten) out.push(`- Written again (draft): "${r.line}" → "${r.text}"`);
@@ -437,7 +437,7 @@ export function writeLocal(ROOT, files, summary) {
 // → { url, branch } | { error }
 export async function openMergeRequest(access, { files, sha, target, title, description, branch, message }) {
   const b = await access.send('POST', `/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(sha)}`);
-  if (!b.ok) return { error: b.status === 403 || b.status === 401 ? `GitLab refused (${b.status}) the token in ${access.writesWith}: it needs the api scope and Developer access to the layer. Give it a token that writes only there: the layer's own (its Settings → Access tokens) or its group's, as GITLAB_WRITE_TOKEN in .env` : `GitLab answered ${b.status} when making the branch` };
+  if (!b.ok) return { error: b.status === 403 || b.status === 401 ? `GitLab refused (${b.status}) the token in ${access.writesWith}: it needs Commit Create (and Merge request Create) on the layer, and your role there Developer or more. Add the layer to your token's projects, or ask a Maintainer of it for the role` : `GitLab answered ${b.status} when making the branch` };
   const c = await access.send('POST', '/repository/commits', { branch, commit_message: message, actions: [...files].map(([file_path, content]) => ({ action: 'update', file_path, content })) });
   if (!c.ok) return { error: `GitLab answered ${c.status} to the commit (the branch ${branch} was made; delete it before trying again)` };
   const m = await access.send('POST', '/merge_requests', { source_branch: branch, target_branch: target, title, description, remove_source_branch: true });
@@ -463,6 +463,17 @@ export async function commitToBranch(access, { files, sha, target, message }) {
 // The layer as last read, checked, its changes planned, drafted (answers given, else the claude command; when neither
 // can, the requests are written for whoever runs the engine) and made in its files. → { snap, access, result, summary,
 // note, plan } or { error }. Nothing is sent.
+// May this person send changes to the layer, as a commit on its branch or a merge request? GitLab answers, from the
+// write token's role in the layer and whether it may push to the branch (stores.mjs → writeAccess); what the setup or
+// the person says is never enough. → { ok } | { ok: false, why, mergeRequest? (a merge request would be accepted) }
+export async function mayWrite(ROOT, cfg, want = 'commit', opts = {}) {
+  const { writeAccess } = await import('./stores.mjs');
+  const a = await writeAccess(ROOT, cfg, 'intentLayer', opts);
+  if (!a.mode) return { ok: false, why: a.why };
+  if (want === 'commit' && a.mode === 'merge-request' && a.why) return { ok: false, why: a.why, mergeRequest: true };
+  return { ok: true };
+}
+
 export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null, model } = {}) {
   const il = await import('./intent-layer.mjs');
   const truth = await import('./intent-truth.mjs');
@@ -512,6 +523,8 @@ export async function autoFix(ROOT, cfg, { offline = false } = {}) {
   if (mode !== 'commit' || offline || fixedThisRun) return null;
   fixedThisRun = true;
   try {
+    const may = await mayWrite(ROOT, cfg, 'commit');
+    if (!may.ok) return `ℹ️  Intent layer not fixed this run: ${may.why}${may.mergeRequest ? ' (--intent-changes --merge-request sends the fixes for review)' : ''}.`;
     const p = await prepareLayerFix(ROOT, cfg);
     if (p.error) return `⚠️  Intent layer not fixed this run: ${p.error}`;
     if (!p.result.files.size) return p.note ? `🔧 Intent layer: nothing to fix that needs no drafting. ${p.note}` : null;

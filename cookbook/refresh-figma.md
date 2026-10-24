@@ -1449,4 +1449,4 @@ If either reports FAIL, reconcile CSS before Phase 2.
 
 ## Phase 1 - Step 7: Summary
 
-Print tokens changed/added/removed per section, which CSS vars need updating, confirmation both snapshots refreshed and resolvers pass.
+Print tokens changed/added/removed per section, which CSS vars need updating, confirmation both snapshots refreshed and resolvers pass. When `ds-config.json` names a snapshots store (`stores.snapshots`), the refreshed snapshots reach the team with `rms-design-system-engine --refresh-snapshots`, once the person asks; GitLab decides whether they may write it.

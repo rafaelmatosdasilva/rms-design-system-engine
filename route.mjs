@@ -225,7 +225,7 @@ const RULES = [
   ['states-and-variants', (t) => /hover|disabled|desativad|desabilitad|\bstates?\b|estado|variant|combina|pressed|focus|selected/i.test(t)],
   ['refresh-figma', (t) => /refresh|atualiz|snapshot|stale|desatualiz|design (has )?changed|mudou|changed in figma/i.test(t)],
   ['ci-and-hooks', (t) => /\bci\b|webhook|git hook|pipeline|pre-?commit|pre-?push|\bhooks?\b/i.test(t)],
-  ['first-setup', (t) => /\bset ?up\b|configur|install/i.test(t)],
+  ['first-setup', (t) => /\bset ?up\b|configur|install|\b(company|client|team)\W+(profile|command)\b|\bprofile (link|file)\b|--profile\b/i.test(t)],
 ];
 
 // Sentences the agent says as written, so what it can and cannot do is never its own wording.

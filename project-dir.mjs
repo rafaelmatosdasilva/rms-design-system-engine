@@ -55,7 +55,19 @@ function arg(flag) { const hit = process.argv.slice(2).filter((a) => a === flag 
 
 // The effect: move to the project before the engine reads its folder.
 export const PROJECT_FROM = process.cwd();
-const asked = arg('--project');
+let asked = arg('--project');
+// A company's profile (profile.mjs), given with --profile: read once here, where the run starts and its .env is; where
+// the code is comes from it when --project does not say. audit.mjs writes the rest of it into ds-config.json.
+export let PROFILE_READ = null;
+const profileAsked = arg('--profile');
+if (profileAsked && !profileAsked.startsWith('--')) {
+  // Making the company's command only reads it: the run stays where it started.
+  const onlyReads = process.argv.includes('--make-command');
+  const { readProfile } = await import('./profile.mjs');
+  PROFILE_READ = await readProfile(profileAsked, { from: PROJECT_FROM });
+  if (PROFILE_READ.error) console.error(`⚠️  Profile not read: ${PROFILE_READ.error}`);
+  else if (!asked && !onlyReads && PROFILE_READ.profile.project) asked = String(PROFILE_READ.profile.project);
+}
 // Whether the person has said where the code is: told now (--project, `.` for this folder) or remembered from before.
 export let PROJECT_GIVEN = Boolean(asked);
 // The GitLab commit this run checks, when the project is read from GitLab (null otherwise).

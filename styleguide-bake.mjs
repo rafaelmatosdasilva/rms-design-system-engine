@@ -12,6 +12,11 @@ import { cpus } from 'node:os';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from './cdp.mjs';
 
 export const BAKED_ID = 'sg-a11y-baked';
+// The results kept with the snapshots, so whoever builds next (a person, the team's pipeline) tries only the components
+// that changed since: { at, results: { name: { sig, live, items, parts } } }. A *.snapshot.json, so the snapshots store
+// carries it to everyone.
+export const RESULTS_FILE = 'a11y-results.snapshot.json';
+export function readSaved(path) { try { const j = JSON.parse(readFileSync(path, 'utf8')); return j && typeof j.results === 'object' ? j.results : {}; } catch { return {}; } }
 const BAKED_RE = new RegExp(`<script id="${BAKED_ID}" type="application/json">[\\s\\S]*?<\\/script>`);
 
 // The page with these results kept in it (any earlier ones replaced), right after the page's data (sg-data), so the
@@ -30,13 +35,14 @@ export function withoutBaked(html) { return html.replace(BAKED_RE, ''); }
 // Try every component of the page at file in Chrome and keep the results in it. jobs: pages trying at once.
 // → { tried, of, unfinished, dead, errors, ms } | { skipped: why }. errors: each script error the page threw while trying,
 // once; dead: the page's script stopped before it could try anything.
-export async function bakeA11y(file, { chromePath = process.env.CHROME_PATH || findChrome({ playwright: true }), jobs = Math.max(1, Math.min(4, cpus().length)), timeoutMs = 60 * 60 * 1000 } = {}) {
+export async function bakeA11y(file, { saved = null, chromePath = process.env.CHROME_PATH || findChrome({ playwright: true }), jobs = Math.max(1, Math.min(4, cpus().length)), timeoutMs = 60 * 60 * 1000 } = {}) {
   if (!chromePath) return { skipped: 'no Chrome found (set CHROME_PATH)' };
   if (typeof WebSocket === 'undefined') return { skipped: 'this Node has no WebSocket (Node 22 or later)' };
   const t0 = Date.now();
-  // Tried afresh: results an earlier build kept are taken out first, so the page tries every component.
-  const before = readFileSync(file, 'utf8'), clean = withoutBaked(before);
-  if (clean !== before) writeFileSync(file, clean);
+  // Results an earlier build kept in the page are taken out; the saved ones (saved: { name: result }) go in instead, and the
+  // page tries only the components whose signature changed since (its code, the system's CSS, the check itself).
+  const before = readFileSync(file, 'utf8'), clean = withoutBaked(before), start = saved && Object.keys(saved).length ? withBaked(clean, { at: null, results: saved }) : clean;
+  if (start !== before) writeFileSync(file, start);
   const { wsUrl, kill } = await launchChrome(chromePath);
   try {
     const { send, on, close } = await connectCDP(wsUrl, { timeoutMs: 120000 });
@@ -61,6 +67,7 @@ export async function bakeA11y(file, { chromePath = process.env.CHROME_PATH || f
     close();
     const results = Object.assign({}, ...parts.map((p) => p.results));
     writeFileSync(file, withBaked(readFileSync(file, 'utf8'), { at: new Date().toISOString(), results }));
-    return { tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, dead: parts.some((p) => p.dead), errors: [...errors], ms: Date.now() - t0 };
+    const reused = saved ? Object.keys(results).filter((n) => saved[n] && saved[n].sig === results[n].sig).length : 0;
+    return { results, reused, tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, dead: parts.some((p) => p.dead), errors: [...errors], ms: Date.now() - t0 };
   } finally { kill(); }
 }

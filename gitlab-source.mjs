@@ -82,6 +82,19 @@ export function writeTokenFrom(env, folders = []) {
   return '';
 }
 
+// Any variable from the environment, else from a .env in one of the folders: a store's own token (stores.mjs), named in
+// its place's tokenEnv. Only names made of capitals, digits and _ are read.
+export function envFrom(name, env, folders = []) {
+  if (!/^[A-Z_][A-Z0-9_]*$/.test(String(name ?? ''))) return '';
+  if (env[name]) return env[name];
+  for (const d of folders) {
+    let text; try { text = readFileSync(join(d, '.env'), 'utf8'); } catch { continue; }
+    const m = text.match(new RegExp(`^\\s*${name}\\s*=(.*)$`, 'm'));
+    if (m && envValue(m[1])) return envValue(m[1]);
+  }
+  return '';
+}
+
 // GITLAB_HOST from the environment, else from a .env in one of the folders (so a project's .env can name its host).
 export function hostEnvFrom(env, folders = []) {
   if (env.GITLAB_HOST) return env.GITLAB_HOST;

@@ -398,6 +398,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) calc(var(--sg-card-gap) - var(--sg-space-s)); font-size: var(--sg-s); color: var(--sg-text-2); }
 .sg-health-bar + .sg-health-legend { margin-top: calc(-1 * var(--sg-space-s)); }   /* the legend 8px closer to its bar */
 .sg-health-legend .pg-par-status { font-weight: var(--sg-text-weight); color: var(--sg-text-2); }
+.sg-health-lead { color: var(--sg-muted); }   /* what the legend counts (Components), quieter than its counts */
 .sg-health-bar > span + span { background: var(--sg-a5); }
 .sg-health-bar > span + span + span { background: repeating-linear-gradient(135deg, var(--sg-a5) 0 2px, transparent 2px 4px); }
 .sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
@@ -1828,12 +1829,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var COMP_DATA = {};
   COMPONENTS.forEach(function (c) {
     var a = {}; Object.keys(c.a11y || {}).forEach(function (k) { if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k]; });
-    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(c.renders ? [c.renders] : []));
+    // Where a render was placed on the page it was measured in (top: 112665px) is not the component: left out.
+    var renders = c.renders ? JSON.parse(JSON.stringify(c.renders).replace(/\b(top|left|right|bottom|inset)\s*:\s*-?[\d.]+px/g, '$1:*')) : null;
+    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(renders ? [renders] : []));
   });
+  // The system's CSS as its rules, in any order: a bundler can write the same rules in another order on each build
+  // (the project's Vite does), which changes nothing a result rests on.
+  function cssSigText(css) { return String(css).split('}').map(function (x) { return x.trim(); }).filter(Boolean).sort().join('}'); }
   // What a component's accessibility result rests on beyond its own data: the system's CSS and the checks themselves
   // (wcag-page.js). Never the page's own code, its data or what a build measures, which change with every build: a
   // result kept in this browser holds until the code, Figma or the checks change, and only what changed is tried again.
-  var PAGE_SIG = sigOf(Array.prototype.filter.call(document.querySelectorAll('style[data-system], script:not([type="application/json"])'), function (s) { return s.tagName === 'STYLE' || /wcag-page\.js/.test(s.textContent.slice(0, 200)); }).map(function (s) { return s.textContent; }).join('\u0000'));
+  var PAGE_SIG = sigOf(Array.prototype.filter.call(document.querySelectorAll('style[data-system], script:not([type="application/json"])'), function (s) { return s.tagName === 'STYLE' || /wcag-page\.js/.test(s.textContent.slice(0, 200)); }).map(function (s) { return s.tagName === 'STYLE' ? cssSigText(s.textContent) : s.textContent; }).join('\u0000'));
   var html = document.documentElement, main = document.getElementById('sg-main'), nav = document.getElementById('sg-nav');
   // Opened in the Status page's panel (?embed): the component's page alone, no menu and no bar.
   if (/[?&]embed\b/.test(location.search)) html.classList.add('sg-embed');
@@ -1853,7 +1859,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     health: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
     status: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
     changelog: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
-    'intent-layer': '<circle cx="8" cy="8" r="6"/><path d="M10.6 5.4 9 9 5.4 10.6 7 7Z"/>',
+    documentation: '<path d="M4 2h5.5L12 4.5V14H4Z"/><path d="M6 7h4M6 9.5h4M6 12h2.5"/>',
     'for-agents': '<rect x="3" y="4" width="10" height="8" rx="2"/><path d="M6 8h.01M10 8h.01M8 2v2"/>',
     colors: '<circle cx="8" cy="8" r="6"/><path d="M8 2v12M2.8 5h10.4M2.8 11h10.4"/>',
     typography: '<path d="M3 4V3h10v1M8 3v10M6 13h4"/>',
@@ -2981,10 +2987,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Intent layer: a review of every page of the team's intent layer in one table, each page with one decision (delete
   // it, move it then delete it, rename it, name it as Figma does, write it, complete it, tidy it, keep it), why, and each
   // change it takes; then each component no page is written for. The most urgent decisions first.
-  var IL = DATA.intentLayer;
+  // Documentation (once the Intent layer page): every page of the intent layer and every component, what is written
+  // about it from every source (the intent layer, Figma, the code, the contract) and what is still to write, and where.
+  // Its rows read each component's documentation, defined further down: it is drawn with the Status page's first lists.
+  var IL = DATA.intentLayer, fillDocs = null;
   if (IL && (IL.pages || []).length) {
-    hr(); navLink('intent-layer', 'intent layer');
-    var ilSec = section('intent-layer', 'Agents', 'Intent layer', '');
+    hr(); navLink('documentation', 'documentation');
+    var ilSec = section('documentation', 'System', 'Documentation', '');
+    fillDocs = function () {
     var ilSrc = IL.source || {};
     var ilLink = function (p) { return (p.url ? '<a class="sg-uses-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name || p.file) + '</a>' : esc(p.name || p.file)) + '<span class="pg-par-val">' + esc(p.file || '') + '</span>'; };
     // What a page is for: the component it names; a template, the component built from the same code file, else
@@ -3040,6 +3050,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
     var ilDrafts = function (p) { return (p.drafts || []).map(function (d) { return '<p class="sg-il-line"><strong>Draft</strong> · ' + esc(d.where) + '<span class="pg-par-val">' + esc(d.text) + '</span></p>'; }).join(''); };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line">' + esc(capital(n.what)) + '<span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
+    // What is still to write about the component a row is for, from every source: each piece of its documentation not
+    // written yet or to check (its Documentation area's rows), with where to write it (Figma, the intent layer). Its page
+    // in the intent layer is the row's own decision, never repeated here.
+    var docComp = function (p) { var n = p.missingFor || p.component || (p.about && p.about.is); return n ? COMPONENTS.filter(function (c) { return c.name === n; })[0] || null : null; };
+    var docLeft = function (p) {
+      if (p._left) return p._left;
+      var c = docComp(p), out = [];
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer') out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      return (p._left = out);
+    };
+    // Where what is missing is written: "in Figma", "in the intent layer", or both.
+    var docWhere = function (p) { var w = []; docLeft(p).forEach(function (x) { String(x.where || '').split(' · ').forEach(function (s) { if (s && w.indexOf(s) < 0) w.push(s); }); }); return w; };
+    var docTopic = function (p) { var w = docWhere(p); return !docLeft(p).length ? '' : w.length === 1 ? 'Missing in ' + (/^Figma$/.test(w[0]) ? 'Figma' : w[0].charAt(0).toLowerCase() + w[0].slice(1)) : 'Missing documentation'; };
+    var docLeftHTML = function (p) { return docLeft(p).map(function (x) { return '<p class="sg-il-line"><strong>' + esc(x.kind) + '</strong>' + (x.st === 'check' ? ' (to check)' : '') + (x.where ? '<span class="pg-par-val">' + esc((x.st === 'check' ? 'In ' : 'Write it in ') + x.where.split(' · ').map(function (w) { return /^(Intent layer|The code|The contract)$/.test(w) ? 'the ' + w.replace(/^The /, '').toLowerCase() : w; }).join(' or ')) + (x.todo ? '. ' + esc(x.todo) : '') + '</span>' : (x.todo ? '<span class="pg-par-val">' + esc(x.todo) + '</span>' : '')) + '</p>'; }).join(''); };
+    var needsReview = function (p) { return !!p.missingFor || p.action !== 'keep' || docLeft(p).length > 0; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
     var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', review: 'figma', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
@@ -3051,38 +3076,39 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // component, a name not in the system, a component with no page, drafts…
     var IL_TOPIC = { review: 'Drafts', move: 'Part of a component', fix: 'Not in the system', missing: 'No intent page', 'delete': 'Says nothing of its own', rename: 'Named differently', name: 'Named differently', write: 'Nothing for agents', improve: 'Incomplete' };
     var labelOf = function (k) { if (IL_TOPIC[k]) return IL_TOPIC[k]; var l = labels.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : k; };
-    var decisionCell = function (k) { return k === 'keep' ? '<span class="pg-par-status pg-par--' + IL_DOT.keep + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'
-      : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true"></span>Review</span><span class="pg-par-val">' + esc(labelOf(k)) + '</span>'; };
+    // Review, and under it each topic: the intent layer's decision (when it is not Keep), then what is missing.
+    var decisionCell = function (k, p) { var topics = (k === 'keep' ? [] : [labelOf(k)]).concat(p && docTopic(p) ? [docTopic(p)] : []); return !topics.length ? '<span class="pg-par-status pg-par--' + IL_DOT.keep + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(labelOf(k)) + '</span>'
+      : '<span class="pg-par-status pg-par--figma"><span class="pg-par-sign" aria-hidden="true"></span>Review</span><span class="pg-par-val">' + esc(topics.join(' · ')) + '</span>'; };
     // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
     // When the page's file last changed in the intent layer (its last commit), as a date and time.
     var ilWhen = function (x) { var d = new Date(x); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
     var ilCellsOf = function (p) {
-      if (p.missingFor) return { decision: decisionCell('missing'), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
+      if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: '', reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
-      return { decision: decisionCell(p.action), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
+      return { decision: decisionCell(p.action, p), left: docLeftHTML(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action) + '"' + (p.missingFor || p.action !== 'keep' ? ' data-chip-group="toReview"' : '') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(p.missingFor ? 'missing' : p.action === 'keep' && needsReview(p) ? 'left' : p.action) + '"' + (needsReview(p) ? ' data-chip-group="toReview"' : '') + '><td>' + c.forWhat + '</td><td>' + c.file + '</td><td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
-      var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Intent layer page');
+      var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-      var body = card('Decision', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Intent layer'].concat(p.missingFor || p.action !== 'keep' ? ['Review', labelOf(p.missingFor ? 'missing' : p.action)] : ['Keep']), title: p.missingFor || p.name || p.file || 'Page', body: body });
+      var body = card('Decision', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Still to write', c.left) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(needsReview(p) ? ['Review'].concat(p.missingFor || p.action !== 'keep' ? [labelOf(p.missingFor ? 'missing' : p.action)] : [docTopic(p)]) : ['Keep']), title: p.missingFor || p.name || p.file || 'Page', body: body });
       panelShow(m, from);
     };
-    var counts = {}; rows.forEach(function (p) { counts[p.action] = (counts[p.action] || 0) + 1; });
-    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(function (p) { return p.missingFor || p.action !== 'keep'; }).length;
+    var counts = {}; rows.forEach(function (p) { if (!needsReview(p)) counts.keep = (counts.keep || 0) + 1; });
+    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(needsReview).length;
       return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.keep ? [{ key: 'keep', label: 'Keep', n: counts.keep, dot: IL_DOT.keep }] : []); })() });
     // The review, downloaded: for Excel (a workbook with the table's own columns and rows) and for Claude (Markdown: what the
     // table is, how to work through it, then each page with its decision, why and each change), to hand to whoever fixes it.
     var ilText = function (html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.pg-par-val'), function (v) { v.textContent = ' — ' + v.textContent; }); var ps = d.querySelectorAll('p'); return (ps.length ? Array.prototype.map.call(ps, function (x) { return x.textContent.trim(); }) : [d.textContent.trim()]).filter(Boolean).join('\n'); };
-    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '' } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilDrafts(p) + ilWhy(p)), gets: ilText(ilGets(p)) }; }); };
+    var ilRecords = function () { return rows.map(function (p) { return p.missingFor ? { decision: labelOf('missing'), page: '', file: '', link: '', forWhat: p.missingFor, todo: 'Write its page in the intent layer, titled ' + p.missingFor + '.', why: 'No page is written for this component.', gets: '', left: ilText(docLeftHTML(p)) } : { decision: labelOf(p.action), page: p.name || p.file || '', file: p.file || '', link: p.url || '', forWhat: ilText(ilFor(p)), todo: ilText(ilTodo(p)), why: ilText(ilDrafts(p) + ilWhy(p)), gets: ilText(ilGets(p)), left: ilText(docLeftHTML(p)) }; }); };
     var ilSave = function (name, type, content) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([].concat(content), { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); };
-    var ilBase = String(DATA.title || 'design-system').replace(/[^\w-]+/g, '-').toLowerCase() + '-intent-layer-review';
+    var ilBase = String(DATA.title || 'design-system').replace(/[^\w-]+/g, '-').toLowerCase() + '-documentation-review';
     // For Excel: a real workbook (.xlsx), never a CSV, which Excel splits on the wrong character in many languages and
     // so opens in one column. It is read from the table on the page, so its columns and rows are the table's: each line
     // of a cell on its own line, the head row bold and fixed, each page's link kept.
@@ -3090,21 +3116,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilXlsx = function () {
       // The table's columns (its open arrow left out), then what to do, why and what the agents get, which the table leaves
       // to the side panel.
-      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Why', 'What the agents read', 'Where it goes']);
+      var table = ilBox.querySelector('table'), head = Array.prototype.filter.call(table.querySelectorAll('thead th'), function (th) { return !th.classList.contains('sg-row-go'); }).map(function (th) { return th.textContent.trim(); }).concat(['What to do', 'Still to write', 'Why', 'What the agents read', 'Where it goes']);
       var panelCell = function (i, k) { var d = document.createElement('td'); d.innerHTML = (k === 'why' && !rows[i].missingFor ? ilDrafts(rows[i]) : '') + ilCellsOf(rows[i])[k]; return ilCells(d); };
-      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'reads'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
+      var body = Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) { return Array.prototype.filter.call(tr.children, function (td) { return !td.classList.contains('sg-row-go'); }).map(function (td) { var a = td.querySelector('a[href^="http"]'); return { text: ilCells(td), url: a ? a.href : '' }; }).concat([{ text: panelCell(+tr.getAttribute('data-il-row'), 'todo'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'left'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'why'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'reads'), url: '' }, { text: panelCell(+tr.getAttribute('data-il-row'), 'gets'), url: '' }]); });
       var x = function (v) { return String(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
       var col = function (i) { return String.fromCharCode(65 + i); };
       var cell = function (r, i, text, style) { return '<c r="' + col(i) + r + '" t="inlineStr" s="' + style + '"><is><t xml:space="preserve">' + x(text) + '</t></is></c>'; };
       var links = [], rowsXml = ['<row r="1">' + head.map(function (h, i) { return cell(1, i, h, 1); }).join('') + '</row>'];
       body.forEach(function (cells, n) { var r = n + 2; rowsXml.push('<row r="' + r + '">' + cells.map(function (c, i) { if (c.url) links.push({ ref: col(i) + r, url: c.url }); return cell(r, i, c.text, c.url ? 2 : 0); }).join('') + '</row>'); });
-      var widths = [26, 36, 22, 16, 20, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
+      var widths = [26, 36, 22, 16, 20, 60, 60, 50, 70, 42], last = col(head.length - 1) + (body.length + 1);
       var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:' + last + '"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>' + head.map(function (h, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (widths[i] || 30) + '" customWidth="1"/>'; }).join('') + '</cols><sheetData>' + rowsXml.join('') + '</sheetData><autoFilter ref="A1:' + last + '"/>' + (links.length ? '<hyperlinks>' + links.map(function (l, i) { return '<hyperlink ref="' + l.ref + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</hyperlinks>' : '') + '</worksheet>';
       var rel = function (rels) { return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>'; };
       var files = [
         ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
         ['_rels/.rels', rel('<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>')],
-        ['xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Intent layer" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">\'Intent layer\'!$A$1:$' + col(head.length - 1) + '$' + (body.length + 1) + '</definedName></definedNames></workbook>'],
+        ['xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Documentation" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">\'Intent layer\'!$A$1:$' + col(head.length - 1) + '$' + (body.length + 1) + '</definedName></definedNames></workbook>'],
         ['xl/_rels/workbook.xml.rels', rel('<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>')],
         ['xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'],
         ['xl/worksheets/sheet1.xml', sheet]
@@ -3129,8 +3155,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return parts.concat(central, [end.b]);
     };
     var ilMd = function () {
-      var recs = ilRecords(), out = ['# Intent layer review: ' + (DATA.title || 'design system'), '', 'A review of every page of the team\'s intent layer' + (ilSrc.url ? ' (' + ilSrc.url + ')' : '') + ', one decision per page, made by the living style guide from the design system\'s components.', '', 'How to work through it:', '- Go decision by decision, in this order; each page says what to do, why, and what the agents get from it now.', '- Name components exactly as written here: they are the design system\'s own names.', '- Change only the pages listed. Keep each page\'s format (its DSDS sections).', '- When a decision looks wrong, say why instead of applying it.', ''];
-      labels.forEach(function (l) { var mine = recs.filter(function (r) { return r.decision === l[1]; }); if (!mine.length) return; out.push('## ' + l[1] + ' (' + mine.length + ')', ''); mine.forEach(function (r) { out.push('### ' + (r.page || r.forWhat)); if (r.file) out.push('- File: `' + r.file + '`' + (r.link ? ' (' + r.link + ')' : '')); if (r.forWhat) out.push('- For: ' + r.forWhat.replace(/\n/g, '; ')); out.push('- What to do: ' + r.todo.replace(/\n/g, '; ')); if (r.why) out.push('- Why: ' + r.why.replace(/\n/g, '; ')); if (r.gets) out.push('- What the agents get now: ' + r.gets.replace(/\n/g, '; ')); out.push(''); }); });
+      var recs = ilRecords(), out = ['# Documentation review: ' + (DATA.title || 'design system'), '', 'A review of the design system\'s documentation: every page of the team\'s intent layer' + (ilSrc.url ? ' (' + ilSrc.url + ')' : '') + ', one decision per page, and what is still to write about each component and where (Figma, the intent layer), made by the living style guide from the design system\'s components.', '', 'How to work through it:', '- Go decision by decision, in this order; each page says what to do, why, and what the agents get from it now.', '- Name components exactly as written here: they are the design system\'s own names.', '- Change only the pages listed. Keep each page\'s format (its DSDS sections).', '- When a decision looks wrong, say why instead of applying it.', ''];
+      labels.forEach(function (l) { var mine = recs.filter(function (r) { return r.decision === l[1]; }); if (!mine.length) return; out.push('## ' + l[1] + ' (' + mine.length + ')', ''); mine.forEach(function (r) { out.push('### ' + (r.page || r.forWhat)); if (r.file) out.push('- File: `' + r.file + '`' + (r.link ? ' (' + r.link + ')' : '')); if (r.forWhat) out.push('- For: ' + r.forWhat.replace(/\n/g, '; ')); out.push('- What to do: ' + r.todo.replace(/\n/g, '; ')); if (r.left) out.push('- Still to write: ' + r.left.replace(/\n/g, '; ')); if (r.why) out.push('- Why: ' + r.why.replace(/\n/g, '; ')); if (r.gets) out.push('- What the agents get now: ' + r.gets.replace(/\n/g, '; ')); out.push(''); }); });
       return out.join('\n');
     };
     var ilHead = ilSec.querySelector(':scope > h2');
@@ -3142,6 +3168,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il"><thead><tr><th>For</th><th>File</th><th>Sources</th><th>Decision</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
     ilBox.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-il-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); ilPanel(+tr.getAttribute('data-il-row'), tr); } });
+    };
   }
   // For agents: what of Figma's and the code's notes no agent is given, each with why, what to do and whether to remove
   // it (the intent layer has its own page).
@@ -6854,8 +6881,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
     var id = j < 0 ? path : path.slice(0, j);
-    // A link from when there was a What's new page, or a Documentation (once Coverage) page: where it lives now.
-    if (id === 'documentation' || id === 'coverage') return { id: 'status', area: null, slug: 'documentation', q: null };
+    // Documentation was once Coverage, then the Intent layer page: their links open it; with no page of its own (no
+    // intent layer), the Status page's Documentation.
+    if (id === 'documentation' || id === 'coverage' || id === 'intent-layer') { if (!document.getElementById('documentation')) return { id: 'status', area: null, slug: 'documentation', q: null }; id = 'documentation'; }
     if (id === 'overview') return { id: 'index', area: null, slug: '', q: null };   // the index was once Overview
     if (id === 'brand-kit') id = 'identity';   // Identity was once the brand kit
     if (id === 'todo' || id === 'tasks' || id === 'health') return { id: 'status', area: null, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // the page was once To do, then Tasks and Health
@@ -7187,7 +7215,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // listed in the parent's details (its Parts tab). A family with no component of its own name (navigation/LinkCompact,
     // navigation/RailWide) is one row in its name, made of its parts.
     var RANK = function (x) { return x.cls === 'differs' ? 4 : x.cls === 'figma' ? 3 : x.say === 'Untested' ? 2 : x.cls === 'match' ? 1 : 0; };
-    var worst = function (xs, rename) { var w = xs.reduce(function (m, x) { return RANK(x) > RANK(m) ? x : m; }, xs[0]); return C(w.cls, rename && /^No (code|Figma)$/.test(w.say) ? 'Differs' : w.say, xs.reduce(function (n, x) { return n + x.fix; }, 0), xs.reduce(function (n, x) { return n + x.dec; }, 0)); };
+    var worst = function (xs, rename) { var w = xs.reduce(function (m, x) { return RANK(x) > RANK(m) ? x : m; }, xs[0]), out = C(w.cls, rename && /^No (code|Figma)$/.test(w.say) ? 'Differs' : w.say, xs.reduce(function (n, x) { return n + x.fix; }, 0), xs.reduce(function (n, x) { return n + x.dec; }, 0)); out.n = xs.reduce(function (n, x) { return n + checksOf(x); }, 0); return out; };
     var heads = {}, rows = [];
     mxRows.forEach(function (o) { if (!parentOf(o.name)) heads[o.name] = o; });
     mxRows.forEach(function (o) {
@@ -7329,6 +7357,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function rawWhy(raw) { return String(raw || '').replace(/^\w+\)\s*\(/, '').replace(/\)?\s*\(?not rendered\)?$/i, '').replace(/^\(|\)$/g, '').trim(); }
   function whyTip(raw) { var d = rawWhy(raw); return d ? tipHTML('What the test browser said: ' + d, 'Technical detail') : ''; }
   function stateC(cls, say, fix, dec, why) { return { cls: cls, say: say, fix: fix || 0, dec: dec || 0, why: why || '' }; }
+  // The checks a state counts: its own count, else what it has to fix or decide (Missing documentation: one, to write).
+  function checksOf(x) { return !x || x.say === 'N/A' || x.say === 'Untested' ? 0 : x.n != null ? x.n : x.fix + x.dec; }
   // Why an area is N/A, as precisely as is known: only one side has the component, or nothing of that kind applies.
   var NA_WHY = {
     codeOnly: 'Only the code has this component: Figma has nothing to compare it with.',
@@ -7366,6 +7396,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var acc = untested ? stateC('none', 'Untested') : a.fix ? stateC('differs', 'Issues', a.fix, a.dec) : a.dec ? stateC('figma', 'Review', 0, a.dec) : a.n ? stateC('match', 'Pass') : stateC('none', 'N/A', 0, 0, NA_WHY.Accessibility);
     // Ready: everything written. Missing: nothing written at all. Partial: anything between, text to check included.
     var doc = !d.n ? stateC('none', 'N/A', 0, 0, c.codeOnly ? NA_WHY.codeOnly : NA_WHY.Documentation) : !d.fix && !d.dec ? stateC('match', 'Ready') : d.fix === d.n ? stateC('differs', 'Missing', d.fix, d.dec) : stateC('figma', 'Partial', d.fix, d.dec);
+    // How many checks each state counts, so a card can say how much of them is done (its percentage).
+    par.n = p.n; acc.n = a.n; doc.n = d.n;
     return { par: par, acc: acc, doc: doc, all: all, untested: untested, fix: p.fix + a.fix + d.fix + (c.codeOnly ? 1 : 0), dec: p.dec + a.dec + d.dec };
   }
   // A component's area tab and the state it carries, as its Status row says it.
@@ -7412,18 +7444,24 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Each button the same few words, the legend's own: See 141 differs, See 60 missing.
     var nx = function (n, word, area) { return n ? { n: n, area: area, say: 'See ' + n + ' ' + word.toLowerCase() } : null; };
     // doneWord: the word that counts as done, or several (Found and CSS only are both in the code).
-    var card = function (title, parts, doneWord, outOf, of, next) { return { title: title, big: outOf ? [].concat(doneWord).reduce(function (t, w) { return t + countOf(parts, w); }, 0) : null, outOf: outOf || null, of: outOf ? of : 'nothing to measure yet', total: outOf, parts: parts, next: next }; };
+    // pct: how much of its checks is done, the big number (a component is rarely all done, so its count alone reads 0
+    // for long); the count of components all done stays under it.
+    var card = function (title, parts, doneWord, outOf, of, next, pct, pctWord) { var n = outOf ? [].concat(doneWord).reduce(function (t, w) { return t + countOf(parts, w); }, 0) : null; return { title: title, pct: pct, pctWord: pctWord, big: n, outOf: outOf || null, of: outOf ? n + ' of ' + outOf + ' ' + of : 'nothing to measure yet', total: outOf, parts: parts, next: next }; };
+    // Of every check its rows count (never one N/A or not tried yet), the share done, rounded down so 100% is all done.
+    var pctOf = function (list, k) { var all = 0, left = 0; list.forEach(function (o) { var x = o[k], n = checksOf(x); all += n; left += Math.min(n, x ? x.fix + x.dec : 0); }); return all ? Math.floor((all - left) / all * 100) : null; };
     var tile = function (o) {
       var tip = o.how ? tipHTML(o.how, 'How ' + o.title + ' is counted', o.howParts ? { parts: o.howParts } : undefined) : '';
       var total = o.total || 0, parts = (o.parts || []).filter(function (x) { return x.n > 0; });
       var barHTML = '<span class="sg-health-bar" aria-hidden="true">' + (total ? parts.map(function (x) { return '<span class="is-' + x.cls + (x.word === 'Untested' ? ' is-untested' : '') + '" style="width:' + Math.max(1, Math.round(x.n / total * 100)) + '%"></span>'; }).join('') : '') + '</span>';
-      var legend = '<p class="sg-health-legend">' + parts.map(function (x) { return '<span class="pg-par-status pg-par--' + ({ done: 'match', check: 'figma', fix: 'differs', none: 'none' })[x.cls] + (x.word === 'Untested' ? ' is-untested' : '') + '">' + (x.word === 'N/A' ? '' : '<span class="pg-par-sign" aria-hidden="true"></span>') + esc(x.say) + '</span>'; }).join('') + (o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</p>';
+      // The legend counts components (the big number counts checks): it says so first, once, quieter than its counts.
+      var legend = '<p class="sg-health-legend">' + (parts.length ? '<span class="sg-health-lead">Components</span>' : '') + parts.map(function (x) { return '<span class="pg-par-status pg-par--' + ({ done: 'match', check: 'figma', fix: 'differs', none: 'none' })[x.cls] + (x.word === 'Untested' ? ' is-untested' : '') + '">' + (x.word === 'N/A' ? '' : '<span class="pg-par-sign" aria-hidden="true"></span>') + esc(x.say) + '</span>'; }).join('') + (o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</p>';
       // Its next step, a button alone at its foot (See 130 components): the table below on what is left there.
       // Its next step: under a line, a link that goes down to the table with that filter on (an anchor: its arrow points down).
       var next = o.next && o.next.area ? '<div class="sg-health-go"><button type="button" class="sg-health-anchor" data-go-area="' + esc(o.next.area) + '">' + esc(o.next.say || 'See ' + plural(o.next.n, 'component', 'components')) +
         '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg></button></div>' : '';
       // The count and what it is out of on one line (3 of 133), what it counts under it (full matches).
-      var count = '<div class="sg-health-count"><p class="sg-health-num">' + (o.big == null ? '–' : o.big) + (o.outOf != null ? '<span class="sg-health-out">of ' + o.outOf + '</span>' : '') + '</p>' + (o.of ? '<p class="sg-health-desc">' + esc(o.of) + '</p>' : '') + '</div>';
+      // The share done, big (37% matched), and under it how many components are all done (0 of 131 components fully matched).
+      var count = '<div class="sg-health-count"><p class="sg-health-num">' + (o.pct == null ? '–' : o.pct + '%') + (o.pct != null ? '<span class="sg-health-out">' + esc(o.pctWord) + '</span>' : '') + '</p>' + (o.of ? '<p class="sg-health-desc">' + esc(o.of) + '</p>' : '') + '</div>';
       return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(o.title) + '</p>' + tip + '</div>' + count + barHTML + legend + next + '</div>';
     };
     var lower = function (xs) { return xs.map(function (x) { return x.charAt(0).toLowerCase() + x.slice(1); }); };
@@ -7440,25 +7478,33 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var accP = states(accRows, function (o) { return o.acc; }), docP = states(docRows, function (o) { return o.doc; }, 'with nothing to document');
     var left = function (parts, done) { return parts.filter(function (x) { return x.word !== done && x.cls !== 'none'; }).reduce(function (n, x) { return n + x.n; }, 0); };
     // Each tile's link goes to what is most urgent: what fails first, then what is only part done.
-    var pT = card('Figma × Code Parity', parP, 'Match', parRows.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'));
-    var iT = card('Code Implementation', codeP, 'Found', figmaRows.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'));
-    var aT = card('Accessibility', accP, 'Pass', accRows.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'To review', 'AccessibilityReview'));
-    var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'));
+    var pT = card('Figma × Code Parity', parP, 'Match', parRows.length, 'components fully matched', nx(countOf(parP, 'Differs'), 'Differs', 'Parity') || nx(countOf(parP, 'Partial'), 'Partial', 'ParityPartial'), pctOf(parRows, 'par'), 'matched');
+    // Implementation's checks are its components: the share of Figma's that the code has.
+    var iT = card('Code Implementation', codeP, 'Found', figmaRows.length, 'components found in code', countOf(codeP, 'Missing') ? nx(countOf(codeP, 'Missing'), 'Missing', 'Implementation') : nx(countOf(codeP, 'Unsure'), 'Unsure', 'Unsure'), figmaRows.length ? Math.floor(countOf(codeP, 'Found') / figmaRows.length * 100) : null, 'built');
+    var aT = card('Accessibility', accP, 'Pass', accRows.length, 'components that pass', nx(countOf(accP, 'Issues'), 'Issues', 'Accessibility') || nx(countOf(accP, 'Review'), 'To review', 'AccessibilityReview'), pctOf(accRows, 'acc'), 'passed');
+    var dT = card('AI-ready Documentation', docP, 'Ready', docRows.length, 'components fully documented', nx(countOf(docP, 'Missing'), 'Missing', 'Documentation') || nx(countOf(docP, 'Partial'), 'Partial', 'DocumentationPartial'), pctOf(docRows, 'doc'), 'written');
+    // The big number says how much is done, so no line under it repeats a count; the legend says the done state in the
+    // big number's word (131 built, 3 matched), the rest in the table's.
+    [[pT, 'Match'], [iT, 'Found'], [aT, 'Pass'], [dT, 'Ready']].forEach(function (c) {
+      if (c[0].total) c[0].of = '';
+      c[0].parts.forEach(function (x) { if (x.word === c[1]) x.say = x.n + ' ' + c[0].pctWord; });
+    });
     // What each card counts, in the words of the table's own states.
     var SAME = ' A part (chartBars/bar) counts with its parent.';
-    pT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation); one with nothing to compare is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.';
+    var PCT = function (what) { return ' The percentage: of every ' + what + ', how many are done; the legend counts the components, each in its state.'; };
+    pT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation); one with nothing to compare is counted apart.' + SAME + ' Match: all its props, tokens and values are the same in Figma and in the code. Partial: some are the same, some differ or are to check. Unsure: nothing known to differ, only things to check. Differs: none are the same. Nothing to compare: Figma gives it no props, tokens or values to compare with the code.' + PCT('prop, token and value compared');
     // Out of Figma's components only: one the code has and Figma does not is not the code building the system (it is
     // in the table, its Figma Missing), so counting it as found would make the card read more built than it is.
-    iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class).';
+    iT.how = 'Every component Figma has; one only the code has is not counted here (the table lists it, its Figma Missing).' + SAME + ' Found: matched to its component file in the code. Unsure: a file looks like it, still to confirm. Missing: no component in the code (at most its CSS class). The percentage: the share of Figma\'s components the code has.';
     // The standard it is checked against and the tools that check it, said plainly: someone will ask.
-    aT.how = 'Checked against WCAG 2.2, levels A and AA (the W3C\'s accessibility standard), in headless Chrome, on every variant and state.';
+    aT.how = 'Checked against WCAG 2.2, levels A and AA (the W3C\'s accessibility standard), in headless Chrome, on every variant and state.' + PCT('check tried') + ' One not tried yet counts in neither.';
     aT.howParts = [
       ['axe-core', 'Deque\'s open-source accessibility checker: names, roles, ARIA, labels, landmarks.'],
       ['The engine\'s WCAG checks', 'Keyboard: Tab order, focus shown, and the keys each pattern needs (arrows, Home and End, Escape, Tab kept in a dialog). Names: what a screen reader says on each control, and names that say little. Hover, focus, input and press.'],
       ['The accessibility tree', 'The browser\'s own: each control\'s name, role and state, as assistive technology reads them.'],
       ['Contrast', 'WCAG\'s formula: 4.5:1 for text, 3:1 for large text and control edges, in every theme and in two modes at once (dark with high contrast).']
     ];
-    dT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation).' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.';
+    dT.how = 'Every component Figma has that the code has built (one not built yet is on Code Implementation).' + SAME + ' Ready: all its documentation written (' + listed(lower(READY_KINDS)) + ', and its tokens\' descriptions). Partial: some written, or written and to check. Missing: none written.' + PCT('piece of documentation');
     var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
@@ -7703,8 +7749,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     c.__a11y = { items: (c.a11y ? a11yStaticItems(c) : []).concat(k.items || []), live: k.live || null, liveItems: k.items || [], baked: !!baked };
     if (k.parts) c.__textParts = k.parts;   // its text parts, as drawn when it was tried, named in what a person checks
   }
+  // Results kept from an earlier build (the page's own, or saved with the snapshots) count wherever the component is the
+  // same as when it was tried, the build included: it tries only what changed since.
+  COMPONENTS.forEach(function (c) { useKept(c, BAKED && BAKED.results && BAKED.results[c.name], true); });
   if (!BAKING) {
-    COMPONENTS.forEach(function (c) { useKept(c, BAKED && BAKED.results && BAKED.results[c.name], true); });
     try { var kept = JSON.parse(localStorage.getItem(A11Y_KEY) || 'null') || {}; COMPONENTS.forEach(function (c) { if (!c.__a11y) useKept(c, kept[c.name], false); }); } catch (e) { /* none kept */ }
   }
   function keepA11y() {
@@ -7718,6 +7766,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // What this page tried, for the build to keep in the page: { name: { sig, live, items } }.
   window.__sgA11yResults = function () { var o = {}; COMPONENTS.forEach(function (c) { if (c.__a11y) o[c.name] = { sig: compSig(c), live: c.__a11y.live || null, items: c.__a11y.liveItems || [], parts: c.__textParts || [] }; }); return o; };
   fillTodo();
+  if (fillDocs) { fillDocs(); fillDocs = null; }
   // Every component not tried yet in this browser, one after another, while the Status page is open: each built out of
   // sight, its Accessibility check run as its own area runs it, kept, then the list drawn again with what it found.
   var sweepAt = 0, sweeping = false;
@@ -9497,7 +9546,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   (function () { var go = function () { setTimeout(function () { (window.requestIdleCallback || setTimeout)(preloadComponentPanel); }, 1500); }; if (document.readyState === 'complete') go(); else window.addEventListener('load', go); })();
   function route() {
     if (!location.hash || /^#(index|overview)$/.test(location.hash)) { if (homeId() !== 'index') history.replaceState(null, '', location.search + '#' + homeId()); }
-    else if (/^#(documentation|coverage)$/.test(location.hash)) history.replaceState(null, '', '#status/documentation');   // the address says where it lives now
+    else if (/^#(documentation|coverage|intent-layer)$/.test(location.hash)) history.replaceState(null, '', location.search + (document.getElementById('documentation') ? '#documentation' : '#status/documentation'));   // the address says where it lives now: the Documentation page, else (no intent layer) the Status page's
     else if (/^#brand-kit([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#identity' + location.hash.replace(/^#brand-kit/, ''));   // Identity was once the brand kit
     else if (/^#(todo|tasks|health)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', '#status' + location.hash.replace(/^#(todo|tasks|health)/, ''));   // the page was once To do, then Tasks and Health
     var at = hashParts(), id = at.id || homeId(), built = !!document.getElementById(id);

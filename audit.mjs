@@ -20,7 +20,7 @@
 //              gates (freshness, CSS hygiene) are computed on the main thread.
 
 import './stdio-sync.mjs';   // first: a report read through a pipe is never cut off at exit
-import { hasCode, PROJECT_GIVEN, PROJECT_FROM, GITLAB_SOURCE }  from './project-dir.mjs';  // second: moves to the project (--project, or the one remembered) before anything reads the folder
+import { hasCode, PROJECT_GIVEN, PROJECT_FROM, GITLAB_SOURCE, PROFILE_READ }  from './project-dir.mjs';  // second: moves to the project (--project, or the one remembered) before anything reads the folder
 import readline                                                  from 'readline';
 import { spawn, spawnSync }                                      from 'child_process';
 import { existsSync, readdirSync, readFileSync, statSync,
@@ -68,6 +68,33 @@ if (existsSync(envPath)) {
 }
 const today      = new Date().toISOString().slice(0, 10);
 const WIDTH      = 60;
+
+// ── Where each part lives: the company's profile and the team's stores (profile.mjs, stores.mjs) ──
+// The profile given now (--profile, read where the run started: project-dir.mjs) or remembered in ds-config.json is
+// written in when its maintainers changed it, and this person is told what GitLab lets them write; then the snapshots
+// and the team's decisions are read from their stores. Commands that only print, or make a profile, skip both.
+const STORE_QUIET = ['--version', '--route', '--recipe', '--reference', '--summary', '--help', '--profile-export', '--profile-new', '--make-command'].some((f) => process.argv.slice(2).some((a) => a === f || a.startsWith(f + '=')));
+const STORE_OFFLINE = process.argv.includes('--offline');
+if (!STORE_QUIET) {
+  const pf = await import('./profile.mjs');
+  const given = PROFILE_READ && !PROFILE_READ.error ? PROFILE_READ.source : null;
+  const r = await pf.refreshProfile(ROOT, { given, read: given ? PROFILE_READ : null, offline: STORE_OFFLINE });
+  for (const l of r.lines) console.error(l);
+  const st = await import('./stores.mjs');
+  if (r.applied && !process.argv.includes('--store')) for (const l of await st.accessLines(ROOT, r.cfg, { offline: STORE_OFFLINE })) console.error(l);   // --store says them itself
+  let scfg = null; try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* not set up yet, or said where it is read */ }
+  if (scfg) for (const l of await st.pullOnRun(ROOT, scfg, { offline: STORE_OFFLINE })) console.error(l);
+}
+// A decision just recorded goes to the team's decisions store when the setup names one: GitLab decides whether this
+// person may write it there, and the line says what happened. → true when sent, false when not, null with no store.
+async function sendDecisions() {
+  let c; try { c = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { return null; }
+  const st = await import('./stores.mjs');
+  if (!st.storesOf(c).decisions.write) return null;
+  const r = await st.pushStore(ROOT, c, 'decisions', st.localFiles(ROOT, c, 'decisions'), 'Design-system decisions, recorded with the design-system engine', { offline: STORE_OFFLINE });
+  console.log(r.line);
+  return r.ok;
+}
 const SHOW_TREND = process.argv.includes('--trend');
 const INIT_ONLY  = process.argv.includes('--init');
 
@@ -330,6 +357,130 @@ if (process.argv.includes('--check-intent')) {
   process.exit(1);
 }
 
+// ── Where each part lives: --store, --profile-new, --profile-export, --make-command, --refresh-snapshots ──
+// --store [<part>.<read|write>=<link|folder|nowhere> …] [<part>.<read|write>.<path|branch|tokenEnv>=<v>] [<part>.mode=
+// commit|merge-request]: names where a part lives (stores.mjs), never whether this person may write it (GitLab answers
+// that, and the lines say what it answered). With nothing after it, says where each part lives and what GitLab lets
+// this person do there.
+// The --store answers written into ds-config.json → stores. → the next config, or exits with what is wrong
+function applyStoreFlags(scfg, raw, file, st) {
+  const sets = _argValues('--store').filter((v) => /=/.test(v));
+  if (!sets.length) return scfg;
+  scfg.stores = scfg.stores ?? {};
+  for (const s of sets) {
+    const [lhs, ...rest] = s.split('='); const v = rest.join('=').trim();
+    // <part>=<place> and <part>.path=… say where the part lives (read there, written there); .read and .write stay for
+    // the rare part read in one place and written in another.
+    let [part, side, key] = lhs.trim().split('.');
+    if (!side) side = 'read';
+    else if (['path', 'branch', 'tokenEnv', 'writeTokenEnv'].includes(side)) { key = side; side = 'read'; }
+    if (!st.PARTS.includes(part) || !['read', 'write', 'mode'].includes(side) || (side === 'mode' && key)) { console.log(`❌ --store ${s}: say <part>=<link, folder or nowhere>, then <part>.path= or <part>.branch= (parts: ${st.PARTS.join(', ')})`); process.exit(2); }
+    const was = scfg.stores[part];
+    const e = scfg.stores[part] = was && typeof was === 'object' && ('read' in was || 'write' in was || 'mode' in was) ? was : (was ? { read: was } : {});
+    if (side === 'mode') { if (!['commit', 'merge-request'].includes(v)) { console.log('❌ <part>.mode is commit or merge-request'); process.exit(2); } e.mode = v; continue; }
+    if (!key) { const none = /^(nowhere|none|null)$/i.test(v); e[side] = none ? null : /^https?:\/\//i.test(v) ? { gitlab: v } : { folder: v }; if (none && side === 'read' && !lhs.includes('.')) e.write = null; continue; }
+    if (!['path', 'branch', 'tokenEnv', 'writeTokenEnv'].includes(key)) { console.log(`❌ --store ${s}: a place takes path, branch or tokenEnv`); process.exit(2); }
+    if (!e[side] || typeof e[side] !== 'object') { console.log(`❌ --store ${s}: say ${part}=<link or folder> first`); process.exit(2); }
+    e[side][key] = v;
+  }
+  const indent = /\n(\t+)"/.exec(raw)?.[1]?.slice(0, 1) ?? ' '.repeat((/\n( +)"/.exec(raw)?.[1] ?? '  ').length);
+  writeFileSync(file, JSON.stringify(scfg, null, indent) + '\n');
+  console.log('✅ ds-config.json → stores updated.');
+  return scfg;
+}
+if ((process.argv.includes('--store') || process.argv.includes('--stores')) && !process.argv.includes('--profile-new')) {
+  const file = join(ROOT, 'ds-config.json');
+  let raw, scfg; try { raw = readFileSync(file, 'utf8'); scfg = JSON.parse(raw); } catch { console.error('❌ ds-config.json not found at project root: set the project up first (rms-design-system-engine --init, or --profile <the company\'s profile>).'); process.exit(1); }
+  const st = await import('./stores.mjs');
+  applyStoreFlags(scfg, raw, file, st);
+  console.log('Where each part lives, and whether this person may change it there (GitLab\'s answer):');
+  const lines = await st.accessLines(ROOT, scfg, { offline: process.argv.includes('--offline') });
+  console.log(lines.length ? lines.join('\n') : '   No part has a store: everything stays in this folder.');
+  console.log('NEXT: tell the person the lines above; a part they cannot write is written by whoever GitLab lets.');
+  process.exit(0);
+}
+
+// --profile-new [file] [--name <company>]: asks where each part lives (in a terminal; else takes --store), then writes
+// this setup as the company's profile. --profile-export [file] [--name <company>]: writes it as it is. Never a token,
+// never what one person set for themself (profile.mjs → PERSONAL).
+if (process.argv.includes('--profile-new') || process.argv.includes('--profile-export')) {
+  const asking = process.argv.includes('--profile-new');
+  const flag = asking ? '--profile-new' : '--profile-export';
+  const at = process.argv.indexOf(flag), out = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  const file = join(ROOT, 'ds-config.json');
+  let raw, scfg; try { raw = readFileSync(file, 'utf8'); scfg = JSON.parse(raw); } catch { console.error('❌ ds-config.json not found: set the project up first (rms-design-system-engine --init), then make its profile.'); process.exit(1); }
+  const pf = await import('./profile.mjs'), st = await import('./stores.mjs');
+  if (asking && process.stdin.isTTY && !_argValues('--store').length) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const q = (t) => new Promise((ok) => rl.question(t, (a) => ok(a.trim())));
+    // One question a part: where it lives. Who may change it is GitLab's answer (its roles and protected branches), so
+    // nothing about reading or writing is asked: a change goes there as a commit, or a merge request where the branch
+    // is protected.
+    console.log('Where each part lives, for everyone who uses this profile: a GitLab link, a folder, or "nowhere" (Enter keeps what is there). Who may change it is set in GitLab.\n');
+    scfg.stores = scfg.stores ?? {};
+    const now = st.storesOf(scfg);
+    for (const part of st.PARTS) {
+      const was = now[part].read ?? now[part].write;
+      const r = await q(`${st.LABEL[part]}: where does it live?${was ? ` [${st.describePlace(was)}]` : ''} `);
+      if (!r) continue;
+      if (/^nowhere$/i.test(r)) { scfg.stores[part] = { read: null, write: null }; continue; }
+      const place = /^https?:\/\//i.test(r) ? { gitlab: r } : { folder: r };
+      const sub = await q('  The folder inside it (Enter: its root)? '); if (sub) place.path = sub;
+      if (place.gitlab) { const br = await q('  The branch (Enter: its default)? '); if (br) place.branch = br; }
+      scfg.stores[part] = { read: place };
+    }
+    rl.close();
+    const indent = /\n(\t+)"/.exec(raw)?.[1]?.slice(0, 1) ?? ' '.repeat((/\n( +)"/.exec(raw)?.[1] ?? '  ').length);
+    writeFileSync(file, JSON.stringify(scfg, null, indent) + '\n');
+  } else if (asking && _argValues('--store').length) applyStoreFlags(scfg, raw, file, st);
+  else if (asking && !scfg.stores) {
+    console.log('Say where each part lives with --store (no terminal to ask in): --profile-new --store snapshots=<link> --store intentLayer=<link> …');
+    process.exit(2);
+  }
+  const project = GITLAB_SOURCE ? `${(() => { try { return JSON.parse(readFileSync(join(ROOT, '.gitlab-source.json'), 'utf8')).source; } catch { return null; } })()}` : null;
+  const prof = pf.exportProfile(scfg, { name: _argValue('--name') ?? undefined, project: project && project !== 'null' ? project : undefined });
+  const dest = resolve(PROJECT_FROM, out ?? pf.PROFILE_FILE);
+  writeFileSync(dest, JSON.stringify(prof, null, 2) + '\n');
+  console.log(`✅ Profile written: ${dest}`);
+  const placed = Object.entries(st.storesOf({ ...prof.config, stores: prof.stores })).filter(([, v]) => v.read || v.write).map(([k]) => st.LABEL[k].toLowerCase());
+  console.log(`   ${placed.length ? `Where it says each part lives: ${placed.join(', ')}` : 'No part has a place of its own: each stays in the folder it is used in'}; no token and nothing one person set for themself.`);
+  console.log('   Before sharing it, in GitLab: protect the default branch of each store, give Developer only to the people who write it, and let only maintainers change the repository the profile is kept in. The engine stays inside what GitLab allows; GitLab is the lock.');
+  console.log(`NEXT: the person commits it to a private repository of the company everyone can read; then rms-design-system-engine --make-command <client> --profile <its link>.`);
+  process.exit(0);
+}
+
+// --make-command <client> --profile <link or file> [--dir <folder>]: writes the command a team installs,
+// rms-design-system-engine-<client>: the engine with that profile. Into ~/.claude/skills, or --dir to share it.
+if (process.argv.includes('--make-command')) {
+  const client = _argValue('--make-command');
+  const source = _argValue('--profile');
+  if (!client || client.startsWith('--') || !source) { console.log('Usage: rms-design-system-engine --make-command <client> --profile <the profile\'s link or file> [--dir <folder>]'); process.exit(2); }
+  const pf = await import('./profile.mjs');
+  const r = PROFILE_READ ?? await pf.readProfile(source, { from: PROJECT_FROM });
+  if (r.error) { console.log(`❌ The profile cannot be read: ${r.error}. Each person needs to read it with their own GITLAB_TOKEN.`); process.exit(1); }
+  const dir = _argValue('--dir');
+  const link = /^https?:\/\//i.test(source) ? source : resolve(PROJECT_FROM, source);
+  const out = pf.writeCommand(client, link, { dir: dir ? resolve(PROJECT_FROM, dir) : undefined, name: r.profile.name });
+  console.log(`✅ /${pf.commandName(client)} written: ${out}`);
+  console.log(`   It runs the engine with ${link}; each person keeps their own GitLab token in .env and writes only where GitLab lets them.`);
+  console.log(`NEXT: ${dir ? 'the person shares that folder in the company\'s private repository; each colleague copies it into ~/.claude/skills/' : `the person shares ${dirname(out)} with the team (a private repository); each colleague puts it in ~/.claude/skills/`} and runs /${pf.commandName(client)}.`);
+  process.exit(0);
+}
+
+// --refresh-snapshots: the snapshots this folder holds sent to the team's snapshots store, as one commit (or a merge
+// request into a protected branch), when GitLab lets this person write it. The capture itself is the refresh-figma recipe.
+if (process.argv.includes('--refresh-snapshots')) {
+  let scfg; try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const st = await import('./stores.mjs');
+  if (!st.storesOf(scfg).snapshots.write) { console.log('ℹ️  No snapshots store: the snapshots stay in this folder (ds-config.json → stores.snapshots names one).'); console.log('NEXT: none'); process.exit(0); }
+  const { intentLayerConfig } = await import('./doc-source-dsds.mjs');
+  const files = st.localFiles(ROOT, scfg, 'snapshots', { intentOut: intentLayerConfig(scfg)?.out });
+  const r = await st.pushStore(ROOT, scfg, 'snapshots', files, `Snapshots refreshed with the design-system engine (${files.size} file${files.size === 1 ? '' : 's'})`, { offline: STORE_OFFLINE });
+  console.log(r.line);
+  console.log(r.ok ? 'NEXT: everyone\'s next run reads them.' : 'NEXT: tell the person the line above; the snapshots stay in this folder.');
+  process.exit(r.ok ? 0 : 1);
+}
+
 // ── --intent-decide [key,… yes|no]: the team's answer to the engine's proposals for the Intent layer's Fix, Add, Move ──
 // With nothing after it, lists each open proposal with its key and what it rests on. With keys ("all" for every open
 // one) and yes or no, records the answer in design-system-engine-intent-decisions.json: a yes is acted on from the next
@@ -355,6 +506,7 @@ if (process.argv.includes('--intent-decide')) {
   if (unknown.length) { console.log(`❌ No proposal is called ${unknown.join(', ')} (--intent-decide lists them).`); process.exit(2); }
   pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals));
   console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans}${ans === 'yes' ? ': acted on from the next run, and the Intent layer page no longer asks them of the team' : ': they stay on the Intent layer page'} (${projectPath(ROOT, 'intentDecisions')}).`);
+  await sendDecisions();
   console.log('NEXT: rebuild the style guide to see it (--styleguide).');
   process.exit(0);
 }
@@ -366,7 +518,7 @@ if (process.argv.includes('--intent-autofix')) {
   let raw, pcfg; try { raw = readFileSync(file, 'utf8'); pcfg = JSON.parse(raw); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   const v = String(process.argv[process.argv.indexOf('--intent-autofix') + 1] ?? '').toLowerCase();
   if (!['on', 'off'].includes(v)) { console.log('Say on or off: rms-design-system-engine --intent-autofix on'); process.exit(2); }
-  if (!pcfg.intentLayer) { console.log('❌ ds-config.json names no intent layer: rms-design-system-engine --init --documentation=<its GitLab link> first.'); process.exit(2); }
+  if (!pcfg.intentLayer && !pcfg.stores?.intentLayer) { console.log('❌ ds-config.json names no intent layer: rms-design-system-engine --init --documentation=<its GitLab link> first.'); process.exit(2); }
   const il = typeof pcfg.intentLayer === 'string' ? { gitlab: pcfg.intentLayer } : { ...pcfg.intentLayer };
   if (v === 'on') il.autoFix = 'commit'; else delete il.autoFix;
   pcfg.intentLayer = Object.keys(il).length === 1 && il.gitlab ? il.gitlab : il;
@@ -408,6 +560,7 @@ if (process.argv.includes('--intent-changes')) {
   // --commit: one commit straight on the layer's branch (only while it is still where it was read); --merge-request: one
   // merge request for the team. Neither unless the person asks.
   if (process.argv.includes('--commit')) {
+    { const may = await ch.mayWrite(ROOT, pcfg, 'commit'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
     const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message: 'Intent layer review: ' + summary.split('\n')[0] + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
@@ -415,6 +568,7 @@ if (process.argv.includes('--intent-changes')) {
     process.exit(0);
   }
   if (!process.argv.includes('--merge-request')) { console.log('NEXT: read the changes; to send them to the layer: rms-design-system-engine --intent-changes --commit (straight on its branch) or --merge-request (for the team to review), only when the person asks'); process.exit(0); }
+  { const may = await ch.mayWrite(ROOT, pcfg, 'merge-request'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
   const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/intent-review-${stamp}`,
     title: 'Intent layer review: lines written on every page, sentences the system contradicts, drafts to review',
@@ -465,6 +619,7 @@ if (process.argv.includes('--review-drafts')) {
   if (!result.files.size) { console.log('NEXT: none'); process.exit(result.problems.length ? 1 : 0); }
   const message = 'Intent layer: drafts reviewed (' + summary.split('\n')[0].replace(/^Drafts reviewed on /, '').replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
   if (process.argv.includes('--commit')) {
+    { const may = await ch.mayWrite(ROOT, pcfg, 'commit'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
     const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
@@ -472,6 +627,7 @@ if (process.argv.includes('--review-drafts')) {
     process.exit(0);
   }
   if (process.argv.includes('--merge-request')) {
+    { const may = await ch.mayWrite(ROOT, pcfg, 'merge-request'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-reviewed-${stamp}`, title: 'Intent layer: drafts reviewed', description: summary, message });
     if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
@@ -488,10 +644,18 @@ if (process.argv.includes('--review-drafts')) {
 if (process.argv.includes('--contracts-out')) {
   let pcfg = {};
   try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
-  const at = process.argv.indexOf('--contracts-out'), dir = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
-  if (!dir) { console.log('Give the folder: rms-design-system-engine --contracts-out <dir>  (for example <intent layer clone>/specs/contracts)'); process.exit(2); }
+  const at = process.argv.indexOf('--contracts-out');
+  let dir = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? process.argv[at + 1] : null;
+  // With no folder, the contracts store (ds-config.json → stores.contracts): a folder is written in place; a GitLab
+  // project gets them as one commit (or a merge request), when GitLab lets this person write it.
+  const st = await import('./stores.mjs');
+  const cstore = st.storesOf(pcfg).contracts.write;
+  const toStore = !dir && cstore;
+  if (toStore) dir = cstore.folder ? resolve(ROOT, cstore.folder, cstore.path || '') : join(ROOT, OUT_DIR, 'contracts-out');
+  if (!dir) { console.log('Give the folder: rms-design-system-engine --contracts-out <dir>  (for example <intent layer clone>/specs/contracts), or name the contracts store (--store contracts.write=<link or folder>)'); process.exit(2); }
   const { generateContracts } = await import('./contract-gen.mjs');
   const r = await generateContracts(ROOT, pcfg, { publishTo: dir, force: true });
+  if (toStore && !cstore.folder && !r.invalid.length) { const sent = await st.pushStore(ROOT, pcfg, 'contracts', st.folderFiles(dir, 'contracts'), `Contracts published with the design-system engine (${r.components.length})`, { offline: STORE_OFFLINE }); console.log(sent.line); }
   console.log(`📐 Contracts published → ${r.outDir}  (${r.components.length} contract${r.components.length === 1 ? '' : 's'}${r.removed?.length ? ` · ${r.removed.length} removed` : ''}${r.skipped?.length ? ` · ${r.skipped.length} not written, listed in README.md` : ''})`);
   for (const i of r.invalid.slice(0, 20)) console.log(`   ❌ ${i.name}: ${i.errs.slice(0, 3).join('; ')}`);
   if (r.undefinedRefs?.length) console.log(`   ⚠️  ${r.undefinedRefs.length} token(s) Figma binds that the variables do not have, listed in README.md: fix them in Figma`);
@@ -924,7 +1088,7 @@ if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
     if (!gone.length) { console.log(`No kept difference matches${component ? ` in ${component.join(', ')}` : ''}${words.length ? ` "${words.join(', ')}"` : ''}.`); process.exit(1); }
     console.log(`✓ ${gone.length} difference${gone.length === 1 ? '' : 's'} no longer kept: the next audit lists ${gone.length === 1 ? 'it' : 'them'} as open again.`);
     for (const d of gone) console.log(`   • ${km.keptLine(d)}`);
-    console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`);
+    if (await sendDecisions() == null) console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`); else console.log('NEXT: run rms-design-system-engine');
     process.exit(0);
   }
   const all = km.readKept(ROOT);
@@ -956,7 +1120,7 @@ if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
   console.log(`✓ Kept on purpose: ${added.length} difference${added.length === 1 ? '' : 's'}, in ${file}.`);
   for (const d of added) console.log(`   • ${km.keptLine(d)}`);
   console.log('   While the values stay as they are, they never fail a run and the differences list and the style guide show them as kept, with the reason. When a value changes, the difference is open again.');
-  console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`);
+  if (await sendDecisions() == null) console.log(`NEXT: commit ${file} when the person asks, then run rms-design-system-engine`); else console.log('NEXT: run rms-design-system-engine');
   process.exit(0);
 }
 
@@ -979,7 +1143,7 @@ if (process.argv.includes('--checked') || process.argv.includes('--unchecked')) 
   const ck = await import('./checked.mjs');
   if (undo) {
     console.log(ck.removeCheck(ROOT, component, sc) ? `✓ ${component} ${sc} is to check again.` : `${component} ${sc} was not marked as checked.`);
-    console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks`);
+    if (await sendDecisions() == null) console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks`); else console.log('NEXT: none');
     process.exit(0);
   }
   const crit = byPerson.find((k) => k.sc === sc);
@@ -997,7 +1161,7 @@ if (process.argv.includes('--checked') || process.argv.includes('--unchecked')) 
   const by = (byAt > 0 && process.argv[byAt + 1]) || String(git.stdout ?? '').trim() || 'a person';
   const e = ck.recordCheck(ROOT, { component: name, sc, by, signature: ck.componentSignature(ROOT, ccfg, name, cls) });
   console.log(`✓ ${name}, ${sc} ${crit.name}: checked by ${e.by} on ${e.at.slice(0, 10)}. The style guide shows it Done until ${name} changes.`);
-  console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks, then rebuild the style guide (rms-design-system-engine --styleguide)`);
+  if (await sendDecisions() == null) console.log(`NEXT: commit ${PROJECT.checked.now} when the person asks, then rebuild the style guide (rms-design-system-engine --styleguide)`); else console.log('NEXT: rebuild the style guide (rms-design-system-engine --styleguide)');
   process.exit(0);
 }
 
@@ -1338,11 +1502,27 @@ if (process.argv.includes('--styleguide')) {
     // the final results at once, nothing running while they read (styleguide-bake.mjs). --no-a11y-bake builds the page
     // without it (a page only measured, as a CI's first build is); styleguide.bakeA11y: false in ds-config.json too.
     if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false) {
-      const { bakeA11y } = await import('./styleguide-bake.mjs');
-      console.log('   Trying every component\'s accessibility in a browser, to keep the results in the page...');
-      const b = await bakeA11y(resolve(ROOT, r.out)).catch((e) => ({ skipped: String(e.message).split('\n')[0] }));
+      const { bakeA11y, readSaved, RESULTS_FILE } = await import('./styleguide-bake.mjs');
+      // The results saved with the snapshots: a component unchanged since is not tried again.
+      const savedPath = join(ROOT, RESULTS_FILE), saved = readSaved(savedPath);
+      console.log(`   Trying the accessibility of ${Object.keys(saved).length ? 'each component changed since the saved results' : 'every component'} in a browser, to keep the results in the page...`);
+      const b = await bakeA11y(resolve(ROOT, r.out), { saved }).catch((e) => ({ skipped: String(e.message).split('\n')[0] }));
       console.log(b.skipped ? `   Accessibility not tried while building (${b.skipped}): a browser that opens the page tries it and keeps what it finds.`
-        : `♿ Accessibility tried in a browser: ${b.tried} of ${b.of} components, every variant, kept in the page (${Math.round(b.ms / 1000)}s)${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
+        : `♿ Accessibility in the page: ${b.tried} of ${b.of} components, every variant${b.reused ? ` (${b.reused} unchanged since the saved results, ${b.tried - b.reused} tried now)` : ''}, ${Math.round(b.ms / 1000)}s${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
+      // Saved with the snapshots, and sent to the team's snapshots store when GitLab lets this person (or the pipeline)
+      // write it: everyone's next build, and the page the team publishes, start from them.
+      if (!b.skipped && !b.dead && b.results && Object.keys(b.results).length) {
+        const next = JSON.stringify({ at: new Date().toISOString(), results: b.results }, null, 1) + '\n';
+        const same = (() => { try { return JSON.stringify(JSON.parse(readFileSync(savedPath, 'utf8')).results) === JSON.stringify(b.results); } catch { return false; } })();
+        if (!same) {
+          writeFileSync(savedPath, next);
+          const st = await import('./stores.mjs');
+          if (st.storesOf(sgConfig).snapshots.write) {
+            const sent = await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[RESULTS_FILE, Buffer.from(next)]]), `Accessibility results saved with the design-system engine (${b.tried - (b.reused || 0)} component${b.tried - (b.reused || 0) === 1 ? '' : 's'} tried)`, { offline: STORE_OFFLINE });
+            console.log(sent.line);
+          } else console.log(`   Saved in ${RESULTS_FILE}: the next build here tries only what changes (ds-config.json → stores.snapshots shares it with the team).`);
+        }
+      }
       for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
       // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
       if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
@@ -1371,6 +1551,17 @@ if (process.argv.includes('--styleguide-check')) {
 if (process.argv.includes('--publish-styleguide')) {
   let pcfg = {};
   try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  // A style guide store (ds-config.json → stores.styleguide): the page built last, and the pages beside it, sent there,
+  // when GitLab lets this person write it; the team's own pipeline serves it from there.
+  { const st = await import('./stores.mjs');
+    if (st.storesOf(pcfg).styleguide.write && !process.argv.includes('--print') && !_argValue('--host')) {
+      const page = resolve(ROOT, pcfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html');
+      if (!existsSync(page)) { console.log(`❌ No style guide built yet at ${relative(ROOT, page)}: rms-design-system-engine --styleguide first.`); process.exit(1); }
+      const r = await st.pushStore(ROOT, pcfg, 'styleguide', st.folderFiles(dirname(page), 'styleguide'), 'Style guide published with the design-system engine', { offline: STORE_OFFLINE });
+      console.log(r.line);
+      console.log(r.ok ? 'NEXT: tell the person where it went (the line above).' : 'NEXT: tell the person the line above; nothing was sent.');
+      process.exit(r.ok ? 0 : 1);
+    } }
   const { writePublishJob, githubJob, gitlabJob, hostOf, productRepos } = await import('./publish-job.mjs');
   const host = _argValue('--host') ?? null;
   if (host && !/^(github|gitlab)$/.test(host)) { console.error('❌ --host is github or gitlab.'); process.exit(1); }

@@ -123,5 +123,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-21-parity-each-side-says-where` | The 21 guide tasks on Haiku (engine 8d5c3d6) | "Parity: each side says where a value is and what sets it; a token finding as what Figma has and what the code has" |
 | `2026-10-21-status-the-documentation-card-counts` | The 21 guide tasks on Haiku (engine 7a568ab) | "Status: the Documentation card counts only what the code has built, as Parity and Accessibility do" |
 | `2026-10-22-intent-layer-page-part-of` | The 21 guide tasks on Haiku (engine 4c73986) | "Intent layer page: Part of and its component 8px apart" |
+| `2026-10-23-where-each-part-lives-and` | The 21 guide tasks on Haiku (engine de2a613) | "Where each part lives, and who may write it: stores, a company's profile and its command" |
+| `2026-10-24-one-token-per-person-the` | The 21 guide tasks on Haiku (engine c15a00a) | "One token per person: the installer asks for a fine-grained token (Read on the system's projects, Commit and Merge request Create), and a refused write says what that token needs instead of asking for a second one" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

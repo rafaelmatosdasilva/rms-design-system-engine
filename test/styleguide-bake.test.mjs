@@ -40,3 +40,26 @@ test('a page whose script stops is said at once, never waited out for an hour', 
     assert.match(r.errors.join(), /rows is not defined/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('saved results go into the page before it tries anything, so it tries only what changed; they come back with the new ones', { timeout: 120000 }, async (t) => {
+  const { findChrome } = await import('../cdp.mjs');
+  if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { bakeA11y, readSaved, RESULTS_FILE } = await import('../styleguide-bake.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'sg-saved-'));
+  try {
+    const file = join(dir, 'index.html');
+    // A page that keeps what it was given and tries only the component it has no result for (tag).
+    writeFileSync(file, '<html><body><script type="application/json" id="sg-data">{"components":[{"name":"chip"},{"name":"tag"}]}</script><script>var b = JSON.parse((document.getElementById("sg-a11y-baked") || {}).textContent || "null"), r = (b && b.results) || {}; window.__given = Object.keys(r); r.tag = { sig: "t1", live: { tried: 1 }, items: [] }; window.__sgA11yResults = function () { return r; }; window.__sgSweepDone = true;</script></body></html>');
+    const saved = { chip: { sig: 'c1', live: { tried: 3 }, items: [] } };
+    const r = await bakeA11y(file, { jobs: 1, saved });
+    assert.equal(r.reused, 1, JSON.stringify(r));
+    assert.deepEqual(Object.keys(r.results).sort(), ['chip', 'tag']);
+    assert.match(readFileSync(file, 'utf8'), /"chip":\{"sig":"c1"/, 'the page keeps the saved result');
+    writeFileSync(join(dir, RESULTS_FILE), JSON.stringify({ at: 't', results: r.results }));
+    assert.deepEqual(Object.keys(readSaved(join(dir, RESULTS_FILE))).sort(), ['chip', 'tag']);
+    assert.deepEqual(readSaved(join(dir, 'none.json')), {});
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
