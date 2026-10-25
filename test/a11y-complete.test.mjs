@@ -267,9 +267,10 @@ test('out of time: what the pages it finished found is kept, the page it was on 
     // Every page is accounted for: counted as checked, or said why not. A page can be both (one that was reached and
     // then gave up loading on its own), so this is a floor, not a sum.
     assert.ok(Number(done[1]) + (d.notRead ?? []).length >= 9, `${done[1]} checked and ${(d.notRead ?? []).length} said why not:\n${said}`);
-    // What a page that finished found is kept. The quick page is the only one that can finish, so its finding is there
-    // exactly when it is not among the pages that did not finish.
-    const quickFinished = !said.includes('first.html');
-    assert.equal(d.issues.some((i) => i.issue === 'contrast' && /Faint words/.test(JSON.stringify(i))), quickFinished, said);
+    // Nothing found is thrown away, and nothing missing is passed over in silence: the quick page's finding is here,
+    // or that page is named among those the budget cut short. A page stopped partway keeps what it had already
+    // measured, so the finding and the page being named are not opposites — both can be true at once.
+    const found = d.issues.some((i) => i.issue === 'contrast' && /Faint words/.test(JSON.stringify(i)));
+    assert.ok(found || said.includes('first.html'), `the quick page's finding is neither kept nor accounted for:\n${said}`);
   } finally { for (const r of held) r.destroy(); server.close(); }
 });
