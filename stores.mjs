@@ -71,6 +71,8 @@ export function placeOf(v) {
   return null;
 }
 const keyOf = (pl) => JSON.stringify(pl);
+// The same place, whichever token reads or writes it: where it is, not how it is reached.
+export const samePlace = (a, b) => !!a && !!b && ['gitlab', 'folder', 'github', 'branch', 'path'].every((k) => (a[k] ?? null) === (b[k] ?? null));
 
 // Each part's read and write place, and how a write is sent ("commit" or "merge-request"). The intent layer named the
 // old way (ds-config.json → intentLayer) is its place when stores does not name one.
@@ -114,8 +116,14 @@ export function gitlabApi(ROOT, place, { env = process.env, http } = {}) {
   if (!p) return { error: `${place.gitlab} is not a GitLab project link` };
   const allowed = tokenAllowedFor(p.host, e);
   const readTok = (place.tokenEnv && envFrom(place.tokenEnv, e, folders)) || tokenFrom(e, folders);
-  const wName = place.writeTokenEnv || place.tokenEnv || 'GITLAB_WRITE_TOKEN';
-  const writeTok = envFrom(wName, e, folders) || (wName === 'GITLAB_WRITE_TOKEN' ? writeTokenFrom(e, folders) : '') || readTok;
+  // The token that writes: the place's own (writeTokenEnv, else tokenEnv), else GITLAB_WRITE_TOKEN, else the one that
+  // reads. A place's own write token is often the pipeline's (a project access token): a computer without it writes
+  // with the person's own, so one setup serves both. A place with only its own token (tokenEnv) keeps to it.
+  const own = place.writeTokenEnv || place.tokenEnv || null;
+  const tries = [[own, own ? envFrom(own, e, folders) : ''], ...(place.tokenEnv && !place.writeTokenEnv ? [] : [['GITLAB_WRITE_TOKEN', writeTokenFrom(e, folders)]])];
+  const hit = tries.find(([, t]) => t);
+  const writeTok = hit?.[1] || readTok;
+  const wName = hit?.[0] ?? (place.tokenEnv || 'GITLAB_TOKEN');
   const h = (t) => (t && allowed ? { 'PRIVATE-TOKEN': t } : {});
   const hr = h(readTok), hw = h(writeTok);
   // The project by its id, found from the link even when it moved or names the project (gitlab-source.mjs).
@@ -143,8 +151,12 @@ export async function writeAccess(ROOT, cfg, part, opts = {}) {
   const s = storesOf(cfg)[part];
   const place = s?.write;
   if (!place) return { mode: null, place: null, why: s?.read ? `this setup reads ${LABEL[part].toLowerCase()} from ${describePlace(s.read)} and writes it nowhere` : 'the setup names no place for it' };
-  const k = keyOf([place, s.mode]);
-  if (!asked.has(k)) asked.set(k, check(ROOT, place, s.mode, opts));
+  return placeAccess(ROOT, place, s.mode, opts);
+}
+// The same for a place that is no part's: the profile's repository, or a store's root (its README, readmes.mjs).
+export function placeAccess(ROOT, place, mode = 'commit', opts = {}) {
+  const k = keyOf([place, mode]);
+  if (!asked.has(k)) asked.set(k, check(ROOT, place, mode, opts));
   return asked.get(k);
 }
 async function check(ROOT, place, want, opts) {
@@ -403,7 +415,7 @@ export async function accessLines(ROOT, cfg, opts = {}) {
     const { read, write } = s[part];
     if (!read && !write) continue;
     const a = await writeAccess(ROOT, cfg, part, opts);
-    const same = read && write && keyOf(read) === keyOf(write);
+    const same = samePlace(read, write);
     const where = same || !write ? `lives in ${describePlace(read)}` : read ? `read from ${describePlace(read)}, written to ${describePlace(write)}` : `lives in ${describePlace(write)}`;
     const may = a.mode === 'commit' ? `you can change it (a commit on ${a.branch})`
       : a.mode === 'merge-request' ? `you can change it through a merge request into ${a.branch}`

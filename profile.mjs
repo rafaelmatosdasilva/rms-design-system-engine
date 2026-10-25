@@ -4,7 +4,7 @@
 // change (its intent layer, say): where the code is, the Figma file, the rest of the shared setup, and where each part
 // of the engine's files lives (stores.mjs). It never holds a token or anything one person sets for themself.
 //
-//   { "profile": 1, "name": "Acme", "project": "<the code's link>",
+//   { "profile": 1, "name": "Acme", "client": "acme", "project": "<the code's link>",
 //     "stores": { "snapshots": { "read": { "gitlab": "<link>", "path": "snapshots" } }, ... },
 //     "config": { "figmaFileKey": "...", "paths": { ... }, ... } }
 //

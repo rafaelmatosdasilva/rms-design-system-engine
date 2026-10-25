@@ -8,10 +8,13 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
 import { BUILD } from './skill-evals/build-tasks.mjs';
+import { hasTypescript } from './skill-evals/build-score.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REF = join(HERE, 'skill-evals', 'build-reference');
 const CHROME = findChrome({ playwright: true });
+const TS = hasTypescript();
+const NO_TS = 'TypeScript is not installed globally (npm install -g typescript): the scorer compiles the component with it';
 const task = BUILD.find((t) => t.id === 'build-stepper');
 
 function project(jsx, css = readFileSync(join(REF, 'src/components/stepper.css'), 'utf8')) {
@@ -25,13 +28,13 @@ function project(jsx, css = readFileSync(join(REF, 'src/components/stepper.css')
 }
 const failing = (checks) => checks.filter((c) => !c.ok).map((c) => c.name);
 
-test('the reference stepper passes every check: its range, the names of its buttons, a click on each, its floor and ArrowUp', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('the reference stepper passes every check: its range, the names of its buttons, a click on each, its floor and ArrowUp', { skip: !CHROME ? 'no Chrome available' : !TS ? NO_TS : false, timeout: 120000 }, async () => {
   const checks = await task.score(project(readFileSync(join(REF, 'src/components/Stepper.jsx'), 'utf8')));
   assert.deepEqual(failing(checks), [], JSON.stringify(checks.filter((c) => !c.ok)));
   assert.match(checks.find((c) => c.name.startsWith('a click on Increment')).detail, /^from 1: up 2, down 1$/, 'its own state, kept between renders');
 });
 
-test('one whose buttons have no spoken name, with no spinbutton and no floor, fails on those points only', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('one whose buttons have no spoken name, with no spinbutton and no floor, fails on those points only', { skip: !CHROME ? 'no Chrome available' : !TS ? NO_TS : false, timeout: 120000 }, async () => {
   const jsx = `import { useState } from 'react';
 import './stepper.css';
 export function Stepper({ Value = '1' }) {
@@ -42,7 +45,7 @@ export function Stepper({ Value = '1' }) {
   assert.deepEqual(f, ['the value is a spinbutton with its range (Figma role: spinbutton, from 0 to 10)', 'the spinbutton can have an accessible name', 'the step buttons have spoken names (Figma: Decrement and Increment, roles decrement and increment)', 'it stays within 0 to 10 (Decrement stops at 0)', 'ArrowUp steps the spinbutton up']);
 });
 
-test('a controlled stepper (its value from its prop, its changes through onChange) is measured through its parent: one that stops at 0 passes', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('a controlled stepper (its value from its prop, its changes through onChange) is measured through its parent: one that stops at 0 passes', { skip: !CHROME ? 'no Chrome available' : !TS ? NO_TS : false, timeout: 120000 }, async () => {
   const jsx = `import { useState } from 'react';
 import './stepper.css';
 const clamp = (n) => Math.min(10, Math.max(0, n));

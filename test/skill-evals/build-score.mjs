@@ -21,17 +21,21 @@ import { usableTypeScript, TYPESCRIPT_HINT } from '../../project-typescript.mjs'
 // (version 7) is passed over. When none is usable the throw names what to install: it surfaces as an HTTP 500 the
 // browser reports only as "Failed to fetch dynamically imported module", which says nothing on its own.
 let tsModule = null;
-function tsLib(dir) {
+function tsLib(dir = null) {
   if (tsModule) return tsModule;
-  const own = () => createRequire(join(dir, 'package.json'))('typescript');
-  const global = () => createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript');
-  for (const load of [own, global]) {
+  const loaders = [];
+  if (dir) loaders.push(() => createRequire(join(dir, 'package.json'))('typescript'));
+  loaders.push(() => createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript'));
+  for (const load of loaders) {
     let got = null;
     try { got = load(); } catch { continue; }
     if (usableTypeScript(got)) return (tsModule = got);
   }
   throw new Error(`no TypeScript that can read JSX: ${TYPESCRIPT_HINT}`);
 }
+// Whether the scorer can turn JSX into a page here: a TypeScript that reads JSX, the build's own or the global one
+// (CI installs one; a computer may not). Version 7 answers no, as it would fail at the first transpile anyway.
+export const hasTypescript = () => { try { return !!tsLib(); } catch { return false; } };
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
 const REACT_SHIM = `
