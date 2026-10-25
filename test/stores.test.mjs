@@ -47,7 +47,7 @@ function fakeGitlab({ roles = { 'read-token': 20, 'write-token': 30 }, readOnly 
     if (path === '/repository/branches') { g.branches[new URL(url).searchParams.get('branch')] = true; return res(201, {}); }
     if (path === '/repository/commits') {
       if (body.branch === branch.name && !branch.can_push) return res(403, { message: 'protected' });
-      for (const a of body.actions) g.files[a.file_path] = Buffer.from(a.content, 'base64').toString('utf8');
+      for (const a of body.actions) if (a.action === 'delete') delete g.files[a.file_path]; else g.files[a.file_path] = Buffer.from(a.content, 'base64').toString('utf8');
       if (body.branch === branch.name) g.head = String(++n).padStart(40, '0');
       return res(201, { id: g.head, web_url: `https://${HOST}/design/snapshots/-/commit/${g.head}` });
     }
@@ -295,4 +295,26 @@ test('a commit says whose run made it; a checkout with no identity of its own se
   const body2 = g2.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
   assert.equal('author_name' in body2, false, JSON.stringify(body2 && Object.keys(body2)));
   assert.equal('author_email' in body2, false);
+});
+
+test('publishing the style guide again removes the files an earlier page linked, never one a page there still links', async () => {
+  const { pageFiles } = await import('../stores.mjs');
+  const { writeStyleguide } = await import('../styleguide-files.mjs');
+  const page = (n) => `<!--sg-file:styleguide-->\n<style>.a{}</style>\n<script type="application/json" id="sg-data">{"n":${n}}</script>`;
+  const d = project();
+  writeStyleguide(join(d, 'index.html'), page(1));
+  const old = [...pageFiles(join(d, 'index.html')).keys()].find((f) => /\.data\./.test(f));
+  // The store: the last build's page and data, a page of one component still linking its own, and a file of the team's.
+  const g = fakeGitlab({ files: { 'sg/index.html': '<script src="' + old + '"></script>', ['sg/' + old]: 'x', 'sg/chip.html': '<script src="chip.data.0123456789.js"></script>', 'sg/chip.data.0123456789.js': 'y', 'sg/notes.txt': 'mine' } });
+  writeStyleguide(join(d, 'index.html'), page(2));
+  const files = pageFiles(join(d, 'index.html'));
+  const r = await pushStore(project(), cfgWith({ styleguide: { write: { gitlab: LINK, path: 'sg' } } }), 'styleguide', files, 'Style guide', { env, http: g.http });
+  assert.equal(r.ok, true, r.line);
+  assert.ok(!('sg/' + old in g.files), 'the last build\'s data is removed');
+  for (const f of ['sg/chip.data.0123456789.js', 'sg/notes.txt', 'sg/chip.html', ...[...files.keys()].map((k) => 'sg/' + k)]) assert.ok(f in g.files, f);
+  // A folder store too.
+  const dir = project(), cfg = cfgWith({ styleguide: { write: { folder: dir } } });
+  writeFileSync(join(dir, old), 'x'); writeFileSync(join(dir, 'notes.txt'), 'mine');
+  assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
+  assert.ok(!existsSync(join(dir, old)) && existsSync(join(dir, 'notes.txt')) && existsSync(join(dir, 'index.html')));
 });

@@ -1607,3 +1607,9 @@ test('a saved accessibility result holds wherever the page is built: a Vue scope
   assert.equal(noScopeIds('<div data-v-1a2b3c4d class="cardTile">'), noScopeIds('<div data-v-ff00ee11 class="cardTile">'));
   assert.match(tpl, /COMP_DATA\[c\.name\] = noScopeIds\(/, 'a component\'s own signature leaves it out too');
 });
+
+test('a page opens at its top, reloaded too: the browser never puts back an earlier scroll after the page opened', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  assert.match(tpl, /history\.scrollRestoration = 'manual'/);
+  assert.ok(tpl.indexOf("history.scrollRestoration = 'manual'") < tpl.indexOf('function route()'), 'set before the page routes');
+});

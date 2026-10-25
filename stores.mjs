@@ -25,7 +25,7 @@
 // commit the engine makes names whose run made it as its author (decided-by.mjs), the token's owner staying the
 // committer, so a store several people write tells their runs apart.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, accessSync, constants } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, accessSync, unlinkSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { join, resolve, dirname, relative, sep, basename } from 'node:path';
@@ -34,6 +34,7 @@ import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { runBy } from './decided-by.mjs';
+import { isOwnFile, linksOf } from './styleguide-files.mjs';
 
 export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes'];
 export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
@@ -297,6 +298,16 @@ export function themesToShare(ROOT, dirs, sys) {
   return out;
 }
 
+// The style guide's own files (styleguide-files.mjs) beside the pages sent that nothing links any more: neither a page
+// sent nor another page already there (read: its text). Only a file of its own, named as it names them, at the top.
+function staleBeside(sendable, there, read) {
+  const sent = new Set(sendable.map(([rel]) => rel));
+  const linked = new Set();
+  for (const [rel, data] of sendable) if (/\.html?$/i.test(rel)) linksOf(Buffer.from(data).toString('utf8')).forEach((l) => linked.add(l));
+  for (const f of there) if (/^[^/]+\.html?$/i.test(f) && !sent.has(f)) linksOf(read(f)).forEach((l) => linked.add(l));
+  return there.filter((f) => !f.includes('/') && isOwnFile(f) && !sent.has(f) && !linked.has(f));
+}
+
 // The page and what it links to beside it (another page, a picture, a stylesheet), followed from each page sent: never
 // the rest of its folder, where a person may keep files of their own (a theme saved from the page).
 export function pageFiles(page) {
@@ -418,7 +429,10 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
   if (a.mode === 'folder') {
     const dir = resolve(ROOT, place.folder, place.path || '');
     for (const [rel, data] of sendable) { const fp = join(dir, rel); mkdirSync(dirname(fp), { recursive: true }); writeFileSync(fp, data); }
-    return { ok: true, line: `📤 ${label}: ${sendable.length} file${sendable.length === 1 ? '' : 's'} written to ${dir}` };
+    let there = []; try { there = readdirSync(dir); } catch { /* nothing there */ }
+    const gone = part !== 'styleguide' ? [] : staleBeside(sendable, there, (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch { return ''; } });
+    for (const f of gone) { try { unlinkSync(join(dir, f)); } catch { /* gone already */ } }
+    return { ok: true, line: `📤 ${label}: ${sendable.length} file${sendable.length === 1 ? '' : 's'} written to ${dir}${gone.length ? `, ${gone.length} an earlier page linked removed` : ''}` };
   }
   const api = a.api;
   try {
@@ -441,8 +455,18 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     }
     // A file as it was when the store was last read, at the commit still there, is not sent again.
     const changed = sendable.filter(([rel, data]) => !(prev.sha === head && prev.files?.[rel] === hash(data) && there.has(pre + rel)));
-    if (!changed.length) return { ok: true, line: `ℹ️  ${label}: ${describePlace(place)} already has these files` };
-    const actions = changed.map(([rel, data]) => ({ action: there.has(pre + rel) ? 'update' : 'create', file_path: pre + rel, content: Buffer.from(data).toString('base64'), encoding: 'base64' }));
+    // The style guide's own files an earlier page linked and no page there links now (its data of the last build):
+    // removed in the same commit, so the store holds what its pages use, never one more data file a build.
+    const beside = [...there].filter((p) => p.startsWith(pre)).map((p) => p.slice(pre.length));
+    const pages = {};
+    for (const f of part === 'styleguide' ? beside.filter((x) => /^[^/]+\.html?$/i.test(x) && !sendable.some(([rel]) => rel === x)) : []) {
+      const r = await api.get(`/repository/files/${encodeURIComponent(pre + f)}/raw?ref=${encodeURIComponent(head)}`, { write: true });
+      pages[f] = r.ok ? Buffer.from(await r.arrayBuffer()).toString('utf8') : '';
+    }
+    const gone = part === 'styleguide' ? staleBeside(sendable, beside, (f) => pages[f] ?? '') : [];
+    if (!changed.length && !gone.length) return { ok: true, line: `ℹ️  ${label}: ${describePlace(place)} already has these files` };
+    const actions = [...changed.map(([rel, data]) => ({ action: there.has(pre + rel) ? 'update' : 'create', file_path: pre + rel, content: Buffer.from(data).toString('base64'), encoding: 'base64' })),
+      ...gone.map((f) => ({ action: 'delete', file_path: pre + f }))];
     // The commit says whose run made it. The token's owner stays the committer, so GitLab's roles and its audit trail
     // are untouched; this is the author, which is what tells three people's runs apart in a store they all write.
     const who = 'runBy' in opts ? opts.runBy : runBy(ROOT);
