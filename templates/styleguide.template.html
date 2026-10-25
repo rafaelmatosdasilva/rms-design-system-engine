@@ -1643,7 +1643,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-cell-clip { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); mask-image: linear-gradient(to bottom, var(--sg-text) 70%, transparent); }
 .sg-doc-notes { margin: var(--sg-space-xs) 0 var(--sg-space-s); padding-inline-start: 1.2em; }   /* the points to cover, for this component */
 .sg-doc-notes li + li { margin-top: var(--sg-space-xxs); }
-.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh-read); font-weight: var(--sg-text-weight); color: var(--sg-text); }
+.sg-row-detail-body { padding: var(--sg-space-s) var(--sg-cell-x); overflow-wrap: anywhere; font-size: var(--sg-m); line-height: var(--sg-lh-read); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
+/* One style in every panel: running text muted; what names something (a title, a label, a table's heading, a link, a
+   code name, a status) in the text colour. A line's leading title is a step larger (below). */
+.sg-row-detail-body :is(strong, b, th, a, code, .sg-il-head, .sg-il-label, .pg-par-status, .sg-todo-who, .sg-uses-link) { color: var(--sg-text); }
 /* A panel's card in the page's running text, the table's own: one size and one line height for all it holds, each
    finding a paragraph of its own (its sign, a table's mark, left to the table). */
 .sg-row-detail-body :is(.pg-a11y-item, .pg-par-status, .sg-todo-who, .sg-il-line, .pg-missing) { font-size: inherit; line-height: inherit; }   /* a secondary line (pg-par-val) keeps the table's own size and colour */
@@ -1658,8 +1661,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-l); }
 .sg-row-detail-body .sg-il-line:last-child { margin-bottom: 0; }
 .sg-row-detail-body .sg-il-line .pg-par-val { display: block; font-size: inherit; line-height: inherit; margin-top: var(--sg-space-xxs); }
-.sg-row-detail-body .sg-il-what, .sg-row-detail-body .sg-il-where { display: block; margin-top: var(--sg-space-xxs); }
-.sg-row-detail-body :is(.sg-il-what, .sg-il-where) > b { font-weight: var(--sg-l-weight); color: var(--sg-text); }
+.sg-row-detail-body .sg-il-label { display: block; margin-top: var(--sg-space-s); font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-text); }   /* Points to cover, How to write it, Where */
+.sg-row-detail-body :is(.sg-il-line > strong:first-child + .sg-il-label, .sg-il-line > .sg-il-label:first-child) { margin-top: 0; }
+.sg-row-detail-body .sg-il-text { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-weight: var(--sg-text-weight); }
+.sg-row-detail-body .sg-il-points { margin: var(--sg-space-xxs) 0 0; padding-left: var(--sg-space-l); color: var(--sg-muted); font-weight: var(--sg-text-weight); }
+.sg-row-detail-body .sg-il-points li + li { margin-top: var(--sg-space-xxs); }
 .sg-row-detail-body .sg-il-cmd { display: flex; align-items: center; margin-top: var(--sg-space-xs); }   /* the answer's command, Copy beside it */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
@@ -3071,7 +3077,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilTodo = function (p) { return ilIfNot(p, (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('')) || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
     // system has instead, with where that comes from.
-    var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + (f.line ? ': \u201c' + esc(f.line) + '\u201d' : ' (' + esc(f.says) + ')') + '<span class="pg-par-val">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
+    var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + '<span class="sg-il-text">' + (f.line ? '\u201c' + esc(f.line) + '\u201d' : esc(f.says)) + '</span><span class="sg-il-label">What the system has</span><span class="sg-il-text">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
     // The engine's proposed answer to a decision that is the team's (Fix, Add, Move), what it rests on, and how to say
     // yes or no to it is said in What to do (intent-proposals.mjs). A no keeps the decision on the page as it was.
     var ilProposal = function (p) {
@@ -3117,7 +3123,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var c = docComp(p), out = [];
       // A part with a draft waiting on its page is the draft's to review, never also missing.
       var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
@@ -3137,7 +3143,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         return esc(w);
       }).join(' <span class="pg-muted">or</span> ');
     };
-    var docLeftHTML = function (p) { return docLeft(p).map(function (x) { var where = whereHTML(p, x); return '<div class="sg-il-line"><strong>' + esc(x.kind) + (x.st === 'check' ? ' (to check)' : '') + '</strong>' + (x.todo ? '<span class="sg-il-what"><b>What:</b> ' + esc(x.todo) + '</span>' : '') + (where ? '<span class="sg-il-where"><b>Where:</b> ' + where + '</span>' : '') + '</div>'; }).join(''); };
+    var docLeftHTML = function (p) { return docLeft(p).map(function (x) { var where = whereHTML(p, x); return '<div class="sg-il-line"><strong>' + esc(x.kind) + (x.st === 'check' ? ' (to check)' : '') + '</strong>'
+      // Its parts apart, each under a small label: the points to cover as a list, how to write it, and where.
+      + ((x.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + x.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' : '')
+      + ((x.how || x.todo) ? '<span class="sg-il-label">' + ((x.notes || []).length ? 'How to write it' : 'What to write') + '</span><span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '')
+      + (where ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + where + '</span>' : '') + '</div>'; }).join(''); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
@@ -3189,7 +3199,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
-          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-what"><b>What:</b> one sentence on what each token is for (agents read it, through tokens.json, to pick the right token).</span><span class="sg-il-where"><b>Where:</b> Figma, in each variable\'s <b>Description</b> (Local variables → select the variable → Description).</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
+          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for (agents read it, through tokens.json, to pick the right token).</span><span class="sg-il-label">Where</span><span class="sg-il-text">Figma, in each variable\'s Description (Local variables → select the variable → Description).</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
           todo: tm.length ? '<p class="sg-il-line"><strong>Describe ' + tm.length + ' of the ' + tn + ' tokens the components use, in Figma.</strong></p>' : '',
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
@@ -3389,7 +3399,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     if (c.agentRating) rows.push(mk('example', 'Example', ex ? '<p>An example of it in use is written.</p>' : '<p class="pg-missing">No example yet.</p>', ex ? 'done' : 'todo',
       'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE()));
     // Still to write: a ready example from its own import and props, to start from.
-    if (rows.length && !ex) rows[rows.length - 1].todo = notesHTML(docNotes('Example', c), 'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE());
+    if (rows.length && !ex) { var exHow = 'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE(); rows[rows.length - 1].todo = notesHTML(docNotes('Example', c), exHow); rows[rows.length - 1].notes = docNotes('Example', c); rows[rows.length - 1].how = exHow; }
     // Its properties, in its contract. The one everybody reads is in the intent layer: done while it still lists what the
     // code and Figma have, a task to publish again when it does not. Only the engine's local one: a task to publish it.
     var k = c.contract;
@@ -3517,7 +3527,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     return (ir ? [ir] : []).concat(lr ? [lr] : []).concat(KNOW.map(function (k) {
       var has = !!k[1](c), body = has ? k[2](c) : '', parts = has && k[5] ? k[5](c).filter(function (p) { return p.html; }) : null, weak = has && (k[0] === 'Role' ? !!roleClash(c) : k[0] !== 'Do and don\'t' && WEAK(body));   // a role is one word by nature: it is to check only when two sources name two roles
       return { key: c.name + '\u0000doc:' + k[0], area: 'Documentation', kind: k[0], written: has ? body + (weak ? '<p class="pg-missing">Too thin to say anything: write a full sentence.</p>' : '') : '<p class="pg-missing">' + esc(k[4]) + '</p>',
-        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
+        todo: has && !weak ? '' : notesHTML(docNotes(k[0], c), (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT)), notes: has && !weak ? [] : docNotes(k[0], c), how: has && !weak ? '' : (weak ? 'What is written is too short to tell an agent anything. ' : '') + (WRITE_HOW[k[0]] || GUIDE_HINT), who: has && !weak ? '' : !DATA.intentLayer && !weak ? WHO.figma : WHO.person, st: !has ? 'todo' : weak ? 'check' : 'done', rel: weak ? 'Too thin' : '', at: DATA.builtAt || null, src: has ? (parts && parts.length ? parts.map(function (p) { return p.where; }) : [k[3](c)]) : [], srcLinks: parts ? parts.map(function (p) { return p.url; }) : null, writtenParts: parts && parts.length > 1 ? parts : null };
     })).concat(ag).concat(tok ? [tok] : []);
   }
   function docOpen(c) { var n = docIssueRows(c).filter(isOpen).length; return { todo: n > 0, say: n ? n + ' to fix' : '' }; }
@@ -6740,7 +6750,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (k === 'source') return r.writeTo ? '' : card(col[0], srcLines() || '<p class="pg-missing">Nothing.</p>');   // still to write: where is in What to do
       // Written in two places: what each says, apart, under where it was read.
       if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
-      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<div class="sg-il-line"><span class="sg-il-what"><b>What:</b> ' + r.todo + '</span>' + (r.writeTo && srcLines() ? '<span class="sg-il-where"><b>Where:</b> ' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' : ''));   // nothing to do: no card
+      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' : ''));   // nothing to do: no card
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
       if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
