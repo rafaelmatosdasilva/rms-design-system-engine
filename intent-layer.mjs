@@ -129,6 +129,7 @@ export function componentIntent(e, src, wrong = []) {
     sections: list(e.sections),
     // What was left out of its page: the sections that are facts (by title), the lines repeated on every page.
     facts: list(e.facts ?? []), repeated: e.repeated ?? 0,
+    ...(e.defined && Object.keys(e.defined).length ? { defined: e.defined } : {}),
   };
 }
 

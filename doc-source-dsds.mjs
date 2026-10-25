@@ -40,7 +40,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 12;   // 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
+export const READER = 13;   // 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -95,6 +95,8 @@ const KEY_OF = [
 ];
 // Facts the engine reads from Figma and the code itself: never read as intent.
 const FACT_TITLE = /^(source|sources|tokens? used|tokens|api|props|properties|events|emits|slots|anatomy|states|css custom properties|metadata)$/i;
+// A definition that only says what kind of thing it is: nothing an agent can use.
+const PLACEHOLDER_DEF = /^((an? )?(event|slot|prop(erty)?) (emitted|exposed|accepted|provided|defined) by the component|(the )?(default|named) slot|no description( yet)?|)\.?$/i;
 // Section titles written for people by their nature (where a fact was confirmed, examples, links to other pages, a
 // mapping to the code, notes on tokens the contracts carry): left on the page as they are, never read as rules.
 export const FOR_PEOPLE = /^(evidence|.*\bexamples?|cross[- ]references?|references?|see also|related|related pages|changelog|history|sources?|.*\bmapping|token notes)$/i;
@@ -163,6 +165,10 @@ export function entityView(entity, file, group = '', shared = null) {
     status: null, file, code: codeFileOf(entity), summary: null,
     purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [],
     facts: [], repeated: 0,   // what was left out: the sections that are facts (by title), the lines repeated on every page
+    // What its generated definitions sections name (Events, Properties, Slots), each term with whether it says more than
+    // its name (a placeholder like "Event emitted by the component." says nothing): left out for agents, kept so a check
+    // can tell what is written. { events: [{ term, said }], props: [...], slots: [...] }
+    defined: {},
     // The other names it goes by (Figma's, the code's): a line that differs from another page's only by them is one line.
     aliases: (Array.isArray(entity?.metadata?.aliases) ? entity.metadata.aliases : []).map(String).filter(Boolean),
   };
@@ -174,6 +180,12 @@ export function entityView(entity, file, group = '', shared = null) {
   // DSDS 0.15 writes documentBlocks; 0.23 writes sections: a section's freeform parts read as 0.15's sections, its
   // guidelines (a statement each, a shared one through its ref) by their title as a section's are: "When to use",
   // "When not to use", "Common mistakes", "Limitations" as those, the rest ("Rules", "For agents") as a checklist.
+  for (const x of entity?.sections ?? []) {
+    if (x?.kind !== 'definitions') continue;
+    const k = /event|emit/i.test(x.title ?? '') ? 'events' : /slot/i.test(x.title ?? '') ? 'slots' : /prop/i.test(x.title ?? '') ? 'props' : null;
+    if (!k) continue;
+    view.defined[k] = [...(view.defined[k] ?? []), ...(x.items ?? []).map((it) => ({ term: String(it?.term ?? '').replace(/\s*\(.*\)\s*$/, '').trim(), codeTerm: /\(([^)]+)\)\s*$/.exec(String(it?.term ?? ''))?.[1] ?? null, said: !PLACEHOLDER_DEF.test(String(it?.definition ?? '').trim()) })).filter((x) => x.term)];
+  }
   const v23 = (entity?.sections ?? []).flatMap((x) => {
     if (!x || typeof x !== 'object') return [];
     if (x.kind === 'guidelines') {

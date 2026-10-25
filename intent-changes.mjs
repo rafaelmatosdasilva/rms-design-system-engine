@@ -80,7 +80,9 @@ export function specIndex(files) {
     if (!/\.md$/i.test(f)) continue;
     const src = /^\s*[-*]\s*Source:\s*`([^`]+)`/mi.exec(t)?.[1]?.replace(/^\.?\//, '');
     const h1 = /^#\s+(.+)$/m.exec(t)?.[1]?.trim();
-    if (src && /\.\w+$/.test(src)) byCode.set(src, f); else if (src) byFolder.push([src.replace(/\/?$/, '/'), f]);
+    // A component's own spec wins over a pattern's that names the same code as its source.
+    if (src && /\.\w+$/.test(src)) { if (!byCode.has(src) || (/\/components\//.test(f) && !/\/components\//.test(byCode.get(src)))) byCode.set(src, f); }
+    else if (src) byFolder.push([src.replace(/\/?$/, '/'), f]);
     if (h1 && !byTitle.has(norm(h1))) byTitle.set(norm(h1), f);
   }
   return { byCode, byFolder, byTitle };
@@ -97,7 +99,7 @@ export function specOf(e, idx) {
 // ── Editing a Markdown spec ─────────────────────────────────────────────────────────────────────────────────────────
 // The written sections first, in the order a spec keeps them (Purpose to Limitations), then the reference ones (its role,
 // do and don't, an example): a spec checked for its section order takes a new one in its place.
-const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example'];
+const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example', 'properties', 'data', 'events', 'slots'];
 // The role of the element a component's code renders, as a screen reader names it (none for an element with no role).
 // An example of a component in use: its tag, and each prop that takes named values with the first of them (up to three),
 // so every name and value in it is one the code takes.
@@ -118,6 +120,55 @@ export function withRealUses(ROOT, facts) {
     if (n && code && whole.length <= 320 && !code.includes('`')) facts.components[n].realUse = whole;
   }
   return facts;
+}
+// The section the engine keeps as the code is: Data, what each list or object holds. Events, props and slots are the
+// generator's own definitions (from the code), never written twice.
+const OWNED = ['Data'];
+// Their lines for a component, from its code facts (codeFactsFor), leaving out what the rest of its page already names
+// (said: the words of its other lines). → [{ where, text }]
+export function factLines(k, said = new Set()) {
+  const unsaid = (x) => !said.has(String(x).toLowerCase());
+  const out = [];
+  for (const p of Object.keys(k.data ?? {}).filter((p) => (k.data[p] ?? []).some(unsaid))) out.push({ where: 'Data', text: `\`${p}\` holds ${k.listy?.[p] ? 'a list of items, each with' : 'an object with'} ${k.data[p].map((f) => `\`${f}\``).join(', ')}.` });
+  return out;
+}
+
+// What the code says of each component, from the system the last prototype check read (page-check.mjs keeps it in
+// OUT_DIR/prototypes/page-system.json), and what the stress tests found (stress.json): by its code file →
+// { events, payloads, slots, props (no comment explains them), propFacts, data: { prop: fields }, listy, ownless, shared,
+// confusedWith (the other component, by the name the facts know it) }
+export function codeFactsFor(ROOT, facts) {
+  const out = new Map();
+  let cache = null, stress = null;
+  try { cache = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'page-system.json'), 'utf8')); } catch { return out; }
+  try { stress = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'stress.json'), 'utf8')); } catch { /* no stress test yet */ }
+  const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const factName = new Map(Object.keys(facts.components ?? {}).map((n) => [key(n), n]));
+  const asFact = (n) => [n, ...(cache.components?.[n]?.aliases ?? [])].map((a) => factName.get(key(a))).find(Boolean) ?? null;
+  const ownless = new Set(stress?.scenarios?.ownless ?? []);
+  const sharedOf = (n) => (stress?.scenarios?.shared ?? []).filter((x) => x.components.includes(n)).map((x) => x.text);
+  for (const [n, c] of Object.entries(cache.components ?? {})) {
+    if (!c?.file) continue;
+    const props = Object.entries(c.props ?? {});
+    const listy = Object.fromEntries(props.filter(([, d]) => /array|object/.test(String(d.type ?? '').toLowerCase())).map(([p, d]) => [p, /array/.test(String(d.type).toLowerCase())]));
+    // What each list or object holds: the fields its comment names, and those the product's own code gives it.
+    const data = {};
+    for (const p of Object.keys(listy)) {
+      const named = Object.keys(c.fields?.[p] ?? {});
+      const given = [...new Set((cache.uses?.[`${n}\u0000${p}`]?.values ?? []).flatMap((v) => (Array.isArray(v) ? v.flat(2) : [v])).filter((x) => x && typeof x === 'object' && !Array.isArray(x)).flatMap((x) => Object.keys(x)))];
+      const all = [...new Set([...named, ...given])];
+      if (all.length) data[p] = all;
+    }
+    const confused = stress?.scenarios?.confusions?.[n]?.map((x) => x.chose).filter(Boolean) ?? [];
+    out.set(String(c.file).replace(/^\.?\//, ''), {
+      name: n, events: c.events ?? [], payloads: c.eventPayloads ?? {}, slots: c.slots?.named ?? [],
+      props: props.filter(([, d]) => !d.description && !listy[d]).map(([p]) => p).filter((p) => !(p in listy)),
+      propFacts: Object.fromEntries(props.map(([p, d]) => [p, { type: d.type ?? null, default: d.default ?? null, options: d.options ?? null }])),
+      data, listy, ownless: ownless.has(n), shared: sharedOf(n),
+      confusedWith: confused.length ? asFact(confused.sort((a, b) => confused.filter((x) => x === b).length - confused.filter((x) => x === a).length)[0]) : null,
+    });
+  }
+  return out;
 }
 export function exampleOf(b) {
   // A use in the product's own code is the surest example there is: it is the code.
@@ -224,7 +275,7 @@ export function jsonAdd(entry, where, line, { sure = false } = {}) {
 //   rewrite: [{ line (as written), finding }]; need: ['purpose' | 'whenToUse' | 'whenNotToUse' | 'mistakes' | 'limitations'
 //   | 'example' | 'role' | 'doDont' | 'differ']
 // leftForPeople: the lines a drafter said nothing in the system can say (kept, so they are not asked about again).
-export function planOf(snap, report, { leftForPeople = new Set() } = {}) {
+export function planOf(snap, report, { leftForPeople = new Set(), code = null } = {}) {
   const byKey = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
   const out = [];
   for (const page of report.pages) {
@@ -253,6 +304,31 @@ export function planOf(snap, report, { leftForPeople = new Set() } = {}) {
       if (!said.some((t) => /^do'?s?\s*(and|&)\s*don'?t'?s?\b/i.test(t) || /(^|:\s*)(do|don'?t|do not)\s*:/i.test(t))) need.push('doDont');
       const twin = (page.wrong ?? []).find((f) => f.kind === 'twin');
       if (twin) need.push({ differ: twin.other });
+      // What the stress tests found: no "when to use" of its own (every line shared), or agents picking another
+      // component for what its page names (drafted: telling them apart is a judgement).
+      const k = code?.(e);
+      if (k?.ownless && !need.includes('whenToUse')) need.push('whenToUse', { ownUse: k.shared ?? [] });
+      if (k?.confusedWith && !twin) need.push({ differ: k.confusedWith });
+    }
+    // What the code says for certain, kept as the code is: what each list or object holds. That section is the engine's:
+    // each run writes what the page does not say yet and takes out a line the code no longer says (a field gone), with
+    // nothing to review.
+    if (page.component) {
+      const k = code?.(e);
+      if (k) {
+        const owned = [], free = [];
+        for (const l of linesOf(e)) {
+          const m = /^(Data):\s*([\s\S]*)$/.exec(l.text);
+          if (OWNED.includes(l.where)) owned.push({ where: l.where, text: l.text.trim() });
+          else if (m) owned.push({ where: m[1], text: m[2].trim() });
+          else free.push(l);
+        }
+        const said = new Set(free.flatMap((l) => String(l.text).toLowerCase().match(/[a-z_$][\w$:-]*/g) ?? []));
+        const now = factLines(k, said);
+        for (const o of owned) if (!now.some((x) => x.where === o.where && flat(x.text) === flat(o.text))) remove.push(o.text);
+        const write = now.filter((x) => !owned.some((o) => o.where === x.where && flat(o.text) === flat(x.text)));
+        if (write.length) need.push({ write });
+      }
     }
     if (remove.length || rewrite.length || need.length) out.push({ entity: e, page, remove, rewrite, need });
   }
@@ -301,7 +377,8 @@ export function draftJobs(plan, facts) {
     // Its role and an example are taken from the code, never asked (draftPlan).
     const parts = it.need.filter((n) => typeof n === 'string' && n !== 'role' && n !== 'example');
     const differ = it.need.find((n) => n?.differ)?.differ;
-    if (name && (parts.length || differ)) jobs.push({ key: `${i}.d`, kind: 'draft', it, ask: { key: `${i}.d`, task: 'draft', need: parts, differFrom: differ ?? null, facts: briefOf(name, facts, it.entity), other: differ ? briefOf(differ, facts) : null } });
+    const ownUse = it.need.find((n) => n?.ownUse)?.ownUse;
+    if (name && (parts.length || differ)) jobs.push({ key: `${i}.d`, kind: 'draft', it, ask: { key: `${i}.d`, task: 'draft', need: parts, differFrom: differ ?? null, facts: briefOf(name, facts, it.entity), other: differ ? briefOf(differ, facts) : null, ...(ownUse ? { ownUse: true, shared: ownUse } : {}) } });
   }
   return jobs;
 }
@@ -310,7 +387,7 @@ export function draftPrompt(asks) {
   return `You write the documentation of a design system's components, for the people and agents who build with it. Answer with one JSON object and nothing else: { "<key>": <answer> } for every key below.
 
 For a "rewrite": the line has the problems listed. Write it again so that it says what it meant with only what the facts have: { "text": "<the line>" }. If nothing in the facts can say it, { "text": null, "why": "<one short sentence>" }.
-For a "draft": write the parts listed in need, for the component in facts: { "purpose": "<one sentence: what it is for>", "whenToUse": ["<line>", …], "whenNotToUse": ["<line>", …], "mistakes": ["<a mistake people make with it, and what to do instead>", …], "limitations": ["<what it does not do, or only does when a prop is set>", …], "doDont": ["Do: <line>", "Don't: <line>"] } (2 or 3 lines each, only the parts asked). With differFrom: also say when to use this one and not the other component (facts in other), in whenToUse, and when to use the other one instead, in whenNotToUse, naming it in backticks.
+For a "draft": write the parts listed in need, for the component in facts: { "purpose": "<one sentence: what it is for>", "whenToUse": ["<line>", …], "whenNotToUse": ["<line>", …], "mistakes": ["<a mistake people make with it, and what to do instead>", …], "limitations": ["<what it does not do, or only does when a prop is set>", …], "doDont": ["Do: <line>", "Don't: <line>"] } (2 or 3 lines each, only the parts asked). With differFrom: also say when to use this one and not the other component (facts in other), in whenToUse, and when to use the other one instead, in whenNotToUse, naming it in backticks. With ownUse: every "when to use" line it has now is shared word for word with other components (in shared): write whenToUse lines that only this one meets, never one of those.
 
 ${RULES}
 
@@ -321,18 +398,25 @@ ${JSON.stringify(asks, null, 1)}`;
 // → plan items with { rewritten: [{ line, text|null, why }], drafted: [{ where, text }], dropped: [{ text, why }] }
 // plan.answers: every answer the drafter gave, by key, so the same drafts can be sent later (--drafts-from) instead of
 // asked again.
-export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {}) {
-  const jobs = draftJobs(plan, facts);
-  plan.answers = {};
-  for (const it of plan) Object.assign(it, { rewritten: [], drafted: [], dropped: [] });
-  // What the code says as it is, written as the team's (sure): its role, from the element it renders, and an example
-  // of it with its own tag and props, each value one it takes. Nothing in them is judged, so nothing to review.
+// What the code says as it is, written as the team's (sure): its role, from the element it renders; an example of it,
+// from the product's own use or its own tag and props; its events and what each sends; what each list holds; its slots;
+// the props no comment explains. Nothing in them is judged, so nothing to review. → plan, each item's drafted holding them
+export function sureParts(plan, facts) {
   for (const it of plan) {
+    it.drafted = (it.drafted ?? []).filter((d) => !d.sure);
     const name = it.page.component, b = name ? briefOf(name, facts) : null; if (!b) continue;
     // Written "Role: button", not "button": a reader that keeps a section's lines as rules, and not its title, still says what it is.
     if (it.need.includes('role') && ROLE_OF[b.root]) it.drafted.push({ where: 'Role', text: `Role: ${ROLE_OF[b.root]}`, sure: true });
     if (it.need.includes('example') && b.tag) it.drafted.push({ where: 'Example', text: exampleOf(b), sure: true });
+    for (const x of it.need.find((n) => n?.write)?.write ?? []) it.drafted.push({ ...x, sure: true });
   }
+  return plan;
+}
+export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {}) {
+  const jobs = draftJobs(plan, facts);
+  plan.answers = {};
+  for (const it of plan) Object.assign(it, { rewritten: [], drafted: [], dropped: [] });
+  sureParts(plan, facts);
   for (let k = 0; k < jobs.length; k += batch) {
     const part = jobs.slice(k, k + batch);
     const answer = answers ?? jsonIn(run(draftPrompt(part.map((j) => j.ask)))) ?? {};
@@ -562,10 +646,13 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   if (access.error) return { error: access.error };
   const leftFile = resolve(ROOT, OUT_DIR, 'intent-left-for-people.json');
   let left = []; try { left = JSON.parse(readFileSync(leftFile, 'utf8')); } catch { /* none yet */ }
-  const plan = planOf(snap, report, { leftForPeople: new Set(left.map((x) => flat(x.line))) });
+  const code = codeFactsFor(ROOT, facts);
+  const plan = planOf(snap, report, { leftForPeople: new Set(left.map((x) => flat(x.line))), code: (e) => code.get(String(e.code ?? '').replace(/^\.?\//, '')) ?? null });
+  for (const it of plan) it.code = code.get(String(it.entity.code ?? '').replace(/^\.?\//, '')) ?? null;
   if (!plan.length) return { snap, access, plan, answers: {}, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
   let files; try { files = await layerFiles(access, snap._source.sha); } catch (e) { return { error: e.message }; }
   let note = '';
+  sureParts(plan, facts);
   if (drafts && draftJobs(plan, facts).length) {
     if (answers) draftPlan(plan, facts, null, { answers, batch: Infinity });
     else {
@@ -573,6 +660,7 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
       try { if (!run) throw new Error('the claude command is not installed'); draftPlan(plan, facts, run); }
       catch (e) {
         for (const it of plan) Object.assign(it, { rewritten: [], drafted: [], dropped: [] });
+        sureParts(plan, facts);   // what the code says for certain is written all the same
         const ask = resolve(ROOT, OUT_DIR, 'intent-draft-request.md');
         mkdirSync(dirname(ask), { recursive: true });
         writeFileSync(ask, draftPrompt(draftJobs(plan, facts).map((j) => j.ask)) + '\n');

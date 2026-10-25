@@ -24,6 +24,8 @@ export function docCoverage(page, context = null) {
     const ilWords = words([k?.purpose, k?.guidelines, ...(il ? [il.purpose, ...il.whenToUse, ...il.whenNotToUse, ...il.mistakes, ...il.limitations, ...il.rules, ...(il.examples ?? [])] : [])].join(' '));
     const cw = new Set(c.commentWords ?? []);
     const named = (x) => cw.has(String(x).toLowerCase()) || ilWords.has(String(x).toLowerCase());
+    // What its generated definitions say of it (an event, a prop, a slot), when they say more than its name.
+    const defines = (kind, x) => (il?.defined?.[kind] ?? []).some((d) => d.said && [d.term, d.codeTerm].filter(Boolean).some((t) => t.toLowerCase() === String(x).toLowerCase()));
     const missing = [];
     const check = (ok, item) => { total++; if (ok) said++; else missing.push({ ...item, write: WRITE[item.kind] }); };
     check(!!il, { kind: 'page', what: name, why: 'it has no page in the intent layer' });
@@ -32,7 +34,7 @@ export function docCoverage(page, context = null) {
       check(!!(il.examples ?? []).length, { kind: 'example', what: name, why: 'its page shows no example of it in use' });
     }
     for (const [p, d] of Object.entries(c.props ?? {})) {
-      check(!!d.description || named(p), { kind: 'prop', what: p, why: `nothing says what ${p} does` });
+      check(!!d.description || named(p) || defines('props', p), { kind: 'prop', what: p, why: `nothing says what ${p} does` });
       const listy = /array|object/.test(String(d.type ?? '').toLowerCase());
       if (listy) check(!!c.fields?.[p], { kind: 'fields', what: p, why: `nothing says what ${p} holds` });
       // A field the product's own code gives that no comment lists.
@@ -42,8 +44,8 @@ export function docCoverage(page, context = null) {
         for (const f of given) check(f in c.fields[p], { kind: 'field', what: `${p}.${f}`, why: `the product gives ${p} a "${f}" no comment lists` });
       }
     }
-    for (const e of c.events ?? []) check(named(e), { kind: 'event', what: e, why: `nothing says when ${e} is sent or what it carries` });
-    for (const sl of c.slots?.named ?? []) check(named(sl), { kind: 'slot', what: sl, why: `nothing says what goes in the ${sl} slot` });
+    for (const e of c.events ?? []) check(named(e) || defines('events', e), { kind: 'event', what: e, why: `nothing says when ${e} is sent or what it carries` });
+    for (const sl of c.slots?.named ?? []) check(named(sl) || defines('slots', sl), { kind: 'slot', what: sl, why: `nothing says what goes in the ${sl} slot` });
     components[name] = { missing, said: 0, total: 0 };
   }
   // Each component's own counts.
