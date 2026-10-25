@@ -23,7 +23,7 @@ import { createRequire } from 'node:module';
 import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi } from './component-source.mjs';
 import { parseCodeConnect, normalizeNodeId } from './codeconnect-check.mjs';
 import { parseConnectFile } from './code-connect-map.mjs';
-import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
+import { projectTypeScriptOnly, withinProject, usableTypeScript } from './project-typescript.mjs';
 
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const unq = (s) => String(s ?? '').trim().replace(/^['"`]|['"`]$/g, '');
@@ -181,7 +181,10 @@ export function loadTypeScript(ROOT) {
     const at = req.resolve('typescript');
     // Only the project's own when DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project (never one NODE_PATH reaches).
     if (projectTypeScriptOnly() && !withinProject(ROOT, at)) return null;
-    return req(at);
+    const ts = req(at);
+    // One that cannot read a Props type by syntax (version 7) is no TypeScript here: the readings it would feed are
+    // better absent than a crash halfway through reading the components.
+    return usableTypeScript(ts) ? ts : null;
   } catch { return null; }
 }
 // Read the Props type of one component by syntax. Returns the api shape, or null when no Props

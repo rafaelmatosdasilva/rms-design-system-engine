@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findSteeringFiles, steeringTruth, steeringFindings, steeringLine } from '../steering-check.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 
 const truth = steeringTruth({
   catalog: { components: {
@@ -80,7 +80,7 @@ test('in a real run on the demo design system: wrong names are listed, a correct
     for (const [f, text] of Object.entries(files)) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), text); }
     const env = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@e', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@e' };
     execFileSync('git', ['init', '-q'], { cwd: dir }); execFileSync('git', ['add', '-A'], { cwd: dir }); execFileSync('git', ['commit', '-qm', 'x'], { cwd: dir, env: { ...process.env, ...env } });
-    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--static'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: 300000 });
+    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--static'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: budget(300000) });
     return r.stdout + r.stderr;
   };
   const bad = run({ 'AGENTS.md': 'Use <Chip size="XL"> next to <Button />.\nRound it with var(--radii-chipp).\nThe radius token is radii/chipz.\nRun rms-design-system-engine --component chip.\n' });

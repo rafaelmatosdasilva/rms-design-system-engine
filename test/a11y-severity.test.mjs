@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { A11Y_GUIDE, A11Y_BLOCKER, A11Y_ADVISORY, severityOf, a11yVerdict, a11yFindingRecord } from '../a11y-check.mjs';
 import { WCAG21 } from '../wcag21.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -47,11 +47,11 @@ const PAGE = `<!doctype html><html lang="en"><head><title>T</title><style>
   BODY
 </main></body></html>`;
 const run = (dir, args, env = {}) => {
-  try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1', ...env } }) }; }
+  try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1', ...env } }) }; }
   catch (e) { return { code: e.status, out: (e.stdout ?? '') + (e.stderr ?? '') }; }
 };
 
-test('the report lists blockers first, then warnings, then advisories, and ends with the verdict', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 300000 }, () => {
+test('the report lists blockers first, then warnings, then advisories, and ends with the verdict', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(300000) }, () => {
   const dir = makeFixture({ 'page.html': PAGE.replace('BODY', '<input class="field" placeholder="Search…">\n  <button class="icon"><svg width="16" height="16"><rect width="16" height="16"/></svg></button>') });
   const { out } = run(dir, []);
   const at = (w) => out.indexOf(`• ${w}: `);
@@ -63,7 +63,7 @@ test('the report lists blockers first, then warnings, then advisories, and ends 
   assert.deepEqual(d.issues.map((i) => [i.issue, i.severity]), [['name', 'blocker'], ['placeholderlabel', 'warning'], ['focusthin', 'advisory']]);
 });
 
-test('must-pass stops on a blocker, never on an advisory alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 300000 }, () => {
+test('must-pass stops on a blocker, never on an advisory alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(300000) }, () => {
   const strict = { 'ds-config.json': { a11yStrict: true } };
   const advisory = run(makeFixture({ ...strict, 'page.html': PAGE.replace('BODY', '') }), []);
   assert.equal(advisory.code, 0, advisory.out);

@@ -14,12 +14,27 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../../cdp.mjs';
+import { usableTypeScript, TYPESCRIPT_HINT } from '../../project-typescript.mjs';
 
-// TypeScript, from the global npm folder, loaded when a build is first transpiled: the scorer's other helpers (the
-// prototype scorer imports them) work on a machine that has none.
+// TypeScript, loaded when a build is first transpiled, so the scorer's other helpers (the prototype scorer imports
+// them) work on a machine that has none. The build's own first, then the global npm folder's; one that cannot read JSX
+// (version 7) is passed over. When none is usable the throw names what to install: it surfaces as an HTTP 500 the
+// browser reports only as "Failed to fetch dynamically imported module", which says nothing on its own.
 let tsModule = null;
-const tsLib = () => (tsModule ??= createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript'));
-// Whether the scorer can turn JSX into a page here: TypeScript installed globally (CI installs it; a computer may not).
+function tsLib(dir = null) {
+  if (tsModule) return tsModule;
+  const loaders = [];
+  if (dir) loaders.push(() => createRequire(join(dir, 'package.json'))('typescript'));
+  loaders.push(() => createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript'));
+  for (const load of loaders) {
+    let got = null;
+    try { got = load(); } catch { continue; }
+    if (usableTypeScript(got)) return (tsModule = got);
+  }
+  throw new Error(`no TypeScript that can read JSX: ${TYPESCRIPT_HINT}`);
+}
+// Whether the scorer can turn JSX into a page here: a TypeScript that reads JSX, the build's own or the global one
+// (CI installs one; a computer may not). Version 7 answers no, as it would fail at the first transpile anyway.
 export const hasTypescript = () => { try { return !!tsLib(); } catch { return false; } };
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
@@ -90,12 +105,12 @@ const walk = (dir, out = []) => {
 };
 
 // Turn one project file into a browser module; its local imports become other modules of the same bundle.
-function transpile(src, file) {
+function transpile(src, file, dir) {
   let code = src
     .replace(/^\s*import\s+(\w+)\s+from\s+['"]([^'"]+\.module\.(css|scss))['"];?/gm, (_, n) => `const ${n} = new Proxy({}, { get: (_t, k) => String(k) });`)
     .replace(/^\s*import\s+['"][^'"]+\.(css|scss)['"];?/gm, '')
     .replace(/^\s*import\s+[^;]*?from\s+['"][^'"]+\.(css|scss|svg|png)['"];?/gm, '');
-  const ts = tsLib();
+  const ts = tsLib(dir);
   const out = ts.transpileModule(code, { fileName: file, compilerOptions: { jsx: ts.JsxEmit.React, jsxFactory: '__h', jsxFragmentFactory: '__F', target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText;
   return `import { createElement as __h, Fragment as __F } from '/__react.js';\n${out.replace(/from\s+['"](react|react\/jsx-runtime)['"]/g, "from '/__react.js'")}`;
 }
@@ -115,7 +130,7 @@ function serve(dir) {
     if (!existsSync(p) || !p.startsWith(dir)) { res.writeHead(404); return res.end(); }
     if (CODE_EXT.includes(extname(p))) {
       let js;
-      try { js = transpile(readFileSync(p, 'utf8'), p); } catch (e) { res.writeHead(500); return res.end(String(e)); }
+      try { js = transpile(readFileSync(p, 'utf8'), p, dir); } catch (e) { res.writeHead(500); return res.end(String(e)); }
       // Local imports resolve against this file's folder; bare ones other than react cannot load here.
       js = js.replace(/(from\s+|import\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g, (m, a, spec) => `${a}'/${relative(dir, resolve(dirname(p), spec))}'`);
       res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(js);

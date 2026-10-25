@@ -7,7 +7,7 @@ import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { readingOrder, screenFindings, productOfScreen, projectScreens, screenTodos, mergeScreens, screenSnapshot, screenScopes, cutPlaces, pageShift } from '../screen-parity.mjs';
 import { screenCaptureScript } from '../screen-layout.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -117,7 +117,7 @@ test('the product a screen is for: ds-config\'s screens, the screen components s
   assert.equal(productOfScreen({ id: '7:8', name: 'Other' }, { products: ['shop'] }), null);
 });
 
-test('in the browser: the product\'s page at the screen\'s size, against the screen; the style guide\'s To do row', { timeout: 120000, skip: (!findChrome({ playwright: true }) || typeof WebSocket !== 'function') && 'no Chrome' }, async () => {
+test('in the browser: the product\'s page at the screen\'s size, against the screen; the style guide\'s To do row', { timeout: budget(120000), skip: (!findChrome({ playwright: true }) || typeof WebSocket !== 'function') && 'no Chrome' }, async () => {
   const root = makeFixture({});
   const ds = join(root, 'ds'), shop = join(root, 'shop');
   try {

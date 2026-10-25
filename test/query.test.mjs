@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { flattenTokens, answer, answerLines } from '../query.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 
 const catalog = { components: {
   badge: { selector: '.hb-badge', props: {
@@ -54,7 +54,7 @@ test('the command: several terms in one call, exit 1 when one is not found, 2 be
   assert.match(empty.stdout, /no contracts\/catalog\.json yet/);
 });
 
-test('no catalog yet: --query runs the audit once to write it, then answers (never hands that step to the agent)', { timeout: 300000 }, async () => {
+test('no catalog yet: --query runs the audit once to write it, then answers (never hands that step to the agent)', { timeout: budget(300000) }, async () => {
   const { fixtureProject } = await import('./helpers.mjs');
   const { spawnSync } = await import('node:child_process');
   const { join, dirname } = await import('node:path');

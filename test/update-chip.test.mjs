@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
 import { BUILD, TIDEPOOL } from './skill-evals/build-tasks.mjs';
 import { hasTypescript } from './skill-evals/build-score.mjs';
+import { budget } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const task = BUILD.find((t) => t.id === 'update-chip');
@@ -26,7 +27,7 @@ const failing = async (edit) => (await task.score(project(edit))).filter((c) => 
 const light = (css) => css.replace('--chip-background: #e8eef9', '--chip-background: #dfe7f7').replace('--radii-chip: 16px', '--radii-chip: 12px');
 const dark = (css) => css.replace('--chip-background: #243049', '--chip-background: #2d3b5c');
 
-test('update-chip: every mode passes, light only fails on dark, untouched fails both, another token moved is named', { skip: !CHROME ? 'no Chrome available' : !hasTypescript() ? 'TypeScript is not installed globally (npm install -g typescript): the scorer compiles the component with it' : false, timeout: 300000 }, async () => {
+test('update-chip: every mode passes, light only fails on dark, untouched fails both, another token moved is named', { skip: !CHROME ? 'no Chrome available' : !hasTypescript() ? 'TypeScript is not installed globally (npm install -g typescript): the scorer compiles the component with it' : false, timeout: budget(300000) }, async () => {
   assert.deepEqual(await failing((c) => dark(light(c))), []);
   assert.deepEqual(await failing(light), ['the new dark background is in the tokens (chip/background, dark: #2d3b5c)', 'dark matches Figma']);
   assert.deepEqual(await failing((c) => c), ['the new light background and radius are in the tokens (chip/background #dfe7f7, radii/chip 12px)', 'the new dark background is in the tokens (chip/background, dark: #2d3b5c)', 'light matches Figma', 'dark matches Figma']);

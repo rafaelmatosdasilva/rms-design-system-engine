@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest first', () => {
@@ -232,7 +233,7 @@ test('[modes] after a mode switch the colours are read settled, never halfway th
   } finally { browser.kill(); }
 });
 
-test('a project whose packages are not installed is told so, not "auto-discovery found nothing"', { timeout: 60000 }, async () => {
+test('a project whose packages are not installed is told so, not "auto-discovery found nothing"', { timeout: budget(60000) }, async () => {
   const { spawnSync } = await import('node:child_process');
   const { mkdtempSync, writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
@@ -278,7 +279,7 @@ test('a style guide with many components is checked in parts of a few components
   assert.equal(styleguideShares({ label: 'x', url: 'file:///x?all', styleguide: true }).length, 1, 'a list it cannot read: one page');
 });
 
-test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: 30000 }, async () => {
+test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: budget(30000) }, async () => {
   const { startDevServer } = await import('../a11y-check.mjs');
   const { mkdtempSync, writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');

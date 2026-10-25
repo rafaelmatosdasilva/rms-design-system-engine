@@ -8,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { scopeView, nestedComponents } from '../styleguide-data.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -31,7 +32,7 @@ test('a nested component is found by the tag its own file gives it (HbBadge for 
   assert.deepEqual(nestedComponents({ name: 'button', cls: 'hb-button', text, names, tags: { badge: ['HbBadge'] } }), ['badge']);
 });
 
-test('--component X --styleguide builds X and what it nests, beside the whole system\'s page', { timeout: 300000 }, () => {
+test('--component X --styleguide builds X and what it nests, beside the whole system\'s page', { timeout: budget(300000) }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'sg-scope-'));
   cpSync(HARBOR, dir, { recursive: true });
   // The button nests the badge (its tag, as its own file names it).

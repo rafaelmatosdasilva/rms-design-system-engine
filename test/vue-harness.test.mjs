@@ -16,6 +16,7 @@ import { globalStyles, renderedVue, appPlugins, appSetup, runtimeDeps, propSampl
 import { harnessCases } from '../component-harness.mjs';
 import { textComponentApi } from '../component-source.mjs';
 import { findChrome } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -66,9 +67,9 @@ test('a React component with no Figma variants is rendered in its code\'s', { sk
   try { assert.deepEqual(h.groups[0].cases.map((c) => c.label), ['default', 'dismissible=true']); } finally { h.close?.(); }
 });
 
-test('the browser check tries every variant of a Vue component, rendered by the project\'s own Vite', { skip: READY, timeout: 300000 }, () => {
+test('the browser check tries every variant of a Vue component, rendered by the project\'s own Vite', { skip: READY, timeout: budget(300000) }, () => {
   const dir = harbor('vue-a11y-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: 250000, env: { ...process.env, CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, CHROME_PATH: CHROME } });
   const out = r.stdout + r.stderr;
   assert.match(out, /ℹ️ {2}\[a11y\] target: 4 Vue component\(s\) rendered with the project's own Vite in each variant \(button: 3 from Figma, badge: 3 from Figma, iconButton: 1 from its props, HbChip: 4 from its props\)/, out);
   const d = JSON.parse(r.stdout.slice(r.stdout.indexOf('{\n')));
@@ -79,14 +80,14 @@ test('the browser check tries every variant of a Vue component, rendered by the 
   assert.equal(d.notRead, undefined, out);
 });
 
-test('the style guide draws a Vue component as the project\'s own Vite renders it, its SCSS compiled', { skip: READY, timeout: 300000 }, () => {
+test('the style guide draws a Vue component as the project\'s own Vite renders it, its SCSS compiled', { skip: READY, timeout: budget(300000) }, () => {
   const dir = harbor('vue-sg-');
   // Figma has the chip too here, so its page is drawn (a component only the code has is a task, not a page).
   const edit = (f, fn) => { const p = join(dir, f); const j = JSON.parse(readFileSync(p, 'utf8')); fn(j.components ?? j); writeFileSync(p, JSON.stringify(j)); };
   edit('figma/structure.snapshot.json', (c) => { c.chip = { h: 24, defaultVariant: 'Tone=Quiet', variants: { 'Tone=Quiet': { h: 24 } } }; });
   edit('figma/props.snapshot.json', (c) => { c.chip = { nodeId: '9:1', properties: { Tone: { type: 'VARIANT', defaultValue: 'Quiet', variantOptions: ['Quiet', 'Loud'] }, 'label#9:0': { type: 'TEXT', defaultValue: 'Filter' } }, annotations: [] }; });
   edit('ds-config.json', (c) => { c.componentFiles.chip = 'components/HbChip.vue'; });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /4 of 4 Vue components drawn as the project's own Vite renders them\./);
   const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
@@ -96,11 +97,11 @@ test('the style guide draws a Vue component as the project\'s own Vite renders i
   // Without the packages, its template is read as before, and the summary says why.
   const bare = mkdtempSync(join(tmpdir(), 'vue-sg-bare-'));
   cpSync(HARBOR, bare, { recursive: true });
-  const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: bare, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: bare, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.match(b.stdout, /Vue components drawn from their templates: the project has no vue package installed\./);
 });
 
-test('the style guide draws each Vue variant as it renders; a page for one component renders only it and what it nests', { skip: READY, timeout: 300000 }, async () => {
+test('the style guide draws each Vue variant as it renders; a page for one component renders only it and what it nests', { skip: READY, timeout: budget(300000) }, async () => {
   const dir = harbor('vue-sg-variants-');
   // Large adds an element, not only a class; the button nests the badge (its tag, as its file names it).
   writeFileSync(join(dir, 'components', 'HbButton.vue'), `<script setup lang="ts">
@@ -109,7 +110,7 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
 </script>
 <template><button :class="['hb-button', { 'hb-button--secondary': variant === 'Secondary' }]" type="button"><span v-if="size === 'Large'" class="hb-button-icon" aria-hidden="true">→</span>{{ label }}<HbBadge /></button></template>
 `);
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: 250000, env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   // The button and the badge it nests: the icon button and the chip are not rendered for this page.
   assert.match(r.stdout, /2 of 2 Vue components drawn as the project's own Vite renders them\./, r.stdout);
@@ -144,7 +145,7 @@ const cart = useCart();
 `;
 const STORES = existsSync(join(TOOLS, 'pinia')) && existsSync(join(TOOLS, 'vue-router')) ? READY : 'no pinia or vue-router (npm install --prefix test/.vue-tools pinia@3 vue-router@4)';
 
-test('a Vue component that reads a Pinia store and links with the router renders with the project\'s own Pinia and router', { skip: STORES, timeout: 300000 }, async () => {
+test('a Vue component that reads a Pinia store and links with the router renders with the project\'s own Pinia and router', { skip: STORES, timeout: budget(300000) }, async () => {
   const project = (deps) => {
     const dir = mkdtempSync(join(tmpdir(), 'vue-store-'));
     mkdirSync(join(dir, 'components'));
@@ -227,7 +228,7 @@ test('a state Figma\'s default variant has on (Disabled) starts off; its on is a
   assert.ok(cases.some((c) => c.label === 'disabled=true'));
 });
 
-test('a Vue component drawn as the product draws it: Figma\'s names in the code\'s words, its icon, its app\'s plugins', { skip: READY, timeout: 300000 }, async () => {
+test('a Vue component drawn as the product draws it: Figma\'s names in the code\'s words, its icon, its app\'s plugins', { skip: READY, timeout: budget(300000) }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'vue-figma-names-')); APP(dir);
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'app', private: true, dependencies: { vue: '^3.5.0' } }));
   writeFileSync(join(dir, 'vite.config.js'), "import vue from '@vitejs/plugin-vue'\nimport { fileURLToPath } from 'node:url'\nexport default { plugins: [vue()], resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } } }");

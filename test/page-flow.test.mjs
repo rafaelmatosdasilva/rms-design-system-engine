@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { focusFlow, a11yFindingRecord, A11Y_GUIDE, severityOf } from '../a11y-check.mjs';
 import { WCAG_KIND } from '../wcag21.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -47,11 +47,11 @@ const PAGE = `<!doctype html><html lang="en"><head><title>Order</title><style>
   <p id="end">End</p>
 </main></body></html>`;
 
-test('in the browser: a whole page walked with Tab, its order and a stop no one sees', { timeout: 180000, skip: !HAS_CHROME && 'no Chrome' }, () => {
+test('in the browser: a whole page walked with Tab, its order and a stop no one sees', { timeout: budget(180000), skip: !HAS_CHROME && 'no Chrome' }, () => {
   const dir = makeFixture({ 'page.html': PAGE });
   try {
     let out = '';
-    try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--no-states'], { cwd: dir, encoding: 'utf8', timeout: 150000, env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
+    try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--no-states'], { cwd: dir, encoding: 'utf8', timeout: budget(150000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
     const d = JSON.parse(out.slice(out.indexOf('{')));
     const of = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
     assert.deepEqual(of('pageorder'), ['Tab goes from button.second "Three" back up to button.third "Two", above it']);
@@ -60,7 +60,7 @@ test('in the browser: a whole page walked with Tab, its order and a stop no one 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('in the browser: beside the style guide, each product\'s page is checked whole and says which product', { timeout: 300000, skip: !HAS_CHROME && 'no Chrome' }, () => {
+test('in the browser: beside the style guide, each product\'s page is checked whole and says which product', { timeout: budget(300000), skip: !HAS_CHROME && 'no Chrome' }, () => {
   const root = makeFixture({});
   const ds = join(root, 'ds'), shop = join(root, 'shop');
   try {
@@ -72,7 +72,7 @@ test('in the browser: beside the style guide, each product\'s page is checked wh
     writeFileSync(join(shop, 'ui.src.html'), 'source');
     writeFileSync(join(shop, 'ui.html'), '<!doctype html><html lang="en"><head><title>Shop</title><style>.chip { display: inline-block; padding: 4px 8px; color: #111; background: #eee; } .note { color: #ccc; background: #fff; }</style></head><body><main><h1>Shop</h1><span class="chip">Chip</span><p class="note">Delivery in two days</p></main></body></html>');
     let out = '';
-    try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json', '--no-axe', '--no-states'], { cwd: ds, encoding: 'utf8', timeout: 280000, env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
+    try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json', '--no-axe', '--no-states'], { cwd: ds, encoding: 'utf8', timeout: budget(280000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
     const d = JSON.parse(out.slice(out.indexOf('{')));
     const shopIssues = d.issues.filter((i) => i.product === 'shop');
     assert.ok(shopIssues.some((i) => i.issue === 'contrast' && /p\.note/.test(i.selector)), JSON.stringify(d.issues.map((i) => [i.issue, i.selector, i.product])));

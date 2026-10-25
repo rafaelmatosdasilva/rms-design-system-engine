@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { vueMarkup } from '../vue-markup.mjs';
 import { codeComponents, rootClassOf } from '../component-source.mjs';
 import { agreedView } from '../styleguide-data.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -65,7 +66,7 @@ test('with Figma\'s components a component only the code has is shown, marked so
 
 const chipVue = `<script setup lang="ts">\nwithDefaults(defineProps<{ tone?: 'quiet' | 'loud'; label?: string }>(), { tone: 'quiet', label: 'Filter' });\n</script>\n<template><button :class="['hb-chip', \`hb-chip--\${tone}\`]" type="button">{{ label }}</button></template>\n`;
 
-test('the style guide of a Vue system: Figma\'s components with Figma\'s data, the code\'s before it', { timeout: 300000 }, () => {
+test('the style guide of a Vue system: Figma\'s components with Figma\'s data, the code\'s before it', { timeout: budget(300000) }, () => {
   const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake', ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   // With Figma's data and styleguide.showCodeOnly: false: its three components; a chip only the code has is a task,
   // with its file.
@@ -107,7 +108,7 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
   assert.match(b.stdout, /\(3 only in the code · the engine's template\)\n\s+No Figma data yet: these are the 3 components the code has/);
 });
 
-test('in the browser: with Figma\'s data a component only the code has has its page and menu item, and its Status row says what to do', { timeout: 300000 }, async (t) => {
+test('in the browser: with Figma\'s data a component only the code has has its page and menu item, and its Status row says what to do', { timeout: budget(300000) }, async (t) => {
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }

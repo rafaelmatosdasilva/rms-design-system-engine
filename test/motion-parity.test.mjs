@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { figmaEasing, transitionsOf, codeMotion, motionFindings, motionSnapshot, MOTION_CAPTURE_JS, motionCaptureScript, prototypeTransitions } from '../motion-parity.mjs';
 import { motionTokens, motionTodos } from '../styleguide-data.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -78,7 +78,7 @@ test('the motion page\'s data: durations and easings as the theme declares them,
     [{ component: 'button', change: 'State Default to Hover', trigger: 'hover', ms: 200, easing: 'ease-out', code: '300ms' }]);
 });
 
-test('--figma-motion writes the capture script, keeps the answer as the snapshot and says what differs; the style guide lists it under the component', { timeout: 300000 }, async (t) => {
+test('--figma-motion writes the capture script, keeps the answer as the snapshot and says what differs; the style guide lists it under the component', { timeout: budget(300000) }, async (t) => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-motion-');
   try {
     const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');

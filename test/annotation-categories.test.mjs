@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { noteKey, captureScript, mergeCaptures, noteKind, isRequirement, requirementEntry, noteIsTodo, loadCategories, categoriesPath } from '../annotation-categories.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { OUT_DIR } from '../names.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -72,7 +72,7 @@ test('the categories snapshot sits beside the component-props one, and a missing
 test('--annotation-categories: no file writes the read-only script; the files it returned become the snapshot', () => {
   const dir = makeFixture({ 'ds-config.json': { figmaFileKey: 'KEY123', paths: { compPropsSnapshot: 'props.json' } },
     'props.json': { chip: { nodeId: '1:2', annotations: [{ label: 'Role: button' }, { label: 'Why it exists' }] } } });
-  const run = (...args) => execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--annotation-categories', ...args], { cwd: dir, encoding: 'utf8', timeout: 60000 });
+  const run = (...args) => execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--annotation-categories', ...args], { cwd: dir, encoding: 'utf8', timeout: budget(60000) });
   let out = run();
   assert.match(out, /figma-capture\/annotation-categories\.js/, out);
   assert.match(out, /on the file KEY123/, out);

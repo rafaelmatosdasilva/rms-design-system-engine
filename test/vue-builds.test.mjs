@@ -13,6 +13,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectBuild, renderedVue } from '../vue-harness.mjs';
 import { findChrome } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CLI_TOOLS = join(ENGINE, 'test', '.vue-cli-tools', 'node_modules');
@@ -52,7 +53,7 @@ export default { name: '${p}Chip', props: { label: { type: String, default: 'Fil
 </style>
 `;
 
-test('a Vue CLI project: its webpack config as vue.config.js shapes it, each variant as it renders, the token CSS left out', { skip: ready(CLI_TOOLS, 'npm install --prefix test/.vue-cli-tools @vue/cli-service@5 vue@3 sass@1 sass-loader@16'), timeout: 240000 }, async () => {
+test('a Vue CLI project: its webpack config as vue.config.js shapes it, each variant as it renders, the token CSS left out', { skip: ready(CLI_TOOLS, 'npm install --prefix test/.vue-cli-tools @vue/cli-service@5 vue@3 sass@1 sass-loader@16'), timeout: budget(240000) }, async () => {
   const dir = project('vue-cli-', {
     'package.json': '{"name":"cx","private":true,"dependencies":{"vue":"^3.5.0"},"devDependencies":{"@vue/cli-service":"^5.0.0"}}',
     // The SCSS variable every component shares comes from vue.config.js, as a Vue CLI project gives it.
@@ -79,7 +80,7 @@ test('a Vue CLI project: its webpack config as vue.config.js shapes it, each var
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('a webpack project: its webpack.config (a function of the mode) with vue-loader', { skip: ready(CLI_TOOLS, 'npm install --prefix test/.vue-cli-tools @vue/cli-service@5 vue@3 sass@1 sass-loader@16'), timeout: 240000 }, async () => {
+test('a webpack project: its webpack.config (a function of the mode) with vue-loader', { skip: ready(CLI_TOOLS, 'npm install --prefix test/.vue-cli-tools @vue/cli-service@5 vue@3 sass@1 sass-loader@16'), timeout: budget(240000) }, async () => {
   const dir = project('vue-webpack-', {
     'package.json': '{"name":"wp","private":true,"dependencies":{"vue":"^3.5.0"},"devDependencies":{"webpack":"^5.0.0","vue-loader":"^17.0.0"}}',
     'webpack.config.js': `const { VueLoaderPlugin } = require('vue-loader');
@@ -106,7 +107,7 @@ module.exports = (env, argv) => ({
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('a Nuxt project: its whole app (auto-imports, auto-registered components, the CSS its config names), client-side', { skip: ready(NUXT_TOOLS, 'npm install --prefix test/.nuxt-tools nuxt@4 vue@3'), timeout: 240000 }, async () => {
+test('a Nuxt project: its whole app (auto-imports, auto-registered components, the CSS its config names), client-side', { skip: ready(NUXT_TOOLS, 'npm install --prefix test/.nuxt-tools nuxt@4 vue@3'), timeout: budget(240000) }, async () => {
   const dir = project('vue-nuxt-', {
     'package.json': '{"name":"nx","private":true,"type":"module","dependencies":{"nuxt":"^4.0.0","vue":"^3.5.0"}}',
     'nuxt.config.ts': "export default defineNuxtConfig({ css: ['~/assets/tokens.css'] })\n",

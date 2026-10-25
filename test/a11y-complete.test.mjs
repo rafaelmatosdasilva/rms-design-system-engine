@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { axeFindings, elementKey, tabTrap, spokenLine, cvdFindings, cvdLuminance, accountFor, a11ySummaryLines, guideFor, severityOf, A11Y_GUIDE, a11yVerdict, AXE_SAME } from '../a11y-check.mjs';
 import { WCAG22, WCAG22_NEW, WCAG_KIND, WCAG21_GUIDE } from '../wcag21.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -146,13 +146,13 @@ const PAGE = `<!doctype html><html lang="en"><head><title>All of it</title><styl
 </script></body></html>`;
 const run = (dir, args) => {
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: 240000, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
   catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
   return out;
 };
 const json = (out) => { const at = out.indexOf('{'); assert.ok(at > -1, out); const d = JSON.parse(out.slice(at)); assert.equal(d.notChecked, undefined, d.notChecked); return d; };
 
-test('the whole check on one page: every new rule found once, the rest of the page left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 300000 }, () => {
+test('the whole check on one page: every new rule found once, the rest of the page left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(300000) }, () => {
   const dir = makeFixture({ 'page.html': PAGE });
   const d = json(run(dir, ['--json', '--a11y']));
   const of = (k) => d.issues.filter((i) => i.issue === k);
@@ -196,7 +196,7 @@ test('the whole check on one page: every new rule found once, the rest of the pa
   assert.ok(!d.issues.some((i) => /A card around/.test(i.selector ?? '')));
 });
 
-test('a part left out on purpose (--no-axe, --no-states) is said, and the verdict says not all of it was checked', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 300000 }, () => {
+test('a part left out on purpose (--no-axe, --no-states) is said, and the verdict says not all of it was checked', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(300000) }, () => {
   const dir = makeFixture({ 'page.html': PAGE });
   const d = json(run(dir, ['--json', '--no-axe', '--no-states']));
   assert.equal(d.leftOut.length, 2);
@@ -206,7 +206,7 @@ test('a part left out on purpose (--no-axe, --no-states) is said, and the verdic
   assert.match(out, /Left out of this run: axe-core's rules \(--no-axe or a11y\.axe: false\)/);
 });
 
-test('each component on a 320px screen: one that cannot be narrower is named, one that wraps is fine', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 300000 }, () => {
+test('each component on a 320px screen: one that cannot be narrower is named, one that wraps is fine', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(300000) }, () => {
   const page = `<!doctype html><html lang="en"><head><title>Narrow</title><style>
     body { font: 14px sans-serif; } .wrap { width: 700px; } button { min-width: 44px; min-height: 44px; white-space: nowrap; padding: 8px 16px; }
     .bar { display: flex; gap: 8px; } .fits { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
@@ -226,32 +226,44 @@ test('each component on a 320px screen: one that cannot be narrower is named, on
 // A check that runs out of time writes its report with what the pages it finished found: the page it was on and the
 // ones it never reached are said not checked. Each slow page waits on a server that never answers, so it never
 // finishes loading: the time limit falls on one of them, after the first page was checked.
-test('out of time: what the pages it finished found is kept, the page it was on and the ones not reached are said not checked', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 240000 }, async () => {
+test('out of time: what the pages it finished found is kept, the page it was on and the ones not reached are said not checked', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(240000) }, async () => {
   const { createServer } = await import('node:http');
   const { spawn } = await import('node:child_process');
-  const { readFileSync } = await import('node:fs');
+  const { readFileSync, writeFileSync } = await import('node:fs');
   const held = [];
   const server = createServer((req, res) => { held.push(res); });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const slow = Array.from({ length: 8 }, (_, i) => `slow${i}.html`);
   const dir = makeFixture({
-    'ds-config.json': { a11y: { timeoutSec: 30 } },
     'first.html': '<!doctype html><html lang="en"><title>First</title><body><main><h1>First</h1><p style="color:#bbb;background:#fff">Faint words</p></main></body></html>',
     ...Object.fromEntries(slow.map((f, i) => [f, `<!doctype html><html lang="en"><title>Slow</title><body><img alt="" src="http://127.0.0.1:${server.address().port}/${i}.png"></body></html>`])),
   });
   try {
-    const urls = ['first.html', ...slow].flatMap((f) => ['--url', pathToFileURL(join(dir, f)).href]);
-    const child = spawn(process.execPath, [join(ENGINE, 'a11y-check.mjs'), ...urls, '--no-axe', '--no-states', '--json-out', join(dir, 'a11y.json')], { cwd: dir, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } });
-    let out = '';
-    child.stdout.on('data', (d) => { out += d; });
-    child.stderr.on('data', (d) => { out += d; });
-    await new Promise((r) => child.on('close', r));
-    assert.match(out, /stopped after 30s, with \d+ of 9 page\(s\) checked: what they found is kept/, out);
+    const url = (f) => pathToFileURL(join(dir, f)).href;
+    const check = (args) => new Promise((done) => {
+      const child = spawn(process.execPath, [join(ENGINE, 'a11y-check.mjs'), ...args, '--no-axe', '--no-states'], { cwd: dir, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } });
+      let out = '';
+      child.stdout.on('data', (d) => { out += d; });
+      child.stderr.on('data', (d) => { out += d; });
+      child.on('close', () => done(out));
+    });
+
+    // What this test is about is which pages a budget that runs out keeps, stops partway and never reaches, not how
+    // fast this computer is. A fixed 30s said that only while the one quick page fit inside it: on a machine running
+    // the rest of the suite it does not, and the test failed for the machine. So the budget is measured here — what
+    // the quick page actually costs, times three, and never less than 30s — and every reading below uses it.
+    const began = Date.now();
+    await check(['--url', url('first.html')]);
+    const secs = Math.max(30, Math.ceil(((Date.now() - began) / 1000) * 3));
+    writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ a11y: { timeoutSec: secs } }, null, 2));
+
+    const out = await check([...['first.html', ...slow].flatMap((f) => ['--url', url(f)]), '--json-out', join(dir, 'a11y.json')]);
+    assert.match(out, new RegExp(`stopped after ${secs}s, with \\d+ of 9 page\\(s\\) checked: what they found is kept`), out);
     const d = JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8'));
     assert.ok(d.issues.some((i) => i.issue === 'contrast' && /Faint words/.test(JSON.stringify(i))), JSON.stringify(d.issues));
     const said = (d.notRead ?? []).join('\n');
-    assert.match(said, /slow\d\.html \(stopped partway: the check ran out of its 30s\)/, said);
-    assert.match(said, /slow7\.html \(not reached: the check ran out of its 30s\)/, said);
+    assert.match(said, new RegExp(`slow\\d\\.html \\(stopped partway: the check ran out of its ${secs}s\\)`), said);
+    assert.match(said, new RegExp(`slow7\\.html \\(not reached: the check ran out of its ${secs}s\\)`), said);
     assert.doesNotMatch(said, /first\.html/);
   } finally { for (const r of held) r.destroy(); server.close(); }
 });

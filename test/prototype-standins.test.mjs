@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { prototypePage } from '../prototype.mjs';
 import { checkPrototype, pageGaps } from '../prototype-pieces.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const CSS = '.btn { padding: 4px 8px; } .btn:focus-visible { outline: 2px solid blue; } .card { display: flex; flex-direction: column; padding: 8px; }';
@@ -36,7 +37,7 @@ test('a stand-in for a component the system has is said; the page lists each gap
   assert.equal(gaps[0].line, 'component: calendar; the prototype uses button meanwhile');
 });
 
-test('stand-ins are marked on the page, counted, turned off and on, and reached from the gaps list', { skip: CHROME ? false : 'no Chrome available', timeout: 90000 }, async () => {
+test('stand-ins are marked on the page, counted, turned off and on, and reached from the gaps list', { skip: CHROME ? false : 'no Chrome available', timeout: budget(90000) }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'proto-standins-'));
   const file = join(dir, 'page.html');
   const gaps = pageGaps(checkPrototype(tree, { catalog, view: parts.view, scales: { spacing: [], text: [] } }).gaps);

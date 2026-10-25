@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chooseFigmaSource, figmaCliPort, refreshFromFigmaCli } from '../figma-source.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -37,7 +37,7 @@ test('figma-cli is run to write design.json, then it is read; a failed snapshot 
   await assert.rejects(refreshFromFigmaCli(dir, cfg, { run: () => ({ status: 1, stderr: 'not connected to Figma\n' }) }), /figma-cli snapshot did not finish: not connected to Figma/);
 });
 
-test('--from-figma-cli reads a design.json; a newer one is read by the audit on its own, and the summary says so', { timeout: 300000 }, () => {
+test('--from-figma-cli reads a design.json; a newer one is read by the audit on its own, and the summary says so', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(TP, 'fc-audit-');
   writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign()));
   const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', PATH: '/usr/bin:/bin' } });

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { checkPrototype, pieceCatalog, systemScales, systemFamily, mergeGaps, gapLine } from '../prototype-pieces.mjs';
 import { screenToPrototype, layoutHabits, screenCaptureScript } from '../screen-layout.mjs';
 import { styleBlocks } from '../styleguide-gen.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const TIDEPOOL = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -178,9 +178,9 @@ function builtTidepool(prefix) {
   }
   return dir;
 }
-const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
 
-test('--prototype draws a valid composition with the components\' own markup and lists its gaps; an invalid one is not drawn', { timeout: 600000 }, () => {
+test('--prototype draws a valid composition with the components\' own markup and lists its gaps; an invalid one is not drawn', { timeout: budget(600000) }, () => {
   const dir = builtTidepool('tp-proto-');
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   writeFileSync(join(dir, 'prototypes', 'notify.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/m' }, children: [
@@ -207,7 +207,7 @@ test('--prototype draws a valid composition with the components\' own markup and
   assert.ok(!existsSync(join(dir, '.design-system-engine-out', 'prototypes', 'bad.html')));
 });
 
-test('--prototype --from-screens turns each designed screen into a drawn starting point', { timeout: 600000 }, () => {
+test('--prototype --from-screens turns each designed screen into a drawn starting point', { timeout: budget(600000) }, () => {
   const dir = builtTidepool('tp-screens-');
   const r = run(dir, '--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json');
   assert.equal(r.status, 0, r.stdout);
@@ -271,7 +271,7 @@ test('a page that differs from the product\'s other pages owes that too, named a
   assert.match(reason, /- page padding: padding\/s here, padding\/m on the product's other pages \(settings\)/);
 });
 
-test('--prototype --catalog lists the system\'s components, the engine\'s pieces with their tokens, and the format', { timeout: 600000 }, () => {
+test('--prototype --catalog lists the system\'s components, the engine\'s pieces with their tokens, and the format', { timeout: budget(600000) }, () => {
   const dir = builtTidepool('tp-catalog-');
   // Its components are code: a prototype is a page in that code, each component written as its card says.
   const r = run(dir, '--prototype', '--catalog');

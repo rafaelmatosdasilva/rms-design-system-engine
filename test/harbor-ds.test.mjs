@@ -23,11 +23,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bareEnv, auditFixture, golden } from './helpers.mjs';
+import { bareEnv, auditFixture, golden, budget } from './helpers.mjs';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'harbor-ds');
 
-test('Harbor design system, without Chrome: every deliberate difference is found, nothing else fails, and the report matches its golden', { timeout: 300000 }, () => {
+test('Harbor design system, without Chrome: every deliberate difference is found, nothing else fails, and the report matches its golden', { timeout: budget(300000) }, () => {
   const r = auditFixture(FIXTURE, bareEnv(), 'harbor-ds-');
   assert.equal(r.code, 1, r.out.slice(-3000));
   // A token value.
@@ -68,7 +68,7 @@ test('Harbor design system, without Chrome: every deliberate difference is found
   golden(FIXTURE, 'expected-report-static.txt', r.out);
 });
 
-test('Harbor, scoped to one component: a page showing several components and a native <button> pull nothing in', { timeout: 300000 }, () => {
+test('Harbor, scoped to one component: a page showing several components and a native <button> pull nothing in', { timeout: budget(300000) }, () => {
   const r = auditFixture(FIXTURE, bareEnv(), 'harbor-ds-', ['--component', 'badge']);
   assert.match(r.out, /SCOPED TO: badge/);
   assert.doesNotMatch(r.out, /nested components pulled in/);

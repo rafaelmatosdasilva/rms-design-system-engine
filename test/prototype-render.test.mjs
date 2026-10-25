@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 import { findChrome } from '../cdp.mjs';
 import { screenBoxes, screenInstances, screenFor, compareWithScreen, compositionPaths, owedFromScreen, interactionLines } from '../prototype-render.mjs';
 
@@ -92,13 +92,13 @@ test('a new page is compared on what it shares with the screen: the page, and th
   assert.deepEqual(compositionPaths(page).map((p) => p.path), ['0', '0.0', '0.1']);
 });
 
-test('--prototype measures the drawn page against the designed screen, saves its picture and owes the page\'s differences', { skip: CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+test('--prototype measures the drawn page against the designed screen, saves its picture and owes the page\'s differences', { skip: CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
   const dir = fixtureProject(TIDEPOOL, 'tp-render-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
     mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8'));
   }
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: 300000 });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
   let r = run('--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /📏 AGAINST THE DESIGNED SCREEN "Settings" \(this prototype redraws it\)/);
@@ -118,13 +118,13 @@ test('--prototype measures the drawn page against the designed screen, saves its
   assert.doesNotMatch(r.stdout, /📏/);
 });
 
-test('a part that opens another opens it in the browser, with the focus inside; Escape closes it and gives the focus back; a field takes typing; a toggle turns on and off', { skip: CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+test('a part that opens another opens it in the browser, with the focus inside; Escape closes it and gives the focus back; a field takes typing; a toggle turns on and off', { skip: CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
   const dir = fixtureProject(TIDEPOOL, 'tp-interact-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
     mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8'));
   }
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: 300000 });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/m' }, children: [
     { component: 'chip', props: { Label: 'Email' } },
