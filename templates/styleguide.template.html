@@ -3061,9 +3061,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilIfNot = function (p, html) {
       var open = ilOpen(p); if (!open.length) return html;
       var todo = html ? html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+      // Its own options when it lists them (three or more), else yes and no.
       return open.map(function (x) {
         var cmd = function (a) { return 'rms-design-system-engine --intent-decide "' + x.key + '" ' + a; };
-        return ilAnswer('If yes', x.yes ? esc(x.yes) : '', cmd('yes')) + ilAnswer('If no', x.no ? esc(x.no) : esc(todo), cmd('no'));
+        var opts = (x.options && x.options.length) ? x.options.map(function (o) { return { answer: String(o.answer).toLowerCase(), label: o.label || 'If ' + o.answer, does: o.does || '' }; }) : [{ answer: 'yes', label: 'If yes', does: x.yes || '' }, { answer: 'no', label: 'If no', does: x.no || todo }];
+        return opts.map(function (o) { return ilAnswer(o.label, esc(o.does), cmd(o.answer)); }).join('');
       }).join('');
     };
     var ilTodo = function (p) { return ilIfNot(p, (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('')) || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
@@ -7058,7 +7060,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function copyText(text, btn, said) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
     var done = function () { label('Copied'); if (said) said.textContent = 'Copied'; setTimeout(function () { label(was); if (said) said.textContent = ''; }, 1500); };
-    var fallback = function () { var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { if (document.execCommand('copy')) done(); } catch (x) {} ta.remove(); };
+    // Where the browser lets no page write to the clipboard, the text beside the button is selected instead, and the
+    // button says which keys copy it: the person is never left with a Copy that did nothing.
+    var keys = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? 'Press \u2318C' : 'Press Ctrl+C';
+    var refused = function () {
+      var code = btn.parentNode && btn.parentNode.querySelector('code, pre');
+      if (code && window.getSelection) { var r = document.createRange(); r.selectNodeContents(code); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+      label(keys); if (said) said.textContent = code ? 'Selected: ' + keys : keys;
+      setTimeout(function () { label(was); if (said) said.textContent = ''; }, 4000);
+    };
+    var fallback = function () { var ta = document.createElement('textarea'), ok = false; ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { ok = document.execCommand('copy'); } catch (x) {} ta.remove(); if (ok) done(); else refused(); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
   }
   // A file handed to the person, every download of the page through here. Shown inside another page (a shared viewer, a

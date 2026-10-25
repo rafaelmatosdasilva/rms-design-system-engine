@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { proposalsFor, applyDecisions, decide, readDecisions } from '../intent-proposals.mjs';
+import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf } from '../intent-proposals.mjs';
 
 const ROOT = mkdtempSync(join(tmpdir(), 'proposals-'));
 const file = (p, t) => { mkdirSync(join(ROOT, p, '..'), { recursive: true }); writeFileSync(join(ROOT, p), t); };
@@ -67,4 +67,9 @@ test('a decision keeps who made it and when, and the page is given both', () => 
   const r = applyDecisions({ report, noPage: ['listMain/Row', 'tileTwo', 'newThing'], proposals: P, decisions: d });
   assert.equal(r.addProposals.tileTwo.by, 'Acme Designer');
   assert.equal(r.addProposals.tileTwo.at, '2026-02-03T10:00:00Z');
+});
+
+test('a proposal\'s answers: yes and no by default, or its own list of three or more, each with what it does', () => {
+  assert.deepEqual(optionsOf({ yes: 'Kept.', no: 'Merged.' }), [{ answer: 'yes', label: 'If yes', does: 'Kept.' }, { answer: 'no', label: 'If no', does: 'Merged.' }]);
+  assert.deepEqual(optionsOf({ options: [{ answer: 'Keep', does: 'Kept.' }, { answer: 'merge', label: 'Merge it', does: 'Merged.' }, { answer: 'drop', does: 'Taken out.' }] }).map((o) => [o.answer, o.label]), [['keep', 'If Keep'], ['merge', 'Merge it'], ['drop', 'If drop']]);
 });

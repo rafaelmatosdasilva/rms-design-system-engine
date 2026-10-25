@@ -517,16 +517,18 @@ if (process.argv.includes('--intent-decide')) {
   if (!keysArg || keysArg.startsWith('--')) {
     if (!open.length) { console.log('✅ No proposal waits for an answer.'); console.log('NEXT: none'); process.exit(0); }
     console.log(`📝 ${open.length} proposal${open.length === 1 ? '' : 's'} wait for the team's answer:`);
-    for (const [k, v] of open) console.log(`\n${k}\n  → ${v.proposal}\n${v.evidence.map((e) => '    · ' + e).join('\n')}`);
-    console.log('\nNEXT: ask the person yes or no for each (or for all); record it with --intent-decide "<key>[,<key>…]" yes|no; never answer for them.');
+    for (const [k, v] of open) console.log(`\n${k}\n  → ${v.proposal}\n${v.evidence.map((e) => '    · ' + e).join('\n')}\n${pr.optionsOf(v).map((o) => `    ${o.answer}: ${o.does}`).join('\n')}`);
+    console.log('\nNEXT: ask the person which answer for each (or for all), saying what each does; record it with --intent-decide "<key>[,<key>…]" <answer>; never answer for them.');
     process.exit(0);
   }
-  if (!['yes', 'no'].includes(ans)) { console.log('Say yes or no: rms-design-system-engine --intent-decide "<key>" yes'); process.exit(2); }
   const keys = keysArg === 'all' ? open.map(([k]) => k) : keysArg.split(',').map((k) => k.trim()).filter(Boolean);
   const unknown = keys.filter((k) => !d.proposals.has(k));
   if (unknown.length) { console.log(`❌ No proposal is called ${unknown.join(', ')} (--intent-decide lists them).`); process.exit(2); }
+  // Each proposal's own answers (yes and no, or the options it lists).
+  const offMenu = keys.filter((k) => !pr.optionsOf(d.proposals.get(k)).some((o) => o.answer === ans));
+  if (!ans || offMenu.length) { console.log(`Answer with one of its options: ${[...new Set((offMenu.length ? offMenu : keys).flatMap((k) => pr.optionsOf(d.proposals.get(k)).map((o) => o.answer)))].join(', ')} (rms-design-system-engine --intent-decide "<key>" <answer>)`); process.exit(2); }
   pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals), { by: (await import('./decided-by.mjs')).decidedBy(ROOT) });
-  console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans} (${projectPath(ROOT, 'intentDecisions')}): ${keys.map((k) => d.proposals.get(k)?.[ans]).filter(Boolean).join(' ') || 'the Documentation page no longer asks it of the team.'}`);
+  console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans} (${projectPath(ROOT, 'intentDecisions')}): ${keys.map((k) => pr.optionsOf(d.proposals.get(k)).find((o) => o.answer === ans)?.does).filter(Boolean).join(' ') || 'the Documentation page no longer asks it of the team.'}`);
   await sendDecisions();
   // What the answer changes in the layer, made now: on the pages it was about (a page to start is found by its answer).
   const only = new Set(keys.map((k) => d.proposals.get(k)?.page).filter(Boolean));

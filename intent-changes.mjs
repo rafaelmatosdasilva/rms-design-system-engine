@@ -325,7 +325,10 @@ export function planOf(snap, report, { leftForPeople = new Set(), code = null, p
     if (page.action === 'move' && partOf.get(page.name)?.length) {
       const users = [...new Set(partOf.get(page.name).map(nameOfCode))];
       const text = `Not used on its own: it is an internal part of ${users.join(' and ')}; use ${users.length > 1 ? 'one of them' : users[0]} instead.`;
-      if (!linesOf(e).some((l) => /internal part of/i.test(l.text))) out.push({ entity: e, page, remove: [], rewrite: [], need: [{ write: [{ where: 'When not to use', text }] }] });
+      // Lines written on every page alike come out of it as out of any page.
+      const remove = [...new Set(e.repeatedLines ?? [])];
+      const said = linesOf(e).some((l) => /internal part of/i.test(l.text));
+      if (!said || remove.length) out.push({ entity: e, page, remove, rewrite: [], need: said ? [] : [{ write: [{ where: 'When not to use', text }] }] });
       continue;
     }
     if (['delete', 'move', 'rename', 'name'].includes(page.action)) continue;   // a page to remove or name first
@@ -743,7 +746,7 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   for (const f of created) if (!result.files.has(f)) result.files.set(f, files.get(f));
   const table = ia.tableOfCode(files);
   if (table) for (const x of started) result.files.set(table, ia.addRow(result.files.get(table) ?? files.get(table), x.codeName, x.code, 'Started from the code by rms-design-system-engine; its lines are drafts to review.'));
-  const merged = ia.applyMerges(ans.merges, files, result.files, { layout: layoutOf(files) });
+  const merged = ia.applyMerges(ans.merges, files, result.files, { layout: layoutOf(files), common: ia.commonLines(snap.entities, { files }) });
   result.created = created; result.started = started; result.merged = merged;
   // What the drafter left for a person: kept, so later runs do not ask about it again (it stays on the page as Fix).
   const now = plan.flatMap((i) => (i.rewritten ?? []).filter((r) => !r.text).map((r) => ({ page: i.entity.name, line: r.line, why: r.why ?? null })));

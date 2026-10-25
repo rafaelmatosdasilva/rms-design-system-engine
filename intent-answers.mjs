@@ -74,10 +74,32 @@ export function addRow(text, name, code, note) {
   return lines.join('\n');
 }
 
+// The lines many pages say alike, their own names aside (a component's name, its code name, anything in backticks):
+// what a generator or a template wrote, never what is true of one part. → (entity, text) → true when it is one of them.
+// files: the layer's own files, so its specs count too (a line taken out of most pages may still be in their specs).
+export function commonLines(entities, { min = 5, files = new Map() } = {}) {
+  const shape = (e, t) => {
+    let x = String(t).replace(/`[^`]*`/g, '{}');
+    for (const w of [e.name, e.code, e.id, ...(e.aliases ?? [])].filter(Boolean).sort((a, b) => String(b).length - String(a).length)) x = x.split(w).join('{}');
+    return x.toLowerCase().replace(/\s+/g, ' ').trim();
+  };
+  const count = new Map();
+  const tally = (e, texts) => { for (const k of new Set(texts.map((t) => shape(e, t.replace(/^\s*[-*]\s+/, ''))).filter(Boolean))) count.set(k, (count.get(k) ?? 0) + 1); };
+  for (const e of entities) tally(e, linesOf(e).flatMap((l) => l.text.split('\n')));
+  // A spec's list items, its title and the code file it names as its own names.
+  for (const [f, t] of files) {
+    if (!/\.md$/i.test(f)) continue;
+    const name = /^#\s+(.+)$/m.exec(t)?.[1]?.trim(), code = /^\s*[-*]\s*Source:\s*`([^`]+)`/mi.exec(t)?.[1];
+    if (!code) continue;
+    tally({ name, code }, t.split('\n').filter((l) => /^\s*[-*]\s+/.test(l) && !/^\s*[-*]\s*[\w ]+:\s*`/.test(l)));
+  }
+  return (e, t) => (count.get(shape(e, t)) ?? 0) >= min;
+}
+
 // Merges: the part's lines its parent's page does not say, drafted there (each with the part's name); the part's page
 // taken out and the table noting it is a part, so the layer makes no page for it again. Its spec stays, as a part's spec
 // does. next: Map(path → text | null for a file taken out).
-export function applyMerges(merges, files, next, { layout = null } = {}) {
+export function applyMerges(merges, files, next, { layout = null, common = () => false } = {}) {
   const idx = specIndex(files), text = (f) => (next.has(f) ? next.get(f) : files.get(f)), pages = [];
   const table = tableOfCode(files);
   for (const { part, into } of merges) {
@@ -88,7 +110,7 @@ export function applyMerges(merges, files, next, { layout = null } = {}) {
     for (const l of linesOf(part)) {
       const where = MERGED[l.where]; if (!where) continue;
       for (const t of l.text.split('\n').map((x) => x.replace(/^\s*[-*]\s+/, '').trim()).filter(Boolean)) {
-        if (said.has(flat(t))) continue;
+        if (said.has(flat(t)) || common(part, t) || /\binternal part of\b/i.test(t)) continue;   // the engine's own line about the part stays with it
         const line = `${part.name}: ${t}`;
         if (src) next.set(src.spec, mdAdd(text(src.spec), where, line));
         if (files.has(into.file)) { let doc; try { doc = JSON.parse(text(into.file)); } catch { doc = null; } if (doc) { const entry = (Array.isArray(doc.entries) ? doc.entries : [doc]).find((x) => x.name === into.name) ?? doc; jsonAdd(entry, where, line, { layout }); next.set(into.file, jsonText(doc, files.get(into.file))); } }

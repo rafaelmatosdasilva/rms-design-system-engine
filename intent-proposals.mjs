@@ -59,6 +59,13 @@ export function partsOf(ROOT, report, codeFiles) {
   return out;
 }
 
+// A proposal's answers, each with what it does: its own list (options: [{ answer, label, does }]) when it has more than
+// two, else yes and no. --intent-decide takes any of them; the Documentation page shows each with its command.
+export function optionsOf(x) {
+  if (Array.isArray(x?.options) && x.options.length) return x.options.map((o) => ({ answer: String(o.answer).toLowerCase(), label: o.label ?? `If ${o.answer}`, does: o.does ?? '' }));
+  return [{ answer: 'yes', label: 'If yes', does: x?.yes ?? '' }, { answer: 'no', label: 'If no', does: x?.no ?? '' }];
+}
+
 // What a yes and a no to keeping a name each do.
 const keepOrRewrite = (name) => ({ yes: `The sentence stays as it is, and ${name} is no longer a finding.`, no: `The sentence is written again with what the system has, as a draft to review.` });
 
