@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The documentation under load: what agents cannot learn, which component they cannot tell apart, and a sweep of real pages (continuous evaluation)
+
+What changed since the entry below (engine f2ce1f0): The documentation under load: what agents cannot learn, which component they cannot tell apart, and a sweep of real pages. The guide changed in `reference/usage.md`.
+
+Guide set measured: `51b2dcf7b232` · Project measured: `13d811a9d668`
+
+| Haiku, engine c7f1651 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.060 |
+| Input a run | 116k | 117k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 70 of 70 runs pass, the same as the entry below. One miss read by hand and rescored: on refresh-no-figma #0 the reply said "Figma data wasn't refreshed" and that a Figma tool or token is needed, which the check only knew as "not refreshed"; the check now takes the contraction too (`heldout.mjs`), and `rescore.mjs` applied it to every run of this record. Records: `records/2026-10-25-the-documentation-under-load-what`.
+
 ## 2026-10: Prototypes as pages in the system's own code, held to the system, and what agents invent fed back to the documentation (continuous evaluation)
 
 What changed since the entry below (engine 8f07cf3): Prototypes as pages in the system's own code, held to the system, and what agents invent fed back to the documentation. The guide changed in `cookbook/prototype.md`, `reference/config.md`, `reference/usage.md`.
