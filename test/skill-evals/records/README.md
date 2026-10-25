@@ -146,5 +146,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-25-the-default-theme-is-called` | The 21 guide tasks on Haiku (engine c15d49a) | "The default theme is called the default one; a project's plain-word names are watched where they are used as names" |
 | `2026-10-25-each-repository-the-setup-names` | The 21 guide tasks on Haiku (engine c0ee871) | "Each repository the setup names says what is there: the engine writes its README on every run" |
 | `2026-10-25-merge-main-into-readmes` | The 21 guide tasks on Haiku (engine ea1fabb) | "Merge main into readmes" |
+| `2026-10-25-places-compared-by-where-they` | The 21 guide tasks on Haiku (engine ae4f913) | "Places compared by where they are, not by the token that reaches them" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
