@@ -141,5 +141,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-25-every-test-closes-the-documentation` | The 21 guide tasks on Haiku (engine cb67d6a) | "Every test closes the documentation gaps it can: the code's facts written as final, the rest drafted for review" |
 | `2026-10-25-ci-changed-a-scheduled-pipeline` | The 21 guide tasks on Haiku (engine bc786bf) | "--ci-changed: a scheduled pipeline builds only when something it is made from moved" |
 | `2026-10-25-intent-layer-every-answer-does` | The 21 guide tasks on Haiku (engine 4ca5375) | "Intent layer: every answer does its own work, each with a command to copy" |
+| `2026-10-25-make-command-writes-the-company` | The 21 guide tasks on Haiku (engine 80a5ef0) | "--make-command writes the company's command even when the profile cannot be read yet" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

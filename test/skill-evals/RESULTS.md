@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: --make-command writes the company's command even when the profile cannot be read yet (continuous evaluation)
+
+What changed since the entry below (engine 4ca5375): Intent layer: every answer does its own work, each with a command to copy (#30); Intent layer: a page written from a shared spec gets one of its own, and keeps what agents read; --make-command writes the company's command even when the profile cannot be read yet. The guide changed in `reference/usage.md`.
+
+Guide set measured: `49e16078bfcd` · Project measured: `13d811a9d668`
+
+| Haiku, engine 80a5ef0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.056 |
+| Input a run | 120k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 120k. Records: `records/2026-10-25-make-command-writes-the-company`.
+
 ## 2026-10: Intent layer: every answer does its own work, each with a command to copy (continuous evaluation)
 
 What changed since the entry below (engine bc786bf): Panels open with what to do (What and Where); a fresh GitLab connection after a long wait (#29); Intent layer: every answer does its own work, each with a command to copy. The guide changed in `reference/usage.md`.
