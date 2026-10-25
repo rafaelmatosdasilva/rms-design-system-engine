@@ -18,6 +18,7 @@
 // loadContext reads files (and refreshes a guidelines link whose file is missing or old); the rest is pure.
 import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { guidanceView } from './styleguide-data.mjs';
+import { isOpen } from './doc-source-dsds.mjs';
 import { projectPath } from './names.mjs';
 import { resolve, dirname, join } from 'node:path';
 
@@ -89,7 +90,7 @@ export function intentText(s) {
     .replace(/\s*→\s*\.[\w-]+/g, ' ')
     .replace(/\bBuilt base \.[\w-]+(?:\s*\([^)]*\))?\.?/gi, ' ')
     .replace(/\bbuilt base \.[\w-]+(?:\s*\([^)]*\))?/gi, ' ');
-  const sentences = t.split(/(?<=[.;])\s+/).map((x) => x.trim()).filter(Boolean)
+  const sentences = t.split(/(?<=[.;?])\s+/).map((x) => x.trim()).filter(Boolean).filter((x) => !isOpen(x))
     .filter((x) => !/::|var\(--|\b[a-z][a-zA-Z-]*=[\w.%-]+|\bCSS:|strokeSides/.test(x) && (x.match(/\d+(?:\.\d+)?px\b/g) ?? []).length < 2)
     .map((x) => x.replace(/:?\s*(?:[\w-]+\/[\w-]+(?:\/[\w-]+)*\s*,\s*){1,}[\w-]+\/[\w-]+(?:\/[\w-]+)*\s*\.?$/, '.'));
   const out = sentences.join(' ').replace(/\(\s*\)/g, ' ').replace(/\s+([.,;:])(?=\s|$)/g, '$1').replace(/([.;:,])\1+/g, '$1').replace(/^[\s.,;:]+|[\s,;:]+$/g, '').replace(/\s+/g, ' ').trim();
@@ -237,6 +238,8 @@ export function breakpointsOf(vars = {}) {
 // extra: { authored: contract.authored.json, examples: { name: [{ kind: 'do' | 'dont', caption }] } }
 export function contextFrom(catalog = { components: {} }, intent = null, sections = null, { authored = null, examples = {}, kept = [], aliases = {} } = {}) {
   const components = {};
+  const open = [];   // what the documentation leaves open, for whoever asks: [{ name, where, text, from }]
+  const openIn = (text, name, where, from) => { for (const x of clean(text).split(/(?<=[.;?])\s+/)) if (x && isOpen(x)) open.push({ name, where, text: x.trim(), from }); };
   const names = Object.keys(catalog.components ?? {});
   const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
   // Guideline sections named after a component go with it; the rest are the product's rules.
@@ -270,6 +273,9 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     // Figma layout reads to know what each component is for and what not to do with it.
     const il = i.intentLayer ?? null;
     const intentLayer = il ? intentLayerOf(il) : null;
+    for (const q of intentLayer?.open ?? []) open.push({ name, where: q.where ?? null, text: q.text, from: intentLayer.file ?? 'the intent layer' });
+    openIn(c.description, name, 'its Figma description', 'Figma'); if (i.design?.description !== c.description) openIn(i.design?.description, name, 'its Figma description', 'Figma');
+    for (const a of i.design?.annotations ?? []) openIn(a?.label ?? a, name, noteFrom(a), 'Figma');
     // The role its intent layer page writes (Role: button), where Figma's annotations name none.
     const ilRole = intentLayer?.role ?? null;
     components[name] = {
@@ -304,10 +310,11 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
       const body = [pg.purpose, ...(pg.whenToUse ?? []).map((x) => `Use when: ${x}`), ...(pg.whenNotToUse ?? []).map((x) => `Not when: ${x}`),
         ...(pg.mistakes ?? []).map((x) => `Common mistake: ${x}`), ...(pg.limitations ?? []).map((x) => `Limitation: ${x}`), ...(pg.rules ?? [])].filter(Boolean).join('\n');
       if (body) rules.push({ title: `${pg.name} (${L}, intent layer)`, text: body, file: pg.url ?? pg.file ?? null, ...(pg.kind ? { kind: pg.kind } : {}) });
+      for (const q of pg.open ?? []) open.push({ name: pg.name, layer: L, where: q.where ?? null, text: q.text, from: pg.url ?? pg.file ?? 'the intent layer' });
       for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null, ...(pg.kind ? { kind: pg.kind } : {}) });
     }
   }
-  return { components, rules, limits: limitsFrom(components, rules, names), inside: insideFrom(components, rules, names, aliases) };
+  return { components, rules, open, limits: limitsFrom(components, rules, names), inside: insideFrom(components, rules, names, aliases) };
 }
 
 // A component's intent layer page as the catalog shows it: each line once (a family's shared rule often says what the
@@ -328,7 +335,7 @@ export function intentLayerOf(il) {
   }
   // A section of its page that is code (an example written as a block) is an example too.
   for (const x of il.sections ?? []) if (/```|<[A-Za-z][\w-]*[\s/>]/.test(x?.text ?? '')) examples.push(String(x.text).trim());
-  return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null, defined: il.defined ?? null };
+  return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null, defined: il.defined ?? null, open: il.open ?? [] };
 }
 
 // Where a component may go, read from the documentation as written: "`searchField` only inside the toolbar", "Do not
@@ -537,7 +544,7 @@ export function detailFor(ctx, focus, detail = [], { pages = [], first = [] } = 
 // sections the request touches, in full; the components
 // its words point to (by name, description, options or guidelines), and the pages closest to it.
 // pages: [{ name, label, text, designed, file }] (prototypes already made and designed screens).
-export function requestFocus(ctx, request, pages = []) {
+export function requestFocus(ctx, request, pages = [], { answered = false } = {}) {
   const words = wordsOf(request);
   if (!words.length) return null;
   const hit = (text) => { const w = wordsOf(text); return words.filter((x) => w.includes(x)); };
@@ -562,13 +569,68 @@ export function requestFocus(ctx, request, pages = []) {
   const scored = pages.map((p) => ({ ...p, matched: [...new Set([...hit(p.name), ...hit(p.text ?? '')])] })).filter((p) => p.matched.length).sort((a, b) => b.matched.length - a.matched.length || b.designed - a.designed);
   // The designed screens the request names (the product, or the screen itself): what a new page for it is made of.
   const screens = (ctx.productScreens ?? []).map((s) => ({ ...s, matched: hit(s.name) })).filter((s) => s.matched.length && s.matched.length >= Math.min(2, wordsOf(s.name).length)).sort((a, b) => b.matched.length - a.matched.length).slice(0, 2);
-  return { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3), lacking: kindsLacking(ctx, request), screens };
+  const focus = { request: String(request).trim(), words, sections, components, ruledOut: out, pages: scored.slice(0, 3), lacking: kindsLacking(ctx, request), screens };
+  focus.ask = answered ? [] : askFirst(ctx, focus);
+  return focus;
+}
+
+// ── What the request leaves the system unable to decide: asked before anything is written ─────────────────────────────
+// Claude alone picks something and goes on; the engine knows when the system has no answer. The page shells it chooses
+// between (the code's templates, else the intent layer's template pages), each with what it is for.
+export function templateChoices(ctx) {
+  const said = (n) => ctx.components?.[n]?.purpose ?? ctx.components?.[n]?.intentLayer?.purpose ?? null;
+  const fromCode = (ctx.templates ?? []).map((t) => (typeof t === 'string' ? t : t?.name)).filter(Boolean);
+  if (fromCode.length) return [...new Set(fromCode)].map((name) => ({ name, purpose: said(name) }));
+  return (ctx.rules ?? []).filter((r) => /\(templates, intent layer\)$/.test(r.title) && !r.title.includes(' · '))
+    .map((r) => ({ name: r.title.replace(/\s*\(templates, intent layer\)$/, ''), purpose: r.text.split('\n')[0] || null }));
+}
+const MOST_ASKED = 3;
+// → [{ kind: 'template' | 'purpose' | 'open', text, options? }], most decisive first: which page shell, when the request
+// fits none or several alike; what the page is for, when nothing in it matches what any component is for; and each
+// question the documentation leaves open on what the request touches.
+export function askFirst(ctx, focus) {
+  if (!focus) return [];
+  const out = [];
+  // Only the kinds of page: a template that lays a panel, a drawer or a dialog over a page lives inside one.
+  const OVER = /\b(side[- ]?layers?|side[- ]?panels?|drawers?|overlays?|modals?|dialogs?|sheets?|popovers?)\b/i;
+  const shells = templateChoices(ctx).filter((t) => !OVER.test(`${t.name.replace(/([a-z])([A-Z])/g, '$1 $2')} ${t.purpose ?? ''}`));
+  const score = new Map(focus.components.map((c) => [c.name, c.score]));
+  const named = (t) => score.has(t.name) || (focus.sections ?? []).some((x) => x.title.startsWith(`${t.name} (`) || x.title.startsWith(`${t.name} · `));
+  const fit = shells.filter(named).sort((a, b) => (score.get(b.name) ?? 0) - (score.get(a.name) ?? 0));
+  // A product page or a designed screen to start from decides the shell already.
+  const started = (focus.pages ?? []).length || (focus.screens ?? []).length;
+  const shellLine = (t) => `${t.name}${t.purpose ? ` (${cut(String(t.purpose).replace(/\s+/g, ' '), 70)})` : ''}`;
+  // A template the request names outright decides it (others it names are what that page holds: a filters panel).
+  const byName = shells.filter((t) => { const w = nameWords(t.name); return w.length && w.every((x) => focus.words.includes(x) || focus.words.includes(`${x}s`) || focus.words.includes(x.replace(/s$/, ''))); });
+  if (shells.length > 1 && !started && !byName.length) {
+    const top = fit.length > 1 ? fit.filter((t) => (score.get(fit[0].name) ?? 0) - (score.get(t.name) ?? 0) <= 1) : [];
+    if (!fit.length) out.push({ kind: 'template', options: shells.slice(0, 6).map((t) => t.name), text: `Which kind of page is it: ${shells.slice(0, 6).map(shellLine).join('; ')}${shells.length > 6 ? '; or another of the system\'s templates' : ''}?` });
+    else if (top.length > 1) out.push({ kind: 'template', options: top.map((t) => t.name), text: `The request fits more than one template: ${top.map(shellLine).join('; ')}. Which one is it?` });
+  }
+  const matched = focus.components.filter((c) => !shells.some((t) => t.name === c.name));
+  if (!matched.length && !started && !(focus.lacking ?? []).length && !(focus.ruledOut ?? []).length)
+    out.push({ kind: 'purpose', text: fit.length || byName.length
+      ? `What should the ${(byName[0] ?? fit[0]).name} page show, and what should people be able to do on it (what they see, change or confirm)? The request names the page but nothing on it, so its content would be guessed.`
+      : 'What should people be able to do on this page (what they see, change or confirm)? Nothing in the request matches what the system\'s components are for, so without it the page would be guessed.' });
+  const touched = new Set([...focus.components.map((c) => c.name), ...fit.map((t) => t.name)]);
+  for (const q of ctx.open ?? []) {
+    if (!touched.has(q.name) && !(q.layer && (focus.sections ?? []).some((x) => x.title.startsWith(`${q.name} (`)))) continue;
+    if (out.some((o) => o.kind === 'open' && o.text.includes(q.text))) continue;
+    out.push({ kind: 'open', name: q.name, text: `The documentation leaves this open for ${q.name}${q.where ? ` (${q.where})` : ''}: "${cut(q.text, 200)}". How should it be on this page?` });
+  }
+  return out;
 }
 
 // The lines the catalog prints for a request.
 export function focusLines(f) {
   if (!f) return [];
   const out = ['', `FOR THIS REQUEST  "${cut(f.request.replace(/\s+/g, ' '), 160)}"`];
+  if (f.ask?.length) {
+    out.push('  ASK FIRST: the system cannot decide these from the request. Ask the person, all in one message, before writing anything:');
+    f.ask.slice(0, MOST_ASKED).forEach((q, i) => out.push(`    ${i + 1}. ${q.text}`));
+    if (f.ask.length > MOST_ASKED) out.push(`    (and ${f.ask.length - MOST_ASKED} more the documentation leaves open; ask them once these are answered)`);
+    out.push('  With the answers, run the catalog again with them added to --for, and --answered. With no one to answer (a run nobody watches), take the first option of each, and say in the reply what you took and that it was not asked.');
+  }
   if (f.pages.length) out.push(`  start from: ${f.pages.map((p) => `${p.label}${p.file ? ` (${p.file})` : ''}`).join('; ')}`);
   for (const s of f.screens ?? []) out.push(`  the designed screen for it: ${s.name} (Figma), made of ${screenUses(s)}: a new page for it is made of the same, in the same frame`);
   if (f.components.length) out.push(`  components its words point to: ${f.components.map((c) => `${c.name} (${c.matched.join(', ')}${c.purpose ? `: ${cut(c.purpose, 80)}` : ''})`).join('; ')}`);

@@ -90,7 +90,9 @@ export function parseMarkup(markup, { syntax = 'vue', line = 1 } = {}) {
   let i = 0, ln = line;
   const adv = (to) => { for (; i < to; i++) if (s[i] === '\n') ln++; };
   // In JSX a "<" starts a tag only where an element can start: not in a comparison or a type argument.
-  const canOpen = (at) => { if (syntax !== 'jsx') return true; let k = at - 1; while (k >= 0 && /\s/.test(s[k])) k--; return k < 0 || /[(>{},=?:&|\n]/.test(s[k]) || /\breturn$/.test(s.slice(Math.max(0, k - 6), k + 1)); };
+  // Inside an element's children and outside {…}, a "<" before a name is always a tag (<label>Name<input /></label>).
+  let braces = 0;
+  const canOpen = (at) => { if (syntax !== 'jsx') return true; if (stack.length > 1 && braces === 0 && stack[stack.length - 1].tag !== '#root') return true; let k = at - 1; while (k >= 0 && /\s/.test(s[k])) k--; return k < 0 || /[(>{},=?:&|\n]/.test(s[k]) || /\breturn$/.test(s.slice(Math.max(0, k - 6), k + 1)); };
   while (i < s.length) {
     if (s.startsWith('<!--', i)) { const e = s.indexOf('-->', i); adv(e < 0 ? s.length : e + 3); continue; }
     if (s[i] === '<' && s[i + 1] === '/') {
@@ -135,6 +137,7 @@ export function parseMarkup(markup, { syntax = 'vue', line = 1 } = {}) {
       if (!selfClosing && !VOID.has(lower)) stack.push(node);
       continue;
     }
+    if (syntax === 'jsx' && stack.length > 1) { if (s[i] === '{') braces++; else if (s[i] === '}' && braces > 0) braces--; }
     adv(i + 1);
   }
   return root;
@@ -381,6 +384,7 @@ export function checkPage(file, text, system, { context = null } = {}) {
   walk(tree, (n, parents) => {
     const what = componentOf(n.tag, { imports, file: abs, ROOT: system.ROOT, aliases: system.aliases, byFile: system.byFile, globals: system.globals, components: system.components });
     cur = what.name ? { component: what.name } : {};
+    n.system = what.name ?? null;   // for the page's quality review (page-quality.mjs), the same for every framework
     const id = `n${++seq}`;
     idOf.set(n, id);
     const parentId = parents.length ? idOf.get(parents[parents.length - 1]) : null;
@@ -490,7 +494,7 @@ export function checkPage(file, text, system, { context = null } = {}) {
   // The template first, where the documentation has templates: a page made of none starts from no template.
   const templates = context?.templates?.length ? context.templates.filter((t) => names.includes(t)) : templatesOf(context, names);
   if (templates.length && Object.keys(used).length && !templates.some((t) => used[t])) add('error', tree.children[0]?.line ?? 1, `the page starts from no template: the documentation chooses a template first (${templates.join(', ')})`, 'rule');
-  return { findings: findings.sort((a, b) => (a.level === b.level ? 0 : a.level === 'error' ? -1 : 1) || a.line - b.line), gaps, used, syntax: src.syntax };
+  return { findings: findings.sort((a, b) => (a.level === b.level ? 0 : a.level === 'error' ? -1 : 1) || a.line - b.line), gaps, used, syntax: src.syntax, tree, markup: src.markup, script: src.script };
 }
 
 // The keys a component's own code reads (row.hint, { cellId }, 'tooltipText'), in its file and the files of its

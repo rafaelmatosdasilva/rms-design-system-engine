@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Prototypes reviewed as pages, the same for every framework: the habits agents fall into, the states owed, every screen size (continuous evaluation)
+
+What changed since the entry below (engine ae4f913): A place's own write token, with a fallback for computers without it (#38); Prototypes ask before they guess, and a question the team left open is never guidance; Prototypes reviewed as pages, the same for every framework: the habits agents fall into, the states owed, every screen size. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
+
+Guide set measured: `8c795b136a56` · Project measured: `13d811a9d668`
+
+| Haiku, engine 97de7da | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.063 |
+| Input a run | 118k | 124k |
+| Rule violations | 1 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 124k a run against 118k. Records: `records/2026-10-25-prototypes-reviewed-as-pages-the`.
+
 ## 2026-10: Places compared by where they are, not by the token that reaches them (continuous evaluation)
 
 What changed since the entry below (engine ea1fabb): Each repository the setup names says what is there: the engine writes its README on every run (#36); Browser tests read the same on any computer (#37); A place's own write token falls back to GITLAB_WRITE_TOKEN, then the reading one; writeTokenEnv documented; Places compared by where they are, not by the token that reaches them. The guide changed in `reference/config.md`, `reference/usage.md`.

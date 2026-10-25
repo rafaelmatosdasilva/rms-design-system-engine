@@ -219,7 +219,7 @@ export function entityView(entity, file, group = '', shared = null) {
         // apart below, never read as a rule with the title in front of its marker.
         else if (view.layer === 'components' && !FOR_PEOPLE.test(titleWords(title)) && !isExample(body)) view.rules.push(...itemsOf(body).map((text) => {
           const own = titleWords(title), led = text.toLowerCase().startsWith(own.toLowerCase() + ':');
-          return DRAFT.test(text) ? { text, level: null, draftOf: own } : { text: led ? text : `${own}: ${text}`, level: null };
+          return DRAFT.test(text) || isOpen(text) ? { text, level: null, draftOf: own } : { text: led ? text : `${own}: ${text}`, level: null };
         }));
         else view.sections.push({ title, text: body });
       }
@@ -244,16 +244,18 @@ export function entityView(entity, file, group = '', shared = null) {
   const st = entity?.metadata?.status;
   view.status = statusLine ?? (st && typeof st === 'object' ? st.status ?? null : st) ?? null;
   // A line written as a draft ("**Draft:** …", by the engine or a person) is not the team's word yet: it is set apart
-  // for review and reaches no agent until its marker is removed.
+  // for review and reaches no agent until its marker is removed. A line the team left open ([open], TBD) the same: it
+  // is a question for a person, never guidance.
   for (const [k, where] of [['purpose', 'Purpose'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules']]) {
     const keep = [];
-    for (const it of view[k]) { const t = String(it?.text ?? it); if (DRAFT.test(t)) (view.drafts ??= []).push({ where: it?.draftOf ?? where, text: t.replace(DRAFT, '').trim() }); else keep.push(it); }
+    for (const it of view[k]) { const t = String(it?.text ?? it); if (DRAFT.test(t)) (view.drafts ??= []).push({ where: it?.draftOf ?? where, text: t.replace(DRAFT, '').trim() }); else if (isOpen(t)) (view.open ??= []).push({ where: it?.draftOf ?? where, text: openText(t) }); else keep.push(it); }
     view[k] = keep;
   }
   // In a section's text too: a line that starts with the marker, as a list item or on its own.
   for (const x of view.sections) {
     const lines = x.text.split('\n'), keep = [];
-    for (const l of lines) { const t = l.replace(/^\s*[-*]\s+/, ''); if (DRAFT.test(t)) (view.drafts ??= []).push({ where: x.title, text: t.replace(DRAFT, '').trim() }); else keep.push(l); }
+    let fenced = false;
+    for (const l of lines) { if (/^\s*```/.test(l)) fenced = !fenced; const t = l.replace(/^\s*[-*]\s+/, ''); if (fenced || /^\s*```/.test(l)) { keep.push(l); continue; } if (DRAFT.test(t)) (view.drafts ??= []).push({ where: x.title, text: t.replace(DRAFT, '').trim() }); else if (isOpen(t)) (view.open ??= []).push({ where: x.title, text: openText(t) }); else keep.push(l); }
     x.text = keep.join('\n').trim();
   }
   view.sections = view.sections.filter((x) => x.text);
@@ -261,6 +263,12 @@ export function entityView(entity, file, group = '', shared = null) {
 }
 // The marker of a drafted line, at its start: **Draft:**, __Draft:__ or Draft:.
 export const DRAFT = /^\s*(?:\*\*|__)?draft(?::(?:\*\*|__)|(?:\*\*|__):|:)\s*/i;
+// A question the team has not settled, written into a page: [open], [TBD], "Open question: …", TBD, "to be decided",
+// "??". It is not a rule yet: set apart like a draft, it reaches no agent, and a person settles it.
+// (Not a bare "Open:", which names a state, and not "??" inside a line, which is code.)
+export const OPEN = /\[(?:open|tbd|tbc|todo|\?)\]|^\s*(?:\*\*|__)?(?:open question|tbd|tbc|todo)(?:\*\*|__)?\s*:|\bTB[DC]\b|\bto be (?:decided|defined|confirmed|agreed)\b|\?{2,}\s*$/i;
+export const isOpen = (t) => OPEN.test(String(t ?? ''));
+const openText = (t) => String(t).replace(/^\s*(?:\*\*|__)?(?:open question|tbd|tbc|todo)(?:\*\*|__)?\s*:\s*/i, '').replace(/\s*\[(?:open|tbd|tbc|todo|\?)\]\s*/gi, ' ').trim();
 
 // The index and its entity files → { system: { name, version, sections }, entities: [view] }.
 // files: Map(path → parsed JSON). entry: the index's path, or null to take every file with an entity.

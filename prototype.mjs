@@ -351,7 +351,7 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
   const want = small ? null : detailFor(ctx, focus, detail, { pages, first });
   const pieces = pieceCatalog(sys.scales, Object.keys(comps));
   const pieceRows = Object.entries(pieces).map(([n, d]) => `${n.padEnd(8)}  ${Object.entries(d.props).map(([k, e]) => `${k}=${e.type === 'enum' ? (e.values.length > 6 ? `<${k === 'style' ? 'text style' : 'spacing token'}>` : e.values.join('|')) : e.type === 'boolean' ? 'true|false' : `<${k === 'width' ? 'screen width in px' : k === 'need' ? 'what is needed' : k === 'closest' ? 'nearest system component' : 'text'}>`}`).join('  ')}`);
-  return [
+  const lines = [
     'PROTOTYPE CATALOG  ·  everything a prototype may use; nothing else exists for it',
     ...sourceLines(page ? page.context : sys.context),
     ...focusLines(focus),
@@ -405,7 +405,13 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
       '',
       `NEXT: write prototypes/<name>.json with only the parts above, then run ${cmd} --prototype prototypes/<name>.json and fix each ❌ line until it is drawn.`,
     ]),
-  ].join('\n');
+  ];
+  // What the request leaves undecided is asked before anything is written: the person's answer, not a guess.
+  if (focus?.ask?.length) {
+    const at = lines.findLastIndex((l) => l.startsWith('NEXT:'));
+    lines[at] = `NEXT: ask the person the questions under ASK FIRST, in one message, and wait for the answers; then run ${cmd} --prototype --catalog --for "<the request, with the answers>" --answered, and write the page from what it prints. With no one to answer, take the first option of each and say so.`;
+  }
+  return lines.join('\n');
 }
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'screen';
@@ -550,7 +556,12 @@ async function pageReport(ROOT, cfg, input, sys) {
   try { store = JSON.parse(readFileSync(gapsFile, 'utf8')); } catch { /* first prototype */ }
   store.byPrototype[name] = r.gaps.map((g) => ({ need: g.need, kind: 'component', closest: null, used: null, prototype: name, ...(g.searched ? { searched: g.searched } : {}), ...(g.why ? { why: g.why } : {}) }));
   try { mkdirSync(outDir, { recursive: true }); writeFileSync(gapsFile, JSON.stringify({ $description: `What the design system lacks, from every prototype checked with ${CLI} --prototype. Generated; the design team decides each one.`, byPrototype: store.byPrototype, merged: mergeGaps(store.byPrototype) }, null, 2) + '\n'); } catch { /* the reply still lists them */ }
-  if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: !errors, page: input, syntax: r.syntax, findings: r.findings, edit: edit ?? null, lint, gaps: r.gaps, used: r.used }, null, 2) + '\n'); return errors ? 1 : 0; }
+  if (JSON_MODE) {
+    const { habitReview, owedStates, fromPageTree } = await import('./page-quality.mjs');
+    const shape = fromPageTree(r.tree ?? { children: [] }, r.markup ?? '');
+    const quality = { ...habitReview(shape, { templates: sys.page.context?.templates ?? [] }), owed: owedStates(shape, { markup: r.markup ?? '', script: r.script ?? '', components: Object.keys(sys.page.components), templates: sys.page.context?.templates ?? [] }) };
+    process.stdout.write(JSON.stringify({ ok: !errors, page: input, syntax: r.syntax, findings: r.findings, edit: edit ?? null, lint, gaps: r.gaps, used: r.used, quality }, null, 2) + '\n'); return errors ? 1 : 0;
+  }
   const usedList = Object.keys(r.used);
   console.log(`\nPAGE CHECK  ·  ${input}  ·  ${r.syntax}  ·  ${usedList.length} system component${usedList.length === 1 ? '' : 's'}${usedList.length ? ` (${usedList.join(', ')})` : ''}`);
   for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} line ${f.line}: ${f.message}`);
@@ -568,14 +579,28 @@ async function pageReport(ROOT, cfg, input, sys) {
     console.log(`\nWhy (${inv.items.length} mistake${inv.items.length === 1 ? '' : 's'}: ${lacking.size ? `${[...lacking.values()].reduce((t, x) => t + x.n, 0)} where the documentation lacks what the agent needed` : 'none where the documentation lacks it'}${followed ? `, ${followed} where it is written and was not followed` : ''}):`);
     for (const x of lacking.values()) console.log(`   📓 ${x.component}: ${x.why} (${x.n})${x.need === 'example' ? ' → the intent layer gets one from the code\'s own use (--intent-changes; written as final, it is the code)' : x.need === 'fields' ? ' → its code comment needs the fields; listed on the Documentation page' : ' → listed on the Documentation page as Missing'}`);
   }
+  // As a page: the habits agents fall into, and the states it owes (page-quality.mjs), read the same for every framework.
+  const { habitReview, owedStates, fromPageTree, habitLines, stateLines } = await import('./page-quality.mjs');
+  const shape = fromPageTree(r.tree ?? { children: [] }, r.markup ?? '');
+  const review = habitReview(shape, { templates: sys.page.context?.templates ?? [] });
+  const owed = owedStates(shape, { markup: r.markup ?? '', script: r.script ?? '', components: Object.keys(sys.page.components), templates: sys.page.context?.templates ?? [] });
+  console.log(`\n🎨 AS A PAGE  ${review.score}/10${review.findings.length ? '' : ': one main action, nothing destructive in front, headings in order, labels that stay, one alert at most'}`);
+  for (const l of habitLines(review)) console.log(`   ${l}`);
+  if (owed.length) { console.log(`\n🧪 STATES IT OWES  ${owed.length}`); for (const l of stateLines(owed)) console.log(`   ${l}`); }
   if (r.gaps.length) { console.log('\nGaps (the design team decides each; never build one):'); for (const g of r.gaps) console.log(`   • ${g.need}${g.searched ? `: looked at ${g.searched}` : ''}${g.why ? `; ${g.why}` : ''}`); }
+  // Drawn as a person meets it: every screen width, its words as written and 40% longer (page-render.mjs). Only a page
+  // the checks above pass is drawn; one that cannot be says why.
+  const drawn = errors || process.argv.includes('--no-browser') ? null : await (await import('./page-render.mjs')).stressPage(ROOT, cfg, input, { breakpoints: sys.context?.breakpoints ?? [] });
+  if (drawn?.lines) { console.log(`\n📱 EVERY SIZE  ${drawn.widths.join(', ')} · the words as written and 40% longer${drawn.lines.length ? `: ${drawn.lines.length}` : ': nothing runs past the screen, is cut or wraps in a control'}`); for (const l of drawn.lines) console.log(`   ${l}`); }
+  else if (drawn?.why) console.log(`\n   ⏭  not drawn in the browser: ${drawn.why}`);
   if (errors) {
     console.log(`\n❌ Not ready: ${errors} error${errors === 1 ? '' : 's'}.`);
     console.log(`NEXT: fix each ❌ line in ${input} (only the system's components, each given only what its card in ${CLI} --prototype --catalog --detail <name> lists; a need nothing fits is a data-missing box), then run ${CLI} --prototype ${input} again.\n`);
     return 1;
   }
   console.log(`\n✅ Ready: only the system's components, written as their code writes them, given only what they take, where the documentation puts them${told.length ? '' : format.length ? ', and the project\'s lint finds only formatting it fixes itself' : ', and the project\'s lint is clean'}.${r.gaps.length ? ` ${r.gaps.length} gap${r.gaps.length === 1 ? '' : 's'} for the design team.` : ''}`);
-  console.log(`NEXT: tell the person where the page is (${input})${r.gaps.length ? ', every gap above as written, and offer to send them to Figma as the design team\'s to do list (--recipe figma-edits), written only after they say yes' : ''}.\n`);
+  if (review.findings.length || owed.length || drawn?.lines?.length) console.log(`NEXT: fix each ⚠️ line under 🎨, 🧪 and 📱 in ${input} with the system's own components (or tell the person why one stays), run ${CLI} --prototype ${input} again until it scores 10 and owes nothing; then tell the person where the page is${r.gaps.length ? ', every gap above as written' : ''}.\n`);
+  else console.log(`NEXT: tell the person where the page is (${input})${r.gaps.length ? ', every gap above as written, and offer to send them to Figma as the design team\'s to do list (--recipe figma-edits), written only after they say yes' : ''}.\n`);
   return 0;
 }
 
@@ -808,7 +833,7 @@ export async function runPrototype(ROOT, argv) {
     const { pages, authored } = productPages(ROOT, sys);
     const req = requestOf(ROOT, args);
     const list = Object.entries(pages).map(([name, p]) => ({ name, label: p.label ?? name, text: p.text, designed: !!p.designed, file: p.file }));
-    const focus = req ? requestFocus(sys.page ? sys.page.context : sys.context, req, sys.page ? [] : list) : null;
+    const focus = req ? requestFocus(sys.page ? sys.page.context : sys.context, req, sys.page ? [] : list, { answered: args.includes('--answered') }) : null;
     const at = args.indexOf('--detail');
     const detail = at >= 0 && args[at + 1] ? args[at + 1].split(',') : [];
     console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list }) + '\n');
@@ -861,6 +886,12 @@ export async function runPrototype(ROOT, argv) {
   for (const l of fontLines(seen?.fonts, { family: sys.scales?.family, google: sys.fonts !== false })) console.log(`   ${l}`);
   if (seen?.a11y) { console.log(''); for (const l of a11yLines(seen.a11y)) console.log(l); }
   else if (seen?.why) console.log(`\n   ⏭  not measured in the browser (${seen.why})`);
+  // The habits the browser review does not measure (page-quality.mjs): a card in a card, a destructive action in front,
+  // a heading level skipped, a label that is only a placeholder, several alerts, sections all at one weight.
+  const { habitFindings, fromComposition } = await import('./page-quality.mjs');
+  let tree0 = null; try { tree0 = treeOf(raw); } catch { /* drawn: the tree is there */ }
+  const habits = tree0 ? habitFindings(fromComposition(tree0), { templates: (sys.context?.templates ?? []).map((t) => t.name ?? t) }).filter((f) => f.kind !== 'primary' && !(f.kind === 'heading' && seen?.review)) : [];
+  if (habits.length) { console.log(`\n🎨 HABITS AGENTS FALL INTO  ${habits.length}`); for (const f of habits) console.log(`   ⚠️  ${f.message}`); }
   if (seen?.review && seen.review.score != null) {
     const v = seen.review;
     console.log(`\n🎨 DESIGN REVIEW  ${v.score}/10${v.findings.length ? '' : ': aligned, one spacing rhythm, one main action, a clear hierarchy, lines that read'}`);
@@ -893,6 +924,7 @@ export async function runPrototype(ROOT, argv) {
     (seen?.a11y ?? []).some((i) => i.own) ? 'Fix each ⚠️ line under ♿ in the composition (a part or group with no name gets "name"; one main heading: a Text with as h1; a text colour that reads on its surface), or tell the person.' : null,
     (seen?.review?.findings ?? []).length ? 'Fix each ⚠️ line under 🎨 in the composition (one primary action, one spacing per arrangement, a heading style above its text, a narrower column) and draw it again until it scores 10, or tell the person why a line stays.' : null,
     (seen?.fit?.findings ?? []).filter((x) => !systemTarget(x)).length ? 'Fix each ⚠️ line under 📱 in the composition (a shorter label, Row wrap, Columns minWidth, fewer parts in a row) and draw it again, or tell the person; a line that happens only with longer words is for a translated product: tell the person.' : null,
+    habits.length ? 'Fix each ⚠️ line under 🎨 HABITS in the composition (one surface, not a card in a card; the safe action the primary one; headings in order; a label that stays; one alert), or tell the person why it stays.' : null,
     works.length ? 'Fix each ⚠️ line under 🖱 in the composition ("opens" names the "id" of the part it opens), or tell the person.' : null,
     seen?.picture ? `Look at ${seen.picture.replace(ROOT + '/', '')} before you answer.` : null,
     gaps.length ? `Tell the person each gap above as it is written: the design team decides them; never build one. Offer to send them to Figma as the design team's to do list (${CLI} --figma-edits writes it; applied only after a yes).` : null,

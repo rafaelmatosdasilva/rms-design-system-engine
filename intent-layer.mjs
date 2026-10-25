@@ -130,6 +130,8 @@ export function componentIntent(e, src, wrong = []) {
     // What was left out of its page: the sections that are facts (by title), the lines repeated on every page.
     facts: list(e.facts ?? []), repeated: e.repeated ?? 0,
     ...(e.defined && Object.keys(e.defined).length ? { defined: e.defined } : {}),
+    // The questions its page leaves open ([open], TBD): never guidance; a prototype that needs one asks the person.
+    ...(e.open?.length ? { open: e.open } : {}),
   };
 }
 
@@ -267,7 +269,7 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     const wrong = wrongOf(e) ?? [];
     const drafts = e.drafts ?? [];
     const about = comp && !component ? notUsed[0]?.about ?? null : null;
-    const page = { ...(about ? { about } : {}), name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.spec ? { spec: e.spec, specUrl: e.specUrl ?? null, ...(e.specShared ? { specShared: true } : {}) } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}), ...(drafts.length ? { drafts } : {}) };
+    const page = { ...(about ? { about } : {}), name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.spec ? { spec: e.spec, specUrl: e.specUrl ?? null, ...(e.specShared ? { specShared: true } : {}) } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}), ...(drafts.length ? { drafts } : {}), ...(e.open?.length ? { open: e.open } : {}) };
     Object.assign(page, decide(page, e, { comp, has }));
     pages.push(page);
   }
@@ -310,7 +312,10 @@ function decide(page, e, { comp, has }) {
   if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...todo] };
   // Lines drafted for it, not the team's word yet: each read, edited as needed, its marker removed (or the line deleted).
   const drafts = page.drafts ?? [];
-  if (drafts.length) return { action: 'review', decision: label('review'), todo: [`Review ${drafts.length === 1 ? 'its draft' : `its ${drafts.length} drafts`}: approve, change or drop each (rms-design-system-engine --review-drafts; in the layer itself, remove the **Draft:** marker to approve, delete the line to drop). No agent gets ${drafts.length === 1 ? 'it' : 'them'} until then.`, ...todo] };
+  // Questions the team left open on it ([open], TBD): a person settles each, writing the answer in its place. Until
+  // then no agent reads the line, and a prototype that needs it asks.
+  const open = (page.open ?? []).map((q) => `Settle the open question${q.where ? ` under ${q.where}` : ''}: "${q.text}". Write the answer in its place, without the [open] or TBD marker; until then no agent reads it, and a prototype that needs it asks the person.`);
+  if (drafts.length || open.length) return { action: 'review', decision: label('review'), todo: [...open, ...(drafts.length ? [`Review ${drafts.length === 1 ? 'its draft' : `its ${drafts.length} drafts`}: approve, change or drop each (rms-design-system-engine --review-drafts; in the layer itself, remove the **Draft:** marker to approve, delete the line to drop). No agent gets ${drafts.length === 1 ? 'it' : 'them'} until then.`] : []), ...todo] };
   // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
   // retitle or remove); keep it only when there is nothing to change.
   const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';
