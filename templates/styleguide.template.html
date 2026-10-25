@@ -1888,6 +1888,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // result kept in this browser holds until the code, Figma or the checks change, and only what changed is tried again.
   var PAGE_SIG = sigOf(Array.prototype.filter.call(document.querySelectorAll('style[data-system], script:not([type="application/json"])'), function (s) { return s.tagName === 'STYLE' || /wcag-page\.js/.test(s.textContent.slice(0, 200)); }).map(function (s) { return s.tagName === 'STYLE' ? cssSigText(s.textContent) : s.textContent; }).join('\u0000'));
   var html = document.documentElement, main = document.getElementById('sg-main'), nav = document.getElementById('sg-nav');
+  // A page opens at its top (route), a reload too: the browser puts back where the person had scrolled only once the
+  // page has loaded, after the page has opened at its top, so the page keeps its own place instead.
+  try { history.scrollRestoration = 'manual'; } catch (e) { /* an older browser: it keeps its own */ }
   // Opened in the Status page's panel (?embed): the component's page alone, no menu and no bar.
   if (/[?&]embed\b/.test(location.search)) html.classList.add('sg-embed');
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
