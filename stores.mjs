@@ -17,8 +17,15 @@
 // Tokens stay in .env, never in a store or a profile: a place may name its own variable (tokenEnv, one token per
 // project); else GITLAB_TOKEN reads and GITLAB_WRITE_TOKEN writes. A token goes only to gitlab.com or a host named in
 // GITLAB_HOST. Nothing here throws to the run: a store that cannot be read or written says so in one line.
+//
+// A computer with no token reads a store with the person's own git access instead (gitStoreFiles): the projects they
+// already clone are reached over their SSH key or their credential helper, so nobody makes a token just to read. Only
+// where there is no token, so a setup that has one is unchanged, and git is never allowed to stop and ask for one.
+// Writing still goes through the API with a token: GitLab's roles and protected branches decide it, as before.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, accessSync, constants } from 'node:fs';
+import { homedir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { join, resolve, dirname, relative, sep, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
@@ -131,7 +138,7 @@ export function gitlabApi(ROOT, place, { env = process.env, http } = {}) {
   const base = () => (ready ??= projectApi(p.origin, p.path, (u) => get0(u, { headers: hr['PRIVATE-TOKEN'] ? hr : hw })).then((x) => x.base));
   return {
     p, writesWith: writeTok && writeTok !== readTok ? wName : (place.tokenEnv || 'GITLAB_TOKEN'),
-    hasWriteToken: !!hw['PRIVATE-TOKEN'], notSent: !!(readTok || writeTok) && !allowed,
+    hasWriteToken: !!hw['PRIVATE-TOKEN'], hasReadToken: !!hr['PRIVATE-TOKEN'], notSent: !!(readTok || writeTok) && !allowed,
     get: async (path, { write = false } = {}) => {
       const b = await base();
       const r = await get0(b + path, { headers: write ? hw : hr });
@@ -140,6 +147,52 @@ export function gitlabApi(ROOT, place, { env = process.env, http } = {}) {
     send: async (method, path, body) => send0((await base()) + path, { method, headers: hw, body }),
   };
 }
+
+// ── Reading a store with the person's own git access ───────────────────────────────────────────────────────────────
+// Someone who already clones the team's projects needs no token of their own to read a store: git reaches it with
+// their SSH key or their credential helper, exactly as when they clone by hand. Used only where there is no token to
+// send, so a setup that has one is untouched.
+//
+// git must never stop to ask for anything. A run waiting on a prompt nobody can see hangs for ever, so every question
+// is turned into a plain failure (BatchMode, GIT_TERMINAL_PROMPT) and the run then says what it would have said.
+const GIT_SILENT = { GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new', GIT_ASKPASS: '', SSH_ASKPASS: '' };
+const mirrorDir = (host, path, home = homedir()) => join(home, '.cache', 'rms-engine', 'git', host, path.replace(/[^A-Za-z0-9._-]/g, '-') + '.git');
+
+// → { sha, files: Map<relative path, Buffer> } | null when git cannot reach it with what this person has.
+export function gitStoreFiles(p, place, { git = gitSilently, home = homedir() } = {}) {
+  const dir = mirrorDir(p.host, p.path, home);
+  const under = place.path ? place.path.replace(/^\/+|\/+$/g, '') : '';
+  try {
+    if (!existsSync(join(dir, 'HEAD'))) { mkdirSync(dirname(dir), { recursive: true }); git(['init', '--bare', '-q', dir]); }
+    const g = (args, input) => git(['--git-dir', dir, ...args], input);
+    // SSH first: it is the access a person already has. The https address only works where a credential helper holds
+    // it, and asks nothing when it does not.
+    const ref = place.branch || 'HEAD';
+    let fetched = false;
+    for (const url of [`git@${p.host}:${p.path}.git`, `${p.origin}/${p.path}.git`]) {
+      try { g(['fetch', '--depth', '1', '-q', url, ref]); fetched = true; break; } catch { /* the next way in */ }
+    }
+    if (!fetched) return null;
+    const sha = String(g(['rev-parse', 'FETCH_HEAD'])).trim();
+    const names = String(g(['ls-tree', '-r', '--name-only', 'FETCH_HEAD', ...(under ? ['--', under] : [])])).split('\n').filter(Boolean);
+    if (!names.length) return { sha, files: new Map() };
+    // One process for every file: a store holds hundreds, and one git per file would cost more than the fetch.
+    const out = g(['cat-file', '--batch'], Buffer.from(names.map((n) => `FETCH_HEAD:${n}\n`).join(''), 'utf8'));
+    const files = new Map();
+    let at = 0;
+    for (const name of names) {
+      const nl = out.indexOf(0x0a, at);
+      if (nl < 0) break;
+      const head = String(out.subarray(at, nl));
+      const size = Number(head.split(' ')[2]);
+      if (!Number.isFinite(size)) break;                      // "missing": the batch and the names fell out of step
+      files.set(under ? relative(under, name) : name, out.subarray(nl + 1, nl + 1 + size));
+      at = nl + 1 + size + 1;                                 // the newline git writes after each object
+    }
+    return { sha, files };
+  } catch { return null; }
+}
+const gitSilently = (args, input) => execFileSync('git', args, { input, maxBuffer: 256 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'ignore'], env: { ...process.env, ...GIT_SILENT } });
 
 // ── May this person write the part there? GitLab says ──────────────────────────────────────────────────────────────
 // Asked once per run and place, with the token that would write: the project's permissions (the token's role) and the
@@ -289,13 +342,25 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
       if (opts.offline) return { line: null, changed: false, written: [] };
       const api = gitlabApi(ROOT, place, opts);
       if (api.error) return { line: `⚠️  ${label}: ${api.error}`, changed: false, written: [] };
-      let ref = place.branch;
-      if (!ref) { const r = await api.get(''); if (!r.ok) return { line: `⚠️  ${label} not read from ${describePlace(place)}: GitLab answered ${r.status}`, changed: false, written: [] }; ref = (await r.json())?.default_branch || 'main'; }
-      const c = await api.get(`/repository/commits/${encodeURIComponent(ref)}`);
-      if (!c.ok) return { line: `⚠️  ${label} not read from ${describePlace(place)}: GitLab answered ${c.status}`, changed: false, written: [] };
-      sha = String((await c.json())?.id ?? '');
-      if (sha && prev.sha === sha) return { line: null, changed: false, written: [] };
-      remote = await treeFiles(api, place.path, sha, part);
+      // No token to send: this person's own git access reads it instead, as it does when they clone the project by
+      // hand. Only here, so a setup with a token keeps going through the API exactly as before; when git cannot
+      // reach it either, the API below says what it always said.
+      if (!api.hasReadToken && !api.hasWriteToken) {
+        const g = (opts.gitStore ?? gitStoreFiles)(api.p, place, opts);
+        if (g) {
+          if (prev.sha === g.sha) return { line: null, changed: false, written: [] };
+          sha = g.sha; remote = g.files;
+        }
+      }
+      if (!remote) {
+        let ref = place.branch;
+        if (!ref) { const r = await api.get(''); if (!r.ok) return { line: `⚠️  ${label} not read from ${describePlace(place)}: GitLab answered ${r.status}`, changed: false, written: [] }; ref = (await r.json())?.default_branch || 'main'; }
+        const c = await api.get(`/repository/commits/${encodeURIComponent(ref)}`);
+        if (!c.ok) return { line: `⚠️  ${label} not read from ${describePlace(place)}: GitLab answered ${c.status}`, changed: false, written: [] };
+        sha = String((await c.json())?.id ?? '');
+        if (sha && prev.sha === sha) return { line: null, changed: false, written: [] };
+        remote = await treeFiles(api, place.path, sha, part);
+      }
     }
   } catch (e) { return { line: `⚠️  ${label} not read from ${describePlace(place)}: ${e.message}`, changed: false, written: [] }; }
   const written = [], kept = [], files = { ...(prev.files ?? {}) };

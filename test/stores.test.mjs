@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines } from '../stores.mjs';
+import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles } from '../stores.mjs';
+import { execFileSync } from 'node:child_process';
 import { mayWrite } from '../intent-changes.mjs';
 
 const HOST = 'gitlab.acme.test';
@@ -233,4 +234,42 @@ test('a style guide build shares the themes the store lacks, or holds older; a c
   writeFileSync(join(mine, 'sunset.theme.json'), '{"id":"t2","name":"Sunset"}');                       // new: sent
   writeFileSync(join(mine, 'notes.json'), '{"a":1}');                                                  // not a theme
   assert.deepEqual([...themesToShare(ROOT, [mine], 'acme').keys()].sort(), ['sand.theme.json', 'sunset.theme.json']);
+});
+
+// ── Reading a store with the person's own git access, for a computer with no token ──────────────────────────────
+// A real repository, read the real way: git init, fetch, ls-tree and cat-file, with only the address swapped for a
+// local one. What is proved is the reading and the parsing, which is where this can go wrong.
+test('no token: a store is read with the person\'s own git access, under its path, and git is never asked for a password', () => {
+  const home = mkdtempSync(join(tmpdir(), 'git-store-home-'));
+  const src = mkdtempSync(join(tmpdir(), 'git-store-src-'));
+  const run = (args, o = {}) => execFileSync('git', args, { cwd: src, stdio: ['pipe', 'pipe', 'ignore'], ...o });
+  run(['init', '-q', '-b', 'main']);
+  run(['config', 'user.email', 'demo@example.com']); run(['config', 'user.name', 'Demo']);
+  mkdirSync(join(src, 'snapshots'), { recursive: true });
+  writeFileSync(join(src, 'snapshots', 'figma-vars.snapshot.json'), '{"a":1}\n');
+  writeFileSync(join(src, 'snapshots', 'deep', 'x.snapshot.json').replace('deep/', 'deep-'), '{"b":2}\n');
+  writeFileSync(join(src, 'README.md'), 'outside the path\n');
+  run(['add', '-A']); run(['commit', '-qm', 'one']);
+
+  // Every address the reader tries resolves to this repository; everything else is the real git.
+  const asked = [];
+  const git = (args, input) => {
+    asked.push(args);
+    return execFileSync('git', args.map((a) => (/^(git@|https?:\/\/)/.test(a) ? src : a)), { input, maxBuffer: 1 << 28, stdio: ['pipe', 'pipe', 'ignore'] });
+  };
+  const p = { host: 'gitlab.example.com', path: 'team/design', origin: 'https://gitlab.example.com' };
+  const got = gitStoreFiles(p, { branch: 'main', path: 'snapshots' }, { git, home });
+  assert.ok(got, 'the store was read');
+  assert.match(got.sha, /^[0-9a-f]{40}$/);
+  assert.deepEqual([...got.files.keys()].sort(), ['deep-x.snapshot.json', 'figma-vars.snapshot.json']);
+  assert.equal(String(got.files.get('figma-vars.snapshot.json')), '{"a":1}\n');   // the file itself, not its listing
+  assert.equal(got.files.has('README.md'), false, 'only what the place\'s path holds');
+
+  // The mirror is kept per repository, so a second run fetches only what moved.
+  assert.ok(existsSync(join(home, '.cache', 'rms-engine', 'git', 'gitlab.example.com', 'team-design.git', 'HEAD')));
+  // SSH is tried first: it is the access a person already has.
+  assert.match(asked.find((a) => a.includes('fetch')).join(' '), /git@gitlab\.example\.com:team\/design\.git/);
+
+  // Nothing reachable: null, so the run falls back to what it always said instead of hanging on a password prompt.
+  assert.equal(gitStoreFiles(p, { branch: 'main', path: '' }, { git: () => { throw new Error('no'); }, home }), null);
 });
