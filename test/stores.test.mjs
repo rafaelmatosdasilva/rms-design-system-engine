@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles } from '../stores.mjs';
+import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf } from '../stores.mjs';
 import { execFileSync } from 'node:child_process';
 import { mayWrite } from '../intent-changes.mjs';
 
@@ -295,4 +295,36 @@ test('a commit says whose run made it; a checkout with no identity of its own se
   const body2 = g2.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
   assert.equal('author_name' in body2, false, JSON.stringify(body2 && Object.keys(body2)));
   assert.equal('author_email' in body2, false);
+});
+
+// ── A store on GitHub ───────────────────────────────────────────────────────────────────────────────────────────
+test('a store on GitHub is read with git, the same way as one on GitLab; writing there still says it is not built', async () => {
+  // The link a person pastes, in the shapes GitHub and GitLab give them.
+  assert.deepEqual(gitPlaceOf({ github: 'https://github.com/acme/design-store' }), { host: 'github.com', path: 'acme/design-store', origin: 'https://github.com' });
+  assert.deepEqual(gitPlaceOf({ github: 'https://github.com/acme/design-store/tree/main/snapshots' }), { host: 'github.com', path: 'acme/design-store', origin: 'https://github.com' });
+  assert.deepEqual(gitPlaceOf({ gitlab: 'https://gitlab.acme.test/team/design/-/blob/main/x.json' }), { host: 'gitlab.acme.test', path: 'team/design', origin: 'https://gitlab.acme.test' });
+  assert.equal(gitPlaceOf({ github: 'https://github.com/acme' }), null, 'an owner is not a repository');
+  assert.equal(gitPlaceOf({ github: 'not a link' }), null);
+
+  const dir = project();
+  const cfg = cfgWith({ snapshots: { read: { github: 'https://github.com/acme/design-store' }, write: { github: 'https://github.com/acme/design-store' } } });
+  const gitStore = (p, place) => {
+    assert.equal(p.host, 'github.com');
+    assert.equal(p.path, 'acme/design-store');
+    return { sha: 'b'.repeat(40), files: new Map([['figma-vars.snapshot.json', Buffer.from('{"a":1}')]]) };
+  };
+  const r = await pullStore(dir, cfg, 'snapshots', { env, gitStore });
+  assert.deepEqual(r.written, ['figma-vars.snapshot.json']);
+  assert.equal(readFileSync(join(dir, 'figma-vars.snapshot.json'), 'utf8'), '{"a":1}');
+
+  // Nothing reachable: said in one line, never thrown at the run.
+  forgetAccess();
+  const none = await pullStore(project(), cfg, 'snapshots', { env, gitStore: () => null });
+  assert.match(none.line, /git could not reach it with this computer's own access/);
+
+  // Writing to GitHub is still not built: it says so instead of pretending.
+  forgetAccess();
+  const w = await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"a":1}']]), 'Snapshots', { env });
+  assert.equal(w.ok, false);
+  assert.match(w.line, /not built yet/);
 });
