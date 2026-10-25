@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Prototypes as pages in the system's own code, held to the system, and what agents invent fed back to the documentation (continuous evaluation)
+
+What changed since the entry below (engine 8f07cf3): Prototypes as pages in the system's own code, held to the system, and what agents invent fed back to the documentation. The guide changed in `cookbook/prototype.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `9a1db1b8f239` · Project measured: `13d811a9d668`
+
+| Haiku, engine f2ce1f0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.060 |
+| Input a run | 120k | 116k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 116k a run against 120k. Records: `records/2026-10-25-prototypes-as-pages-in-the`.
+
 ## 2026-10: Prototype catalog: what the request needs, the code's own props, and where a component goes (continuous evaluation)
 
 What changed since the entry below (engine 6bfa0b9): Documentation page with no intent layer: each component's panel shows what the agents read, its own documentation grouped by where each piece is written, each under its kind; the panel is titled with the component; Documentation page with no intent layer: each row leaves out the File cell its header has not, so Sources, Status and Last updated sit under their own headings; Documentation page with no intent layer: each row has the header's columns again (no stray File cell), and every row says when it was last updated (its documentation's latest check); Intent layer reader: a line already led by its section's title ("Role: button" under Role) keeps the title once, and a drafted line in a prose section stays a draft instead of a rule with the title before its marker; READER 12; Status cards: 4px less between the legend's items (20px on an 8px system); Prototype catalog: what the request needs, the code's own props, and where a component goes. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.
