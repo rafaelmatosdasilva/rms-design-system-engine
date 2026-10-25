@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Places compared by where they are, not by the token that reaches them (continuous evaluation)
+
+What changed since the entry below (engine ea1fabb): Each repository the setup names says what is there: the engine writes its README on every run (#36); Browser tests read the same on any computer (#37); A place's own write token falls back to GITLAB_WRITE_TOKEN, then the reading one; writeTokenEnv documented; Places compared by where they are, not by the token that reaches them. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `e8b5ba62350f` · Project measured: `13d811a9d668`
+
+| Haiku, engine ae4f913 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 69/70 |
+| Mean cost a run | $0.065 | $0.060 |
+| Input a run | 147k | 118k |
+| Rule violations | 0 | 1 |
+
+**Reading.** Haiku: 1 of 70 runs failed, 1 rule violation. Failed: refresh-no-figma #1: never asks for a token in chat (the reply asks for a secret). Records: `records/2026-10-25-places-compared-by-where-they`.
+
 ## 2026-10: Merge main into readmes (continuous evaluation)
 
 What changed since the entry below (engine c0ee871): The default theme is called the default one; plain-word project names are watched in context (#34). The guide changed in `reference/usage.md`.

@@ -106,6 +106,15 @@ test('no write token: read only, and the line says which variable to add', async
   assert.match(a.why, /add ACME_SNAPSHOTS_TOKEN to \.env/);
 });
 
+test('a place\'s own write token: the pipeline\'s where it is set, else GITLAB_WRITE_TOKEN, else the one that reads', async () => {
+  const g = fakeGitlab({ roles: { 'read-token': 30, 'write-token': 30, 'guide-token': 30 } });
+  const cfg = cfgWith({ snapshots: { read: { gitlab: LINK, writeTokenEnv: 'ACME_GUIDE_TOKEN' } } });
+  const sent = async (env) => { forgetAccess(); g.calls.length = 0; await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', `{"n":${Math.random()}}`]]), 'm', { env, http: g.http }); return g.calls.filter((c) => c[0] === 'POST' && c[3]?.branch).map((c) => c[2]); };
+  assert.deepEqual(await sent({ ...env, ACME_GUIDE_TOKEN: 'guide-token' }), ['guide-token'], 'the pipeline: its own token');
+  assert.deepEqual(await sent(env), ['write-token'], 'a computer without it: GITLAB_WRITE_TOKEN');
+  assert.deepEqual(await sent({ GITLAB_TOKEN: 'read-token', GITLAB_HOST: HOST }), ['read-token'], 'only one token: the person\'s own');
+});
+
 test('a protected branch this token cannot push: a merge request, never a commit on it', async () => {
   const g = fakeGitlab({ branch: { name: 'main', can_push: false } });
   const ROOT = project();
