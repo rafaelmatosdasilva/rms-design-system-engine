@@ -230,9 +230,11 @@ test('in the browser: no script error, a control changes the real component, the
     // Waiting for the page's own script to get there. Six seconds was enough on a quiet computer and not on one
     // running the rest of the suite, so the wait follows the machine (budget); and giving up now says so, because a
     // half-drawn page handed back makes the assertion after it read as wrong content when the page was never ready.
+    // Fifteen, not six: the accessibility table settles last, and six times this machine's scale still missed it
+    // under a full run. A longer wait costs nothing until something is actually wrong.
     const until = async (expr, ok, what = 'the page') => {
       let v;
-      const tries = Math.round(budget(6000) / 100);
+      const tries = Math.round(budget(15000) / 100);
       for (let n = 0; n < tries; n++) { v = await run(expr); if (ok(v)) return v; await new Promise((r) => setTimeout(r, 100)); }
       assert.fail(`${what} was not ready after ${Math.round(tries / 10)}s, which a busy machine can take; last read: ${String(v).slice(0, 300)}`);
     };
