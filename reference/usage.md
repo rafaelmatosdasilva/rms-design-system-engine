@@ -1177,7 +1177,8 @@ and whose examples (`Example:`) are shown as examples.
   reads counts, the comment may leave it out) or without one every use in the code gives, a part outside its container,
   more of a component than the guidelines allow, and a page that starts from none of the templates the documentation
   has. What every edit is held to (a colour or size of its own, an undeclared variable, an accessibility problem) and the
-  project's own ESLint and Stylelint (run, never fixing) are part of it. `<div data-missing="<need>" data-searched="…"
+  project's own ESLint and Stylelint (run, never fixing) are part of it; a finding the lint fixes itself (indentation,
+  quotes) is counted apart as formatting, for the project's lint run to fix. `<div data-missing="<need>" data-searched="…"
   data-why="…" />` is a gap, kept in `prototypes/gaps.json`. It ends with ✅ Ready or ❌ Not ready. The project's hook runs
   the same check on every edit of a page in `prototypes/` (`prototype.dir` in `ds-config.json`), from the system the
   last `--prototype` run kept (`.design-system-engine-out/prototypes/page-system.json`); so does `--check-ui <page>`.
@@ -1191,6 +1192,25 @@ and whose examples (`Example:`) are shown as examples.
   wrong**: to write (Missing) where the documentation lacks something, to check (Review) where it is written and was
   still missed. The page system read without Figma: the intent layer's pages name each component and template and
   its code file; with no intent layer, the code's own component files.
+- **The documentation under load.** Three tests find where agents cannot tell what to use or how, and the
+  Documentation page lists each finding (`.design-system-engine-out/prototypes/`):
+  - `--prototype --coverage` (no agent, instant): what an agent cannot learn about each component, a prop, event or
+    slot no comment and no intent layer line names, a list whose items no comment describes, a field the product's
+    code gives that no comment lists, and a component with no page, purpose or example (`doc-coverage.json`; the row
+    **What its documentation does not say**, Missing).
+  - `--prototype --scenarios [--model <id>]`: each component's "when to use" lines, its own names taken out (a line
+    naming another component is skipped), become needs; an agent given only what each component is for picks one, and
+    a wrong pick is a confusion (`stress.json`; the row **Agents picked another component**, to review). A "when to use"
+    line several components share word for word cannot tell an agent which one to use: it is never asked, and is
+    listed; a component whose every line is shared has the row **When to use it, not a sibling** (Missing).
+  - `--prototype --sweep [--requests <n>] [--model <id>]` (12 by default): a page for each of the intent layer's
+    product pages, templates and patterns, written once from the catalog, kept in `prototypes/sweep/` and scored by the
+    page check; each mistake goes into `inventions.json` with its why, and the report counts the pages written with
+    nothing invented. The agent first names the components it needs in full (as `--detail` lets it), then writes the
+    page. A `data-missing` need a component's name says (a secret field, secretField) is an error unless the page
+    names it in `data-searched` and says in `data-why` why it does not fit. Run it again after writing what was missing
+    to see the count fall.
+  Both agent tests use the `claude` command (`--model`, default the drafting model) and print why when it cannot answer.
 - **Where a component goes** is read from the documentation as written, and the check holds every prototype to it: a
   sentence that names the component and its container as the system names them (`` `searchField` only inside the
   toolbar``, ``Do not place `TabItem` without `TabStrip` ``) makes a part outside that container an error. One that

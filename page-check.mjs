@@ -205,11 +205,14 @@ export async function pageSystem(ROOT, cfg = {}, _catalog = null, { productFiles
     const payloads = extractEventPayloads(text), slotProps = extractSlotProps(text);
     const fields = docFields(text);
     const syntax = syntaxOf(k.file);
+    // What its own comments say: the words in them, so a check can tell a prop, event or slot no comment names.
+    const commentWords = [...new Set([...text.matchAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|<!--[\s\S]*?-->/g)].flatMap((m) => m[0].match(/[A-Za-z_$][\w$:-]*/g) ?? []).map((w) => w.toLowerCase()))];
     components[k.name] = {
       name: k.name, file: k.file, tag: callName(k.name, k.file, text).tag ?? null, syntax, aliases: k.aliases ?? [],
       props: a.props ?? {}, events: a.events ?? [], eventPayloads: Object.fromEntries((a.events ?? []).filter((e) => payloads[e]).map((e) => [e, payloads[e]])),
       slots: { named: a.slots?.named ?? [], default: !!a.slots?.default, props: slotProps ?? {} },
       fields: Object.fromEntries(Object.entries(fields).map(([f, v]) => [Object.keys(a.props ?? {}).find((p) => norm(p) === norm(f)) ?? f, v])),
+      commentWords,
     };
     byFile.set(abs, k.name);
     if (k.layer === 'templates') templates.push(k.name);
@@ -343,6 +346,15 @@ function componentOf(tag, { imports, file, ROOT, aliases, byFile, globals, compo
   return { unknown: true };
 }
 
+// The system's components whose name says a need ("secret field" → secretField, "a grid of rates" → rateGrid): the
+// words of the name that say what it is, not the ones every name shares.
+const NAME_FILLER = new Set(['input', 'button', 'general', 'primary', 'secondary', 'tertiary', 'quaternary', 'group', 'field', 'item', 'container', 'base', 'main', 'default', 'list', 'card', 'page', 'header', 'template', 'new', 'old', 'v2', 'simple', 'basic', 'panel', 'bar', 'view', 'text', 'title', 'content', 'wrapper', 'layout', 'section', 'row', 'cell', 'body', 'icon', 'label', 'state']);
+const nameWords = (n) => String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !NAME_FILLER.has(w));
+export function systemFor(need, components) {
+  const words = new Set(String(need).toLowerCase().split(/[^a-z0-9]+/).map((w) => w.replace(/s$/, '')));
+  return Object.keys(components ?? {}).filter((n) => { const own = nameWords(n).map((w) => w.replace(/s$/, '')); return own.length && own.every((w) => words.has(w)); });
+}
+
 // HTML's global attributes: what any element, a component's root included, takes without a prop.
 const GLOBAL_ATTR = /^(class|classname|style|id|key|ref|slot|role|title|tabindex|hidden|lang|dir|draggable|part|is|name|for|htmlfor|aria-.*|data-.*|v-.*)$/i;
 const DOM_EVENT = /^(click|dblclick|input|change|focus|blur|focusin|focusout|keydown|keyup|keypress|mousedown|mouseup|mouseenter|mouseleave|mouseover|mouseout|mousemove|pointerdown|pointerup|pointerenter|pointerleave|pointermove|submit|scroll|wheel|contextmenu|touchstart|touchend|touchmove|dragstart|dragend|drop|load|error|animationend|transitionend)$/i;
@@ -376,7 +388,17 @@ export function checkPage(file, text, system, { context = null } = {}) {
     if (parentId) nodes.find((x) => x.id === parentId).children.push(id);
 
     const missing = n.attrs.find((a) => /^data-missing$/i.test(a.raw ?? a.name));
-    if (missing) { const at = (k) => n.attrs.find((a) => new RegExp(`^data-${k}$`, 'i').test(a.raw ?? ''))?.value ?? null; gaps.push({ need: String(missing.value ?? ''), searched: at('searched'), why: at('why'), line: n.line }); if (!missing.value) add('error', n.line, 'data-missing names no need: write the need it stands for', 'gap'); return; }
+    if (missing) {
+      const at = (k) => n.attrs.find((a) => new RegExp(`^data-${k}$`, 'i').test(a.raw ?? ''))?.value ?? null;
+      gaps.push({ need: String(missing.value ?? ''), searched: at('searched'), why: at('why'), line: n.line });
+      if (!missing.value) add('error', n.line, 'data-missing names no need: write the need it stands for', 'gap');
+      // A need the system has a component for is not a gap: one whose name says the need, unless the page says it looked
+      // at it (data-searched) and why it does not fit (data-why).
+      const has = systemFor(String(missing.value ?? ''), system.components).filter((x) => !norm(at('searched') ?? '').includes(norm(x)));
+      if (has.length && !at('why')) add('error', n.line, `"${missing.value}" is not missing: the system has ${has.slice(0, 3).join(', ')} (its card: --prototype --catalog --detail ${has[0]}). Use it, or name it in data-searched and say in data-why why it does not fit`, 'gap', { component: has[0] });
+      else if (has.length) add('warning', n.line, `"${missing.value}": the system has ${has.slice(0, 3).join(', ')}; the page says why none fits, so it stays a gap for the design team to decide`, 'gap');
+      return;
+    }
 
     if (what.unknown) { const guess = nearName(n.tag, names.map(tagOf)); add('error', n.line, `<${n.tag}> is not a component of the system${guess ? ` (did you mean ${guess}?)` : ''}: import the system's component, or write the need as a data-missing box`, 'component'); return; }
     if (what.imported) {
@@ -549,7 +571,7 @@ export function pageConventions(page, { cmd = 'rms-design-system-engine', names 
 export function pageCache(page, context) {
   return {
     at: new Date().toISOString(), ROOT: page.ROOT,
-    components: Object.fromEntries(Object.entries(page.components).map(([n, c]) => [n, { ...c, _reads: undefined }])), templates: page.templates ?? [],
+    components: Object.fromEntries(Object.entries(page.components).map(([n, c]) => [n, { ...c, _reads: undefined, commentWords: undefined }])), templates: page.templates ?? [],
     byFile: [...page.byFile], roots: [...page.roots], aliases: page.aliases, globals: [...page.globals], uses: page.uses, firstUse: page.firstUse, importSeen: page.importSeen, style: page.style,
     context: { inside: context?.inside ?? [], limits: context?.limits ?? [], templates: context?.templates ?? [], rules: (context?.rules ?? []).filter((r) => /\(templates?,\s*intent layer\)/i.test(r.title)).map((r) => ({ title: r.title })), components: Object.fromEntries(Object.entries(context?.components ?? {}).map(([n, k]) => [n, { never: k.never ?? [], ...(k.intentLayer ? { intentLayer: { examples: k.intentLayer.examples ?? [] } } : {}) }])) },
   };
