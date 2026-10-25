@@ -1,8 +1,8 @@
 # Skill evaluation results
 
-## 2026-10: Accessibility per theme: the build tries every component in each theme the page offers (Standard, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is Standard's); the page shows the chosen theme's, and switches with it (continuous evaluation)
+## 2026-10: Accessibility per theme: the build tries every component in each theme the page offers (the default one, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is the default theme's); the page shows the chosen theme's, and switches with it (continuous evaluation)
 
-What changed since the entry below (engine 80a5ef0): A page written from a shared spec gets one of its own; the company command is always installed (#31); Accessibility per theme: the build tries every component in each theme the page offers (Standard, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is Standard's); the page shows the chosen theme's, and switches with it. The guide changed in `reference/usage.md`.
+What changed since the entry below (engine 80a5ef0): A page written from a shared spec gets one of its own; the company command is always installed (#31); Accessibility per theme: the build tries every component in each theme the page offers (the default one, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is the default theme's); the page shows the chosen theme's, and switches with it. The guide changed in `reference/usage.md`.
 
 Guide set measured: `3f1b5b8ede0c` · Project measured: `13d811a9d668`
 

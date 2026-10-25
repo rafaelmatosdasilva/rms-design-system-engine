@@ -768,10 +768,10 @@ without it; without Chrome it is skipped and said, and a script error the page t
 under the count.
 
 **Each theme has its own results.** A theme changes the colours contrast is measured on, so the build tries every
-component in each theme the page offers (Standard, and each brand that is not only the base of others), and the page
+component in each theme the page offers (the default theme, and each brand that is not only the base of others), and the page
 shows the results of the theme chosen at the top; choosing another shows its own, and what it has not tried yet is
 tried as it is shown. **The results are saved with the snapshots** (`a11y-results.snapshot.json`), each under its component's signature
-(its code, the system's CSS, the check itself), per theme (`themes: { standard, <brand>… }`; an older file with one set is Standard's). The next build puts them in the page first and tries only the
+(its code, the system's CSS, the check itself), per theme (`themes: { default, <brand>… }`; an older file with one set is the default theme's). The next build puts them in the page first and tries only the
 components whose signature changed: nothing changed, nothing tried again. A build that tried something saves the file
 and, when the team keeps its snapshots in a store (`stores.snapshots`), sends it there as one commit when GitLab lets
 this person, or the pipeline's token, write it; so everyone's build, and the page the team publishes, start from the
