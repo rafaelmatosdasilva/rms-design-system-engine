@@ -143,8 +143,12 @@ export async function writeAccess(ROOT, cfg, part, opts = {}) {
   const s = storesOf(cfg)[part];
   const place = s?.write;
   if (!place) return { mode: null, place: null, why: s?.read ? `this setup reads ${LABEL[part].toLowerCase()} from ${describePlace(s.read)} and writes it nowhere` : 'the setup names no place for it' };
-  const k = keyOf([place, s.mode]);
-  if (!asked.has(k)) asked.set(k, check(ROOT, place, s.mode, opts));
+  return placeAccess(ROOT, place, s.mode, opts);
+}
+// The same for a place that is no part's: the profile's repository, or a store's root (its README, readmes.mjs).
+export function placeAccess(ROOT, place, mode = 'commit', opts = {}) {
+  const k = keyOf([place, mode]);
+  if (!asked.has(k)) asked.set(k, check(ROOT, place, mode, opts));
   return asked.get(k);
 }
 async function check(ROOT, place, want, opts) {

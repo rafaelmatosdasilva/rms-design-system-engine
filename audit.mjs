@@ -84,6 +84,8 @@ if (!STORE_QUIET) {
   if (r.applied && !process.argv.includes('--store')) for (const l of await st.accessLines(ROOT, r.cfg, { offline: STORE_OFFLINE })) console.error(l);   // --store says them itself
   let scfg = null; try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* not set up yet, or said where it is read */ }
   if (scfg) for (const l of await st.pullOnRun(ROOT, scfg, { offline: STORE_OFFLINE })) console.error(l);
+  // The README of each repository the setup names, brought up to date where GitLab lets this person (readmes.mjs).
+  if (scfg && !process.argv.includes('--readmes')) for (const l of await (await import('./readmes.mjs')).syncReadmes(ROOT, scfg, { offline: STORE_OFFLINE })) console.error(l);
 }
 // A decision just recorded goes to the team's decisions store when the setup names one: GitLab decides whether this
 // person may write it there, and the line says what happened. → true when sent, false when not, null with no store.
@@ -397,6 +399,16 @@ if ((process.argv.includes('--store') || process.argv.includes('--stores')) && !
   const lines = await st.accessLines(ROOT, scfg, { offline: process.argv.includes('--offline') });
   console.log(lines.length ? lines.join('\n') : '   No part has a store: everything stays in this folder.');
   console.log('NEXT: tell the person the lines above; a part they cannot write is written by whoever GitLab lets.');
+  process.exit(0);
+}
+
+// --readmes: the README of each repository the setup names (the profile's, each store's), written now where GitLab lets
+// this person, and what happened to each said (every run does the same, quietly: readmes.mjs).
+if (process.argv.includes('--readmes')) {
+  let scfg; try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root: set the project up first (rms-design-system-engine --init, or --profile <link>).'); process.exit(2); }
+  const lines = await (await import('./readmes.mjs')).syncReadmes(ROOT, { ...scfg, readmes: true }, { verbose: true, force: true, offline: process.argv.includes('--offline') });
+  console.log(lines.length ? lines.join('\n') : '   No repository holds a part: there is no README to write.');
+  console.log('NEXT: tell the person the lines above; a README not written is written by whoever GitLab lets write there, on their next run.');
   process.exit(0);
 }
 

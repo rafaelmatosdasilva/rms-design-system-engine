@@ -110,6 +110,7 @@ rms-design-system-engine --profile <link|file>           # set up from the compa
 rms-design-system-engine --profile-new [file] [--name <company>]     # ask where each part lives, one question a part (a terminal; else --store), then write this setup as the company's profile
 rms-design-system-engine --profile-export [file] [--name <company>]  # write this setup as the company's profile as it is: no token, nothing one person set for themself
 rms-design-system-engine --make-command <client> --profile <link> [--dir <folder>]   # write the command the team installs, /rms-design-system-engine-<client>: the engine with that profile
+rms-design-system-engine --readmes                       # the README of each repository the setup names (the profile's, each store's) brought up to date now, where GitLab lets this person, and what happened to each (every run does it quietly)
 rms-design-system-engine --refresh-snapshots             # send the snapshots this folder holds to the snapshots store, when GitLab lets this person write it
 rms-design-system-engine --share-theme <file.theme.json>…  # send a theme saved from the style guide to the team's themes store, for everyone's Theme choice
 rms-design-system-engine --baseline                      # capture today's failing gates as accepted adoption debt (commit design-system-engine-baseline.json)
@@ -988,6 +989,19 @@ repository): the engine run with that profile. Each colleague installs the engin
 tokens in `.env`, and runs `/rms-design-system-engine-<client>`: nothing else to set up, and a location changed in the
 profile reaches everyone on their next run. One profile and one command per client, side by side; none of it is ever
 in the engine.
+
+**Each repository's README says what is there** (`readmes.mjs`). The profile's repository gets its whole README from the
+profile file: how each person sets up (the install line, the token, the command), where each part lives, what the
+repository holds; and the command each person installs (`<command>/SKILL.md`). Its client name is the profile's
+`client`, else the command folder the repository holds. Every other repository a store names gets a section of the
+engine's in its README, between two markers (`<!-- rms-design-system-engine:start … -->` and `…:end -->`): what the
+engine keeps there and who writes it, the snapshots it holds, its pipeline (the variables `.gitlab-ci.yml` lists in its
+comments, and its schedules), who can do what, and the related projects. What the team wrote around the markers stays;
+a README without them gets the section under its title. Each run generates them, compares them with what is there and
+writes only what differs, where GitLab lets the person running it write (a commit, or one merge request the engine keeps
+open); a run without that access changes nothing and says nothing. A repository is asked again only when its branch
+moved, the setup changed or the engine did, so a person who may only read is not asked on every run. `--readmes` does it
+now and says what happened to each; `"readmes": false` in `ds-config.json` turns it off.
 
 #### Publishing the contracts to a shared repository (`--contracts-out <dir>`)
 
