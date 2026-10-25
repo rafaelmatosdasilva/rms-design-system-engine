@@ -49,6 +49,11 @@ export const FORBIDDEN = new Set([
   // people and companies the work drew on
   '1c2563a021738678', '72b8db31f2f39c41', '607bed4f8e5226fb', '45efe0b1fdb47eaa', '609984247e6fcfb0',
   '93a2053547af3262', '58e0ef06e87c9414', '8a85e1283b16be7b',
+  '141d30e756b1efec', '3bce63badd0c0e79', '809d981517d24070', 'e934d809967b6d5e', '700f00ff0547bccb', '84641aad095dec03',
+  '07b2524d70b6b1fa', 'bc6b606a532bd044', 'a48c8a6d9419ac20', 'd8977bb21ae2b0d5', 'ec5937f01a0c9f44', '810c771515eb668e',
+  'd1bb974e8d257c38', '28a15a0115916c21', '67b659deace466f7', '2d20df4d684d8b11', '2ea6163a9d4e3c20', 'ac38211e165670ed',
+  '82dbdc66789e34e5', '9bc113a69b366048', 'd6095a9a98024a1a', '26d4f89871e6b8bb', '6bf2ab132b2a255b', 'c9fd53f3265ef997', 'ab3b2c3d6646d194', 'a56ae264f3640539', '954742c08ab50fea', '8b3ed8af70bd3b1d', '41c133b3a6687e48',
+  '52f7e22d230c8ec9', 'efe00d9b908d2eaf', 'a2e1c468ef02e38d', '4c07f29eb330bad4', '3dc5c99e12e84a0f', '05aaae5b98c10776',
   // the private backlog and the owner's personal address
   '0cfbd5a35f88c2ef', '49f94064933b52f6', '7b682e980cda89ba', 'a2ecd660a27c8db8', 'ea6214d81b87a69a',
   'd79e4b5fcb6c289d', '6d381e28f97ddd5f',
