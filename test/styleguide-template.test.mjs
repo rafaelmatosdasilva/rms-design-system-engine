@@ -227,7 +227,15 @@ test('in the browser: no script error, a control changes the real component, the
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     // Each state read once it is reached, never after a fixed time: the page keeps trying variants while it changes, and
     // a busy machine is slower than a quiet one.
-    const until = async (expr, ok) => { let v; for (let n = 0; n < 60; n++) { v = await run(expr); if (ok(v)) break; await new Promise((r) => setTimeout(r, 100)); } return v; };
+    // Waiting for the page's own script to get there. Six seconds was enough on a quiet computer and not on one
+    // running the rest of the suite, so the wait follows the machine (budget); and giving up now says so, because a
+    // half-drawn page handed back makes the assertion after it read as wrong content when the page was never ready.
+    const until = async (expr, ok, what = 'the page') => {
+      let v;
+      const tries = Math.round(budget(6000) / 100);
+      for (let n = 0; n < tries; n++) { v = await run(expr); if (ok(v)) return v; await new Promise((r) => setTimeout(r, 100)); }
+      assert.fail(`${what} was not ready after ${Math.round(tries / 10)}s, which a busy machine can take; last read: ${String(v).slice(0, 300)}`);
+    };
     const shownIs = (id) => until(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`, (v) => v === id);
     // One view at a time: the page opens on Status (the index stays built, off the menu, each component's thumbnail in
     // it), and a component is drawn when it is opened.

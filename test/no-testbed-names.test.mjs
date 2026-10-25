@@ -11,6 +11,7 @@ import { mkdtempSync, writeFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { forbiddenHits, privateFindings, messageFindings, repoFindings, PUBLIC_EXAMPLE, ROOT } from '../.githooks/private-check.mjs';
+import { projectTerms } from '../.githooks/private-terms.mjs';
 
 export { forbiddenHits };
 
@@ -51,6 +52,21 @@ test('placeholders, no-reply addresses, colour spaces and products are not priva
   assert.deepEqual(kinds('icon@1x.png; Display P3 (D65); a heading H2; fonts from Google Fonts; by the design team'), []);
   assert.deepEqual(kinds('valuesByMode: { S1: 12, S2: 8 }'), []);
   assert.deepEqual(messageFindings('Clean the docs\n\n# a comment git adds\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n'), []);
+});
+
+test('a word of the web a project happens to use is no project\'s: the name it really chose still is', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'web-words-'));
+  try {
+    writeFileSync(join(dir, 'figma-component-props.snapshot.json'), JSON.stringify({
+      components: { CardTile: { properties: { textContent: { type: 'TEXT' }, required: { type: 'BOOLEAN' }, download: { type: 'BOOLEAN' }, classList: { type: 'TEXT' }, quokkaLabel: { type: 'TEXT' } } } },
+    }));
+    const { terms } = projectTerms(dir);
+    // The platform's own names for things. The engine writes them in its own files, so taking one for a secret
+    // refuses an honest commit; four did before this list existed.
+    for (const w of ['textcontent', 'required', 'download', 'classlist']) assert.equal(terms.has(w), false, `${w} is the web's word, not a project's`);
+    // What the project actually named stays refused, which is the whole point of the guard.
+    assert.equal(terms.has('quokkalabel'), true, [...terms.keys()].join(' '));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('the commit hooks refuse a private change and let a clean one through', () => {
