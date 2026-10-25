@@ -130,10 +130,15 @@ export async function connectCDP(wsUrl, { timeoutMs = 30000 } = {}) {
 }
 
 // Open a page in a new target and attach a flat session with the Runtime domain enabled.
+// The target opens blank so the page starts in light before its own script runs: headless Chrome takes
+// prefers-color-scheme from the computer it runs on, so a page that reads it at load would come up dark on a
+// dark-mode machine and light on a light one. A caller that wants dark asks for it itself, after this.
 export async function openPage(send, url) {
-  const { targetId } = await send('Target.createTarget', { url });
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
   await send('Runtime.enable', {}, sessionId);
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] }, sessionId).catch(() => {});
+  if (url && url !== 'about:blank') await send('Page.navigate', { url }, sessionId);
   return { targetId, sessionId };
 }
 

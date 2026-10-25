@@ -10,6 +10,7 @@ import { checkPrototype } from '../prototype-pieces.mjs';
 import { prototypePage } from '../prototype.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
 import { pathToFileURL } from 'node:url';
+import { budget } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const scales = { spacing: [{ name: 'padding/l', var: '--padding-l', value: '16px' }, { name: 'gap/m', var: '--gap-m', value: '8px' }], text: [], colors: [{ name: 'panel/background', var: '--panel-background' }] };
@@ -44,7 +45,7 @@ test('a designed screen keeps its modes, size, clipping, sides, surfaces, and le
   assert.match(bad.findings.map((f) => f.message).join('\n'), /Stack\.surface "#123456" is not one of the system's colour tokens/);
 });
 
-test('page: drawn in the screen\'s mode, at its size, an option value turns on its class, and each instance\'s words are written', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: drawn in the screen\'s mode, at its size, an option value turns on its class, and each instance\'s words are written', { skip: CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   const { prototype: tree } = screenToPrototype(screen, { catalog, scales, drawable: new Set(['node']) });
   const parts = { view: { components: [{ name: 'node', cls: 'node', markup: '<button class="node"><span>x</span></button>', controls: [] }], modes: [{ attr: 'data-theme', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }] }] }, themeCSS: ':root{--panel-background:#111} [data-theme=dark]{--panel-background:#000}', componentCSS: '.node{color:red} .node.node-selected{outline:2px solid white}', iconSheet: '' };
   const html = prototypePage({ name: 'plugin', tree, parts, scales, gaps: [], catalog });

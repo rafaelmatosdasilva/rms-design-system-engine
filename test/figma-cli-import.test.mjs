@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { snapshotsFromDesign, varsFromDesign, importFigmaCli, tokensFromDesign } from '../figma-cli-import.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const TP = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -53,7 +54,7 @@ test('another format version is refused with what to do', () => {
   assert.throws(() => snapshotsFromDesign({ version: 1 }, {}), /design\.json format v1; this engine reads v2/);
 });
 
-test('the command writes the snapshots ds-config names, and the audit reads them', { timeout: 300000 }, () => {
+test('the command writes the snapshots ds-config names, and the audit reads them', { timeout: budget(300000) }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'figma-cli-'));
   cpSync(TP, dir, { recursive: true });
   writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign()));

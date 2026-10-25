@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, spawn, execFileSync } from 'node:child_process';
-import { bareEnv, fixtureProject, normalise } from './helpers.mjs';
+import { bareEnv, fixtureProject, normalise, budget } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -23,7 +23,7 @@ const contract = (dir, code) => edit(dir, 'structure-contract.mjs', (t) => `${t}
 const css = (dir, from, to) => edit(dir, 'src/theme.css', (t) => { assert.ok(t.includes(from), `the theme holds ${from}`); return t.replace(from, to); });
 const commit = (dir) => { execFileSync('git', ['add', '-A'], { cwd: dir }); execFileSync('git', ['-c', 'user.name=d', '-c', 'user.email=d@e', 'commit', '-qm', 'x', '--allow-empty'], { cwd: dir }); };
 const audit = (dir, env) => {
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
   const out = normalise((r.stdout ?? '') + (r.stderr ?? ''), dir);
   return { out, gates: gates(out) };
 };
@@ -87,7 +87,7 @@ const CASES = {
 const ALREADY = new Set([3, 15]);
 for (const [n, c] of Object.entries(CASES)) {
   const g = Number(n);
-  test(`[${g}] catches ${c.what}`, { timeout: 120000 }, () => {
+  test(`[${g}] catches ${c.what}`, { timeout: budget(120000) }, () => {
     const { clean, bad } = plant(c);
     if (!ALREADY.has(g)) assert.equal(clean.gates[g], 'Pass', `set up, it reads something and passes:\n${section(clean.out, g)}`);
     assert.equal(bad.gates[g], 'Fail', `the mistake is caught:\n${section(bad.out, g)}`);
@@ -97,7 +97,7 @@ for (const [n, c] of Object.entries(CASES)) {
 }
 
 // The browser check, with Chrome: a component drawn 30px high where Figma has 32px.
-test('[24] catches a component drawn at another height than Figma\'s', { timeout: 180000 }, async (t) => {
+test('[24] catches a component drawn at another height than Figma\'s', { timeout: budget(180000) }, async (t) => {
   const { findChrome } = await import('../cdp.mjs');
   const chrome = process.env.CHROME_PATH || findChrome({ playwright: true });
   if (!chrome) { t.skip('no Chrome'); return; }
@@ -110,7 +110,7 @@ test('[24] catches a component drawn at another height than Figma\'s', { timeout
 
 // The Figma frame check needs Figma's images API: its script runs here against a stand-in that serves the frame's
 // image, and must catch the frame once the image changes.
-test('[2] catches a Figma frame that changed since its reference', { timeout: 60000 }, async () => {
+test('[2] catches a Figma frame that changed since its reference', { timeout: budget(60000) }, async () => {
   const dir = fixtureProject(FIXTURE, 'planted-frame-');
   config(dir, (c) => ({ ...c, figmaFileKey: 'KEY', frames: [{ name: 'Gallery', nodeId: '1:2' }] }));
   put(dir, 'frame.png', 'first');
@@ -136,7 +136,7 @@ s.listen(0, '127.0.0.1', () => console.log(s.address().port));`);
 });
 
 // With nothing to read a check says Not run, with why, never Pass: on the demo as it is, each of these has nothing.
-test('a check that read nothing is Not run, never Pass', { timeout: 60000 }, () => {
+test('a check that read nothing is Not run, never Pass', { timeout: budget(60000) }, () => {
   const dir = fixtureProject(FIXTURE, 'planted-none-');
   const { out, gates: g } = audit(dir, bareEnv());
   for (const n of [2, 4, 6, 8, 10, 17, 18, 19, 21, 22, 23, 24]) assert.equal(g[n], 'Not run', `[${n}] read nothing:\n${section(out, n)}`);

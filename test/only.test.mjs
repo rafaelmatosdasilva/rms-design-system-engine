@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { readGateLabels, parseOnly, onlyWords, onlyHelp } from '../only.mjs';
 import { route, onlyPart } from '../route.mjs';
 import { buildSummary } from '../next-step.mjs';
-import { fixtureProject, bareEnv, normalise } from './helpers.mjs';
+import { fixtureProject, bareEnv, normalise, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABELS = readGateLabels(join(ENGINE, 'audit.mjs'));
@@ -88,11 +88,11 @@ test('the summary of a partial run says what ran, and accessibility on its own i
   assert.doesNotMatch(buildSummary({ verdict: 'pass', gates: [] }), /Only|ran in this run/);
 });
 
-test('on the demo design system: one gate, the accessibility check alone, a word it does not know, and --baseline', { timeout: 600000 }, () => {
+test('on the demo design system: one gate, the accessibility check alone, a word it does not know, and --baseline', { timeout: budget(600000) }, () => {
   // With the primitive example laid over the demo, so the parity part shows the system's own advice too.
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'only-', { overlay: join(ENGINE, 'test', 'fixtures', 'demo-primitives') });
   const audit = (...args) => {
-    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
+    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
     const out = normalise((r.stdout ?? '') + (r.stderr ?? ''), dir);
     return { code: r.status, out, gates: [...out.matchAll(/^(?:✅|❌|⏭|⚠️)\s+\[(\d+)\]/gm)].map((m) => Number(m[1])) };
   };

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { findChrome } from '../cdp.mjs';
 import { partRoleOf, partRolesOf, behavioursFor, annotatedBehaviours, behaviourSheetLines, partSheetLines } from '../behaviour-contract.mjs';
 import { annotationFacts } from '../a11y-check.mjs';
@@ -64,7 +64,7 @@ test('page: each part does what its role says, and each component does what its 
     'ds-config.json': { componentSelectors: { field: '.field', loose: '.loose', stepper: '.stepper', toggle: '.toggle', dead: '.dead', more: '.more', stuck: '.stuck' } },
   });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 120000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = JSON.parse(out.slice(out.indexOf('{')));
   const of = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();

@@ -6,12 +6,20 @@
 // verbatim when it is a string, otherwise as pretty JSON.
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
 const SCRIPTS_DIR = fileURLToPath(new URL('..', import.meta.url));
+
+// A time limit in a test is there to stop a hang, never to measure how fast this computer is. The full suite starts
+// many browser tests at once, so one that finishes in two minutes on its own can take far longer while the others
+// compete for the same cores: the limit is then reached by a busy machine and the run reads as a broken engine.
+// Every limit is scaled by how many files the runner may run together, and RMS_TEST_TIME_SCALE sets it by hand for a
+// machine that needs more still. A limit made longer only delays a real hang; it never lets a failing test pass.
+export const TIME_SCALE = Math.max(1, Number(process.env.RMS_TEST_TIME_SCALE) || Math.min(4, Math.round(availableParallelism() / 3)));
+export const budget = (ms) => Math.round(ms * TIME_SCALE);
 
 export function makeFixture(files = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'gate-'));

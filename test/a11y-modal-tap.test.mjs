@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { modalEscape, A11Y_GUIDE, severityOf, cvdVariantFindings, colourDistance, changeLine } from '../a11y-check.mjs';
 import { A11Y_WCAG } from '../styleguide-data.mjs';
 import { findChrome } from '../cdp.mjs';
@@ -47,7 +47,7 @@ const page = (body) => `<!doctype html><html lang="en"><head><meta charset="utf-
 
 const run = (dir, file) => {
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe'], { cwd: dir, encoding: 'utf8', timeout: 240000, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
   catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
   const at = out.indexOf('{'); assert.ok(at > -1, out);
   return JSON.parse(out.slice(at));
@@ -61,7 +61,7 @@ test('their words, their criteria and how a walk is read', () => {
   assert.deepEqual([A11Y_WCAG.modalescape, A11Y_WCAG.tapcontent], ['2.4.3', '1.4.13']);
 });
 
-test('a modal that lets Tab reach the page behind it, and a tip a tap closes as it opens, are found; the right ones pass', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+test('a modal that lets Tab reach the page behind it, and a tip a tap closes as it opens, are found; the right ones pass', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
   // A modal open over the page covers what is behind it, so each is tried on a page of its own.
   const dir = makeFixture({ 'modal-bad.html': page(modal(false)), 'modal-good.html': page(modal(true)), 'tip-bad.html': page(tips(false)), 'tip-good.html': page(tips(true)) });
   const of = (d, k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
@@ -83,7 +83,7 @@ test('two variants that differ only by a red against a green read as one to peop
   assert.deepEqual([A11Y_WCAG.cvdvariant, A11Y_WCAG.forcedstate], ['1.4.1', '1.4.11']);
 });
 
-test('in the browser: red and green variants, and a selected tab drawn only by its background in high-contrast mode', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+test('in the browser: red and green variants, and a selected tab drawn only by its background in high-contrast mode', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
   const body = `<style>
     .badge { display: inline-block; padding: 4px 8px; color: #fff; font: 600 14px sans-serif; }
     .badge--success { background: #43a047; } .badge--error { background: #e53935; } .badge--info { background: #1565c0; }
@@ -96,7 +96,7 @@ test('in the browser: red and green variants, and a selected tab drawn only by i
   <div class="tabsok" role="tablist"><button class="tabok" role="tab" aria-selected="true">One</button><button class="tabok" role="tab" aria-selected="false">Two</button></div>`;
   const dir = makeFixture({ 'page.html': page(body), 'ds-config.json': { componentSelectors: { badge: '.badge', tabs: '.tabs', tabsok: '.tabsok' } } });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--component', 'badge,tabs,tabsok'], { cwd: dir, encoding: 'utf8', timeout: 240000, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--component', 'badge,tabs,tabsok'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
   catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
   const d = JSON.parse(out.slice(out.indexOf('{')));
   const of = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
@@ -105,13 +105,13 @@ test('in the browser: red and green variants, and a selected tab drawn only by i
   assert.deepEqual(of('forcedstate'), ['button.tab "One" (selected)'], all);
 });
 
-test('what a screen reader says when a press shows a toast; one put in no live region is said unheard', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+test('what a screen reader says when a press shows a toast; one put in no live region is said unheard', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
   assert.equal(changeLine({ said: [{ how: 'politely', text: 'Saved' }], focus: null }), 'says "Saved" politely');
   assert.equal(changeLine({}), 'says nothing, and the focus stays where it was');
   const toast = (live) => page(`<button id="go">Show toast</button>${live ? '<div class="region" role="status"></div>' : ''}
     <script>document.getElementById('go').addEventListener('click', () => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = 'Saved'; ${live ? "document.querySelector('.region')" : 'document.querySelector("main")'}.appendChild(t); });</script>`);
   const dir = makeFixture({ 'bad.html': toast(false), 'good.html': toast(true), 'ds-config.json': { componentSelectors: { toast: '.toast' } } });
-  const go = (file) => { let out = ''; try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe', '--component', 'toast'], { cwd: dir, encoding: 'utf8', timeout: 240000, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); } catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); } return JSON.parse(out.slice(out.indexOf('{'))); };
+  const go = (file) => { let out = ''; try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe', '--component', 'toast'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); } catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); } return JSON.parse(out.slice(out.indexOf('{'))); };
   const bad = go('bad.html'), good = go('good.html');
   const of = (d, k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
   assert.deepEqual(of(bad, 'unannounced'), ['div.toast "Saved" (shown by pressing "Show toast"): in no live region, and the focus does not go to it'], JSON.stringify(bad.issues.map((i) => [i.issue, i.selector])));

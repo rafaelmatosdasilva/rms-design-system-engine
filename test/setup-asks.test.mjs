@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { nextStep, buildSummary } from '../next-step.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIGMA = '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X';
@@ -22,7 +23,7 @@ function otherCode() {
   return dir;
 }
 
-test('in a folder of other code, setup says what it holds and asks where the code is; it writes nothing', { timeout: 120000 }, () => {
+test('in a folder of other code, setup says what it holds and asks where the code is; it writes nothing', { timeout: budget(120000) }, () => {
   const dir = otherCode();
   const r = init(dir, FIGMA);
   assert.equal(r.status, 2);
@@ -34,7 +35,7 @@ test('in a folder of other code, setup says what it holds and asks where the cod
   assert.match(none.stdout, /and, if they have one, the link to its Figma file \(optional\)/);
 });
 
-test('told the code is here, a folder with no design tokens starts from Figma, and says why', { timeout: 120000 }, () => {
+test('told the code is here, a folder with no design tokens starts from Figma, and says why', { timeout: budget(120000) }, () => {
   const dir = otherCode();
   const r = init(dir, FIGMA, '--project=.');
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -42,7 +43,7 @@ test('told the code is here, a folder with no design tokens starts from Figma, a
   assert.equal(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).build, true);
 });
 
-test('with no Figma link, there must be design tokens to check; building needs the Figma file', { timeout: 120000 }, () => {
+test('with no Figma link, there must be design tokens to check; building needs the Figma file', { timeout: budget(120000) }, () => {
   const dir = otherCode();
   const r = init(dir, '--project=.');
   assert.equal(r.status, 2);
@@ -53,7 +54,7 @@ test('with no Figma link, there must be design tokens to check; building needs t
   assert.ok(!existsSync(join(dir, 'ds-config.json')));
 });
 
-test('set up without Figma, only the code is checked and the summary says nothing was compared with Figma', { timeout: 300000 }, () => {
+test('set up without Figma, only the code is checked and the summary says nothing was compared with Figma', { timeout: budget(300000) }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'setup-nofigma-'));
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'theme.css'), ':root { --text: #111; }\nbody { color: var(--text); }\n');

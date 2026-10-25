@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { retired, usesOf, migrationSteps, migrationPatches, migrationsMarkdown, migrationView, projectMigrations } from '../migrations.mjs';
+import { budget } from './helpers.mjs';
 
 test('what is retired: a deprecated component, a deprecated token with its replacement, an old name a rename kept', () => {
   const items = retired({
@@ -90,7 +91,7 @@ test('read from a project: the authored status, the token\'s Figma description, 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('the audit writes the steps beside its other hand-back files and says so in one line', { timeout: 300000 }, async () => {
+test('the audit writes the steps beside its other hand-back files and says so in one line', { timeout: budget(300000) }, async () => {
   const { fixtureProject } = await import('./helpers.mjs');
   const { fileURLToPath } = await import('node:url');
   const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));

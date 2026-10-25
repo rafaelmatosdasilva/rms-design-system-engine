@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { namingFromCode, snapshotPaths, systemScripts, productsBeside, framesFromSnapshot, figmaTokenNames } from '../setup-facts.mjs';
 import { dataStateLine } from '../next-step.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const put = (root, rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), typeof text === 'string' ? text : JSON.stringify(text, null, 2)); };
@@ -106,6 +107,20 @@ test('the installer\'s last words set up with where the code is, never --init al
   assert.doesNotMatch(text, /rms-design-system-engine --init +#/);
 });
 
+test('the installer refuses what the engine cannot run without, and names what the optional ones unlock', () => {
+  const text = readFileSync(join(ENGINE, 'install.sh'), 'utf8');
+  // Node is the one version the engine cannot do without (its built-in WebSocket talks to Chrome).
+  assert.match(text, /NODE_MAJOR.*process\.versions\.node/s);
+  assert.match(text, /"\$NODE_MAJOR" -lt 22/);
+  // Chrome and TypeScript only decide how much a run sees, so they are a note with the line that installs each.
+  assert.match(text, /No Chrome found/);
+  assert.match(text, /export CHROME_PATH=/);
+  assert.match(text, /npm i -g typescript@5/);
+  // The trap is that a bare `npm i -g typescript` installs version 7: it may be explained, never offered to run.
+  assert.doesNotMatch(text, /^\s*npm i -g typescript(?!@5)/m);
+  assert.match(text, /version 7/);
+});
+
 test('setup reached from another request routes that request again once it is done, never a generic first run', async () => {
   const { route } = await import('../route.mjs');
   const r = route("check buttonPrimary's accessibility", { hasConfig: false });
@@ -130,7 +145,7 @@ test('a Figma file set up and nothing captured from it: the run says nothing was
   const dir = mkdtempSync(join(tmpdir(), 'no-snapshot-'));
   put(dir, 'src/theme.css', ':root { --button-background: #fff; }\n.button { background: var(--button-background); }\n');
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--figma-url=https://www.figma.com/design/AbC123def/Demo', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: 240000, env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
   const summary = readFileSync(join(dir, '.design-system-engine-out', 'summary.md'), 'utf8');
   assert.match(summary, /\*\*No Figma data captured yet, so nothing was compared with Figma\.\*\*/);
   assert.match(summary, /\nNEXT: no Figma data is captured yet/);

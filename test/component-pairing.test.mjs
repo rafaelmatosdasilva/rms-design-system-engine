@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { makeFixture, runGate } from './helpers.mjs';
+import { makeFixture, runGate, budget } from './helpers.mjs';
 import { createPairing, pairingTasks, stateBase, stateSiblings, folderForms, words } from '../component-pairing.mjs';
 import { resolveComponentFile, componentSourceFiles, textReader } from '../component-source.mjs';
 import { loadLocator } from '../component-locator.mjs';
@@ -248,7 +248,7 @@ test('the props gate names the proposal for a component it finds no file for, an
   assert.equal(pinned.code, 0, pinned.out);
 });
 
-test('the audit and the style guide list a proposal to confirm or pin, and never show its file as the code\'s alone', { timeout: 300000 }, async () => {
+test('the audit and the style guide list a proposal to confirm or pin, and never show its file as the code\'s alone', { timeout: budget(300000) }, async () => {
   const { cpSync, mkdtempSync, writeFileSync, readFileSync, mkdirSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { spawnSync } = await import('node:child_process');

@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { agreedView, modeAxes, optionEffect, instanceMarkup, componentTokens, agreedTokens } from '../styleguide-data.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 // A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
@@ -47,7 +47,7 @@ test('a recorded value that moved on one side is not agreed; nothing left says s
   assert.equal(clean.notAgreed.line, 'Figma and the code agree on everything this page shows.');
 });
 
-test('--styleguide with no template of the project\'s own builds the engine\'s, from the components that are built', { timeout: 300000 }, () => {
+test('--styleguide with no template of the project\'s own builds the engine\'s, from the components that are built', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
@@ -148,7 +148,7 @@ test('a token\'s description in Figma travels to the token panel; one with none 
   assert.match(tpl, /t\.figma && !t\.primitive \? '<div><dt>What it is for<\/dt><dd><p class="pg-missing">Not written yet\.<\/p>/);
 });
 
-test('--component with --styleguide: that component audited first, then its own page beside the whole one, its address printed', { timeout: 600000 }, () => {
+test('--component with --styleguide: that component audited first, then its own page beside the whole one, its address printed', { timeout: budget(600000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sgc-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -159,7 +159,7 @@ test('--component with --styleguide: that component audited first, then its own 
   assert.match(out, /button: \.design-system-engine-out\/styleguide\/button\.html#c-button/);
 });
 
-test('the demo design system: its real markup from its page, and props named differently stay out', { timeout: 300000 }, () => {
+test('the demo design system: its real markup from its page, and props named differently stay out', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sg-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -171,7 +171,7 @@ test('the demo design system: its real markup from its page, and props named dif
   assert.match(data.notAgreed.line, /where Figma and the code differ/);
 });
 
-test('in the browser: no script error, a control changes the real component, the tokens behind it are named', { timeout: 300000 }, async (t) => {
+test('in the browser: no script error, a control changes the real component, the tokens behind it are named', { timeout: budget(300000) }, async (t) => {
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
@@ -655,7 +655,7 @@ test('in the browser: no script error, a control changes the real component, the
   } finally { c.kill(); }
 });
 
-test('"In use" shows the approved pictures of the system\'s own frames', { timeout: 300000 }, () => {
+test('"In use" shows the approved pictures of the system\'s own frames', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, frames: [{ name: 'Settings', nodeId: '5:1' }, { name: 'Missing', nodeId: '9:9' }] }));
@@ -1281,7 +1281,7 @@ test('Do and Don\'t: pictures in the references, each named for its caption, do\
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('in the browser: with a width chosen, a link to another component opens it', { timeout: 300000 }, async (t) => {
+test('in the browser: with a width chosen, a link to another component opens it', { timeout: budget(300000) }, async (t) => {
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
@@ -1373,7 +1373,7 @@ test('a page title: the system\'s own heading when it has a large one, else its 
   assert.match(tpl, /\.sg-section > h2, \.pg-head > h2 \{ font-size: calc\(var\(--sg-title\) \+ var\(--sg-space-xxs\) \* 3\.5\);/);
 });
 
-test('Status: four cards at the top (Parity, Implementation, Accessibility, Documentation), each a count of components with its next step, the tasks under them, second in the side panel; #health and #tasks open it', { timeout: 300000 }, async (t) => {
+test('Status: four cards at the top (Parity, Implementation, Accessibility, Documentation), each a count of components with its next step, the tasks under them, second in the side panel; #health and #tasks open it', { timeout: budget(300000) }, async (t) => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   // An item done counts whole, one to check half, one to fix nothing; the weights are the team's when it gives them.
   assert.match(tpl, /var HEALTH_PART = \{ done: 1, kept: 1, check: 0\.5, todo: 0 \};/);

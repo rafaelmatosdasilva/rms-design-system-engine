@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { classRules, nearCopies, systemRules, productCopies } from '../system-advice.mjs';
 import { editCheck } from '../edit-check.mjs';
-import { makeFixture, fixtureProject } from './helpers.mjs';
+import { makeFixture, fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const system = '.button { display: inline-flex; padding: 4px 12px; border-radius: 6px; background: var(--button-background); color: var(--button-text); font: inherit; }\n.chip { display: inline-flex; }\n';
@@ -60,7 +60,7 @@ test('the edit check: a rule the edit adds that nearly copies a system component
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('the audit says it under System health, and the style guide puts it in the component\'s To do as a decision', { timeout: 300000 }, async (t) => {
+test('the audit says it under System health, and the style guide puts it in the component\'s To do as a decision', { timeout: budget(300000) }, async (t) => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-copy-'), shop = `${dir}-shop`;
   try {
     const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');

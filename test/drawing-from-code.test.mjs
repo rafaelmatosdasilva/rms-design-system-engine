@@ -12,6 +12,7 @@ import { modifierFor, systemFamily, checkPrototype } from '../prototype-pieces.m
 import { prototypePage, fontLoader, codeColours } from '../prototype.mjs';
 import { screenToPrototype } from '../screen-layout.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 
@@ -96,7 +97,7 @@ test('a designed instance keeps its swapped-in icon and the state it is shown in
   assert.equal(r.ok, true, JSON.stringify(r.findings));
 });
 
-test('page: each instance draws the markup with room for its words, its icon from the sheet, its state\'s class, and no margin of its own in an arrangement', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: each instance draws the markup with room for its words, its icon from the sheet, its state\'s class, and no margin of its own in an arrangement', { skip: CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   const { prototype: tree } = screenToPrototype(screen, { catalog, scales, drawable: new Set(['node']) });
   const full = '<button class="node var-item"><div class="var-type-icon"></div><span class="var-name">Label</span></button>';
   const parts = { view: { components: [{ name: 'node', cls: 'node', markup: full, markups: [full, '<button class="node icon-only"><svg><use href="#icon-x"/></svg></button>'], controls: [] }], modes: [] },

@@ -11,7 +11,7 @@ import { join, dirname, relative, resolve, extname } from 'node:path';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
-import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
+import { projectTypeScriptOnly, withinProject, usableTypeScript, TYPESCRIPT_HINT } from './project-typescript.mjs';
 import { textComponentApi } from './component-source.mjs';
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
@@ -107,8 +107,9 @@ export const createContext = (v) => ({ Provider: ({ children }) => children, _v:
 export default { createElement, Fragment, useState, useReducer, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useId, forwardRef, memo, createContext, useContext };
 `;
 
-// TypeScript: the project's own, else the global npm folder's. null when neither is there. Only the project's own when
-// DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project (project-typescript.mjs).
+// TypeScript: the project's own, else the global npm folder's. null when neither is there, and one that cannot read
+// JSX (version 7) counts as not there, so a project that has it keeps its components read through the global one.
+// Only the project's own when DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project (project-typescript.mjs).
 const tsCache = new Map();
 export function loadTypeScript(ROOT) {
   const key = `${ROOT}|${projectTypeScriptOnly()}`;
@@ -117,7 +118,7 @@ export function loadTypeScript(ROOT) {
   const own = () => { const req = createRequire(join(ROOT, 'package.json')); const at = req.resolve('typescript'); if (projectTypeScriptOnly() && !withinProject(ROOT, at)) throw new Error('not the project\'s'); return req(at); };
   const global = () => createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(), 'noop.js'))('typescript');
   for (const load of projectTypeScriptOnly() ? [own] : [own, global]) {
-    try { ts = load(); break; } catch { /* not there */ }
+    try { const got = load(); if (usableTypeScript(got)) { ts = got; break; } } catch { /* not there */ }
   }
   tsCache.set(key, ts);
   return ts;
@@ -358,7 +359,7 @@ window.__dseHarnessReady = true;
 // names: the components to render. → { url, close, groups, missing: [why] } or null when nothing can be rendered.
 export async function startHarness(ROOT, cfg, names, { propsSnap = {}, locate, max = cfg.a11y?.maxVariants ?? 16 } = {}) {
   const ts = loadTypeScript(ROOT);
-  if (!ts) return { url: null, why: 'no TypeScript to read the components\' JSX (the project\'s own, or a global one: npm i -g typescript)' };
+  if (!ts) return { url: null, why: `no TypeScript to read the components' JSX (${TYPESCRIPT_HINT})` };
   const groups = [], missing = [];
   for (const name of names) {
     const file = locate(name);

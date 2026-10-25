@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { figmaFileKeyOf, figmaMainKeyOf } from '../figma-link.mjs';
 import { route } from '../route.mjs';
-import { bareEnv } from './helpers.mjs';
+import { bareEnv, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -33,7 +33,7 @@ test('a Figma link to use from now on routes to the file switch; building and pr
 test('setup with a branch link stores the branch; a project already set up takes a new link and keeps everything else', () => {
   const root = mkdtempSync(join(tmpdir(), 'figma-branch-'));
   writeFileSync(join(root, 'ds-config.json'), JSON.stringify({ figmaFileKey: 'MainKey123', themeCSS: 'theme.css', figma: { collections: ['Colors'] } }, null, 2));
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 120000 });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(120000) });
   let r = run('--init', '--figma-url=https://www.figma.com/design/MainKey123/branch/BranchKey456/DS?node-id=0-1');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /✓ The Figma file is now BranchKey456, a branch of MainKey123/);

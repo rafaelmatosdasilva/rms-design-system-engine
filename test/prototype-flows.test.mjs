@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { linksOf, flowGraph, teamFlows, stepPage, flowFindings, targetOf } from '../prototype-flows.mjs';
 import { checkPrototype } from '../prototype-pieces.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const page = (label, to) => ({ component: 'Page', children: [{ component: 'Text', props: { as: 'h1', text: label } }, ...(to ? [{ id: 'next', component: 'button', props: { Label: 'Continue', goesTo: to } }] : [])] });
@@ -46,7 +46,7 @@ test('what the reply owes: a page not drawn, a step with no page, two steps in a
   ]);
 });
 
-test('--prototype --flow lists the links and holds them to the guidelines\' flow; a link to a page not drawn is owed', { timeout: 600000 }, () => {
+test('--prototype --flow lists the links and holds them to the guidelines\' flow; a link to a page not drawn is owed', { timeout: budget(600000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-flow-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
@@ -59,7 +59,7 @@ test('--prototype --flow lists the links and holds them to the guidelines\' flow
   const step = (h, to) => ({ component: 'Page', props: { padding: 'padding/m' }, children: [{ component: 'Text', props: { as: 'h1', text: h } }, ...(to ? [{ component: 'button', props: { Label: 'Continue', goesTo: to } }] : [])] });
   writeFileSync(join(dir, 'prototypes', 'account.json'), JSON.stringify(step('Your account', 'plan')));
   writeFileSync(join(dir, 'prototypes', 'plan.json'), JSON.stringify(step('Choose a plan')));
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   let r = run('--prototype', 'prototypes/account.json', '--no-browser');
   assert.equal(r.status, 0, r.stdout);
   assert.match(readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'account.html'), 'utf8'), /"goesTo":"plan"/);
@@ -76,7 +76,7 @@ test('--prototype --flow lists the links and holds them to the guidelines\' flow
   assert.match(r.stdout, /⚠️ {2}"Continue" goes to "welcome", which is not drawn yet/);
 });
 
-test('--prototype --flow holds the pages of a flow to each other: the frame, the words for each action, a way back on every page after the first', { timeout: 600000 }, () => {
+test('--prototype --flow holds the pages of a flow to each other: the frame, the words for each action, a way back on every page after the first', { timeout: budget(600000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-flowc-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
@@ -88,7 +88,7 @@ test('--prototype --flow holds the pages of a flow to each other: the frame, the
   writeFileSync(join(dir, 'prototypes', 'plan.json'), JSON.stringify(step('padding/m', 'Choose a plan', [['Back', 'account'], ['Continue', 'payment']])));
   writeFileSync(join(dir, 'prototypes', 'payment.json'), JSON.stringify(step('padding/s', 'Payment', [['Next', 'welcome']])));
   writeFileSync(join(dir, 'prototypes', 'welcome.json'), JSON.stringify(step('padding/m', 'Welcome', [['Back', 'payment']])));
-  let r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  let r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   assert.equal(r.status, 1, 'pages that decide differently are not a finished flow: ' + r.stdout);
   assert.match(r.stdout, /❌ payment: page padding: padding\/s here, padding\/m on the other pages of the flow/);
   assert.match(r.stdout, /❌ payment: the words for going on: "Next" here, "Continue" on the other pages of the flow/);
@@ -96,12 +96,12 @@ test('--prototype --flow holds the pages of a flow to each other: the frame, the
   assert.doesNotMatch(r.stdout, /❌ (account|plan|welcome):/, 'the pages that match say nothing');
   // Brought in line, the flow holds.
   writeFileSync(join(dir, 'prototypes', 'payment.json'), JSON.stringify(step('padding/m', 'Payment', [['Back', 'plan'], ['Continue', 'welcome']])));
-  r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /✅ the flow holds/);
   // A draft of several pages in one file, left behind, is not part of the flow and is said until it goes.
   writeFileSync(join(dir, 'prototypes', 'signup.json'), JSON.stringify({ account: step('padding/m', 'Your account', [['Next', 'plan']]), plan: step('padding/m', 'Choose a plan', [['Next', 'payment']]) }));
-  r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--flow'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout, /❌ prototypes\/signup\.json is not one page \(no "component" at its root\): one page per file, so make it one or remove it/);
   assert.match(r.stdout, /🔗 FLOWS {2}4 page\(s\)/, 'never counted as a page');

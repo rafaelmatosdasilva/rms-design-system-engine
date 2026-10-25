@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { renamedTokens, sweepFiles, linesDiff } from '../rename-sweep.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -23,7 +24,7 @@ test('the renames between two reads: same values in every mode, the closest name
   assert.match(linesDiff(ch), /^--- a\/a\.css\n\+\+\+ b\/a\.css\n@@ -1,2 \+1,2 @@\n-\.a \{ color: var\(--chip-bg\); \}\n\+\.a \{ color: var\(--chip-background\); \}\n \.b/);
 });
 
-test('--rename-sweep writes one patch for the system and one per product, and each applies as is', { timeout: 120000 }, () => {
+test('--rename-sweep writes one patch for the system and one per product, and each applies as is', { timeout: budget(120000) }, () => {
   const top = mkdtempSync(join(tmpdir(), 'sweep-')), ds = join(top, 'ds'), shop = join(top, 'shop');
   const put = (root, p, t) => { mkdirSync(dirname(join(root, p)), { recursive: true }); writeFileSync(join(root, p), t); };
   const git = (cwd, ...a) => spawnSync('git', a, { cwd, encoding: 'utf8' });
