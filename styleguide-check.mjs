@@ -7,7 +7,7 @@
 //
 //   import { checkStyleguidePage } from './styleguide-check.mjs'   → [{ selector, property, value, why }]
 //   node audit.mjs --styleguide-check [page.html]                  prints them; exit 1 when there are any
-import { readFileSync } from 'node:fs';
+import { readPage } from './styleguide-files.mjs';
 import { markupFindings } from './a11y-static.mjs';
 
 const COLOUR = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(|(?<![\w-])(?:white|black|red|green|blue|gray|grey|silver|orange|yellow|purple|pink|navy|teal)(?![\w-])/i;
@@ -127,4 +127,5 @@ export function checkLines(found) {
     ...(bad.length > 40 ? [`   … and ${bad.length - 40} more`] : []), ...warnLines];
 }
 
-export function checkFile(file, opts = {}) { return checkStyleguidePage(readFileSync(file, 'utf8'), opts); }
+// The page with the files it links beside it written back in (its styles and code: styleguide-files.mjs).
+export function checkFile(file, opts = {}) { return checkStyleguidePage(readPage(file), opts); }

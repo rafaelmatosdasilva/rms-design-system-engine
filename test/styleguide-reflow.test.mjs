@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fixtureProject, budget } from './helpers.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../cdp.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -18,7 +19,7 @@ test('every page of the style guide fits 320px: grids, tab bars and long titles 
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const file = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
-  const data = JSON.parse(readFileSync(file, 'utf8').match(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  const data = JSON.parse(readPage(file).match(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/)[1]);
   const pages = ['', ...data.components.map((c) => `#c-${c.name}`), '#colors', '#spacing', '#status'];
   const browser = await launchChrome(CHROME, { tmpPrefix: 'sg-reflow-' });
   const { send, close } = await connectCDP(browser.wsUrl);

@@ -34,6 +34,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { styleNames } from './text-styles.mjs';
 import { join, basename } from 'path';
+import { readPage } from './styleguide-files.mjs';
 
 const ROOT = process.cwd();
 
@@ -60,7 +61,8 @@ function readLocal(p) {
   // can't be read offline — the gate stays best-effort, never a false failure).
   if (/^https?:\/\//.test(p)) return null;
   const abs = join(ROOT, p);
-  return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+  // A page reads with the files it links beside it (the style guide's styles and code: styleguide-files.mjs).
+  return existsSync(abs) ? (/\.html?$/i.test(abs) ? readPage(abs) : readFileSync(abs, 'utf8')) : null;
 }
 
 // ── Declared CSS vars (canonical) ─────────────────────────────────────────────

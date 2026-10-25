@@ -13,6 +13,7 @@ import { collectFindings, differencesMarkdown } from '../run-diff.mjs';
 import { route } from '../route.mjs';
 import { judge } from '../guard.mjs';
 import { fixtureProject, bareEnv, budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const dir = () => mkdtempSync(join(tmpdir(), 'kept-'));
@@ -153,7 +154,7 @@ test('on the demo system: a kept difference no longer fails its gate and leaves 
   assert.ok(existsSync(join(root, 'design-system-engine-kept.json')));
   // The style guide carries it on the component's page, with its reason.
   r = run('--styleguide');
-  const page = readFileSync(join(root, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
+  const page = readPage(join(root, '.design-system-engine-out', 'styleguide', 'index.html'));
   const data = JSON.parse(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/.exec(page)[1]);
   const kept = (data.components ?? []).flatMap((c) => c.kept ?? []);
   assert.equal(kept.length, 1, 'one kept difference on the pages');

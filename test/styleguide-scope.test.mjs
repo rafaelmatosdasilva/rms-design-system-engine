@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { scopeView, nestedComponents } from '../styleguide-data.mjs';
 import { budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -48,7 +49,7 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
   assert.match(out, /The whole system's style guide: rms-design-system-engine --styleguide/);
   assert.match(out, /button: \.design-system-engine-out\/styleguide\/button\.html#c-button/);
   assert.ok(!existsSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html')), 'the whole system\'s page is not written in its place');
-  const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'button.html'), 'utf8');
+  const page = readPage(join(dir, '.design-system-engine-out', 'styleguide', 'button.html'));
   const data = JSON.parse(page.match(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/)?.[1] ?? 'null');
   assert.ok(data, 'the page holds its data');
   assert.deepEqual(data.components.map((c) => c.name).sort(), ['badge', 'button']);
