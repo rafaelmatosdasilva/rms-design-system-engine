@@ -74,7 +74,9 @@ export async function layerFiles(access, sha) {
 
 // ── Where a page is written ─────────────────────────────────────────────────────────────────────────────────────────
 // The Markdown specs, by the code file their metadata names (a file, or a family's folder) and by their title.
-export function specIndex(files) {
+// codes: the code files of the layer's pages, when known: a folder's spec that only one of them falls under is that
+// page's own, not shared.
+export function specIndex(files, { codes = [] } = {}) {
   const byCode = new Map(), byFolder = [], byTitle = new Map();
   for (const [f, t] of files) {
     if (!/\.md$/i.test(f)) continue;
@@ -86,7 +88,7 @@ export function specIndex(files) {
     else if (src) byFolder.push([src.replace(/\/?$/, '/'), f]);
     if (h1 && !byTitle.has(norm(h1))) byTitle.set(norm(h1), f);
   }
-  return { byCode, byFolder, byTitle };
+  return { byCode, byFolder, byTitle, codes: codes.map((c) => String(c ?? '').replace(/^\.?\//, '')).filter(Boolean) };
 }
 // → { spec, shared } (shared: a family's spec, written into several pages), or null
 export function specOf(e, idx) {
@@ -94,7 +96,7 @@ export function specOf(e, idx) {
   if (code && idx.byCode.has(code)) return { spec: idx.byCode.get(code), shared: false };
   if (idx.byTitle.has(norm(e.name))) return { spec: idx.byTitle.get(norm(e.name)), shared: false };
   const fam = code && idx.byFolder.filter(([d]) => code.startsWith(d)).sort((a, b) => b[0].length - a[0].length)[0];
-  return fam ? { spec: fam[1], shared: true } : null;
+  return fam ? { spec: fam[1], shared: (idx.codes ?? []).filter((c) => c.startsWith(fam[0])).length !== 1 } : null;
 }
 
 // ── Editing a Markdown spec ─────────────────────────────────────────────────────────────────────────────────────────
@@ -280,6 +282,9 @@ export function jsonAdd(entry, where, line, { sure = false, layout = null } = {}
   const key = where.toLowerCase(), mark = sure ? '' : MARK;
   if (key === 'purpose') { if (!flat(entry.description)) entry.description = mark + line; return; }
   const shape = layout?.shapes.get(key);
+  // Never twice: a line the page has already, as a rule or a line of its text, is not added again.
+  const want = flat(mark + line);
+  if ((entry.sections ?? []).some((x) => (x.items ?? []).some((it) => flat(it.statement) === want) || (x.freeform ?? []).some((b) => String(b.body ?? '').split('\n').some((l) => flat(l.replace(/^\s*[-*]\s+/, '')) === want)))) return;
   if (shape && shape !== 'guidelines') {
     entry.sections ??= [];
     const host = shape === 'own' ? where : shape.slice(3);
@@ -494,8 +499,8 @@ export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {})
 
 // ── Making the changes ──────────────────────────────────────────────────────────────────────────────────────────────
 // plan (drafted or not) and the layer's files → { files: Map(path → new text), pages: [summary], held: [why not] }
-export function applyPlan(plan, files) {
-  const idx = specIndex(files), layout = layoutOf(files);
+export function applyPlan(plan, files, { codes = [] } = {}) {
+  const idx = specIndex(files, { codes }), layout = layoutOf(files);
   const next = new Map();
   const text = (f) => next.get(f) ?? files.get(f);
   const pages = [], held = [];
@@ -603,11 +608,13 @@ export function describeReview({ pages, problems }) {
 }
 
 // What changed, for the person and for the merge request's description.
-export function describeChanges({ pages, held, merged = [], started = [] }, { dropped = [] } = {}) {
+export function describeChanges({ pages, held, merged = [], started = [], ownSpecs = [], regathered = [] }, { dropped = [] } = {}) {
   const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
-  const out = [`${merged.length ? `${merged.length} page${merged.length === 1 ? '' : 's'} merged into another's, ` : ''}${started.length ? `${started.length} new page${started.length === 1 ? '' : 's'}, ` : ''}${pages.length} page${pages.length === 1 ? '' : 's'} changed: ${n('removed')} line${n('removed') === 1 ? '' : 's'} written on every page alike taken out, ${n('rewritten')} sentence${n('rewritten') === 1 ? '' : 's'} the system contradicts written again as drafts, ${n('drafted')} line${n('drafted') === 1 ? '' : 's'} drafted.`,
+  const out = [`${regathered.length ? `${regathered.length} specs completed from their family's, ` : ''}${ownSpecs.length ? `${ownSpecs.length} page${ownSpecs.length === 1 ? '' : 's'} given a spec of ${ownSpecs.length === 1 ? 'its' : 'their'} own, ` : ''}${merged.length ? `${merged.length} page${merged.length === 1 ? '' : 's'} merged into another's, ` : ''}${started.length ? `${started.length} new page${started.length === 1 ? '' : 's'}, ` : ''}${pages.length} page${pages.length === 1 ? '' : 's'} changed: ${n('removed')} line${n('removed') === 1 ? '' : 's'} written on every page alike taken out, ${n('rewritten')} sentence${n('rewritten') === 1 ? '' : 's'} the system contradicts written again as drafts, ${n('drafted')} line${n('drafted') === 1 ? '' : 's'} drafted.`,
     '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). rms-design-system-engine lists each under Review on the Documentation page.', ''];
   for (const m of merged) out.push(`### ${m.name} → ${m.into}`, `The team said no to keeping its page: ${m.moved.length} line${m.moved.length === 1 ? '' : 's'} only it said drafted on ${m.into}'s page, \`${m.file}\` taken out, and it is noted as a part of ${m.into}.`, ...m.moved.map((d) => `- Drafted, ${d.where}: "${d.text}"`), '');
+  if (regathered.length) out.push('### Specs of their own, completed', 'Each spec of its own nobody had written yet takes its family\'s sections the layer does not give it (as its page showed them before), and the drafts its family\'s spec held for it alone.', ...regathered.map((f) => `- \`${f}\``), '');
+  if (ownSpecs.length) out.push('### Specs of their own', 'Each was written from a spec several pages share; it now has its own beside it (the family\'s shared sections still reach it), so what is written for it is its own.', ...ownSpecs.map((x) => `- ${x.name}: \`${x.spec}\` (family \`${x.family}\`)`), '');
   for (const x of started) out.push(`### ${x.name} (new page)`, `Started from its code (\`${x.code}\`): \`${x.spec}\` and \`${x.file}\`; its lines are below.`, '');
   for (const p of pages) {
     out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
@@ -713,7 +720,7 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   const codeOf = (e) => code.get(String(e.code ?? '').replace(/^\.?\//, '')) ?? null;
   const plan = planOf(snap, report, { leftForPeople: new Set(left.map((x) => flat(x.line))), code: codeOf, partOf, hold: ans.hold }).filter((it) => !only || only.has(it.entity.name));
   if (only) ans.merges = ans.merges.filter((m) => only.has(m.part.name));
-  if (!plan.length && !ans.merges.length && !ans.creates.length) return { snap, access, plan, answers: {}, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
+  // The layer's files are read even with nothing planned: the specs are checked against the pages below.
   let files; try { files = await layerFiles(access, snap._source.sha); } catch (e) { return { error: e.message }; }
   // A page to start: its files beside its siblings', then drafted as any page with nothing written.
   const created = new Set(), started = [];
@@ -724,6 +731,48 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
     plan.push({ entity: s.entity, page: { name: s.entity.name, file: s.file, component: c.name }, remove: [], rewrite: [], need: ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'example', 'role', 'doDont'] });
   }
   for (const it of plan) it.code = codeOf(it.entity);
+  const codes = snap.entities.map((e) => e.code);
+  // The engine's own section (Data) as its page shows it and its spec does not: written in the spec too, or the next
+  // time the layer generates its pages from the specs, the line is gone from the page.
+  if (!only) {
+    const byKey = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
+    for (const page of report.pages.filter((x) => x.component)) {
+      const e = byKey.get(`${page.file}#${page.name}`); if (!e) continue;
+      const src = specOf(e, specIndex(files, { codes })); const md = src && files.get(src.spec); if (!md) continue;
+      const mdLines = new Set(md.split('\n').map((l) => flat(l.replace(/^\s*[-*]\s+/, ''))));
+      // As a section of its own, or as a rule that starts with its title ("Data: …"), as the reader may give it.
+      const ownedText = linesOf(e).flatMap((l) => OWNED.includes(l.where) ? String(l.text).split('\n') : (/^(Data):\s*([\s\S]*)$/.exec(l.text) ? [/^(Data):\s*([\s\S]*)$/.exec(l.text)[2]] : []));
+      const lost = ownedText.map((t) => t.replace(/^\s*[-*]\s+/, '').trim()).filter((t) => t && !mdLines.has(flat(t)));
+      if (!lost.length) continue;
+      let it = plan.find((x) => x.entity === e);
+      if (!it) { it = { entity: e, page, remove: [], rewrite: [], need: [], code: codeOf(e) }; plan.push(it); }
+      const w = it.need.find((n) => n?.write); const add = lost.map((text) => ({ where: 'Data', text }));
+      if (w) w.write.push(...add.filter((a) => !w.write.some((x) => flat(x.text) === flat(a.text)))); else it.need.push({ write: add });
+    }
+  }
+  // A page with a spec of its own beside its family's: the drafts the family's spec still holds for it alone move to its own.
+  const regathered = new Map();
+  if (!only) {
+    const idx = specIndex(files, { codes }), carried = ia.familyCarried(files);
+    for (const e of snap.entities) {
+      const src = specOf(e, idx); const own = src && !src.shared && files.get(src.spec);
+      const fam = own && /^\s*[-*]\s*Family spec:\s*`([^`]+)`/mi.exec(own)?.[1];
+      if (!fam || !files.has(fam)) continue;
+      const famText = regathered.get(fam) ?? files.get(fam);
+      const m = ia.ownDrafts(e, ia.seedFromFamily(regathered.get(src.spec) ?? own, famText, carried), famText, snap.entities);
+      if (m.own !== own) { regathered.set(src.spec, m.own); regathered.set(fam, m.family); }
+    }
+    for (const [f, t] of regathered) files.set(f, t);
+  }
+  if (!plan.length && !ans.merges.length && !regathered.size) return { snap, access, plan, answers: {}, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
+  // A page written from a spec several pages share gets one of its own first, so what is written for it is its own.
+  const split = new Set(), ownSpecs = [];
+  for (const it of plan) {
+    if (!specOf(it.entity, specIndex(files, { codes }))?.shared) continue;
+    const s = ia.ownSpec(it.entity, files, { api: ia.apiOf(ROOT, it.entity.code), entities: snap.entities }); if (!s) continue;
+    for (const [f, t] of s.files) { if (!files.has(f)) created.add(f); files.set(f, t); split.add(f); }
+    ownSpecs.push({ name: it.entity.name, spec: s.spec, family: s.family });
+  }
   let note = '';
   sureParts(plan, facts);
   if (drafts && draftJobs(plan, facts).length) {
@@ -742,12 +791,13 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
     }
   }
   const dropped = plan.flatMap((i) => (i.dropped ?? []).map((d) => ({ page: i.entity.name, ...d })));
-  const result = applyPlan(plan, files);
-  for (const f of created) if (!result.files.has(f)) result.files.set(f, files.get(f));
+  const result = applyPlan(plan, files, { codes });
+  for (const f of [...created, ...split, ...regathered.keys()]) if (!result.files.has(f)) result.files.set(f, files.get(f));
+  result.regathered = [...regathered.keys()];
   const table = ia.tableOfCode(files);
   if (table) for (const x of started) result.files.set(table, ia.addRow(result.files.get(table) ?? files.get(table), x.codeName, x.code, 'Started from the code by rms-design-system-engine; its lines are drafts to review.'));
   const merged = ia.applyMerges(ans.merges, files, result.files, { layout: layoutOf(files), common: ia.commonLines(snap.entities, { files }) });
-  result.created = created; result.started = started; result.merged = merged;
+  result.created = created; result.started = started; result.merged = merged; result.ownSpecs = ownSpecs;
   // What the drafter left for a person: kept, so later runs do not ask about it again (it stays on the page as Fix).
   const now = plan.flatMap((i) => (i.rewritten ?? []).filter((r) => !r.text).map((r) => ({ page: i.entity.name, line: r.line, why: r.why ?? null })));
   if (now.length) { mkdirSync(dirname(leftFile), { recursive: true }); writeFileSync(leftFile, JSON.stringify([...left, ...now.filter((n) => !left.some((l) => flat(l.line) === flat(n.line)))], null, 1) + '\n'); }

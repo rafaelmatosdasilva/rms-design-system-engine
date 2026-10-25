@@ -384,9 +384,12 @@ same can be done in the layer by hand (remove the marker to approve, delete the 
 the repeated lines taken out; each sentence the content check finds wrong written again with only what the system has;
 what a component page lacks (what it is for, when to use it, when not to) drafted. A change goes into the page's
 source when the page is generated from one (a Markdown spec whose metadata names the page's code file as `Source`, or
-whose title is its name) and into the page itself, so both say the same until the layer is generated again; a spec
-that several pages are written from (a family's) takes what is true of all of them, never a draft for one page, which
-is said. **A drafted line starts with `**Draft:**`**: the engine reads it apart from the page (`drafts`), no agent gets
+whose title is its name) and into the page itself, so both say the same until the layer is generated again. A page
+written from a spec several pages share (a family's) is first given a spec of its own beside it: its Metadata (its code
+file, the family spec), its API from the code, what of the family's spec the layer would no longer give its page, the
+drafts the family's spec held for it alone, and, where the layer's scripts pair code files with spec names, its entry;
+a folder's spec that only one page falls under is that page's own. The engine's own Data lines a page shows and its
+spec does not are written in the spec too, so generating the pages again keeps them. **A drafted line starts with `**Draft:**`**: the engine reads it apart from the page (`drafts`), no agent gets
 it, and the page's decision is **Review** until a person reads it, changes what is not right and removes the marker (or
 deletes the line to turn it down). Drafts are written by the `claude` command, told only what the system has (each
 component's props and the values they take, its code file, what its page says), and each is kept only when the
