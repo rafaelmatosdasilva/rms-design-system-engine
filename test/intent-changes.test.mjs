@@ -264,6 +264,8 @@ test('the sure parts are written even when nothing can be drafted', () => {
 test('a component\'s own spec wins over a pattern that names the same code as its source', () => {
   const idx = specIndex(new Map([['specs/patterns/selection.md', '# Selection\n\n- Source: `src/tables/Grid.vue`\n'], ['specs/components/grid.md', '# Grid\n\n- Source: `src/tables/Grid.vue`\n']]));
   assert.deepEqual(specOf({ name: 'Grid', code: 'src/tables/Grid.vue' }, idx), { spec: 'specs/components/grid.md', shared: false });
+  const only = specIndex(new Map([['specs/patterns/error.md', '# Error\n\n- Source: `src/notes/Note.vue`\n'], ['specs/components/notes.md', '# Notes\n\n- Source: `src/notes/`\n']]));
+  assert.deepEqual(specOf({ name: 'Note General', code: 'src/notes/Note.vue' }, only), { spec: 'specs/components/notes.md', shared: true }, 'a pattern never owns a component\'s code');
 });
 
 test('when the code changes, the engine\'s own section follows it: a line it no longer says comes out, the new one goes in', () => {

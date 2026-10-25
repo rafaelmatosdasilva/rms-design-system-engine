@@ -80,8 +80,9 @@ export function specIndex(files) {
     if (!/\.md$/i.test(f)) continue;
     const src = /^\s*[-*]\s*Source:\s*`([^`]+)`/mi.exec(t)?.[1]?.replace(/^\.?\//, '');
     const h1 = /^#\s+(.+)$/m.exec(t)?.[1]?.trim();
-    // A component's own spec wins over a pattern's that names the same code as its source.
-    if (src && /\.\w+$/.test(src)) { if (!byCode.has(src) || (/\/components\//.test(f) && !/\/components\//.test(byCode.get(src)))) byCode.set(src, f); }
+    // A component's own spec wins over a pattern's that names the same code as its source; a pattern never owns a
+    // component's code (its drafts would land in the pattern, and leave the component's page when it is generated again).
+    if (src && /\.\w+$/.test(src)) { if (/(^|\/)patterns\//.test(f)) continue; if (!byCode.has(src) || (/\/components\//.test(f) && !/\/components\//.test(byCode.get(src)))) byCode.set(src, f); }
     else if (src) byFolder.push([src.replace(/\/?$/, '/'), f]);
     if (h1 && !byTitle.has(norm(h1))) byTitle.set(norm(h1), f);
   }
