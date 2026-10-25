@@ -80,8 +80,9 @@ export function specIndex(files) {
     if (!/\.md$/i.test(f)) continue;
     const src = /^\s*[-*]\s*Source:\s*`([^`]+)`/mi.exec(t)?.[1]?.replace(/^\.?\//, '');
     const h1 = /^#\s+(.+)$/m.exec(t)?.[1]?.trim();
-    // A component's own spec wins over a pattern's that names the same code as its source.
-    if (src && /\.\w+$/.test(src)) { if (!byCode.has(src) || (/\/components\//.test(f) && !/\/components\//.test(byCode.get(src)))) byCode.set(src, f); }
+    // A component's own spec wins over a pattern's that names the same code as its source; a pattern never owns a
+    // component's code (its drafts would land in the pattern, and leave the component's page when it is generated again).
+    if (src && /\.\w+$/.test(src)) { if (/(^|\/)patterns\//.test(f)) continue; if (!byCode.has(src) || (/\/components\//.test(f) && !/\/components\//.test(byCode.get(src)))) byCode.set(src, f); }
     else if (src) byFolder.push([src.replace(/\/?$/, '/'), f]);
     if (h1 && !byTitle.has(norm(h1))) byTitle.set(norm(h1), f);
   }
@@ -255,9 +256,46 @@ export function jsonReplace(entry, line, next) {
   if (flat(entry.description) === want) { entry.description = MARK + next; n++; }
   return n;
 }
-export function jsonAdd(entry, where, line, { sure = false } = {}) {
+// How the layer's own pages hold each heading, so a line goes where the layer's generator would put it, and generating the
+// pages again moves nothing: as a guidelines section, as a section of its own (its text under the same title), or as a
+// block of text inside another section. The shape most pages use wins. files: Map(path → text) → { shapes, parents }
+export function layoutOf(files) {
+  const votes = new Map(), parents = new Set();
+  const vote = (title, shape) => { const k = String(title ?? '').toLowerCase(); if (!k) return; const v = votes.get(k) ?? new Map(); v.set(shape, (v.get(shape) ?? 0) + 1); votes.set(k, v); };
+  for (const [f, t] of files) {
+    if (!/\.json$/i.test(f)) continue;
+    let doc; try { doc = JSON.parse(t); } catch { continue; }
+    for (const e of entriesOf(doc)) for (const s of e?.sections ?? []) {
+      if (s.kind === 'guidelines') { vote(s.title, 'guidelines'); continue; }
+      for (const b of s.freeform ?? []) {
+        if (String(b.title ?? '').toLowerCase() === String(s.title ?? '').toLowerCase()) vote(b.title, 'own');
+        else { vote(b.title, `in:${s.title}`); parents.add(String(s.title).toLowerCase()); }
+      }
+    }
+  }
+  const shapes = new Map([...votes].map(([k, v]) => [k, [...v].sort((a, b) => b[1] - a[1])[0][0]]));
+  return { shapes, parents };
+}
+export function jsonAdd(entry, where, line, { sure = false, layout = null } = {}) {
   const key = where.toLowerCase(), mark = sure ? '' : MARK;
   if (key === 'purpose') { if (!flat(entry.description)) entry.description = mark + line; return; }
+  const shape = layout?.shapes.get(key);
+  if (shape && shape !== 'guidelines') {
+    entry.sections ??= [];
+    const host = shape === 'own' ? where : shape.slice(3);
+    let s = entry.sections.find((x) => x.kind !== 'guidelines' && String(x.title ?? '').toLowerCase() === host.toLowerCase());
+    if (!s) {
+      s = { kind: 'section', for: 'all', title: host, freeform: [] };
+      // A section of its own goes before the sections that hold the rest of the text, as the generator places it.
+      const later = shape === 'own' ? entry.sections.findIndex((x) => x.kind === 'section' && layout.parents.has(String(x.title ?? '').toLowerCase())) : -1;
+      entry.sections.splice(later < 0 ? entry.sections.length : later, 0, s);
+    }
+    s.freeform ??= [];
+    let b = s.freeform.find((x) => String(x.title ?? '').toLowerCase() === key);
+    if (!b) { b = { title: where, body: '' }; s.freeform.push(b); }
+    b.body = (b.body ? b.body + '\n' : '') + '- ' + mark + line;
+    return;
+  }
   const [framing, level] = SECTION[key] ?? ['how-to-use', 'should'];
   entry.sections ??= [];
   let s = entry.sections.find((x) => x.kind === 'guidelines' && String(x.title ?? '').toLowerCase() === key);
@@ -443,7 +481,7 @@ export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {})
 // ── Making the changes ──────────────────────────────────────────────────────────────────────────────────────────────
 // plan (drafted or not) and the layer's files → { files: Map(path → new text), pages: [summary], held: [why not] }
 export function applyPlan(plan, files) {
-  const idx = specIndex(files);
+  const idx = specIndex(files), layout = layoutOf(files);
   const next = new Map();
   const text = (f) => next.get(f) ?? files.get(f);
   const pages = [], held = [];
@@ -467,7 +505,7 @@ export function applyPlan(plan, files) {
       else held.push({ name: e.name, why: `"${r.line}" names what the system does not have, and nothing it has says it: ${r.why ?? 'a person decides'}` });
     }
     if ((it.drafted ?? []).length && src?.shared) held.push({ name: e.name, why: `it is written from ${src.spec}, which other pages are written from too: give it a spec of its own, then draft it` });
-    else for (const d of it.drafted ?? []) { edit((t) => mdAdd(t, d.where, d.text, { sure: d.sure }), (x) => (jsonAdd(x, d.where, d.text, { sure: d.sure }), true)); did.drafted.push(d); }
+    else for (const d of it.drafted ?? []) { edit((t) => mdAdd(t, d.where, d.text, { sure: d.sure }), (x) => (jsonAdd(x, d.where, d.text, { sure: d.sure, layout }), true)); did.drafted.push(d); }
     if (did.removed.length || did.rewritten.length || did.drafted.length) pages.push(did);
   }
   return { files: next, pages, held };

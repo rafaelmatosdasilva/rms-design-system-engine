@@ -4,7 +4,7 @@
 // reference is the system's, a line that differs only by the page's own name is repeated. An invented system (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText, specIndex, specOf, planOf, draftPlan, sureParts, applyPlan, describeChanges } from '../intent-changes.mjs';
+import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText, layoutOf, specIndex, specOf, planOf, draftPlan, sureParts, applyPlan, describeChanges } from '../intent-changes.mjs';
 import { entityView, dropBoilerplate, DRAFT } from '../doc-source-dsds.mjs';
 import { factsFrom } from '../intent-truth.mjs';
 import { useReport } from '../intent-layer.mjs';
@@ -66,6 +66,30 @@ test('a DSDS page: the same changes, its own formatting kept', () => {
   assert.equal(jsonRemove(doc, 'Confirmed in the reference.'), 1);
   const out = jsonText(doc, before);
   assert.ok(out.startsWith('{\n\t"kind"') && out.endsWith('}\n'));
+});
+
+test('a line goes where the layer\'s own generator puts that heading, so generating the pages again moves nothing', () => {
+  const page = (title, sections) => JSON.stringify({ kind: 'component', name: title, sections });
+  const spec = (blocks) => ({ kind: 'section', for: 'all', title: 'Specification', freeform: blocks });
+  const lim = { kind: 'section', for: 'all', title: 'Limitations', freeform: [{ title: 'Limitations', body: '- One at a time.' }] };
+  const files = new Map([
+    ['dsds/a.dsds.json', page('A', [{ kind: 'guidelines', for: 'all', framing: 'when-to-use', title: 'When to use', items: [] }, lim, spec([{ title: 'Data', body: '- `rows` holds a list.' }])])],
+    ['dsds/b.dsds.json', page('B', [lim, spec([{ title: 'Do and don\'t', body: '- Do: keep it short.' }])])]
+  ]);
+  const layout = layoutOf(files);
+  assert.equal(layout.shapes.get('when to use'), 'guidelines');
+  assert.equal(layout.shapes.get('limitations'), 'own');
+  assert.equal(layout.shapes.get('data'), 'in:Specification');
+  const doc = { kind: 'component', name: 'C', sections: [{ kind: 'guidelines', for: 'all', framing: 'when-to-use', title: 'When to use', items: [] }, spec([{ title: 'Evidence', body: '- Read in the code.' }])] };
+  jsonAdd(doc, 'Limitations', 'Two at most.', { layout });
+  jsonAdd(doc, 'Limitations', 'Phone only.', { layout });
+  jsonAdd(doc, 'Data', '`tabs` holds a list of items, each with `id`.', { sure: true, layout });
+  jsonAdd(doc, 'When not to use', 'Not for a list.', { layout });
+  assert.deepEqual(doc.sections.map((x) => x.title), ['When to use', 'When not to use', 'Limitations', 'Specification'], 'a section of its own before the one that holds the rest');
+  assert.equal(doc.sections[2].freeform[0].body, '- **Draft:** Two at most.\n- **Draft:** Phone only.');
+  assert.equal(doc.sections[3].freeform.find((b) => b.title === 'Data').body, '- `tabs` holds a list of items, each with `id`.');
+  assert.equal(jsonRemove(doc, 'Phone only.'), 0, 'a draft is matched with its marker');
+  assert.equal(jsonRemove(doc, '**Draft:** Phone only.'), 1);
 });
 
 test('where a page is written: its spec by the code file it names, by its title, else a family\'s spec shared with others', () => {
@@ -264,6 +288,8 @@ test('the sure parts are written even when nothing can be drafted', () => {
 test('a component\'s own spec wins over a pattern that names the same code as its source', () => {
   const idx = specIndex(new Map([['specs/patterns/selection.md', '# Selection\n\n- Source: `src/tables/Grid.vue`\n'], ['specs/components/grid.md', '# Grid\n\n- Source: `src/tables/Grid.vue`\n']]));
   assert.deepEqual(specOf({ name: 'Grid', code: 'src/tables/Grid.vue' }, idx), { spec: 'specs/components/grid.md', shared: false });
+  const only = specIndex(new Map([['specs/patterns/error.md', '# Error\n\n- Source: `src/notes/Note.vue`\n'], ['specs/components/notes.md', '# Notes\n\n- Source: `src/notes/`\n']]));
+  assert.deepEqual(specOf({ name: 'Note General', code: 'src/notes/Note.vue' }, only), { spec: 'specs/components/notes.md', shared: true }, 'a pattern never owns a component\'s code');
 });
 
 test('when the code changes, the engine\'s own section follows it: a line it no longer says comes out, the new one goes in', () => {
