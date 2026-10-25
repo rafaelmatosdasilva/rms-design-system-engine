@@ -160,11 +160,11 @@ export function gitlabApi(ROOT, place, { env = process.env, http } = {}) {
 // git must never stop to ask for anything. A run waiting on a prompt nobody can see hangs for ever, so every question
 // is turned into a plain failure (BatchMode, GIT_TERMINAL_PROMPT) and the run then says what it would have said.
 const GIT_SILENT = { GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new', GIT_ASKPASS: '', SSH_ASKPASS: '' };
-const mirrorDir = (host, path, home = homedir()) => join(home, '.cache', 'rms-engine', 'git', host, path.replace(/[^A-Za-z0-9._-]/g, '-') + '.git');
+const gitMirrorDir = (host, path, home = homedir()) => join(home, '.cache', 'rms-engine', 'git', host, path.replace(/[^A-Za-z0-9._-]/g, '-') + '.git');
 
 // → { sha, files: Map<relative path, Buffer> } | null when git cannot reach it with what this person has.
 export function gitStoreFiles(p, place, { git = gitSilently, home = homedir() } = {}) {
-  const dir = mirrorDir(p.host, p.path, home);
+  const dir = gitMirrorDir(p.host, p.path, home);
   const under = place.path ? place.path.replace(/^\/+|\/+$/g, '') : '';
   try {
     if (!existsSync(join(dir, 'HEAD'))) { mkdirSync(dirname(dir), { recursive: true }); git(['init', '--bare', '-q', dir]); }
