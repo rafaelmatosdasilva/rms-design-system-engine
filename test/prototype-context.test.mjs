@@ -212,7 +212,8 @@ test('the catalog shows what each component is for and the product\'s pages; a d
   cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
   writeFileSync(join(dir, 'guidelines.md'), 'Every page opens with one heading.\n\n## field\nOnly for typing text. Never as an on/off control.\n');
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
-  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, guidelines: { sources: ['guidelines.md'] } }, null, 2));
+  // The composition path (a system whose components are not code): what Figma and the guidelines say, drawn by the engine.
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, frameworkComponents: false, guidelines: { sources: ['guidelines.md'] } }, null, 2));
   const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
   assert.equal(run('--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json').status, 0);
 
@@ -250,6 +251,9 @@ test('without importing anything, the designed screens set the product\'s pages 
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
   cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
+  // The composition path: designed screens are its starting points (a page in code reads no Figma).
+  const cfg0 = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, frameworkComponents: false }, null, 2));
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--catalog', '--for', 'a notification settings page with a Save button'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /FOR THIS REQUEST {2}"a notification settings page with a Save button"\n {2}start from: Settings \(designed in Figma; rms-design-system-engine --prototype --from-screens brings it into prototypes\/\)/);

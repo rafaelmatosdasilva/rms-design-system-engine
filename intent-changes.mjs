@@ -101,7 +101,27 @@ const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mis
 // The role of the element a component's code renders, as a screen reader names it (none for an element with no role).
 // An example of a component in use: its tag, and each prop that takes named values with the first of them (up to three),
 // so every name and value in it is one the code takes.
+// Each component's first use in the product's own code, as the last prototype check read it (page-check.mjs keeps it in
+// OUT_DIR/prototypes/page-system.json): an example that is the code itself, its product's own attributes (data-*,
+// class) left out. Sets facts.components[name].realUse.
+export function withRealUses(ROOT, facts) {
+  let cache = null;
+  try { cache = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'page-system.json'), 'utf8')); } catch { return facts; }
+  const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const byKey = new Map(Object.keys(facts.components ?? {}).map((n) => [key(n), n]));
+  for (const [name, u] of Object.entries(cache.firstUse ?? {})) {
+    const n = [name, ...(cache.components?.[name]?.aliases ?? [])].map((a) => byKey.get(key(a))).find(Boolean);
+    const code = String(u?.code ?? '').replace(/\s+(?:data-[\w-]+|class|className)=(?:"[^"]*"|'[^']*')/g, '').replace(/\s+/g, ' ').trim();
+    // A tag that holds children is shown open and closed, its children left out.
+    const tag = /^<([\w.:-]+)/.exec(code)?.[1];
+    const whole = /\/>$/.test(code) || !tag ? code : `${code} … </${tag}>`;
+    if (n && code && whole.length <= 320 && !code.includes('`')) facts.components[n].realUse = whole;
+  }
+  return facts;
+}
 export function exampleOf(b) {
+  // A use in the product's own code is the surest example there is: it is the code.
+  if (b.realUse) return '`' + b.realUse + '`';
   // Only the code's own props (a name only Figma uses is not one the component takes).
   const set = Object.entries(b.props ?? {}).filter(([p, v]) => (!b.codeProps || b.codeProps.includes(p)) && Array.isArray(v) && v.length && v.every((x) => typeof x === 'string' && !/^(true|false)$/.test(x))).slice(0, 3);
   return '`<' + b.tag + set.map(([p, v]) => ` ${p}="${v[0]}"`).join('') + ' />`';
@@ -251,6 +271,7 @@ export function briefOf(name, facts, e = null) {
     codeProps: Object.values(c.props ?? {}).some((d) => d.from) ? Object.keys(c.props).filter((p) => c.props[p].from === 'the code') : null,
     props: Object.fromEntries(Object.entries(c.props ?? {}).map(([p, d]) => [p, d.options?.length ? d.options : d.type ?? 'any'])),
     page: e ? linesOf(e).map((l) => `${l.where}: ${l.text}`).slice(0, 40) : [],
+    ...(c.realUse ? { realUse: c.realUse } : {}),
   };
 }
 const RULES = `Rules for every line you write:
@@ -532,6 +553,7 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   const snap = il.readIntentLayer(ROOT, cfg);
   if (!snap?._source?.sha) return { error: 'no intent layer read yet' };
   const facts = truth.systemFacts(ROOT, cfg, { record: false });
+  withRealUses(ROOT, facts);
   const names = [...new Set([...il.systemNames(ROOT, cfg), ...Object.keys(facts.components)])];
   const matched = il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, cfg));
   const found = truth.checkLayer(snap, matched, facts);

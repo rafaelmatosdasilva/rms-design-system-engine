@@ -235,7 +235,7 @@ export function breakpointsOf(vars = {}) {
 
 // { components: { name: { purpose, role, notes, notFor, useInstead, status, guidelines, options } }, rules, limits }
 // extra: { authored: contract.authored.json, examples: { name: [{ kind: 'do' | 'dont', caption }] } }
-export function contextFrom(catalog = { components: {} }, intent = null, sections = null, { authored = null, examples = {}, kept = [] } = {}) {
+export function contextFrom(catalog = { components: {} }, intent = null, sections = null, { authored = null, examples = {}, kept = [], aliases = {} } = {}) {
   const components = {};
   const names = Object.keys(catalog.components ?? {});
   const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
@@ -307,7 +307,7 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
       for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null, ...(pg.kind ? { kind: pg.kind } : {}) });
     }
   }
-  return { components, rules, limits: limitsFrom(components, rules, names), inside: insideFrom(components, rules, names) };
+  return { components, rules, limits: limitsFrom(components, rules, names), inside: insideFrom(components, rules, names, aliases) };
 }
 
 // A component's intent layer page as the catalog shows it: each line once (a family's shared rule often says what the
@@ -326,6 +326,8 @@ export function intentLayerOf(il) {
     else if (ex) examples.push(ex[1].trim());
     else rules.push(r);
   }
+  // A section of its page that is code (an example written as a block) is an example too.
+  for (const x of il.sections ?? []) if (/```|<[A-Za-z][\w-]*[\s/>]/.test(x?.text ?? '')) examples.push(String(x.text).trim());
   return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null };
 }
 
@@ -334,8 +336,8 @@ export function intentLayerOf(il) {
 // sentence that names the component and its container as the system names them counts; anything vaguer stays words.
 // → [{ component, within: [names], sentence, from, owned }]: owned, when another component may hold it instead ("unless a
 // component lays it out").
-export function insideFrom(components, rules, names) {
-  const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
+export function insideFrom(components, rules, names, aliases = {}) {
+  const byKey = new Map([...Object.entries(aliases).map(([a, n]) => [a.toLowerCase().replace(/[^a-z0-9]/g, ''), n]), ...names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n])]);
   const nameOf = (w) => byKey.get(String(w).toLowerCase().replace(/[^a-z0-9]/g, '')) ?? null;
   const ticked = (t) => [...String(t).matchAll(/`([A-Za-z][\w/-]*)`/g)].map((m) => nameOf(m[1])).filter(Boolean);
   const texts = [];
@@ -492,7 +494,7 @@ export function ruleLines(ctx, { width = 500, full = null, above = null } = {}) 
 // page names its group): one step out, never the whole system. detail: names or rule titles asked for by name.
 // → { components: Set, rules: Set }
 const MOST_IN_FULL = 16;
-export function detailFor(ctx, focus, detail = [], { pages = [] } = {}) {
+export function detailFor(ctx, focus, detail = [], { pages = [], first = [] } = {}) {
   const names = Object.keys(ctx.components ?? {});
   const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
   // A name as code writes it (`Drawer`, TabStrip, buttonPrimary): in backticks, or with a capital inside it. A plain
@@ -512,6 +514,8 @@ export function detailFor(ctx, focus, detail = [], { pages = [] } = {}) {
     if (n) comps.add(n);
     for (const r of ctx.rules ?? []) if (r.title.toLowerCase().includes(d.toLowerCase())) rules.add(r.title);
   }
+  // What the guidelines' own code examples import comes first: the template and the components it is built with.
+  for (const n of first) if (ctx.components?.[n] && comps.size < MOST_IN_FULL) comps.add(n);
   if (focus) {
     for (const c of focus.components ?? []) if (c.score >= 3) comps.add(c.name);   // one shared word is not enough
     for (const s of focus.screens ?? []) for (const [n] of s.components ?? []) comps.add(n);
@@ -572,7 +576,8 @@ export function focusLines(f) {
   for (const r of f.ruledOut ?? []) out.push(`  ruled out by the documentation for "${r.words.join(', ')}": ${r.name}, "${cut(r.sentence, 200)}"; what the request needs there is a Missing box unless another component is for it`);
   if (f.sections.length) {
     out.push('  the team\'s guidelines that apply (follow them; say so when the request asks for something they rule out):');
-    for (const s of f.sections) out.push(`    ${s.title}${s.file ? ` (${s.file})` : ''}: ${cut(s.text.replace(/\s+/g, ' '), 1200)}`);
+    // A section with code keeps its lines (an example is read as code, not as one long sentence).
+    for (const s of f.sections) out.push(/```/.test(s.text) ? `    ${s.title}${s.file ? ` (${s.file})` : ''}:\n${cut(s.text, 3000).split('\n').map((l) => `      ${l}`).join('\n')}` : `    ${s.title}${s.file ? ` (${s.file})` : ''}: ${cut(s.text.replace(/\s+/g, ' '), 1200)}`);
   }
   out.push('  Every word of the request that no component is for is a Missing box, or a component with "standInFor".');
   return out;

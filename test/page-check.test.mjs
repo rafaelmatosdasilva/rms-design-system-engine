@@ -1,0 +1,215 @@
+// A prototype written in the system's own code is held to the system: only its components, each given only what it
+// takes, where the documentation puts it. An invented Acme system, in Vue and in JSX.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import { docFields, readLiteral, literalBindings, shapeFindings, requiredKeys, UNKNOWN } from '../prop-shapes.mjs';
+import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../page-check.mjs';
+
+const put = (root, rel, text) => { const p = join(root, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
+
+function acme() {
+  const root = mkdtempSync(join(tmpdir(), 'acme-page-'));
+  put(root, 'ds-config.json', '{}');
+  put(root, 'src/components/library/tabs/TabStrip.vue', `<template><div class="tab-strip"><button v-for="t in tabs" :key="t.id" @click="emit('picked', t.id)">{{ t.label }}</button></div></template>
+<script setup>
+const emit = defineEmits(['picked'])
+/** Props received:
+@tabs {Array} the tabs to show
+	- id {String, Number} what picked sends back
+	- label {String} the words on the tab
+	- selected {Boolean} the tab shown
+@look {String} how it looks [main (default), quiet]
+*/
+const props = defineProps({ tabs: { type: Array, required: true }, look: { type: String, default: 'main' }, compact: { type: Boolean, default: false } })
+</script>`);
+  put(root, 'src/components/library/toolbars/Toolbar.vue', `<template><div class="toolbar"><slot name="start"/><slot/></div></template>
+<script setup>
+const props = defineProps({ divided: { type: Boolean, default: false } })
+</script>`);
+  put(root, 'src/components/library/search/SearchField.vue', `<template><input class="search-field" :placeholder="placeholder" @keyup.enter="emit('enter')"/></template>
+<script setup>
+const emit = defineEmits(['enter'])
+const props = defineProps({ placeholder: { type: String, default: '' } })
+</script>`);
+  put(root, 'src/components/templates/ListPage.vue', `<template><main class="list-page"><header><slot name="header"/></header><slot/></main></template>
+<script setup>
+const props = defineProps({ title: { type: String, default: '' } })
+</script>`);
+  put(root, 'src/components/library/badges/Badge.jsx', `export function Badge({ tone = 'info', label, onDismiss }) {
+  return <span className="badge">{label}</span>
+}
+Badge.propTypes = {}
+/** @tone {String} its colour [info (default), warn] */
+`);
+  put(root, 'src/views/Orders.vue', `<template><list-page title="Orders"><template #header><tab-strip :tabs="tabs" @picked="pick"/></template></list-page></template>
+<script setup>
+import { ref } from 'vue'
+import ListPage from '@/components/templates/ListPage'
+import TabStrip from '@/components/library/tabs/TabStrip'
+const tabs = ref([{ id: 'a', label: 'Open' }, { id: 'b', label: 'Closed' }, { id: 'c', label: 'All', selected: true }])
+const pick = () => {}
+</script>`);
+  const catalog = { components: { tabStrip: { props: {} }, toolbar: { props: {} }, searchField: { props: {} }, listPage: { props: {} }, badge: { props: {} } } };
+  const context = {
+    inside: [{ component: 'SearchField', within: ['Toolbar'], sentence: '`searchField` only inside the toolbar.', from: 'Orders page', owned: false }],
+    limits: [], components: {},
+    rules: [{ title: 'List Page Template (templates, intent layer)', text: 'A list of records starts here.' }],
+  };
+  return { root, catalog, context };
+}
+
+test('a doc comment\'s fields, a literal as written, and the data a component is given against what it takes', () => {
+  const f = docFields('/** @tabs {Array} the tabs\n\t- id {String, Number} x\n\t- badge {Object} with:\n\t\t-tone {String} y\n@look {String} z */');
+  assert.deepEqual(Object.keys(f.tabs), ['id', 'badge']);
+  assert.deepEqual(Object.keys(f.tabs.badge.fields), ['tone']);
+  const v = readLiteral("ref([{ id: 1, label: 'A', ...rest }, { id, label: `B` }])");
+  assert.equal(v[0].label, 'A');
+  assert.equal(v[1].id, UNKNOWN, 'a shorthand key is there, its value unknown');
+  assert.deepEqual(Object.keys(literalBindings('const tabs = ref([{ id: 1 }])\nlet n = 2\nconst [items, setItems] = useState([])')), ['tabs', 'n', 'items']);
+  assert.deepEqual(shapeFindings([{ id: 1, lable: 'x' }], f.tabs, { required: ['id'] }).map((x) => `${x.kind}:${x.key}`), ['unknown:lable']);
+  assert.deepEqual(requiredKeys([[{ id: 1, label: 'a' }, { id: 2, label: 'b', x: 1 }, { id: 3, label: 'c' }]]), ['id', 'label']);
+});
+
+test('the markup reader sees multi-line tags, each framework\'s props, events, two-way bindings and slots', () => {
+  const vue = parseMarkup('<tab-strip\n  look="quiet"\n  :tabs="tabs"\n  @picked="pick"\n  v-model:open="o"/>\n<template #header>x</template>', { syntax: 'vue' });
+  const a = vue.children[0].attrs.map((x) => `${x.kind}:${x.name}`);
+  assert.deepEqual(a, ['prop:look', 'prop:tabs', 'event:picked', 'model:open']);
+  assert.equal(vue.children[1].attrs[0].kind, 'slot');
+  const svelte = parseMarkup('<TabStrip {tabs} on:picked={pick} bind:open slot="header"/>', { syntax: 'svelte' });
+  assert.deepEqual(svelte.children[0].attrs.map((x) => `${x.kind}:${x.name}`), ['prop:tabs', 'event:picked', 'model:open', 'slotTarget:header']);
+  const jsx = parseMarkup('const x = a < b; return (<Badge tone="warn" onDismiss={() => close(1)}>{items.map((i) => <Badge key={i} />)}</Badge>)', { syntax: 'jsx' });
+  assert.equal(jsx.children[0].tag, 'Badge');
+  assert.equal(jsx.children[0].children[0].tag, 'Badge', 'a tag inside an expression is a child');
+  assert.equal(splitSource('P.vue', '<template><div><template v-if="x"><b/></template></div></template>\n<script>let y</script>').markup, '<div><template v-if="x"><b/></template></div>');
+});
+
+test('a Vue page with invented parts, wrong data and a misplaced part is refused line by line; one written right passes', async () => {
+  const { root, catalog, context } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  // No intent layer: the system is its code's own component files, Figma never read.
+  assert.deepEqual(Object.keys(page.components).sort(), ['Badge', 'ListPage', 'SearchField', 'TabStrip', 'Toolbar']);
+  const bad = `<template>
+  <list-page :titel="'Orders'">
+    <template #footer>x</template>
+    <tab-strip look="loud" compact="false" :tabs="[{ id: 1, lable: 'Open' }, { label: 'Closed' }]" @pick="go"/>
+    <search-field placeholder="Find"/>
+    <fancy-grid/>
+    <home-pill/>
+  </list-page>
+  <div data-missing="order timeline" data-searched="tabStrip, listPage" data-why="nothing shows events in time"/>
+</template>
+<script setup>
+import ListPage from '@/components/templates/ListPage'
+import TabStrip from '@/components/library/tabs/TabStrip'
+import SearchField from '@/components/library/search/SearchField'
+import FancyGrid from '@/components/library/grids/FancyGrid'
+import HomePill from './HomePill.vue'
+</script>`;
+  const r = checkPage('prototypes/Orders.vue', bad, page, { context });
+  const msgs = r.findings.filter((f) => f.level === 'error').map((f) => `${f.line} ${f.message}`);
+  const has = (re) => assert.ok(msgs.some((m) => re.test(m)), `${re} in:\n${msgs.join('\n')}`);
+  has(/^2 list-page has no prop "titel" \(did you mean title\?\)/);
+  has(/^3 list-page has no slot "footer" \(its slots: default, header\)/);
+  has(/^4 tab-strip look="loud" is not one of main, quiet/);
+  has(/^4 tab-strip compact="false" is the text "false", which turns it on: write :compact="false"/);
+  has(/^4 tab-strip tabs: "lable" is not a field it takes \(did you mean label\?\)/);
+  has(/^4 tab-strip tabs: item 2 has no "id", which every use in the code gives \(src\/views\/Orders\.vue:1\)/);
+  has(/^4 tab-strip emits no "pick" \(did you mean picked\?\)/);
+  has(/^5 SearchField is not inside Toolbar/);
+  has(/^6 <fancy-grid> is imported from @\/components\/library\/grids\/FancyGrid, which is not a file of the system/);
+  has(/^7 <home-pill> is a component of its own \(from \.\/HomePill\.vue\), not the system's/);
+  assert.deepEqual(r.gaps.map((g) => g.need), ['order timeline']);
+
+  const good = `<template>
+  <list-page title="Orders">
+    <template #header><tab-strip look="quiet" :compact="false" :tabs="tabs" @picked="pick"/></template>
+    <toolbar><template #start><search-field placeholder="Find" @enter="find"/></template></toolbar>
+  </list-page>
+</template>
+<script setup>
+import { ref } from 'vue'
+import ListPage from '@/components/templates/ListPage'
+import TabStrip from '@/components/library/tabs/TabStrip'
+import Toolbar from '@/components/library/toolbars/Toolbar'
+import SearchField from '@/components/library/search/SearchField'
+const tabs = ref([{ id: 'o', label: 'Open', selected: true }, { id: 'c', label: 'Closed' }])
+const pick = () => {}
+const find = () => {}
+</script>`;
+  const ok = checkPage('prototypes/Orders.vue', good, page, { context });
+  assert.deepEqual(ok.findings, []);
+
+  const noTemplate = checkPage('prototypes/Bare.vue', '<template><toolbar/></template>\n<script setup>\nimport Toolbar from \'@/components/library/toolbars/Toolbar\'\n</script>', page, { context });
+  assert.ok(noTemplate.findings.some((f) => /starts from no template: the documentation chooses a template first \(ListPage\)/.test(f.message)));
+});
+
+test('a JSX page is held to the same checks, as JSX writes a prop and a listener', async () => {
+  const { root, catalog, context } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const r = checkPage('prototypes/Alerts.jsx', `import { Badge } from '@/components/library/badges/Badge'
+import ListPage from '@/components/templates/ListPage'
+export default function Alerts() {
+  return (<ListPage title="Alerts"><Badge tone="loud" label="New" onDismiss={() => {}} onClose={() => {}} /></ListPage>)
+}`, page, { context });
+  const msgs = r.findings.map((f) => f.message);
+  assert.ok(msgs.some((m) => /Badge tone="loud" is not one of info, warn/.test(m)), msgs.join('\n'));
+  assert.ok(msgs.some((m) => /Badge has no "onClose"/.test(m)), msgs.join('\n'));
+  assert.ok(!msgs.some((m) => /onDismiss/.test(m)), 'a prop the component takes');
+});
+
+test('each component\'s card says how to import it, what it takes and emits, and its use in the code', async () => {
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const lines = usageCards(page, ['TabStrip'], { importLine: (c) => page.importSeen[c.name] }).join('\n');
+  assert.match(lines, /TabStrip {2}import TabStrip from '@\/components\/library\/tabs\/TabStrip'/);
+  assert.match(lines, /props: tabs\* list of \{id, label, selected\} · look main\|quiet = main · compact boolean/);
+  assert.match(lines, /events: @picked/);
+  assert.match(lines, /slots: none: nothing goes inside it/);
+  assert.match(lines, /in the code \(src\/views\/Orders\.vue:1\): <tab-strip :tabs="tabs" @picked="pick"\/>/);
+  assert.match(lines, /tabs = ref\(\[\{ id: 'a', label: 'Open' \}/);
+  assert.match(pageConventions(page).join('\n'), /no component takes a two-way binding/);
+  assert.deepEqual(importedComponents(page, "```vue\nimport TabStrip from '@/components/library/tabs/TabStrip'\n```"), ['TabStrip']);
+});
+
+test('the edit hook holds a page in prototypes/ to the same check, from the system the last run kept', async () => {
+  const { root, catalog, context } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  put(root, '.design-system-engine-out/prototypes/page-system.json', JSON.stringify(pageCache(page, context)));
+  put(root, 'prototypes/Orders.vue', '<template><list-page><search-field/></list-page></template>\n<script setup>\nimport ListPage from \'@/components/templates/ListPage\'\nimport SearchField from \'@/components/library/search/SearchField\'\n</script>');
+  const out = pageHookCheck({ tool_input: { file_path: join(root, 'prototypes/Orders.vue') } }, { root });
+  assert.match(out, /prototypes\/Orders\.vue:1 {2}SearchField is not inside Toolbar/);
+  put(root, 'src/views/Other.vue', '<template><search-field/></template>');
+  assert.equal(pageHookCheck({ tool_input: { file_path: join(root, 'src/views/Other.vue') } }, { root }), null, 'only a page in prototypes/');
+});
+
+test('each mistake is kept with why: a gap in the documentation, or written and not followed', async () => {
+  const { root, catalog, context } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const ctx = { ...context, components: { TabStrip: { intentLayer: { examples: [] } }, ListPage: { intentLayer: { examples: ['<ListPage title="A" />'] } } } };
+  const r = checkPage('prototypes/P.vue', `<template><list-page :titel="'x'"><tab-strip :tabs="[{ lable: 'A' }]" @pick="go"/><search-field/></list-page></template>
+<script setup>
+import ListPage from '@/components/templates/ListPage'
+import TabStrip from '@/components/library/tabs/TabStrip'
+import SearchField from '@/components/library/search/SearchField'
+</script>`, page, { context: ctx });
+  const { rec, items } = recordInventions(root, '.design-system-engine-out', 'prototypes/P.vue', r, { page, context: ctx });
+  const why = (c, k) => items.find((x) => x.component === c && x.kind === k);
+  assert.deepEqual([why('TabStrip', 'event').gap, why('TabStrip', 'event').need], [true, 'example'], 'its page shows no example');
+  assert.deepEqual([why('ListPage', 'prop').gap, why('ListPage', 'prop').why], [false, 'its page has an example; the agent wrote it otherwise']);
+  assert.deepEqual([why('SearchField', 'rule').gap, why('SearchField', 'rule').why], [false, 'the rule is written; the agent did not follow it']);
+  assert.equal(why('SearchField', 'rule').component, 'SearchField');
+  assert.equal(rec.byComponent.TabStrip.needs.example.n >= 1, true);
+  assert.equal(rec.runs.length, 1);
+});
+
+test('an example the intent layer gets is the product\'s own use of the component, its product attributes left out', async () => {
+  const { withRealUses, briefOf, exampleOf } = await import('../intent-changes.mjs');
+  const { root, catalog, context } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  put(root, '.design-system-engine-out/prototypes/page-system.json', JSON.stringify(pageCache(page, context)));
+  const facts = withRealUses(root, { components: { TabStrip: { file: 'src/components/library/tabs/TabStrip.vue', props: {} } } });
+  assert.equal(exampleOf(briefOf('TabStrip', facts)), '`<tab-strip :tabs="tabs" @picked="pick"/>`');
+});

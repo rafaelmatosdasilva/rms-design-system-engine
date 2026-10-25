@@ -1164,6 +1164,33 @@ family's spec takes what it is for from the next line; one with nothing from Fig
 role (`Role:`) from the intent layer, whose lines are each said once (a family's shared rule and the component's own)
 and whose examples (`Example:`) are shown as examples.
 
+- **A page in the system's own code.** When the system's components are code (Vue, Svelte, React, custom elements), the
+  catalog shows each component it gives in full as a usage card: its import as the product's code writes it, its props
+  (type, values, default, required) with the fields of each list or object prop (from its doc comment, `- id {String}`
+  under `@tabs {Array}`), its events as the framework writes a listener, its slots, and its first use in the code with
+  the data it binds; then how the project writes a page (its import alias, its script style, whether any component takes
+  a two-way binding, the helpers its uses import). The prototype is then `prototypes/<Name>.<ext>`, and
+  `--prototype <that file>` checks it (`page-check.mjs`, the engine's own markup reader: no dependency). Each of these is
+  an error: a tag that is not one of the system's components or an import of one that does not exist (with the closest
+  name), a component of its own, a prop, value, event, slot or two-way binding the component does not have, a required
+  prop left out, `"false"` written as text, a list item with a field the component does not take (a field its own code
+  reads counts, the comment may leave it out) or without one every use in the code gives, a part outside its container,
+  more of a component than the guidelines allow, and a page that starts from none of the templates the documentation
+  has. What every edit is held to (a colour or size of its own, an undeclared variable, an accessibility problem) and the
+  project's own ESLint and Stylelint (run, never fixing) are part of it. `<div data-missing="<need>" data-searched="…"
+  data-why="…" />` is a gap, kept in `prototypes/gaps.json`. It ends with ✅ Ready or ❌ Not ready. The project's hook runs
+  the same check on every edit of a page in `prototypes/` (`prototype.dir` in `ds-config.json`), from the system the
+  last `--prototype` run kept (`.design-system-engine-out/prototypes/page-system.json`); so does `--check-ui <page>`.
+- **What agents invent, and why.** Each page check (the command and the edit hook) keeps every mistake in
+  `.design-system-engine-out/prototypes/inventions.json`, each with why: a gap in the documentation (the component has
+  no page in the intent layer, its page shows no example of it in use, or its code comment does not say what a list
+  takes) or written and not followed (a rule the agent missed, an example it wrote otherwise). The report ends with
+  📓 lines for the gaps. What the code answers for sure is written: an example the intent layer gets
+  (`--intent-changes`, and the audit's `intentLayer.autoFix`) is the product's own first use of the component, its
+  `data-*` and `class` left out, written as final; the rest shows on the Documentation page as **What agents got
+  wrong**: to write (Missing) where the documentation lacks something, to check (Review) where it is written and was
+  still missed. The page system read without Figma: the intent layer's pages name each component and template and
+  its code file; with no intent layer, the code's own component files.
 - **Where a component goes** is read from the documentation as written, and the check holds every prototype to it: a
   sentence that names the component and its container as the system names them (`` `searchField` only inside the
   toolbar``, ``Do not place `TabItem` without `TabStrip` ``) makes a part outside that container an error. One that

@@ -341,7 +341,9 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
       if (existsSync(cfgPath)) {
         let cfg = {};
         try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* defaults */ }
-        const out = editHookOutput(editCheck(event, { root, cfg }));
+        // A page in prototypes/ is held to the system too: its components, what each is given, where each goes.
+        const page = (await import('./page-check.mjs')).pageHookCheck(event, { root, cfg, outDir: OUT_DIR });
+        const out = editHookOutput([editCheck(event, { root, cfg }), page].filter(Boolean).join('\n\n') || null);
         if (out) process.stdout.write(out);
       }
     } else if (existsSync(cfgPath)) {

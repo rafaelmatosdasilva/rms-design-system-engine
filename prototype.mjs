@@ -17,6 +17,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
 import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pageGaps, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
+import { pageSystem, pageContext, checkPage, syntaxOf, usageCards, pageConventions, pageCache, importedComponents, recordInventions } from './page-check.mjs';
+import { importOf } from './styleguide-data.mjs';
 import { loadContext, purposeLines, ruleLines, detailFor, usesAgainstPurpose, requestFocus, focusLines, cut, screenUses } from './prototype-context.mjs';
 
 // A system this small is shown whole in the catalog.
@@ -324,6 +326,15 @@ export function conventionLines(conv) {
   return lines.length ? ['', 'How this product\'s pages are arranged (keep a new page the same):', ...lines.map((l) => `  ${l}`)] : [];
 }
 
+// The theme's own spacing variables (--space-m: 8px), as a page writes them: var(--space-m) (8px).
+export function themeSpacing(css) {
+  const out = new Map();
+  for (const m of String(css).matchAll(/(--[\w-]*(?:spacing|space|gap|padding|margin)[\w-]*)\s*:\s*([\d.]+(?:px|rem))\s*[;}]/gi)) if (!out.has(m[1])) out.set(m[1], m[2]);
+  // The system's general spacing first; a variable one component owns (--advanced-…, --button-…) is that component's.
+  const general = [...out].filter(([v]) => /^--(?:spacing|space|gap|padding|margin)\b|^--[\w]+-(?:spacing|space)-/i.test(v) && !/advanced/i.test(v));
+  return (general.length ? general : [...out]).slice(0, 24).map(([v, x]) => `var(${v}) (${x})`);
+}
+
 // --catalog: everything a prototype may use, in one screen: the system's components and options, the engine's pieces
 // with the tokens they take, the format, and the starting points already made.
 export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null, detail = [], pages = [] } = {}) {
@@ -331,46 +342,139 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
   const comps = Object.fromEntries(Object.entries(sys.catalog.components ?? {}).map(([n, c]) => [n, { ...c, ...(drawable.has(n) ? {} : { status: c.status ? `${c.status}, not built in code` : 'not built in code: drawn as a box' }) }]));
   // A small system is shown whole. A large one in full only where the request (and what it names) needs it, every other
   // component and rule in a line: a catalog read whole is followed; one too long to read is skimmed, and guessed.
-  const ctx = sys.context ?? { components: {}, rules: [] };
-  const small = Object.keys(comps).length <= SMALL_SYSTEM && (ctx.rules ?? []).length <= SMALL_SYSTEM;
-  const want = small ? null : detailFor(ctx, focus, detail, { pages });
+  // A system whose components are code reads only the code and the intent layer: never Figma.
+  const page = sys.page && Object.keys(sys.page.components).length ? sys.page : null;
+  const ctx = (page ? page.context : sys.context) ?? { components: {}, rules: [] };
+  const names = page ? Object.keys(page.components) : Object.keys(comps);
+  const small = names.length <= SMALL_SYSTEM && (ctx.rules ?? []).length <= SMALL_SYSTEM;
+  const first = page && focus ? [...new Set((focus.sections ?? []).flatMap((x) => importedComponents(page, x.text)))] : [];
+  const want = small ? null : detailFor(ctx, focus, detail, { pages, first });
   const pieces = pieceCatalog(sys.scales, Object.keys(comps));
   const pieceRows = Object.entries(pieces).map(([n, d]) => `${n.padEnd(8)}  ${Object.entries(d.props).map(([k, e]) => `${k}=${e.type === 'enum' ? (e.values.length > 6 ? `<${k === 'style' ? 'text style' : 'spacing token'}>` : e.values.join('|')) : e.type === 'boolean' ? 'true|false' : `<${k === 'width' ? 'screen width in px' : k === 'need' ? 'what is needed' : k === 'closest' ? 'nearest system component' : 'text'}>`}`).join('  ')}`);
   return [
     'PROTOTYPE CATALOG  ·  everything a prototype may use; nothing else exists for it',
-    ...sourceLines(sys.context),
+    ...sourceLines(page ? page.context : sys.context),
     ...focusLines(focus),
     '',
-    want ? `The design system's components in full (name, options; code: is a prop only the code has, written as the code names it; any other one's options with --detail <name>,…):` : 'The design system\'s components (name, options; code: is a prop only the code has, written as the code names it):',
-    catalogTable({ components: want ? Object.fromEntries(Object.entries(comps).filter(([n]) => want.components.has(n))) : comps }),
-    ...(() => { const l = purposeLines(ctx, Object.keys(comps), { full: want?.components ?? null }); return l.length ? ['', `What each component is for (Figma descriptions and annotations, code notes, the team's guidelines, the intent layer); use it only for that${want ? `. In full: ${want.components.size ? [...want.components].join(', ') : 'none yet'}; every other one in a line, in full with --detail <name>,…` : ''}:`, ...l] : []; })(),
+    ...(page ? [
+      `How to write each component the request needs, as the code writes it (import, props with each list's fields, events, slots, a use from the code)${want ? '; any other one with --detail <name>,…' : ''}. A page gives a component only what its card lists:`,
+      ...usageCards(page, (want ? [...want.components] : names).filter((n) => page.components[n]), { importLine: (c) => {
+        if (page.importSeen?.[c.name]) return page.importSeen[c.name];
+        // Written as the code writes its other imports: with or without the file's extension, with or without a semicolon.
+        const seen = Object.values(page.importSeen ?? {});
+        const bare = seen.length && seen.filter((l) => !/\.(vue|svelte|jsx|tsx)'/.test(l)).length > seen.length / 2, semi = seen.filter((l) => l.endsWith(';')).length > seen.length / 2;
+        let text = ''; try { text = readFileSync(resolve(page.ROOT, c.file), 'utf8'); } catch { /* the tag is enough */ }
+        const line = importOf({ tag: c.tag, syntax: c.syntax, file: c.file, text })?.line ?? null;
+        return line && seen.length ? line.replace(bare ? /\.(vue|svelte)'/ : /(?!)/, "'").replace(/;$/, semi ? ';' : '') : line; } }),
+      '',
+      'How this project writes a page (read from its code):',
+      ...pageConventions(page, { cmd, names: want ? [...want.components] : null }),
+    ] : [
+      want ? `The design system's components in full (name, options; code: is a prop only the code has, written as the code names it; any other one's options with --detail <name>,…):` : 'The design system\'s components (name, options; code: is a prop only the code has, written as the code names it):',
+      catalogTable({ components: want ? Object.fromEntries(Object.entries(comps).filter(([n]) => want.components.has(n))) : comps }),
+    ]),
+    ...(() => { const l = purposeLines(ctx, names, { full: want?.components ?? null }); return l.length ? ['', `What each component is for (${page ? 'the intent layer' : 'Figma descriptions and annotations, code notes, the team\'s guidelines, the intent layer'}); use it only for that${want ? `. In full: ${want.components.size ? [...want.components].join(', ') : 'none yet'}; every other one in a line, in full with --detail <name>,…` : ''}:`, ...l] : []; })(),
     ...(() => { const l = ruleLines(ctx, { full: want?.rules ?? null, above: want?.shownAbove ?? null, width: want ? 4000 : 500 }); return l.length ? ['', `The team's rules for the product${want ? ' (the ones this request touches in full; any other with --detail "<title>")' : ''}:`, ...l] : []; })(),
     ...(want && !focus && !detail.length ? ['', `This system is large: run ${cmd} --prototype --catalog --for "<the request>" to see in full what the request needs.`] : []),
     ...((sys.context?.limits ?? []).length ? ['', 'Rules the check holds every prototype to (read from the guidelines):', ...sys.context.limits.map((l) => `  at most ${l.max} ${l.component} per ${l.per}: "${cut(l.sentence, 160)}" (${l.from})`)] : []),
-    ...((sys.context?.templates ?? []).length ? ['', 'Templates in Figma (the components each composes, in order):', ...sys.context.templates.map((t) => `  ${t.name}: ${t.components.join(', ')}`)] : []),
-    ...((sys.context?.productScreens ?? []).length ? ['', 'The product\'s screens in Figma (the components each one uses, the most used first; a new page for a product is made of the same):', ...sys.context.productScreens.map((s) => `  ${s.name}: ${screenUses(s)}`)] : []),
-    ...conventionLines(conventions),
-    '',
-    'The engine\'s pieces (only where the system has none of its own):',
-    ...pieceRows.map((r) => `  ${r}`),
-    `Spacing tokens: ${sys.scales.spacing.map((t) => `${t.name} (${t.value})`).join(', ') || 'none'}`,
-    `Text styles: ${sys.scales.text.map((t) => `${t.name} (${t.size}/${t.lh} ${t.weight})`).join(', ') || 'none'}`,
-    ...((sys.context?.breakpoints ?? []).length ? [`Screen widths (Page.width): ${sys.context.breakpoints.map((b) => `${b.name} (${b.px})`).join(', ')}`] : []),
-    '',
-    'Format: { "component": "Page", "props": { "padding": "<spacing token>" }, "children": [ { "component": "<name>", "props": { "<option>": "<value>" } } ] }',
-    'A system component used for a need it does not quite meet carries "standInFor": "<the need>" in its props; a need nothing fits is { "component": "Missing", "props": { "need": "…" } }.',
-    `A flow is one prototype per page, linked: a part that leads to the next page carries "goesTo": "<prototype name>" ("<name>#<state>" for one of its states); ${cmd} --prototype --flow checks the links against the flows the team wrote down.`,
-    'It works as in the product (the system\'s scripts run, a selection moves, a field takes typing). A part that opens another (a dialog, a menu, a popover) carries "opens": "<id>" in its props, and the part it opens has that "id": it is drawn closed and opens on a click. A part that shows no words or holds a group of choices (an icon button, a segmented control) carries "name": "<what it is for>": what a screen reader says. A part with a tooltip carries "tip": "<its words>". A part that fills its parent carries "stretch": true (across) or "grow": true (the room left), as Figma\'s fill container; one of several slots goes in the one it names with "inSlot": "<slot>".',
-    'Its other states go beside it: "states": { "empty": { "<id>": { …that part in this state… } }, "error": { … }, "loading": { … } }, each naming by "id" only the parts that differ (null leaves one out). A page with a list owes an empty state, one that takes input an error state, and each state the request or the guidelines name.',
-    'It is reviewed as drawn: the parts of a column start on one line, one spacing per arrangement, one primary action in view, the main heading the largest text and each heading above its text, lines under 90 characters.',
-    'It is tried at every screen width, in every state, with the words as written and 40% longer: nothing may run past the screen, be cut or spill, a control\'s label stays on one line, and on a phone every target is 24px or more. Row "wrap" and Columns "minWidth" let a layout fit a narrow screen.',
-    ...(starts.length ? ['', `Prototypes already here (starting points read from designed screens among them): ${starts.map((f) => `prototypes/${f}`).join(', ')}; copy the closest one`] : []),
-    '',
-    `NEXT: write prototypes/<name>.json with only the parts above, then run ${cmd} --prototype prototypes/<name>.json and fix each ❌ line until it is drawn.`,
+    ...(!page && (sys.context?.templates ?? []).length ? ['', 'Templates in Figma (the components each composes, in order):', ...sys.context.templates.map((t) => `  ${t.name}: ${t.components.join(', ')}`)] : []),
+    ...(!page && (sys.context?.productScreens ?? []).length ? ['', 'The product\'s screens in Figma (the components each one uses, the most used first; a new page for a product is made of the same):', ...sys.context.productScreens.map((s) => `  ${s.name}: ${screenUses(s)}`)] : []),
+    ...(page ? [] : conventionLines(conventions)),
+    ...(page ? [
+      '',
+      `Spacing between components (the template's slots first, else a plain element with the theme's own variables): ${themeSpacing(sys.parts.themeCSS ?? '').join(', ') || 'none in the theme'}`,
+      'A page with a list owes an empty state, one that takes input an error state: show them with the system\'s own components for it (its empty and error states, the template\'s error params), each as its card writes it.',
+      '',
+      `NEXT: write prototypes/<Name>${({ vue: '.vue', svelte: '.svelte', jsx: '.jsx', html: '.html' })[Object.values(page.components)[0]?.syntax] ?? '.vue'} from the cards above, then run ${cmd} --prototype prototypes/<Name>${({ vue: '.vue', svelte: '.svelte', jsx: '.jsx', html: '.html' })[Object.values(page.components)[0]?.syntax] ?? '.vue'} and fix each ❌ line until it says the page is ready.`,
+    ] : [
+      '',
+      'The engine\'s pieces (only where the system has none of its own):',
+      ...pieceRows.map((r) => `  ${r}`),
+      `Spacing tokens: ${sys.scales.spacing.map((t) => `${t.name} (${t.value})`).join(', ') || 'none'}`,
+      `Text styles: ${sys.scales.text.map((t) => `${t.name} (${t.size}/${t.lh} ${t.weight})`).join(', ') || 'none'}`,
+      ...((sys.context?.breakpoints ?? []).length ? [`Screen widths (Page.width): ${sys.context.breakpoints.map((b) => `${b.name} (${b.px})`).join(', ')}`] : []),
+      '',
+      'Format: { "component": "Page", "props": { "padding": "<spacing token>" }, "children": [ { "component": "<name>", "props": { "<option>": "<value>" } } ] }',
+      'A system component used for a need it does not quite meet carries "standInFor": "<the need>" in its props; a need nothing fits is { "component": "Missing", "props": { "need": "…" } }.',
+      `A flow is one prototype per page, linked: a part that leads to the next page carries "goesTo": "<prototype name>" ("<name>#<state>" for one of its states); ${cmd} --prototype --flow checks the links against the flows the team wrote down.`,
+      'It works as in the product (the system\'s scripts run, a selection moves, a field takes typing). A part that opens another (a dialog, a menu, a popover) carries "opens": "<id>" in its props, and the part it opens has that "id": it is drawn closed and opens on a click. A part that shows no words or holds a group of choices (an icon button, a segmented control) carries "name": "<what it is for>": what a screen reader says. A part with a tooltip carries "tip": "<its words>". A part that fills its parent carries "stretch": true (across) or "grow": true (the room left), as Figma\'s fill container; one of several slots goes in the one it names with "inSlot": "<slot>".',
+      'Its other states go beside it: "states": { "empty": { "<id>": { …that part in this state… } }, "error": { … }, "loading": { … } }, each naming by "id" only the parts that differ (null leaves one out). A page with a list owes an empty state, one that takes input an error state, and each state the request or the guidelines name.',
+      'It is reviewed as drawn: the parts of a column start on one line, one spacing per arrangement, one primary action in view, the main heading the largest text and each heading above its text, lines under 90 characters.',
+      'It is tried at every screen width, in every state, with the words as written and 40% longer: nothing may run past the screen, be cut or spill, a control\'s label stays on one line, and on a phone every target is 24px or more. Row "wrap" and Columns "minWidth" let a layout fit a narrow screen.',
+      ...(starts.length ? ['', `Prototypes already here (starting points read from designed screens among them): ${starts.map((f) => `prototypes/${f}`).join(', ')}; copy the closest one`] : []),
+      '',
+      `NEXT: write prototypes/<name>.json with only the parts above, then run ${cmd} --prototype prototypes/<name>.json and fix each ❌ line until it is drawn.`,
+    ]),
   ].join('\n');
 }
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'screen';
+
+// The project's own lint on one file, as the project runs it but never fixing anything: ESLint, and Stylelint for a file
+// with styles. → [{ level, line, message, tool }]
+export function projectLint(ROOT, abs) {
+  const out = [];
+  const bin = (n) => [join(ROOT, 'node_modules', '.bin', n)].find(existsSync);
+  const eslint = bin('eslint');
+  if (eslint) {
+    const r = spawnSync(eslint, ['--format', 'json', '--no-warn-ignored', abs], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
+    try { for (const f of JSON.parse(r.stdout || '[]')) for (const m of f.messages ?? []) out.push({ level: m.severity === 2 ? 'error' : 'warning', line: m.line ?? 1, message: `${m.message}${m.ruleId ? ` (${m.ruleId})` : ''}`, tool: 'eslint' }); } catch { /* no JSON: the lint did not run */ }
+  }
+  const stylelint = /\.(vue|svelte|css|scss|less|html?)$/i.test(abs) ? bin('stylelint') : null;
+  if (stylelint) {
+    const r = spawnSync(stylelint, ['--formatter', 'json', abs], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
+    try { for (const f of JSON.parse(r.stdout || r.stderr || '[]')) for (const w of f.warnings ?? []) out.push({ level: w.severity === 'error' ? 'error' : 'warning', line: w.line ?? 1, message: w.text, tool: 'stylelint' }); } catch { /* the lint did not run */ }
+  }
+  return out;
+}
+
+// --prototype <page>: a page in the system's own code (Vue, Svelte, JSX, HTML), held to the system (page-check.mjs), to
+// what every edit is held to (edit-check.mjs), and to the project's lint. Nothing is changed: each ❌ is the agent's to fix.
+async function pageReport(ROOT, cfg, input, sys) {
+  const abs = resolve(ROOT, input);
+  const JSON_MODE = process.argv.includes('--json');
+  if (!existsSync(abs)) { console.log(`\n❌ ${input} does not exist.\n`); return 2; }
+  if (!sys.page) { console.log(`\n⏭  ${input}: the system's components were not found in code, so a page cannot be checked against them. Write the prototype as prototypes/<name>.json instead.\n`); return 2; }
+  const text = readFileSync(abs, 'utf8');
+  const name = basename(input).replace(/\.[^.]+$/, '');
+  const r = checkPage(input, text, sys.page, { context: sys.page.context });
+  const inv = recordInventions(ROOT, OUT_DIR, input, r, { page: sys.page, context: sys.page.context, by: 'command' });
+  const { editCheck } = await import('./edit-check.mjs');
+  const edit = editCheck({ tool_name: 'Write', tool_input: { file_path: abs, content: text } }, { root: ROOT, cfg: { ...cfg, hooks: true, editCheck: true }, headOf: () => null });
+  const lint = projectLint(ROOT, abs);
+  const errors = r.findings.filter((f) => f.level === 'error').length + (edit ? 1 : 0) + lint.filter((l) => l.level === 'error').length;
+  // The gaps go on the design team's list beside every other prototype's.
+  const outDir = join(ROOT, OUT_DIR, 'prototypes');
+  const gapsFile = join(outDir, 'gaps.json');
+  let store = { byPrototype: {} };
+  try { store = JSON.parse(readFileSync(gapsFile, 'utf8')); } catch { /* first prototype */ }
+  store.byPrototype[name] = r.gaps.map((g) => ({ need: g.need, kind: 'component', closest: null, used: null, prototype: name, ...(g.searched ? { searched: g.searched } : {}), ...(g.why ? { why: g.why } : {}) }));
+  try { mkdirSync(outDir, { recursive: true }); writeFileSync(gapsFile, JSON.stringify({ $description: `What the design system lacks, from every prototype checked with ${CLI} --prototype. Generated; the design team decides each one.`, byPrototype: store.byPrototype, merged: mergeGaps(store.byPrototype) }, null, 2) + '\n'); } catch { /* the reply still lists them */ }
+  if (JSON_MODE) { process.stdout.write(JSON.stringify({ ok: !errors, page: input, syntax: r.syntax, findings: r.findings, edit: edit ?? null, lint, gaps: r.gaps, used: r.used }, null, 2) + '\n'); return errors ? 1 : 0; }
+  const usedList = Object.keys(r.used);
+  console.log(`\nPAGE CHECK  ·  ${input}  ·  ${r.syntax}  ·  ${usedList.length} system component${usedList.length === 1 ? '' : 's'}${usedList.length ? ` (${usedList.join(', ')})` : ''}`);
+  for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} line ${f.line}: ${f.message}`);
+  if (edit) console.log(`\nWhat every edit is held to:\n${edit.split('\n').map((l) => `   ${l}`).join('\n')}`);
+  if (lint.length) { console.log('\nThe project\'s lint (nothing fixed):'); for (const l of lint) console.log(`   ${l.level === 'error' ? '❌' : '⚠️ '} line ${l.line}: ${l.message} [${l.tool}]`); }
+  // Why each mistake happened: what the documentation lacked (written into the intent layer where the code is sure,
+  // listed on the Documentation page where it is not), or what was written and not followed.
+  const lacking = new Map();
+  for (const it of inv.items.filter((x) => x.gap)) { const k = `${it.component}\u0000${it.need}`; lacking.set(k, { ...it, n: (lacking.get(k)?.n ?? 0) + 1 }); }
+  const followed = inv.items.filter((x) => !x.gap && x.component).length;
+  if (inv.items.length) {
+    console.log(`\nWhy (${inv.items.length} mistake${inv.items.length === 1 ? '' : 's'}: ${lacking.size ? `${[...lacking.values()].reduce((t, x) => t + x.n, 0)} where the documentation lacks what the agent needed` : 'none where the documentation lacks it'}${followed ? `, ${followed} where it is written and was not followed` : ''}):`);
+    for (const x of lacking.values()) console.log(`   📓 ${x.component}: ${x.why} (${x.n})${x.need === 'example' ? ' → the intent layer gets one from the code\'s own use (--intent-changes; written as final, it is the code)' : x.need === 'fields' ? ' → its code comment needs the fields; listed on the Documentation page' : ' → listed on the Documentation page as Missing'}`);
+  }
+  if (r.gaps.length) { console.log('\nGaps (the design team decides each; never build one):'); for (const g of r.gaps) console.log(`   • ${g.need}${g.searched ? `: looked at ${g.searched}` : ''}${g.why ? `; ${g.why}` : ''}`); }
+  if (errors) {
+    console.log(`\n❌ Not ready: ${errors} error${errors === 1 ? '' : 's'}.`);
+    console.log(`NEXT: fix each ❌ line in ${input} (only the system's components, each given only what its card in ${CLI} --prototype --catalog --detail <name> lists; a need nothing fits is a data-missing box), then run ${CLI} --prototype ${input} again.\n`);
+    return 1;
+  }
+  console.log(`\n✅ Ready: only the system's components, written as their code writes them, given only what they take, where the documentation puts them${lint.length ? '' : ', and the project\'s lint is clean'}.${r.gaps.length ? ` ${r.gaps.length} gap${r.gaps.length === 1 ? '' : 's'} for the design team.` : ''}`);
+  console.log(`NEXT: tell the person where the page is (${input})${r.gaps.length ? ', every gap above as written, and offer to send them to Figma as the design team\'s to do list (--recipe figma-edits), written only after they say yes' : ''}.\n`);
+  return 0;
+}
 
 // The drawn page in the browser: its picture, and against the designed screen it redraws or the product's closest one.
 // What differs in the page's own arrangement is added to what the reply owes the person (last.json). Without Chrome,
@@ -583,13 +687,25 @@ export async function runPrototype(ROOT, argv) {
   const sys = await systemFor(ROOT, cfg);
   if (sys) sys.request = requestOf(ROOT, args);
   if (!sys) { console.log(`\n⏭  no catalog yet: run ${CLI} once to write it, then draw the prototype again.\n`); return 2; }
+  // A system whose components are code (Vue, Svelte, React, custom elements): a prototype is a page in that code.
+  if ((args.includes('--catalog') || (input && syntaxOf(input))) && cfg.frameworkComponents !== false) {
+    try {
+      const page = await pageSystem(ROOT, cfg);
+      if (Object.keys(page.components).length) {
+        page.context = await pageContext(ROOT, cfg, page);
+        sys.page = page;
+        try { mkdirSync(join(ROOT, OUT_DIR, 'prototypes'), { recursive: true }); writeFileSync(join(ROOT, OUT_DIR, 'prototypes', 'page-system.json'), JSON.stringify(pageCache(page, page.context)) + '\n'); } catch { /* the hook then waits for the next run */ }
+      }
+    } catch { /* the composition path stands */ }
+  }
+  if (input && syntaxOf(input) && !/\.json$/i.test(input)) return pageReport(ROOT, cfg, input, sys);
   if (args.includes('--catalog')) {
     let starts = [];
     try { starts = readdirSync(join(ROOT, 'prototypes')).filter((f) => f.endsWith('.json')); } catch { /* none yet */ }
     const { pages, authored } = productPages(ROOT, sys);
     const req = requestOf(ROOT, args);
     const list = Object.entries(pages).map(([name, p]) => ({ name, label: p.label ?? name, text: p.text, designed: !!p.designed, file: p.file }));
-    const focus = req ? requestFocus(sys.context, req, list) : null;
+    const focus = req ? requestFocus(sys.page ? sys.page.context : sys.context, req, sys.page ? [] : list) : null;
     const at = args.indexOf('--detail');
     const detail = at >= 0 && args[at + 1] ? args[at + 1].split(',') : [];
     console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list }) + '\n');
