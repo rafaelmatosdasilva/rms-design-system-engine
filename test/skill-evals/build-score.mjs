@@ -19,6 +19,8 @@ import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../
 // prototype scorer imports them) work on a machine that has none.
 let tsModule = null;
 const tsLib = () => (tsModule ??= createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'noop.js'))('typescript'));
+// Whether the scorer can turn JSX into a page here: TypeScript installed globally (CI installs it; a computer may not).
+export const hasTypescript = () => { try { return !!tsLib(); } catch { return false; } };
 
 // ── The React stand-in: enough for a presentational component, nothing more ──────────────────────────────────
 const REACT_SHIM = `

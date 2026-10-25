@@ -8,10 +8,13 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
 import { BUILD } from './skill-evals/build-tasks.mjs';
+import { hasTypescript } from './skill-evals/build-score.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REF = join(HERE, 'skill-evals', 'build-reference');
 const CHROME = findChrome({ playwright: true });
+const TS = hasTypescript();
+const NO_TS = 'TypeScript is not installed globally (npm install -g typescript): the scorer compiles the component with it';
 const task = BUILD.find((t) => t.id === 'build-disclosure');
 
 function project(jsx, css = readFileSync(join(REF, 'src/components/disclosure.css'), 'utf8')) {
@@ -25,14 +28,14 @@ function project(jsx, css = readFileSync(join(REF, 'src/components/disclosure.cs
 }
 const failing = (checks) => checks.filter((c) => !c.ok).map((c) => c.name);
 
-test('the reference disclosure passes every check, a click opening and closing it', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('the reference disclosure passes every check, a click opening and closing it', { skip: !CHROME ? 'no Chrome available' : !TS ? NO_TS : false, timeout: 120000 }, async () => {
   const checks = await task.score(project(readFileSync(join(REF, 'src/components/Disclosure.jsx'), 'utf8')));
   assert.deepEqual(failing(checks), [], JSON.stringify(checks.filter((c) => !c.ok)));
   const opens = checks.find((c) => c.name.startsWith('a click opens it'));
   assert.match(opens.detail ?? opens.note ?? '', /^aria-expanded=true, passage shown/, 'the click itself opens it, its own state kept between renders');
 });
 
-test('one that never opens, with a chevron that is read out, fails on those points only', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('one that never opens, with a chevron that is read out, fails on those points only', { skip: !CHROME ? 'no Chrome available' : !TS ? NO_TS : false, timeout: 120000 }, async () => {
   const jsx = `import './disclosure.css';
 export function Disclosure({ Label = 'Details', Content = 'Shipping takes two business days.', Expanded = false }) {
   return (<div className="disclosure"><button type="button" className="disclosure__trigger" aria-expanded={Expanded ? 'true' : 'false'}><span>{Label}</span><span className="disclosure__chevron">▾</span></button>{Expanded && <div className="disclosure__panel">{Content}</div>}</div>);
