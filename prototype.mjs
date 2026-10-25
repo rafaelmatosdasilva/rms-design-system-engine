@@ -351,7 +351,7 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
   const want = small ? null : detailFor(ctx, focus, detail, { pages, first });
   const pieces = pieceCatalog(sys.scales, Object.keys(comps));
   const pieceRows = Object.entries(pieces).map(([n, d]) => `${n.padEnd(8)}  ${Object.entries(d.props).map(([k, e]) => `${k}=${e.type === 'enum' ? (e.values.length > 6 ? `<${k === 'style' ? 'text style' : 'spacing token'}>` : e.values.join('|')) : e.type === 'boolean' ? 'true|false' : `<${k === 'width' ? 'screen width in px' : k === 'need' ? 'what is needed' : k === 'closest' ? 'nearest system component' : 'text'}>`}`).join('  ')}`);
-  return [
+  const lines = [
     'PROTOTYPE CATALOG  ·  everything a prototype may use; nothing else exists for it',
     ...sourceLines(page ? page.context : sys.context),
     ...focusLines(focus),
@@ -405,7 +405,13 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
       '',
       `NEXT: write prototypes/<name>.json with only the parts above, then run ${cmd} --prototype prototypes/<name>.json and fix each ❌ line until it is drawn.`,
     ]),
-  ].join('\n');
+  ];
+  // What the request leaves undecided is asked before anything is written: the person's answer, not a guess.
+  if (focus?.ask?.length) {
+    const at = lines.findLastIndex((l) => l.startsWith('NEXT:'));
+    lines[at] = `NEXT: ask the person the questions under ASK FIRST, in one message, and wait for the answers; then run ${cmd} --prototype --catalog --for "<the request, with the answers>" --answered, and write the page from what it prints. With no one to answer, take the first option of each and say so.`;
+  }
+  return lines.join('\n');
 }
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'screen';
@@ -808,7 +814,7 @@ export async function runPrototype(ROOT, argv) {
     const { pages, authored } = productPages(ROOT, sys);
     const req = requestOf(ROOT, args);
     const list = Object.entries(pages).map(([name, p]) => ({ name, label: p.label ?? name, text: p.text, designed: !!p.designed, file: p.file }));
-    const focus = req ? requestFocus(sys.page ? sys.page.context : sys.context, req, sys.page ? [] : list) : null;
+    const focus = req ? requestFocus(sys.page ? sys.page.context : sys.context, req, sys.page ? [] : list, { answered: args.includes('--answered') }) : null;
     const at = args.indexOf('--detail');
     const detail = at >= 0 && args[at + 1] ? args[at + 1].split(',') : [];
     console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list }) + '\n');

@@ -390,7 +390,10 @@ written from a spec several pages share (a family's) is first given a spec of it
 file, the family spec), its API from the code, what of the family's spec the layer would no longer give its page, the
 drafts the family's spec held for it alone, and, where the layer's scripts pair code files with spec names, its entry;
 a folder's spec that only one page falls under is that page's own. The engine's own Data lines a page shows and its
-spec does not are written in the spec too, so generating the pages again keeps them. **A drafted line starts with `**Draft:**`**: the engine reads it apart from the page (`drafts`), no agent gets
+spec does not are written in the spec too, so generating the pages again keeps them. **A line the team left open** (`[open]`, `[TBD]`, `Open question: …`, TBD, "to be decided", a line ending in `??`; not
+a bare "Open:", which names a state, and never inside a code block, in the intent layer or a Figma description) is a
+question, not a rule: read apart from the page (`open`), it reaches no agent, the page's decision is **Review** with the
+question to settle, and a prototype request that touches it asks the person first. **A drafted line starts with `**Draft:**`**: the engine reads it apart from the page (`drafts`), no agent gets
 it, and the page's decision is **Review** until a person reads it, changes what is not right and removes the marker (or
 deletes the line to turn it down). Drafts are written by the `claude` command, told only what the system has (each
 component's props and the values they take, its code file, what its page says), and each is kept only when the
@@ -1186,7 +1189,11 @@ link it came from, and a link not fetched yet); for this request, what applies t
 their options (a component the code does not have is marked: it is drawn as a labelled box); what each component is for;
 the team's rules for the product; the rules the check holds every prototype to; the templates in Figma; how the
 product's pages are arranged; the engine's layout pieces with the spacing tokens, text styles and screen widths they
-take; the format; and the prototypes already in `prototypes/`.
+take; the format; and the prototypes already in `prototypes/`. For a request (`--for`) it first lists what the system cannot decide from it, under
+**ASK FIRST**: which kind of page, when the request names none of the system's page templates or fits several alike (a
+template that lays a panel, a drawer or a dialog over a page is not a kind of page); what the page is for, when nothing
+in the request matches what any component is for; and each question the documentation leaves open on what it touches.
+Its NEXT line then says to ask the person and wait; `--answered`, with the answers added to `--for`, asks nothing.
 
 A system of more than 30 components or rules is shown in full only where the request needs it, so the catalog is read
 whole instead of skimmed: `--for "<the request>"` (or the request the project's hook saved) picks the components it
