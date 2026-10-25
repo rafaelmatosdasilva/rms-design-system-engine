@@ -456,12 +456,14 @@ if (process.argv.includes('--make-command')) {
   const source = _argValue('--profile');
   if (!client || client.startsWith('--') || !source) { console.log('Usage: rms-design-system-engine --make-command <client> --profile <the profile\'s link or file> [--dir <folder>]'); process.exit(2); }
   const pf = await import('./profile.mjs');
+  // The command only names the profile: it is written even when the profile cannot be read yet (no token, or one that
+  // cannot read it), so the person has it, and is told what to fix before its first run.
   const r = PROFILE_READ ?? await pf.readProfile(source, { from: PROJECT_FROM });
-  if (r.error) { console.log(`❌ The profile cannot be read: ${r.error}. Each person needs to read it with their own GITLAB_TOKEN.`); process.exit(1); }
   const dir = _argValue('--dir');
   const link = /^https?:\/\//i.test(source) ? source : resolve(PROJECT_FROM, source);
-  const out = pf.writeCommand(client, link, { dir: dir ? resolve(PROJECT_FROM, dir) : undefined, name: r.profile.name });
+  const out = pf.writeCommand(client, link, { dir: dir ? resolve(PROJECT_FROM, dir) : undefined, name: r.profile?.name });
   console.log(`✅ /${pf.commandName(client)} written: ${out}`);
+  if (r.error) console.log(`⚠️  The profile cannot be read yet: ${r.error}. Put a GITLAB_TOKEN that can read it in .env before the first run.`);
   console.log(`   It runs the engine with ${link}; each person keeps their own GitLab token in .env and writes only where GitLab lets them.`);
   console.log(`NEXT: ${dir ? 'the person shares that folder in the company\'s private repository; each colleague copies it into ~/.claude/skills/' : `the person shares ${dirname(out)} with the team (a private repository); each colleague puts it in ~/.claude/skills/`} and runs /${pf.commandName(client)}.`);
   process.exit(0);
