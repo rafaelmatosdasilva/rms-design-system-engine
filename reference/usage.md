@@ -1117,7 +1117,9 @@ makes a listed token fail the gate.
 A generator (an AI agent, a small model in the browser, a template tool) composes real design-system UI
 only when it is told exactly what exists, and its output is checked every time. Every run writes
 `contracts/catalog.json` beside the contracts: each component with its props (allowed values, defaults,
-and the code prop name when known), the components it may contain (from Figma's composition and the
+and the code prop name when known; a prop only the code has, such as a Vue `variant` Figma has no property for, is
+listed as the code names it, `codeOnly`, read from the component's own file when no fresh code capture holds it), the
+components it may contain (from Figma's composition and the
 nesting the code capture saw), what it must never contain, its status, and where it lives (`livesIn`, also
 in each contract): the products whose code uses it, with how many files and uses (a page built from a source
 beside it counted once), the system's own pages that show it, the components it sits inside and the ones it
@@ -1152,6 +1154,21 @@ the team's rules for the product; the rules the check holds every prototype to; 
 product's pages are arranged; the engine's layout pieces with the spacing tokens, text styles and screen widths they
 take; the format; and the prototypes already in `prototypes/`.
 
+A system of more than 30 components or rules is shown in full only where the request needs it, so the catalog is read
+whole instead of skimmed: `--for "<the request>"` (or the request the project's hook saved) picks the components it
+points to, the ones its designed screen and starting pages are made of, and the ones the guidelines it touches and those
+components' own rules name as code writes them (`` `TabStrip` ``, `buttonPrimary`, `<Toolbar>`), at most 16. Every other
+component is one line, every other rule is named by its page, and the token pages are counted (their tokens are in the
+scales). `--detail <name or rule title>,…` prints any of them in full. A component whose own page only points to its
+family's spec takes what it is for from the next line; one with nothing from Figma or the code takes its purpose and
+role (`Role:`) from the intent layer, whose lines are each said once (a family's shared rule and the component's own)
+and whose examples (`Example:`) are shown as examples.
+
+- **Where a component goes** is read from the documentation as written, and the check holds every prototype to it: a
+  sentence that names the component and its container as the system names them (`` `searchField` only inside the
+  toolbar``, ``Do not place `TabItem` without `TabStrip` ``) makes a part outside that container an error. One that
+  allows another owner (`unless another component lays it out`) is an error only when nothing of the system holds
+  the part. An unknown prop is an error with the closest real name (`did you mean variant?`).
 - **What each component is for** comes from everything the team wrote, read as the design intent reads it
   (`intent-gen.mjs`, nothing written): the Figma description and annotations (a `Role:` annotation is shown as its
   role), each option's description, the code's notes and the comment above its CSS rule, the authored contract

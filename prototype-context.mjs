@@ -191,6 +191,9 @@ export async function loadContext(ROOT, cfg = {}, catalog = { components: {} }, 
     if (list.length) examples[name] = list;
   }
   if (Object.keys(examples).length) sources.push({ what: 'the team', detail: `Do and Don't of ${Object.keys(examples).length} component${Object.keys(examples).length === 1 ? '' : 's'}` });
+  // The intent layer the design intent read (intent-layer.mjs): its pages, at the commit read, its drafts left out.
+  const IL = intent?.intentLayer;
+  if (IL?.pages) { const s = IL._source ?? {}; sources.push({ what: 'the intent layer', detail: `${IL.pages} page${IL.pages === 1 ? '' : 's'} from ${String(s.url ?? s.label ?? 'the intent layer').replace(/^https?:\/\//, '')}${s.ref ? ` @ ${s.ref}` : ''}${s.sha ? ` ${String(s.sha).slice(0, 8)}` : ''} (a line marked Draft, or one the system contradicts, is left out)` }); }
   if (intent && LAYERS.some((L) => intent[L]?.authored)) sources.push({ what: 'the team', detail: `the design intent's ${LAYERS.filter((L) => intent[L]?.authored).join(', ')}` });
 
   // The guidelines, section by section, each with where it comes from.
@@ -266,8 +269,9 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     // The team's intent layer, kept apart from Figma's and the code's words: what the agent composing a screen without a
     // Figma layout reads to know what each component is for and what not to do with it.
     const il = i.intentLayer ?? null;
-    const intentLayer = il ? Object.fromEntries(Object.entries({ purpose: intentText(il.purpose) || null, whenToUse: il.whenToUse ?? [], whenNotToUse: il.whenNotToUse ?? [], mistakes: il.mistakes ?? [], limitations: il.limitations ?? [], rules: il.rules ?? [], file: il.url ?? il.file ?? null })
-      .map(([k, v]) => [k, Array.isArray(v) ? v.map(clean).filter(Boolean) : v])) : null;
+    const intentLayer = il ? intentLayerOf(il) : null;
+    // The role its intent layer page writes (Role: button), where Figma's annotations name none.
+    const ilRole = intentLayer?.role ?? null;
     components[name] = {
       // What rules a use out: the documentation's "never" sentences, when not to use it, every common mistake and
       // every Don't (each a use the team has seen go wrong).
@@ -276,8 +280,8 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
         ...(intentLayer?.whenNotToUse ?? []).map((x) => ({ sentence: `Intent layer: ${x}`, clause: x, min: 2 }))],
       intentLayer,
       whenToUse, mistakes, limitations, dos, donts,
-      purpose,
-      role,
+      purpose: purpose ?? intentLayer?.purpose ?? null,
+      role: role ?? ilRole,
       notes: [...new Set(notes)],
       options,
       notFor,
@@ -299,11 +303,90 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     for (const pg of intent?.[L]?.intentLayer ?? []) {
       const body = [pg.purpose, ...(pg.whenToUse ?? []).map((x) => `Use when: ${x}`), ...(pg.whenNotToUse ?? []).map((x) => `Not when: ${x}`),
         ...(pg.mistakes ?? []).map((x) => `Common mistake: ${x}`), ...(pg.limitations ?? []).map((x) => `Limitation: ${x}`), ...(pg.rules ?? [])].filter(Boolean).join('\n');
-      if (body) rules.push({ title: `${pg.name} (${L}, intent layer)`, text: body, file: pg.url ?? pg.file ?? null });
-      for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null });
+      if (body) rules.push({ title: `${pg.name} (${L}, intent layer)`, text: body, file: pg.url ?? pg.file ?? null, ...(pg.kind ? { kind: pg.kind } : {}) });
+      for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null, ...(pg.kind ? { kind: pg.kind } : {}) });
     }
   }
-  return { components, rules, limits: limitsFrom(components, rules, names) };
+  return { components, rules, limits: limitsFrom(components, rules, names), inside: insideFrom(components, rules, names) };
+}
+
+// A component's intent layer page as the catalog shows it: each line once (a family's shared rule often says what the
+// component's own page says), its role and its examples apart from its rules (Role: button, Example: <TabStrip …>).
+const sameLine = (x) => String(x).toLowerCase().replace(/\s*\((?:must|should|may)(?:-not)?\)\s*$/, '').replace(/[^a-z0-9]+/g, ' ').trim();
+export function intentLayerOf(il) {
+  const seen = new Set();
+  const once = (list) => (list ?? []).map(clean).filter(Boolean).filter((x) => { const k = sameLine(x); return !seen.has(k) && seen.add(k); });
+  const purpose = intentText(il.purpose) || null;
+  const lists = { whenToUse: once(il.whenToUse), whenNotToUse: once(il.whenNotToUse), mistakes: once(il.mistakes), limitations: once(il.limitations) };
+  let role = null;
+  const examples = [], rules = [];
+  for (const r of once(il.rules)) {
+    const m = /^role\s*:\s*(.+)$/i.exec(r), ex = /^example\s*:\s*(.+)$/i.exec(r);
+    if (m) role = role ?? m[1].trim();
+    else if (ex) examples.push(ex[1].trim());
+    else rules.push(r);
+  }
+  return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null };
+}
+
+// Where a component may go, read from the documentation as written: "`searchField` only inside the toolbar", "Do not
+// place `TabItem` without `TabStrip` unless another component lays it out". Only a
+// sentence that names the component and its container as the system names them counts; anything vaguer stays words.
+// → [{ component, within: [names], sentence, from, owned }]: owned, when another component may hold it instead ("unless a
+// component lays it out").
+export function insideFrom(components, rules, names) {
+  const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
+  const nameOf = (w) => byKey.get(String(w).toLowerCase().replace(/[^a-z0-9]/g, '')) ?? null;
+  const ticked = (t) => [...String(t).matchAll(/`([A-Za-z][\w/-]*)`/g)].map((m) => nameOf(m[1])).filter(Boolean);
+  const texts = [];
+  for (const [n, k] of Object.entries(components)) {
+    const il = k.intentLayer;
+    for (const t of [k.guidelines, ...(k.mistakes ?? []), ...(il ? [...il.rules, ...il.mistakes, ...il.whenNotToUse] : [])]) if (t) texts.push({ text: t, about: n, from: `${n}'s documentation` });
+  }
+  for (const r of rules) if (r.kind !== 'token') texts.push({ text: r.text, about: null, from: r.title });
+  const out = [], seen = new Set();
+  const add = (subjects, container, sentence, from, owned) => {
+    for (const c of subjects) {
+      if (!container || c === container) continue;
+      const key = `${c}>${container}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ component: c, within: [container], sentence: sentence.trim().replace(/^[-*]\s*/, ''), from, owned });
+    }
+  };
+  for (const t of texts) {
+    for (const sentence of String(t.text).split(/(?<=[.!?])\s+|\n+/)) {
+      const owned = /\bunless\b/i.test(sentence);
+      // `X` (…) only inside / only in (the) Y
+      const only = /^(.*?)(?<![\w-])only\s+(?:inside|within|in)\s+(?:the\s+|a\s+|an\s+)?`?([A-Za-z][\w/-]*)`?/i.exec(sentence);
+      if (only && !/\b(?:not|never)\b/i.test(only[1])) add(ticked(only[1]), nameOf(only[2]), sentence, t.from, owned);
+      // Do not place `A` or `B` … without `C`
+      const without = /\b(?:do not|don't|never)\s+(?:place|put|use|render)\s+(.+?)\s+without\s+`([A-Za-z][\w/-]*)`/i.exec(sentence);
+      if (without) add(ticked(without[1]), nameOf(without[2]), sentence, t.from, owned);
+    }
+  }
+  return out;
+}
+
+// A part placed where its documentation says it never goes: one with none of the containers it names among the parts
+// that hold it. One another component may own is only a mistake when nothing of the system holds it (the engine's
+// layout pieces are not the system's). nodes: nodesOf(ui).nodes; pieces: the engine's piece names.
+export function insideFindings(inside = [], nodes = [], pieces = []) {
+  if (!inside.length) return [];
+  const parent = new Map();
+  for (const n of nodes) for (const k of n.children ?? []) parent.set(typeof k === 'object' ? k?.id : k, n.id);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const holders = (id) => { const out = []; for (let p = parent.get(id); p != null; p = parent.get(p)) { const n = byId.get(p); if (n) out.push(n.component); } return out; };
+  const out = [];
+  for (const n of nodes) {
+    for (const r of inside.filter((x) => x.component === n.component)) {
+      const up = holders(n.id);
+      if (up.some((c) => r.within.includes(c))) continue;
+      if (r.owned && up.some((c) => !pieces.includes(c))) continue;
+      out.push({ rule: null, source: 'the team\'s documentation', level: 'error', id: n.id, message: `${n.component} is not inside ${r.within.join(' or ')}: "${cut(r.sentence, 200)}" (${r.from}). Put it in ${r.within.join(' or ')}` });
+    }
+  }
+  return out;
 }
 
 // The sentences that rule a use out ("Never an on/off control", "not for navigation"), and the authored whenNotToUse.
@@ -352,15 +435,17 @@ export function limitsFrom(components, rules, names) {
 const said = (k) => k && (k.kept?.length || k.purpose || k.role || k.notes.length || k.notFor || k.guidelines || k.useInstead?.length || k.status || k.options?.length || k.whenToUse?.length || k.mistakes?.length || k.limitations?.length || k.dos?.length || k.donts?.length || k.intentLayer);
 
 // One block per component for the catalog: what it is for, its role, its options' meaning, when not to use it, the
-// team's notes and its guidelines.
-export function purposeLines(ctx, names, { width = 400 } = {}) {
+// team's notes and its guidelines. full: the names shown in full (a Set; null: every one); each other one is its
+// first line only, so a catalog of hundreds of components stays short enough to be read whole.
+export function purposeLines(ctx, names, { width = 400, full = null } = {}) {
   const list = names.filter((n) => said(ctx.components[n]));
   if (!list.length) return [];
-  const pad = Math.max(...list.map((n) => n.length));
+  const pad = Math.min(28, Math.max(...list.map((n) => n.length)));
   const out = [];
   for (const n of list) {
     const k = ctx.components[n];
     const head = [k.purpose, k.role ? `Role ${k.role}.` : null, k.status ? `[${k.status}${k.useInstead?.length ? `: use ${k.useInstead.join(' or ')}` : ''}]` : null].filter(Boolean).join(' ');
+    if (full && !full.has(n)) { out.push(`  ${n.padEnd(pad)}  ${cut(head || '(no description yet)', 110)}`); continue; }
     out.push(`  ${n.padEnd(pad)}  ${cut(head || '(no description yet)', width)}`);
     const more = (label, text) => out.push(`  ${' '.repeat(pad)}    ${label} ${cut(text, width)}`);
     for (const o of k.options) more('option', o);
@@ -382,14 +467,66 @@ export function purposeLines(ctx, names, { width = 400 } = {}) {
       for (const m of il.mistakes) more('intent: mistake', m);
       for (const l of il.limitations) more('intent: limit', l);
       for (const r of il.rules) more('intent: rule', r);
+      for (const x of il.examples ?? []) more('intent: example', x);
     }
   }
   return out;
 }
 
-// The team's rules for the product, each section on its own line (the full text stays in its file).
-export function ruleLines(ctx, { width = 500 } = {}) {
-  return ctx.rules.map((r) => `  ${r.title}${r.file ? ` (${r.file})` : ''}: ${cut(r.text.replace(/\s+/g, ' '), width)}`);
+// The team's rules for the product, each section on its own line (the full text stays in its file). full: the titles
+// shown with their text (a Set; null: every one); the others are named only, a few to a line.
+export function ruleLines(ctx, { width = 500, full = null, above = null } = {}) {
+  const shown = ctx.rules.filter((r) => (!full || full.has(r.title)) && !above?.has(r.title));
+  const out = shown.map((r) => `  ${r.title}${r.file ? ` (${r.file})` : ''}: ${cut(r.text.replace(/\s+/g, ' '), width)}`);
+  // The others by the page they come from (Orders · Rules → Orders), each once; a token's page is in the scales.
+  const rest = full ? ctx.rules.filter((r) => !full.has(r.title) && !above?.has(r.title)) : [];
+  const tokenPages = rest.filter((r) => r.kind === 'token').length;
+  const named = [...new Set(rest.filter((r) => r.kind !== 'token').map((r) => r.title.split(' · ')[0].replace(/\s*\([^)]*\)\s*$/, '').trim()))];
+  for (let i = 0; i < named.length; i += 10) out.push(`  ${i ? '' : 'also: '}${named.slice(i, i + 10).join('; ')}`);
+  if (tokenPages) out.push(`  and ${tokenPages} token page${tokenPages === 1 ? '' : 's'}: a prototype takes its tokens from the scales below`);
+  return out;
+}
+
+// What a request needs in full: the components it points to, the ones the guidelines it touches name, the ones its
+// designed screen and its starting pages are made of, and the ones each of those names in its own documentation (a tab's
+// page names its group): one step out, never the whole system. detail: names or rule titles asked for by name.
+// → { components: Set, rules: Set }
+const MOST_IN_FULL = 16;
+export function detailFor(ctx, focus, detail = [], { pages = [] } = {}) {
+  const names = Object.keys(ctx.components ?? {});
+  const byKey = new Map(names.map((n) => [n.toLowerCase().replace(/[^a-z0-9]/g, ''), n]));
+  // A name as code writes it (`Drawer`, TabStrip, buttonPrimary): in backticks, or with a capital inside it. A plain
+  // word ("a component", "the menu item") names no component.
+  const named = (text) => {
+    const t = String(text ?? ''), out = new Set();
+    const add = (w) => { const n = byKey.get(w.toLowerCase().replace(/[^a-z0-9]/g, '')); if (n) out.add(n); };
+    for (const m of t.matchAll(/`([A-Za-z][\w/-]*)/g)) add(m[1]);
+    for (const m of t.matchAll(/\b[A-Za-z][a-z0-9]*[A-Z][\w-]*/g)) add(m[0]);
+    for (const m of t.matchAll(/(?:<|\bimport\s+)([A-Z][\w]*)/g)) add(m[1]);   // a tag or an import in an example
+    return [...out];
+  };
+  const comps = new Set(), rules = new Set(), second = new Map(), shownAbove = new Set();
+  const asked = detail.map((d) => String(d).trim()).filter(Boolean);
+  for (const d of asked) {
+    const n = byKey.get(d.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    if (n) comps.add(n);
+    for (const r of ctx.rules ?? []) if (r.title.toLowerCase().includes(d.toLowerCase())) rules.add(r.title);
+  }
+  if (focus) {
+    for (const c of focus.components ?? []) if (c.score >= 3) comps.add(c.name);   // one shared word is not enough
+    for (const s of focus.screens ?? []) for (const [n] of s.components ?? []) comps.add(n);
+    for (const p of focus.pages ?? []) for (const n of named(pages.find((x) => x.name === p.name)?.text ?? '')) comps.add(n);
+    for (const r of focus.ruledOut ?? []) comps.add(r.name);
+    // The components the guidelines it touches name, the most named first: they come after its own.
+    for (const s of focus.sections ?? []) { shownAbove.add(s.title); for (const n of named(`${s.title} ${s.text}`)) second.set(n, (second.get(n) ?? 0) + 3); }
+  }
+  // What the request's own components need to be used right: what their rules and mistakes name (a tab's group).
+  for (const n of [...comps]) {
+    const k = ctx.components[n], il = k?.intentLayer;
+    for (const m of named([k?.guidelines, ...(k?.mistakes ?? []), ...(il ? [...il.mistakes, ...il.rules] : [])].join(' '))) if (!comps.has(m)) second.set(m, (second.get(m) ?? 0) + 1);
+  }
+  for (const [n] of [...second].filter(([n]) => !comps.has(n)).sort((a, b) => b[1] - a[1])) { if (comps.size >= MOST_IN_FULL) break; comps.add(n); }
+  return { components: comps, rules, shownAbove };
 }
 
 // What the person asked for, against everything known: the guidelines' opening text (it is for every page) and the
@@ -404,7 +541,7 @@ export function requestFocus(ctx, request, pages = []) {
     const inHead = hit(r.title), inBody = hit(r.text);
     return { ...r, score: inHead.length * 3 + inBody.length, matched: [...new Set([...inHead, ...inBody])] };
   }).filter((r) => r.score >= 2 || r.matched.length >= 2 || r.title === 'guidelines').sort((a, b) => (b.title === 'guidelines') - (a.title === 'guidelines') || b.score - a.score).slice(0, 5);
-  const positive = (k) => [k.purpose, k.role, ...k.options, ...(k.whenToUse ?? []), ...(k.dos ?? []), ...(k.guidelines ?? '').split(/(?<=[.!?])\s+/), ...k.notes].filter((x) => x && !NEVER.test(x)).join(' ');
+  const positive = (k) => [k.purpose, k.role, ...k.options, ...(k.whenToUse ?? []), ...(k.intentLayer?.whenToUse ?? []), ...(k.dos ?? []), ...(k.guidelines ?? '').split(/(?<=[.!?])\s+/), ...k.notes].filter((x) => x && !NEVER.test(x)).join(' ');
   // A word many components' notes share (the product's name) points to none of them.
   const docs = Object.entries(ctx.components).map(([name, k]) => [name, hit(positive(k))]);
   const common = new Set(words.filter((w) => docs.filter(([, m]) => m.includes(w)).length > Math.max(2, docs.length / 4)));

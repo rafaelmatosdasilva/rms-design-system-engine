@@ -135,5 +135,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-24-merge-remote-tracking-branch-origin-4` | The 21 guide tasks on Haiku (engine 88b78a0) | "Merge remote-tracking branch 'origin/main' into gitlab-path-resolve" |
 | `2026-10-24-intent-layer-drafts-sent-in` | The 21 guide tasks on Haiku (engine 92415e4) | "Intent layer drafts sent in parts (GitLab closes a request too large), each on the one before; a role written "Role: …" after the written sections, as a spec checked for its order wants; a section with a draft waiting counts as Review, not Missing; one status a row on the Documentation page; markup is no name the check calls unknown" |
 | `2026-10-24-merge-remote-tracking-branch-origin-5` | The 21 guide tasks on Haiku (engine 6bfa0b9) | "Merge remote-tracking branch 'origin/main' into docs-fold-for-agents" |
+| `2026-10-24-prototype-catalog-what-the-request` | The 21 guide tasks on Haiku (engine 8f07cf3) | "Prototype catalog: what the request needs, the code's own props, and where a component goes" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

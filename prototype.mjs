@@ -17,7 +17,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
 import { checkPrototype, systemScales, nodesOf, mergeGaps, groupLayout, gapLine, pageGaps, pieceCatalog } from './prototype-pieces.mjs';
 import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
-import { loadContext, purposeLines, ruleLines, usesAgainstPurpose, requestFocus, focusLines, cut, screenUses } from './prototype-context.mjs';
+import { loadContext, purposeLines, ruleLines, detailFor, usesAgainstPurpose, requestFocus, focusLines, cut, screenUses } from './prototype-context.mjs';
+
+// A system this small is shown whole in the catalog.
+const SMALL_SYSTEM = 30;
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from './product-conventions.mjs';
 import { splitStates, applyState, statesOwed, stateFindings, normaliseValues } from './prototype-states.mjs';
 import { linksOf, flowGraph, teamFlows, flowFindings } from './prototype-flows.mjs';
@@ -115,7 +118,7 @@ export function fillsWidth(css, cls) {
 }
 
 export function prototypePage({ name, tree, states = [], parts, scales, gaps, note = '', catalog = { components: {} }, fonts = true }) {
-  const opts = (n, type) => Object.fromEntries(Object.entries(catalog.components?.[n]?.props ?? {}).filter(([, e]) => e.type === type).map(([k, e]) => [k, typeof e.default === 'string' ? e.default : '']));
+  const opts = (n, type) => Object.fromEntries(Object.entries(catalog.components?.[n]?.props ?? {}).filter(([, e]) => e.type === type && !e.codeOnly).map(([k, e]) => [k, typeof e.default === 'string' ? e.default : '']));
   // The classes the system's CSS adds to a component's own class (.node.node-selected): what an option value can turn on.
   // The theme's rules count as much as the components' own sheets: a system often writes its states there.
   const css = `${parts.themeCSS ?? ''}\n${parts.componentCSS ?? ''}`.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -323,9 +326,14 @@ export function conventionLines(conv) {
 
 // --catalog: everything a prototype may use, in one screen: the system's components and options, the engine's pieces
 // with the tokens they take, the format, and the starting points already made.
-export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null } = {}) {
+export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null, detail = [], pages = [] } = {}) {
   const drawable = new Set((sys.parts.view.components ?? []).map((c) => c.name));
   const comps = Object.fromEntries(Object.entries(sys.catalog.components ?? {}).map(([n, c]) => [n, { ...c, ...(drawable.has(n) ? {} : { status: c.status ? `${c.status}, not built in code` : 'not built in code: drawn as a box' }) }]));
+  // A small system is shown whole. A large one in full only where the request (and what it names) needs it, every other
+  // component and rule in a line: a catalog read whole is followed; one too long to read is skimmed, and guessed.
+  const ctx = sys.context ?? { components: {}, rules: [] };
+  const small = Object.keys(comps).length <= SMALL_SYSTEM && (ctx.rules ?? []).length <= SMALL_SYSTEM;
+  const want = small ? null : detailFor(ctx, focus, detail, { pages });
   const pieces = pieceCatalog(sys.scales, Object.keys(comps));
   const pieceRows = Object.entries(pieces).map(([n, d]) => `${n.padEnd(8)}  ${Object.entries(d.props).map(([k, e]) => `${k}=${e.type === 'enum' ? (e.values.length > 6 ? `<${k === 'style' ? 'text style' : 'spacing token'}>` : e.values.join('|')) : e.type === 'boolean' ? 'true|false' : `<${k === 'width' ? 'screen width in px' : k === 'need' ? 'what is needed' : k === 'closest' ? 'nearest system component' : 'text'}>`}`).join('  ')}`);
   return [
@@ -333,10 +341,11 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
     ...sourceLines(sys.context),
     ...focusLines(focus),
     '',
-    'The design system\'s components (name, options):',
-    catalogTable({ components: comps }),
-    ...(() => { const l = purposeLines(sys.context ?? { components: {}, rules: [] }, Object.keys(comps)); return l.length ? ['', 'What each component is for (Figma descriptions and annotations, code notes, the team\'s guidelines); use it only for that:', ...l] : []; })(),
-    ...(() => { const l = ruleLines(sys.context ?? { components: {}, rules: [] }); return l.length ? ['', 'The team\'s rules for the product:', ...l] : []; })(),
+    want ? `The design system's components in full (name, options; code: is a prop only the code has, written as the code names it; any other one's options with --detail <name>,…):` : 'The design system\'s components (name, options; code: is a prop only the code has, written as the code names it):',
+    catalogTable({ components: want ? Object.fromEntries(Object.entries(comps).filter(([n]) => want.components.has(n))) : comps }),
+    ...(() => { const l = purposeLines(ctx, Object.keys(comps), { full: want?.components ?? null }); return l.length ? ['', `What each component is for (Figma descriptions and annotations, code notes, the team's guidelines, the intent layer); use it only for that${want ? `. In full: ${want.components.size ? [...want.components].join(', ') : 'none yet'}; every other one in a line, in full with --detail <name>,…` : ''}:`, ...l] : []; })(),
+    ...(() => { const l = ruleLines(ctx, { full: want?.rules ?? null, above: want?.shownAbove ?? null, width: want ? 4000 : 500 }); return l.length ? ['', `The team's rules for the product${want ? ' (the ones this request touches in full; any other with --detail "<title>")' : ''}:`, ...l] : []; })(),
+    ...(want && !focus && !detail.length ? ['', `This system is large: run ${cmd} --prototype --catalog --for "<the request>" to see in full what the request needs.`] : []),
     ...((sys.context?.limits ?? []).length ? ['', 'Rules the check holds every prototype to (read from the guidelines):', ...sys.context.limits.map((l) => `  at most ${l.max} ${l.component} per ${l.per}: "${cut(l.sentence, 160)}" (${l.from})`)] : []),
     ...((sys.context?.templates ?? []).length ? ['', 'Templates in Figma (the components each composes, in order):', ...sys.context.templates.map((t) => `  ${t.name}: ${t.components.join(', ')}`)] : []),
     ...((sys.context?.productScreens ?? []).length ? ['', 'The product\'s screens in Figma (the components each one uses, the most used first; a new page for a product is made of the same):', ...sys.context.productScreens.map((s) => `  ${s.name}: ${screenUses(s)}`)] : []),
@@ -579,8 +588,11 @@ export async function runPrototype(ROOT, argv) {
     try { starts = readdirSync(join(ROOT, 'prototypes')).filter((f) => f.endsWith('.json')); } catch { /* none yet */ }
     const { pages, authored } = productPages(ROOT, sys);
     const req = requestOf(ROOT, args);
-    const focus = req ? requestFocus(sys.context, req, Object.entries(pages).map(([name, p]) => ({ name, label: p.label ?? name, text: p.text, designed: !!p.designed, file: p.file }))) : null;
-    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus }) + '\n');
+    const list = Object.entries(pages).map(([name, p]) => ({ name, label: p.label ?? name, text: p.text, designed: !!p.designed, file: p.file }));
+    const focus = req ? requestFocus(sys.context, req, list) : null;
+    const at = args.indexOf('--detail');
+    const detail = at >= 0 && args[at + 1] ? args[at + 1].split(',') : [];
+    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list }) + '\n');
     return 0;
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);

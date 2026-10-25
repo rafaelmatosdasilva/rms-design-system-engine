@@ -113,6 +113,7 @@ export function codeFilesOf(ROOT, cfg = {}) {
 
 // What a component carries from the layer, for the design intent, the contracts and the style guide. wrong: what the
 // content check found on its page (intent-truth.mjs): the lines it says are wrong are left out, and it is listed.
+const FAMILY_POINTER = /^use the family spec\b/i;
 export function componentIntent(e, src, wrong = []) {
   const bad = new Set(wrong.filter((f) => (f.kind === 'name' || f.kind === 'claim') && f.line).map((f) => norm(f.line)));
   const ok = (t) => !bad.size || ![...bad].some((b) => b && norm(t).includes(b));
@@ -120,8 +121,9 @@ export function componentIntent(e, src, wrong = []) {
   const list = (a) => (a.length ? a : null);
   return {
     ...(wrong.length ? { wrong: wrong.map(({ kind, where, line, truth, fix }) => ({ kind, where, line, truth, fix })) } : {}),
-    name: e.name, file: e.file, url: e.url ?? fileUrl(src, e.file), status: e.status ?? null, source: e.source?.label ?? src?.label ?? 'the intent layer',
-    purpose: e.purpose[0] ?? null, whenToUse: list(e.whenToUse), whenNotToUse: list(e.whenNotToUse),
+    name: e.name, ...(e.kind ? { kind: e.kind } : {}), file: e.file, url: e.url ?? fileUrl(src, e.file), status: e.status ?? null, source: e.source?.label ?? src?.label ?? 'the intent layer',
+    // A split page's first line only points to its family's spec: what the component is for is the line after it.
+    purpose: e.purpose.find((x) => !FAMILY_POINTER.test(x)) ?? null, whenToUse: list(e.whenToUse), whenNotToUse: list(e.whenNotToUse),
     mistakes: list(e.mistakes), limitations: list(e.limitations),
     rules: list(e.rules.map((r) => (r.level ? `${r.text} (${r.level})` : r.text))),
     sections: list(e.sections),

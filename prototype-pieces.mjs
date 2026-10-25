@@ -11,7 +11,7 @@
 // Pure: no I/O. prototype.mjs is the command.
 import { checkUi } from './ui-catalog.mjs';
 import { shortStyleNames } from './text-styles.mjs';
-import { ruledOut, requestFindings, wordsOf } from './prototype-context.mjs';
+import { ruledOut, requestFindings, wordsOf, insideFindings } from './prototype-context.mjs';
 
 export const PIECES = ['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing'];
 export const GAP_KINDS = ['component', 'option', 'token', 'icon', 'layout', 'pattern'];
@@ -196,6 +196,7 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
     const optDefs = catalog.components[node.component]?.props ?? {};
     for (const k of Object.keys(p)) {
       if (['standInFor', 'purpose', 'content', 'box', 'textless', 'surface', 'figmaState', 'opens', 'goesTo', 'name', 'inSlot', 'tip', 'grow', 'stretch', 'why', 'searched'].includes(k) || agreed.has(k)) continue;
+      if (!optDefs[k] && !Object.values(optDefs).some((e) => e.codeName === k)) continue;   // not one of its props: an error above
       // A value of a choice turns on the class the system's CSS adds for it (.node.node-selected); a default value
       // needs none. One the CSS has no class for is drawn without it, and said.
       if (optDefs[k]?.type === 'enum') {
@@ -216,6 +217,8 @@ export function checkPrototype(ui, { catalog = { components: {} }, view = { comp
       findings.push({ rule: null, source: 'the code', level: 'warning', id: node.id, said, message: `${said} has no part of that name in the code yet: drawn without it` });
     }
   }
+  // Where the documentation says a component goes (a tab inside its strip, a search field inside the toolbar).
+  findings.push(...insideFindings(context?.inside ?? [], nodes, Object.keys(pieces)));
   // The team's written limits: a component used more often than its guidelines allow.
   const count = new Map();
   for (const node of nodes) count.set(node.component, (count.get(node.component) ?? 0) + 1);

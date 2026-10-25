@@ -78,8 +78,23 @@ export function buildCatalog(built, { code = null, selectorFor = null, examples 
         props[pn] = e;
       }
     }
+    // The code's props Figma has no property for (a variant, a full-width switch): an agent writing the component passes them, so
+    // they are listed as the code names them and checked, never guessed.
+    if ((c.props ?? []).length) {
+      const mapped = new Set(Object.values(props).map((e) => e.codeName).filter(Boolean));
+      for (const [pn, pe] of Object.entries(api?.props ?? {})) {
+        if (STATE_PROP.test(pn) || mapped.has(pn) || props[pn]) continue;
+        const t = String(pe?.type ?? '').toLowerCase();
+        if (/array|object|func|symbol/.test(t)) continue;
+        const e = { type: Array.isArray(pe?.options) && pe.options.length ? 'enum' : /bool/.test(t) ? 'boolean' : 'text', codeName: pn, codeOnly: true };
+        if (e.type === 'enum') e.values = pe.options.map(String);
+        if (pe?.default != null && pe.default !== '') e.default = pe.default;
+        if (pe?.description) e.description = String(pe.description);
+        props[pn] = e;
+      }
+    }
     const rel = c.relationships ?? {};
-    const inCode = Object.entries(code?.nesting?.[name]?.contains ?? {}).filter(([k, v]) => names.has(k) && (v.renderedIn?.length || v.inSource)).map(([k]) => k);
+    const inCode =Object.entries(code?.nesting?.[name]?.contains ?? {}).filter(([k, v]) => names.has(k) && (v.renderedIn?.length || v.inSource)).map(([k]) => k);
     const children = [...new Set([...(rel.composesWith ?? []), ...inCode])].filter((k) => k !== name);
     const entry = { description: String(c.description ?? '').replace(/\s+/g, ' ').trim() };
     if (selectorFor) entry.selector = selectorFor(name);
@@ -137,7 +152,7 @@ export const RULES = [
 export function catalogTable(catalog) {
   const rows = Object.entries(catalog.components).map(([name, c]) => {
     const props = Object.entries(c.props).map(([p, e]) =>
-      `${p}=${e.type === 'enum' ? (e.values ?? []).join('|') : e.type === 'boolean' ? 'true|false' : e.type === 'children' ? '<its children>' : e.type}`).join('  ');
+      `${e.codeOnly ? 'code:' : ''}${p}=${e.type === 'enum' ? (e.values ?? []).join('|') : e.type === 'boolean' ? 'true|false' : e.type === 'children' ? '<its children>' : e.type}`).join('  ');
     const tail = [c.children?.length ? `contains ${c.children.join(', ')}` : null, c.status ? `[${c.status}${c.useInstead?.length ? ` → ${c.useInstead.join(', ')}` : ''}]` : null].filter(Boolean).join('  ');
     return [name, props || '-', tail];
   });
@@ -170,9 +185,20 @@ function flatten(ui) {
   return { root, nodes, flat: false };
 }
 
+// The closest real name: the same in other case, one holding the other, else one a typo or two away.
+const distance = (a, b) => {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length];
+};
 const near = (name, list) => {
   const k = String(name).toLowerCase();
-  return list.find((x) => x.toLowerCase() === k) ?? list.find((x) => x.toLowerCase().includes(k) || k.includes(x.toLowerCase())) ?? null;
+  const typo = list.map((x) => [x, distance(k, x.toLowerCase())]).filter(([x, d]) => d <= Math.min(2, Math.floor(Math.max(k.length, x.length) / 3))).sort((a, b) => a[1] - b[1])[0]?.[0];
+  return list.find((x) => x.toLowerCase() === k) ?? list.find((x) => x.toLowerCase().includes(k) || k.includes(x.toLowerCase())) ?? typo ?? null;
 };
 
 export function checkUi(ui, catalog) {
@@ -202,7 +228,7 @@ export function checkUi(ui, catalog) {
         const p = def.props?.[k] ?? Object.entries(def.props ?? {}).find(([, e]) => e.codeName === k)?.[1];
         // A part's own keys (its id, its children) written inside its props: say where they go.
         if (!p && ['id', 'children', 'component'].includes(k)) { add(2, 'error', node.id, `${node.component} has no prop "${k}": "${k}" goes beside "component", not inside "props"`); continue; }
-        if (!p) { add(2, 'error', node.id, `${node.component} has no prop "${k}"`); continue; }
+        if (!p) { const guess = near(k, Object.entries(def.props ?? {}).flatMap(([n, e]) => [n, e.codeName].filter(Boolean))); add(2, 'error', node.id, `${node.component} has no prop "${k}"${guess ? ` (did you mean ${guess}?)` : ''}`); continue; }
         const allowed = k === p.codeName && p.codeValues ? p.codeValues : p.values;   // code props take the code's own names
         if (p.type === 'enum' && allowed && !allowed.includes(v)) {
           const right = rightFor(p.rejected, v);

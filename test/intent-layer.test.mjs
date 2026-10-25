@@ -414,13 +414,14 @@ test('the prototype context: a component\'s page fills what it is for, the other
   const { dir, cfg } = await project();
   const { intent } = await generateIntent(dir, cfg, { write: false });
   const ctx = contextFrom({ components: { chipFilter: { props: {} }, cardPlain: { props: {} } } }, intent, []);
-  // Its own block, apart from Figma's and the code's words.
-  assert.equal(ctx.components.cardPlain.purpose, null);
+  // Its own block, apart from Figma's and the code's words; with nothing from Figma or the code, it says what it is for.
+  assert.equal(ctx.components.cardPlain.purpose, 'A surface that groups one subject.');
   assert.equal(ctx.components.cardPlain.intentLayer.purpose, 'A surface that groups one subject.');
   assert.deepEqual(ctx.components.chipFilter.intentLayer.whenNotToUse, ['Not for a single choice: use a radio group.']);
   assert.ok(ctx.components.chipFilter.never.some((n) => n.sentence === 'Intent layer: Not for a single choice: use a radio group.'));
   const lines = purposeLines(ctx, ['cardPlain', 'chipFilter']).join('\n');
-  assert.match(lines, /intent A surface that groups one subject\./);
+  assert.match(lines, /cardPlain\s+A surface that groups one subject\./);
+  assert.doesNotMatch(lines, /intent A surface/, 'said once');
   assert.match(lines, /intent: not for Not for a single choice/);
   const saving = ctx.rules.filter((r) => /^Saving/.test(r.title));
   assert.ok(saving.some((r) => /Save a long form as a draft\.[\s\S]*Not when: Not for the final submit\./.test(r.text)));
@@ -430,7 +431,7 @@ test('the prototype context: a component\'s page fills what it is for, the other
 
 test('componentIntent lists only what the page says', () => {
   const v = entityView({ kind: 'component', name: 'X', documentBlocks: [sections([['Intent', 'For x.']])] }, 'a/x.json');
-  assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, source: 'the intent layer', purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null, facts: null, repeated: 0 });
+  assert.deepEqual(componentIntent(v, { url: LINK, ref: 'main' }), { name: 'X', kind: 'component', file: 'a/x.json', url: `${LINK}/-/blob/main/a/x.json`, status: null, source: 'the intent layer', purpose: 'For x.', whenToUse: null, whenNotToUse: null, mistakes: null, limitations: null, rules: null, sections: null, facts: null, repeated: 0 });
 });
 
 test('Figma\'s and the code\'s notes no agent is given: each with why, what to do and whether to remove it', () => {

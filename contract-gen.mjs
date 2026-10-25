@@ -989,6 +989,16 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
       classFor = (n) => (own[n] ? '.' + own[n].cls : cls0 ? cls0(n) : null);
     } catch { /* optional */ }
   }
+  // Each component's code API read from its own file where no fresh capture holds it (the capture is older than the
+  // code, or was never made): the props an agent may pass are the code's, so they are never left to a guess.
+  if (cfg.frameworkComponents !== false) {
+    try {
+      const { apiReaderFor, apiEntry } = await import('./structure-capture.mjs');
+      const reader = apiReaderFor(ROOT, cfg, { classFor: classFor ?? undefined });
+      code = { ...(code ?? {}), api: { ...(code?.api ?? {}) } };
+      for (const n of targets.filter((x) => structure[x] || props[x])) if (!code.api[n]?.file) { try { const a = apiEntry(ROOT, reader, n); if (a.file) code.api[n] = a; } catch { /* unreadable */ } }
+    } catch { /* optional */ }
+  }
   try {
     const { productFiles, usageMap } = await import('./usage-map.mjs');
     files = productFiles(ROOT, cfg);
