@@ -3698,7 +3698,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var used = {}; BK_ALL.forEach(function (t) { (t.aliases || []).forEach(function (a) { if (a) used[a] = (used[a] || 0) + 1; }); });
     // The brand chosen in the page's switch, else the system's own title.
     var bkBrand = function () {
-      // The theme chosen in the page's switch, by name; the system's own name on its standard one.
+      // The theme chosen in the page's switch, by name; the system's own name on its default one.
       var sel = document.getElementById('sg-brand-select');
       return sel && sel.value && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : (DATA.title || 'Design system');
     };
@@ -7937,10 +7937,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   try { BAKED = JSON.parse((document.getElementById('sg-a11y-baked') || {}).textContent || 'null'); } catch (e) { BAKED = null; }
   function compSig(c) { return PAGE_SIG + '.' + sigOf(COMP_DATA[c.name] || ''); }
   // Each theme its own results (a theme changes the colours contrast is measured on): the ones shown are the chosen
-  // theme's, Standard when none is. An older page's single set (BAKED.results) is Standard's.
-  var themeKey = function (k) { return k && ((DATA.brands && DATA.brands.list) || []).some(function (b) { return b.key === k; }) ? k : 'standard'; };
+  // theme's, the default one when none is. An older page's single set (BAKED.results) is the default one's.
+  var themeKey = function (k) { return k && ((DATA.brands && DATA.brands.list) || []).some(function (b) { return b.key === k; }) ? k : 'default'; };
   var A11Y_THEME = themeKey(html.getAttribute('data-brand') || URLQ.get('brand') || (function () { try { return localStorage.getItem('sg-brand'); } catch (e) { return null; } })());
-  function bakedFor(t) { return !BAKED ? null : BAKED.themes ? BAKED.themes[t] || null : t === 'standard' ? BAKED.results || null : null; }
+  function bakedFor(t) { return !BAKED ? null : BAKED.themes ? BAKED.themes[t] || null : t === 'default' ? BAKED.results || null : null; }
   var A11Y_BASE = 'sg-a11y-kept', A11Y_KEY = A11Y_BASE + ':' + A11Y_THEME;
   // A component the build went through with nothing to try in a browser is kept too (live: null), so it is not tried here.
   function useKept(c, k, baked) {
@@ -9681,7 +9681,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var setBrand = function (k) {
       if (k && brandOf(k)) html.setAttribute('data-brand', k); else html.removeAttribute('data-brand');
       try { if (k) localStorage.setItem('sg-brand', k); else localStorage.removeItem('sg-brand'); } catch (e) {}
-      setQuery('brand', k && brandOf(k) ? k : 'standard');   // the address always names the theme, the default one too
+      setQuery('brand', k && brandOf(k) ? k : 'default');   // the address always names the theme, the default one too
       redrawAll();
       checkFonts(k);
       try { document.dispatchEvent(new CustomEvent('sg-brand', { detail: k })); } catch (e) {}
@@ -9689,7 +9689,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var bWrap = document.createElement('div'); bWrap.className = 'sg-brand-ctl';
     var bId = 'sg-brand-select';
     bWrap.innerHTML = '<label class="sg-mode-label sg-dd-named" id="' + bId + '-label" for="' + bId + '">Theme</label><span class="sg-dd"><select id="' + bId + '" class="sg-input sg-select-native" tabindex="-1" aria-hidden="true">' +
-      '<option value="">Standard</option>' +
+      '<option value="">Default</option>' +
       // A brand others are built on (Acme, the base of Retail, Wealth and Travel) is not a brand of its own: only what
       // is built on it is offered, named with the base it comes from (Acme · Retail).
       (function () {
@@ -9705,7 +9705,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     bWrap.appendChild(fontNote);
     if (mount) mount.appendChild(bWrap);
     if (kept && brandOf(kept) && bSel.querySelector('option[value="' + kept + '"]')) { bSel.value = kept; setBrand(kept); }
-    else setQuery('brand', 'standard');
+    else setQuery('brand', 'default');
     bDrop.sync();
   }
   // The browser's own setting leads until someone picks a mode: when it changes (the computer goes dark at night, the
