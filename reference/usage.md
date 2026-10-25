@@ -1144,6 +1144,18 @@ check every edit gets on what changed since the last commit, never failing the f
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
+#### A scheduled pipeline (`--ci-changed`)
+
+`rms-design-system-engine --ci-changed` says whether anything a build is made from moved since the last build, for a
+pipeline started on a schedule because nothing can start it on a change (a code repository the team may only read). It
+reads the latest commit of the code (its GitLab mirror), of each store read from GitLab (for its folder), of the intent
+layer and of the profile's file, Figma's version of the file (with `FIGMA_TOKEN`) and the engine's own commit, with the
+tokens every run reads (the environment, else `.env`). Exit 0 names what moved (or that no build is recorded yet); exit 3
+says nothing did. `--ci-changed --record`, after a build that succeeded, keeps them in
+`.design-system-engine-out/ci-last-build.json`. A store the build only writes (the published style guide) is never read,
+so its own commit starts nothing; a folder with no commit yet is a state of its own; a source that cannot be read counts
+as moved.
+
 #### Prototypes
 
 `rms-design-system-engine --prototype --catalog` prints everything a prototype may use, in this order: what it was read

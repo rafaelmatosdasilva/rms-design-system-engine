@@ -43,6 +43,15 @@ Configure `webhook.port` and `webhook.secret` in `ds-config.json`.
 
 ## CI Setup
 
+**A pipeline no webhook can start.** When the pipeline lives in a repository of its own (the style guide's, the team's)
+and the code repository may only be read (no webhook, no job there), run it on a schedule (every hour) and start it
+with `rms-design-system-engine --ci-changed`: it asks each source for its latest commit (the code, each store read from
+GitLab, the intent layer, the profile), Figma for its file's version (with `FIGMA_TOKEN`) and the engine for its own,
+and exits 3 when none moved since the last build, so the job stops in seconds; 0 names what moved. After a build that
+succeeded, `--ci-changed --record` keeps what it was made from in `.design-system-engine-out/ci-last-build.json` (keep that
+file in the pipeline's cache). A source that cannot be read counts as moved: a build too many, never a change missed.
+
+
 To run the engine on every PR/push via GitHub Actions, add `.github/workflows/design-system-engine.yml` to your project:
 
 ```yaml
