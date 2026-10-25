@@ -15,14 +15,14 @@ export const BAKED_ID = 'sg-a11y-baked';
 // The results kept with the snapshots, so whoever builds next (a person, the team's pipeline) tries only the components
 // that changed since, in each theme: { at, themes: { theme: { name: { sig, live, items, parts } } } }. A theme changes the
 // colours contrast is measured on, so each has its own. A *.snapshot.json, so the snapshots store carries it to everyone.
-// An older file with one set (results) is the Standard theme's.
+// An older file with one set (results) is the default theme's.
 export const RESULTS_FILE = 'a11y-results.snapshot.json';
-export function readSaved(path) { try { const j = JSON.parse(readFileSync(path, 'utf8')); return j && typeof j.themes === 'object' ? j.themes : j && typeof j.results === 'object' ? { standard: j.results } : {}; } catch { return {}; } }
-// The themes the page offers: Standard, and each brand that is not only the base of others (the page's Theme choice).
+export function readSaved(path) { try { const j = JSON.parse(readFileSync(path, 'utf8')); return j && typeof j.themes === 'object' ? j.themes : j && typeof j.results === 'object' ? { default: j.results } : {}; } catch { return {}; } }
+// The themes the page offers: the default one, and each brand that is not only the base of others (the page's Theme choice).
 export function themesOf(html) {
   let d = {}; try { d = JSON.parse((/<script[^>]*\bid="sg-data"[^>]*>([\s\S]*?)<\/script>/.exec(html) ?? [])[1] || '{}'); } catch { d = {}; }
   const list = d.brands?.list ?? [], base = new Set(list.map((b) => b.parent).filter(Boolean));
-  return ['standard', ...list.filter((b) => b.key && !base.has(b.key)).map((b) => b.key)];
+  return ['default', ...list.filter((b) => b.key && !base.has(b.key)).map((b) => b.key)];
 }
 const BAKED_RE = new RegExp(`<script id="${BAKED_ID}" type="application/json">[\\s\\S]*?<\\/script>`);
 

@@ -1094,7 +1094,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         // The system's own variables (each group's parts) and its value of one in a mode, so a layer a brand switches off
         // (a border's or a shadow's display set to false) draws nothing.
         const names = [...new Set([...Object.values(varsSnap.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...Object.keys(varsSnap.sizing ?? {}), ...list.flatMap((b) => Object.keys(b.overrides))])];
-        const standard = (v, key) => varsSnap.color?.[key]?.[v] ?? varsSnap.sizing?.[v] ?? null;
+        const baseValue = (v, key) => varsSnap.color?.[key]?.[v] ?? varsSnap.sizing?.[v] ?? null;
         // Brands kept as stylesheets name each variable as the code does (--primitives-green): back to Figma's name where
         // the system has one, so what points at it is written again too.
         const fromCss = new Map(names.map((n) => [toVar(n), n]));
@@ -1109,7 +1109,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           if (x && typeof x === 'object' && x.alias) (links[key] ??= {})[n] = [x.alias];
         }
         const declared = new Set([...systemCss.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
-        const css = brandCss(list, { axes, aliases: links, toVar, scope, unit, names, standard, exists: (n) => declared.has(toVar(n)) });
+        const css = brandCss(list, { axes, aliases: links, toVar, scope, unit, names, baseValue, exists: (n) => declared.has(toVar(n)) });
         // What a brand overrides that the code has no variable for: said, so a name that differs is found.
         const known = new Set([...systemCss.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
         const unknown = [...new Set(list.flatMap((b) => Object.keys(b.overrides)))].filter((n) => !known.has(toVar(n)));

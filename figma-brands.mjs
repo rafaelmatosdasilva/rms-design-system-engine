@@ -194,9 +194,9 @@ export function brandList(snap) {
 // A layer a brand switches off: a group's display (border/default/display, shadow/display, shadow/anyDisplay) set to
 // false where the system shows it. The code has no variable for that switch, so the group's own variables are written
 // so it draws nothing: each colour transparent, each offset, blur, spread and width 0. names: every variable of the
-// system (each group's parts); standard(v): the system's own value of a variable in this mode.
+// system (each group's parts); baseValue(v): the system's own value of a variable in this mode.
 const OFF_COLOUR = /colou?r$/i, OFF_SIZE = /^(x|y|blur|spread|width|borderWidth|strokeWidth|size)$/i;
-export function hiddenLayers(overrides, mode, { names = [], standard = () => null } = {}) {
+export function hiddenLayers(overrides, mode, { names = [], baseValue = () => null } = {}) {
   const out = new Map();
   const off = (x) => x === false || x === 'false';
   for (const [v, by] of Object.entries(overrides ?? {})) {
@@ -256,7 +256,7 @@ export function brandDeclarations(overrides, mode, aliases = {}, hidden = { name
 // of which writes after it only what it changes (and what points at that), so the CSS grows with what differs.
 // modes: [{ name, attr, value }] per axis, the base with no attr; toVar: Figma variable name → CSS variable;
 // value(v): a value as CSS (an alias as var()).
-export function brandCss(brands, { axes = [], aliases = {}, toVar, scope = '.pg-preview', unit = (v) => v, names = [], standard = () => null, exists = null } = {}) {
+export function brandCss(brands, { axes = [], aliases = {}, toVar, scope = '.pg-preview', unit = (v) => v, names = [], baseValue = () => null, exists = null } = {}) {
   const css = [];
   // An alias as var(); one with an opacity of its own mixed with transparent at that share (unless what it points at
   // has an opacity of its own already: Figma keeps that one, it does not multiply them); any other shape left out.
@@ -274,7 +274,7 @@ export function brandCss(brands, { axes = [], aliases = {}, toVar, scope = '.pg-
     for (const axis of axes) {
       for (const m of axis.modes) {
         full = b.overrides; mode = m.name;
-        const decl = brandDeclarations(b.ownOverrides ?? b.overrides, m.name, aliases[m.key] ?? {}, { names, standard: (v) => standard(v, m.key), exists }, b.overrides);
+        const decl = brandDeclarations(b.ownOverrides ?? b.overrides, m.name, aliases[m.key] ?? {}, { names, baseValue: (v) => baseValue(v, m.key), exists }, b.overrides);
         if (!decl.size) continue;
         let sel;
         if (!m.attr) {

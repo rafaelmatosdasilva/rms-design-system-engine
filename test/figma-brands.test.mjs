@@ -75,12 +75,12 @@ test('read through a runner: the list, then each collection in parts, a part cut
 test('a layer a brand switches off draws nothing: its colours transparent, its offsets and widths 0', async () => {
   const { hiddenLayers } = await import('../figma-brands.mjs');
   const names = ['bannerMain/shadow/display', 'bannerMain/shadow/color', 'bannerMain/shadow/Y', 'bannerMain/shadow/blur', 'bannerMain/radius', 'button/border/default/display', 'button/border/default/color'];
-  const standard = (v) => ({ 'bannerMain/shadow/display': true, 'button/border/default/display': 'false' })[v] ?? null;
-  const off = hiddenLayers({ 'bannerMain/shadow/display': { Dark: false }, 'button/border/default/display': { Dark: false } }, 'Dark', { names, standard });
+  const baseValue = (v) => ({ 'bannerMain/shadow/display': true, 'button/border/default/display': 'false' })[v] ?? null;
+  const off = hiddenLayers({ 'bannerMain/shadow/display': { Dark: false }, 'button/border/default/display': { Dark: false } }, 'Dark', { names, baseValue });
   // Off wherever it is off (the code has no switch for it, so it draws the layer whatever the system says).
   assert.deepEqual(Object.fromEntries(off), { 'bannerMain/shadow/color': 'transparent', 'bannerMain/shadow/Y': 0, 'bannerMain/shadow/blur': 0, 'button/border/default/color': 'transparent' });
   // In another mode: nothing to write.
-  assert.equal(hiddenLayers({ 'bannerMain/shadow/display': { Dark: false } }, 'Light', { names, standard }).size, 0);
+  assert.equal(hiddenLayers({ 'bannerMain/shadow/display': { Dark: false } }, 'Light', { names, baseValue }).size, 0);
 });
 
 test('brands kept as stylesheets give the same snapshot: a file a brand, each block in the mode its selector names', async () => {
@@ -96,14 +96,14 @@ test('brands kept as stylesheets give the same snapshot: a file a brand, each bl
 });
 
 test('a brand under another follows the links of the one above it, not the system\'s', () => {
-  const standard = { 'menu/selected': ['base/primary'], 'base/primary': [] };
+  const baseValue = { 'menu/selected': ['base/primary'], 'base/primary': [] };
   // Acme points the selected background at the app's background; Retail changes the primary hue only.
   const acme = { 'menu/selected': { Light: { alias: 'base/pageBackground' } } };
   const retail = { 'base/primary': { Light: '#e05200' } };
-  const decl = brandDeclarations(retail, 'Light', standard, { names: [] }, { ...acme, ...retail });
+  const decl = brandDeclarations(retail, 'Light', baseValue, { names: [] }, { ...acme, ...retail });
   assert.deepEqual([...decl.keys()], ['base/primary']);
   // On its own (the system's links), Retail would repaint the selected background too.
-  assert.deepEqual([...brandDeclarations(retail, 'Light', standard).keys()].sort(), ['base/primary', 'menu/selected']);
+  assert.deepEqual([...brandDeclarations(retail, 'Light', baseValue).keys()].sort(), ['base/primary', 'menu/selected']);
 });
 
 test('a colour with an opacity of its own is mixed with transparent at that share; an unread shape is left out', () => {
