@@ -53,6 +53,26 @@ Each sign the code gives counts. A strong sign pairs on its own. A weak one need
 
 ## Install and update
 
+### What the engine needs on your machine
+
+Two things are required. The installer refuses to go on without them.
+
+| Required | Why |
+|---|---|
+| **Git** | The install is a clone, so updates are a pull and never a re-download. |
+| **Node.js 22 or newer** | The engine talks to Chrome over Node's built-in WebSocket, which older versions do not have. |
+
+Two more are optional, and each decides how much a run can see. The installer checks for them and prints the one line that installs whatever is missing.
+
+| Optional | What you lose without it | How to get it |
+|---|---|---|
+| **Google Chrome** | Nothing is measured as a browser draws it: rendered parity, the accessibility check and every picture are skipped. | [Install Chrome](https://google.com/chrome), or point `CHROME_PATH` at the one you already keep. |
+| **TypeScript 5** | Your components' JSX and props are read from their text alone, so fewer components are understood. | A project with its own `typescript` 5 is already fine. Otherwise `npm i -g typescript@5`. |
+
+> **Ask for TypeScript 5 by name.** A plain `npm i -g typescript` installs version 7, the rewrite, which reads no JSX. The engine treats it as no TypeScript at all rather than failing midway through a run, and says so.
+
+### Staying up to date
+
 The skill updates itself. Once a day, before an audit, it pulls the latest version and says so in one line.
 
 - It only does this when the install is on `main` with no local changes, and never on CI.

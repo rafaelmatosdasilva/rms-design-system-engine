@@ -60,9 +60,22 @@ function common() {
   for (const w of GENERIC_WORDS.split(/\s+/)) COMMON.add(w);
   return COMMON;
 }
-const isCommon = (w) => { const c = common(); return c.has(w) || (w.endsWith('ies') && c.has(w.slice(0, -3) + 'y')) || (w.endsWith('es') && c.has(w.slice(0, -2))) || (w.endsWith('s') && c.has(w.slice(0, -1))); };
+// A dictionary lists "require", not "required", so an inflection of a common word is common too. Without this, a
+// project that happens to name a property "required" makes an everyday English word private, and every honest commit
+// that writes "is required" is refused.
+const isCommon = (w) => {
+  const c = common();
+  return c.has(w)
+    || (w.endsWith('ies') && c.has(w.slice(0, -3) + 'y'))
+    || (w.endsWith('es') && c.has(w.slice(0, -2)))
+    || (w.endsWith('s') && c.has(w.slice(0, -1)))
+    || (w.endsWith('ed') && (c.has(w.slice(0, -1)) || c.has(w.slice(0, -2)) || c.has(w.slice(0, -3) + 'y')))
+    || (w.endsWith('ing') && (c.has(w.slice(0, -3)) || c.has(w.slice(0, -3) + 'e')));
+};
 // Words of CSS, HTML and design systems a dictionary may lack.
-const GENERIC_WORDS = 'small medium large xs sm md lg xl xxl xxs xxxs xxxl px rem em ms vh vw dp pt deg rgb rgba hsl hex svg png css html js ui ux api url id ids nav btn img src alt aria rtl ltr min max auto inline flex grid hug fill fixed rgb srgb dropdown tooltip popover checkbox textarea navbar sidebar topbar toolbar statusbar breadcrumb breadcrumbs stepper spinner skeleton snackbar toast toasts accordion carousel pagination paginator datepicker timepicker colorpicker combobox listbox menubar tablist tabpanel treeview tree avatar badge chip chips tag tags pill slider switch toggle radio dialog modal sheet drawer popup lightbox banner callout alert alerts hero footer header heading subheading caption overline eyebrow placeholder hover focus focused pressed disabled readonly selected unselected checked unchecked indeterminate expanded collapsed active inactive visited loading empty error success warning info positive negative neutral pending critical primary secondary tertiary quaternary accent brand inverse inverted muted subtle strong emphasis elevated elevation surface surfaces background foreground outline outlined filled ghost link plain solid dashed dotted rounded pill radius radii stroke strokes shadow shadows blur opacity gradient overlay scrim backdrop divider dividers separator spacing spacer gap gaps padding margin inset offset width height size sizes sizing typography typeface font fonts weight weights lineheight letterspacing paragraph body label labels title titles subtitle display headline icon icons iconography illustration logo logos token tokens semantic primitive primitives alias aliases mode modes theme themes light dark density compact comfortable spacious breakpoint breakpoints viewport desktop laptop tablet mobile phone motion duration durations easing easings transition transitions animation keyframe delay variant variants variable variables property properties component components instance instances slot slots state states boolean booleans string strings number numbers collection collections layer layers frame frames page pages screen screens section sections figma';
+const GENERIC_WORDS = 'small medium large xs sm md lg xl xxl xxs xxxs xxxl px rem em ms vh vw dp pt deg rgb rgba hsl hex svg png css html js ui ux api url id ids nav btn img src alt aria rtl ltr min max auto inline flex grid hug fill fixed rgb srgb required download upload dropdown tooltip popover checkbox textarea navbar sidebar topbar toolbar statusbar breadcrumb breadcrumbs stepper spinner skeleton snackbar toast toasts accordion carousel pagination paginator datepicker timepicker colorpicker combobox listbox menubar tablist tabpanel treeview tree avatar badge chip chips tag tags pill slider switch toggle radio dialog modal sheet drawer popup lightbox banner callout alert alerts hero footer header heading subheading caption overline eyebrow placeholder hover focus focused pressed disabled readonly selected unselected checked unchecked indeterminate expanded collapsed active inactive visited loading empty error success warning info positive negative neutral pending critical primary secondary tertiary quaternary accent brand inverse inverted muted subtle strong emphasis elevated elevation surface surfaces background foreground outline outlined filled ghost link plain solid dashed dotted rounded pill radius radii stroke strokes shadow shadows blur opacity gradient overlay scrim backdrop divider dividers separator spacing spacer gap gaps padding margin inset offset width height size sizes sizing typography typeface font fonts weight weights lineheight letterspacing paragraph body label labels title titles subtitle display headline icon icons iconography illustration logo logos token tokens semantic primitive primitives alias aliases mode modes theme themes light dark density compact comfortable spacious breakpoint breakpoints viewport desktop laptop tablet mobile phone motion duration durations easing easings transition transitions animation keyframe delay variant variants variable variables property properties component components instance instances slot slots state states boolean booleans string strings number numbers collection collections layer layers frame frames page pages screen screens section sections figma';
+// What a label in a self-hosted address names when it is the service, not the company that runs it.
+const SERVICE_LABELS = new Set('git gitlab github bitbucket gitea gogs svn scm vcs repo repos code www web mail smtp imap jira confluence artifactory nexus npm registry docker harbor ci cd runner pages wiki intranet portal dev devel staging stage test qa uat prod production'.split(' '));
 // Names made of common words that every design system writes the same way: never a project's own.
 const GENERIC_NAMES = new Set(('buttonprimary buttonsecondary buttontertiary buttonlink buttonicon iconbutton buttongroup ' +
   'textbutton linkbutton radiobutton radiogroup checkboxgroup togglebutton switchbutton segmentedcontrol listitem listgroup ' +
@@ -188,7 +201,10 @@ export function projectTerms(root) {
     }
   }
   for (const k of keys) out.set(k.toLowerCase(), 'figma file key');
-  for (const h of hosts) { out.set(norm(h), 'host'); for (const part of h.split('.').slice(0, -1)) add(part, 'host', own); }
+  // A self-hosted address keeps the whole host and the labels that name the company (gitlab.acme.com → acme), never
+  // the label that names the service: "gitlab" in this engine's own pages is the service, not anyone's project, and
+  // taking it as private would refuse every honest commit until someone bypassed the hook.
+  for (const h of hosts) { out.set(norm(h), 'host'); for (const part of h.split('.').slice(0, -1)) if (!SERVICE_LABELS.has(part.toLowerCase())) add(part, 'host', own); }
   return { terms: out, phrases: [...phrases], keys: [...keys], hosts: [...hosts] };
 }
 // The theme files a project's modules keep for it: <data>/<system>/*.json (data: the entry's own folder, else the

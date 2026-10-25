@@ -179,7 +179,7 @@
 
 ────────────────────────────────────────────────────────────
 
-⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing. The components were not rendered from their code either: no TypeScript to read the components' JSX (the project's own, or a global one: npm i -g typescript).
+⏭  [a11y] no render targets — start your dev server and pass --url <page> (or set ds-config.json → a11y.urls / a11y.serve), or build the UIs for a static DS. Auto-discovery found nothing. The components were not rendered from their code either: no TypeScript to read the components' JSX (install typescript 5 in the project, or npm i -g typescript@5 (version 7 reads no JSX)).
 
 🧭 System health: 1 thing to keep the system healthy as it grows. Advisory.
      11 of 11 semantic tokens have no description in Figma (action/primary/color, action/primary/text/color, radius/control, space/2, space/3, …): what a token is for is what an agent reads to pick it.

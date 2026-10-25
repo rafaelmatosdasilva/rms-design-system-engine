@@ -12,6 +12,7 @@ import { fingerprint, markupClassSet } from '../markup-source.mjs';
 import { mergeNesting, captureIcons, captureMarkup, captureApis, apiReaderFor, sourceNesting } from '../structure-capture.mjs';
 import { captureCode } from '../code-capture.mjs';
 import { findChrome } from '../cdp.mjs';
+import { usableTypeScript } from '../project-typescript.mjs';
 
 const HAS_CHROME = !!findChrome({ playwright: true }) && typeof WebSocket !== 'undefined';
 const TS = loadTypeScript(process.env.TS_FOR_TESTS ?? process.cwd());
@@ -107,6 +108,21 @@ test('api: merge marks agreement verified, one source single-source, a disagreem
   assert.deepEqual(m.props.tone.readings, { 'custom-elements': { default: 'info' }, text: { default: 'warn' } });
   assert.equal(m.props.extra.confidence, 'single-source');
   assert.deepEqual(m.slots.named, ['icon']);
+});
+
+test('api: a TypeScript that cannot read JSX or a Props type counts as none', () => {
+  assert.equal(usableTypeScript(null), false);
+  // TypeScript 7's shape: a version and nothing else.
+  assert.equal(usableTypeScript({ version: '7.0.2', versionMajorMinor: '7.0' }), false);
+  assert.equal(usableTypeScript({ transpileModule: () => {}, createSourceFile: () => {}, JsxEmit: {}, ScriptTarget: {}, ModuleKind: {}, ScriptKind: {} }), true);
+
+  // A project that installed one is read as having none, so nothing downstream gets a module it cannot call.
+  const dir = makeFixture({
+    'package.json': { name: 'p', dependencies: { typescript: '7.0.2' } },
+    'node_modules/typescript/package.json': { name: 'typescript', version: '7.0.2', main: 'index.js' },
+    'node_modules/typescript/index.js': 'module.exports = { version: "7.0.2" };\n',
+  });
+  assert.equal(loadTypeScript(dir), null);
 });
 
 test('api: the reader joins Code Connect by Figma node id and falls back to text patterns', () => {

@@ -106,6 +106,20 @@ test('the installer\'s last words set up with where the code is, never --init al
   assert.doesNotMatch(text, /rms-design-system-engine --init +#/);
 });
 
+test('the installer refuses what the engine cannot run without, and names what the optional ones unlock', () => {
+  const text = readFileSync(join(ENGINE, 'install.sh'), 'utf8');
+  // Node is the one version the engine cannot do without (its built-in WebSocket talks to Chrome).
+  assert.match(text, /NODE_MAJOR.*process\.versions\.node/s);
+  assert.match(text, /"\$NODE_MAJOR" -lt 22/);
+  // Chrome and TypeScript only decide how much a run sees, so they are a note with the line that installs each.
+  assert.match(text, /No Chrome found/);
+  assert.match(text, /export CHROME_PATH=/);
+  assert.match(text, /npm i -g typescript@5/);
+  // The trap is that a bare `npm i -g typescript` installs version 7: it may be explained, never offered to run.
+  assert.doesNotMatch(text, /^\s*npm i -g typescript(?!@5)/m);
+  assert.match(text, /version 7/);
+});
+
 test('setup reached from another request routes that request again once it is done, never a generic first run', async () => {
   const { route } = await import('../route.mjs');
   const r = route("check buttonPrimary's accessibility", { hasConfig: false });

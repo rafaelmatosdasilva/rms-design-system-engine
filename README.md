@@ -18,6 +18,8 @@ Unlike standalone skills and fragmented workflows, RMS Design System Engine gene
 
 **Requirements:** [Claude Code](https://claude.com/claude-code), [Node.js](https://nodejs.org) 22+ and [Git](https://git-scm.com).
 
+**Recommended:** [Google Chrome](https://google.com/chrome), so everything can be measured as a browser draws it, and TypeScript 5 (`npm i -g typescript@5`), so your components' JSX and props are read. Without them those checks are skipped; the installer tells you which are missing.
+
 Ask Claude Code to run this command to install the engine:
 
 ```bash
