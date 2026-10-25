@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { systemFacts, rateComponent, rateGuidance, sectionsFrom, figmaWords, extractionQuestions, extractionPrompt, scoreExtraction, askModel, ratingLines, readFacts } from '../guidance-rating.mjs';
 import { levelContext } from '../eval-run.mjs';
 import { bareEnv, budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -144,7 +145,7 @@ test('each component\'s Documentation area says what an agent can take from its 
   writeFileSync(join(dir, 'contracts', 'button.contract.json'), JSON.stringify({ id: 'button', props: [{ name: 'variant' }, { name: 'size' }, { name: 'label' }] }));
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: budget(250000) });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
+  const page = readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'));
   const data = JSON.parse(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/.exec(page)[1]);
   const of = (n) => (data.components ?? []).find((c) => c.name === n);
   // Only the engine's local contract: named, as a task to publish it; no copy beside the guide and no button, since the

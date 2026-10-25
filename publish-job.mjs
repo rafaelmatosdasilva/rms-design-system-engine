@@ -35,7 +35,7 @@ const steps = (out, products, host) => {
     'node ../engine/audit.mjs || true                 # the differences the page shows; a failing audit still publishes',
     'node ../engine/audit.mjs --styleguide            # the page again, with them, its accessibility tried and kept in it',
     `node ../engine/audit.mjs --styleguide-check ${out}   # only the system on it, its own accessibility: else nothing is published`,
-    `mkdir -p public && cp ${out} public/index.html`,
+    `node ../engine/styleguide-files.mjs ${out} public   # the page and the files it links beside it (its styles, code, fonts, data)`,
     'cp .design-system-engine-out/differences.md public/differences.md 2>/dev/null || true',
   ];
 };

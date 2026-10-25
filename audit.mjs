@@ -1614,6 +1614,18 @@ if (process.argv.includes('--styleguide')) {
           if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[OPEN_FILE, Buffer.from(next)]]), 'When each open task was first found, saved with rms-design-system-engine', { offline: STORE_OFFLINE })).line);
         }
       }
+    } else {
+      // Built without trying them (--no-a11y-bake, a CI's first build): the results saved with the snapshots go in the
+      // page all the same, so it shows them at once and the viewer's browser tries only the components that changed
+      // since (their signature differs), never every one again.
+      const { readSaved, savedFor, savedAt, withBaked, themesOf, RESULTS_FILE } = await import('./styleguide-bake.mjs');
+      const { readPage } = await import('./styleguide-files.mjs');
+      const page = resolve(ROOT, r.out), saved = savedFor(readSaved(join(ROOT, RESULTS_FILE)), themesOf(readPage(page)));
+      if (Object.keys(saved).length) {
+        const html = readFileSync(page, 'utf8'), next = withBaked(html, { at: savedAt(join(ROOT, RESULTS_FILE)), themes: saved });
+        if (next !== html) writeFileSync(page, next);
+        console.log(`   Accessibility from the saved results (${RESULTS_FILE}): a component changed since is tried by the browser that opens the page.`);
+      }
     }
     // Each open task's age in the page (how long since an audit first found it), from the record a build with the browser
     // keeps: also in a page built without it, as of that build.

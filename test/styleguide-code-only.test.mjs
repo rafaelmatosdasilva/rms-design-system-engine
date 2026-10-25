@@ -14,6 +14,7 @@ import { vueMarkup } from '../vue-markup.mjs';
 import { codeComponents, rootClassOf } from '../component-source.mjs';
 import { agreedView } from '../styleguide-data.mjs';
 import { budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -79,7 +80,7 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
   assert.equal(a.status, 0, a.stdout + a.stderr);
   assert.match(a.stdout, /\(3 components agreed, 1 in the code and not in Figma, on the Status page · the engine's template\)/);
   assert.match(a.stdout, /1 component the code has and Figma does not\. Each one is on the Status page/);
-  const page = readFileSync(join(withFigma, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
+  const page = readPage(join(withFigma, '.design-system-engine-out', 'styleguide', 'index.html'));
   assert.doesNotMatch(page, /"name":"HbChip","cls"/, 'not one of the page\'s components');
   assert.doesNotMatch(page, /"codeOnly":\{/);
   assert.match(page, /"notInFigma":\[\{"name":"HbChip","file":"components\/HbChip.vue"\}\]/);
@@ -94,7 +95,7 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
   const s = run(shown);
   assert.equal(s.status, 0, s.stdout + s.stderr);
   assert.match(s.stdout, /\(3 components agreed, 1 only in the code · the engine's template\)/);
-  const shownPage = readFileSync(join(shown, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
+  const shownPage = readPage(join(shown, '.design-system-engine-out', 'styleguide', 'index.html'));
   assert.match(shownPage, /"name":"HbChip","cls":"hb-chip"[^}]*"markup":"\\u003cbutton class=\\"hb-chip\\" type=\\"button\\">Filter\\u003c\/button>","markupFrom":"vue"/);
   assert.match(shownPage, /"codeOnly":\{"file":"components\/HbChip.vue","props":\[\{"name":"tone","default":"quiet","options":\["quiet","loud"\]\},\{"name":"label","default":"Filter"\}\],"figma":true\}/);
   // Before Figma's data: the code's three components, said so.

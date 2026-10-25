@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { agreedView, modeAxes, optionEffect, instanceMarkup, componentTokens, agreedTokens } from '../styleguide-data.mjs';
 import { fixtureProject, budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 // A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
@@ -56,7 +57,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   assert.match(r.stdout, /Style guide → \.design-system-engine-out\/styleguide\/index\.html {2}\(2 components agreed · the engine's template\)/);
   assert.match(r.stdout, /components the code does not have yet \(button, field, disclosure and stepper\)/);
   assert.equal(existsSync(join(dir, 'component-prop-result.json')), false, 'the project is left as it was');
-  const html = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
+  const html = readPage(join(dir, '.design-system-engine-out/styleguide/index.html'));
   assert.doesNotMatch(html, /\{\{[A-Z_]+\}\}/, 'every marker filled');
   assert.match(html, /\.chip\.chip--l/, 'the component\'s own stylesheet is on the page');
   assert.match(html, /--chip-background/, 'and the tokens');
@@ -163,7 +164,7 @@ test('the demo design system: its real markup from its page, and props named dif
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sg-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  const data = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  const data = JSON.parse(readPage(join(dir, '.design-system-engine-out/styleguide/index.html')).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   const button = data.components.find((c) => c.name === 'button');
   assert.equal(button.markupFrom, 'page');
   assert.equal(button.markup, '<button class="tp-button" type="button">Save</button>');
@@ -671,7 +672,7 @@ test('"In use" shows the approved pictures of the system\'s own frames', { timeo
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   writeFileSync(join(dir, '.design-system-engine-refs', '5-1.png'), png);
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
-  const data = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  const data = JSON.parse(readPage(join(dir, '.design-system-engine-out/styleguide/index.html')).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(data.screens.map((x) => x.caption), ['Settings']);
   assert.match(data.screens[0].src, /^data:image\/png;base64,iVBOR/);
 });
@@ -1594,4 +1595,15 @@ test('the Playground\'s controls are resized from the line beside them: a separa
   assert.match(tpl, /:root\.sg-panel-sized \.pg-preview-card \{ grid-template-columns: [^}]*min\(var\(--pg-panel-w\), 100% - var\(--sg-stage-min\)\)/, 'never so wide the stage drops under its least');
   assert.match(tpl, /@container \(max-width: 720px\) \{[^\n]*\.pg-panel-grip \{ display: none; \}/, 'no handle when the controls sit under the stage');
   assert.match(tpl, /e\.key === 'ArrowLeft'[^\n]*e\.key === 'ArrowRight'/, 'the arrow keys resize it too');
+});
+
+test('a saved accessibility result holds wherever the page is built: a Vue scoped id (where the file sat) is no part of a signature', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const fn = (name) => tpl.match(new RegExp(`function ${name}\\((?:text|css)\\) \\{[^\\n]*\\}`))[0];
+  const { noScopeIds, cssSigText } = new Function(`${fn('noScopeIds')}\n${fn('cssSigText')}\nreturn { noScopeIds, cssSigText };`)();
+  const here = '.cardTile[data-v-1a2b3c4d] { color: var(--text); }\n.cardTile .tip[data-v-1a2b3c4d] { opacity: .7; }';
+  const there = here.replace(/1a2b3c4d/g, 'ff00ee11');
+  assert.equal(cssSigText(here), cssSigText(there));
+  assert.equal(noScopeIds('<div data-v-1a2b3c4d class="cardTile">'), noScopeIds('<div data-v-ff00ee11 class="cardTile">'));
+  assert.match(tpl, /COMP_DATA\[c\.name\] = noScopeIds\(/, 'a component\'s own signature leaves it out too');
 });
