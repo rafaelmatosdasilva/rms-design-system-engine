@@ -267,7 +267,7 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     const wrong = wrongOf(e) ?? [];
     const drafts = e.drafts ?? [];
     const about = comp && !component ? notUsed[0]?.about ?? null : null;
-    const page = { ...(about ? { about } : {}), name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}), ...(drafts.length ? { drafts } : {}) };
+    const page = { ...(about ? { about } : {}), name: e.name, kind: e.kind, layer: e.layer, file: e.file, url: e.url ?? fileUrl(snap._source, e.file), source: e.source?.label ?? null, component, verdict, gets, notUsed, ...(e.code ? { code: e.code } : {}), ...(e.spec ? { spec: e.spec, specUrl: e.specUrl ?? null, ...(e.specShared ? { specShared: true } : {}) } : {}), ...(e.updatedAt ? { updatedAt: e.updatedAt } : {}), ...(wrong.length ? { wrong } : {}), ...(drafts.length ? { drafts } : {}) };
     Object.assign(page, decide(page, e, { comp, has }));
     pages.push(page);
   }

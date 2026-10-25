@@ -1653,6 +1653,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-affects { table-layout: auto; }   /* each column as wide as its words, never a word cut in two */   /* in a panel's card: a plain table, nothing sticks */
 .sg-affects .pg-par-val { display: block; }
 .sg-row-detail-body > p, .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-xs); }
+/* In a panel, each point is a block of its own: its title a step larger, its words the body's own size, a clear space
+   before the next one. */
+.sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-l); }
+.sg-row-detail-body .sg-il-line:last-child { margin-bottom: 0; }
+.sg-row-detail-body .sg-il-line > strong:first-child { display: block; font-size: var(--sg-l); line-height: var(--sg-lh-tight, 1.3); margin-bottom: var(--sg-space-xs); }
+.sg-row-detail-body .sg-il-line .pg-par-val { display: block; font-size: inherit; line-height: inherit; margin-top: var(--sg-space-xxs); }
+.sg-row-detail-body .sg-il-what, .sg-row-detail-body .sg-il-where { display: block; margin-top: var(--sg-space-xxs); }
+.sg-row-detail-body :is(.sg-il-what, .sg-il-where) > b { font-weight: var(--sg-l-weight); color: var(--sg-text); }
+.sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
+/* What the agents read: each section a block, its lines close, a clear space between sections. */
+.sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }
+.sg-row-detail-body .sg-il-group:last-child { margin-bottom: 0; }
+.sg-row-detail-body .sg-il-head { margin: 0 0 var(--sg-space-xs); font-size: var(--sg-l); font-weight: var(--sg-l-weight); color: var(--sg-text); }
+.sg-row-detail-body .sg-il-item { margin: 0 0 var(--sg-space-xs); }
+.sg-row-detail-body .sg-il-item:last-child { margin-bottom: 0; }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
 .sg-il-label { color: var(--sg-muted); font-size: var(--sg-s); }
@@ -3058,7 +3073,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilOthersOf = function (p) { return p.missingFor ? ((IL.noPageOthers || {})[p.missingFor] || []) : (p.others || []); };
     var ilReads = function (p) {
       var r = p.reads || {};
-      var own = IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(k[1]) + '</span></p>' + r[k[0]].map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
+      // Each section a block of its own: its title, then its lines close together; a clear space before the next section.
+      var own = IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<div class="sg-il-group"><p class="sg-il-head">' + esc(k[1]) + '</p>' + r[k[0]].map(function (t) { return '<p class="sg-il-item">' + esc(t) + '</p>'; }).join('') + '</div>'; }).join('');
       return (own ? ilSourceHead('Intent layer', p.spec || p.file) + own : '') + ilOthersOf(p).map(function (o) { return ilSourceHead(o.source) + o.lines.map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
     };
     // A component with no intent layer: what the agents read about it is its own documentation, as written, grouped by
@@ -3067,7 +3083,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var noLayerReads = function (p) {
       var c = docComp(p), by = {}, order = [];
       try { docIssueRows(c).forEach(function (r) { if (r.st !== 'done' || !r.written || r.kind === 'Intent layer') return; var w = srcNames(r.src || []).join(' · ') || 'The system'; if (!by[w]) { by[w] = []; order.push(w); } by[w].push(r); }); } catch (e) { /* its own area says it */ }
-      return order.map(function (w) { return ilSourceHead(w) + by[w].map(function (r) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(r.kind) + '</span></p>' + r.written; }).join(''); }).join('');
+      return order.map(function (w) { return ilSourceHead(w) + by[w].map(function (r) { return '<div class="sg-il-group"><p class="sg-il-head">' + esc(r.kind) + '</p>' + r.written + '</div>'; }).join(''); }).join('');
     };
     // The sources a row's content comes from, in a word each, for the table.
     var ilSources = function (p) { if (p.tokens) return 'Figma';
@@ -3093,7 +3109,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var docWhere = function (p, st) { var w = []; docLeft(p).filter(function (x) { return !st || x.st === st; }).forEach(function (x) { String(x.where || '').split(' · ').forEach(function (s) { if (s && w.indexOf(s) < 0) w.push(s); }); }); return w; };
     // Where what is missing is to be written, said under Missing: In Figma, In the intent layer, or both.
     var docTopic = function (p) { if (p.tokens) return 'In Figma'; var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
-    var docLeftHTML = function (p) { return docLeft(p).map(function (x) { return '<p class="sg-il-line"><strong>' + esc(x.kind) + '</strong>' + (x.st === 'check' ? ' (to check)' : '') + (x.where ? '<span class="pg-par-val">' + esc((x.st === 'check' ? 'In ' : 'Write it in ') + x.where.split(' · ').map(function (w) { return /^(Intent layer|The code|The contract)$/.test(w) ? 'the ' + w.replace(/^The /, '').toLowerCase() : w; }).join(' or ')) + (x.todo ? '. ' + esc(x.todo) : '') + '</span>' : (x.todo ? '<span class="pg-par-val">' + esc(x.todo) + '</span>' : '')) + '</p>'; }).join(''); };
+    // Each thing still to write, as one block: what to write (or check), and exactly where: the spec file a person edits
+    // and its section (the page's JSON is generated from it), Figma's description, or the code's comment.
+    var SECTION_OF = { 'What it is': 'Purpose', 'When to use': 'When to use', 'When not to use': 'When not to use', 'Common mistakes': 'Common mistakes', Limitations: 'Limitations', Example: 'Example', Role: 'Role', 'Do and don\'t': 'Do and don\'t' };
+    var whereHTML = function (p, x) {
+      return String(x.where || '').split(' · ').filter(Boolean).map(function (w) {
+        if (/intent layer/i.test(w)) { var f = p.spec || p.file; return f ? (p.specUrl || p.url ? '<a class="sg-uses-link" href="' + esc(p.specUrl || p.url) + '" target="_blank" rel="noopener"><code>' + esc(f) + '</code></a>' : '<code>' + esc(f) + '</code>') + (SECTION_OF[x.kind] ? ', under <b>## ' + esc(SECTION_OF[x.kind]) + '</b>' : '') + (p.specShared ? ' (a spec several components share: write it for this one by name)' : '') : 'its page in the intent layer'; }
+        if (/^figma$/i.test(w)) return 'Figma: select the component, then its <b>Description</b> in the right panel';
+        if (/code/i.test(w)) return p.code ? 'its code comment, in <code>' + esc(p.code) + '</code>' : 'its code comment';
+        return esc(w);
+      }).join(' <span class="pg-muted">or</span> ');
+    };
+    var docLeftHTML = function (p) { return docLeft(p).map(function (x) { var where = whereHTML(p, x); return '<div class="sg-il-line"><strong>' + esc(x.kind) + (x.st === 'check' ? ' (to check)' : '') + '</strong>' + (x.todo ? '<span class="sg-il-what"><b>What:</b> ' + esc(x.todo) + '</span>' : '') + (where ? '<span class="sg-il-where"><b>Where:</b> ' + where + '</span>' : '') + '</div>'; }).join(''); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
@@ -3145,7 +3172,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
-          left: tm.length ? '<p class="sg-il-line"><strong>Their descriptions</strong><span class="pg-par-val">Write it in Figma, in each variable\'s description: what the token is for. Agents read it, through tokens.json, to pick the right token.</span></p><p class="sg-il-line">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join(', ') + '</p>' : '',
+          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-what"><b>What:</b> one sentence on what each token is for (agents read it, through tokens.json, to pick the right token).</span><span class="sg-il-where"><b>Where:</b> Figma, in each variable\'s <b>Description</b> (Local variables → select the variable → Description).</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
           todo: tm.length ? '<p class="sg-il-line"><strong>Describe ' + tm.length + ' of the ' + tn + ' tokens the components use, in Figma.</strong></p>' : '',
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
@@ -3161,7 +3188,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What to do', c.todo) + card('Still to write', c.left) + card('To remove', c.remove) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      // What to do comes first: the task, each thing still to write (what and where), drafts to review, notes to remove;
+      // then what the page is and why.
+      var body = card('What to do', c.todo) + card('Still to write', c.left) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('To remove', c.remove) + card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
@@ -6684,13 +6713,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var figmaOf = function () { var c0 = HAS_PAGE[comp]; return c0 ? figmaUrlOf(c0) : null; };
     var srcLines = function () { return (r.src || []).filter(Boolean).map(function (x, i) { var url = (r.srcLinks || [])[i] || ilHref(x) || (/figma/i.test(x) ? figmaOf() : null), file = url && /intent layer/i.test(x) && x.indexOf(ilFile(url)) < 0 ? ilFile(url) : ''; return '<p>' + (url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(x) + '</a>' + (file ? '<span class="pg-par-val">' + esc(file) + '</span>' : '') : esc(x)) + '</p>'; }).join(''); };
     var hasSource = colsOf(d.area).some(function (col) { return col[1] === 'source'; });
-    var body = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; }).map(function (col) {
+    // An open task opens with what to do (and, for something still to write, where); what it is and why come after.
+    var taskOpen = r.st && r.st !== 'done', order = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; });
+    if (taskOpen) order = order.filter(function (col) { return col[1] === 'todo'; }).concat(order.filter(function (col) { return col[1] !== 'todo'; }));
+    var body = order.map(function (col) {
       var k = col[1];
       // Its source, said once: what it was read from, or, still to write, nothing yet and where it belongs.
-      if (k === 'source') return card(col[0], r.writeTo ? '<p class="pg-missing">Nothing yet.</p><p>Write it in:</p>' + srcLines() : srcLines() || '<p class="pg-missing">Nothing.</p>');
+      if (k === 'source') return r.writeTo ? '' : card(col[0], srcLines() || '<p class="pg-missing">Nothing.</p>');   // still to write: where is in What to do
       // Written in two places: what each says, apart, under where it was read.
       if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
-      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<p>' + r.todo + '</p>' : ''));   // nothing to do: no card
+      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (r.todo ? '<div class="sg-il-line"><span class="sg-il-what"><b>What:</b> ' + r.todo + '</span>' + (r.writeTo && srcLines() ? '<span class="sg-il-where"><b>Where:</b> ' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' : ''));   // nothing to do: no card
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
       if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');

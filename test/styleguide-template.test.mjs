@@ -515,7 +515,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Example', 'Its tokens'].sort().join('|'));
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*$/, 'what is to write first, then what is to check, what is written after');
     // The table is its task, kind, status and when it was checked; what is written and what to do are in its panel.
-    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /Missing[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*You in Figma/);
+    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*You in Figma[\s\S]*What:[\s\S]*Where:[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
     assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Partial|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet|You in Figma/, 'what is written and what to do: in the panel only');
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.
@@ -628,12 +628,12 @@ test('in the browser: no script error, a control changes the real component, the
     assert.doesNotMatch(btn, /shows no change when it takes the focus/, 'a ring drawn on ::after is a focus that shows');
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
-    assert.match(await until(ROWS_FULL('#c-chip .pg-a11y-rows'), (v) => /Screen readers/.test(v)), /Figma annotation.*Screen readers announce the hint after the label.*Write it as Role: button/s);
+    assert.match(await until(ROWS_FULL('#c-chip .pg-a11y-rows'), (v) => /Screen readers/.test(v)), /What to do.*Write it as Role: button.*What the Figma notes say.*Screen readers announce the hint after the label/s, 'what to do first, then what Figma says');
     // A check a person made by hand is Done, by whom and when, while chip is as it was; one made before chip changed is
     // to check again, saying who checked it; one nobody checked says how to mark it.
     const rowOf = (sc) => run(`(() => { const tr = [...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.textContent.includes('${sc} ')); return tr ? tr.dataset.status + '|' + ${ROW_FULL('tr')} : ''; })()`);
     assert.match(await rowOf('1.3.3'), /^done\|.*Checked by QA on \d{4}-\d\d-\d\d: No instruction relies only on shape/s);
-    assert.match(await rowOf('3.3.7'), /^check\|.*Checked by QA on 2026-09-01, before chip changed\..*Once someone has checked it, record it as checked and this row reads Done\./s);
+    assert.match(await rowOf('3.3.7'), /^check\|(?=.*Once someone has checked it, record it as checked and this row reads Done\..*Checked by QA on 2026-09-01, before chip changed\.)/s, 'what to do first, then its status');
     assert.match(await rowOf('1.4.5'), /^check\|.*Once someone has checked it, record it as checked and this row reads Done\./s);
     // A system with no intent layer has a Documentation page too: one row a component, from Figma and the code, the File
     // column left out, a note no agent reads flagged Remove; an old link to Coverage, For agents or the Intent layer opens it.

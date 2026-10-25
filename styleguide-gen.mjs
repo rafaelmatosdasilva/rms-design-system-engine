@@ -750,7 +750,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           for (const f of [kebab(p.name), kebab(dedupe(p.name)), kebab(code)].filter(Boolean)) for (const d of ['specs/components', 'specs/templates', 'specs/patterns', 'specs/foundations']) if (layerFiles.has(`${d}/${f}.md`)) return `${d}/${f}.md`;
           return null;
         };
-        for (const p of view.intentLayer.pages) { const sp = specOf(p); if (sp) p.spec = sp; if (p.component) { const o = otherSources(p.component); if (o.length) p.others = o; } }
+        for (const p of view.intentLayer.pages) { const sp = p.spec ? null : specOf(p); if (sp) { p.spec = sp; if (p.url && p.file && p.url.includes(p.file)) p.specUrl = p.url.replace(p.file, sp); } if (p.component) { const o = otherSources(p.component); if (o.length) p.others = o; } }
         view.intentLayer.noPageOthers = Object.fromEntries(decided.noPage.map((n) => [n, otherSources(n)]).filter(([, o]) => o.length));
       }
     } catch { /* no intent layer */ }

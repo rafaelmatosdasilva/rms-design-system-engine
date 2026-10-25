@@ -177,7 +177,9 @@ export function projectNote(given, r) {
 export function plainGet(url, { headers = {}, signal } = {}, hops = 5) {
   return new Promise((ok, fail) => {
     const u = new URL(url);
-    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method: 'GET', headers, signal }, (res) => {
+    // A connection of its own each time (agent: false): one kept alive from before a long wait (drafting blocks for
+    // minutes) is closed by then, and writing into it fails with EPIPE.
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method: 'GET', headers, signal, agent: false }, (res) => {
       const status = res.statusCode ?? 0;
       if (status >= 300 && status < 400 && res.headers.location && hops > 0) {
         res.resume();
@@ -205,7 +207,7 @@ export function plainSend(url, { method = 'POST', headers = {}, body = null } = 
   return new Promise((ok, fail) => {
     const u = new URL(url);
     const data = body == null ? null : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
-    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method, headers: { ...headers, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {}) } }, (res) => {
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, { method, agent: false, headers: { ...headers, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {}) } }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('error', fail);
