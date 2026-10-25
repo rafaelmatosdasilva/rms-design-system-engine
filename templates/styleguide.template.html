@@ -1660,6 +1660,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-line .pg-par-val { display: block; font-size: inherit; line-height: inherit; margin-top: var(--sg-space-xxs); }
 .sg-row-detail-body .sg-il-what, .sg-row-detail-body .sg-il-where { display: block; margin-top: var(--sg-space-xxs); }
 .sg-row-detail-body :is(.sg-il-what, .sg-il-where) > b { font-weight: var(--sg-l-weight); color: var(--sg-text); }
+.sg-row-detail-body .sg-il-cmd { display: flex; align-items: center; margin-top: var(--sg-space-xs); }   /* the answer's command, Copy beside it */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
 .sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }
@@ -3053,11 +3054,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A page kept as it is: its Keep says it all, so What to do and Why stay empty rather than repeat it on every row.
     // With a proposal still to answer, what to do is to answer it; the engine's own route is said only as the one if not.
     var ilOpen = function (p) { return (p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || [])).filter(function (x) { return x.answer !== 'no'; }); };
-    // Said once, here: answer the proposal (in the chat, or the command), and what to do instead on a no.
+    // Each answer apart, with what it does and the command that gives it, a Copy beside it: pasted into Claude (or run in a
+    // terminal), the answer is recorded and its change made. A proposal that does not say what its no does falls back on
+    // the page's own task.
+    var ilAnswer = function (head, does, cmd) { return '<div class="sg-il-line"><strong>' + esc(head) + '</strong>' + (does ? '<span class="pg-par-val">' + does + '</span>' : '') + '<span class="sg-tk-code-line sg-il-cmd"><code>' + esc(cmd) + '</code>' + sysButton('button', 'Copy', ' data-il-copy="' + esc(cmd) + '"') + '</span></div>'; };
     var ilIfNot = function (p, html) {
       var open = ilOpen(p); if (!open.length) return html;
-      return '<p class="sg-il-line"><strong>Answer the proposal above: yes or no.</strong><span class="pg-par-val">In the chat, or with ' + open.map(function (x) { return '<code>rms-design-system-engine --intent-decide "' + esc(x.key) + '" yes</code>'; }).join(' or ') + '</span></p>'
-        + (html ? '<p class="sg-il-line"><strong>If no</strong><span class="pg-par-val">' + html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() + '</span></p>' : '');
+      var todo = html ? html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+      return open.map(function (x) {
+        var cmd = function (a) { return 'rms-design-system-engine --intent-decide "' + x.key + '" ' + a; };
+        return ilAnswer('If yes', x.yes ? esc(x.yes) : '', cmd('yes')) + ilAnswer('If no', x.no ? esc(x.no) : esc(todo), cmd('no'));
+      }).join('');
     };
     var ilTodo = function (p) { return ilIfNot(p, (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('')) || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
@@ -3199,6 +3206,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Its status first, then the proposal to say yes or no to, then what to do: the task, each thing still to write (what
       // and where), drafts to review, notes to remove; then what the page is and why.
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', c.todo) + card('Still to write', c.left) + card('Drafts to review', p.missingFor ? '' : ilDrafts(p)) + card('To remove', c.remove) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, null); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
