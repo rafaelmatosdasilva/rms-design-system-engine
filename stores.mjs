@@ -114,8 +114,14 @@ export function gitlabApi(ROOT, place, { env = process.env, http } = {}) {
   if (!p) return { error: `${place.gitlab} is not a GitLab project link` };
   const allowed = tokenAllowedFor(p.host, e);
   const readTok = (place.tokenEnv && envFrom(place.tokenEnv, e, folders)) || tokenFrom(e, folders);
-  const wName = place.writeTokenEnv || place.tokenEnv || 'GITLAB_WRITE_TOKEN';
-  const writeTok = envFrom(wName, e, folders) || (wName === 'GITLAB_WRITE_TOKEN' ? writeTokenFrom(e, folders) : '') || readTok;
+  // The token that writes: the place's own (writeTokenEnv, else tokenEnv), else GITLAB_WRITE_TOKEN, else the one that
+  // reads. A place's own write token is often the pipeline's (a project access token): a computer without it writes
+  // with the person's own, so one setup serves both. A place with only its own token (tokenEnv) keeps to it.
+  const own = place.writeTokenEnv || place.tokenEnv || null;
+  const tries = [[own, own ? envFrom(own, e, folders) : ''], ...(place.tokenEnv && !place.writeTokenEnv ? [] : [['GITLAB_WRITE_TOKEN', writeTokenFrom(e, folders)]])];
+  const hit = tries.find(([, t]) => t);
+  const writeTok = hit?.[1] || readTok;
+  const wName = hit?.[0] ?? (place.tokenEnv || 'GITLAB_TOKEN');
   const h = (t) => (t && allowed ? { 'PRIVATE-TOKEN': t } : {});
   const hr = h(readTok), hw = h(writeTok);
   // The project by its id, found from the link even when it moved or names the project (gitlab-source.mjs).

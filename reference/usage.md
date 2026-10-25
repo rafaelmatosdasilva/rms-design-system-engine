@@ -961,7 +961,9 @@ name instead of its path finds the one project of that name in that group. Every
 id, which a move never changes, and the run says once which path to write instead.
 
 **Tokens stay in each person's `.env`.** A place may name its own variable (`tokenEnv`, one token per project, the
-least each needs); else `GITLAB_TOKEN` reads and `GITLAB_WRITE_TOKEN` writes. A token goes only to gitlab.com or a host
+least each needs); else `GITLAB_TOKEN` reads and `GITLAB_WRITE_TOKEN` writes. A place may also name only the token that
+writes there (`writeTokenEnv`): a pipeline sets it to the project's own access token, and a computer without it writes
+with `GITLAB_WRITE_TOKEN`, else with the person's `GITLAB_TOKEN`. A token goes only to gitlab.com or a host
 named in `GITLAB_HOST`.
 
 **A company's profile** (`profile.mjs`): the shared setup (`config`: the Figma file, the paths, everything but what one
