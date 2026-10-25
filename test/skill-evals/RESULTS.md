@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Intent layer: every answer does its own work, each with a command to copy (continuous evaluation)
+
+What changed since the entry below (engine bc786bf): Panels open with what to do (What and Where); a fresh GitLab connection after a long wait (#29); Intent layer: every answer does its own work, each with a command to copy. The guide changed in `reference/usage.md`.
+
+Guide set measured: `f1b0694e4d39` · Project measured: `13d811a9d668`
+
+| Haiku, engine 4ca5375 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.063 | $0.061 |
+| Input a run | 138k | 120k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 138k. Records: `records/2026-10-25-intent-layer-every-answer-does`.
+
 ## 2026-10: --ci-changed: a scheduled pipeline builds only when something it is made from moved (continuous evaluation)
 
 What changed since the entry below (engine cb67d6a): --ci-changed: a scheduled pipeline builds only when something it is made from moved. The guide changed in `cookbook/ci-and-hooks.md`, `reference/usage.md`.
