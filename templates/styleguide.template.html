@@ -3367,6 +3367,24 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         needs.length ? 'todo' : 'check', needs.length ? 'Write ' + needs.map(function (n) { return WRITE[n] || n; }).join('; and ') + '.' : 'What agents needed is written, and they still got it wrong: say it more plainly, or higher on its page.'));
       rows[rows.length - 1].src = ['The prototypes\' checks'];
     }
+    // What an agent cannot learn about it (its props, events, slots and lists no comment and no page explains).
+    var cov = c.docCoverage || [];
+    if (cov.length) {
+      var groups = {}, LABEL = { prop: 'Props', event: 'Events', slot: 'Slots', fields: 'Lists with nothing on what they hold', field: 'Fields the product gives that no comment lists' };
+      cov.forEach(function (m) { (groups[m.kind] = groups[m.kind] || []).push(m); });
+      rows.push(mk('unsaid', 'What its documentation does not say', '<p class="pg-missing">' + cov.length + (cov.length === 1 ? ' thing an agent cannot learn' : ' things an agent cannot learn') + ' from its documentation:</p><ul>' + Object.keys(groups).map(function (k) { return '<li><strong>' + esc(LABEL[k] || k) + '</strong>: ' + groups[k].map(function (m) { return '<code>' + esc(m.what) + '</code>'; }).join(', ') + '</li>'; }).join('') + '</ul>', 'todo',
+        Object.keys(groups).map(function (k) { return 'Write ' + (LABEL[k] || k).toLowerCase() + ' ' + groups[k][0].write + '.'; }).join(' ')));
+      rows[rows.length - 1].src = ['Its code and its intent layer page'];
+    }
+    // Its "when to use" lines are all its family's: nothing tells an agent when this one and not a sibling (Missing).
+    if (c.noOwnUse) { rows.push(mk('ownuse', 'When to use it, not a sibling', '<p class="pg-missing">Every "when to use" line on its page is shared word for word with other components: none tells an agent when this one is right and its siblings are not.</p>', 'todo', 'Write one "when to use" line of its own on its intent layer page: the need only it meets.')); rows[rows.length - 1].src = ['The "which component?" test']; }
+    // Needs its own page names, for which agents picked another component: two pages claiming one use, or a purpose
+    // that does not say enough (to review).
+    if ((c.confusions || []).length) {
+      rows.push(mk('confused', 'Agents picked another component', '<p class="pg-missing">For ' + c.confusions.length + (c.confusions.length === 1 ? ' need' : ' needs') + ' its page names, agents chose another component:</p><ul>' + c.confusions.slice(0, 6).map(function (x) { return '<li>"' + esc(x.text) + '": <code>' + esc(x.chose || 'nothing') + '</code></li>'; }).join('') + '</ul>', 'check',
+        'Say in its purpose what sets it apart from ' + [...new Set(c.confusions.map(function (x) { return x.chose; }).filter(Boolean))].slice(0, 3).join(', ') + ', and name the other one in its "when not to use", or take the need off the page that does not own it.'));
+      rows[rows.length - 1].src = ['The "which component?" test'];
+    }
     if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
       'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
     return rows;

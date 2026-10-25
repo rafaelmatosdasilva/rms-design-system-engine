@@ -410,6 +410,91 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'screen';
 
+// The results of the documentation's stress tests, kept together: OUT_DIR/prototypes/stress.json.
+function keepStress(ROOT, part, value) {
+  const file = join(ROOT, OUT_DIR, 'prototypes', 'stress.json');
+  let rec = {}; try { rec = JSON.parse(readFileSync(file, 'utf8')); } catch { /* the first */ }
+  rec[part] = { at: new Date().toISOString(), ...value };
+  try { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, JSON.stringify({ $description: `The documentation's stress tests (${CLI} --prototype --scenarios, --sweep). Generated.`, ...rec }, null, 2) + '\n'); } catch { /* the report still says it */ }
+}
+async function runnerFor(model) {
+  const { claudeRunner } = await import('./intent-changes.mjs');
+  return claudeRunner(model ? { model } : {});
+}
+
+// --prototype --scenarios: can an agent tell, from what each component is for, which one a need calls for?
+async function scenariosReport(ROOT, sys, { model } = {}) {
+  if (!sys.page) { console.log('\n⏭  the system\'s components were not found in code.\n'); return 2; }
+  const { scenariosFrom, menuOf, runChoices, gradeChoices, sharedLines, withoutOwnUse } = await import('./doc-stress.mjs');
+  const scenarios = scenariosFrom(sys.page.context, sys.page);
+  if (!scenarios.length) { console.log('\n⏭  no component says when to use it: there is nothing to ask. Write each one\'s "when to use" in its intent layer page.\n'); return 0; }
+  const run = await runnerFor(model);
+  if (!run) { console.log('\n⏭  the claude command is not installed here: the scenarios need an agent to answer them.\n'); return 2; }
+  let answers;
+  try { answers = runChoices(scenarios, menuOf(sys.page.context, sys.page), run); } catch (e) { console.log(`\n⏭  ${e.message}\n`); return 2; }
+  const g = gradeChoices(scenarios, answers, sys.page);
+  const shared = sharedLines(sys.page.context, sys.page), ownless = withoutOwnUse(sys.page.context, sys.page);
+  keepStress(ROOT, 'scenarios', { model: model ?? null, right: g.right, total: g.total, confusions: g.confusions, shared, ownless });
+  console.log(`\nWHICH COMPONENT?  ·  ${g.right} of ${g.total} needs led an agent to the component whose page names them (${Math.round((100 * g.right) / g.total)}%)`);
+  for (const [n, list] of Object.entries(g.confusions).sort((a, b) => b[1].length - a[1].length).slice(0, 30)) console.log(`   ⚠️  ${n}: picked ${[...new Set(list.map((x) => x.chose ?? 'nothing'))].join(', ')} for "${cut(list[0].text, 110)}"${list.length > 1 ? ` (+${list.length - 1})` : ''}`);
+  if (shared.length) { console.log(`\n${shared.length} "when to use" line${shared.length === 1 ? '' : 's'} several components share word for word: they cannot tell an agent which one to use.`); for (const x of shared.slice(0, 10)) console.log(`   📓 "${cut(x.text, 90)}": ${x.components.slice(0, 6).join(', ')}${x.components.length > 6 ? ` +${x.components.length - 6}` : ''}`); }
+  if (ownless.length) console.log(`\n📓 ${ownless.length} component${ownless.length === 1 ? ' has' : 's have'} no "when to use" of ${ownless.length === 1 ? 'its' : 'their'} own (every line is shared): ${ownless.slice(0, 20).join(', ')}${ownless.length > 20 ? ` +${ownless.length - 20}` : ''}. Write one that sets each apart from its siblings.`);
+  console.log(`\nNEXT: each ⚠️ is two pages that claim the same use, or a purpose that does not say enough; the Documentation page lists them to review (${CLI} --styleguide).\n`);
+  return 0;
+}
+
+// --prototype --sweep: pages built for the intent layer's own templates and pages, each in one go from the catalog, and
+// scored by the page check: how much agents invent, where, and why (inventions.json, by "sweep").
+async function sweepReport(ROOT, cfg, sys, { model, most = 12 } = {}) {
+  if (!sys.page) { console.log('\n⏭  the system\'s components were not found in code.\n'); return 2; }
+  const { sweepRequests, pagePrompt, detailPrompt, codeOf } = await import('./doc-stress.mjs');
+  const requests = sweepRequests(sys.page.context, { most });
+  if (!requests.length) { console.log('\n⏭  the intent layer has no template, pattern or page that says what it is for: nothing to ask for.\n'); return 0; }
+  const run = await runnerFor(model);
+  if (!run) { console.log('\n⏭  the claude command is not installed here: the sweep needs an agent to write the pages.\n'); return 2; }
+  const ext = ({ vue: '.vue', svelte: '.svelte', jsx: '.jsx', html: '.html' })[Object.values(sys.page.components)[0]?.syntax] ?? '.vue';
+  const dir = join(ROOT, cfg.prototype?.dir ?? 'prototypes', 'sweep');
+  mkdirSync(dir, { recursive: true });
+  const results = [];
+  console.log(`\nREQUEST SWEEP  ·  ${requests.length} page${requests.length === 1 ? '' : 's'}, each written once from the catalog${model ? ` by ${model}` : ''}`);
+  for (const q of requests) {
+    const focus = requestFocus(sys.page.context, q.request, []);
+    let code = null, detail = [];
+    try {
+      // First the cards it asks for (as an agent runs --detail), then the page.
+      const ask = run(detailPrompt(q.request, catalogText(sys, { focus })));
+      try { detail = (JSON.parse(/\{[\s\S]*\}/.exec(String(ask))?.[0] ?? '{}').detail ?? []).filter((n) => sys.page.components[n]).slice(0, 12); } catch { /* none asked */ }
+      code = codeOf(run(pagePrompt(q.request, catalogText(sys, { focus, detail }), ext)));
+    } catch (e) { console.log(`   ⏭  ${q.from}: ${e.message}`); continue; }
+    if (!code) { console.log(`   ⏭  ${q.from}: no page came back`); continue; }
+    const file = join(dir, `${q.id}-${slug(q.from)}${ext}`);
+    writeFileSync(file, code);
+    const rel = file.slice(ROOT.length + 1);
+    const r = checkPage(rel, code, sys.page, { context: sys.page.context });
+    const inv = recordInventions(ROOT, OUT_DIR, rel, r, { page: sys.page, context: sys.page.context, by: 'sweep' });
+    const gaps = inv.items.filter((x) => x.gap).length;
+    results.push({ from: q.from, request: q.request, page: rel, errors: inv.items.length, gaps, missing: r.gaps.length, used: Object.keys(r.used) });
+    console.log(`   ${inv.items.length ? '❌' : '✅'} ${q.from}: ${inv.items.length} mistake${inv.items.length === 1 ? '' : 's'}${gaps ? `, ${gaps} where the documentation lacks it` : ''}${r.gaps.length ? `, ${r.gaps.length} need${r.gaps.length === 1 ? '' : 's'} the system lacks` : ''} (${rel})`);
+  }
+  const total = results.reduce((t, x) => t + x.errors, 0), clean = results.filter((x) => !x.errors).length;
+  keepStress(ROOT, 'sweep', { model: model ?? null, pages: results.length, clean, mistakes: total, results });
+  console.log(`\n${clean} of ${results.length} pages written with nothing invented; ${total} mistake${total === 1 ? '' : 's'} in all (${results.length ? (total / results.length).toFixed(1) : 0} a page).`);
+  console.log(`NEXT: each mistake and its why is on the Documentation page (${CLI} --styleguide); write what it says is missing, then sweep again to see the count fall.\n`);
+  return 0;
+}
+
+// --prototype --coverage: what an agent cannot learn about each component from its documentation (doc-coverage.mjs),
+// kept in OUT_DIR/prototypes/doc-coverage.json for the Documentation page. Nothing is written into the documentation.
+async function coverageReport(ROOT, sys) {
+  if (!sys.page) { console.log(`\n⏭  the system's components were not found in code: --coverage reads each component's own file.\n`); return 2; }
+  const { docCoverage, coverageLines } = await import('./doc-coverage.mjs');
+  const cov = docCoverage(sys.page, sys.page.context);
+  try { mkdirSync(join(ROOT, OUT_DIR, 'prototypes'), { recursive: true }); writeFileSync(join(ROOT, OUT_DIR, 'prototypes', 'doc-coverage.json'), JSON.stringify({ $description: `What an agent cannot learn about each component from its documentation. Generated by ${CLI} --prototype --coverage.`, at: new Date().toISOString(), ...cov }, null, 2) + '\n'); } catch { /* the report still says it */ }
+  console.log('\n' + coverageLines(cov).join('\n'));
+  console.log(`\nNEXT: the Documentation page lists each one as Missing (build it with ${CLI} --styleguide); write what is missing where each line says, the most used components first.\n`);
+  return 0;
+}
+
 // The project's own lint on one file, as the project runs it but never fixing anything: ESLint, and Stylelint for a file
 // with styles. → [{ level, line, message, tool }]
 export function projectLint(ROOT, abs) {
@@ -418,12 +503,14 @@ export function projectLint(ROOT, abs) {
   const eslint = bin('eslint');
   if (eslint) {
     const r = spawnSync(eslint, ['--format', 'json', '--no-warn-ignored', abs], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
-    try { for (const f of JSON.parse(r.stdout || '[]')) for (const m of f.messages ?? []) out.push({ level: m.severity === 2 ? 'error' : 'warning', line: m.line ?? 1, message: `${m.message}${m.ruleId ? ` (${m.ruleId})` : ''}`, tool: 'eslint' }); } catch { /* no JSON: the lint did not run */ }
+    // A finding the lint fixes itself (indentation, quotes, semicolons) is the project's formatting, not a mistake: counted
+    // apart, for the project's own lint run (npm run lint) to fix.
+    try { for (const f of JSON.parse(r.stdout || '[]')) for (const m of f.messages ?? []) out.push({ level: m.fix ? 'format' : m.severity === 2 ? 'error' : 'warning', line: m.line ?? 1, message: `${m.message}${m.ruleId ? ` (${m.ruleId})` : ''}`, tool: 'eslint' }); } catch { /* no JSON: the lint did not run */ }
   }
   const stylelint = /\.(vue|svelte|css|scss|less|html?)$/i.test(abs) ? bin('stylelint') : null;
   if (stylelint) {
     const r = spawnSync(stylelint, ['--formatter', 'json', abs], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
-    try { for (const f of JSON.parse(r.stdout || r.stderr || '[]')) for (const w of f.warnings ?? []) out.push({ level: w.severity === 'error' ? 'error' : 'warning', line: w.line ?? 1, message: w.text, tool: 'stylelint' }); } catch { /* the lint did not run */ }
+    try { for (const f of JSON.parse(r.stdout || r.stderr || '[]')) for (const w of f.warnings ?? []) out.push({ level: /^@stylistic\/|indentation|whitespace|newline|empty-line|quotes|semicolon/i.test(w.rule ?? '') ? 'format' : w.severity === 'error' ? 'error' : 'warning', line: w.line ?? 1, message: w.text, tool: 'stylelint' }); } catch { /* the lint did not run */ }
   }
   return out;
 }
@@ -455,7 +542,10 @@ async function pageReport(ROOT, cfg, input, sys) {
   console.log(`\nPAGE CHECK  ·  ${input}  ·  ${r.syntax}  ·  ${usedList.length} system component${usedList.length === 1 ? '' : 's'}${usedList.length ? ` (${usedList.join(', ')})` : ''}`);
   for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} line ${f.line}: ${f.message}`);
   if (edit) console.log(`\nWhat every edit is held to:\n${edit.split('\n').map((l) => `   ${l}`).join('\n')}`);
-  if (lint.length) { console.log('\nThe project\'s lint (nothing fixed):'); for (const l of lint) console.log(`   ${l.level === 'error' ? '❌' : '⚠️ '} line ${l.line}: ${l.message} [${l.tool}]`); }
+  const format = lint.filter((l) => l.level === 'format'), told = lint.filter((l) => l.level !== 'format');
+  if (told.length || format.length) console.log('\nThe project\'s lint (nothing fixed):');
+  for (const l of told) console.log(`   ${l.level === 'error' ? '❌' : '⚠️ '} line ${l.line}: ${l.message} [${l.tool}]`);
+  if (format.length) console.log(`   ✏️  ${format.length} formatting finding${format.length === 1 ? '' : 's'} its lint fixes itself (${[...new Set(format.map((l) => l.message.replace(/^.*\(([^)]+)\)$/, '$1')))].slice(0, 4).join(', ')}): the project's own lint run fixes them`);
   // Why each mistake happened: what the documentation lacked (written into the intent layer where the code is sure,
   // listed on the Documentation page where it is not), or what was written and not followed.
   const lacking = new Map();
@@ -471,7 +561,7 @@ async function pageReport(ROOT, cfg, input, sys) {
     console.log(`NEXT: fix each ❌ line in ${input} (only the system's components, each given only what its card in ${CLI} --prototype --catalog --detail <name> lists; a need nothing fits is a data-missing box), then run ${CLI} --prototype ${input} again.\n`);
     return 1;
   }
-  console.log(`\n✅ Ready: only the system's components, written as their code writes them, given only what they take, where the documentation puts them${lint.length ? '' : ', and the project\'s lint is clean'}.${r.gaps.length ? ` ${r.gaps.length} gap${r.gaps.length === 1 ? '' : 's'} for the design team.` : ''}`);
+  console.log(`\n✅ Ready: only the system's components, written as their code writes them, given only what they take, where the documentation puts them${told.length ? '' : format.length ? ', and the project\'s lint finds only formatting it fixes itself' : ', and the project\'s lint is clean'}.${r.gaps.length ? ` ${r.gaps.length} gap${r.gaps.length === 1 ? '' : 's'} for the design team.` : ''}`);
   console.log(`NEXT: tell the person where the page is (${input})${r.gaps.length ? ', every gap above as written, and offer to send them to Figma as the design team\'s to do list (--recipe figma-edits), written only after they say yes' : ''}.\n`);
   return 0;
 }
@@ -674,7 +764,7 @@ export async function runPrototype(ROOT, argv) {
   let cfg = {};
   try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* defaults */ }
   const file = screensFile ?? input;
-  if (!args.includes('--catalog') && !args.includes('--consistency') && !args.includes('--flow') && (!file || !existsSync(resolve(ROOT, file)))) {
+  if (!args.includes('--catalog') && !args.includes('--consistency') && !args.includes('--flow') && !args.includes('--coverage') && !args.includes('--scenarios') && !args.includes('--sweep') && (!file || !existsSync(resolve(ROOT, file)))) {
     console.log(`\nUsage: ${CLI} --prototype <composition.json>`);
     console.log(`       ${CLI} --prototype --from-screens <screen-capture.json>`);
     console.log(`       ${CLI} --prototype --catalog | --consistency | --flow`);
@@ -688,7 +778,7 @@ export async function runPrototype(ROOT, argv) {
   if (sys) sys.request = requestOf(ROOT, args);
   if (!sys) { console.log(`\n⏭  no catalog yet: run ${CLI} once to write it, then draw the prototype again.\n`); return 2; }
   // A system whose components are code (Vue, Svelte, React, custom elements): a prototype is a page in that code.
-  if ((args.includes('--catalog') || (input && syntaxOf(input))) && cfg.frameworkComponents !== false) {
+  if ((args.includes('--catalog') || args.includes('--coverage') || args.includes('--scenarios') || args.includes('--sweep') || (input && syntaxOf(input))) && cfg.frameworkComponents !== false) {
     try {
       const page = await pageSystem(ROOT, cfg);
       if (Object.keys(page.components).length) {
@@ -713,6 +803,12 @@ export async function runPrototype(ROOT, argv) {
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);
   if (args.includes('--flow')) return flowReport(ROOT, sys);
+  if (args.includes('--coverage')) return coverageReport(ROOT, sys);
+  if (args.includes('--scenarios') || args.includes('--sweep')) {
+    const at = args.indexOf('--model'), model = at >= 0 ? args[at + 1] : undefined;
+    const n = args.indexOf('--requests'), most = n >= 0 ? Number(args[n + 1]) || 12 : 12;
+    return args.includes('--sweep') ? sweepReport(ROOT, cfg, sys, { model, most }) : scenariosReport(ROOT, sys, { model });
+  }
   if (screensFile) return fromScreens(ROOT, cfg, screensFile, sys, { force: args.includes('--force'), browser: !args.includes('--no-browser') });
 
   let raw;

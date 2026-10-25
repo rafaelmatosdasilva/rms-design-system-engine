@@ -789,6 +789,16 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
       const byKey = new Map(Object.entries(inv).map(([n, b]) => [key(n), b]));
       for (const c of view.components) { const b = byKey.get(key(c.name)); if (b?.count) c.inventions = b; }
+      // What an agent cannot learn about it from its documentation (--prototype --coverage).
+      const cov = readJson(join(ROOT, OUT_DIR, 'prototypes', 'doc-coverage.json'))?.components ?? {};
+      const covKey = new Map(Object.entries(cov).map(([n, b]) => [key(n), b]));
+      for (const c of view.components) { const b = covKey.get(key(c.name)); if (b?.missing?.length) c.docCoverage = b.missing.filter((m) => !['page', 'purpose', 'example'].includes(m.kind)); }
+      // Needs its page names for which agents picked another component (--prototype --scenarios).
+      const conf = readJson(join(ROOT, OUT_DIR, 'prototypes', 'stress.json'))?.scenarios?.confusions ?? {};
+      const confKey = new Map(Object.entries(conf).map(([n, b]) => [key(n), b]));
+      for (const c of view.components) { const b = confKey.get(key(c.name)); if (b?.length) c.confusions = b; }
+      const ownless = new Set((readJson(join(ROOT, OUT_DIR, 'prototypes', 'stress.json'))?.scenarios?.ownless ?? []).map(key));
+      for (const c of view.components) if (ownless.has(key(c.name))) c.noOwnUse = true;
     } catch { /* no prototype checked yet */ }
     // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
     // --contracts-out through a merge request): its Contract button opens it on GitLab, and its Documentation says what it

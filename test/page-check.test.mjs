@@ -213,3 +213,59 @@ test('an example the intent layer gets is the product\'s own use of the componen
   const facts = withRealUses(root, { components: { TabStrip: { file: 'src/components/library/tabs/TabStrip.vue', props: {} } } });
   assert.equal(exampleOf(briefOf('TabStrip', facts)), '`<tab-strip :tabs="tabs" @picked="pick"/>`');
 });
+
+test('what an agent cannot learn from the documentation: props, events, slots and lists no comment and no page explains', async () => {
+  const { docCoverage, coverageLines } = await import('../doc-coverage.mjs');
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const ctx = { components: { TabStrip: { purpose: 'Switches views.', intentLayer: { whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: ['Send picked with the id of the tab.'], examples: [] } } } };
+  const cov = docCoverage(page, ctx);
+  const tab = cov.components.TabStrip.missing.map((m) => `${m.kind}:${m.what}`);
+  assert.ok(tab.includes('example:TabStrip'), tab.join(' '));
+  assert.ok(tab.includes('prop:compact'), 'a prop no comment names');
+  assert.ok(!tab.includes('prop:tabs') && !tab.includes('fields:tabs'), 'its comment says what tabs holds');
+  assert.ok(!tab.includes('event:picked'), 'its page names the event');
+  assert.ok(cov.components.Toolbar.missing.some((m) => m.kind === 'page'));
+  assert.ok(cov.components.Toolbar.missing.some((m) => m.kind === 'slot' && m.what === 'start'));
+  assert.match(coverageLines(cov).join('\n'), /^What an agent cannot learn from the documentation: \d+ of \d+ things unsaid/);
+});
+
+test('the documentation under load: needs turned into "which component?" scenarios, graded; requests from its own pages', async () => {
+  const { scenariosFrom, runChoices, gradeChoices, sweepRequests, menuOf, codeOf } = await import('../doc-stress.mjs');
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const ctx = {
+    components: {
+      TabStrip: { purpose: 'Switches between views of one page.', intentLayer: { whenToUse: ['Use TabStrip when people switch between sibling views of the same record.', 'Use it with `Toolbar` above.'] } },
+      SearchField: { purpose: 'Finds records by their words.', intentLayer: { whenToUse: ['Use it when people look for a record by typing part of its name.'] } },
+    },
+    rules: [{ title: 'Orders page (pages, intent layer)', text: 'The orders page lists every order a customer made, newest first.' }, { title: 'Orders page · Rules (pages, intent layer)', text: 'x' }],
+  };
+  const sc = scenariosFrom(ctx, page);
+  assert.deepEqual(sc.map((s) => [s.component, s.text]).sort(), [['SearchField', 'Use it when people look for a record by typing part of its name.'], ['TabStrip', 'Use it when people switch between sibling views of the same record.']], 'its own name taken out; a need that names another component left out');
+  const byName = Object.fromEntries(sc.map((s) => [s.component, s.id]));
+  assert.match(menuOf(ctx, page), /TabStrip: Switches between views of one page\./);
+  const answers = runChoices(sc, 'menu', () => JSON.stringify({ [byName.TabStrip]: 'TabStrip', [byName.SearchField]: 'tab-strip' }));
+  const g = gradeChoices(sc, answers, page);
+  assert.equal(g.right, 1);
+  assert.deepEqual(g.confusions, { SearchField: [{ chose: 'TabStrip', text: 'Use it when people look for a record by typing part of its name.' }] }, 'a tag answers for its component');
+  assert.deepEqual(sweepRequests(ctx).map((r) => r.from), ['Orders page'], 'a whole page, not one of its sections');
+  assert.equal(codeOf('Here:\n```vue\n<template/>\n```'), '<template/>\n');
+  const { sharedLines, withoutOwnUse } = await import('../doc-stress.mjs');
+  const twins = { components: { TabStrip: { intentLayer: { whenToUse: ['People pick one of several.'] } }, Toolbar: { intentLayer: { whenToUse: ['People pick one of several.', 'Actions sit above a list.'] } } } };
+  assert.deepEqual(sharedLines(twins, page).map((x) => x.components), [['TabStrip', 'Toolbar']]);
+  assert.deepEqual(withoutOwnUse(twins, page), ['TabStrip'], 'a line of its own sets Toolbar apart');
+});
+
+test('a need the system has a component for is not a gap, unless the page says it looked at it and why it does not fit', async () => {
+  const { systemFor } = await import('../page-check.mjs');
+  const comps = { secretField: {}, rateGrid: {}, drawerPanel: {}, tickBoxPrimary: {} };
+  assert.deepEqual(systemFor('a secret field for the login', comps), ['secretField']);
+  assert.deepEqual(systemFor('a grid of rates', comps), ['rateGrid']);
+  assert.deepEqual(systemFor('fields for the filter panel', comps), [], 'a word every name shares says nothing');
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const r = checkPage('prototypes/P.vue', '<template><list-page><div data-missing="tab strip for the views"/><div data-missing="tab strip again" data-searched="TabStrip" data-why="it cannot hold icons"/></list-page></template>\n<script setup>\nimport ListPage from \'@/components/templates/ListPage\'\n</script>', page, {});
+  assert.ok(r.findings.some((f) => f.level === 'error' && /"tab strip for the views" is not missing: the system has TabStrip/.test(f.message)));
+  assert.ok(!r.findings.some((f) => f.level === 'error' && /tab strip again/.test(f.message)), 'looked at and said why');
+});
