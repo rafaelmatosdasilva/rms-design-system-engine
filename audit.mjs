@@ -532,6 +532,36 @@ if (process.argv.includes('--intent-decide')) {
   process.exit(0);
 }
 
+// ── --ci-changed [--record]: has anything this build is made from moved since the last build (ci-changed.mjs) ──
+// For a scheduled pipeline no webhook can start (a code repository the team may only read): exit 0 when the code, a
+// store, the intent layer, the profile, the Figma file or the engine moved since the last build (each named), 3 when
+// nothing did, so the job stops in seconds. --record keeps what this build was made from, after it succeeded, in
+// OUT_DIR/ci-last-build.json (the pipeline keeps that folder in its cache).
+if (process.argv.includes('--ci-changed')) {
+  let ccfg = {}; try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* no setup: everything counts as new */ }
+  const { sourcesOf, sourcesNow, changes, short, readLast } = await import('./ci-changed.mjs');
+  const { plainGet, tokenFrom } = await import('./gitlab-source.mjs');
+  const file = join(ROOT, OUT_DIR, 'ci-last-build.json');
+  // The tokens as every run reads them: the environment (a pipeline's variables), else a .env beside the project.
+  const dotenv = (k) => { for (const d of [ROOT, dirname(ROOT)]) { try { const m = new RegExp(`^\\s*${k}\\s*=\\s*['"]?([^'"\\n#]+)`, 'm').exec(readFileSync(join(d, '.env'), 'utf8')); if (m) return m[1].trim(); } catch { /* none here */ } } return undefined; };
+  const env = { ...process.env, GITLAB_TOKEN: tokenFrom(process.env, [ROOT, dirname(ROOT)]) ?? undefined, FIGMA_TOKEN: process.env.FIGMA_TOKEN ?? dotenv('FIGMA_TOKEN') };
+  const now = await sourcesNow(sourcesOf(ROOT, ccfg), { get: (url, headers) => plainGet(url, { headers }), env });
+  let engine = null; try { const { execFileSync } = await import('node:child_process'); engine = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: SCRIPT_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { /* not a checkout */ }
+  if (engine) now['the engine'] = engine;
+  if (process.argv.includes('--record')) {
+    mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+    writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), sources: now }, null, 2) + '\n');
+    console.log(`✅ Recorded what this build was made from: ${Object.entries(now).map(([w, id]) => `${w} ${short(id)}`).join(' · ')}`);
+    process.exit(0);
+  }
+  const last = readLast(file);
+  const moved = changes(now, last?.sources ?? {});
+  if (!last) { console.log('▶️  No build recorded yet: build.'); process.exit(0); }
+  if (moved.length) { console.log(`▶️  Changed since the last build (${last.at}): ${moved.map((m) => `${m.what} ${short(m.from)} → ${short(m.to)}`).join(' · ')}. Build.`); process.exit(0); }
+  console.log(`⏸  Nothing changed since the last build (${last.at}): ${Object.keys(now).join(', ')} as they were.`);
+  process.exit(3);
+}
+
 // ── --intent-autofix on|off: whether each run fixes the intent layer and commits it straight on its branch ──
 // Writes ds-config.json → intentLayer.autoFix ("commit", or taken out), keeping the file's own indentation.
 if (process.argv.includes('--intent-autofix')) {

@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: --ci-changed: a scheduled pipeline builds only when something it is made from moved (continuous evaluation)
+
+What changed since the entry below (engine cb67d6a): --ci-changed: a scheduled pipeline builds only when something it is made from moved. The guide changed in `cookbook/ci-and-hooks.md`, `reference/usage.md`.
+
+Guide set measured: `6f999125b5cd` · Project measured: `13d811a9d668`
+
+| Haiku, engine bc786bf | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.064 | $0.063 |
+| Input a run | 134k | 138k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 138k a run against 134k. Records: `records/2026-10-25-ci-changed-a-scheduled-pipeline`.
+
 ## 2026-10: Every test closes the documentation gaps it can: the code's facts written as final, the rest drafted for review (continuous evaluation)
 
 What changed since the entry below (engine c7f1651): Evaluations: the documentation under load (a miss read by hand: the check now takes "wasn't refreshed"); Every test closes the documentation gaps it can: the code's facts written as final, the rest drafted for review. The guide changed in `reference/usage.md`.
