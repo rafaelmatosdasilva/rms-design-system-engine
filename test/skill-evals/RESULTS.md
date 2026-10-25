@@ -1,5 +1,35 @@
 # Skill evaluation results
 
+## 2026-10: Merge main into readmes (continuous evaluation)
+
+What changed since the entry below (engine c0ee871): The default theme is called the default one; plain-word project names are watched in context (#34). The guide changed in `reference/usage.md`.
+
+Guide set measured: `d80c9ef41634` · Project measured: `13d811a9d668`
+
+| Haiku, engine ea1fabb | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 69/70 |
+| Mean cost a run | $0.056 | $0.065 |
+| Input a run | 101k | 147k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed. Failed: fix-chip-height #2: the combination is 32px, the field still 36px. Records: `records/2026-10-25-merge-main-into-readmes`.
+
+## 2026-10: Each repository the setup names says what is there: the engine writes its README on every run (continuous evaluation)
+
+What changed since the entry below (engine ddc45c6): Accessibility per theme (#32); Private check: more of the people and companies the work drew on (#33); Each repository the setup names says what is there: the engine writes its README on every run. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `95337677e465` · Project measured: `13d811a9d668`
+
+| Haiku, engine c0ee871 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.059 | $0.056 |
+| Input a run | 117k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below. Failed: fix-chip-height #2: the combination is 32px, the field still 36px. Records: `records/2026-10-25-each-repository-the-setup-names`.
+
 ## 2026-10: The default theme is called the default one; a project's plain-word names are watched where they are used as names (continuous evaluation)
 
 What changed since the entry below (engine ddc45c6): Accessibility per theme (#32); The default theme is called the default one; a project's plain-word names are watched where they are used as names. The guide changed in `reference/usage.md`.

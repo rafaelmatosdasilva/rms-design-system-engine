@@ -144,5 +144,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-25-make-command-writes-the-company` | The 21 guide tasks on Haiku (engine 80a5ef0) | "--make-command writes the company's command even when the profile cannot be read yet" |
 | `2026-10-25-accessibility-per-theme-the-build` | The 21 guide tasks on Haiku (engine ddc45c6) | "Accessibility per theme: the build tries every component in each theme the page offers (the default one, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is the default theme's); the page shows the chosen theme's, and switches with it" |
 | `2026-10-25-the-default-theme-is-called` | The 21 guide tasks on Haiku (engine c15d49a) | "The default theme is called the default one; a project's plain-word names are watched where they are used as names" |
+| `2026-10-25-each-repository-the-setup-names` | The 21 guide tasks on Haiku (engine c0ee871) | "Each repository the setup names says what is there: the engine writes its README on every run" |
+| `2026-10-25-merge-main-into-readmes` | The 21 guide tasks on Haiku (engine ea1fabb) | "Merge main into readmes" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
