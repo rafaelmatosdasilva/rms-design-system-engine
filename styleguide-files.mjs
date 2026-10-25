@@ -22,6 +22,8 @@ const DATA_TAG = /<script type="application\/json" id="sg-data">([\s\S]*?)<\/scr
 const FONT_STYLE = /<style data-font-from="([^"]*)">([\s\S]*?)<\/style>/g;
 // The files this module writes (and may remove): its names, a hash of ten hex digits, .css or .js.
 const OWN_FILE = /^(?:styleguide|fonts|[\w+-]+\.data)\.[0-9a-f]{10}\.(?:css|js)$/;
+// Whether a file beside a page is one this module writes (named by what it holds).
+export const isOwnFile = (name) => OWN_FILE.test(name);
 const hashOf = (text) => createHash('sha1').update(text).digest('hex').slice(0, 10);
 
 // The data as a script that sets a global: its JSON written as the object itself (JSON is JavaScript), measured
@@ -51,7 +53,7 @@ export function splitPage(html, base = 'index') {
 }
 
 // The local files a page links (src= and href= that are a file beside it).
-const linksOf = (html) => [...String(html).matchAll(/\b(?:src|href)="([^"#?:]+)"/g)].map((m) => m[1]).filter((f) => !f.startsWith('/') && !f.includes('..'));
+export const linksOf = (html) => [...String(html).matchAll(/\b(?:src|href)="([^"#?:]+)"/g)].map((m) => m[1]).filter((f) => !f.startsWith('/') && !f.includes('..'));
 
 // Writes the page and the files it links; then removes the files this module wrote that no page beside it links
 // any more (an earlier build's), so the folder holds what its pages use. split: false writes the page whole.
