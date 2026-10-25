@@ -328,7 +328,7 @@ export function intentLayerOf(il) {
   }
   // A section of its page that is code (an example written as a block) is an example too.
   for (const x of il.sections ?? []) if (/```|<[A-Za-z][\w-]*[\s/>]/.test(x?.text ?? '')) examples.push(String(x.text).trim());
-  return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null };
+  return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null, defined: il.defined ?? null };
 }
 
 // Where a component may go, read from the documentation as written: "`searchField` only inside the toolbar", "Do not

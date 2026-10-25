@@ -4,7 +4,7 @@
 // reference is the system's, a line that differs only by the page's own name is repeated. An invented system (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText, specIndex, specOf, planOf, draftPlan, applyPlan, describeChanges } from '../intent-changes.mjs';
+import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText, specIndex, specOf, planOf, draftPlan, sureParts, applyPlan, describeChanges } from '../intent-changes.mjs';
 import { entityView, dropBoilerplate, DRAFT } from '../doc-source-dsds.mjs';
 import { factsFrom } from '../intent-truth.mjs';
 import { useReport } from '../intent-layer.mjs';
@@ -233,4 +233,57 @@ test('a large change goes as several commits, each made on the one before, and s
   const r2 = await commitToBranch(moving, { files, sha: 'abc123', target: 'master', message: 'm' });
   assert.equal(sent.length, 1);
   assert.match(r2.error, /moved while the changes were sent \(1 of 3 parts sent\)/);
+});
+
+test('what the tests found and the code says for certain is written as final; telling siblings apart is drafted', () => {
+  const facts = factsFrom({ components: { chipOne: { file: 'src/chips/ChipOne.vue', root: 'button', props: {} }, chipTwo: { file: 'src/chips/ChipTwo.vue', props: {} } } });
+  const e = { kind: 'component', layer: 'components', name: 'Chip One', id: 'component-chip-one', file: 'specs/dsds/chip-one.dsds.json', code: 'src/chips/ChipOne.vue', purpose: ['A chip for one choice.'], whenToUse: ['The value is picked by the user.'], whenNotToUse: ['Not for navigation.'], mistakes: ['x'], limitations: ['y'], rules: ['Role: button', 'Do: keep it short.', 'Example: `<ChipOne />`', 'Send `picked` once.'], sections: [] };
+  const snap = { _source: {}, entities: [e] };
+  const report = useReport(snap, new Map([['chipOne', e]]), { names: ['chipOne'], wrongOf: () => [] });
+  const code = { name: 'chipOne', events: ['picked', 'removed', 'cleared'], payloads: { removed: 'chip.id', cleared: '$event' }, slots: ['icon'], props: ['dense'], propFacts: { dense: { type: 'boolean', default: false } }, data: { items: ['id', 'label'] }, listy: { items: true }, ownless: true, shared: ['The value is picked by the user.'], confusedWith: 'chipTwo' };
+  const plan = planOf(snap, report, { code: () => code });
+  plan[0].code = code;
+  assert.deepEqual(plan[0].need.find((n) => n?.write).write, [{ where: 'Data', text: '`items` holds a list of items, each with `id`, `label`.' }], 'events, props and slots are the generator\'s own definitions');
+  assert.ok(plan[0].need.includes('whenToUse') && plan[0].need.some((n) => n?.ownUse) && plan[0].need.some((n) => n?.differ === 'chipTwo'));
+  const asked = [];
+  draftPlan(plan, facts, (prompt) => { asked.push(prompt); return JSON.stringify({ '0.d': { whenToUse: ['Use it when the user removes picks one by one, not `chipTwo`.'] } }); });
+  assert.match(asked[0], /"ownUse": true/);
+  assert.match(asked[0], /With ownUse: every "when to use" line/);
+  const sure = plan[0].drafted.filter((d) => d.sure).map((d) => `${d.where}: ${d.text}`);
+  assert.deepEqual(sure, ['Data: `items` holds a list of items, each with `id`, `label`.']);
+  assert.ok(plan[0].drafted.some((d) => !d.sure && d.where === 'When to use'), 'drafted for review');
+});
+
+test('the sure parts are written even when nothing can be drafted', () => {
+  const facts = factsFrom({ components: { chipOne: { file: 'src/chips/ChipOne.vue', props: {} } } });
+  const plan = [{ entity: { name: 'Chip One' }, page: { component: 'chipOne' }, need: [{ write: [{ where: 'Data', text: '`items` holds a list of items, each with `id`.' }] }] }];
+  sureParts(plan, facts);
+  assert.deepEqual(plan[0].drafted, [{ where: 'Data', text: '`items` holds a list of items, each with `id`.', sure: true }]);
+});
+
+test('a component\'s own spec wins over a pattern that names the same code as its source', () => {
+  const idx = specIndex(new Map([['specs/patterns/selection.md', '# Selection\n\n- Source: `src/tables/Grid.vue`\n'], ['specs/components/grid.md', '# Grid\n\n- Source: `src/tables/Grid.vue`\n']]));
+  assert.deepEqual(specOf({ name: 'Grid', code: 'src/tables/Grid.vue' }, idx), { spec: 'specs/components/grid.md', shared: false });
+});
+
+test('when the code changes, the engine\'s own section follows it: a line it no longer says comes out, the new one goes in', () => {
+  const e = { kind: 'component', layer: 'components', name: 'Chip One', id: 'component-chip-one', file: 'specs/dsds/chip-one.dsds.json', code: 'src/chips/ChipOne.vue', purpose: ['A chip.'], whenToUse: ['Use it for one choice.'], whenNotToUse: ['Not for links.'], mistakes: ['x'], limitations: ['y'], rules: ['Role: button', 'Do: keep it short.', 'Example: `<ChipOne />`', 'Data: `items` holds a list of items, each with `id`, `name`.', 'Data: `groups` holds a list of items, each with `id`.'], sections: [] };
+  const snap = { _source: {}, entities: [e] };
+  const report = useReport(snap, new Map([['chipOne', e]]), { names: ['chipOne'], wrongOf: () => [] });
+  // The code renamed name to label, and groups is gone.
+  const code = { events: [], payloads: {}, slots: [], props: [], propFacts: {}, data: { items: ['id', 'label'] }, listy: { items: true } };
+  const plan = planOf(snap, report, { code: () => code });
+  assert.deepEqual(plan[0].remove.sort(), ['`groups` holds a list of items, each with `id`.', '`items` holds a list of items, each with `id`, `name`.']);
+  assert.deepEqual(plan[0].need.find((n) => n?.write).write, [{ where: 'Data', text: '`items` holds a list of items, each with `id`, `label`.' }]);
+  // As the code says it: nothing to do.
+  const same = planOf(snap, report, { code: () => ({ events: [], payloads: {}, slots: [], props: [], propFacts: {}, data: { items: ['id', 'name'], groups: ['id'] }, listy: { items: true, groups: true } }) });
+  assert.equal(same.length, 0);
+});
+
+test('the reader keeps what a generated definitions section names, and whether it says more than the name', () => {
+  const v = entityView({ kind: 'component', name: 'Chip One', sections: [
+    { kind: 'definitions', title: 'Events', items: [{ term: 'picked', definition: 'Event emitted by the component.' }, { term: 'removed', definition: 'Sent when the person takes the chip out, with its id.' }] },
+    { kind: 'definitions', title: 'Properties', items: [{ term: 'size (chipSize)', definition: 'Vue prop `chipSize`. String; default `m`.' }] },
+  ] }, 'specs/dsds/chip-one.dsds.json');
+  assert.deepEqual(v.defined, { events: [{ term: 'picked', codeTerm: null, said: false }, { term: 'removed', codeTerm: null, said: true }], props: [{ term: 'size', codeTerm: 'chipSize', said: true }] });
 });

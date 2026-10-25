@@ -410,6 +410,15 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
 
 const slug = (s) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'screen';
 
+// After a test: what it found that the code says for certain is written into the intent layer (an example, each event and
+// what it sends, what each list holds, its slots, the props no comment explains), and what needs judgement is drafted
+// for review (intent-changes.mjs autoFix, when intentLayer.autoFix is "commit" and GitLab lets this person write).
+async function closeGaps(ROOT, cfg) {
+  const mode = typeof cfg.intentLayer === 'object' ? cfg.intentLayer.autoFix : null;
+  if (mode !== 'commit') { console.log(`ℹ️  The intent layer is not fixed by itself (intentLayer.autoFix is not "commit"): ${CLI} --intent-changes shows what would be written.`); return; }
+  try { const said = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg); if (said) console.log(said); } catch (e) { console.log(`⚠️  Intent layer not fixed this run: ${e.message}`); }
+}
+
 // The results of the documentation's stress tests, kept together: OUT_DIR/prototypes/stress.json.
 function keepStress(ROOT, part, value) {
   const file = join(ROOT, OUT_DIR, 'prototypes', 'stress.json');
@@ -423,7 +432,7 @@ async function runnerFor(model) {
 }
 
 // --prototype --scenarios: can an agent tell, from what each component is for, which one a need calls for?
-async function scenariosReport(ROOT, sys, { model } = {}) {
+async function scenariosReport(ROOT, sys, { model, cfg = {} } = {}) {
   if (!sys.page) { console.log('\n⏭  the system\'s components were not found in code.\n'); return 2; }
   const { scenariosFrom, menuOf, runChoices, gradeChoices, sharedLines, withoutOwnUse } = await import('./doc-stress.mjs');
   const scenarios = scenariosFrom(sys.page.context, sys.page);
@@ -439,7 +448,8 @@ async function scenariosReport(ROOT, sys, { model } = {}) {
   for (const [n, list] of Object.entries(g.confusions).sort((a, b) => b[1].length - a[1].length).slice(0, 30)) console.log(`   ⚠️  ${n}: picked ${[...new Set(list.map((x) => x.chose ?? 'nothing'))].join(', ')} for "${cut(list[0].text, 110)}"${list.length > 1 ? ` (+${list.length - 1})` : ''}`);
   if (shared.length) { console.log(`\n${shared.length} "when to use" line${shared.length === 1 ? '' : 's'} several components share word for word: they cannot tell an agent which one to use.`); for (const x of shared.slice(0, 10)) console.log(`   📓 "${cut(x.text, 90)}": ${x.components.slice(0, 6).join(', ')}${x.components.length > 6 ? ` +${x.components.length - 6}` : ''}`); }
   if (ownless.length) console.log(`\n📓 ${ownless.length} component${ownless.length === 1 ? ' has' : 's have'} no "when to use" of ${ownless.length === 1 ? 'its' : 'their'} own (every line is shared): ${ownless.slice(0, 20).join(', ')}${ownless.length > 20 ? ` +${ownless.length - 20}` : ''}. Write one that sets each apart from its siblings.`);
-  console.log(`\nNEXT: each ⚠️ is two pages that claim the same use, or a purpose that does not say enough; the Documentation page lists them to review (${CLI} --styleguide).\n`);
+  await closeGaps(ROOT, cfg);
+  console.log(`\nNEXT: each ⚠️ and 📓 is drafted into the intent layer for review (when to use it and not its sibling); the Documentation page lists them as Review (${CLI} --styleguide).\n`);
   return 0;
 }
 
@@ -479,19 +489,22 @@ async function sweepReport(ROOT, cfg, sys, { model, most = 12 } = {}) {
   const total = results.reduce((t, x) => t + x.errors, 0), clean = results.filter((x) => !x.errors).length;
   keepStress(ROOT, 'sweep', { model: model ?? null, pages: results.length, clean, mistakes: total, results });
   console.log(`\n${clean} of ${results.length} pages written with nothing invented; ${total} mistake${total === 1 ? '' : 's'} in all (${results.length ? (total / results.length).toFixed(1) : 0} a page).`);
-  console.log(`NEXT: each mistake and its why is on the Documentation page (${CLI} --styleguide); write what it says is missing, then sweep again to see the count fall.\n`);
+  await closeGaps(ROOT, cfg);
+  console.log(`NEXT: what the code says for certain is written into the intent layer, the rest drafted for review (the Documentation page, ${CLI} --styleguide); sweep again to see the count fall.\n`);
   return 0;
 }
 
 // --prototype --coverage: what an agent cannot learn about each component from its documentation (doc-coverage.mjs),
-// kept in OUT_DIR/prototypes/doc-coverage.json for the Documentation page. Nothing is written into the documentation.
-async function coverageReport(ROOT, sys) {
+// kept in OUT_DIR/prototypes/doc-coverage.json for the Documentation page; what the code says for certain is then written
+// into the intent layer (closeGaps).
+async function coverageReport(ROOT, sys, cfg = {}) {
   if (!sys.page) { console.log(`\n⏭  the system's components were not found in code: --coverage reads each component's own file.\n`); return 2; }
   const { docCoverage, coverageLines } = await import('./doc-coverage.mjs');
   const cov = docCoverage(sys.page, sys.page.context);
   try { mkdirSync(join(ROOT, OUT_DIR, 'prototypes'), { recursive: true }); writeFileSync(join(ROOT, OUT_DIR, 'prototypes', 'doc-coverage.json'), JSON.stringify({ $description: `What an agent cannot learn about each component from its documentation. Generated by ${CLI} --prototype --coverage.`, at: new Date().toISOString(), ...cov }, null, 2) + '\n'); } catch { /* the report still says it */ }
   console.log('\n' + coverageLines(cov).join('\n'));
-  console.log(`\nNEXT: the Documentation page lists each one as Missing (build it with ${CLI} --styleguide); write what is missing where each line says, the most used components first.\n`);
+  await closeGaps(ROOT, cfg);
+  console.log(`\nNEXT: what the code says for certain is written into the intent layer; the rest is on the Documentation page as Missing or Review (build it with ${CLI} --styleguide).\n`);
   return 0;
 }
 
@@ -803,11 +816,11 @@ export async function runPrototype(ROOT, argv) {
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);
   if (args.includes('--flow')) return flowReport(ROOT, sys);
-  if (args.includes('--coverage')) return coverageReport(ROOT, sys);
+  if (args.includes('--coverage')) return coverageReport(ROOT, sys, cfg);
   if (args.includes('--scenarios') || args.includes('--sweep')) {
     const at = args.indexOf('--model'), model = at >= 0 ? args[at + 1] : undefined;
     const n = args.indexOf('--requests'), most = n >= 0 ? Number(args[n + 1]) || 12 : 12;
-    return args.includes('--sweep') ? sweepReport(ROOT, cfg, sys, { model, most }) : scenariosReport(ROOT, sys, { model });
+    return args.includes('--sweep') ? sweepReport(ROOT, cfg, sys, { model, most }) : scenariosReport(ROOT, sys, { model, cfg });
   }
   if (screensFile) return fromScreens(ROOT, cfg, screensFile, sys, { force: args.includes('--force'), browser: !args.includes('--no-browser') });
 

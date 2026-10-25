@@ -138,5 +138,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-24-prototype-catalog-what-the-request` | The 21 guide tasks on Haiku (engine 8f07cf3) | "Prototype catalog: what the request needs, the code's own props, and where a component goes" |
 | `2026-10-25-prototypes-as-pages-in-the` | The 21 guide tasks on Haiku (engine f2ce1f0) | "Prototypes as pages in the system's own code, held to the system, and what agents invent fed back to the documentation" |
 | `2026-10-25-the-documentation-under-load-what` | The 21 guide tasks on Haiku (engine c7f1651) | "The documentation under load: what agents cannot learn, which component they cannot tell apart, and a sweep of real pages" |
+| `2026-10-25-every-test-closes-the-documentation` | The 21 guide tasks on Haiku (engine cb67d6a) | "Every test closes the documentation gaps it can: the code's facts written as final, the rest drafted for review" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

@@ -1211,6 +1211,17 @@ and whose examples (`Example:`) are shown as examples.
     names it in `data-searched` and says in `data-why` why it does not fit. Run it again after writing what was missing
     to see the count fall.
   Both agent tests use the `claude` command (`--model`, default the drafting model) and print why when it cannot answer.
+  **Each test closes what it can.** At its end (and at the start of every engine run) the intent layer is fixed when
+  `intentLayer.autoFix` is `"commit"` and GitLab lets the person write. What the code says for certain is written as
+  final on the component's own spec and page: what each list or object holds (**Data**: the fields its comment names
+  and those the product's code gives it), and an example from the product's own use. Data is the engine's section: each
+  run takes out a line the code no longer says (a field renamed or gone) and writes the new one, so the page follows the
+  code with nothing to review. Events, props and slots are the intent layer generator's own definitions, read from the
+  code; an event whose definition only names it ("Event emitted by the component.") is listed as a gap. What needs
+  judgement is drafted, marked `**Draft:**` (Review): a "when to use" of its own for a component whose every line is
+  shared, and when to use it and not the component agents picked instead. A page written from a spec several
+  components share is not changed (listed: give it a spec of its own). The sure parts are written even when nothing
+  can be drafted (no `claude` here).
 - **Where a component goes** is read from the documentation as written, and the check holds every prototype to it: a
   sentence that names the component and its container as the system names them (`` `searchField` only inside the
   toolbar``, ``Do not place `TabItem` without `TabStrip` ``) makes a part outside that container an error. One that
