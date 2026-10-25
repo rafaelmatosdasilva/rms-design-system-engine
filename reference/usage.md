@@ -384,9 +384,12 @@ same can be done in the layer by hand (remove the marker to approve, delete the 
 the repeated lines taken out; each sentence the content check finds wrong written again with only what the system has;
 what a component page lacks (what it is for, when to use it, when not to) drafted. A change goes into the page's
 source when the page is generated from one (a Markdown spec whose metadata names the page's code file as `Source`, or
-whose title is its name) and into the page itself, so both say the same until the layer is generated again; a spec
-that several pages are written from (a family's) takes what is true of all of them, never a draft for one page, which
-is said. **A drafted line starts with `**Draft:**`**: the engine reads it apart from the page (`drafts`), no agent gets
+whose title is its name) and into the page itself, so both say the same until the layer is generated again. A page
+written from a spec several pages share (a family's) is first given a spec of its own beside it: its Metadata (its code
+file, the family spec), its API from the code, what of the family's spec the layer would no longer give its page, the
+drafts the family's spec held for it alone, and, where the layer's scripts pair code files with spec names, its entry;
+a folder's spec that only one page falls under is that page's own. The engine's own Data lines a page shows and its
+spec does not are written in the spec too, so generating the pages again keeps them. **A drafted line starts with `**Draft:**`**: the engine reads it apart from the page (`drafts`), no agent gets
 it, and the page's decision is **Review** until a person reads it, changes what is not right and removes the marker (or
 deletes the line to turn it down). Drafts are written by the `claude` command, told only what the system has (each
 component's props and the values they take, its code file, what its page says), and each is kept only when the
@@ -764,8 +767,11 @@ says Not checked for what is not tried yet, and the menu shows no count; then Ac
 without it; without Chrome it is skipped and said, and a script error the page throws while trying is printed
 under the count.
 
-**The results are saved with the snapshots** (`a11y-results.snapshot.json`), each under its component's signature
-(its code, the system's CSS, the check itself). The next build puts them in the page first and tries only the
+**Each theme has its own results.** A theme changes the colours contrast is measured on, so the build tries every
+component in each theme the page offers (the default theme, and each brand that is not only the base of others), and the page
+shows the results of the theme chosen at the top; choosing another shows its own, and what it has not tried yet is
+tried as it is shown. **The results are saved with the snapshots** (`a11y-results.snapshot.json`), each under its component's signature
+(its code, the system's CSS, the check itself), per theme (`themes: { default, <brand>… }`; an older file with one set is the default theme's). The next build puts them in the page first and tries only the
 components whose signature changed: nothing changed, nothing tried again. A build that tried something saves the file
 and, when the team keeps its snapshots in a store (`stores.snapshots`), sends it there as one commit when GitLab lets
 this person, or the pipeline's token, write it; so everyone's build, and the page the team publishes, start from the

@@ -12,6 +12,8 @@
 //   node .githooks/private-terms.mjs --add <folder>    remember a project (its folder holds ds-config.json)
 //   node .githooks/private-terms.mjs --scan <folder>   remember every project found under a folder
 //   node .githooks/private-terms.mjs --allow <word>    a term that is the engine's own, never refused again
+//   node .githooks/private-terms.mjs --name <word>     a project's name that is a plain word (a theme, a brand): refused
+//                                                      where the text uses it as a name, kept on this computer only
 //   node .githooks/private-terms.mjs --list            the projects and how many terms each gives
 //   node .githooks/private-terms.mjs --review          the terms the engine's files already carry, to fix or allow
 //
@@ -73,7 +75,7 @@ const isCommon = (w) => {
     || (w.endsWith('ing') && (c.has(w.slice(0, -3)) || c.has(w.slice(0, -3) + 'e')));
 };
 // Words of CSS, HTML and design systems a dictionary may lack.
-const GENERIC_WORDS = 'small medium large xs sm md lg xl xxl xxs xxxs xxxl px rem em ms vh vw dp pt deg rgb rgba hsl hex svg png css html js ui ux api url id ids nav btn img src alt aria rtl ltr min max auto inline flex grid hug fill fixed rgb srgb required download upload dropdown tooltip popover checkbox textarea navbar sidebar topbar toolbar statusbar breadcrumb breadcrumbs stepper spinner skeleton snackbar toast toasts accordion carousel pagination paginator datepicker timepicker colorpicker combobox listbox menubar tablist tabpanel treeview tree avatar badge chip chips tag tags pill slider switch toggle radio dialog modal sheet drawer popup lightbox banner callout alert alerts hero footer header heading subheading caption overline eyebrow placeholder hover focus focused pressed disabled readonly selected unselected checked unchecked indeterminate expanded collapsed active inactive visited loading empty error success warning info positive negative neutral pending critical primary secondary tertiary quaternary accent brand inverse inverted muted subtle strong emphasis elevated elevation surface surfaces background foreground outline outlined filled ghost link plain solid dashed dotted rounded pill radius radii stroke strokes shadow shadows blur opacity gradient overlay scrim backdrop divider dividers separator spacing spacer gap gaps padding margin inset offset width height size sizes sizing typography typeface font fonts weight weights lineheight letterspacing paragraph body label labels title titles subtitle display headline icon icons iconography illustration logo logos token tokens semantic primitive primitives alias aliases mode modes theme themes light dark density compact comfortable spacious breakpoint breakpoints viewport desktop laptop tablet mobile phone motion duration durations easing easings transition transitions animation keyframe delay variant variants variable variables property properties component components instance instances slot slots state states boolean booleans string strings number numbers collection collections layer layers frame frames page pages screen screens section sections figma';
+const GENERIC_WORDS = 'small medium large xs sm md lg xl xxl xxs xxxs xxxl px rem em ms vh vw dp pt deg rgb rgba hsl hex svg png css html js ui ux api url id ids nav btn img src alt aria rtl ltr min max auto inline flex grid hug fill fixed rgb srgb required download upload var vars textcontent innerhtml classlist dataset dropdown tooltip popover checkbox textarea navbar sidebar topbar toolbar statusbar breadcrumb breadcrumbs stepper spinner skeleton snackbar toast toasts accordion carousel pagination paginator datepicker timepicker colorpicker combobox listbox menubar tablist tabpanel treeview tree avatar badge chip chips tag tags pill slider switch toggle radio dialog modal sheet drawer popup lightbox banner callout alert alerts hero footer header heading subheading caption overline eyebrow placeholder hover focus focused pressed disabled readonly selected unselected checked unchecked indeterminate expanded collapsed active inactive visited loading empty error success warning info positive negative neutral pending critical primary secondary tertiary quaternary accent brand inverse inverted muted subtle strong emphasis elevated elevation surface surfaces background foreground outline outlined filled ghost link plain solid dashed dotted rounded pill radius radii stroke strokes shadow shadows blur opacity gradient overlay scrim backdrop divider dividers separator spacing spacer gap gaps padding margin inset offset width height size sizes sizing typography typeface font fonts weight weights lineheight letterspacing paragraph body label labels title titles subtitle display headline icon icons iconography illustration logo logos token tokens semantic primitive primitives alias aliases mode modes theme themes light dark density compact comfortable spacious breakpoint breakpoints viewport desktop laptop tablet mobile phone motion duration durations easing easings transition transitions animation keyframe delay variant variants variable variables property properties component components instance instances slot slots state states boolean booleans string strings number numbers collection collections layer layers frame frames page pages screen screens section sections figma';
 // What a label in a self-hosted address names when it is the service, not the company that runs it.
 const SERVICE_LABELS = new Set('git gitlab github bitbucket gitea gogs svn scm vcs repo repos code www web mail smtp imap jira confluence artifactory nexus npm registry docker harbor ci cd runner pages wiki intranet portal dev devel staging stage test qa uat prod production'.split(' '));
 // Names made of common words that every design system writes the same way: never a project's own.
@@ -110,8 +112,17 @@ const FIGMA_KEY = /figma\.com\/(?:design|file|board|proto|make|slides)\/([A-Za-z
 export function projectTerms(root) {
   const out = new Map();   // term → where it came from
   const phrases = new Set();   // the terms written as words apart (Acme Grotesk), matched in prose too
-  const add = (raw, from, o) => { const t = distinctive(raw, o); if (t && !out.has(t)) out.set(t, from); if (t && o?.own && /\s/.test(String(raw).trim())) phrases.add(t); };
-  const own = { own: true };
+  // A theme's, a brand's, a mode's or a collection's name that is a plain word (Acme Standard, Northwind): never refused as a
+  // word, only where the text uses it as a name (localTerms → find). Design systems' own words are left out.
+  const named = new Map();
+  const add = (raw, from, o) => {
+    const t = distinctive(raw, o);
+    if (t && !out.has(t)) out.set(t, from);
+    if (t && o?.own && /\s/.test(String(raw).trim())) phrases.add(t);
+    const w = norm(raw);
+    if (!t && o?.named && w.length >= 3 && /^[a-z]+$/.test(w) && !GENERIC_WORDS.split(/\s+/).includes(w) && !named.has(w)) named.set(w, from);
+  };
+  const own = { own: true }, ownNamed = { own: true, named: true };
   // A name with a path (a token's, a/b/c), a variant's combination (State=Default, Size=M) or a property's id
   // (showFooter#33057:0): each part on its own, and the whole when it is one word.
   const name = (raw, from, o) => {
@@ -125,7 +136,7 @@ export function projectTerms(root) {
   const cfg = readJson(join(root, 'ds-config.json'), {});
   // Its custom themes, made with a module and kept apart from it (styleguide.modules: { path, data }): each one's name
   // and file are the project's as much as its brands are.
-  for (const f of themeFiles(root, cfg)) { const t = readJson(f, {}); if (t.name) { add(t.name, 'custom theme', own); name(t.name, 'custom theme', own); } add(basename(f).replace(/\.theme\.json$|\.json$/i, ''), 'custom theme', own); }
+  for (const f of themeFiles(root, cfg)) { const t = readJson(f, {}); if (t.name) { add(t.name, 'custom theme', ownNamed); name(t.name, 'custom theme', ownNamed); } add(basename(f).replace(/\.theme\.json$|\.json$/i, ''), 'custom theme', own); }
   const near = (f) => { try { return readFileSync(join(root, f), 'utf8'); } catch { return ''; } };
   // The project's own names: its setup's name, its folder, its package, its repository and its hosts.
   if (cfg.name) { add(cfg.name, 'project name', own); for (const w of String(cfg.name).split(/\s+/)) add(w, 'project name', own); }
@@ -172,14 +183,14 @@ export function projectTerms(root) {
       }
     } else if (from === 'figma-brands') {
       for (const c of j.collections ?? []) {
-        name(c.name, 'brand', own);
-        for (const m of c.modes ?? []) name(typeof m === 'string' ? m : m?.name, 'brand mode', own);
+        name(c.name, 'brand', ownNamed);
+        for (const m of c.modes ?? []) name(typeof m === 'string' ? m : m?.name, 'brand mode', ownNamed);
         const ov = (o, d) => { if (!isObj(o) || d > 3) return; for (const [k, v] of Object.entries(o)) { if (k.includes('/')) { name(k, 'brand token'); if (isObj(v)) for (const x of Object.values(v)) font(k, typeof x === 'object' ? x?.value : x); } else ov(v, d + 1); } };
         ov(c.overrides, 0); ov(c.library, 0);
       }
     } else if (from === 'design') {
       for (const c of j.variables ?? []) {
-        name(c.name, 'collection'); for (const m of c.modes ?? []) name(m, 'mode');
+        name(c.name, 'collection', { named: true }); for (const m of c.modes ?? []) name(m, 'mode', { named: true });
         for (const v of c.variables ?? []) { name(v.name, 'token'); for (const x of Object.values(v.values ?? {})) font(v.name, x); }
       }
       for (const p of j.pages ?? []) { name(p.name, 'page'); for (const fr of p.frames ?? []) name(fr?.name, 'frame'); for (const c of p.components ?? []) name(c?.name, 'component'); }
@@ -205,7 +216,7 @@ export function projectTerms(root) {
   // the label that names the service: "gitlab" in this engine's own pages is the service, not anyone's project, and
   // taking it as private would refuse every honest commit until someone bypassed the hook.
   for (const h of hosts) { out.set(norm(h), 'host'); for (const part of h.split('.').slice(0, -1)) if (!SERVICE_LABELS.has(part.toLowerCase())) add(part, 'host', own); }
-  return { terms: out, phrases: [...phrases], keys: [...keys], hosts: [...hosts] };
+  return { terms: out, phrases: [...phrases], named, keys: [...keys], hosts: [...hosts] };
 }
 // The theme files a project's modules keep for it: <data>/<system>/*.json (data: the entry's own folder, else the
 // module's data/).
@@ -235,16 +246,19 @@ export function buildTerms({ force = false } = {}) {
   const projects = readJson(PROJECTS(), { projects: [] }).projects.filter((p) => existsSync(p));
   const had = readJson(TERMS(), null);
   if (!force && had && projects.every((p) => newest(p) <= (had.built ?? 0)) && projects.length === (had.projects ?? []).length) return had;
-  const terms = {}, keys = new Set(), hosts = new Set(), per = {}, phrases = new Set();
+  const terms = {}, keys = new Set(), hosts = new Set(), per = {}, phrases = new Set(), named = {};
   for (const p of projects) {
     const r = projectTerms(p);
     per[p] = r.terms.size;
     for (const [t, from] of r.terms) if (!terms[t]) terms[t] = `${from} (${basename(p)})`;
     r.keys.forEach((k) => keys.add(k)); r.hosts.forEach((h) => hosts.add(h)); r.phrases.forEach((x) => phrases.add(x));
+    for (const [w, from] of r.named ?? []) if (!named[w]) named[w] = `${from} (${basename(p)})`;
   }
   const allow = had?.allow ?? [];
-  for (const a of allow) delete terms[norm(a)];
-  const out = { built: Date.now(), projects, per, allow, terms, phrases: [...phrases], keys: [...keys], hosts: [...hosts] };
+  // The plain-word names a person named by hand (--name), kept across rebuilds like what is allowed.
+  for (const w of had?.namedByHand ?? []) if (!named[w]) named[w] = 'named by hand';
+  for (const a of allow) { delete terms[norm(a)]; delete named[norm(a)]; }
+  const out = { built: Date.now(), projects, per, allow, terms, phrases: [...phrases], named, namedByHand: had?.namedByHand ?? [], keys: [...keys], hosts: [...hosts] };
   writeJson(TERMS(), out);
   return out;
 }
@@ -258,13 +272,28 @@ export function localTerms() {
   const map = new Map(Object.entries(t?.terms ?? {}));
   const allow = new Set((t?.allow ?? []).map(norm));
   const phrases = new Set(t?.phrases ?? []);
+  const named = new Map(Object.entries(t?.named ?? {}).filter(([w]) => !allow.has(w)));
   LOADED = {
     size: map.size,
     find(text) {
-      if (!map.size) return [];
+      const hits = new Map();
+      // A plain-word name used as a name: in quotes or backticks, as a key or a value (acme: , brand=acme),
+      // capitalised in the middle of a sentence (each theme, Acme and…), or beside theme, brand or mode.
+      for (const [w, from] of named) {
+        const W = w[0].toUpperCase() + w.slice(1), s = String(text);
+        // Capitalised after a lower-case word or an opening bracket (not in a title of capitalised words), or a label
+        // between tags (<option>Acme</option>).
+        const capitalised = new RegExp(`(?:\\b[a-z][a-z0-9]*[,;]?\\s+|\\(|>\\s*)${W}\\b`);
+        // Quoted, as a key or as a value only with a theme, brand or mode beside it on the line (setQuery('brand',
+        // 'acme')); a word next to one of those (the Acme theme) as it is.
+        const near = (re) => s.split('\n').some((l) => re.test(l) && /\b(themes?|brands?|modes?)\b/i.test(l));
+        const keyed = new RegExp(`["'\`]${w}["'\`]|\\b${w}\\s*[:=]|[=:]\\s*["']?${w}\\b`, 'i');
+        const beside = new RegExp(`\\b(?:themes?|brands?|modes?)\\W+(?:\\w+\\W+){0,2}?${w}\\b|\\b${w}\\W+(?:\\w+\\W+){0,1}?(?:themes?|brands?|modes?)\\b`, 'i');
+        if (capitalised.test(s) || beside.test(s) || near(keyed)) hits.set(w, `${from}, used as a name`);
+      }
+      if (!map.size) return [...hits].map(([term, from]) => ({ term, from }));
       // Words as an identifier writes them: camelCase is one word, and words joined by "-" or "_" are one name
       // (header-quokka, header_quokka); words apart in a sentence ("a header, quokka") never make a name.
-      const hits = new Map();
       for (const chunk of String(text).split(/[^A-Za-z0-9_-]+/)) {
         const words = chunk.toLowerCase().split(/[-_]+/).filter(Boolean);
         for (let i = 0; i < words.length; i++) for (let n = 1; n <= 4 && i + n <= words.length; n++) {
@@ -298,6 +327,10 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
     buildTerms({ force: true });
   } else if (a.includes('--allow')) {
     const t = buildTerms(); t.allow = [...new Set([...(t.allow ?? []), at('--allow')])]; delete t.terms[norm(at('--allow'))]; writeJson(TERMS(), t); console.log('allowed', at('--allow'));
+  } else if (a.includes('--name')) {
+    const w = norm(at('--name') ?? '');
+    if (!/^[a-z]{3,}$/.test(w)) { console.log('Give one word of 3 letters or more: --name <word>'); process.exit(2); }
+    const t = buildTerms(); t.namedByHand = [...new Set([...(t.namedByHand ?? []), w])]; t.named = { ...(t.named ?? {}), [w]: 'named by hand' }; writeJson(TERMS(), t); console.log('named', w, '(refused where it is used as a name)');
   } else if (a.includes('--review')) {
     const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
     const files = execFileSync('git', ['-C', ROOT, 'ls-files'], { encoding: 'utf8' }).split('\n').filter((f) => f && !/^test\/skill-evals\/records\//.test(f) && /\.(mjs|js|md|json|html|css|yml|sh)$/.test(f));

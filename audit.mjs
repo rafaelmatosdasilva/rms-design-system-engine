@@ -456,12 +456,14 @@ if (process.argv.includes('--make-command')) {
   const source = _argValue('--profile');
   if (!client || client.startsWith('--') || !source) { console.log('Usage: rms-design-system-engine --make-command <client> --profile <the profile\'s link or file> [--dir <folder>]'); process.exit(2); }
   const pf = await import('./profile.mjs');
+  // The command only names the profile: it is written even when the profile cannot be read yet (no token, or one that
+  // cannot read it), so the person has it, and is told what to fix before its first run.
   const r = PROFILE_READ ?? await pf.readProfile(source, { from: PROJECT_FROM });
-  if (r.error) { console.log(`❌ The profile cannot be read: ${r.error}. Each person needs to read it with their own GITLAB_TOKEN.`); process.exit(1); }
   const dir = _argValue('--dir');
   const link = /^https?:\/\//i.test(source) ? source : resolve(PROJECT_FROM, source);
-  const out = pf.writeCommand(client, link, { dir: dir ? resolve(PROJECT_FROM, dir) : undefined, name: r.profile.name });
+  const out = pf.writeCommand(client, link, { dir: dir ? resolve(PROJECT_FROM, dir) : undefined, name: r.profile?.name });
   console.log(`✅ /${pf.commandName(client)} written: ${out}`);
+  if (r.error) console.log(`⚠️  The profile cannot be read yet: ${r.error}. Put a GITLAB_TOKEN that can read it in .env before the first run.`);
   console.log(`   It runs the engine with ${link}; each person keeps their own GitLab token in .env and writes only where GitLab lets them.`);
   console.log(`NEXT: ${dir ? 'the person shares that folder in the company\'s private repository; each colleague copies it into ~/.claude/skills/' : `the person shares ${dirname(out)} with the team (a private repository); each colleague puts it in ~/.claude/skills/`} and runs /${pf.commandName(client)}.`);
   process.exit(0);
@@ -1570,17 +1572,17 @@ if (process.argv.includes('--styleguide')) {
       console.log(`   Trying the accessibility of ${Object.keys(saved).length ? 'each component changed since the saved results' : 'every component'} in a browser, to keep the results in the page...`);
       const b = await bakeA11y(resolve(ROOT, r.out), { saved }).catch((e) => ({ skipped: String(e.message).split('\n')[0] }));
       console.log(b.skipped ? `   Accessibility not tried while building (${b.skipped}): a browser that opens the page tries it and keeps what it finds.`
-        : `♿ Accessibility in the page: ${b.tried} of ${b.of} components, every variant${b.reused ? ` (${b.reused} unchanged since the saved results, ${b.tried - b.reused} tried now)` : ''}, ${Math.round(b.ms / 1000)}s${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
+        : `♿ Accessibility in the page: ${b.tried} of ${b.of} components, every variant${(b.themeList?.length ?? 1) > 1 ? `, in each of ${b.themeList.length} themes (${b.themeList.join(', ')})` : ''}${b.reused ? ` (${b.reused} unchanged since the saved results, ${(b.triedAll ?? b.tried) - b.reused} tried now)` : ''}, ${Math.round(b.ms / 1000)}s${b.tried < b.of ? `; the other ${b.of - b.tried} are tried by the browser that opens it` : ''}.`);
       // Saved with the snapshots, and sent to the team's snapshots store when GitLab lets this person (or the pipeline)
       // write it: everyone's next build, and the page the team publishes, start from them.
-      if (!b.skipped && !b.dead && b.results && Object.keys(b.results).length) {
-        const next = JSON.stringify({ at: new Date().toISOString(), results: b.results }, null, 1) + '\n';
-        const same = (() => { try { return JSON.stringify(JSON.parse(readFileSync(savedPath, 'utf8')).results) === JSON.stringify(b.results); } catch { return false; } })();
+      if (!b.skipped && !b.dead && b.themes && Object.values(b.themes).some((x) => Object.keys(x).length)) {
+        const next = JSON.stringify({ at: new Date().toISOString(), themes: b.themes }, null, 1) + '\n';
+        const same = JSON.stringify(saved) === JSON.stringify(b.themes);
         if (!same) {
           writeFileSync(savedPath, next);
           const st = await import('./stores.mjs');
           if (st.storesOf(sgConfig).snapshots.write) {
-            const sent = await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[RESULTS_FILE, Buffer.from(next)]]), `Accessibility results saved with rms-design-system-engine (${b.tried - (b.reused || 0)} component${b.tried - (b.reused || 0) === 1 ? '' : 's'} tried)`, { offline: STORE_OFFLINE });
+            const sent = await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[RESULTS_FILE, Buffer.from(next)]]), `Accessibility results saved with rms-design-system-engine (${(b.triedAll ?? b.tried) - (b.reused || 0)} tried, ${b.themeList?.length ?? 1} theme${(b.themeList?.length ?? 1) === 1 ? '' : 's'})`, { offline: STORE_OFFLINE });
             console.log(sent.line);
           } else console.log(`   Saved in ${RESULTS_FILE}: the next build here tries only what changes (ds-config.json → stores.snapshots shares it with the team).`);
         }

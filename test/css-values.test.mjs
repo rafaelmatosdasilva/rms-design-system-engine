@@ -76,8 +76,8 @@ test('Gate 3: a sizing token written in rem matches the Figma px value', () => {
 test('Motion: 0.2s matches 200ms, and a keyword easing matches its curve', () => {
   const r = runGate('motion-check.mjs', {
     'ds-config.json': { paths: { themeCSS: 'theme.css', snapshotVars: 'figma-vars.snapshot.json' }, figma: { motion: {} } },
-    'theme.css': ':root { --duration-fast: 0.2s; --easing-standard: ease-in-out; }',
-    'figma-vars.snapshot.json': { motion: { 'duration/fast': '200ms', 'easing/standard': 'cubic-bezier(0.42, 0, 0.58, 1)' } },
+    'theme.css': ':root { --duration-fast: 0.2s; --easing-default: ease-in-out; }',
+    'figma-vars.snapshot.json': { motion: { 'duration/fast': '200ms', 'easing/default': 'cubic-bezier(0.42, 0, 0.58, 1)' } },
   });
   assert.match(r.out, /MATCH\s+2/, r.out);
   assert.equal(r.code, 0, r.out);

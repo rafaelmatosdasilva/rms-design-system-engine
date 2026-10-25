@@ -470,7 +470,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     // written from is named as shared.
     try {
       const { specIndex, specOf } = await import('./intent-changes.mjs');
-      const idx = specIndex(specs);
+      const idx = specIndex(specs, { codes: entities.map((e) => e.code) });
       for (const e of entities) { const sp = specOf(e, idx); if (sp) { e.spec = sp.spec; e.specUrl = fileUrl(source, sp.spec); if (sp.shared) e.specShared = true; } }
     } catch { /* the pages stand without it */ }
     // When each page's file last changed: the files a new commit changed (one compare with the commit read before) take

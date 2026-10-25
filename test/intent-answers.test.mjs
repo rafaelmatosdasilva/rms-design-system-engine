@@ -1,8 +1,8 @@
 // intent-answers.mjs - what each of the team's answers to the engine's proposals changes in the intent layer's files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersFor, markPart, addRow, applyMerges, startPage, commonLines } from '../intent-answers.mjs';
-import { planOf } from '../intent-changes.mjs';
+import { answersFor, markPart, addRow, applyMerges, startPage, commonLines, ownSpec } from '../intent-answers.mjs';
+import { planOf, specIndex, specOf } from '../intent-changes.mjs';
 
 const ent = (name, code, extra = {}) => ({ kind: 'component', layer: 'components', name, file: `specs/dsds/tiles/${name.toLowerCase().replace(/ /g, '-')}.dsds.json`, code, purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], ...extra });
 const grip = ent('Tile Grip', 'src/tiles/Grip.vue', { purpose: ['Lets a person drag a tile.'], whenNotToUse: ['Not for lists.', 'Another component owns it more specifically.'], repeatedLines: ['Another component owns it more specifically.'] });
@@ -81,4 +81,19 @@ test('a line many pages say alike, their names aside, is not moved: it is a temp
   const next = new Map();
   const [m] = applyMerges([{ part: g, into: one }], files(), next, { common });
   assert.deepEqual(m.moved.map((x) => x.text), ['Tile Grip: Lets a person drag a tile.']);
+});
+
+test('a family spec several pages share: each page gets its own beside it, and its entry in the layer\'s map of code to spec', () => {
+  const fam = '# Tiles\n\n- Source: `src/tiles`\n\n## When to use\n\n- For subjects.\n';
+  const split = '# Tile Zero\n\n## Metadata\n\n- Source: `src/tiles/Zero.vue`\n- Family spec: `specs/components/tiles.md`\n\n## API\n\n- Props: a\n- Emits: none\n';
+  const map = "const specOfCode = {\n\t'src/lists/A.vue': 'list-a',\n\t'src/lists/B.vue': 'list-b',\n\t'src/tiles/Zero.vue': 'tile-zero'\n}\n";
+  const f = new Map([['specs/components/tiles.md', fam], ['specs/components/tile-zero.md', split], ['scripts/gen.mjs', map]]);
+  const s = ownSpec(one, f, { api: { props: ['tone'], events: ['picked'], slots: [] } });
+  assert.equal(s.spec, 'specs/components/tile-one.md');
+  assert.equal(s.files.get(s.spec), '# Tile One\n\n## Metadata\n\n- Name: Tile One\n- Category: Component variant\n- Status: Active\n- Source: `src/tiles/TileOne.vue`\n- Family spec: `specs/components/tiles.md`\n\n## When to use\n\n- For subjects.\n\n## API\n\n- Props: tone\n- Emits: picked\n', 'its family\'s sections the layer does not give it come with it');
+  assert.equal(s.files.get('scripts/gen.mjs'), "const specOfCode = {\n\t'src/lists/A.vue': 'list-a',\n\t'src/lists/B.vue': 'list-b',\n\t'src/tiles/Zero.vue': 'tile-zero',\n\t'src/tiles/TileOne.vue': 'tile-one'\n}\n", 'beside its siblings, in the map\'s own form');
+  assert.equal(ownSpec(one, new Map([...f, ...s.files])), null, 'once');
+  // A folder's spec only one page falls under is that page's own.
+  const idx = specIndex(new Map([['specs/components/badges.md', '# Badges\n\n- Source: `src/badges`\n']]), { codes: ['src/badges/Dot.vue', 'src/tiles/TileOne.vue'] });
+  assert.deepEqual(specOf({ name: 'Badge Dot', code: 'src/badges/Dot.vue' }, idx), { spec: 'specs/components/badges.md', shared: false });
 });

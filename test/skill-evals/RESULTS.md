@@ -1,5 +1,50 @@
 # Skill evaluation results
 
+## 2026-10: The default theme is called the default one; a project's plain-word names are watched where they are used as names (continuous evaluation)
+
+What changed since the entry below (engine ddc45c6): Accessibility per theme (#32); The default theme is called the default one; a project's plain-word names are watched where they are used as names. The guide changed in `reference/usage.md`.
+
+Guide set measured: `5f3eedc5702a` · Project measured: `13d811a9d668`
+
+| Haiku, engine c15d49a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.059 | $0.065 |
+| Input a run | 117k | 139k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 139k a run against 117k. Records: `records/2026-10-25-the-default-theme-is-called`.
+
+## 2026-10: Accessibility per theme: the build tries every component in each theme the page offers (the default one, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is the default theme's); the page shows the chosen theme's, and switches with it (continuous evaluation)
+
+What changed since the entry below (engine 80a5ef0): A page written from a shared spec gets one of its own; the company command is always installed (#31); Accessibility per theme: the build tries every component in each theme the page offers (the default one, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is the default theme's); the page shows the chosen theme's, and switches with it. The guide changed in `reference/usage.md`.
+
+Guide set measured: `3f1b5b8ede0c` · Project measured: `13d811a9d668`
+
+| Haiku, engine ddc45c6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.056 | $0.059 |
+| Input a run | 102k | 117k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 117k a run against 102k. Records: `records/2026-10-25-accessibility-per-theme-the-build`.
+
+## 2026-10: --make-command writes the company's command even when the profile cannot be read yet (continuous evaluation)
+
+What changed since the entry below (engine 4ca5375): Intent layer: every answer does its own work, each with a command to copy (#30); Intent layer: a page written from a shared spec gets one of its own, and keeps what agents read; --make-command writes the company's command even when the profile cannot be read yet. The guide changed in `reference/usage.md`.
+
+Guide set measured: `49e16078bfcd` · Project measured: `13d811a9d668`
+
+| Haiku, engine 80a5ef0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.056 |
+| Input a run | 120k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 120k. Records: `records/2026-10-25-make-command-writes-the-company`.
+
 ## 2026-10: Intent layer: every answer does its own work, each with a command to copy (continuous evaluation)
 
 What changed since the entry below (engine bc786bf): Panels open with what to do (What and Where); a fresh GitLab connection after a long wait (#29); Intent layer: every answer does its own work, each with a command to copy. The guide changed in `reference/usage.md`.

@@ -51,15 +51,21 @@ test('saved results go into the page before it tries anything, so it tries only 
   const dir = mkdtempSync(join(tmpdir(), 'sg-saved-'));
   try {
     const file = join(dir, 'index.html');
-    // A page that keeps what it was given and tries only the component it has no result for (tag).
-    writeFileSync(file, '<html><body><script type="application/json" id="sg-data">{"components":[{"name":"chip"},{"name":"tag"}]}</script><script>var b = JSON.parse((document.getElementById("sg-a11y-baked") || {}).textContent || "null"), r = (b && b.results) || {}; window.__given = Object.keys(r); r.tag = { sig: "t1", live: { tried: 1 }, items: [] }; window.__sgA11yResults = function () { return r; }; window.__sgSweepDone = true;</script></body></html>');
-    const saved = { chip: { sig: 'c1', live: { tried: 3 }, items: [] } };
+    // A page with two themes (the default one and a brand, Acme Retail) that keeps what it was given for the theme it is opened
+    // in and tries only the component it has no result for there.
+    writeFileSync(file, '<html><body><script type="application/json" id="sg-data">{"components":[{"name":"chip"},{"name":"tag"}],"brands":{"list":[{"key":"acme"},{"key":"retail","parent":"acme"}]}}</script><script>var th = new URLSearchParams(location.search).get("brand") || "default", b = JSON.parse((document.getElementById("sg-a11y-baked") || {}).textContent || "null"), r = (b && b.themes && b.themes[th]) || {}; r.tag = { sig: "t1-" + th, live: { tried: 1 }, items: [] }; window.__sgA11yResults = function () { return r; }; window.__sgSweepDone = true;</script></body></html>');
+    const saved = { default: { chip: { sig: 'c1', live: { tried: 3 }, items: [] } } };
     const r = await bakeA11y(file, { jobs: 1, saved });
+    assert.deepEqual(r.themeList, ['default', 'retail'], 'the default theme, and each brand that is not only the base of others');
     assert.equal(r.reused, 1, JSON.stringify(r));
-    assert.deepEqual(Object.keys(r.results).sort(), ['chip', 'tag']);
-    assert.match(readFileSync(file, 'utf8'), /"chip":\{"sig":"c1"/, 'the page keeps the saved result');
-    writeFileSync(join(dir, RESULTS_FILE), JSON.stringify({ at: 't', results: r.results }));
-    assert.deepEqual(Object.keys(readSaved(join(dir, RESULTS_FILE))).sort(), ['chip', 'tag']);
+    assert.deepEqual(Object.keys(r.themes.default).sort(), ['chip', 'tag']);
+    assert.deepEqual(Object.keys(r.themes.retail), ['tag'], 'a theme with nothing saved tries everything there');
+    assert.equal(r.themes.retail.tag.sig, 't1-retail', 'each theme tried in itself');
+    assert.match(readFileSync(file, 'utf8'), /"themes":\{"default":\{"chip":\{"sig":"c1"/, 'the page keeps the saved result');
+    writeFileSync(join(dir, RESULTS_FILE), JSON.stringify({ at: 't', themes: r.themes }));
+    assert.deepEqual(Object.keys(readSaved(join(dir, RESULTS_FILE))).sort(), ['default', 'retail']);
+    writeFileSync(join(dir, 'old.json'), JSON.stringify({ at: 't', results: { chip: {} } }));
+    assert.deepEqual(readSaved(join(dir, 'old.json')), { default: { chip: {} } }, 'an older file with one set is the default theme\'s');
     assert.deepEqual(readSaved(join(dir, 'none.json')), {});
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
