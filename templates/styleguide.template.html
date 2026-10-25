@@ -1657,7 +1657,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
    before the next one. */
 .sg-row-detail-body .sg-il-line { margin: 0 0 var(--sg-space-l); }
 .sg-row-detail-body .sg-il-line:last-child { margin-bottom: 0; }
-.sg-row-detail-body .sg-il-line > strong:first-child { display: block; font-size: var(--sg-l); line-height: var(--sg-lh-tight, 1.3); margin-bottom: var(--sg-space-xs); }
 .sg-row-detail-body .sg-il-line .pg-par-val { display: block; font-size: inherit; line-height: inherit; margin-top: var(--sg-space-xxs); }
 .sg-row-detail-body .sg-il-what, .sg-row-detail-body .sg-il-where { display: block; margin-top: var(--sg-space-xxs); }
 .sg-row-detail-body :is(.sg-il-what, .sg-il-where) > b { font-weight: var(--sg-l-weight); color: var(--sg-text); }
@@ -1665,8 +1664,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
 .sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }
 .sg-row-detail-body .sg-il-group:last-child { margin-bottom: 0; }
-.sg-row-detail-body .sg-il-head { margin: 0 0 var(--sg-space-xs); font-size: var(--sg-l); font-weight: var(--sg-l-weight); color: var(--sg-text); }
+.sg-row-detail-body .sg-il-head { margin: 0 0 var(--sg-space-xs); }
 .sg-row-detail-body .sg-il-item { margin: 0 0 var(--sg-space-xs); }
+/* One hierarchy in every panel: a title is the text colour, bold and a step larger; the lines under it are muted. */
+.sg-row-detail-body :is(.sg-il-line > strong:first-child, .sg-il-head) { display: block; font-size: var(--sg-l); line-height: var(--sg-lh-tight, 1.3); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-row-detail-body .sg-il-line > strong:first-child { margin-bottom: var(--sg-space-xs); }
+.sg-row-detail-body :is(.sg-il-item, .sg-il-line .pg-par-val) { color: var(--sg-muted); font-weight: var(--sg-text-weight); }
 .sg-row-detail-body .sg-il-item:last-child { margin-bottom: 0; }
 .sg-il-not + .sg-il-not { margin-top: var(--sg-space-s); padding-top: var(--sg-space-s); border-top: var(--sg-line); }
 .sg-il-line { margin: 0 0 var(--sg-space-xxs); }
