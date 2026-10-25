@@ -1223,6 +1223,20 @@ and whose examples (`Example:`) are shown as examples.
   data-why="…" />` is a gap, kept in `prototypes/gaps.json`. It ends with ✅ Ready or ❌ Not ready. The project's hook runs
   the same check on every edit of a page in `prototypes/` (`prototype.dir` in `ds-config.json`), from the system the
   last `--prototype` run kept (`.design-system-engine-out/prototypes/page-system.json`); so does `--check-ui <page>`.
+- **As a page, the same for every framework** (`page-quality.mjs`, `page-render.mjs`). Beside the system's own checks,
+  the page is read for the habits agents fall into (🎨 AS A PAGE, a score out of 10): a card inside a card, more than
+  one main action in view (an action inside a dialog or a panel is that layer's own), a destructive action styled as
+  the main one, more than one main heading or a heading level skipped, a field labelled only by its placeholder,
+  several alerts on one page, and three sections or more with no heading. Then the states it owes (🧪): a list with
+  nothing for when it is empty, a form that shows no error, data it loads with nothing shown meanwhile, each with the
+  system's own component for it where it has one. Read from the page's structure, so a Vue, React, Svelte or HTML page
+  is read alike. A page the checks pass is then drawn (📱 EVERY SIZE): a Vue page by the project's own build, a React
+  page through the engine's stand-in for React (TypeScript, the project's or a global one), at Figma's breakpoints (else
+  a phone's, a tablet's and a desktop's width), its words as written and 40% longer; what runs past the screen, is
+  cut, wraps inside a control, or is under 24px to tap on a phone is said with its words. A page it cannot draw (another
+  framework, a page or a component on it that throws) says why, and nothing is guessed; `--no-browser` skips it. Each
+  ⚠️ line is fixed, or the reply says why it stays. A composition gets the habits the browser review does not measure
+  (🎨 HABITS).
 - **What agents invent, and why.** Each page check (the command and the edit hook) keeps every mistake in
   `.design-system-engine-out/prototypes/inventions.json`, each with why: a gap in the documentation (the component has
   no page in the intent layer, its page shows no example of it in use, or its code comment does not say what a list
