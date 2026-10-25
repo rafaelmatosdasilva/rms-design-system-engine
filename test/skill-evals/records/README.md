@@ -142,5 +142,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-25-ci-changed-a-scheduled-pipeline` | The 21 guide tasks on Haiku (engine bc786bf) | "--ci-changed: a scheduled pipeline builds only when something it is made from moved" |
 | `2026-10-25-intent-layer-every-answer-does` | The 21 guide tasks on Haiku (engine 4ca5375) | "Intent layer: every answer does its own work, each with a command to copy" |
 | `2026-10-25-make-command-writes-the-company` | The 21 guide tasks on Haiku (engine 80a5ef0) | "--make-command writes the company's command even when the profile cannot be read yet" |
+| `2026-10-25-accessibility-per-theme-the-build` | The 21 guide tasks on Haiku (engine ddc45c6) | "Accessibility per theme: the build tries every component in each theme the page offers (Standard, and each brand not only the base of others) and saves each theme's results with the snapshots (themes: { … }; an older file is Standard's); the page shows the chosen theme's, and switches with it" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

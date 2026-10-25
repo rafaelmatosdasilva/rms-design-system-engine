@@ -7697,7 +7697,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // What each card counts, said simply: a person reads it once and knows what the number means.
     pT.how = 'How closely the code matches Figma. The percentage counts every property, token and value compared; the legend counts components. Only components already in the code are counted.';
     iT.how = 'How many of Figma\'s components exist in the code. Missing ones have no component in the code yet.';
-    aT.how = 'How many accessibility checks pass, tried on every variant in a real browser: the keyboard, focus, what a screen reader says, and colour contrast (WCAG 2.2 AA).';
+    aT.how = 'How many accessibility checks pass, tried on every variant in a real browser: the keyboard, focus, what a screen reader says, and colour contrast (WCAG 2.2 AA). Shown for the theme chosen at the top: each theme has its own colours, so its own results.';
     dT.how = 'How much of each component\'s documentation is written: what it is, when to use it, examples, its role and more. Agents read it to use the system the right way.';
     var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
@@ -7936,7 +7936,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var BAKED = null;
   try { BAKED = JSON.parse((document.getElementById('sg-a11y-baked') || {}).textContent || 'null'); } catch (e) { BAKED = null; }
   function compSig(c) { return PAGE_SIG + '.' + sigOf(COMP_DATA[c.name] || ''); }
-  var A11Y_KEY = 'sg-a11y-kept';
+  // Each theme its own results (a theme changes the colours contrast is measured on): the ones shown are the chosen
+  // theme's, Standard when none is. An older page's single set (BAKED.results) is Standard's.
+  var themeKey = function (k) { return k && ((DATA.brands && DATA.brands.list) || []).some(function (b) { return b.key === k; }) ? k : 'standard'; };
+  var A11Y_THEME = themeKey(html.getAttribute('data-brand') || URLQ.get('brand') || (function () { try { return localStorage.getItem('sg-brand'); } catch (e) { return null; } })());
+  function bakedFor(t) { return !BAKED ? null : BAKED.themes ? BAKED.themes[t] || null : t === 'standard' ? BAKED.results || null : null; }
+  var A11Y_BASE = 'sg-a11y-kept', A11Y_KEY = A11Y_BASE + ':' + A11Y_THEME;
   // A component the build went through with nothing to try in a browser is kept too (live: null), so it is not tried here.
   function useKept(c, k, baked) {
     if (!k || k.sig !== compSig(c) || !(k.live || baked)) return;
@@ -7945,10 +7950,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   // Results kept from an earlier build (the page's own, or saved with the snapshots) count wherever the component is the
   // same as when it was tried, the build included: it tries only what changed since.
-  COMPONENTS.forEach(function (c) { useKept(c, BAKED && BAKED.results && BAKED.results[c.name], true); });
-  if (!BAKING) {
-    try { var kept = JSON.parse(localStorage.getItem(A11Y_KEY) || 'null') || {}; COMPONENTS.forEach(function (c) { if (!c.__a11y) useKept(c, kept[c.name], false); }); } catch (e) { /* none kept */ }
+  function loadA11y() {
+    var baked = bakedFor(A11Y_THEME) || {};
+    COMPONENTS.forEach(function (c) { useKept(c, baked[c.name], true); });
+    if (!BAKING) {
+      try { var kept = JSON.parse(localStorage.getItem(A11Y_KEY) || 'null') || {}; COMPONENTS.forEach(function (c) { if (!c.__a11y) useKept(c, kept[c.name], false); }); } catch (e) { /* none kept */ }
+    }
   }
+  loadA11y();
+  // Another theme chosen: its own results, and what it has not tried yet is tried as it is shown.
+  document.addEventListener('sg-brand', function (e) {
+    var t = themeKey(e.detail); if (t === A11Y_THEME) return;
+    A11Y_THEME = t; A11Y_KEY = A11Y_BASE + ':' + t;
+    COMPONENTS.forEach(function (c) { c.__a11y = null; c.__textParts = null; });
+    loadA11y(); fillTodo(); redrawAll();
+  });
   function keepA11y() {
     if (BAKING) return;
     try {
