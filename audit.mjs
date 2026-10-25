@@ -504,8 +504,8 @@ if (process.argv.includes('--share-theme')) {
 
 // ── --intent-decide [key,… yes|no]: the team's answer to the engine's proposals for the Intent layer's Fix, Add, Move ──
 // With nothing after it, lists each open proposal with its key and what it rests on. With keys ("all" for every open
-// one) and yes or no, records the answer in design-system-engine-intent-decisions.json: a yes is acted on from the next
-// run (intent-proposals.mjs), a no keeps the decision on the page.
+// one) and yes or no, records the answer in design-system-engine-intent-decisions.json and makes what it changes in the
+// layer at once (intent-answers.mjs): each answer, yes or no, does its own work.
 if (process.argv.includes('--intent-decide')) {
   let pcfg = {};
   try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
@@ -517,17 +517,22 @@ if (process.argv.includes('--intent-decide')) {
   if (!keysArg || keysArg.startsWith('--')) {
     if (!open.length) { console.log('✅ No proposal waits for an answer.'); console.log('NEXT: none'); process.exit(0); }
     console.log(`📝 ${open.length} proposal${open.length === 1 ? '' : 's'} wait for the team's answer:`);
-    for (const [k, v] of open) console.log(`\n${k}\n  → ${v.proposal}\n${v.evidence.map((e) => '    · ' + e).join('\n')}`);
-    console.log('\nNEXT: ask the person yes or no for each (or for all); record it with --intent-decide "<key>[,<key>…]" yes|no; never answer for them.');
+    for (const [k, v] of open) console.log(`\n${k}\n  → ${v.proposal}\n${v.evidence.map((e) => '    · ' + e).join('\n')}\n${pr.optionsOf(v).map((o) => `    ${o.answer}: ${o.does}`).join('\n')}`);
+    console.log('\nNEXT: ask the person which answer for each (or for all), saying what each does; record it with --intent-decide "<key>[,<key>…]" <answer>; never answer for them.');
     process.exit(0);
   }
-  if (!['yes', 'no'].includes(ans)) { console.log('Say yes or no: rms-design-system-engine --intent-decide "<key>" yes'); process.exit(2); }
   const keys = keysArg === 'all' ? open.map(([k]) => k) : keysArg.split(',').map((k) => k.trim()).filter(Boolean);
   const unknown = keys.filter((k) => !d.proposals.has(k));
   if (unknown.length) { console.log(`❌ No proposal is called ${unknown.join(', ')} (--intent-decide lists them).`); process.exit(2); }
+  // Each proposal's own answers (yes and no, or the options it lists).
+  const offMenu = keys.filter((k) => !pr.optionsOf(d.proposals.get(k)).some((o) => o.answer === ans));
+  if (!ans || offMenu.length) { console.log(`Answer with one of its options: ${[...new Set((offMenu.length ? offMenu : keys).flatMap((k) => pr.optionsOf(d.proposals.get(k)).map((o) => o.answer)))].join(', ')} (rms-design-system-engine --intent-decide "<key>" <answer>)`); process.exit(2); }
   pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals), { by: (await import('./decided-by.mjs')).decidedBy(ROOT) });
-  console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans}${ans === 'yes' ? ': acted on from the next run, and the Intent layer page no longer asks them of the team' : ': they stay on the Intent layer page'} (${projectPath(ROOT, 'intentDecisions')}).`);
+  console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans} (${projectPath(ROOT, 'intentDecisions')}): ${keys.map((k) => pr.optionsOf(d.proposals.get(k)).find((o) => o.answer === ans)?.does).filter(Boolean).join(' ') || 'the Documentation page no longer asks it of the team.'}`);
   await sendDecisions();
+  // What the answer changes in the layer, made now: on the pages it was about (a page to start is found by its answer).
+  const only = new Set(keys.map((k) => d.proposals.get(k)?.page).filter(Boolean));
+  console.log((await (await import('./intent-changes.mjs')).actOnAnswers(ROOT, pcfg, { only })));
   console.log('NEXT: rebuild the style guide to see it (--styleguide).');
   process.exit(0);
 }
@@ -618,7 +623,7 @@ if (process.argv.includes('--intent-changes')) {
   // merge request for the team. Neither unless the person asks.
   if (process.argv.includes('--commit')) {
     { const may = await ch.mayWrite(ROOT, pcfg, 'commit'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
-    const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message: 'Intent layer review: ' + summary.split('\n')[0] + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+    const done = await ch.commitToBranch(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, message: 'Intent layer review: ' + summary.split('\n')[0] + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
     console.log('NEXT: the Documentation page lists each draft under Review until its marker is removed.');
@@ -627,7 +632,7 @@ if (process.argv.includes('--intent-changes')) {
   if (!process.argv.includes('--merge-request')) { console.log('NEXT: read the changes; to send them to the layer: rms-design-system-engine --intent-changes --commit (straight on its branch) or --merge-request (for the team to review), only when the person asks'); process.exit(0); }
   { const may = await ch.mayWrite(ROOT, pcfg, 'merge-request'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-  const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/intent-review-${stamp}`,
+  const mr = await ch.openMergeRequest(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/intent-review-${stamp}`,
     title: 'Intent layer review: lines written on every page, sentences the system contradicts, drafts to review',
     description: summary + '\n\nMade by rms-design-system-engine from its review of the intent layer. Nothing marked **Draft:** reaches an agent until a person removes the marker.',
     message: 'Intent layer review: repeated lines taken out, contradicted sentences written again as drafts\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
@@ -677,7 +682,7 @@ if (process.argv.includes('--review-drafts')) {
   const message = 'Intent layer: drafts reviewed (' + summary.split('\n')[0].replace(/^Drafts reviewed on /, '').replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
   if (process.argv.includes('--commit')) {
     { const may = await ch.mayWrite(ROOT, pcfg, 'commit'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
-    const done = await ch.commitToBranch(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, message });
+    const done = await ch.commitToBranch(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
     console.log('NEXT: the approved lines reach the agents on the next run; the style guide shows them in each component\'s Documentation.');
@@ -686,7 +691,7 @@ if (process.argv.includes('--review-drafts')) {
   if (process.argv.includes('--merge-request')) {
     { const may = await ch.mayWrite(ROOT, pcfg, 'merge-request'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-    const mr = await ch.openMergeRequest(access, { files: result.files, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-reviewed-${stamp}`, title: 'Intent layer: drafts reviewed', description: summary, message });
+    const mr = await ch.openMergeRequest(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-reviewed-${stamp}`, title: 'Intent layer: drafts reviewed', description: summary, message });
     if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
     console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
     process.exit(0);

@@ -515,7 +515,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Example', 'Its tokens'].sort().join('|'));
     assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*$/, 'what is to write first, then what is to check, what is written after');
     // The table is its task, kind, status and when it was checked; what is written and what to do are in its panel.
-    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*You in Figma[\s\S]*What:[\s\S]*Where:[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
+    assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*You in Figma[\s\S]*(How to write it|What to do)[\s\S]*Where[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
     assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Partial|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-knowledge').textContent`), /Not written yet|You in Figma/, 'what is written and what to do: in the panel only');
     // The menu: worded buttons; on a wide screen it is always there, with nothing to hide it.

@@ -2,7 +2,8 @@
 // engine proposes and what it rests on, for a person to say yes or no to. A yes is kept in the project
 // (design-system-engine-intent-decisions.json) and the engine acts on it from then on: a component documented in
 // another's page is not asked a page of its own, a name the team keeps is no longer a finding, a page the team keeps
-// is no longer asked to move. A no keeps the decision on the page as it was. Nothing here writes to the layer.
+// is no longer asked to move. Each proposal says what its yes and its no do (yes, no); what an answer changes in the
+// layer is made by intent-answers.mjs. Nothing here writes to the layer.
 //
 // What it proposes, from what the engine reads:
 //   Add   a component with the same code file as one a page documents: that page is its page.
@@ -50,7 +51,26 @@ function importersOf(ROOT, file, codeFiles) {
   return out;
 }
 
+// Each page of an internal part (a Move: a code file only other components use, with no Figma component of its own) and
+// the code files that use it. → Map(page name → [files])
+export function partsOf(ROOT, report, codeFiles) {
+  const out = new Map();
+  for (const p of report.pages.filter((x) => x.action === 'move' && x.code)) { const by = importersOf(ROOT, p.code, codeFiles); if (by.length) out.set(p.name, by); }
+  return out;
+}
+
+// A proposal's answers, each with what it does: its own list (options: [{ answer, label, does }]) when it has more than
+// two, else yes and no. --intent-decide takes any of them; the Documentation page shows each with its command.
+export function optionsOf(x) {
+  if (Array.isArray(x?.options) && x.options.length) return x.options.map((o) => ({ answer: String(o.answer).toLowerCase(), label: o.label ?? `If ${o.answer}`, does: o.does ?? '' }));
+  return [{ answer: 'yes', label: 'If yes', does: x?.yes ?? '' }, { answer: 'no', label: 'If no', does: x?.no ?? '' }];
+}
+
+// What a yes and a no to keeping a name each do.
+const keepOrRewrite = (name) => ({ yes: `The sentence stays as it is, and ${name} is no longer a finding.`, no: `The sentence is written again with what the system has, as a draft to review.` });
+
 // → Map(key → { kind, subject, page?, proposal, evidence: [..], effect })
+//   yes, no: what each answer does, said on the page beside the command that gives it.
 //   report: useReport's; snap: the layer; names: the system's components; codeFiles: { name: file } (codeFilesOf);
 //   facts: intent-truth's (for the Figma screens' words and the code's files); noPage: the components with no page.
 export function proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPage }) {
@@ -62,7 +82,7 @@ export function proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPa
   for (const n of noPage) {
     const key = `add:${n}`, file = codeFiles[n];
     const same = file && documentedFiles.get(noExt(file));
-    if (same) { out.set(key, { kind: 'add', subject: n, proposal: `Its page is ${same.page.name}: no page of its own.`, evidence: [`${n} and ${same.name} are drawn from one code file, ${file}, and ${same.page.name} documents ${same.name}.`], effect: 'documented' }); continue; }
+    if (same) { out.set(key, { kind: 'add', subject: n, proposal: `Its page is ${same.page.name}: no page of its own.`, evidence: [`${n} and ${same.name} are drawn from one code file, ${file}, and ${same.page.name} documents ${same.name}.`], effect: 'documented', yes: `No page of its own: ${same.page.name} documents it.`, no: 'It gets a page of its own, started from its code, its lines drafts to review.' }); continue; }
     const parent = n.includes('/') ? n.split('/')[0] : null;
     const byName = parent && pageFor.get(parent);
     const beside = !byName && file && [...documentedFiles.values()].find((d) => dirOf(codeFiles[d.name]) === dirOf(file) && /^(row|item|chip|label|divider|header|cell|background|bar|line|option)s?$/i.test(base(file)));
@@ -70,10 +90,10 @@ export function proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPa
     if (host) {
       const ev = [byName ? `Its Figma name puts it inside ${parent}: ${n}.` : `Its code file, ${file}, is beside ${host.name}'s (${codeFiles[host.name]}).`];
       if (file) { const by = importersOf(ROOT, file, codeFiles); if (by.length) ev.push(`Only ${by.map((f) => base(f) + '.' + f.split('.').pop()).join(', ')} use${by.length === 1 ? 's' : ''} it in the code.`); }
-      out.set(key, { kind: 'add', subject: n, proposal: `Document it in ${host.page.name}'s page, as a part of ${host.name}: no page of its own.`, evidence: ev, effect: 'documented' });
+      out.set(key, { kind: 'add', subject: n, proposal: `Document it in ${host.page.name}'s page, as a part of ${host.name}: no page of its own.`, evidence: ev, effect: 'documented', yes: `No page of its own: ${host.page.name}'s page documents it, as a part of ${host.name}.`, no: 'It gets a page of its own, started from its code, its lines drafts to review.' });
       continue;
     }
-    out.set(key, { kind: 'add', subject: n, proposal: `Write its page.`, evidence: [file ? `It is in the code (${file}) and no page documents it.` : 'No page documents it.'], effect: 'write' });
+    out.set(key, { kind: 'add', subject: n, proposal: `Write its page.`, evidence: [file ? `It is in the code (${file}) and no page documents it.` : 'No page documents it.'], effect: 'write', yes: 'Its page is started from its code, its lines drafts to review.', no: 'No page: it is taken off the pages to write.' });
   }
   // Fix
   const byEntity = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
@@ -93,18 +113,19 @@ export function proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPa
       const older = (/^(.+?)v\d+$/i.exec(nameOf) ?? [])[1];
       const olderName = older && names.find((x) => norm(x) === norm(older));
       const fileLike = Object.values(codeFiles).concat(facts?.files ?? []).find((fp) => { const w = words(noExt(fp).replace(/^src\/components\/library\//, '').replace(/\//g, ' ')); const nw = words(nameOf); return nw.length > 1 && nw.every((x) => w.some((y) => y.startsWith(x) || x.startsWith(y))); });
-      if (figmaSentence) out.set(key, { kind: 'fix', subject: nameOf, page: p.name, proposal: 'Keep it: it is a name of Figma\'s own, which the engine does not read.', evidence: [`The page says it is Figma's: "${figmaSentence.trim().slice(0, 200)}"`], effect: 'keep' });
+      if (figmaSentence) out.set(key, { kind: 'fix', subject: nameOf, page: p.name, proposal: 'Keep it: it is a name of Figma\'s own, which the engine does not read.', evidence: [`The page says it is Figma's: "${figmaSentence.trim().slice(0, 200)}"`], effect: 'keep', ...keepOrRewrite(nameOf) });
       else if (olderName) {
         const dep = facts?.text && new RegExp(`${olderName}[^"\\n]{0,40}deprecated`, 'i').test(facts.text);
-        out.set(key, { kind: 'fix', subject: nameOf, page: p.name, proposal: `Keep it: it names what replaces ${olderName}, which the system does not have yet; it clears once it does.`, evidence: [`The system has ${olderName}${dep ? ', which Figma marks deprecated' : ''}, and no ${nameOf} yet.`], effect: 'keep' });
-      } else if (fileLike) out.set(key, { kind: 'fix', subject: nameOf, page: p.name, proposal: `Keep it: it names ${fileLike}, a part in the code.`, evidence: [`${fileLike} is in the code${(() => { const by = importersOf(ROOT, fileLike, codeFiles); return by.length ? `, used only by ${by.map((x) => base(x)).join(', ')}` : ''; })()}.`], effect: 'keep' });
+        out.set(key, { kind: 'fix', subject: nameOf, page: p.name, proposal: `Keep it: it names what replaces ${olderName}, which the system does not have yet; it clears once it does.`, evidence: [`The system has ${olderName}${dep ? ', which Figma marks deprecated' : ''}, and no ${nameOf} yet.`], effect: 'keep', ...keepOrRewrite(nameOf) });
+      } else if (fileLike) out.set(key, { kind: 'fix', subject: nameOf, page: p.name, proposal: `Keep it: it names ${fileLike}, a part in the code.`, evidence: [`${fileLike} is in the code${(() => { const by = importersOf(ROOT, fileLike, codeFiles); return by.length ? `, used only by ${by.map((x) => base(x)).join(', ')}` : ''; })()}.`], effect: 'keep', ...keepOrRewrite(nameOf) });
     }
   }
   // Move
   for (const p of report.pages.filter((x) => x.action === 'move')) {
     const file = p.code;
     const by = file ? importersOf(ROOT, file, codeFiles) : [];
-    if (file && by.length) out.set(`move:${p.name}`, { kind: 'move', subject: p.name, page: p.name, proposal: 'Keep its page: it documents an internal part, and the layer writes the page from its own code file.', evidence: [`${file} is used only by ${by.map((x) => base(x)).join(', ')} in the code.`, 'The Figma library has no component of its own for it.'], effect: 'keep' });
+    const users = [...new Set(by.map((f) => snap.entities.find((x) => x.code && noExt(x.code) === noExt(f))?.name ?? base(f)))].join(' and ');
+    if (file && by.length) out.set(`move:${p.name}`, { kind: 'move', subject: p.name, page: p.name, proposal: 'Keep its page: it documents an internal part, and the layer writes the page from its own code file.', evidence: [`${file} is used only by ${by.map((x) => base(x)).join(', ')} in the code.`, 'The Figma library has no component of its own for it.'], effect: 'keep', by, yes: `The page stays, with a line saying it is not used on its own: use ${users}.`, no: `What only this page says goes to ${users}'s page, as drafts to review, and this page is taken out.` });
   }
   return out;
 }
@@ -116,7 +137,8 @@ export function applyDecisions({ report, noPage, proposals, decisions }) {
   const answer = (k) => decisions[k]?.answer ?? null;
   // Who answered it and when, beside the answer: the page says it.
   const said = (k) => decisions[k] ? { by: decisions[k].by ?? null, at: decisions[k].at ?? null } : {};
-  const left = noPage.filter((n) => !(accepted(decisions, `add:${n}`) && proposals.get(`add:${n}`)?.effect === 'documented'));
+  // Off the pages to write: one documented in another's page (a yes to that), or one the team said needs none (a no to writing it).
+  const left = noPage.filter((n) => { const x = proposals.get(`add:${n}`), a = answer(`add:${n}`); return !((a === 'yes' && x?.effect === 'documented') || (a === 'no' && x?.effect === 'write')); });
   const pages = report.pages.map((p) => {
     let q = { ...p };
     if (q.wrong?.length) {

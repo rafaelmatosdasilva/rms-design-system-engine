@@ -313,16 +313,30 @@ export function jsonAdd(entry, where, line, { sure = false, layout = null } = {}
 //   rewrite: [{ line (as written), finding }]; need: ['purpose' | 'whenToUse' | 'whenNotToUse' | 'mistakes' | 'limitations'
 //   | 'example' | 'role' | 'doDont' | 'differ']
 // leftForPeople: the lines a drafter said nothing in the system can say (kept, so they are not asked about again).
-export function planOf(snap, report, { leftForPeople = new Set(), code = null } = {}) {
+// partOf: Map(page name → the code files that use it), for each page of an internal part (intent-proposals.mjs → partsOf).
+// hold: the keys of the Fix proposals the team has not answered (intent-answers.mjs): their sentences wait for the answer.
+export function planOf(snap, report, { leftForPeople = new Set(), code = null, partOf = new Map(), hold = new Set() } = {}) {
   const byKey = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
+  const nameOfCode = (f) => snap.entities.find((x) => x.code && String(x.code).replace(/^\.?\//, '') === String(f).replace(/^\.?\//, ''))?.name ?? String(f).split('/').pop().replace(/\.\w+$/, '');
   const out = [];
   for (const page of report.pages) {
     const e = byKey.get(`${page.file}#${page.name}`); if (!e) continue;
+    // An internal part's page says, for certain, that it is not used on its own and what to use: the components that use it.
+    if (page.action === 'move' && partOf.get(page.name)?.length) {
+      const users = [...new Set(partOf.get(page.name).map(nameOfCode))];
+      const text = `Not used on its own: it is an internal part of ${users.join(' and ')}; use ${users.length > 1 ? 'one of them' : users[0]} instead.`;
+      // Lines written on every page alike come out of it as out of any page.
+      const remove = [...new Set(e.repeatedLines ?? [])];
+      const said = linesOf(e).some((l) => /internal part of/i.test(l.text));
+      if (!said || remove.length) out.push({ entity: e, page, remove, rewrite: [], need: said ? [] : [{ write: [{ where: 'When not to use', text }] }] });
+      continue;
+    }
     if (['delete', 'move', 'rename', 'name'].includes(page.action)) continue;   // a page to remove or name first
     const remove = [...new Set(e.repeatedLines ?? [])];
     const rewrite = [];
     for (const f of page.wrong ?? []) {
       if (f.kind !== 'name' && f.kind !== 'claim' || !f.line) continue;
+      if (f.kind === 'name' && hold.has(`fix:${page.name}:${String(f.says).replace(/`/g, '')}`)) continue;
       // The line as written that holds the sentence: a list item, or a line of a section's text.
       const held = linesOf(e).flatMap((l) => l.text.split('\n')).map((l) => l.replace(/^\s*[-*]\s+/, '').trim()).find((l) => flat(l).includes(flat(f.line)));
       if (held && leftForPeople.has(flat(held))) continue;
@@ -442,11 +456,11 @@ ${JSON.stringify(asks, null, 1)}`;
 export function sureParts(plan, facts) {
   for (const it of plan) {
     it.drafted = (it.drafted ?? []).filter((d) => !d.sure);
+    for (const x of it.need.find((n) => n?.write)?.write ?? []) it.drafted.push({ ...x, sure: true });
     const name = it.page.component, b = name ? briefOf(name, facts) : null; if (!b) continue;
     // Written "Role: button", not "button": a reader that keeps a section's lines as rules, and not its title, still says what it is.
     if (it.need.includes('role') && ROLE_OF[b.root]) it.drafted.push({ where: 'Role', text: `Role: ${ROLE_OF[b.root]}`, sure: true });
     if (it.need.includes('example') && b.tag) it.drafted.push({ where: 'Example', text: exampleOf(b), sure: true });
-    for (const x of it.need.find((n) => n?.write)?.write ?? []) it.drafted.push({ ...x, sure: true });
   }
   return plan;
 }
@@ -589,10 +603,12 @@ export function describeReview({ pages, problems }) {
 }
 
 // What changed, for the person and for the merge request's description.
-export function describeChanges({ pages, held }, { dropped = [] } = {}) {
+export function describeChanges({ pages, held, merged = [], started = [] }, { dropped = [] } = {}) {
   const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
-  const out = [`${pages.length} page${pages.length === 1 ? '' : 's'} changed: ${n('removed')} line${n('removed') === 1 ? '' : 's'} written on every page alike taken out, ${n('rewritten')} sentence${n('rewritten') === 1 ? '' : 's'} the system contradicts written again as drafts, ${n('drafted')} line${n('drafted') === 1 ? '' : 's'} drafted.`,
+  const out = [`${merged.length ? `${merged.length} page${merged.length === 1 ? '' : 's'} merged into another's, ` : ''}${started.length ? `${started.length} new page${started.length === 1 ? '' : 's'}, ` : ''}${pages.length} page${pages.length === 1 ? '' : 's'} changed: ${n('removed')} line${n('removed') === 1 ? '' : 's'} written on every page alike taken out, ${n('rewritten')} sentence${n('rewritten') === 1 ? '' : 's'} the system contradicts written again as drafts, ${n('drafted')} line${n('drafted') === 1 ? '' : 's'} drafted.`,
     '', 'A line that starts with **Draft:** is not the team\'s word yet: no agent gets it until a person reads it, changes what is not right and removes the marker (or deletes it to turn it down). rms-design-system-engine lists each under Review on the Documentation page.', ''];
+  for (const m of merged) out.push(`### ${m.name} → ${m.into}`, `The team said no to keeping its page: ${m.moved.length} line${m.moved.length === 1 ? '' : 's'} only it said drafted on ${m.into}'s page, \`${m.file}\` taken out, and it is noted as a part of ${m.into}.`, ...m.moved.map((d) => `- Drafted, ${d.where}: "${d.text}"`), '');
+  for (const x of started) out.push(`### ${x.name} (new page)`, `Started from its code (\`${x.code}\`): \`${x.spec}\` and \`${x.file}\`; its lines are below.`, '');
   for (const p of pages) {
     out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
     for (const r of p.rewritten) out.push(`- Written again (draft): "${r.line}" → "${r.text}"`);
@@ -610,17 +626,17 @@ export function writeLocal(ROOT, files, summary) {
   const dir = resolve(ROOT, CHANGES_DIR);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  for (const [f, t] of files) { const p = join(dir, f); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, t); }
+  for (const [f, t] of files) { if (t === null) continue; const p = join(dir, f); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, t); }   // a file taken out: CHANGES.md says it
   writeFileSync(join(dir, 'CHANGES.md'), summary + '\n');
   return dir;
 }
 
 // One branch, one commit, one merge request, from the commit the changes were made on: the team merges it, or not.
 // → { url, branch } | { error }
-export async function openMergeRequest(access, { files, sha, target, title, description, branch, message }) {
+export async function openMergeRequest(access, { files, sha, target, title, description, branch, message, created = new Set() }) {
   const b = await access.send('POST', `/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(sha)}`);
   if (!b.ok) return { error: b.status === 403 || b.status === 401 ? `GitLab refused (${b.status}) the token in ${access.writesWith}: it needs Commit Create (and Merge request Create) on the layer, and your role there Developer or more. Add the layer to your token's projects, or ask a Maintainer of it for the role` : `GitLab answered ${b.status} when making the branch` };
-  const c = await access.send('POST', '/repository/commits', { branch, commit_message: message, actions: [...files].map(([file_path, content]) => ({ action: 'update', file_path, content })) });
+  const c = await access.send('POST', '/repository/commits', { branch, commit_message: message, actions: [...files].map(([file_path, content]) => (content === null ? { action: 'delete', file_path } : { action: created.has(file_path) ? 'create' : 'update', file_path, content })) });
   if (!c.ok) return { error: `GitLab answered ${c.status} to the commit (the branch ${branch} was made; delete it before trying again)` };
   const m = await access.send('POST', '/merge_requests', { source_branch: branch, target_branch: target, title, description, remove_source_branch: true });
   if (!m.ok) return { error: `GitLab answered ${m.status} to the merge request (the branch ${branch} holds the changes)` };
@@ -630,7 +646,8 @@ export async function openMergeRequest(access, { files, sha, target, title, desc
 // The same changes as one commit straight on the layer's branch, for a team that reviews in the layer itself rather
 // than in a merge request: only when the branch is still at the commit the changes were made on, so nothing written
 // since is overwritten. Drafted lines keep their marker either way. → { url, sha } | { error }
-export async function commitToBranch(access, { files, sha, target, message }) {
+// files: Map(path → text, or null for a file taken out); created: the paths that are new.
+export async function commitToBranch(access, { files, sha, target, message, created = new Set() }) {
   const h = await access.get(`/repository/commits/${encodeURIComponent(target)}`);
   if (!h.ok) return { error: `GitLab answered ${h.status} for ${target}` };
   const head = String((await h.json())?.id ?? '');
@@ -640,8 +657,9 @@ export async function commitToBranch(access, { files, sha, target, message }) {
   const parts = [], LIMIT = 400000;
   for (const [file_path, content] of files) {
     const last = parts.at(-1);
-    if (!last || last.size + content.length > LIMIT || last.actions.length >= 40) parts.push({ size: 0, actions: [] });
-    parts.at(-1).actions.push({ action: 'update', file_path, content }); parts.at(-1).size += content.length;
+    const size = content?.length ?? 0;
+    if (!last || last.size + size > LIMIT || last.actions.length >= 40) parts.push({ size: 0, actions: [] });
+    parts.at(-1).actions.push(content === null ? { action: 'delete', file_path } : { action: created.has(file_path) ? 'create' : 'update', file_path, content }); parts.at(-1).size += size;
   }
   let base = head, out = null;
   for (const [k, part] of parts.entries()) {
@@ -669,7 +687,8 @@ export async function mayWrite(ROOT, cfg, want = 'commit', opts = {}) {
   return { ok: true };
 }
 
-export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null, model } = {}) {
+// only: the pages to work on (the ones the team just answered for), with any page their answers start or merge.
+export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null, model, only = null } = {}) {
   const il = await import('./intent-layer.mjs');
   const truth = await import('./intent-truth.mjs');
   const snap = il.readIntentLayer(ROOT, cfg);
@@ -685,10 +704,26 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   const leftFile = resolve(ROOT, OUT_DIR, 'intent-left-for-people.json');
   let left = []; try { left = JSON.parse(readFileSync(leftFile, 'utf8')); } catch { /* none yet */ }
   const code = codeFactsFor(ROOT, facts);
-  const plan = planOf(snap, report, { leftForPeople: new Set(left.map((x) => flat(x.line))), code: (e) => code.get(String(e.code ?? '').replace(/^\.?\//, '')) ?? null });
-  for (const it of plan) it.code = code.get(String(it.entity.code ?? '').replace(/^\.?\//, '')) ?? null;
-  if (!plan.length) return { snap, access, plan, answers: {}, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
+  const pr = await import('./intent-proposals.mjs'), ia = await import('./intent-answers.mjs');
+  const codeFiles = il.codeFilesOf(ROOT, cfg);
+  const partOf = pr.partsOf(ROOT, report, codeFiles);
+  // The team's answers to the engine's proposals: a fix still to answer waits, a merge or a new page is made here.
+  const decided = await pr.decidedLayer(ROOT, cfg);
+  const ans = decided ? ia.answersFor({ snap, report, proposals: decided.proposals, decisions: decided.decisions, codeFiles }) : { hold: new Set(), merges: [], creates: [] };
+  const codeOf = (e) => code.get(String(e.code ?? '').replace(/^\.?\//, '')) ?? null;
+  const plan = planOf(snap, report, { leftForPeople: new Set(left.map((x) => flat(x.line))), code: codeOf, partOf, hold: ans.hold }).filter((it) => !only || only.has(it.entity.name));
+  if (only) ans.merges = ans.merges.filter((m) => only.has(m.part.name));
+  if (!plan.length && !ans.merges.length && !ans.creates.length) return { snap, access, plan, answers: {}, result: { files: new Map(), pages: [], held: [] }, summary: '', note: '' };
   let files; try { files = await layerFiles(access, snap._source.sha); } catch (e) { return { error: e.message }; }
+  // A page to start: its files beside its siblings', then drafted as any page with nothing written.
+  const created = new Set(), started = [];
+  for (const c of ans.creates) {
+    const s = ia.startPage(c, snap, files, { api: ia.apiOf(ROOT, c.code) }); if (!s) continue;
+    for (const [f, t] of s.files) { files.set(f, t); created.add(f); }
+    started.push({ name: s.entity.name, codeName: c.name, code: c.code, spec: s.spec, file: s.file });
+    plan.push({ entity: s.entity, page: { name: s.entity.name, file: s.file, component: c.name }, remove: [], rewrite: [], need: ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'example', 'role', 'doDont'] });
+  }
+  for (const it of plan) it.code = codeOf(it.entity);
   let note = '';
   sureParts(plan, facts);
   if (drafts && draftJobs(plan, facts).length) {
@@ -708,10 +743,32 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
   }
   const dropped = plan.flatMap((i) => (i.dropped ?? []).map((d) => ({ page: i.entity.name, ...d })));
   const result = applyPlan(plan, files);
+  for (const f of created) if (!result.files.has(f)) result.files.set(f, files.get(f));
+  const table = ia.tableOfCode(files);
+  if (table) for (const x of started) result.files.set(table, ia.addRow(result.files.get(table) ?? files.get(table), x.codeName, x.code, 'Started from the code by rms-design-system-engine; its lines are drafts to review.'));
+  const merged = ia.applyMerges(ans.merges, files, result.files, { layout: layoutOf(files), common: ia.commonLines(snap.entities, { files }) });
+  result.created = created; result.started = started; result.merged = merged;
   // What the drafter left for a person: kept, so later runs do not ask about it again (it stays on the page as Fix).
   const now = plan.flatMap((i) => (i.rewritten ?? []).filter((r) => !r.text).map((r) => ({ page: i.entity.name, line: r.line, why: r.why ?? null })));
   if (now.length) { mkdirSync(dirname(leftFile), { recursive: true }); writeFileSync(leftFile, JSON.stringify([...left, ...now.filter((n) => !left.some((l) => flat(l.line) === flat(n.line)))], null, 1) + '\n'); }
   return { snap, access, plan, answers: plan.answers ?? {}, result, summary: describeChanges(result, { dropped }), note };
+}
+
+// Right after the team answers (--intent-decide): what the answers change in the layer, made and committed on its branch
+// at once, on the pages they were about only, so an answer is all a person gives. → the line to say.
+export async function actOnAnswers(ROOT, cfg, { only }) {
+  try {
+    const may = await mayWrite(ROOT, cfg, 'commit');
+    if (!may.ok) return `ℹ️  The layer is not changed yet: ${may.why}. The next run that may write to it (--intent-changes) makes the change.`;
+    const p = await prepareLayerFix(ROOT, cfg, { only });
+    if (p.error) return `⚠️  The layer is not changed yet: ${p.error}`;
+    if (!p.result.files.size) return '✅ Nothing to change in the layer for this answer.';
+    writeLocal(ROOT, p.result.files, p.summary);
+    const done = await commitToBranch(p.access, { files: p.result.files, created: p.result.created, sha: p.snap._source.sha, target: p.snap._source.ref, message: 'Intent layer: the team\'s answers made by rms-design-system-engine (' + p.summary.split('\n')[0].replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+    if (done.error) return `⚠️  The layer is not changed yet: ${done.error}`;
+    try { const il = await import('./intent-layer.mjs'); await il.syncSources(ROOT, cfg); } catch { /* next run reads it */ }
+    return `🔧 Made in the layer and committed on ${p.snap._source.ref}: ${p.summary.split('\n')[0]} ${done.url ?? done.sha} (${OUT_DIR}/intent-changes/CHANGES.md says each change)${p.note ? `\n   ${p.note}` : ''}`;
+  } catch (e) { return `⚠️  The layer is not changed yet: ${e.message}`; }
 }
 
 // On each run (the audit, the style guide), when ds-config.json → intentLayer.autoFix is "commit": what the engine can
@@ -729,7 +786,7 @@ export async function autoFix(ROOT, cfg, { offline = false } = {}) {
     if (p.error) return `⚠️  Intent layer not fixed this run: ${p.error}`;
     if (!p.result.files.size) return p.note ? `🔧 Intent layer: nothing to fix that needs no drafting. ${p.note}` : null;
     writeLocal(ROOT, p.result.files, p.summary);
-    const done = await commitToBranch(p.access, { files: p.result.files, sha: p.snap._source.sha, target: p.snap._source.ref, message: 'Intent layer: fixed by rms-design-system-engine (' + p.summary.split('\n')[0].replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
+    const done = await commitToBranch(p.access, { files: p.result.files, created: p.result.created, sha: p.snap._source.sha, target: p.snap._source.ref, message: 'Intent layer: fixed by rms-design-system-engine (' + p.summary.split('\n')[0].replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
     if (done.error) return `⚠️  Intent layer not fixed this run: ${done.error}`;
     // Read again, so what this run builds shows the layer as it is now.
     try { const il = await import('./intent-layer.mjs'); await il.syncSources(ROOT, cfg); } catch { /* next run reads it */ }

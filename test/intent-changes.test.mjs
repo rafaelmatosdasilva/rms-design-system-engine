@@ -278,6 +278,18 @@ test('what the tests found and the code says for certain is written as final; te
   assert.ok(plan[0].drafted.some((d) => !d.sure && d.where === 'When to use'), 'drafted for review');
 });
 
+test('an internal part\'s page says, for certain, that it is not used on its own and what to use instead', () => {
+  const part = { kind: 'component', layer: 'components', name: 'Tile Grip', file: 'specs/dsds/tile-grip.dsds.json', code: 'src/tiles/Grip.vue', purpose: ['A grip.'], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [] };
+  const owner = { ...part, name: 'Tile One', file: 'specs/dsds/tile-one.dsds.json', code: 'src/tiles/TileOne.vue' };
+  const snap = { _source: {}, entities: [part, owner] };
+  const report = { pages: [{ name: 'Tile Grip', file: part.file, action: 'move', code: part.code }] };
+  const plan = sureParts(planOf(snap, report, { partOf: new Map([['Tile Grip', ['src/tiles/TileOne.vue']]]) }), factsFrom({ components: {} }));
+  assert.deepEqual(plan.map((it) => it.drafted), [[{ where: 'When not to use', text: 'Not used on its own: it is an internal part of Tile One; use Tile One instead.', sure: true }]]);
+  assert.equal(planOf(snap, report).length, 0, 'a page to move with no part found takes nothing');
+  const said = { ...snap, entities: [{ ...part, whenNotToUse: ['Not used on its own: it is an internal part of Tile One.'] }, owner] };
+  assert.equal(planOf(said, report, { partOf: new Map([['Tile Grip', ['src/tiles/TileOne.vue']]]) }).length, 0, 'said once');
+});
+
 test('the sure parts are written even when nothing can be drafted', () => {
   const facts = factsFrom({ components: { chipOne: { file: 'src/chips/ChipOne.vue', props: {} } } });
   const plan = [{ entity: { name: 'Chip One' }, page: { component: 'chipOne' }, need: [{ write: [{ where: 'Data', text: '`items` holds a list of items, each with `id`.' }] }] }];
