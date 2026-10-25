@@ -12,6 +12,7 @@ import { STATE_FILE } from '../gitlab-source.mjs';
 import { codeReason, reasonLine } from '../change-reason.mjs';
 import { changelogs, repoUrl, defaultBranch, ruleChanges } from '../component-changelog.mjs';
 import { recordAgreed } from '../agreed.mjs';
+import { budget } from './helpers.mjs';
 
 const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40), HEAD = 'd'.repeat(40), NEXT = 'e'.repeat(40);
 const commit = (id, title, date, parents = 1) => ({ id, short_id: id.slice(0, 8), title, authored_date: date, author_name: 'QA', parent_ids: Array.from({ length: parents }, (_, i) => String(i).repeat(40)) });
@@ -93,7 +94,7 @@ test('blame, the commits of a file with a pattern, their releases and merge requ
   assert.equal(readHistory(dir).sha, NEXT);
 });
 
-test('the readers the engine already has read GitLab in a mirror (changelog, reason, repository, branch, agreed commit)', { timeout: 120000 }, async () => {
+test('the readers the engine already has read GitLab in a mirror (changelog, reason, repository, branch, agreed commit)', { timeout: budget(120000) }, async () => {
   // The readers are synchronous and ask GitLab from a child process, so the stand-in GitLab runs in a process of its own.
   const work = mkdtempSync(join(tmpdir(), 'gl-server-'));
   writeFileSync(join(work, 'routes.json'), JSON.stringify(ROUTES));

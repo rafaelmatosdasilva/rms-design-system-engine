@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { namingFromCode, snapshotPaths, systemScripts, productsBeside, framesFromSnapshot, figmaTokenNames } from '../setup-facts.mjs';
 import { dataStateLine } from '../next-step.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const put = (root, rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), typeof text === 'string' ? text : JSON.stringify(text, null, 2)); };
@@ -144,7 +145,7 @@ test('a Figma file set up and nothing captured from it: the run says nothing was
   const dir = mkdtempSync(join(tmpdir(), 'no-snapshot-'));
   put(dir, 'src/theme.css', ':root { --button-background: #fff; }\n.button { background: var(--button-background); }\n');
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--figma-url=https://www.figma.com/design/AbC123def/Demo', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: 240000, env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
+  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
   const summary = readFileSync(join(dir, '.design-system-engine-out', 'summary.md'), 'utf8');
   assert.match(summary, /\*\*No Figma data captured yet, so nothing was compared with Figma\.\*\*/);
   assert.match(summary, /\nNEXT: no Figma data is captured yet/);

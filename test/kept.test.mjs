@@ -12,7 +12,7 @@ import { keptKey, recordKept, readKept, dropKept, pick, keepInGates, matchKept, 
 import { collectFindings, differencesMarkdown } from '../run-diff.mjs';
 import { route } from '../route.mjs';
 import { judge } from '../guard.mjs';
-import { fixtureProject, bareEnv } from './helpers.mjs';
+import { fixtureProject, bareEnv, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const dir = () => mkdtempSync(join(tmpdir(), 'kept-'));
@@ -132,9 +132,9 @@ test('--keep keeps the open differences of the last full audit that match, with 
   assert.deepEqual(JSON.parse(readFileSync(join(root, 'design-system-engine-kept.json'), 'utf8')).decisions, []);
 });
 
-test('on the demo system: a kept difference no longer fails its gate and leaves the open list for the kept one', { timeout: 600000 }, () => {
+test('on the demo system: a kept difference no longer fails its gate and leaves the open list for the kept one', { timeout: budget(600000) }, () => {
   const root = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'kept-demo-');
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: 300000 });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
   let r = run();
   assert.match(r.stdout, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
   const before = JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'differences.json'), 'utf8'));

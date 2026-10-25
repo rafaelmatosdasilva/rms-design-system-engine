@@ -10,6 +10,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, plainGet, isMirrorOf, STATE_FILE } from '../gitlab-source.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -183,7 +184,7 @@ test('GitLab out of reach: the mirror already there is checked, and the run says
   assert.equal(none.dir, null); assert.match(none.error, /could not reach/);
 });
 
-test('the engine run end to end: --project=<GitLab link> sets up the mirror, remembers it, and every run refreshes it', { timeout: 120000 }, async () => {
+test('the engine run end to end: --project=<GitLab link> sets up the mirror, remembers it, and every run refreshes it', { timeout: budget(120000) }, async () => {
   const F = 'f'.repeat(40);
   let head = F;
   const archives = { [F]: tarOf([['package.json', '{"name":"ui-kit"}'], ['src/theme.css', ':root { --a: #fff; }']]) };

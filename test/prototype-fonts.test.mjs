@@ -12,6 +12,7 @@ import { prototypePage, fontLoader, fontLines, shippedFamilies, designFamilies }
 import { fontStack, systemFamily, systemScales } from '../prototype-pieces.mjs';
 import { FONTS_IN } from '../prototype-render.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 
@@ -40,7 +41,7 @@ test('where each family comes from: the machine, the system\'s @font-face, else 
   assert.match(fontLines({ Brand: 'broken' })[0], /shipped by the system's @font-face, whose files did not load from the page/);
 });
 
-test('a prototype draws at once wherever its fonts are: installed, served, failing or never answering', { skip: CHROME ? false : 'no Chrome available', timeout: 90000 }, async () => {
+test('a prototype draws at once wherever its fonts are: installed, served, failing or never answering', { skip: CHROME ? false : 'no Chrome available', timeout: budget(90000) }, async () => {
   let have = 'DejaVu Sans';   // a font the machine has, found below
   const server = createServer((req, res) => {
     if (req.url.startsWith('/hang')) return;   // a network that never answers

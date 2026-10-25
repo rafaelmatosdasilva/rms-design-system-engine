@@ -12,7 +12,7 @@ import { buildSummary } from '../next-step.mjs';
 import { route, pagesNamed, rawColoursOf } from '../route.mjs';
 import { roleWord, roleMarkupFindings } from '../role-markup.mjs';
 import { sayKind } from '../guard.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -110,7 +110,7 @@ test('a path that holds "figma" is not "in Figma": the Settings build prompt rou
   assert.notEqual(route('change the chip radius in figma to 8', { components: ['chip'] }).recipe, 'build-from-figma');
 });
 
-test('in build mode a measured difference fails, and Figma leads; renderedParityStrict false keeps it advisory', { timeout: 300000 }, () => {
+test('in build mode a measured difference fails, and Figma leads; renderedParityStrict false keeps it advisory', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-measured-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
@@ -150,7 +150,7 @@ test('a React component is drawn as the JSX it returns: its element, its childre
   assert.equal(jsxMarkup('export const x = 1;', 'x'), null);
 });
 
-test('a height the rule already sets but the drawn box does not keep says why: inline, or padding outside a content box', { timeout: 300000 }, () => {
+test('a height the rule already sets but the drawn box does not keep says why: inline, or padding outside a content box', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-why-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx', 'src/components/field.css', 'src/components/Field.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }

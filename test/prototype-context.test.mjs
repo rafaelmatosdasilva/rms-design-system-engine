@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf, neverOf, ruledOut } from '../prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from '../product-conventions.mjs';
 import { checkPrototype } from '../prototype-pieces.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -204,7 +205,7 @@ test('a stand-in made of the engine\'s own Text is still a gap', () => {
 });
 
 // ── End to end on a built Tidepool with written guidelines ────────────────────────────────────────────────────────
-test('the catalog shows what each component is for and the product\'s pages; a drawn prototype is held to both', { timeout: 600000 }, () => {
+test('the catalog shows what each component is for and the product\'s pages; a drawn prototype is held to both', { timeout: budget(600000) }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'tp-context-'));
   cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
@@ -214,7 +215,7 @@ test('the catalog shows what each component is for and the product\'s pages; a d
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   // The composition path (a system whose components are not code): what Figma and the guidelines say, drawn by the engine.
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, frameworkComponents: false, guidelines: { sources: ['guidelines.md'] } }, null, 2));
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   assert.equal(run('--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json').status, 0);
 
   const cat = run('--prototype', '--catalog');
@@ -245,7 +246,7 @@ test('the catalog shows what each component is for and the product\'s pages; a d
   assert.match(c.stdout, /✅ settings: the same as the others/);
 });
 
-test('without importing anything, the designed screens set the product\'s pages and the request picks the closest one', { timeout: 600000 }, () => {
+test('without importing anything, the designed screens set the product\'s pages and the request picks the closest one', { timeout: budget(600000) }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'tp-focus-'));
   cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
@@ -254,7 +255,7 @@ test('without importing anything, the designed screens set the product\'s pages 
   // The composition path: designed screens are its starting points (a page in code reads no Figma).
   const cfg0 = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, frameworkComponents: false }, null, 2));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--catalog', '--for', 'a notification settings page with a Save button'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: 300000 });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--catalog', '--for', 'a notification settings page with a Save button'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /FOR THIS REQUEST {2}"a notification settings page with a Save button"\n {2}start from: Settings \(designed in Figma; rms-design-system-engine --prototype --from-screens brings it into prototypes\/\)/);
   assert.match(r.stdout, /components its words point to: button/);
@@ -304,7 +305,7 @@ test('the request: a component it names that the prototype leaves out is owed; o
   assert.equal(r.ok, true, JSON.stringify(r.findings));
 });
 
-test('build mode: a text colour set on the component\'s text part counts; none at all fails the structure gate', { timeout: 600000 }, () => {
+test('build mode: a text colour set on the component\'s text part counts; none at all fails the structure gate', { timeout: budget(600000) }, () => {
   const make = (fieldCss) => {
     const dir = mkdtempSync(join(tmpdir(), 'tp-textpart-'));
     cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
@@ -312,7 +313,7 @@ test('build mode: a text colour set on the component\'s text part counts; none a
     cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
     cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
     if (fieldCss) writeFileSync(join(dir, 'src', 'components', 'field.css'), fieldCss);
-    return spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_FETCH: '1' }, timeout: 300000 }).stdout;
+    return spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_FETCH: '1' }, timeout: budget(300000) }).stdout;
   };
   assert.doesNotMatch(make(null), /"color" not set in "\.field"/, 'the reference sets it on .field__input');
   const none = readFileSync(join(ENGINE, 'test', 'skill-evals', 'build-reference', 'src', 'components', 'field.css'), 'utf8').replace(/ color: var\(--text-primary\);/, '');

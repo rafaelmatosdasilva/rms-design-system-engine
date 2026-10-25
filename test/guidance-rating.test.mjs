@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { systemFacts, rateComponent, rateGuidance, sectionsFrom, figmaWords, extractionQuestions, extractionPrompt, scoreExtraction, askModel, ratingLines, readFacts } from '../guidance-rating.mjs';
 import { levelContext } from '../eval-run.mjs';
-import { bareEnv } from './helpers.mjs';
+import { bareEnv, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -107,7 +107,7 @@ test('the extraction test: questions from the facts, answers scored against them
 
 test('--guidance-rating writes the rating; --extract asks the model the person set, and each component keeps its share', () => {
   const dir = harbor();
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--guidance-rating', ...a], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: 120000 });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--guidance-rating', ...a], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: budget(120000) });
   let r = run();
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /📘 Guidance for agents: (Thin|Partial)\./);
@@ -142,7 +142,7 @@ test('each component\'s Documentation area says what an agent can take from its 
   // Its contract, as the engine writes it: its properties are read there, never asked for again.
   mkdirSync(join(dir, 'contracts'), { recursive: true });
   writeFileSync(join(dir, 'contracts', 'button.contract.json'), JSON.stringify({ id: 'button', props: [{ name: 'variant' }, { name: 'size' }, { name: 'label' }] }));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: 250000 });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: budget(250000) });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
   const data = JSON.parse(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/.exec(page)[1]);

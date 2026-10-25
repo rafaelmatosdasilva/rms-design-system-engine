@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { splitStates, applyState, statesOwed, stateFindings, kindOf } from '../prototype-states.mjs';
 import { fitFindings, fitLines, screenWidths } from '../prototype-render.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 import { findChrome } from '../cdp.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,13 +67,13 @@ test('what does not fit is one line per part, with the widths and states it happ
   ]);
 });
 
-test('--prototype draws each state, owes the states the page lacks, and tries every width with longer words', { skip: CHROME ? false : 'no Chrome available', timeout: 600000 }, () => {
+test('--prototype draws each state, owes the states the page lacks, and tries every width with longer words', { skip: CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-states-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
     mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8'));
   }
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: 300000 });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/m', gap: 'padding/m' }, children: [
     { component: 'Text', props: { as: 'h1', text: 'Filters' } },

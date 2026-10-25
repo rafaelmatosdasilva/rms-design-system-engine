@@ -16,11 +16,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bareEnv, auditFixture, golden } from './helpers.mjs';
+import { bareEnv, auditFixture, golden, budget } from './helpers.mjs';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'lagoon-tw');
 
-test('Lagoon, a Tailwind design system: every deliberate difference is found, nothing else fails, and the report matches its golden', { timeout: 300000 }, () => {
+test('Lagoon, a Tailwind design system: every deliberate difference is found, nothing else fails, and the report matches its golden', { timeout: budget(300000) }, () => {
   const r = auditFixture(FIXTURE, bareEnv(), 'lagoon-tw-');
   assert.equal(r.code, 1, r.out.slice(-3000));
   // Token names through the preset: every @theme variable traces back to a Figma token and is used.
@@ -43,7 +43,7 @@ test('Lagoon, a Tailwind design system: every deliberate difference is found, no
   golden(FIXTURE, 'expected-report-static.txt', r.out);
 });
 
-test('--init on a Tailwind project sets the naming preset and reads the class dark mode', { timeout: 120000 }, async () => {
+test('--init on a Tailwind project sets the naming preset and reads the class dark mode', { timeout: budget(120000) }, async () => {
   const { fixtureProject } = await import('./helpers.mjs');
   const { spawnSync, execFileSync } = await import('node:child_process');
   const { readFileSync } = await import('node:fs');

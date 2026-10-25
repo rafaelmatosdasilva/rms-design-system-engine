@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { harnessCases, propsOf, pageColours, loadTypeScript } from '../component-harness.mjs';
 import { findChrome } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TIDEPOOL = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -38,19 +39,19 @@ const tidepool = (stepper = null) => {
 };
 const check = (dir) => {
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: 200000, env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = e.stdout ?? ''; }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(200000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = e.stdout ?? ''; }
   return JSON.parse(out.slice(out.indexOf('{')));
 };
 const ready = CHROME && loadTypeScript(ENGINE) ? false : 'no Chrome or no TypeScript available';
 
-test('build mode: the reference components, rendered from their code, show only what the design itself lacks (an error shown by colour alone)', { skip: ready, timeout: 300000 }, () => {
+test('build mode: the reference components, rendered from their code, show only what the design itself lacks (an error shown by colour alone)', { skip: ready, timeout: budget(300000) }, () => {
   const d = check(tidepool());
   assert.match(String(d.target), /rendered from their code/);
   // Advice beyond AA (a control under the comfortable 44px touch size) is not something the design lacks.
   assert.deepEqual(d.issues.filter((i) => i.severity !== 'advisory').map((i) => `${i.issue} ${i.selector}`), ['rolecontract field (textbox): in its error state the error is shown only by its look: there is no message to read (WCAG 3.3.1). The design needs an error message part, linked to the field with aria-describedby (send it back to Figma)'], JSON.stringify({ issues: d.issues, notRead: d.notRead }));
 });
 
-test('build mode: a stepper with nameless step buttons and no keys is caught on its own code', { skip: ready, timeout: 300000 }, () => {
+test('build mode: a stepper with nameless step buttons and no keys is caught on its own code', { skip: ready, timeout: budget(300000) }, () => {
   const bad = `import { useState } from 'react';
 import './stepper.css';
 export function Stepper({ Value = '1' }) {
@@ -65,7 +66,7 @@ export function Stepper({ Value = '1' }) {
   assert.match(says, /name .*spinbutton/i);
 });
 
-test('build mode: a stepper whose Decrement goes below its minimum is caught, and the check after it starts from the same value', { skip: ready, timeout: 300000 }, () => {
+test('build mode: a stepper whose Decrement goes below its minimum is caught, and the check after it starts from the same value', { skip: ready, timeout: budget(300000) }, () => {
   const below = `import { useState } from 'react';
 import './stepper.css';
 export function Stepper({ Value = '1', ...rest }) {

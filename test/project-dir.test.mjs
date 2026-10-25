@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { hasCode, projectFor, POINTER } from '../project-dir.mjs';
+import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -32,7 +33,7 @@ test('a git link is cloned beside where the engine runs, once; owner/repo is Git
   assert.equal(projectFor('git@x.example:a/b.git', from, { git: () => ({ status: 128 }) }).error, 'could not clone git@x.example:a/b.git');
 });
 
-test('told where the project is, the engine works there and remembers it for the next run from the same folder', { timeout: 120000 }, () => {
+test('told where the project is, the engine works there and remembers it for the next run from the same folder', { timeout: budget(120000) }, () => {
   const from = mkdtempSync(join(tmpdir(), 'pd-run-'));
   const project = mkdtempSync(join(tmpdir(), 'pd-proj-'));
   execFileSync('git', ['init', '-q'], { cwd: project });

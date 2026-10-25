@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { markupFindings, cssFindings, styleOnly, staticA11y, focusIndex, classTags } from '../a11y-static.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 
 const kinds = (xs) => xs.map((x) => [x.line, x.kind]);
 
@@ -144,7 +144,7 @@ test('a long stretch with no brace (a blanked inline image) is read in one pass,
   }
 });
 
-test('a scoped run lists only the findings about the component: its own file, or an element that carries its class', { timeout: 120000 }, async () => {
+test('a scoped run lists only the findings about the component: its own file, or an element that carries its class', { timeout: budget(120000) }, async () => {
   const { spawnSync } = await import('node:child_process');
   const { join, dirname } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
@@ -157,7 +157,7 @@ test('a scoped run lists only the findings about the component: its own file, or
     // A page that uses it, and hand-styles one: only the hand-built one is about the component.
     'src/pages/Login.vue': '<template>\n  <main>\n    <div @click="go">Go</div>\n    <button\n      class="button-primary"><svg/></button>\n  </main>\n</template>\n',
   });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'ButtonPrimary', '--only', 'accessibility'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: 100000 });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'ButtonPrimary', '--only', 'accessibility'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: budget(100000) });
   const out = r.stdout + r.stderr;
   assert.match(out, /src\/buttons\/Primary\.vue:3 {2}an image with no alt/, out.slice(-2500));
   assert.match(out, /src\/pages\/Login\.vue:4 {2}a button with only an icon inside/, 'a hand-built one carries the class: it is about the component');

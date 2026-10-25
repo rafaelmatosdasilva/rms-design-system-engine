@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 import { WCAG21, WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from '../wcag21.mjs';
 import { A11Y_GUIDE, a11yFindingRecord } from '../a11y-check.mjs';
 import { scriptFindings, scriptOnly } from '../a11y-static.mjs';
@@ -90,7 +90,7 @@ async function inPage(fn) {
   } finally { close(); chrome.kill(); }
 }
 
-test('page: a tip that fades out slowly once Escape is pressed is closed, not one that stays', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: a tip that fades out slowly once Escape is pressed is closed, not one that stays', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const found = await ev(`(async () => {
       const box = document.createElement('div');
@@ -110,7 +110,7 @@ test('page: a tip that fades out slowly once Escape is pressed is closed, not on
 
 // a tip or a menu that closes when anything is pressed is not the control acting on the press (a tip must close so,
 // WCAG 1.4.13); only what the press itself does counts. A control that acts on the press is still found.
-test('page: a tip or a menu that closes on any press is not the pressed control acting; one that acts on the press is found', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: a tip or a menu that closes on any press is not the pressed control acting; one that acts on the press is found', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const found = await ev(`(async () => {
       const box = document.createElement('div');
@@ -130,7 +130,7 @@ test('page: a tip or a menu that closes on any press is not the pressed control 
   });
 });
 
-test('page: each WCAG 2.1 problem the page breaks once is found, and the part that is fine is left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: each WCAG 2.1 problem the page breaks once is found, and the part that is fine is left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const good = await ev(`(async () => { const r = document.getElementById('good'); const a = window.__wcag21.check(r, { name: 'x' }); const b = await window.__wcag21.interact(r); return { f: a.findings.concat(b.findings), ran: a.ran.concat(b.ran) }; })()`);
     assert.deepEqual(good.f, [], JSON.stringify(good.f));
@@ -156,10 +156,10 @@ test('page: each WCAG 2.1 problem the page breaks once is found, and the part th
   });
 });
 
-test('audit: the browser check runs the WCAG 2.1 checks and says which ran, each finding with its criterion', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 180000 }, () => {
+test('audit: the browser check runs the WCAG 2.1 checks and says which ran, each finding with its criterion', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(180000) }, () => {
   const dir = makeFixture({ 'page.html': readFileSync(FIXTURE, 'utf8') });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: 170000, env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(170000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = JSON.parse(out.slice(out.indexOf('{')));
   assert.ok(d.ran.includes('wcag21'), out);
@@ -189,7 +189,7 @@ test('style guide: each Figma annotation says what it feeds, and one no check re
 // the arrows but not Home and End, a list box that does not move at all, a combobox that opens but does not close, a menu
 // button whose menu closes on Escape but leaves the focus elsewhere, a modal dialog that lets Tab out. The same, built
 // right, is left alone; with keys: false nothing is pressed.
-test('page: the keys of tab lists, list boxes, comboboxes, menu buttons and modal dialogs', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: the keys of tab lists, list boxes, comboboxes, menu buttons and modal dialogs', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const run = (keys) => ev(`(async () => {
       const box = document.createElement('div');
@@ -222,7 +222,7 @@ test('page: the keys of tab lists, list boxes, comboboxes, menu buttons and moda
   });
 });
 
-test('page: the same patterns built right are left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: the same patterns built right are left alone', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const found = await ev(`(async () => {
       const box = document.createElement('div');
@@ -247,7 +247,7 @@ test('page: the same patterns built right are left alone', { skip: HAS_CHROME ? 
 
 // What a screen reader says on each control (name, role, state), and the names that say little: a role, an icon's
 // name, the role said twice; two links with the same words going to different places.
-test('page: what a screen reader says, and names that say little or the same', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: what a screen reader says, and names that say little or the same', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const r = await ev(`(() => {
       const box = document.createElement('div');
@@ -273,7 +273,7 @@ test('page: what a screen reader says, and names that say little or the same', {
 
 // A build trying the page has no person on it (person: false): the focus a component's own script moves outside it is
 // never taken for a person's, so the try is never stopped (and never started again forever).
-test('page: with no person on the page, focus moved outside by the component\'s own script does not stop the try', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('page: with no person on the page, focus moved outside by the component\'s own script does not stop the try', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   await inPage(async (ev) => {
     const r = await ev(`(async () => {
       const box = document.createElement('div'), away = document.createElement('button');

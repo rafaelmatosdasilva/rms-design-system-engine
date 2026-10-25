@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { tokenCss, modeBlock, buildOrder, buildLine, TOKENS_TO_BUILD } from '../build-list.mjs';
 import { inProgressList, inProgressNames } from '../in-progress.mjs';
 import { nextStep, buildSummary } from '../next-step.mjs';
-import { fixtureProject } from './helpers.mjs';
+import { fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -88,7 +88,7 @@ test('the next step builds the tokens first, then a component only when the pers
   assert.equal(buildLine({ tokens: 0, components: [] }), null);
 });
 
-test('setup asks where the code is before it writes anything; told it starts here from Figma, it is in build mode', { timeout: 120000 }, () => {
+test('setup asks where the code is before it writes anything; told it starts here from Figma, it is in build mode', { timeout: budget(120000) }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'build-init-'));
   execFileSync('git', ['init', '-q'], { cwd: dir });
   const init = (...more) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks', ...more], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
@@ -150,7 +150,7 @@ test('--query prints the build sheet for a component still to build', () => {
   assert.match(r.stdout, /NEXT: build field as written above/);
 });
 
-test('the Figma-only Tidepool project: the first run passes and lists the tokens, then the components, to build', { timeout: 300000 }, () => {
+test('the Figma-only Tidepool project: the first run passes and lists the tokens, then the components, to build', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));
@@ -169,7 +169,7 @@ test('the build sheet says what markup a role asks for', async () => {
   assert.match(r.stdout, /role: togglebutton, so write it as a <button type="button"> with aria-pressed/);
 });
 
-test('a component built into its own stylesheet is found, recorded as a theme file and checked', { timeout: 300000 }, () => {
+test('a component built into its own stylesheet is found, recorded as a theme file and checked', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-own-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
@@ -187,7 +187,7 @@ test('a component built into its own stylesheet is found, recorded as a theme fi
   assert.match(r.stdout, /tag: CSS height is 24px - contract expects 20px/);
 });
 
-test('a literal with no Figma value is named by its file, line and declaration, in the gate and in the summary', { timeout: 300000 }, () => {
+test('a literal with no Figma value is named by its file, line and declaration, in the gate and in the summary', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-lit-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
@@ -218,7 +218,7 @@ test('the edit check accepts a colour Figma paints with no variable, and still f
   assert.ok(found.some((f) => /#123456 is not a design-system colour/.test(f)), found.join('\n'));
 });
 
-test('a variant written as its modifier class alone (.tag--positive) meets .tag.tag--positive; a missing one says how to add it', { timeout: 300000 }, () => {
+test('a variant written as its modifier class alone (.tag--positive) meets .tag.tag--positive; a missing one says how to add it', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-mod-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }

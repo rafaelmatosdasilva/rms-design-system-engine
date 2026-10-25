@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
-import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf } from './helpers.mjs';
+import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIXTURE = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -30,7 +30,7 @@ const audit = (env) => auditFixture(FIXTURE, env, 'demo-ds-');
 const golden = (name, out) => goldenOf(FIXTURE, name, out);
 const project = () => fixtureProject(FIXTURE, 'demo-ds-');
 
-test('demo design system, without Chrome: the static report matches its golden', { timeout: 300000 }, () => {
+test('demo design system, without Chrome: the static report matches its golden', { timeout: budget(300000) }, () => {
   const r = audit(bareEnv());
   assert.equal(r.code, 1, r.out.slice(-3000));
   assert.match(r.out, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
@@ -40,7 +40,7 @@ test('demo design system, without Chrome: the static report matches its golden',
   golden('expected-report-static.txt', r.out);
 });
 
-test('demo design system, with Chrome: every deliberate difference is found, and the report matches its golden', { timeout: 300000, skip: CHROME ? false : 'Chrome not found' }, () => {
+test('demo design system, with Chrome: every deliberate difference is found, and the report matches its golden', { timeout: budget(300000), skip: CHROME ? false : 'Chrome not found' }, () => {
   const r = audit({ ...process.env, CHROME_PATH: CHROME });
   assert.equal(r.code, 1, r.out.slice(-3000));
   assert.match(r.out, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);

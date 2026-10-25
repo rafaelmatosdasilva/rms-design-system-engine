@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { prototypePage } from '../prototype.mjs';
 import { VISUAL_EXPRESSION, visualFindings } from '../prototype-visual.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { budget } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const SYSTEM_CSS = `
@@ -67,7 +68,7 @@ const tree = { component: 'Page', props: { width: '400', padding: 'gap/m', gap: 
   { id: 'm', component: 'modal', props: {}, children: [{ component: 'button', props: { Label: 'Cancel' } }, { component: 'button', props: { Label: 'Delete' } }] },
 ] };
 
-test('a prototype drawn from product copies: parts inside their component, slots filled, the product\'s classes and words left out, fills, options on their parts, and it works', { skip: CHROME ? false : 'no Chrome available', timeout: 120000 }, async () => {
+test('a prototype drawn from product copies: parts inside their component, slots filled, the product\'s classes and words left out, fills, options on their parts, and it works', { skip: CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'proto-draw-'));
   const file = join(dir, 'page.html');
   writeFileSync(file, prototypePage({ name: 'p', tree, parts, scales: { spacing: [{ name: 'gap/m', var: '--gap-m', value: '8px' }], text: [] }, gaps: [], catalog, fonts: false }));
