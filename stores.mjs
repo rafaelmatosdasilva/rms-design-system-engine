@@ -21,7 +21,9 @@
 // A computer with no token reads a store with the person's own git access instead (gitStoreFiles): the projects they
 // already clone are reached over their SSH key or their credential helper, so nobody makes a token just to read. Only
 // where there is no token, so a setup that has one is unchanged, and git is never allowed to stop and ask for one.
-// Writing still goes through the API with a token: GitLab's roles and protected branches decide it, as before.
+// Writing still goes through the API with a token: GitLab's roles and protected branches decide it, as before. Each
+// commit the engine makes names whose run made it as its author (decided-by.mjs), the token's owner staying the
+// committer, so a store several people write tells their runs apart.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, accessSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
@@ -31,6 +33,7 @@ import { createHash } from 'node:crypto';
 import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
+import { runBy } from './decided-by.mjs';
 
 export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes'];
 export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
@@ -440,8 +443,12 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     const changed = sendable.filter(([rel, data]) => !(prev.sha === head && prev.files?.[rel] === hash(data) && there.has(pre + rel)));
     if (!changed.length) return { ok: true, line: `ℹ️  ${label}: ${describePlace(place)} already has these files` };
     const actions = changed.map(([rel, data]) => ({ action: there.has(pre + rel) ? 'update' : 'create', file_path: pre + rel, content: Buffer.from(data).toString('base64'), encoding: 'base64' }));
+    // The commit says whose run made it. The token's owner stays the committer, so GitLab's roles and its audit trail
+    // are untouched; this is the author, which is what tells three people's runs apart in a store they all write.
+    const who = 'runBy' in opts ? opts.runBy : runBy(ROOT);
+    const authored = who ? { author_name: who.name, author_email: who.email } : {};
     if (a.mode === 'commit') {
-      const c = await api.send('POST', '/repository/commits', { branch: a.branch, commit_message: message, actions });
+      const c = await api.send('POST', '/repository/commits', { branch: a.branch, commit_message: message, actions, ...authored });
       if (!c.ok) return { ok: false, line: `⚠️  ${label} not sent: GitLab answered ${c.status} to the commit${c.status === 403 ? ` (the token in ${api.writesWith} may not create commits on ${a.branch})` : ''}` };
       const out = await c.json();
       st[part] = { sha: out?.id ?? null, files: { ...(prev.sha === head ? prev.files : {}), ...Object.fromEntries(changed.map(([rel, d]) => [rel, hash(d)])) }, readAt: new Date().toISOString() };
@@ -451,7 +458,7 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     const branch = `design-system-engine/${part}-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}`;
     const b = await api.send('POST', `/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(head)}`);
     if (!b.ok) return { ok: false, line: `⚠️  ${label} not sent: GitLab answered ${b.status} when making the branch ${branch}` };
-    const c = await api.send('POST', '/repository/commits', { branch, commit_message: message, actions });
+    const c = await api.send('POST', '/repository/commits', { branch, commit_message: message, actions, ...authored });
     if (!c.ok) return { ok: false, line: `⚠️  ${label} not sent: GitLab answered ${c.status} to the commit (the branch ${branch} was made; delete it before trying again)` };
     const m = await api.send('POST', '/merge_requests', { source_branch: branch, target_branch: a.branch, title: message.split('\n')[0], description: message, remove_source_branch: true });
     if (!m.ok) return { ok: false, line: `⚠️  ${label}: the branch ${branch} holds the changes, but GitLab answered ${m.status} to the merge request` };

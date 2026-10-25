@@ -273,3 +273,26 @@ test('no token: a store is read with the person\'s own git access, under its pat
   // Nothing reachable: null, so the run falls back to what it always said instead of hanging on a password prompt.
   assert.equal(gitStoreFiles(p, { branch: 'main', path: '' }, { git: () => { throw new Error('no'); }, home }), null);
 });
+
+// ── Who ran it ──────────────────────────────────────────────────────────────────────────────────────────────────
+test('a commit says whose run made it; a checkout with no identity of its own sends no author', async () => {
+  const g = fakeGitlab();
+  const dir = project();
+  const cfg = cfgWith({ snapshots: { read: LINK } });
+  const files = new Map([['figma-vars.snapshot.json', '{"a":1}']]);
+
+  await pushStore(dir, cfg, 'snapshots', files, 'Snapshots', { env, http: g.http, runBy: { name: 'Acme Runner', email: 'runner@example.com' } });
+  const body = g.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
+  assert.equal(body.author_name, 'Acme Runner');
+  assert.equal(body.author_email, 'runner@example.com');
+
+  // Nobody to name (a checkout with no git identity of its own, a pipeline's): the commit goes as it always did, as
+  // the token's owner. Said here rather than left to this computer's git settings, which differ from machine to
+  // machine and would make this test read them instead of the engine.
+  forgetAccess();
+  const g2 = fakeGitlab();
+  await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"b":2}']]), 'Snapshots', { env, http: g2.http, runBy: null });
+  const body2 = g2.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
+  assert.equal('author_name' in body2, false, JSON.stringify(body2 && Object.keys(body2)));
+  assert.equal('author_email' in body2, false);
+});
