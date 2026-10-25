@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { SKILL, OUT_DIR } from './names.mjs';
 import { parseGitlabUrl, refCandidates } from './gitlab-fetch.mjs';
 import { parseGitlabProject } from './gitlab-source.mjs';
-import { PARTS, LABEL, storesOf, describePlace, gitlabApi, placeAccess } from './stores.mjs';
+import { PARTS, LABEL, storesOf, describePlace, gitlabApi, placeAccess, samePlace } from './stores.mjs';
 import { PROFILE_FILE, commandName, commandSkill } from './profile.mjs';
 import { ENGINE_REPO } from './publish-job.mjs';
 
@@ -145,7 +145,7 @@ export function profileReadme(profile, repo, { client } = {}) {
   for (const part of PARTS) {
     const { read, write } = s[part];
     if (!read && !write) continue;
-    const same = read && write && JSON.stringify(read) === JSON.stringify(write);
+    const same = samePlace(read, write);
     rows.push(`| ${LABEL[part]} | ${same || !write ? placeText(read) : read ? `read from ${placeText(read)}, written to ${placeText(write)}` : placeText(write)} |`);
   }
   return `# ${name} profile

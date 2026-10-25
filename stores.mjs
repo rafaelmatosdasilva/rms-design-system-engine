@@ -71,6 +71,8 @@ export function placeOf(v) {
   return null;
 }
 const keyOf = (pl) => JSON.stringify(pl);
+// The same place, whichever token reads or writes it: where it is, not how it is reached.
+export const samePlace = (a, b) => !!a && !!b && ['gitlab', 'folder', 'github', 'branch', 'path'].every((k) => (a[k] ?? null) === (b[k] ?? null));
 
 // Each part's read and write place, and how a write is sent ("commit" or "merge-request"). The intent layer named the
 // old way (ds-config.json → intentLayer) is its place when stores does not name one.
@@ -413,7 +415,7 @@ export async function accessLines(ROOT, cfg, opts = {}) {
     const { read, write } = s[part];
     if (!read && !write) continue;
     const a = await writeAccess(ROOT, cfg, part, opts);
-    const same = read && write && keyOf(read) === keyOf(write);
+    const same = samePlace(read, write);
     const where = same || !write ? `lives in ${describePlace(read)}` : read ? `read from ${describePlace(read)}, written to ${describePlace(write)}` : `lives in ${describePlace(write)}`;
     const may = a.mode === 'commit' ? `you can change it (a commit on ${a.branch})`
       : a.mode === 'merge-request' ? `you can change it through a merge request into ${a.branch}`

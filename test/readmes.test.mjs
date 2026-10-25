@@ -105,6 +105,8 @@ test('the profile\'s README: the install line first, where each part lives, from
   assert.ok(t.indexOf('install.sh') < t.indexOf('Paste your GitLab token'), 'installing is the first step');
   assert.match(t, /https:\/\/gitlab\.acme\.test\/-\/user_settings\/personal_access_tokens/);
   assert.match(t, /\| Snapshots \| `design\/acme-guide`, `snapshots\/` \|/);
+  const own = JSON.parse(PROFILE_JSON); own.stores.snapshots.write = { ...own.stores.snapshots.read, writeTokenEnv: 'ACME_GUIDE_TOKEN' };
+  assert.match(profileReadme(own, profileRepo(cfg)), /\| Snapshots \| `design\/acme-guide`, `snapshots\/` \|/, 'the same place, whatever token writes it');
   assert.match(t, /\| The code \| `web\/acme-ui` \|/);
   assert.match(t, /`\/rms-design-system-engine-acme`/);
 });
