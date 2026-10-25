@@ -273,12 +273,21 @@ test('a page that differs from the product\'s other pages owes that too, named a
 
 test('--prototype --catalog lists the system\'s components, the engine\'s pieces with their tokens, and the format', { timeout: 600000 }, () => {
   const dir = builtTidepool('tp-catalog-');
+  // Its components are code: a prototype is a page in that code, each component written as its card says.
   const r = run(dir, '--prototype', '--catalog');
   assert.equal(r.status, 0, r.stdout);
-  assert.match(r.stdout, /chip\s+Size=M\|L/);
-  assert.match(r.stdout, /Stack\s+gap=none\|gap\/s\|padding\/xs\|padding\/s\|padding\/m/);
-  assert.match(r.stdout, /Text\s+text=<text>\s+style=m\|s/);
-  assert.match(r.stdout, /NEXT: write prototypes\/<name>\.json with only the parts above/);
+  // No intent layer here: the system is its code's own component files, each read from its file, Figma never read.
+  assert.match(r.stdout, /Button {2}import \{ Button \} from '@\/components\/Button';\n\s+props: Label text = Save · Disabled boolean = false/);
+  assert.doesNotMatch(r.stdout, /Figma/);
+  assert.match(r.stdout, /NEXT: write prototypes\/<Name>\.jsx from the cards above/);
+  // A system whose components are not code (frameworkComponents: false) composes its prototype from the engine's pieces.
+  const cfgFile = join(dir, 'ds-config.json');
+  writeFileSync(cfgFile, JSON.stringify({ ...JSON.parse(readFileSync(cfgFile, 'utf8')), frameworkComponents: false }, null, 2));
+  const c = run(dir, '--prototype', '--catalog');
+  assert.match(c.stdout, /chip\s+Size=M\|L/);
+  assert.match(c.stdout, /Stack\s+gap=none\|gap\/s\|padding\/xs\|padding\/s\|padding\/m/);
+  assert.match(c.stdout, /Text\s+text=<text>\s+style=m\|s/);
+  assert.match(c.stdout, /NEXT: write prototypes\/<name>\.json with only the parts above/);
 });
 
 test('a part opens another part of the composition by its id; one that names no part, the page or itself is an error', () => {

@@ -34,7 +34,10 @@ if (!input || !existsSync(resolve(ROOT, input))) {
 if (/\.(html?|jsx|tsx|vue|svelte|css|scss|less)$/i.test(input)) {
   const { editCheck } = await import('./edit-check.mjs');
   const abs = resolve(ROOT, input);
-  const out = editCheck({ tool_name: 'Write', tool_input: { file_path: abs, content: readFileSync(abs, 'utf8') } }, { root: ROOT, cfg: { ...cfg, hooks: true, editCheck: true } });
+  const event = { tool_name: 'Write', tool_input: { file_path: abs, content: readFileSync(abs, 'utf8') } };
+  // A page in prototypes/ is held to the system as a prototype is: its components, what each is given, where each goes.
+  const page = (await import('./page-check.mjs')).pageHookCheck(event, { root: ROOT, cfg: { ...cfg, hooks: true, editCheck: true }, outDir: OUT_DIR });
+  const out = [editCheck(event, { root: ROOT, cfg: { ...cfg, hooks: true, editCheck: true } }), page].filter(Boolean).join('\n\n') || null;
   if (!out) { console.log(`\n✅ ${input}: what changed since the last commit uses only the system (the check every edit gets). --check-ui is for a generated UI in JSON.\n`); process.exit(0); }
   console.log(`\n${out}\n`);
   process.exit(1);

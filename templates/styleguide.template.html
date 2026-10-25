@@ -3357,6 +3357,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           : mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract in the intent layer, ' + where + ', which the engine generates from Figma and the code: ' + listed + '. Agents read them there; nothing to write.</p>', 'done', '');
       rows.push(Object.assign(row, { src: ['Its contract (' + k.file + ')'] }));
     }
+    // What agents got wrong with it in prototypes, and why: what its documentation lacked (to write), or what is written
+    // and was not followed (to review: say it more plainly, or higher on its page).
+    var inv = c.inventions;
+    if (inv && inv.count) {
+      var needs = Object.keys(inv.needs || {}), WRITE = { example: 'an example of it in use (the engine writes one from the product\'s own code with --intent-changes)', fields: 'what each item of its lists holds, in its code comment', page: 'its page in the intent layer' };
+      rows.push(mk('invented', 'What agents got wrong', '<p' + (needs.length ? ' class="pg-missing"' : '') + '>' + inv.count + (inv.count === 1 ? ' mistake' : ' mistakes') + ' in prototypes' + (needs.length ? ', because ' + needs.map(function (n) { return esc(inv.needs[n].why); }).join(', and ') : ', with what they needed written') + ':</p>' +
+        '<ul>' + (inv.last || []).map(function (l) { return '<li>' + esc(l.message) + ' <span class="pg-dim">(' + esc(l.page) + ')</span></li>'; }).join('') + '</ul>',
+        needs.length ? 'todo' : 'check', needs.length ? 'Write ' + needs.map(function (n) { return WRITE[n] || n; }).join('; and ') + '.' : 'What agents needed is written, and they still got it wrong: say it more plainly, or higher on its page.'));
+      rows[rows.length - 1].src = ['The prototypes\' checks'];
+    }
     if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
       'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
     return rows;

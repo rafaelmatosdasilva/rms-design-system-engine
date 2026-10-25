@@ -782,6 +782,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         view.agentRating = { cls: rating.cls, ready: rating.ready, partial: rating.partial, thin: rating.thin, total: rating.total };
       }
     } catch { /* no rating */ }
+    // What agents got wrong in prototypes (page-check.mjs): each component's mistakes and what its documentation lacked,
+    // so the gap shows where the team writes, not only in the agent's reply.
+    try {
+      const inv = readJson(join(ROOT, OUT_DIR, 'prototypes', 'inventions.json'))?.byComponent ?? {};
+      const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const byKey = new Map(Object.entries(inv).map(([n, b]) => [key(n), b]));
+      for (const c of view.components) { const b = byKey.get(key(c.name)); if (b?.count) c.inventions = b; }
+    } catch { /* no prototype checked yet */ }
     // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
     // --contracts-out through a merge request): its Contract button opens it on GitLab, and its Documentation says what it
     // lists and whether that still matches the code and Figma (shared-contracts.mjs). With none published yet, the
