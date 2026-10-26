@@ -29,6 +29,7 @@ import { buildStamp, mayWrite } from './stamp.mjs';
 import { shortStyleNames, componentStyleKey } from './text-styles.mjs';
 import { resolveStatus, parseStatusTags, lintStatusFields, statusFindings, statusLine } from './decision-status.mjs';
 import { buildCatalog, catalogTable } from './ui-catalog.mjs';
+import { readInvented } from './invented.mjs';
 import { loadLocator } from './component-locator.mjs';
 import { codeComponents } from './component-source.mjs';
 import { readableOn } from './token-pairs.mjs';
@@ -1096,7 +1097,8 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
         if (ex) examples[name] = ex;
       }
     } catch { /* optional */ }
-    catalog = buildCatalog(built, { code, selectorFor, examples });
+    // The names agents invented here, so the catalog rejects them by name rather than only by meaning.
+    catalog = buildCatalog(built, { code, selectorFor, examples, invented: readInvented(ROOT) });
     for (const [name, e] of Object.entries(catalog.components ?? {})) if (lives[name]) e.livesIn = lives[name];
     writeFileSync(join(outDir, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
   } catch { /* best-effort */ }
