@@ -29,7 +29,7 @@ function fakeGitlab({ roles = { 'read-token': 20, 'write-token': 30 }, readOnly 
     const u = new URL(url), path = decodeURIComponent(url.slice(base.length).split('?')[0]);
     if (path === '') return res(200, { default_branch: branch.name, permissions: { project_access: { access_level: level }, group_access: null } });
     if (path.startsWith('/repository/branches/')) return path.endsWith(branch.name) ? res(200, { name: branch.name, can_push: level >= 30 && branch.can_push, protected: !branch.can_push }) : res(404, {});
-    if (path.startsWith('/repository/commits/')) return res(200, { id: g.head });
+    if (path.startsWith('/repository/commits/')) return res(200, { id: g.head, title: g.title ?? null });
     if (path === '/repository/tree') {
       const pre = u.searchParams.get('path');
       return res(200, Object.keys(g.files).filter((f) => !pre || f.startsWith(pre + '/')).map((f) => ({ type: 'blob', path: f })));
@@ -48,7 +48,7 @@ function fakeGitlab({ roles = { 'read-token': 20, 'write-token': 30 }, readOnly 
     if (path === '/repository/commits') {
       if (body.branch === branch.name && !branch.can_push) return res(403, { message: 'protected' });
       for (const a of body.actions) if (a.action === 'delete') delete g.files[a.file_path]; else g.files[a.file_path] = Buffer.from(a.content, 'base64').toString('utf8');
-      if (body.branch === branch.name) g.head = String(++n).padStart(40, '0');
+      if (body.branch === branch.name) { g.head = String(++n).padStart(40, '0'); g.title = String(body.commit_message ?? '').split('\n')[0]; }
       return res(201, { id: g.head, web_url: `https://${HOST}/design/snapshots/-/commit/${g.head}` });
     }
     if (path === '/merge_requests') { g.mrs.push(body); return res(201, { web_url: `https://${HOST}/design/snapshots/-/merge_requests/${g.mrs.length}` }); }
@@ -350,4 +350,19 @@ test('publishing the style guide again removes the files an earlier page linked,
   mkdirSync(join(dir, 'assets')); writeFileSync(join(dir, old), 'x'); writeFileSync(join(dir, 'notes.txt'), 'mine');
   assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
   assert.ok(!existsSync(join(dir, old)) && existsSync(join(dir, 'notes.txt')) && existsSync(join(dir, 'index.html')));
+});
+
+test('a commit the gateway timed out on but GitLab made is sent, said once and never sent again', async () => {
+  const g = fakeGitlab();
+  const send = g.http.send;
+  g.http.send = async (url, o) => { const r = await send(url, o); return o?.body?.branch ? { ...r, ok: false, status: 502, json: async () => ({}) } : r; };
+  const ROOT = project(), cfg = cfgWith({ styleguide: { write: LINK } });
+  const r = await pushStore(ROOT, cfg, 'styleguide', new Map([['index.html', '<p>new</p>']]), 'Style guide published', { env, http: g.http, retryMs: 1 });
+  assert.equal(r.ok, true, r.line);
+  assert.match(r.line, /committed on/);
+  assert.equal(g.files['index.html'], '<p>new</p>');
+  const other = fakeGitlab();
+  other.http.send = async (url, o) => (o?.body?.branch ? { ok: false, status: 502, json: async () => ({}) } : (await fakeGitlab().http.send(url, o)));
+  forgetAccess();
+  assert.equal((await pushStore(project(), cfg, 'styleguide', new Map([['index.html', '<p>x</p>']]), 'Style guide published', { env, http: other.http, retryMs: 1 })).ok, false, 'one that did not land is not sent');
 });

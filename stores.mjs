@@ -501,8 +501,19 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     const authored = who ? { author_name: who.name, author_email: who.email } : {};
     if (a.mode === 'commit') {
       const c = await api.send('POST', '/repository/commits', { branch: a.branch, commit_message: message, actions, ...authored });
-      if (!c.ok) return { ok: false, line: `⚠️  ${label} not sent: GitLab answered ${c.status} to the commit${c.status === 403 ? ` (the token in ${api.writesWith} may not create commits on ${a.branch})` : ''}` };
-      const out = await c.json();
+      // A gateway that gave up while GitLab still made the commit (a large one, a slow server): the branch says whether
+      // it is there, so a commit that landed is never reported as not sent, nor sent again.
+      let out = null;
+      if (!c.ok && c.status >= 500) {
+        for (let i = 0; i < 3 && !out; i++) {
+          await new Promise((r) => setTimeout(r, opts.retryMs ?? 2000));
+          const h2 = await api.get(`/repository/commits/${encodeURIComponent(a.branch)}`, { write: true }).catch(() => null);
+          const j = h2?.ok ? await h2.json() : null;
+          if (j?.id && j.id !== head && String(j.title ?? '').trim() === message.split('\n')[0].trim()) out = j;
+        }
+      }
+      if (!c.ok && !out) return { ok: false, line: `⚠️  ${label} not sent: GitLab answered ${c.status} to the commit${c.status === 403 ? ` (the token in ${api.writesWith} may not create commits on ${a.branch})` : ''}` };
+      out ??= await c.json();
       st[part] = { sha: out?.id ?? null, files: { ...(prev.sha === head ? prev.files : {}), ...Object.fromEntries(changed.map(([rel, d]) => [rel, hash(d)])) }, readAt: new Date().toISOString() };
       writeState(ROOT, st);
       return { ok: true, url: out?.web_url ?? null, line: `📤 ${label}: ${changed.length} file${changed.length === 1 ? '' : 's'} committed on ${describePlace(place)}${out?.web_url ? ` (${out.web_url})` : ''}` };
