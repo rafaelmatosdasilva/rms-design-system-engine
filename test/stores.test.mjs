@@ -382,7 +382,10 @@ test('no token: a store is written by git push, built without checking anything 
   writeFileSync(join(seed, 'protos', 'Old.json'), '{"a":1}');
   run(['add', '-A'], seed); run(['commit', '-qm', 'one'], seed); run(['push', '-q', remote, 'main'], seed);
 
-  const git = (args, input, env) => execFileSync('git', args.map((a) => (/^(git@|https?:\/\/)/.test(a) ? remote : a)), { input, maxBuffer: 1 << 28, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...env } });
+  // No identity of its own, as a CI runner and a fresh container have none: git refuses a commit whose committer
+  // it had to guess, so the engine has to name one. This is how that was found.
+  const bare = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null', GIT_AUTHOR_NAME: '', GIT_AUTHOR_EMAIL: '', GIT_COMMITTER_NAME: '', GIT_COMMITTER_EMAIL: '' };
+  const git = (args, input, env) => execFileSync('git', args.map((a) => (/^(git@|https?:\/\/)/.test(a) ? remote : a)), { input, maxBuffer: 1 << 28, stdio: ['pipe', 'pipe', 'pipe'], env: { ...bare, ...env } });
   const p = { host: 'gitlab.acme.test', path: 'team/design', origin: 'https://gitlab.acme.test' };
   const place = { branch: 'main', path: 'protos' };
 
@@ -400,6 +403,12 @@ test('no token: a store is written by git push, built without checking anything 
   // The same content again changes nothing: no empty commit is pushed.
   const again = gitStorePush(p, place, new Map([['New.json', '{"b":2}']]), 'Prototypes', { git, home });
   assert.equal(again.unchanged, true, JSON.stringify(again));
+
+  // Nobody named: the commit still happens, and says the engine made it rather than failing for want of a name.
+  forgetAccess();
+  const anon = gitStorePush(p, place, new Map([['Anon.json', '{"c":3}']]), 'Prototypes', { git, home });
+  assert.equal(anon.ok, true, anon.why);
+  assert.match(String(run(['log', '-1', '--format=%an', 'main'], remote)), /rms-design-system-engine/);
 
   // A host that refuses says why, in its own words, and nothing throws at the run. Everything but the push is the
   // real git: a double that refuses every call would fail at the fetch and never reach the thing being tested.

@@ -33,7 +33,9 @@ import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { join, resolve, dirname, relative, sep, basename } from 'node:path';
 import { createHash } from 'node:crypto';
-import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
+import { OUT_DIR, REFS_DIR, PROJECT, SKILL } from './names.mjs';
+// The name a commit carries when nobody is named: a no-reply address, never a person's.
+const NOREPLY = `${SKILL}@users.noreply.github.com`;
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { runBy } from './decided-by.mjs';
@@ -251,9 +253,14 @@ export function gitStorePush(p, place, files, message, { git = gitSilently, home
       }
       const tree = String(withIndex(['write-tree'])).trim();
       if (tree === String(g(['rev-parse', `${head}^{tree}`])).trim()) return { ok: true, sha: head, unchanged: true };
-      // Who ran it is the author, as it is for a commit made through the API; git needs a committer too, and uses
-      // this person's own, which is what a push from their terminal would carry.
-      const env = who ? { GIT_AUTHOR_NAME: who.name, GIT_AUTHOR_EMAIL: who.email } : {};
+      // Who ran it is the author, as it is for a commit made through the API. git also needs a committer, and will
+      // not take one it had to guess: a computer with no name configured (a CI runner, a fresh container) is refused
+      // outright with "empty ident name", so the engine always says who is committing rather than leaving it to git.
+      // Where nobody is named, the engine names itself: a commit that says what made it beats a commit that fails.
+      const env = {
+        GIT_AUTHOR_NAME: who?.name || SKILL, GIT_AUTHOR_EMAIL: who?.email || NOREPLY,
+        GIT_COMMITTER_NAME: who?.name || SKILL, GIT_COMMITTER_EMAIL: who?.email || NOREPLY,
+      };
       const sha = String(git(['--git-dir', dir, 'commit-tree', tree, '-p', head, '-m', message], undefined, env)).trim();
       g(['push', '-q', url, `${sha}:refs/heads/${place.branch || 'HEAD'}`]);
       return { ok: true, sha };
