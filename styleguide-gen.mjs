@@ -1273,7 +1273,27 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       }
       // Everything the developers did, release by release, whatever it changed: the Changelog page lists it all, each
       // commit with the components it changed (from their changelogs) when it changed any.
-      view.releaseLog = releaseLog(ROOT).map((g) => ({ ...g, commits: g.commits.map((r) => ({ ...r, url: commitUrl(repo, r.sha), ...(ticketOf(r.subject, cfg, ROOT) ?? {}) })) }));
+      // Each commit's issue: the one its message names, else the one its merge or pull request closes (said "via" it),
+      // else that request itself; and where it changed the system besides a component's code (change-where.mjs).
+      const cw = await import('./change-where.mjs');
+      const onGitlab = /gitlab/i.test(repo ?? '');
+      const ownFiles = new Set([...found.values()].flatMap((w) => w.files ?? []).map((f) => String(f).replace(/^\.\//, '')));
+      const outDir = cfg.styleguide?.out ? relative(ROOT, dirname(resolve(ROOT, cfg.styleguide.out))) : null;
+      const byKey = new Map(); for (const [name, w] of found) for (const f of w.files ?? []) byKey.set(cw.pathKey(f), name);
+      const whereCtx = { names: view.components.map((c) => c.name), componentFiles: ownFiles, byKey, themeFiles: themeFiles.map((f) => String(f).replace(/^\.\//, '')), styleguideDir: outDir && !outDir.startsWith('..') ? outDir : null };
+      const tagUrl = (t) => (repo && t ? `${repo}${onGitlab ? '/-/tags/' : '/releases/tag/'}${encodeURIComponent(t)}` : null);
+      const issueUrl = (t) => (/^#\d+$/.test(t) ? (cfg.changelog?.ticketUrl ? String(cfg.changelog.ticketUrl).replace(/\{id\}/g, t.slice(1)) : (repo ? `${repo}${onGitlab ? '/-/issues/' : '/issues/'}${t.slice(1)}` : null)) : (cfg.changelog?.ticketUrl ? String(cfg.changelog.ticketUrl).replace(/\{id\}/g, encodeURIComponent(t)) : null));
+      view.releaseLog = releaseLog(ROOT, { where: true }).map((g) => ({ ...g, commits: g.commits.map((r) => {
+        const own = ticketOf(r.subject, cfg, ROOT);
+        const n = r.request?.iid ?? cw.requestOf(r.subject)?.n ?? null;
+        const request = n ? { label: cw.requestLabel(n, onGitlab), url: prUrl(repo, n) } : null;
+        const closes = own ? [] : cw.closesOf(`${r.request?.title ?? ''}\n${r.request?.description ?? ''}`, cfg);
+        const via = !own && closes.length ? { ticket: closes[0], ticketUrl: issueUrl(closes[0]), via: request } : null;
+        const where = r.files ? cw.whereOf(r.files, whereCtx).map((w) => ({ ...w,
+          url: w.kind === 'tokens' ? '#tokens' : w.kind === 'version' ? tagUrl(g.release) ?? commitUrl(repo, r.sha) : ['docs', 'figma', 'examples', 'tests', 'code'].includes(w.kind) && w.names?.length === 1 ? null : w.kind === 'docs' ? '#documentation' : commitUrl(repo, r.sha) })) : null;
+        const { files, request: _r, ...rest } = r;
+        return { ...rest, url: commitUrl(repo, r.sha), ...(own ?? via ?? {}), ...(request ? { request } : {}), ...(where ? { where } : {}) };
+      }) }));
       view.links = [
         { label: 'Figma file', url: cfg.figmaFileKey ? `https://www.figma.com/design/${cfg.figmaFileKey}` : null },
         { label: 'Code repository', url: repo },

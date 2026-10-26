@@ -16,6 +16,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { mirrorState, mirrorRepo, mirrorBranch, commitsOf, ensureHistory, releaseLogOf } from './gitlab-history.mjs';
+import { diffFiles } from './change-where.mjs';
 
 const git = (ROOT, args) => { const r = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }); return r.status === 0 ? r.stdout : ''; };
 
@@ -47,8 +48,8 @@ export const defaultBranch = (ROOT) => mirrorBranch(ROOT) ?? (git(ROOT, ['symbol
 // The project's last releases, newest first (what is merged and not released yet first), each with every commit it holds
 // whatever it changed, merges left out: [{ release, releasedAt, commits: [{ sha, short, date, subject, author }] }]. A
 // release holds the commits from the version tag before it; a commit is shown once, in the first release that holds it.
-export function releaseLog(ROOT, { releases = 10 } = {}) {
-  if (mirrorState(ROOT)) return releaseLogOf(ROOT, { releases }) ?? [];
+export function releaseLog(ROOT, { releases = 10, where = false } = {}) {
+  if (mirrorState(ROOT)) return releaseLogOf(ROOT, { releases, where }) ?? [];
   const tags = git(ROOT, ['tag', '-l', 'v[0-9]*', '--sort=v:refname']).split('\n').filter(Boolean);
   const day = tagDates(ROOT);
   const rangeOf = (from, to) => git(ROOT, ['log', '--no-merges', '--format=%H%x1f%aI%x1f%an%x1f%s', from ? `${from}..${to}` : to]).split('\n').filter(Boolean)
@@ -57,6 +58,17 @@ export function releaseLog(ROOT, { releases = 10 } = {}) {
   if (tags.length) { const now = rangeOf(tags.at(-1), 'HEAD'); if (now.length) out.push({ release: null, releasedAt: null, commits: now }); }
   else { const now = rangeOf(null, 'HEAD').slice(0, 100); if (now.length) out.push({ release: null, releasedAt: null, commits: now }); }
   for (let i = tags.length - 1; i >= Math.max(0, tags.length - releases); i--) out.push({ release: tags[i], releasedAt: day[tags[i]] ?? null, commits: rangeOf(tags[i - 1] ?? null, tags[i]).slice(0, 300) });
+  if (where) {
+    // What each commit changed, file by file (its added and removed lines only), read in batches.
+    const all = out.flatMap((g) => g.commits), byId = new Map(all.map((c) => [c.sha, c]));
+    for (let i = 0; i < all.length; i += 40) {
+      const text = git(ROOT, ['show', '--no-color', '--unified=0', '--format=%x00%H', ...all.slice(i, i + 40).map((c) => c.sha)]);
+      for (const part of text.split('\0').filter(Boolean)) {
+        const sha = part.slice(0, 40), c = byId.get(sha);
+        if (c) c.files = diffFiles(part.slice(41)).map((f) => ({ path: f.path, diff: f.diff.slice(0, 20000) }));
+      }
+    }
+  }
   return out;
 }
 
@@ -75,7 +87,8 @@ export function ticketOf(subject, cfg = {}, ROOT = null) {
   if (!m) return null;
   const ticket = m[1], id = ticket.replace(/^#/, '');
   const says = s.slice(m[0].length).replace(/^\s*[-–—:|]\s*/, '').trim();
-  const pattern = cfg?.changelog?.ticketUrl ?? (ROOT ? ticketLinks(ROOT) : null);
+  // The team's link pattern for every ticket; one learned from the project's changelog ([#n](…n)) only for #n tickets.
+  const pattern = cfg?.changelog?.ticketUrl ?? (ROOT && /^#\d+$/.test(ticket) ? ticketLinks(ROOT) : null);
   return { ticket, ticketUrl: pattern ? String(pattern).replace(/\{id\}/g, encodeURIComponent(id)) : null, says: says || s };
 }
 
