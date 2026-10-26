@@ -1397,6 +1397,19 @@ export const GUIDANCE = [
   ['mistakes', 'Common mistakes', /^(common mistakes|mistakes|common errors|erros comuns)$/i],
   ['limitations', 'Limitations', /^(limitations|limits|known limitations|limita[çc][õo]es)$/i],
 ];
+// What a token says it is for, from the vars snapshot: a variable's description (tokenMeta, its name with or without
+// /color), and a text style's (textStyleMeta), the style named "text style <its name>" as the page names it, by its
+// full name or its short one (m for body/m). → (name) => its description, or ''
+export function tokenDescriptions(snap = {}) {
+  const meta = snap.tokenMeta ?? {}, styles = snap.textStyleMeta ?? {};
+  const style = (s) => styles[s]?.description ?? Object.entries(styles).find(([k]) => k.split('/').pop() === s)?.[1]?.description;
+  return (n) => String((/^text style /.test(n) ? style(String(n).slice(11)) : meta[n]?.description ?? meta[`${n}/color`]?.description ?? meta[String(n).replace(/\/colou?r$/, '')]?.description) ?? '').trim();
+}
+
+// Its Do and don't: a "Do and don't" heading (Dos and don'ts, Do & don't), and a Do: or Don't: line, written as one.
+const DO_HEAD = /^do'?s?\s*(?:and|&)\s*don'?t'?s?\s*:?\s*(.*)$/i;
+const DO_LINE = /^(do|don'?t|do not)\s*:\s*(.+)$/i;
+const doLine = (m) => `${/^do$/i.test(m[1]) ? 'Do' : "Don't"}: ${m[2].trim()}`;
 // seen: what the last audit found the products doing with the component (a rule laid over it, a look-alike built by
 // hand, a parent's rule overriding it), said plainly; it fills Common mistakes when the team wrote none.
 // intentLayer: the component's page in the team's intent layer (intent-layer.mjs → componentIntent), its lines already
@@ -1410,7 +1423,8 @@ export function guidanceView({ description = '', annotations = [], note = '', au
     if (!found[key]?.length) { found[key] = list; from[key] = source; if (url) link[key] = url; return; }
     (also[key] ??= []).push({ from: source, text: list, ...(url ? { url } : {}) });
   };
-  // One source's text, read for "When to use: …" lines and the lines under them.
+  // One source's text, read for "When to use: …" lines and the lines under them. Its Do and don't too: a line that
+  // starts with Do: or Don't: (Do not: reads as Don't:), or the lines under a "Do and don't" heading.
   const read = (texts) => {
     const out = {};
     for (const text of texts) {
@@ -1418,7 +1432,11 @@ export function guidanceView({ description = '', annotations = [], note = '', au
       for (const raw of String(text ?? '').split(/\r?\n/)) {
         const line = raw.replace(/^\s*(?:[-*•]|#+)\s*/, '').trim();
         if (!line) { cur = null; continue; }
-        const m = /^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
+        const head = DO_HEAD.exec(line), one = DO_LINE.exec(head ? head[1] : line);
+        if (head) { cur = 'doDont'; out.doDont ??= []; if (head[1].trim()) out.doDont.push(one ? doLine(one) : head[1].trim()); continue; }
+        if (one) { (out.doDont ??= []).push(doLine(one)); cur = null; continue; }
+        if (cur === 'doDont') { out.doDont.push(line); continue; }
+        const m =/^([^:–—-]{3,40}?)\s*[:–—-]\s*(.*)$/.exec(line) ?? (/^[^:]{3,40}:?$/.test(line) ? [line, line.replace(/:$/, ''), ''] : null);
         const hit = m && GUIDANCE.find(([, , re]) => re.test(m[1].trim()));
         if (hit) { cur = hit[0]; out[cur] ??= []; if (m[2].trim()) out[cur].push(m[2].trim()); continue; }
         if (cur) out[cur].push(line);
@@ -1442,7 +1460,14 @@ export function guidanceView({ description = '', annotations = [], note = '', au
   if (!found.mistakes?.length && seen.length) { found.mistakes = [...new Set(seen.map(String))].slice(0, 6); from.mistakes = "the products' code, as the last audit found it"; }
   const sections = GUIDANCE.map(([key, title]) => ({ key, title, text: found[key]?.length ? found[key] : null,
     ...(found[key]?.length ? { from: from[key] } : {}), ...(link[key] ? { url: link[key] } : {}), ...(also[key] ? { also: also[key] } : {}) }));
-  return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key) };
+  // Its Do and don't, apart from the four sections (an intent-layer page's is read where the page is): Figma's, the
+  // code's, then contract.authored.json → guidance.doDont (a string or a list, each line Do: … or Don't: …).
+  add('doDont', figma.doDont, 'Figma');
+  add('doDont', code.doDont, 'the code');
+  const d = authored?.doDont;
+  add('doDont', (Array.isArray(d) ? d : typeof d === 'string' ? d.split(/\r?\n/) : []).map((x) => String(x).replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean).map((x) => (DO_LINE.exec(x) ? doLine(DO_LINE.exec(x)) : x)), 'contract.authored.json');
+  const doDont = found.doDont?.length ? { text: found.doDont, from: from.doDont, ...(also.doDont ? { also: also.doDont } : {}) } : null;
+  return { sections, missing: sections.filter((x) => !x.text).map((x) => x.key), ...(doDont ? { doDont } : {}) };
 }
 
 // ── How ready a component is: stable, beta or deprecated ─────────────────────────────────────────────────────────────

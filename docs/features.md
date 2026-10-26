@@ -296,6 +296,12 @@ Also on each component.
 
 Your intent layer (why each piece exists and how to use it, as DSDS pages on GitLab) is read on every run. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown.
 
+With no intent layer, every row can still be finished.
+
+- **Do and don't.** Write lines that start with `Do:` or `Don't:` in its Figma description, in the comment above its CSS rule, or in `contract.authored.json` under `guidance.doDont`. Agents get them with its pictures.
+- **Properties.** The contract the engine writes from Figma and the code is the one agents read, so there is nothing to publish.
+- **Text styles.** A text style's description in Figma counts as its token's, like a variable's.
+
 ### Guidance for agents
 
 Agents read your guidelines and Figma's descriptions to pick and use each component. [Ask Claude](commands.md#ask-the-system) to rate them, and each component gets a class.
