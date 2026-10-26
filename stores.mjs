@@ -9,7 +9,7 @@
 //               "styleguide": { "write": { "folder": "../public" } } }
 //
 // A place is { gitlab: link, branch?, path?, tokenEnv? }, { github: link, branch?, path? } or { folder: path, path? };
-// a GitHub store is read with git, which the engine already speaks, rather than a second API; a link or a path alone is read as
+// a GitHub store is read and written with git, which the engine already speaks, rather than a second API; a link or a path alone is read as
 // one. `write` is where the part is written, the same place as `read` when not said, and null for nowhere. It is never
 // a claim that this person may write: GitLab answers that (writeAccess), from the token's role in the project and
 // whether it may push to the branch, and the engine writes only where GitLab says yes. GitLab still refuses on its own
@@ -283,7 +283,15 @@ export function placeAccess(ROOT, place, mode = 'commit', opts = {}) {
   return asked.get(k);
 }
 async function check(ROOT, place, want, opts) {
-  if (place.github) return { mode: null, place, why: 'writing to GitHub is not built yet' };
+  // GitHub: written the same way it is read, with git. There is no second API here and no token of the engine's own,
+  // so what a person may push is what GitHub already lets them push — their SSH key or their credential helper, the
+  // repository's branch protection, their role. Reached for the same reason reading was: git is the same everywhere.
+  if (place.github) {
+    const gp = gitPlaceOf(place);
+    if (!gp) return { mode: null, place, why: `${place.github} is not a repository link` };
+    if (!(opts.gitStore ?? gitStoreFiles)(gp, { ...place, path: '' }, opts)) return { mode: null, place, why: 'git could not reach it with this computer\'s own access' };
+    return { mode: 'push', place, gitPlace: gp, why: 'written with your own git access; GitHub still decides what you may push' };
+  }
   if (place.folder) {
     const dir = resolve(ROOT, place.folder, place.path || '');
     try { mkdirSync(dir, { recursive: true }); accessSync(dir, constants.W_OK); return { mode: 'folder', place, why: '' }; }
