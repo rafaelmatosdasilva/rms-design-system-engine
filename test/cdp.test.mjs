@@ -88,8 +88,10 @@ test('a browser never outlives the run that opened it, and never holds it open',
   // nobody was using. Generous, because the launch itself is a real Chrome start.
   assert.ok(took < 60000, `the run took ${Math.round(took / 1000)}s to end while a browser was open`);
 
-  // And it took that browser with it. Given a moment: the kill is sent as the run exits, and the process leaves a
-  // little after.
-  for (let n = 0; n < 50 && alive(pid); n++) await new Promise((r) => setTimeout(r, 100));
+  // And it took that browser with it. Given time, and scaled: the kill is sent as the run exits, and a browser on a
+  // machine running the rest of the suite takes longer to go than one on a quiet machine. Five fixed seconds was
+  // enough alone and not under a full run — the same wrong assumption this suite keeps being taught out of.
+  const gone = Date.now() + budget(15000);
+  while (alive(pid) && Date.now() < gone) await new Promise((r) => setTimeout(r, 100));
   assert.equal(alive(pid), false, `the browser this run opened (pid ${pid}) outlived it`);
 });
