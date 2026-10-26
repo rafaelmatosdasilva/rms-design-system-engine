@@ -498,4 +498,23 @@ test('no token on GitLab: pushStore asks for a merge request when the branch is 
   assert.equal(asked.always, false);
   assert.match(asked.branch, /^design-system-engine\/snapshots-\d{14}$/);
   assert.match(w.line, /sent as a merge request into main with your own git access \(https:\/\/x\/mr\) - main is protected/);
+
+// ── Prototypes as a part of their own ───────────────────────────────────────────────────────────────────────────
+test('prototypes are a part: read into the project\'s own folder, and what a person drew is sent from it', async () => {
+  const g = fakeGitlab({ files: { 'protos/Signup.vue': '<template><div/></template>', 'protos/Flow.json': '{"root":"a"}', 'protos/notes.txt': 'mine' } });
+  const dir = project();
+  const cfg = cfgWith({ prototypes: { read: { gitlab: LINK, path: 'protos' } } });
+
+  // Read: into prototypes/, where --prototype already looks, and only what the part takes.
+  const r = await pullStore(dir, cfg, 'prototypes', { env, http: g.http });
+  assert.deepEqual(r.written.sort(), ['Flow.json', 'Signup.vue'], r.line);
+  assert.equal(readFileSync(join(dir, 'prototypes', 'Signup.vue'), 'utf8'), '<template><div/></template>');
+  assert.equal(existsSync(join(dir, 'prototypes', 'notes.txt')), false, 'a note left beside one is not the team\'s');
+
+  // Sent: what is in the folder, flat, and nothing else that happens to sit there.
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, 'prototypes', 'Reset.vue'), '<template><p/></template>');
+  writeFileSync(join(dir, 'prototypes', 'screenshot.png'), 'not a prototype');
+  const mine = localFiles(dir, cfg, 'prototypes');
+  assert.deepEqual([...mine.keys()].sort(), ['Flow.json', 'Reset.vue', 'Signup.vue']);
 });

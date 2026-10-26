@@ -41,13 +41,16 @@ import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { runBy } from './decided-by.mjs';
 import { isOwnFile, linksOf, ASSETS } from './styleguide-files.mjs';
 
-export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes'];
-export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
+export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes', 'prototypes'];
+export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes', prototypes: 'Prototypes' };
 export const STATE = `${OUT_DIR}/stores.json`;
 // The team's themes (a style guide module's data: one system's themes, flat, <name>.theme.json in the folder the place's
 // path names; a store several systems share points its path at the system's own folder), read into the
 // engine's own folder, never the project's: the build reads them there with the person's own (styleguide-gen.mjs).
 export const THEMES_DIR = `${OUT_DIR}/themes`;
+// The team's prototypes, in the project itself (prototypes/<Name>.vue is where --prototype already reads and writes
+// them), so a person opens and edits one exactly as they do today.
+export const PROTOTYPES_DIR = 'prototypes';
 // The team's decisions: the files people write by deciding (answers to proposals, accepted differences, checks made
 // by hand). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it, nobody decides it.
 export const DECISION_FILES = ['intentDecisions', 'baseline', 'checked'].map((k) => PROJECT[k].now);
@@ -63,6 +66,9 @@ const TAKES = {
   contracts: (rel) => /\.(json|md)$/i.test(rel),
   styleguide: (rel) => /\.(html|css|js|mjs|svg|png|jpe?g|webp|gif|woff2?|json|txt)$/i.test(rel),
   themes: (rel) => /^[^/]+\.json$/i.test(rel),
+  // A team's prototypes: the composition or the page itself, flat in the folder the place's path names, as the
+  // themes are. A prototype is the team's work like a decision is, and until now it lived on whoever drew it.
+  prototypes: (rel) => /^[^/]+\.(json|vue|jsx|tsx|svelte|html?)$/i.test(rel),
 };
 const ROLE = { 0: 'no access', 5: 'Minimal access', 10: 'Guest', 15: 'Planner', 20: 'Reporter', 30: 'Developer', 40: 'Maintainer', 50: 'Owner' };
 const roleOf = (n) => ROLE[n] ?? `access level ${n}`;
@@ -374,6 +380,16 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'coverage', OUT_DIR, REFS_
 export function localFiles(ROOT, cfg, part, { intentOut } = {}) {
   const out = new Map();
   if (part === 'decisions' || part === 'kept') { for (const f of part === 'kept' ? KEPT_FILES : DECISION_FILES) if (existsSync(join(ROOT, f))) out.set(f, readFileSync(join(ROOT, f))); return out; }
+  // The prototypes a person drew, flat in the project's own prototypes/ folder. Only what the part takes, so a
+  // screenshot or a note left beside one is this person's, not the team's.
+  if (part === 'prototypes') {
+    let names = []; try { names = readdirSync(join(ROOT, PROTOTYPES_DIR)); } catch { return out; }
+    for (const n of names) {
+      if (!TAKES.prototypes(n)) continue;
+      try { if (statSync(join(ROOT, PROTOTYPES_DIR, n)).isFile()) out.set(n, readFileSync(join(ROOT, PROTOTYPES_DIR, n))); } catch { /* gone between the two */ }
+    }
+    return out;
+  }
   if (part !== 'snapshots') return out;
   const skipFile = new Set([cleanPath(intentOut ?? 'intent-layer.snapshot.json')]);
   const walk = (d, depth) => {
@@ -499,7 +515,7 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
     }
   } catch (e) { return { line: `⚠️  ${label} not read from ${describePlace(place)}: ${e.message}`, changed: false, written: [] }; }
   const written = [], kept = [], files = { ...(prev.files ?? {}) };
-  const base = resolve(ROOT, part === 'themes' ? THEMES_DIR : '.');
+  const base = resolve(ROOT, part === 'themes' ? THEMES_DIR : part === 'prototypes' ? PROTOTYPES_DIR : '.');
   for (const [rel, data] of remote) {
     if (!safeRel(rel) || !TAKES[part]?.(rel)) continue;
     const fp = resolve(base, rel);
@@ -642,7 +658,7 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
 // ── On each run: the stores the project reads from, brought in ─────────────────────────────────────────────────────
 // The snapshots and the team's decisions (the parts the checks read); the contracts and the style guide are only
 // written. → [line]
-const TAKES_ON_RUN = ['snapshots', 'kept', 'decisions', 'themes'];
+const TAKES_ON_RUN = ['snapshots', 'kept', 'decisions', 'themes', 'prototypes'];
 export async function pullOnRun(ROOT, cfg, opts = {}) {
   const lines = [];
   for (const part of TAKES_ON_RUN) {
