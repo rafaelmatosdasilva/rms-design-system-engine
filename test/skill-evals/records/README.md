@@ -148,5 +148,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-25-merge-main-into-readmes` | The 21 guide tasks on Haiku (engine ea1fabb) | "Merge main into readmes" |
 | `2026-10-25-places-compared-by-where-they` | The 21 guide tasks on Haiku (engine ae4f913) | "Places compared by where they are, not by the token that reaches them" |
 | `2026-10-25-prototypes-reviewed-as-pages-the` | The 21 guide tasks on Haiku (engine 97de7da) | "Prototypes reviewed as pages, the same for every framework: the habits agents fall into, the states owed, every screen size" |
+| `2026-10-26-the-engine-says-when-the` | The 21 guide tasks on Haiku (engine 540a998) | "The engine says when the style guide the team opens is behind, and can publish it itself" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

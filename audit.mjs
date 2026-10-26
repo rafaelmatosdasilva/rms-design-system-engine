@@ -86,6 +86,26 @@ if (!STORE_QUIET) {
   if (scfg) for (const l of await st.pullOnRun(ROOT, scfg, { offline: STORE_OFFLINE })) console.error(l);
   // The README of each repository the setup names, brought up to date where GitLab lets this person (readmes.mjs).
   if (scfg && !process.argv.includes('--readmes')) for (const l of await (await import('./readmes.mjs')).syncReadmes(ROOT, scfg, { offline: STORE_OFFLINE })) console.error(l);
+  // Whether the style guide the team opens is behind what it is built from (guide-freshness.mjs): asked every few hours.
+  if (scfg && !STORE_OFFLINE && !['--guide-status', '--publish-styleguide', '--styleguide', '--ci-changed'].some((f) => process.argv.includes(f))) {
+    try { const g = await (await import('./guide-freshness.mjs')).freshness(ROOT, scfg, await guideEnv()); for (const l of g.lines ?? []) console.error(l); } catch { /* said on the next run */ }
+  }
+}
+// What --ci-changed and the style guide's freshness read with: the tokens as every run reads them, and the engine's commit.
+async function guideEnv() {
+  const { plainGet, tokenFrom } = await import('./gitlab-source.mjs');
+  const dotenv = (k) => { for (const d of [ROOT, dirname(ROOT)]) { try { const m = new RegExp(`^\\s*${k}\\s*=\\s*['"]?([^'"\\n#]+)`, 'm').exec(readFileSync(join(d, '.env'), 'utf8')); if (m) return m[1].trim(); } catch { /* none here */ } } return undefined; };
+  const env = { ...process.env, GITLAB_TOKEN: tokenFrom(process.env, [ROOT, dirname(ROOT)]) ?? undefined, FIGMA_TOKEN: process.env.FIGMA_TOKEN ?? dotenv('FIGMA_TOKEN') };
+  let engine = null; try { const { execFileSync } = await import('node:child_process'); engine = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: SCRIPT_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { /* not a git checkout */ }
+  return { get: (url, headers) => plainGet(url, { headers }), env, engine };
+}
+// The style guide sent to its store, with what it was built from beside it (built-from.json), so any run can tell when
+// the page the team opens is behind. → the store's answer ({ ok, line })
+async function publishGuide(pcfg, page) {
+  const st = await import('./stores.mjs'), gf = await import('./guide-freshness.mjs');
+  const files = st.pageFiles(page);
+  try { const e = await guideEnv(); files.set(gf.BUILT_FROM, Buffer.from(JSON.stringify(gf.builtFrom(await gf.sourcesFor(ROOT, pcfg, e)), null, 1) + '\n')); } catch { /* published without the record */ }
+  return st.pushStore(ROOT, pcfg, 'styleguide', files, 'Style guide published with rms-design-system-engine', { offline: STORE_OFFLINE });
 }
 // A decision just recorded goes to the team's decisions store when the setup names one: GitLab decides whether this
 // person may write it there, and the line says what happened. → true when sent, false when not, null with no store.
@@ -1653,8 +1673,27 @@ if (process.argv.includes('--styleguide')) {
     // them, or by hand): said here, and the check before publishing (--styleguide-check) stops it.
     { const { pageOnlyCopies, pageOnlyLines } = await import('./publish-job.mjs');
       for (const line of pageOnlyLines(pageOnlyCopies(ROOT, sgConfig.styleguide?.out ?? relative(ROOT, r.out)))) console.log(line); }
+    // The page the team opens, when it is behind: published from this build where the setup asks for it
+    // ("styleguide": { "publish": "auto" }) and GitLab lets this person write it; else said, with the command.
+    if (!failures(found).length && !STORE_OFFLINE && !SCOPE_COMPONENTS.length) {
+      try {
+        const g = await (await import('./guide-freshness.mjs')).freshness(ROOT, sgConfig, { ...(await guideEnv()), force: true });
+        if (g.behind && sgConfig.styleguide?.publish === 'auto') { console.log((await publishGuide(sgConfig, resolve(ROOT, r.out))).line); }
+        else for (const l of g.lines ?? []) console.log(`${l}${g.behind ? ` Publish this build with rms-design-system-engine --publish-styleguide (or set "styleguide": { "publish": "auto" } so a build does it).` : ''}`);
+      } catch { /* said on the next run */ }
+    }
     process.exit(failures(found).length ? 1 : 0);
   } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
+}
+
+// ── --guide-status: is the style guide the team opens behind what it is built from, and is its pipeline running ──
+if (process.argv.includes('--guide-status')) {
+  let gcfg; try { gcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(2); }
+  const g = await (await import('./guide-freshness.mjs')).freshness(ROOT, gcfg, { ...(await guideEnv()), force: true });
+  if (g.why) { console.log(`ℹ️  ${g.why}: nothing to compare.`); process.exit(0); }
+  console.log(g.lines.length ? g.lines.join('\n') : `✅ The style guide the team opens is up to date${g.publishedAt ? ` (published ${String(g.publishedAt).slice(0, 10)})` : ''}.`);
+  console.log(g.behind ? 'NEXT: tell the person the line above; to bring it up to date, rms-design-system-engine --styleguide then --publish-styleguide (or "styleguide": { "publish": "auto" }), where GitLab lets them write the store.' : 'NEXT: tell the person the line above.');
+  process.exit(0);
 }
 
 // ── --styleguide-check [page]: the same check on a page already built (after a project added its own links) ──
@@ -1685,7 +1724,7 @@ if (process.argv.includes('--publish-styleguide')) {
     if (st.storesOf(pcfg).styleguide.write && !process.argv.includes('--print') && !_argValue('--host')) {
       const page = resolve(ROOT, pcfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html');
       if (!existsSync(page)) { console.log(`❌ No style guide built yet at ${relative(ROOT, page)}: rms-design-system-engine --styleguide first.`); process.exit(1); }
-      const r = await st.pushStore(ROOT, pcfg, 'styleguide', st.pageFiles(page), 'Style guide published with rms-design-system-engine', { offline: STORE_OFFLINE });
+      const r = await publishGuide(pcfg, page);
       console.log(r.line);
       console.log(r.ok ? 'NEXT: tell the person where it went (the line above).' : 'NEXT: tell the person the line above; nothing was sent.');
       process.exit(r.ok ? 0 : 1);

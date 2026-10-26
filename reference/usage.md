@@ -89,6 +89,7 @@ rms-design-system-engine --capture-import [vars|components]  # check every saved
 rms-design-system-engine --styleguide                    # the style guide of what Figma and the code agree on, only
 rms-design-system-engine --component modal --styleguide  # audit that component (Figma and accessibility in a browser), then a page of it and the components it nests (styleguide/modal.html), its address printed
 rms-design-system-engine --styleguide --no-a11y-bake     # the page without its accessibility tried while it is built (a page only measured, as a CI's first build is)
+rms-design-system-engine --guide-status                  # is the style guide the team opens (its store) behind what it is built from, and is its pipeline running
 rms-design-system-engine --publish-styleguide            # write the CI job that publishes the style guide on every push (GitHub Pages or GitLab Pages, from the git remote; --host github|gitlab, --print to only show it)
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
@@ -811,7 +812,16 @@ the page shows the differences), builds the page again, checks it (a page that f
 `public/`. A job already there is never overwritten, and nothing is committed. A GitHub Pages site is public even from
 a private repository (only GitHub Enterprise Cloud keeps it private); GitLab Pages can be kept to project members.
 
-Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome? }`. `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
+**Is the published page behind?** With a style guide store (`stores.styleguide`), each publish writes beside the page
+what it was built from (`built-from.json`: the engine's commit and each source's latest commit, as `--ci-changed` reads
+them: the code, each store read from GitLab, the profile, the Figma file). A run compares it with the sources now, at
+most every six hours, and says in one line what moved since and when the page was published; where the token may read
+the store's pipelines (GitLab's Pipeline: Read), also a pipeline that has waited for a runner or failed. A style guide
+build always asks, and says how to publish when the page is behind; with `"styleguide": { "publish": "auto" }` it
+publishes itself, where GitLab lets the person write the store, so a pipeline that cannot run never leaves the team on
+an old page. `--guide-status` asks now. The Status page shows, by its title, when it was built and with which engine.
+
+Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome?, publish? }` (`publish: "auto"`: a build publishes to the style guide store when the published page is behind). `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
 DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20
 (docs-truth) checks on the output.
 
