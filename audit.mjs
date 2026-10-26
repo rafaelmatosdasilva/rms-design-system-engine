@@ -4421,7 +4421,7 @@ function reportFull(label, items, shown) {
   const { LIMIT_CAP_SEC: A11Y_CAP_SEC } = await import('./a11y-check.mjs');
   const a11yWaitMs = hookRun ? GATE_TIMEOUT_MS : Math.max(GATE_TIMEOUT_MS, ((Number(cfg.a11y?.timeoutSec) || A11Y_CAP_SEC) + 180) * 1000);
   const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []),
-    ...['--no-axe', '--no-states'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_JSON,
+    ...['--no-axe', '--no-states', '--fresh'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_JSON,
     ...(hookRun ? ['--time-limit', String(Math.max(10, GATE_TIMEOUT_MS / 1000 - 90))] : [])];
 
   // Code capture: the code side read once per run (code-capture.mjs), the mirror of the Figma

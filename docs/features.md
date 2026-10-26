@@ -204,6 +204,14 @@ How sure each finding is.
 
 `--no-axe` and `--no-states` leave a part out, and then the result says not all of it was checked.
 
+### Only what changed is tried again
+
+- **Each page's results are kept.** They are saved under what the page rests on: its components and your CSS, your settings, and the check itself.
+- **An unchanged page is not opened again.** The next run puts its results back, and the report says how many pages it reused. When nothing changed, no browser opens and the check takes seconds.
+- **A change is tried at once.** A style guide is checked a few components a page, so a change to one component tries only its page again.
+- **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
+- `--fresh` (or `a11y.reuse: false`) tries every page again.
+
 ### What the design owes
 
 Some problems belong to the Figma file. They are listed for whoever keeps it.

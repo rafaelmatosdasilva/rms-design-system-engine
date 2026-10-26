@@ -76,7 +76,7 @@ import { createHash } from 'crypto';
 import { gunzipSync } from 'zlib';
 import { join, resolve, dirname, relative } from 'path';
 import { spawn } from 'child_process';
-import { pathToFileURL } from 'url';
+import { pathToFileURL, fileURLToPath } from 'url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
 import { inlinePage } from './styleguide-files.mjs';
 import { loadLocator } from './component-locator.mjs';
@@ -1053,6 +1053,141 @@ export function styleguideShares(sg, size = SHARE_COMPONENTS) {
   return parts.map((p) => ({ ...p, part: `${p.part} of ${parts.length}` }));
 }
 
+// ── Results kept between runs ───────────────────────────────────────────────────
+// A page checked before, with nothing it rests on changed since, gives the same results: each page's are kept under its
+// signature (a11y-kept.json, beside the run's other results), and the next run puts them back instead of opening the
+// page again. A run where nothing changed opens no browser and takes seconds. A page's signature is the check itself
+// (this file and every engine file it reaches, the style guide's template, the in-page checks), what the run was asked
+// (the configuration, the colour modes, the components and the parts left out) and what the page draws: a style guide
+// part, its components as the page's data gives them and the system's CSS; a product page or a built UI, its file;
+// the components rendered from their code, every file of the project. A live page (--url, a dev server) is never kept,
+// and neither is a page the run could not read or finish. --fresh (or a11y.reuse: false) checks every page again.
+export const KEPT_FILE = 'a11y-kept.json';
+export const KEPT_MAX = 400;
+const ENGINE_DIR = dirname(new URL(import.meta.url).pathname);
+const sha = (...parts) => { const h = createHash('sha256'); for (const p of parts) h.update(typeof p === 'string' ? p : stableJson(p)).update('\u0000'); return h.digest('hex').slice(0, 32); };
+// JSON with its keys in order, so the same object always signs the same.
+export function stableJson(v) {
+  if (v === undefined) return 'null';
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
+  if (v instanceof Map) return stableJson([...v]);
+  if (v instanceof Set) return stableJson([...v].sort());
+  return `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stableJson(v[k])}`).join(',')}}`;
+}
+// The engine files a module reaches through its relative imports, static or dynamic. What only shapes the report after
+// the pages are checked (a finding's Figma link) and what writes the page the check then opens (the page is signed on
+// its own) are left out, so a change there keeps the results.
+const IMPORT_RE = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.\/[^'"]+\.m?js)['"]/g;
+export function engineFiles(start, { read = (f) => readFileSync(f, 'utf8'), skip = ['figma-link.mjs', 'styleguide-gen.mjs'] } = {}) {
+  const seen = new Set(), todo = [start];
+  while (todo.length) {
+    const f = todo.pop();
+    if (seen.has(f)) continue;
+    let text; try { text = read(f); } catch { continue; }
+    seen.add(f);
+    for (const m of text.matchAll(IMPORT_RE)) { const g = join(dirname(f), m[1]); if (!skip.some((s) => g.endsWith(`/${s}`))) todo.push(g); }
+  }
+  return [...seen].sort();
+}
+export function checkSignature({ dir = ENGINE_DIR, read = (f) => readFileSync(f, 'utf8') } = {}) {
+  const files = [...engineFiles(join(dir, 'a11y-check.mjs'), { read }), join(dir, 'templates', 'styleguide.template.html'), join(dir, 'wcag-page.js')];
+  return sha(AXE_VERSION, ...files.map((f) => { try { return `${relative(dir, f)}\u0000${read(f)}`; } catch { return relative(dir, f); } }));
+}
+// What the run was asked: the configuration (less where it was read from and when), the flags that change what is
+// checked, the colour modes and the components looked for.
+export function runSignature({ check, cfg = {}, argv = [], roots = null, modes = [], stateMap = {} }) {
+  const { profile, ...rest } = cfg ?? {};
+  const flags = argv.filter((a, i) => a.startsWith('--') && !['--json-out', '--time-limit', '--fresh', '--json', '--a11y'].includes(a) && !['--json-out', '--time-limit'].includes(argv[i - 1]));
+  return sha(check, rest, flags.sort(), roots ?? [], modes.map((m) => [m.name, m.sw, !!m.pair]), stateMap);
+}
+// A style guide's page as each component's results rest on it: the system's CSS as its rules in any order, and each
+// component as the page's data gives it, the way the page itself signs what it keeps (a Vue scoped id and where a
+// render sat on the page left out).
+const noScopeIds = (text) => String(text).replace(/data-v-[0-9a-f]{6,}/g, 'data-v');
+const cssRules = (css) => noScopeIds(css).split('}').map((x) => x.trim()).filter(Boolean).sort().join('}');
+export function styleguideSignatures(html) {
+  let data = {};
+  try { data = JSON.parse((/<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(html) ?? [])[1] || '{}'); } catch { return null; }
+  const css = [...String(html).matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => cssRules(m[1])).join('\u0000');
+  const base = sha(css, data.brands ?? null);
+  const comp = {};
+  for (const c of data.components ?? []) {
+    if (!c?.name) continue;
+    const a = {}; for (const k of Object.keys(c.a11y ?? {})) if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k];
+    const renders = c.renders ? JSON.parse(JSON.stringify(c.renders).replace(/\b(top|left|right|bottom|inset)\s*:\s*-?[\d.]+px/g, '$1:*')) : null;
+    comp[c.name] = sha(noScopeIds(stableJson([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a, renders])));
+  }
+  return { base, comp };
+}
+// Every file of the project the components are built from: what they are rendered from when the check builds them
+// itself. The packages, what the engine writes (its folder, the results it keeps beside the snapshots) and the style
+// guide it writes are left out; the configuration is in the run's own signature.
+const PROJECT_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.nuxt', '.output', '.cache']);
+export function projectSignature(ROOT, cfg = {}, { list = null, read = (f) => readFileSync(f) } = {}) {
+  const outDir = OUT_DIR.split('/')[0];
+  const sgOut = cfg?.styleguide?.out ? relative(ROOT, resolve(ROOT, dirname(cfg.styleguide.out))) : null;
+  const skipFile = (rel) => rel === 'ds-config.json' || /(^|\/)(a11y-results|open-since)\.snapshot\.json$/.test(rel) || /-result\.json$/.test(rel);
+  const files = list ?? (() => {
+    const out = [];
+    const walk = (dir) => {
+      let names = []; try { names = readdirSync(join(ROOT, dir), { withFileTypes: true }); } catch { return; }
+      for (const d of names) {
+        const rel = dir ? `${dir}/${d.name}` : d.name;
+        if (d.isDirectory()) { if (!PROJECT_SKIP_DIRS.has(d.name) && rel !== outDir && rel !== sgOut) walk(rel); }
+        else if (d.isFile()) out.push(rel);
+      }
+    };
+    walk('');
+    return out;
+  })();
+  const h = createHash('sha256');
+  for (const rel of files.filter((f) => !skipFile(f)).sort()) { h.update(rel).update('\u0000'); try { h.update(read(join(ROOT, rel))); } catch { /* gone */ } h.update('\u0000'); }
+  return h.digest('hex').slice(0, 32);
+}
+export function readKept(path) { try { const j = JSON.parse(readFileSync(path, 'utf8')); return j && typeof j.pages === 'object' ? j.pages : {}; } catch { return {}; } }
+// The pages kept for the next run: the ones this run checked or put back, then the earlier ones, newest first, up to a
+// cap, so a file that follows every scoped run never grows without end.
+export function keptToWrite(previous = {}, now = {}, max = KEPT_MAX) {
+  const all = { ...previous, ...now };
+  const order = Object.keys(all).sort((a, b) => (now[b] ? 1 : 0) - (now[a] ? 1 : 0) || String(all[b].at).localeCompare(String(all[a].at)));
+  return Object.fromEntries(order.slice(0, max).map((k) => [k, all[k]]));
+}
+// What one page added to the run's results, and putting it back. acc: the run's lists (arrays), what a screen reader
+// says (a Map), the instances counted (a Map of { total, checked }), the checks that ran (Sets), and the pages swept.
+export function keptMark(acc) {
+  const mark = {};
+  for (const [k, v] of Object.entries(acc)) {
+    if (Array.isArray(v)) mark[k] = v.length;
+    else if (v instanceof Set) mark[k] = new Set(v);
+    else if (v instanceof Map) mark[k] = new Map([...v].map(([key, x]) => [key, JSON.stringify(x)]));
+    else mark[k] = v;
+  }
+  return mark;
+}
+export function keptDelta(acc, mark) {
+  const d = {};
+  for (const [k, v] of Object.entries(acc)) {
+    if (Array.isArray(v)) d[k] = JSON.parse(JSON.stringify(v.slice(mark[k])));
+    else if (v instanceof Set) d[k] = [...v].filter((x) => !mark[k].has(x));
+    else if (v instanceof Map && k === 'instances') d[k] = [...v].map(([key, x]) => { const was = mark[k].has(key) ? JSON.parse(mark[k].get(key)) : { total: 0, checked: 0 }; return [key, { total: x.total - was.total, checked: x.checked - was.checked }]; }).filter(([, x]) => x.total || x.checked);
+    else if (v instanceof Map) d[k] = [...v].filter(([key, x]) => mark[k].get(key) !== JSON.stringify(x)).map(([key, x]) => [key, JSON.parse(JSON.stringify(x))]);
+    else d[k] = v - mark[k];
+  }
+  return d;
+}
+export function keptApply(acc, d) {
+  for (const [k, v] of Object.entries(d ?? {})) {
+    const into = acc[k];
+    if (Array.isArray(into)) into.push(...v);
+    else if (into instanceof Set) for (const x of v) into.add(x);
+    else if (into instanceof Map && k === 'instances') for (const [key, x] of v) { const had = into.get(key) ?? { total: 0, checked: 0 }; into.set(key, { total: had.total + x.total, checked: had.checked + x.checked }); }
+    else if (into instanceof Map) for (const [key, x] of v) into.set(key, x);
+  }
+}
+// A page's own results are kept only when it was read and finished: what could not be is tried again next time.
+export const keptWhole = (d) => !['unread', 'unrendered', 'unfinished'].some((k) => d?.[k]?.length);
+
 // Chrome discovery + DevTools plumbing live in cdp.mjs (shared with Gate [16]).
 
 // The in-page sweep: collect visible text leaves (with their computed color + background layer
@@ -2028,6 +2163,31 @@ async function main() {
     targets = plugins.map(builtUiPath).filter((f) => existsSync(f)).map((f) => ({ label: f.replace(ROOT + '/', ''), url: pathToFileURL(f).href }));
   }
 
+  // Results kept from an earlier run, for each page whose signature has not changed since (KEPT_FILE): put back, not
+  // checked again. Only a page read from a file is signed; a live page is always checked.
+  const REUSE = !argv.includes('--fresh') && cfg.a11y?.reuse !== false;
+  const keptPath = join(ROOT, OUT_DIR, KEPT_FILE);
+  const keptBefore = REUSE ? readKept(keptPath) : {};
+  const keptNow = {};
+  const runSig = REUSE ? runSignature({ check: checkSignature(), cfg, argv, roots, modes: [...modes, ...pairModes] }) : null;
+  if (REUSE) {
+    const sgSigs = new Map();
+    for (const t of targets) {
+      if (!/^file:/.test(t.url ?? '')) continue;
+      try {
+        const file = fileURLToPath(t.url.split(/[?#]/)[0]);
+        const html = inlinePage(readFileSync(file, 'utf8'), dirname(file));
+        if (t.styleguide) {
+          if (!sgSigs.has(file)) sgSigs.set(file, styleguideSignatures(html));
+          const sigs = sgSigs.get(file), names = t.only ?? t.names ?? [];
+          if (!sigs || !names.length || names.some((n) => !sigs.comp[n])) continue;
+          t.sig = sha(runSig, t.url, sigs.base, names.map((n) => sigs.comp[n]));
+        } else t.sig = sha(runSig, t.url, html);
+        t.kept = keptBefore[t.sig] ?? null;
+      } catch { /* not signed: checked */ }
+    }
+  }
+
   // Nothing configured or built → be as automatic as possible: start the project's dev server
   // and discover pages (Storybook stories, else static router routes, else the base page). This
   // is what lets a non-plugin DS (SPA/Storybook) run with zero config and zero questions.
@@ -2072,10 +2232,15 @@ async function main() {
         const own = codeComponents(ROOT, cfg, read).filter((k) => /\.vue$/.test(k.file) && !seen.has(resolve(ROOT, k.file)));
         const ownFile = new Map(own.map((k) => [k.name, resolve(ROOT, k.file)]));
         const names = components.length ? components : [...figmaNames, ...own.map((k) => k.name)];
-        const v = await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n) });
-        if (v.url) {
+        // Rendered from every file of the project: unchanged since they were last checked, their results are put back
+        // and nothing is built.
+        const vueSig = REUSE ? sha(runSig, 'vue', names, projectSignature(ROOT, cfg)) : null;
+        const vueKept = vueSig ? keptBefore[vueSig] : null;
+        const v = vueKept ? { kept: true } : await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n) });
+        if (v.kept) targets.push({ label: vueKept.label, url: null, harness: true, sig: vueSig, kept: vueKept });
+        else if (v.url) {
           const before = stopServer; stopServer = () => { before?.(); v.close(); };
-          targets.push({ label: `the Vue components, rendered with the project's own ${v.build}`, url: v.url, ready: 'window.__dseHarnessReady === true', harness: true });
+          targets.push({ label: `the Vue components, rendered with the project's own ${v.build}`, url: v.url, ready: 'window.__dseHarnessReady === true', harness: true, sig: vueSig });
           console.log(`ℹ️  [a11y] target: ${v.groups.length} Vue component(s) rendered with the project's own ${v.build} in each variant (${v.groups.map((g) => `${g.name}: ${g.cases.length} from ${g.from === 'figma' ? 'Figma' : 'its props'}`).join(', ')})`);
           for (const m of v.missing) console.log(`ℹ️  [a11y] not rendered: ${m}`);
         } else if (v.why) console.log(`ℹ️  [a11y] the Vue components were not rendered from their code: ${v.why}.`);
@@ -2089,9 +2254,11 @@ async function main() {
 
   const STATE_MAP = Object.assign({}, STATE_CLASSES, cfg.a11y?.stateClasses ?? {});
 
+  // Every page put back from an earlier run: no browser is opened.
+  const toOpen = targets.filter((t) => !t.kept).length;
   const CHROME = findChrome();
-  if (!CHROME) skip('Chrome not found (set CHROME_PATH to enable)');
-  if (typeof WebSocket === 'undefined') skip('Node >= 22 required (built-in WebSocket)');
+  if (!CHROME && toOpen) skip('Chrome not found (set CHROME_PATH to enable)');
+  if (typeof WebSocket === 'undefined' && toOpen) skip('Node >= 22 required (built-in WebSocket)');
 
   let browser = null;
   const cleanup = () => { try { browser?.kill(); } catch {} try { stopServer?.(); } catch {} };
@@ -2116,7 +2283,7 @@ async function main() {
   // at a page's share, and nothing it found was kept).
   const perPage = Math.max(1, modes.length) * (12 + (RUN_STATES ? 8 : 0)) + (RUN_AXE ? 20 : 0);
   const perComponent = Math.max(1, modes.length) * PER_COMPONENT_SEC;
-  const share = (t) => perPage + (t.styleguide ? Math.max(0, (t.components ?? 1) - 1) * perComponent : 0);
+  const share = (t) => (t.kept ? 0 : perPage + (t.styleguide ? Math.max(0, (t.components ?? 1) - 1) * perComponent : 0));
   const ownLimit = Number(cfg.a11y?.timeoutSec) || Math.min(LIMIT_CAP_SEC, Math.max(150, targets.reduce((s, t) => s + share(t), 0)));
   const limitSec = TIME_LIMIT ? Math.min(TIME_LIMIT, ownLimit) : ownLimit;
   let pagesDone = 0;
@@ -2133,10 +2300,10 @@ async function main() {
 
   // A cold Chrome on a busy machine can take longer than one start allows: try once more before giving up.
   let launchError = null;
-  for (let i = 0; i < 2 && !browser; i++) browser = await launchChrome(CHROME, { tmpPrefix: 'a11y-check-' }).catch((e) => { launchError = e; return null; });
-  if (!browser) skip(`Chrome failed to start (${String(launchError?.message ?? launchError).split('\n')[0]})`);
+  for (let i = 0; i < 2 && !browser && toOpen; i++) browser = await launchChrome(CHROME, { tmpPrefix: 'a11y-check-' }).catch((e) => { launchError = e; return null; });
+  if (!browser && toOpen) skip(`Chrome failed to start (${String(launchError?.message ?? launchError).split('\n')[0]})`);
 
-  const { send, close: closeCDP } = await connectCDP(browser.wsUrl);
+  const { send, close: closeCDP } = browser ? await connectCDP(browser.wsUrl) : { send: null, close: () => {} };
 
   const findings = [];   // { kind, theme?, desc, ... }
   const axeViolations = [];
@@ -2156,23 +2323,46 @@ async function main() {
   const opened = [], notOpened = [];   // a component opened by a press before it was checked, or one no press showed
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
+  // What each page adds to the lists above, kept under its signature once it was read and finished (settle), or put
+  // back from an earlier run instead of opening it.
+  const acc = { findings, axeViolations, unrendered, unread, unfinished, notJudged, accounted, heard, changes, instances, opened, notOpened, ranChecks, behavioursNotChecked };
+  const reusedPages = [], cutTargets = new Set();
+  let pending = null;
+  const settle = () => {
+    if (!pending) return;
+    const { target, mark, swept } = pending;
+    pending = null;
+    if (!target.sig || cutTargets.has(target)) return;
+    const delta = keptDelta(acc, mark);
+    if (keptWhole(delta)) keptNow[target.sig] = { at: new Date().toISOString(), label: target.label, swept: sweptPlugins - swept, delta };
+  };
   // A page the time limit cut or never reached: each of its components (a style guide's part), else the page, not checked.
   const notChecked = (t, why) => (t.only ?? [t.label]).map((n) => `${n} (${why})`);
   const endCut = () => {
     if (!cut) return;
     for (const [list, n] of cut.marks) list.length = n;   // the failures the closing caused are the stop, not findings
     unfinished.push(...notChecked(cut.target, `stopped partway: the check ran out of its ${limitSec}s`));
+    cutTargets.add(cut.target);
     cut = null;
   };
   const dsRoots = roots;   // the design system's components: a product page is checked whole
   for (const target of targets) {
     endCut();
+    settle();
     stopPage = null;
     roots = target.wholePage ? null : dsRoots;
+    if (target.kept) {
+      keptApply(acc, target.kept.delta);
+      sweptPlugins += target.kept.swept ?? 0;
+      keptNow[target.sig] = target.kept;
+      reusedPages.push(target.only ? `${target.label} (${target.only.join(', ')})` : target.label);
+      continue;
+    }
     if (outOfTime) { unfinished.push(...notChecked(target, `not reached: the check ran out of its ${limitSec}s`)); continue; }
     pagesDone++;
     const label = target.label;
     const where = target.only ? `${label} (${target.only.join(', ')})` : label;   // a part of the style guide, by its components
+    pending = { target, mark: keptMark(acc), swept: sweptPlugins };
     const { targetId, sessionId } = await openPage(send, target.url);
     stopPage = () => { cut = { target, marks: [unfinished, unread, unrendered, notOpened].map((l) => [l, l.length]) }; send('Target.closeTarget', { targetId }).catch(() => {}); };
     if (outOfTime) stopPage();
@@ -2968,7 +3158,10 @@ async function main() {
     } catch (e) { if (!cut) throw e; }
   }
   endCut();
+  settle();
   roots = dsRoots;
+  if (REUSE) { try { mkdirSync(dirname(keptPath), { recursive: true }); writeFileSync(keptPath, JSON.stringify({ pages: keptToWrite(keptBefore, keptNow) }) + '\n'); } catch { /* keeping is a convenience */ } }
+  if (reusedPages.length && !JSON_MODE) console.log(`ℹ️  [a11y] ${reusedPages.length} of ${targets.length} page${targets.length === 1 ? '' : 's'} unchanged since ${reusedPages.length === 1 ? 'it was' : 'they were'} last checked: ${reusedPages.length === 1 ? 'its results are' : 'their results are'} put back, not checked again (--fresh checks every page again)`);
   // What was found on a product's own page says which product.
   const productOf = new Map(targets.filter((t) => t.product).map((t) => [t.label, t.product]));
   if (productOf.size) for (const f of [...findings, ...axeViolations]) if (productOf.has(f.plugin)) f.product = productOf.get(f.plugin);
@@ -3053,6 +3246,8 @@ async function main() {
     target: targets.map((t) => t.label),
     usedStyleguide: !!sg,
     themes, strict: STRICT, total, cannotMeasure: cannot.length,
+    // The pages put back from an earlier run, unchanged since: their results are that run's.
+    ...(reusedPages.length ? { reused: reusedPages } : {}),
     verdict,
     checkedAt: new Date().toISOString(),
     // The page-wide checks that finished: a criterion they stand for (a keyboard trap, text spacing, reflow, zoom) is
