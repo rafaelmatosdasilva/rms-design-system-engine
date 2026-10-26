@@ -14,6 +14,21 @@ const WRITE = {
   slot: 'in its code comment or its intent layer page: what goes in it', fields: 'in its code comment, under the prop (- field {Type} what it holds)',
   field: 'in its code comment, under the prop', page: 'its page in the intent layer', purpose: 'its page in the intent layer: what it is for',
   example: 'its page in the intent layer: an example of it in use (the engine writes one from the product\'s own code)',
+  values: 'in its code comment or its intent layer page: what each allowed value means, not only that it is allowed',
+  keyboard: 'its page in the intent layer: what Tab, Enter, Space, Escape and the arrows do in it',
+  apart: 'both pages in the intent layer: what each is for, in words the other does not use',
+};
+
+// What the keyboard behaviour of a component is said with. An agent asked "what does Enter do here?" finds nothing
+// in a page that never names a key, and then writes the behaviour it guesses.
+const KEYS = /\b(tab|shift ?\+ ?tab|enter|return|space(bar)?|escape|esc|arrow|up and down|left and right|home|end|page ?up|page ?down|keyboard|focus(es|ed)? (moves|returns|goes))\b/i;
+// A component whose keyboard behaviour is the browser's own: nothing to write, and asking for it would be noise.
+const NO_KEYS = /^(icon|image|img|avatar|badge|chip|tag|divider|separator|spacer|skeleton|spinner|progress|text|heading|title|label|caption|logo|illustration|thumbnail|surface|card)/i;
+// Two components an agent will confuse: names alike to the eye, as a reader skimming a list sees them.
+const alike = (a, b) => {
+  const x = a.toLowerCase().replace(/[^a-z0-9]/g, ''), y = b.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (x === y) return false;
+  return x.startsWith(y) || y.startsWith(x) || (Math.abs(x.length - y.length) <= 2 && [...x].filter((ch, i) => ch !== y[i]).length <= 2);
 };
 
 export function docCoverage(page, context = null) {
@@ -27,7 +42,10 @@ export function docCoverage(page, context = null) {
     // What its generated definitions say of it (an event, a prop, a slot), when they say more than its name.
     const defines = (kind, x) => (il?.defined?.[kind] ?? []).some((d) => d.said && [d.term, d.codeTerm].filter(Boolean).some((t) => t.toLowerCase() === String(x).toLowerCase()));
     const missing = [];
-    const check = (ok, item) => { total++; if (ok) said++; else missing.push({ ...item, write: WRITE[item.kind] }); };
+    // Counted as they are asked, not re-derived afterwards: a new kind of question would otherwise be missing
+    // from a component's score while counting against it.
+    let asked = 0;
+    const check = (ok, item) => { total++; asked++; if (ok) said++; else missing.push({ ...item, write: WRITE[item.kind] }); };
     check(!!il, { kind: 'page', what: name, why: 'it has no page in the intent layer' });
     if (il) {
       check(!!(k.purpose || il.purpose), { kind: 'purpose', what: name, why: 'its page does not say what it is for' });
@@ -44,16 +62,44 @@ export function docCoverage(page, context = null) {
         for (const f of given) check(f in c.fields[p], { kind: 'field', what: `${p}.${f}`, why: `the product gives ${p} a "${f}" no comment lists` });
       }
     }
+    // An allowed value an agent can choose but nothing explains: it knows size takes s, m and l, and not which to
+    // pick. Asked only where there is a choice to make and a page to make it on.
+    if (il) for (const [p, d] of Object.entries(c.props ?? {})) {
+      const values = Array.isArray(d.options) ? d.options : Array.isArray(d.values) ? d.values : [];
+      if (values.length < 2) continue;
+      check(values.some((v) => named(v)) || defines('props', p), { kind: 'values', what: `${p} (${values.slice(0, 4).join(', ')}${values.length > 4 ? '…' : ''})`, why: `nothing says which of ${p}'s values to choose` });
+    }
+    // What the keyboard does in it. An agent writing a page meets this question and, finding no answer, invents one.
+    if (il && !NO_KEYS.test(name)) {
+      const text = [k?.purpose, k?.guidelines, il.purpose, ...(il.whenToUse ?? []), ...(il.rules ?? []), ...(il.limitations ?? []), ...(il.mistakes ?? [])].join(' ');
+      check(KEYS.test(text) || KEYS.test([...(c.commentWords ?? [])].join(' ')), { kind: 'keyboard', what: name, why: `nothing says what the keyboard does in ${name}` });
+    }
     for (const e of c.events ?? []) check(named(e) || defines('events', e), { kind: 'event', what: e, why: `nothing says when ${e} is sent or what it carries` });
     for (const sl of c.slots?.named ?? []) check(named(sl) || defines('slots', sl), { kind: 'slot', what: sl, why: `nothing says what goes in the ${sl} slot` });
-    components[name] = { missing, said: 0, total: 0 };
+    components[name] = { missing, asked, said: 0, total: 0 };
+  }
+  // Two components whose names look alike, whose pages say nothing that tells them apart: asked once, against both.
+  // This is the question an agent gets wrong silently — it picks the one it saw first and nothing ever says it chose
+  // the wrong one. A pair where at least one page uses a word the other does not is answered; where neither does, it
+  // is a gap belonging to both.
+  const names = Object.keys(components);
+  const purposeOf = (n) => {
+    const k = context?.components?.[n], il = k?.intentLayer;
+    return words([k?.purpose, il?.purpose, ...(il?.whenToUse ?? [])].join(' '));
+  };
+  for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
+    if (!alike(names[i], names[j])) continue;
+    const a = purposeOf(names[i]), b = purposeOf(names[j]);
+    const apart = [...a].some((w) => !b.has(w)) && [...b].some((w) => !a.has(w));
+    total++;
+    // Asked of both, so neither reads as fully documented while the pair is indistinguishable.
+    for (const n of [names[i], names[j]]) components[n].asked++;
+    if (apart) { said++; continue; }
+    for (const n of [names[i], names[j]]) components[n].missing.push({ kind: 'apart', what: `${names[i]} and ${names[j]}`, why: `nothing tells ${names[i]} and ${names[j]} apart: an agent picks whichever it saw first`, write: WRITE.apart });
   }
   // Each component's own counts.
   for (const [name, c] of Object.entries(components)) {
-    const all = c.missing.length;
-    const comp = page.components[name];
-    const asked = 1 + (context?.components?.[name]?.intentLayer ? 2 : 0) + Object.keys(comp.props ?? {}).length + Object.values(comp.props ?? {}).filter((d) => /array|object/.test(String(d.type ?? '').toLowerCase())).length + (comp.events ?? []).length + (comp.slots?.named ?? []).length;
-    c.total = asked; c.said = Math.max(0, asked - all);
+    c.total = c.asked; c.said = Math.max(0, c.asked - c.missing.length);
   }
   return { components, totals: { said, total, missing: total - said } };
 }
@@ -65,7 +111,7 @@ export function coverageLines(cov, { top = 25 } = {}) {
   for (const [name, c] of list.slice(0, top)) {
     const by = {};
     for (const m of c.missing) (by[m.kind] = by[m.kind] ?? []).push(m.what);
-    const LABEL = { prop: 'props', event: 'events', slot: 'slots', fields: 'lists with nothing on what they hold', field: 'fields the product gives' };
+    const LABEL = { prop: 'props', event: 'events', slot: 'slots', fields: 'lists with nothing on what they hold', field: 'fields the product gives', values: 'values nothing helps choose between', apart: 'nothing tells these apart' };
     out.push(`  ${name}: ${Object.entries(by).map(([k, v]) => (LABEL[k] ? `${LABEL[k]} ${v.slice(0, 6).join(', ')}${v.length > 6 ? ` +${v.length - 6}` : ''}` : `no ${k}`)).join(' · ')}`);
   }
   if (list.length > top) out.push(`  … and ${list.length - top} more (the Documentation page lists each)`);
