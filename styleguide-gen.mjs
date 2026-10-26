@@ -918,6 +918,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     view.builtAt = new Date().toISOString();
     // What it was built from: the code commit, the Figma version and the engine, also in the page's <head>.
     view.built = buildStamp(ROOT, { vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), at: view.builtAt });
+    // Where the engine's commits are, so the Status page links the one it was built with (an old page shows it).
+    try { view.engineRepo = (await import('./publish-job.mjs')).ENGINE_REPO.replace(/\.git$/, ''); } catch { /* the page says the commit alone */ }
     try { const { tokenUses } = await import('./styleguide-data.mjs'); view.tokenUses = tokenUses(allCss, view.components); } catch { /* none listed */ }
     // Every token each component is drawn with (its parts and states too, seen in this variant or not), by Figma's name.
     try {
