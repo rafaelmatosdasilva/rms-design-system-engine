@@ -361,6 +361,8 @@ The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory ·
 - Build nothing by hand that a component covers.
 - Ask `--query` before guessing a name.
 
+**It also notices when an agent did not read.** `--catalog` remembers which components' cards it handed over, and `--check-ui` says which components the generated page used without one. It is a warning, never a refusal — a card can reach an agent another way — and a project where nothing has been handed over yet says nothing at all rather than flagging everything. Agents that skip a component's card are where most layout and prop mistakes start, so this names the cause instead of the symptoms.
+
 Then it says which source decides when two disagree. The goal of the people who use the product first, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor. It stays small enough to read whole. For a large system the full catalog stays in `catalog.json`.
 
 ### Does your guidance help your AI tools?

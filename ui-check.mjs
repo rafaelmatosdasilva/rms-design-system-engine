@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { checkUi, RULES } from './ui-catalog.mjs';
+import { cardsRead } from './cards-read.mjs';
 import { OUT_DIR } from './names.mjs';
 
 const ROOT = process.cwd();
@@ -52,7 +53,11 @@ try { ui = JSON.parse(readFileSync(resolve(ROOT, input), 'utf8')); }
 catch (e) { console.log(`\n❌ ${input} is not valid JSON (${e.message.split('\n')[0]}). Nothing was checked.\n`); process.exit(1); }
 
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
-const r = checkUi(ui, catalog);
+// Which cards this project handed over recently, so a component written from its name alone is said (rule 6).
+// Nothing noted at all means nothing is known, not that nothing was read: the rule then says nothing. Only once a
+// card has been handed over is there a basis to say another was not.
+const read = cardsRead(ROOT);
+const r = checkUi(ui, catalog, { cardsRead: read.size ? read : null });
 try {
   mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
   writeFileSync(join(ROOT, OUT_DIR, 'ui-check.json'), JSON.stringify({ input, checked: new Date().toISOString(), ...r }, null, 2) + '\n');
