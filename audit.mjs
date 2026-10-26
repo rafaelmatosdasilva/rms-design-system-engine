@@ -5924,6 +5924,15 @@ function reportFull(label, items, shown) {
     } catch (e) { console.log(C.dim(`ℹ️  Workarounds around components not checked: ${e.message}`)); }
   }
 
+  // A check a person has had to call wrong more than once is the loudest problem the engine has about itself: people
+  // stop reading the lines it writes, and then miss the true one. Said whatever this run found, because the point is
+  // the check rather than today's lines, and the findings themselves are never hidden by having been marked.
+  try {
+    const { wrongLines } = await import('./wrong.mjs');
+    const lines = wrongLines(ROOT);
+    if (lines.length) { console.log(C.yellow(`\n🔁 ${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(`   ${l}`)); }
+  } catch { /* nothing marked wrong, or the file is not readable */ }
+
   // ── A primitive written by hand (advisory) ─────────────────────────────
   _section('advice');
   // A plain element styled as a primitive the owner declared in "primitives" (a <span> with the body text style
