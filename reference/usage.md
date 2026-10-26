@@ -1246,10 +1246,18 @@ and whose examples (`Example:`) are shown as examples.
   data-why="…" />` is a gap, kept in `prototypes/gaps.json`. It ends with ✅ Ready or ❌ Not ready. The project's hook runs
   the same check on every edit of a page in `prototypes/` (`prototype.dir` in `ds-config.json`), from the system the
   last `--prototype` run kept (`.design-system-engine-out/prototypes/page-system.json`); so does `--check-ui <page>`.
+<<<<<<< HEAD
   `--prototype <file> --handoff` writes `prototypes/<name>.handoff.md` beside it: what the page is made of (each
   component, how often, how it is written and where its file is), what the system lacked for it, and what is still
   unresolved. It measures nothing new - every number comes from the check that just ran - and it is written whether or
   not the page is ready, because a page that is not ready is exactly the one someone else needs the facts about.
+=======
+  `--prototype <file> --comment "<what you saw>" [--on <component>] [--line <n>]` keeps what a person said about the
+  page beside it (`prototypes/<name>.comments.json`, committed), and `--close <id> --answer "<what changed>"` closes
+  one with what it produced. Every run of that page prints the open ones, oldest first, above what the check found: a
+  person's words outrank a rule, and whoever reads them is about to change the page. Closing one needs an answer,
+  because a comment closed with nothing said is one nobody can learn from.
+>>>>>>> 1352113 (What a person said about a prototype is kept with it)
 - **As a page, the same for every framework** (`page-quality.mjs`, `page-render.mjs`). Beside the system's own checks,
   the page is read for the habits agents fall into (🎨 AS A PAGE, a score out of 10): a card inside a card, more than
   one main action in view (an action inside a dialog or a panel is that layer's own), a destructive action styled as

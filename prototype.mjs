@@ -21,6 +21,7 @@ import { pageSystem, pageContext, checkPage, syntaxOf, usageCards, pageConventio
 import { importOf } from './styleguide-data.mjs';
 import { loadContext, purposeLines, ruleLines, detailFor, usesAgainstPurpose, requestFocus, focusLines, cut, screenUses } from './prototype-context.mjs';
 import { noteCardsRead } from './cards-read.mjs';
+import { decidedBy } from './decided-by.mjs';
 
 // A system this small is shown whole in the catalog.
 const SMALL_SYSTEM = 30;
@@ -575,6 +576,26 @@ async function pageReport(ROOT, cfg, input, sys) {
   if (!sys.page) { console.log(`\n⏭  ${input}: the system's components were not found in code, so a page cannot be checked against them. Write the prototype as prototypes/<name>.json instead.\n`); return 2; }
   const text = readFileSync(abs, 'utf8');
   const name = basename(input).replace(/\.[^.]+$/, '');
+
+  // --comment / --close: what a person said about this page, kept with it. Done before the check, so saying something
+  // and reading the page are one step: a person who has just looked at it is the person with something to say.
+  const { addComment, closeComment, readComments, commentLines } = await import('./comments.mjs');
+  const at = (flag) => { const i = args.indexOf(flag); return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : null; };
+  if (at('--comment')) {
+    try {
+      const c = addComment(ROOT, name, at('--comment'), { by: decidedBy(ROOT, args), on: { component: at('--on'), line: at('--line') } });
+      console.log(`\n💬 ${c.id} on ${name}: "${c.says}"${c.on?.component ? ` (${c.on.component})` : ''}. It is shown to whoever works on this page next.\n`);
+    } catch (e) { console.log(`\n❌ ${e.message}\n`); return 2; }
+    return 0;
+  }
+  if (at('--close')) {
+    try {
+      const c = closeComment(ROOT, name, at('--close'), { answer: at('--answer'), by: decidedBy(ROOT, args) });
+      if (!c) { console.log(`\n❌ ${name} has no comment ${at('--close')}.\n`); return 2; }
+      console.log(`\n✅ ${c.id} closed: ${c.done.answer}\n`);
+    } catch (e) { console.log(`\n❌ ${e.message}\n`); return 2; }
+    return 0;
+  }
   const r = checkPage(input, text, sys.page, { context: sys.page.context });
   const inv = recordInventions(ROOT, OUT_DIR, input, r, { page: sys.page, context: sys.page.context, by: 'command' });
   const { editCheck } = await import('./edit-check.mjs');
@@ -597,6 +618,10 @@ async function pageReport(ROOT, cfg, input, sys) {
   const usedList = Object.keys(r.used);
   console.log(`\nPAGE CHECK  ·  ${input}  ·  ${r.syntax}  ·  ${usedList.length} system component${usedList.length === 1 ? '' : 's'}${usedList.length ? ` (${usedList.join(', ')})` : ''}`);
   for (const f of r.findings) console.log(`   ${f.level === 'error' ? '❌' : '⚠️ '} line ${f.line}: ${f.message}`);
+  // What people said, before what the check found: a person's words outrank a rule, and whoever reads this is
+  // about to change the page.
+  const said = commentLines(readComments(ROOT, name));
+  if (said.length) { console.log(`\n💬 ${said[0]}`); for (const l of said.slice(1)) console.log(`   ${l}`); }
   if (edit) console.log(`\nWhat every edit is held to:\n${edit.split('\n').map((l) => `   ${l}`).join('\n')}`);
   const format = lint.filter((l) => l.level === 'format'), told = lint.filter((l) => l.level !== 'format');
   if (told.length || format.length) console.log('\nThe project\'s lint (nothing fixed):');
