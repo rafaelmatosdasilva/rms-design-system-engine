@@ -7,7 +7,7 @@
 // the system (only the system's tokens and components, its own accessibility: a page that fails is not published),
 // and publishes public/. The engine writes the file and says what to do next; it never commits, pushes or overwrites
 // a job that is already there.
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
 export const ENGINE_REPO = 'https://github.com/rafaelmatosdasilva/rms-design-system-engine.git';
@@ -39,6 +39,36 @@ const steps = (out, products, host) => {
     'cp .design-system-engine-out/differences.md public/differences.md 2>/dev/null || true',
   ];
 };
+
+// A project's own job that publishes the style guide by copying the page alone (cp <out> public/index.html: a job this
+// engine wrote before the page had files beside it, or one written by hand). The page links its styles, code, fonts and
+// data beside it (styleguide-files.mjs), so such a job publishes a page without them. → [{ file, line, text, fix }]
+export function pageOnlyCopies(ROOT, out, { read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return null; } } } = {}) {
+  const files = [];
+  const list = (dir) => { try { return readdirSync(join(ROOT, dir)).filter((f) => /\.ya?ml$/i.test(f)).map((f) => `${dir}/${f}`); } catch { return []; } };
+  files.push(...list('.github/workflows'), '.gitlab-ci.yml', ...list('.gitlab'));
+  const want = String(out).replace(/^\.\//, '');
+  const found = [];
+  for (const file of files) {
+    const text = read(join(ROOT, file));
+    if (text == null || /styleguide-files\.mjs/.test(text)) continue;   // it copies the page with its files already
+    const engine = /(\S*?)\/audit\.mjs\b/.exec(text)?.[1] ?? '../engine';
+    text.split('\n').forEach((l, i) => {
+      for (const m of l.matchAll(/\bcp\s+(?:-\w+\s+)*["']?([^\s"';&|]+)["']?\s+["']?([^\s"';&|]+)["']?/g)) {
+        const src = m[1].replace(/^\.\//, ''), dest = m[2];
+        if (!/\.html?$/i.test(src) || !(src === want || src.endsWith('/' + want) || want.endsWith('/' + src) || src === '${out}')) continue;
+        const to = /\.html?$/i.test(dest) ? (dest.includes('/') ? dest.slice(0, dest.lastIndexOf('/')) : '.') : dest;
+        found.push({ file, line: i + 1, text: l.trim(), fix: `node ${engine}/styleguide-files.mjs ${src} ${to}` });
+      }
+    });
+  }
+  return found;
+}
+// stop: said by the check that runs before a job publishes (the job stops there: nothing published), else a warning.
+export function pageOnlyLines(found, { stop = false } = {}) {
+  return found.flatMap((f) => [`${stop ? '❌' : '⚠️ '} ${f.file}:${f.line} publishes the style guide's page alone (${f.text}): its styles, code, fonts and data are files beside it now, so the published page would be blank${stop ? '. Nothing is published until it copies them' : ''}.`,
+    `   Replace that line with: ${f.fix}`]);
+}
 
 // GitHub Pages: built on every push to the default branch (and by hand), deployed by GitHub's own Pages actions.
 export function githubJob({ out, products = [], branch = 'main' }) {

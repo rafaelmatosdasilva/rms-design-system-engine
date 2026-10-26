@@ -1649,6 +1649,10 @@ if (process.argv.includes('--styleguide')) {
     const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
     const found = checkFile(r.out);
     for (const line of checkLines(found)) console.log(line);
+    // A job of the project's own that would publish the page without the files beside it (written before the page had
+    // them, or by hand): said here, and the check before publishing (--styleguide-check) stops it.
+    { const { pageOnlyCopies, pageOnlyLines } = await import('./publish-job.mjs');
+      for (const line of pageOnlyLines(pageOnlyCopies(ROOT, sgConfig.styleguide?.out ?? relative(ROOT, r.out)))) console.log(line); }
     process.exit(failures(found).length ? 1 : 0);
   } catch (e) { console.error(`❌ style guide not built: ${e.message}`); process.exit(1); }
 }
@@ -1659,7 +1663,13 @@ if (process.argv.includes('--styleguide-check')) {
   let page = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null;
   if (!page) { try { const c = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); page = c.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html'; } catch { page = '.design-system-engine-out/styleguide/index.html'; } }
   const { checkFile, checkLines, failures } = await import('./styleguide-check.mjs');
-  try { const found = checkFile(resolve(ROOT, page)); for (const line of checkLines(found)) console.log(line); process.exit(failures(found).length ? 1 : 0); }
+  const { pageOnlyCopies, pageOnlyLines } = await import('./publish-job.mjs');
+  try {
+    const found = checkFile(resolve(ROOT, page)); for (const line of checkLines(found)) console.log(line);
+    // A job that would publish the page without its files beside it stops here, before it publishes a blank page.
+    const alone = pageOnlyCopies(ROOT, relative(ROOT, resolve(ROOT, page))); for (const line of pageOnlyLines(alone, { stop: true })) console.log(line);
+    process.exit(failures(found).length || alone.length ? 1 : 0);
+  }
   catch (e) { console.error(`❌ style guide not checked: ${e.message}`); process.exit(1); }
 }
 
