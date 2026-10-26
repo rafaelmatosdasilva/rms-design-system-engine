@@ -1637,6 +1637,17 @@ export function affected(r = {}, cls = null) {
 // result: the last browser check (a11y.json), or null · guide: { kind: { title(n), fix } } (a11y-check.mjs A11Y_GUIDE).
 // → { role, element, expects: [{ says, wcag }], excused: [{ says, reason }], checked: null | { at, notRead?, issues: [{ kind,
 // title, fix, wcag, details: [where each one is] }] } }, one issue per kind of problem, each wcag as the page names it ("WCAG 4.1.2 Name, Role, Value (A)").
+// A component with no role of its own, read from its markup: its root a plain element (a span, a div, a p) that is
+// nothing to press, type in or go to: no role, tabindex, href, click handler or contenteditable on it. A screen reader
+// reads what it holds as it is, so "no role" is its answer, never one a person has to decide.
+// → { tag } | null (no markup, or a root that is a control, a landmark or says a role)
+const STATIC_TAGS = new Set(['span', 'div', 'p', 'small', 'strong', 'em', 'b', 'i']);
+export function staticRole(markup) {
+  const m = /^\s*(?:<!--[\s\S]*?-->\s*)*<([a-zA-Z][\w-]*)([^>]*)>/.exec(String(markup ?? ''));
+  if (!m || !STATIC_TAGS.has(m[1].toLowerCase())) return null;
+  if (/\s(role|tabindex|href|contenteditable|on[a-z]+|aria-(pressed|checked|expanded|selected|haspopup))\s*=/i.test(' ' + m[2])) return null;
+  return { tag: m[1].toLowerCase() };
+}
 export function a11yView({ name, cls = null, role = null, roleFrom = null, annotations = [], parts = [], exceptions = {}, result = null, guide = {}, notes = [] } = {}) {
   const expects = [];
   const known = role && roleOf(role);

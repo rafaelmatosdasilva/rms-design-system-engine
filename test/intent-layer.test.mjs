@@ -448,7 +448,10 @@ test('Figma\'s and the code\'s notes no agent is given: each with why, what to d
   assert.equal(by.repeatsDescription.from, 'Figma annotation on its "Label" layer');
   assert.match(by.repeatsDescription.remove, /^Yes/);
   assert.equal(by.buildOnly.who, 'figma');
-  assert.equal(by.repeatsNote.from, 'the code (its note in the structure contract)');
+  // The code's note that repeats a Figma one is the developers' own: never one to remove.
+  assert.equal(by.repeatsNote, undefined);
+  assert.ok(!left.some((l) => l.who === 'code' && l.reason !== 'notShown'), 'a code note is flagged only when it is one an agent would read but is not shown');
+  assert.deepEqual(notesOf({ code: { note: 'strokeSides=bottom, h=32', cssComment: '── Toast' } }, null).left, [], 'build notes and section headings in the code are left to its developers');
   assert.equal(by.notShown.text, 'Wraps on small screens.');
   assert.equal(by.notShown.who, 'code');
   assert.equal(NOTES_SHOWN, 3);
