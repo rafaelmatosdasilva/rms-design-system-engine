@@ -350,3 +350,23 @@ test('publishing the style guide again removes the files an earlier page linked,
   assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
   assert.ok(!existsSync(join(dir, old)) && existsSync(join(dir, 'notes.txt')) && existsSync(join(dir, 'index.html')));
 });
+
+// ── Prototypes as a part of their own ───────────────────────────────────────────────────────────────────────────
+test('prototypes are a part: read into the project\'s own folder, and what a person drew is sent from it', async () => {
+  const g = fakeGitlab({ files: { 'protos/Signup.vue': '<template><div/></template>', 'protos/Flow.json': '{"root":"a"}', 'protos/notes.txt': 'mine' } });
+  const dir = project();
+  const cfg = cfgWith({ prototypes: { read: { gitlab: LINK, path: 'protos' } } });
+
+  // Read: into prototypes/, where --prototype already looks, and only what the part takes.
+  const r = await pullStore(dir, cfg, 'prototypes', { env, http: g.http });
+  assert.deepEqual(r.written.sort(), ['Flow.json', 'Signup.vue'], r.line);
+  assert.equal(readFileSync(join(dir, 'prototypes', 'Signup.vue'), 'utf8'), '<template><div/></template>');
+  assert.equal(existsSync(join(dir, 'prototypes', 'notes.txt')), false, 'a note left beside one is not the team\'s');
+
+  // Sent: what is in the folder, flat, and nothing else that happens to sit there.
+  mkdirSync(join(dir, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, 'prototypes', 'Reset.vue'), '<template><p/></template>');
+  writeFileSync(join(dir, 'prototypes', 'screenshot.png'), 'not a prototype');
+  const mine = localFiles(dir, cfg, 'prototypes');
+  assert.deepEqual([...mine.keys()].sort(), ['Flow.json', 'Reset.vue', 'Signup.vue']);
+});
