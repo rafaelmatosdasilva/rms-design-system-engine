@@ -11,7 +11,7 @@
 // Exit 0 = drawn. Exit 1 = the composition breaks a rule (nothing drawn). Exit 2 = no input, no catalog.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve, basename, dirname } from 'node:path';
+import { join, resolve, basename, dirname, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RULES, catalogTable } from './ui-catalog.mjs';
@@ -598,6 +598,15 @@ async function pageReport(ROOT, cfg, input, sys) {
   const drawn = errors || process.argv.includes('--no-browser') ? null : await (await import('./page-render.mjs')).stressPage(ROOT, cfg, input, { breakpoints: sys.context?.breakpoints ?? [] });
   if (drawn?.lines) { console.log(`\n📱 EVERY SIZE  ${drawn.widths.join(', ')} · the words as written and 40% longer${drawn.lines.length ? `: ${drawn.lines.length}` : ': nothing runs past the screen, is cut or wraps in a control'}`); for (const l of drawn.lines) console.log(`   ${l}`); }
   else if (drawn?.why) console.log(`\n   ⏭  not drawn in the browser: ${drawn.why}`);
+  // --handoff: the page a developer gets instead of the prototype file. Written whatever the check said, because
+  // a page that is not ready is exactly the one someone else needs the facts about; the package says so itself.
+  if (args.includes('--handoff')) {
+    const { handoffPackage, handoffLines } = await import('./handoff.mjs');
+    const pkg = handoffPackage({ name, file: input, syntax: r.syntax, used: r.used, gaps: r.gaps, findings: r.findings, page: sys.page, request: requestOf(ROOT, args) });
+    const out = join(ROOT, 'prototypes', `${name}.handoff.md`);
+    try { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, handoffLines(pkg).join('\n') + '\n'); console.log(`\n📦 Handoff written to ${relative(ROOT, out)}: what it is made of, what the system lacks for it, and what is still open.`); }
+    catch (e) { console.log(`\n⚠️  The handoff was not written: ${e.message}`); }
+  }
   if (errors) {
     console.log(`\n❌ Not ready: ${errors} error${errors === 1 ? '' : 's'}.`);
     console.log(`NEXT: fix each ❌ line in ${input} (only the system's components, each given only what its card in ${CLI} --prototype --catalog --detail <name> lists; a need nothing fits is a data-missing box), then run ${CLI} --prototype ${input} again.\n`);
