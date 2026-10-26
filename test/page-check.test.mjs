@@ -1,6 +1,7 @@
 // A prototype written in the system's own code is held to the system: only its components, each given only what it
 // takes, where the documentation puts it. An invented Acme system, in Vue and in JSX.
 import { test } from 'node:test';
+import { docCoverage } from '../doc-coverage.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -268,4 +269,42 @@ test('a need the system has a component for is not a gap, unless the page says i
   const r = checkPage('prototypes/P.vue', '<template><list-page><div data-missing="tab strip for the views"/><div data-missing="tab strip again" data-searched="TabStrip" data-why="it cannot hold icons"/></list-page></template>\n<script setup>\nimport ListPage from \'@/components/templates/ListPage\'\n</script>', page, {});
   assert.ok(r.findings.some((f) => f.level === 'error' && /"tab strip for the views" is not missing: the system has TabStrip/.test(f.message)));
   assert.ok(!r.findings.some((f) => f.level === 'error' && /tab strip again/.test(f.message)), 'looked at and said why');
+});
+
+test('coverage asks the questions an agent actually gets stuck on: which value, what the keyboard does, which of two alike', () => {
+  const page = { components: {
+    // Documented in every old way, and still silent on which size to pick and on the keyboard.
+    menu: { props: { size: { description: 'how big', options: ['s', 'm', 'l'] } }, commentWords: ['size'] },
+    // The pair an agent confuses, with purposes made of the same words.
+    card: { props: {} }, cards: { props: {} },
+    // Its keyboard is the browser's own: never asked for.
+    icon: { props: {} },
+  } };
+  const il = (purpose, extra = {}) => ({ intentLayer: { purpose, whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], examples: ['<x/>'], ...extra }, purpose });
+  const context = { components: {
+    menu: il('a list of actions'),
+    card: il('a box that holds content'),
+    cards: il('a box that holds content'),
+    icon: il('a small picture'),
+  } };
+  const kinds = (cov, n) => cov.components[n].missing.map((m) => m.kind);
+
+  const cov = docCoverage(page, context);
+  assert.ok(kinds(cov, 'menu').includes('values'), JSON.stringify(kinds(cov, 'menu')));
+  assert.ok(kinds(cov, 'menu').includes('keyboard'));
+  assert.ok(kinds(cov, 'card').includes('apart') && kinds(cov, 'cards').includes('apart'), 'the pair is a gap for both');
+  assert.equal(kinds(cov, 'icon').includes('keyboard'), false, 'an icon has no keyboard of its own to describe');
+
+  // Said, and the questions stop being asked of it.
+  const better = { components: {
+    menu: il('a list of actions. Use s inside a toolbar, m everywhere, l only on a touch screen. Tab moves between items and Escape closes it'),
+    card: il('a box that holds one thing'), cards: il('a grid of several boxes'), icon: il('a small picture'),
+  } };
+  const cov2 = docCoverage(page, { components: better.components });
+  assert.equal(kinds(cov2, 'menu').includes('values'), false, JSON.stringify(cov2.components.menu.missing));
+  assert.equal(kinds(cov2, 'menu').includes('keyboard'), false);
+  assert.equal(kinds(cov2, 'card').includes('apart'), false, 'two purposes with words of their own tell them apart');
+
+  // A component is never counted as fully said while a question about it is unanswered.
+  assert.ok(cov.components.menu.total >= cov.components.menu.said + 2);
 });
