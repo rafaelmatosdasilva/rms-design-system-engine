@@ -934,10 +934,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const t of [...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])]) if (!own.some((e) => e.var === t.var)) own.push({ var: t.var, props: [] });
         if (own.length) c.allTokens = own.map((e) => ({ var: e.var, figma: named.get(e.var) ?? null, props: e.props }));
       }
-      // What each component's tokens say they are for (Figma's variable descriptions), for its Documentation: an agent
-      // reads them to pick the right token, so a token with none is a line to write.
-      const meta = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.tokenMeta ?? {};
-      const said = (n) => String(meta[n]?.description ?? meta[`${n}/color`]?.description ?? meta[String(n).replace(/\/colou?r$/, '')]?.description ?? '').trim();
+      // What each component's tokens say they are for (Figma's variable descriptions, and a text style's own), for its
+      // Documentation: an agent reads them to pick the right token, so a token with none is a line to write.
+      const said = (await import('./styleguide-data.mjs')).tokenDescriptions(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {});
       // Every Figma variable named after a component (advanced/buttonPromo/shadow/X) is that component's too, the
       // code using it or not.
       const vsnap = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
