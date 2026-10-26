@@ -30,7 +30,7 @@ test('a page splits into its files, each named by what it holds; the system\'s C
   const { html, files } = splitPage(page(), 'index');
   const names = [...files.keys()];
   assert.equal(names.length, 4);
-  for (const re of [/^fonts\.[0-9a-f]{10}\.css$/, /^styleguide\.[0-9a-f]{10}\.css$/, /^styleguide\.[0-9a-f]{10}\.js$/, /^index\.data\.[0-9a-f]{10}\.js$/]) assert.ok(names.some((n) => re.test(n)), String(re));
+  for (const re of [/^assets\/fonts\.[0-9a-f]{10}\.css$/, /^assets\/styleguide\.[0-9a-f]{10}\.css$/, /^assets\/styleguide\.[0-9a-f]{10}\.js$/, /^assets\/index\.data\.[0-9a-f]{10}\.js$/]) assert.ok(names.some((n) => re.test(n)), String(re));
   for (const n of names) assert.ok(html.includes(`"${n}"`), `${n} linked`);
   assert.match(html, /<style data-system>/);
   assert.match(html, /<script>\/\* wcag-page\.js \*\/<\/script>/);
@@ -62,10 +62,14 @@ test('written: the page and its files; read back as one page, the same data; an 
   const first = writeStyleguide(join(d, 'index.html'), page(json.replace('Acme', 'Northwind')));
   writeStyleguide(join(d, 'button.html'), page());   // a page of one component beside the whole system's
   const second = writeStyleguide(join(d, 'index.html'), page());
-  const left = readdirSync(d).sort();
-  assert.ok(!left.includes(first.files.find((f) => /\.data\./.test(f))), 'the first build\'s data is gone');
-  for (const f of [...second.files, 'my.theme.json', 'app.0123456789.js', 'button.html']) assert.ok(left.includes(f), f);
-  assert.ok(left.some((f) => /^button\.data\.[0-9a-f]{10}\.js$/.test(f)), 'the other page keeps its own data');
+  assert.ok(!existsSync(join(d, first.files.find((f) => /\.data\./.test(f)))), 'the first build\'s data is gone');
+  for (const f of [...second.files, 'my.theme.json', 'app.0123456789.js', 'button.html']) assert.ok(existsSync(join(d, f)), f);
+  assert.ok(readdirSync(join(d, 'assets')).some((f) => /^button\.data\.[0-9a-f]{10}\.js$/.test(f)), 'the other page keeps its own data');
+  assert.deepEqual(readdirSync(d).filter((f) => /\.(css|js)$/.test(f)), ['app.0123456789.js'], 'the page\'s files are in assets/, none loose beside it');
+  // An earlier build's files beside the page (before they went in assets/) are removed once no page links them.
+  writeFileSync(join(d, 'index.data.0123456789.js'), 'x'); writeFileSync(join(d, 'styleguide.0123456789.css'), 'x');
+  writeStyleguide(join(d, 'index.html'), page());
+  assert.ok(!existsSync(join(d, 'index.data.0123456789.js')) && !existsSync(join(d, 'styleguide.0123456789.css')));
   assert.deepEqual(pageData(join(d, 'index.html')), DATA);
   const one = readPage(join(d, 'index.html'));
   assert.match(one, /<style data-font-from="https:\/\/fonts\.example\/css\?family=Mono">@font-face/);

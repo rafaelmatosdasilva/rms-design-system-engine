@@ -209,7 +209,7 @@ export function storeSection(entry, { name = 'the design system', tree = [], ci 
 
   if (parts.some((e) => e.part === 'styleguide' && e.write)) {
     const at = parts.find((e) => e.part === 'styleguide').path;
-    out.push('', '### The style guide', '', `**Open it:** \`${at ? at + '/' : ''}index.html\` in this repository. Nothing in it is written by hand: the engine builds it from the code, Figma (through the snapshots), the intent layer and the team's decisions, so it always says what the system is today.`, '',
+    out.push('', '### The style guide', '', `**Open it:** \`${at ? at + '/' : ''}index.html\` in this repository. On your computer: download \`index.html\` and the \`assets\` folder beside it (or the whole repository as a zip) and open \`index.html\`. Nothing in it is written by hand: the engine builds it from the code, Figma (through the snapshots), the intent layer and the team's decisions, so it always says what the system is today.`, '',
       '| Page | What it tells you |', '|---|---|',
       '| **Status** | How far the system is: parity with Figma, how much is built, accessibility, and documentation |',
       "| **Showroom** | The products' screens drawn with the system's components |",

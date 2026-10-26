@@ -337,16 +337,17 @@ test('publishing the style guide again removes the files an earlier page linked,
   writeStyleguide(join(d, 'index.html'), page(1));
   const old = [...pageFiles(join(d, 'index.html')).keys()].find((f) => /\.data\./.test(f));
   // The store: the last build's page and data, a page of one component still linking its own, and a file of the team's.
-  const g = fakeGitlab({ files: { 'sg/index.html': '<script src="' + old + '"></script>', ['sg/' + old]: 'x', 'sg/chip.html': '<script src="chip.data.0123456789.js"></script>', 'sg/chip.data.0123456789.js': 'y', 'sg/notes.txt': 'mine' } });
+  const g = fakeGitlab({ files: { 'sg/index.html': '<script src="' + old + '"></script>', ['sg/' + old]: 'x', 'sg/index.data.0123456789.js': 'beside the page, as builds once wrote it', 'sg/chip.html': '<script src="chip.data.0123456789.js"></script>', 'sg/chip.data.0123456789.js': 'y', 'sg/notes.txt': 'mine' } });
   writeStyleguide(join(d, 'index.html'), page(2));
   const files = pageFiles(join(d, 'index.html'));
   const r = await pushStore(project(), cfgWith({ styleguide: { write: { gitlab: LINK, path: 'sg' } } }), 'styleguide', files, 'Style guide', { env, http: g.http });
   assert.equal(r.ok, true, r.line);
   assert.ok(!('sg/' + old in g.files), 'the last build\'s data is removed');
+  assert.ok(!('sg/index.data.0123456789.js' in g.files), 'and one an older build left beside the page');
   for (const f of ['sg/chip.data.0123456789.js', 'sg/notes.txt', 'sg/chip.html', ...[...files.keys()].map((k) => 'sg/' + k)]) assert.ok(f in g.files, f);
   // A folder store too.
   const dir = project(), cfg = cfgWith({ styleguide: { write: { folder: dir } } });
-  writeFileSync(join(dir, old), 'x'); writeFileSync(join(dir, 'notes.txt'), 'mine');
+  mkdirSync(join(dir, 'assets')); writeFileSync(join(dir, old), 'x'); writeFileSync(join(dir, 'notes.txt'), 'mine');
   assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
   assert.ok(!existsSync(join(dir, old)) && existsSync(join(dir, 'notes.txt')) && existsSync(join(dir, 'index.html')));
 });

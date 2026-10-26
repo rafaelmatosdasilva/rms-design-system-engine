@@ -1,7 +1,8 @@
 // styleguide-files.mjs - the style guide as a page and the files beside it.
 //
-// The page links its own styles and code, its fonts and its data as files of their own, each named by what it holds
-// (styleguide.<hash>.css): a host serves them once and a browser keeps them, so a visitor coming back after a rebuild
+// The page links its own styles and code, its fonts and its data as files of their own, in one folder beside it and
+// each named by what it holds (assets/styleguide.<hash>.css): the page and that folder are all a person downloads to
+// open it on their computer. A host serves them once and a browser keeps them, so a visitor coming back after a rebuild
 // downloads only what changed (the page and its data), and the component panel, the same page in a frame, reads
 // everything from the browser's cache. Classic <script src> files and plain <link> stylesheets, never fetch or a module:
 // the page still opens from disk, double-clicked.
@@ -20,10 +21,12 @@ import { fileURLToPath } from 'node:url';
 const FILE_MARK = /<!--sg-file:([\w-]+)-->\s*<(style|script)>([\s\S]*?)<\/\2>/g;
 const DATA_TAG = /<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/;
 const FONT_STYLE = /<style data-font-from="([^"]*)">([\s\S]*?)<\/style>/g;
-// The files this module writes (and may remove): its names, a hash of ten hex digits, .css or .js.
-const OWN_FILE = /^(?:styleguide|fonts|[\w+-]+\.data)\.[0-9a-f]{10}\.(?:css|js)$/;
-// Whether a file beside a page is one this module writes (named by what it holds).
-export const isOwnFile = (name) => OWN_FILE.test(name);
+// The folder beside the page its files go in.
+export const ASSETS = 'assets';
+// The files this module writes (and may remove): its names, a hash of ten hex digits, .css or .js; in the assets folder,
+// or beside the page as an earlier build wrote them (removed once no page links them).
+const OWN_NAME = /^(?:styleguide|fonts|[\w+-]+\.data)\.[0-9a-f]{10}\.(?:css|js)$/;
+export const isOwnFile = (rel) => OWN_NAME.test(rel) || (String(rel).startsWith(ASSETS + '/') && OWN_NAME.test(String(rel).slice(ASSETS.length + 1)));
 const hashOf = (text) => createHash('sha1').update(text).digest('hex').slice(0, 10);
 
 // The data as a script that sets a global: its JSON written as the object itself (JSON is JavaScript), measured
@@ -45,7 +48,7 @@ export function dataOfScript(js) {
 export function splitPage(html, base = 'index') {
   const files = new Map();
   if (!/<!--sg-file:[\w-]+-->/.test(html)) return { html, files };
-  const put = (name, ext, text) => { const f = `${name}.${hashOf(text)}.${ext}`; files.set(f, text); return f; };
+  const put = (name, ext, text) => { const f = `${ASSETS}/${name}.${hashOf(text)}.${ext}`; files.set(f, text); return f; };
   let out = html.replace(FILE_MARK, (all, name, tag, body) => (tag === 'style' ? `<link rel="stylesheet" href="${put(name, 'css', body)}">` : `<script src="${put(name, 'js', body)}"></script>`));
   out = out.replace(FONT_STYLE, (all, from, body) => `<link rel="stylesheet" href="${put('fonts', 'css', body)}" data-font-from="${from}">`);
   out = out.replace(DATA_TAG, (all, json) => `<script src="${put(`${String(base).replace(/[^\w+-]+/g, '-')}.data`, 'js', dataScript(json))}" id="sg-data"></script>`);
@@ -65,12 +68,13 @@ export function writeStyleguide(outPath, html, { split = true } = {}) {
   for (const [name, text] of page.files) {
     bytes += Buffer.byteLength(text);
     const p = join(dir, name);
-    if (!existsSync(p)) writeFileSync(p, text);   // named by what it holds: one already there is the same
+    if (!existsSync(p)) { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); }   // named by what it holds: one already there is the same
   }
   writeFileSync(outPath, page.html);
   const used = new Set();
   for (const f of readdirSync(dir)) if (/\.html?$/i.test(f)) { try { linksOf(readFileSync(join(dir, f), 'utf8')).forEach((l) => used.add(l)); } catch { /* unreadable: links nothing */ } }
-  for (const f of readdirSync(dir)) if (OWN_FILE.test(f) && !used.has(f)) { try { unlinkSync(join(dir, f)); } catch { /* gone already */ } }
+  const mine = [...readdirSync(dir), ...(() => { try { return readdirSync(join(dir, ASSETS)).map((f) => `${ASSETS}/${f}`); } catch { return []; } })()];
+  for (const f of mine) if (isOwnFile(f) && !used.has(f)) { try { unlinkSync(join(dir, f)); } catch { /* gone already */ } }
   return { files: [...page.files.keys()], bytes };
 }
 
@@ -80,9 +84,9 @@ export function writeStyleguide(outPath, html, { split = true } = {}) {
 export function inlinePage(html, dir, readFile = (p) => readFileSync(p, 'utf8')) {
   const read = (rel) => { try { return readFile(join(dir, rel)); } catch { return null; } };
   return String(html)
-    .replace(/<script src="([^"]+\.data\.[0-9a-f]{10}\.js)" id="sg-data"><\/script>/, (all, f) => { const j = dataOfScript(read(f) ?? ''); return j == null ? all : `<script type="application/json" id="sg-data">${j.replace(/</g, '\\u003c')}</script>`; })
-    .replace(/<link rel="stylesheet" href="((?:styleguide|fonts)\.[0-9a-f]{10}\.css)"( data-font-from="[^"]*")?>/g, (all, f, from) => { const t = read(f); return t == null ? all : `<style${from ?? ''}>${t}</style>`; })
-    .replace(/<script src="(styleguide\.[0-9a-f]{10}\.js)"><\/script>/g, (all, f) => { const t = read(f); return t == null ? all : `<script>${t}</script>`; });
+    .replace(/<script src="((?:assets\/)?[^"/]+\.data\.[0-9a-f]{10}\.js)" id="sg-data"><\/script>/, (all, f) => { const j = dataOfScript(read(f) ?? ''); return j == null ? all : `<script type="application/json" id="sg-data">${j.replace(/</g, '\\u003c')}</script>`; })
+    .replace(/<link rel="stylesheet" href="((?:assets\/)?(?:styleguide|fonts)\.[0-9a-f]{10}\.css)"( data-font-from="[^"]*")?>/g, (all, f, from) => { const t = read(f); return t == null ? all : `<style${from ?? ''}>${t}</style>`; })
+    .replace(/<script src="((?:assets\/)?styleguide\.[0-9a-f]{10}\.js)"><\/script>/g, (all, f) => { const t = read(f); return t == null ? all : `<script>${t}</script>`; });
 }
 export function readPage(file) { return inlinePage(readFileSync(file, 'utf8'), dirname(file)); }
 export function pageData(file) {
@@ -94,8 +98,8 @@ export function pageData(file) {
 export function copyPage(page, toDir) {
   const dir = dirname(page), html = readFileSync(page, 'utf8');
   mkdirSync(toDir, { recursive: true });
-  const files = linksOf(html).filter((f) => OWN_FILE.test(f) && existsSync(join(dir, f)));
-  for (const f of files) copyFileSync(join(dir, f), join(toDir, f));
+  const files = linksOf(html).filter((f) => isOwnFile(f) && existsSync(join(dir, f)));
+  for (const f of files) { mkdirSync(dirname(join(toDir, f)), { recursive: true }); copyFileSync(join(dir, f), join(toDir, f)); }
   writeFileSync(join(toDir, 'index.html'), html);
   return ['index.html', ...files];
 }
