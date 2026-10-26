@@ -298,7 +298,7 @@ test('a commit says whose run made it; a checkout with no identity of its own se
 });
 
 // ── A store on GitHub ───────────────────────────────────────────────────────────────────────────────────────────
-test('a store on GitHub is read with git, the same way as one on GitLab; writing there still says it is not built', async () => {
+test('a store on GitHub is read and written with git, the same way as one on GitLab', async () => {
   // The link a person pastes, in the shapes GitHub and GitLab give them.
   assert.deepEqual(gitPlaceOf({ github: 'https://github.com/acme/design-store' }), { host: 'github.com', path: 'acme/design-store', origin: 'https://github.com' });
   assert.deepEqual(gitPlaceOf({ github: 'https://github.com/acme/design-store/tree/main/snapshots' }), { host: 'github.com', path: 'acme/design-store', origin: 'https://github.com' });
@@ -322,11 +322,22 @@ test('a store on GitHub is read with git, the same way as one on GitLab; writing
   const none = await pullStore(project(), cfg, 'snapshots', { env, gitStore: () => null });
   assert.match(none.line, /git could not reach it with this computer's own access/);
 
-  // Writing to GitHub is still not built: it says so instead of pretending.
+  // Writing to GitHub: the same git the reading uses, with no token and no second API. Reachable, so it is offered.
   forgetAccess();
-  const w = await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"a":1}']]), 'Snapshots', { env });
-  assert.equal(w.ok, false);
-  assert.match(w.line, /not built yet/);
+  const pushed = [];
+  const w = await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"a":1}']]), 'Snapshots', {
+    env, gitStore, // What reaches it is the pairs pushStore filtered, not a Map: taking .keys() of those gives indices.
+    gitPushStore: (gp, place, files) => { pushed.push([gp.host, [...files].map(([rel]) => rel)]); return { ok: true, sha: 'c'.repeat(40) }; },
+  });
+  assert.equal(w.ok, true, w.line);
+  assert.deepEqual(pushed, [['github.com', ['figma-vars.snapshot.json']]]);
+  assert.match(w.line, /with your own git access/);
+
+  // Unreachable: said in one line, never pretended.
+  forgetAccess();
+  const no = await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"a":1}']]), 'Snapshots', { env, gitStore: () => null });
+  assert.equal(no.ok, false);
+  assert.match(no.line, /git could not reach it/);
 });
 
 test('publishing the style guide again removes the files an earlier page linked, never one a page there still links', async () => {
