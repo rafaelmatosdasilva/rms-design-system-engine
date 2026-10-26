@@ -78,6 +78,7 @@ import { join, resolve, dirname, relative } from 'path';
 import { spawn } from 'child_process';
 import { pathToFileURL } from 'url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
+import { inlinePage } from './styleguide-files.mjs';
 import { loadLocator } from './component-locator.mjs';
 import { loadModes, loadCollections, combinedModes, mergeSwitches, modeSwitchFor } from './mode-resolver.mjs';
 import { modeSwitch, styleguideSwitch } from './code-capture.mjs';
@@ -1024,7 +1025,7 @@ export function styleguideTarget(cfg, ROOT, exists = existsSync, read = (f) => r
   // project's own pages are checked instead. One whose list cannot be read is taken as it is.
   // How many components it draws (null when its list cannot be read): 0 means nothing to try.
   const list = (abs) => {
-    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(read(abs)); return m ? (JSON.parse(m[1]).components ?? [{}]).map((c) => c?.name) : null; } catch { return null; }
+    try { const m = /<script[^>]*\bid=["']sg-data["'][^>]*>([\s\S]*?)<\/script>/.exec(inlinePage(read(abs), dirname(abs), read)); return m ? (JSON.parse(m[1]).components ?? [{}]).map((c) => c?.name) : null; } catch { return null; }
   };
   // Where the style guide is written: the configured place, else the project's own template's, else the engine's.
   for (const rel of [cfg?.styleguide?.out, 'apps/styleguide/index.html', `${OUT_DIR}/styleguide/index.html`].filter(Boolean)) {
@@ -2851,7 +2852,7 @@ async function main() {
       for (const [c, v] of Object.entries(snap)) { const w = !c.startsWith('_') && roleWordOf(requirementEntry(v, cats, cfg)?.annotations ?? []); if (w) roles[c] = w; }   // the role as Figma writes it (togglebutton, disclosure)
       // States follow their props: on the style guide, each option's effect is in its data (the code's selector for it).
       if (target.styleguide) {
-        const sg = await evalv(`(() => { try { return JSON.parse(document.getElementById('sg-data').textContent).components || []; } catch (e) { return []; } })()`);
+        const sg = await evalv(`(() => { try { return (self.SG_DATA || JSON.parse(self.SG_DATA_JSON || document.getElementById('sg-data').textContent)).components || []; } catch (e) { return []; } })()`);
         for (const f of stateFindings((sg ?? []).map((c) => ({ ...c, role: roles[c.name] ?? c.role })))) if (!components.length || components.includes(f.component)) findings.push({ kind: 'statefollows', plugin: label, desc: f.message });
       }
       const names = [...new Set([...Object.keys(roles), ...Object.keys(snap).filter((k) => !k.startsWith('_'))])];

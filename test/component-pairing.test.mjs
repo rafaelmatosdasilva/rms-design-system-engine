@@ -8,6 +8,7 @@ import { createPairing, pairingTasks, stateBase, stateSiblings, folderForms, wor
 import { resolveComponentFile, componentSourceFiles, textReader } from '../component-source.mjs';
 import { loadLocator } from '../component-locator.mjs';
 import { projectState } from '../route.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const vue = (cls, style = '', script = '') => `<template><div class="${cls}"><slot /></div></template>\n<script setup>${script}</script>\n<style>${style}</style>\n`;
 const snap = (components, props = {}, colors = {}) => ({
@@ -266,7 +267,7 @@ test('the audit and the style guide list a proposal to confirm or pin, and never
   assert.doesNotMatch(audit.stdout, /🧱 /, 'the proposed file is not a component only in code');
   const sg = run('--styleguide', '--no-a11y-bake');
   assert.equal(sg.status, 0, sg.stdout + sg.stderr);
-  const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
+  const page = readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'));
   assert.match(page, /"who":"both","area":"Parity","type":"Component pairing","kind":"Pairing","pairing":"tag","match":"proposed","say":"Figma's tag may be components\/tags\/Default\.vue/);
   assert.doesNotMatch(page, /"codeOnly":\{"file":"components\/tags\/Default\.vue"/);
 });

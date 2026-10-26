@@ -16,6 +16,8 @@
 /*{{THEME_CSS}}*/
 /*{{COMPONENT_CSS}}*/
 </style>
+<!-- A block marked sg-file goes into a file of its own beside the page, named by what it holds (styleguide-files.mjs). -->
+<!--sg-file:styleguide-->
 <style>
 /* ── Style guide chrome: the template is the layout only. Every colour, font, text size, radius, space and shadow
    is a role variable the engine fills with the design system's own tokens (CHROME below); what the system has no
@@ -304,7 +306,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-brand-ctl > .sg-mode-diff { position: absolute; top: 100%; margin-top: var(--sg-space-xxs); }
 
 /* ── Section headings ────────────────────────────────────────────────────── */
-.sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-space-xxl); }   /* as far from the top as the page's own padding: opening one never scrolls the page */
+.sg-section { margin-bottom: var(--sg-space-xxl); scroll-margin-top: var(--sg-page-top, var(--sg-space-xxl)); }   /* as far from the top as the page shown starts (--sg-page-top): the browser's jump to the page the address names (#status) never scrolls it */
 .sg-section-badge { display: inline-flex; align-items: center; padding: 0; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-bottom: 0;   /* right over the title on every page: the title's own line height is the gap */ }
 /* Above the title that sticks: the title's room reaches up under the tag, so the tag is drawn over it, never cut;
    scrolled away, it passes under the bar at the window's top. */
@@ -1770,7 +1772,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   #mode-controls { flex-wrap: wrap; gap: var(--sg-space-s); }
   #sg-search { margin-left: 0; width: 100%; }
   .sg-brand-ctl .sg-select, .sg-brand-ctl .sg-dd { width: 100%; }
-  .sg-section { scroll-margin-top: var(--sg-space-l); }
+  .sg-section { scroll-margin-top: var(--sg-page-top, var(--sg-space-l)); }
   /* On a phone the stage gives the component room of its own below the mode switches, never squeezed under them. */
   .pg-preview, .pg-frame { min-height: 220px; }
   .pg-preview-card, :root.sg-panel-sized .pg-preview-card { grid-template-columns: minmax(0, 1fr); } .pg-preview-card > .pg-preview-col { border-right: 0; border-bottom: var(--sg-line); } .pg-panel { min-width: 0; } .pg-panel-grip { display: none; }
@@ -1824,9 +1826,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }).catch(function () {});
 })();
 </script>
+<!--sg-file:styleguide-->
 <script>
 (function () {
-  var DATA = JSON.parse(document.getElementById('sg-data').textContent || '{}');
+  // The page's data: set by its data file beside it (styleguide-files.mjs), or written in the page itself.
+  var DATA = self.SG_DATA || JSON.parse(self.SG_DATA_JSON || document.getElementById('sg-data').textContent || '{}');
   var TOKENS = DATA.tokens || { colors: [], spacing: [], radii: [], sizing: [], typography: [] };
   var COMPONENTS = DATA.components || [];
   // A component the code has only as a CSS class (its class in the stylesheet, no component file, nothing it renders):
@@ -1870,16 +1874,23 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var a = {}; Object.keys(c.a11y || {}).forEach(function (k) { if (!/^(checked|audited|static|sources)$/.test(k)) a[k] = c.a11y[k]; });
     // Where a render was placed on the page it was measured in (top: 112665px) is not the component: left out.
     var renders = c.renders ? JSON.parse(JSON.stringify(c.renders).replace(/\b(top|left|right|bottom|inset)\s*:\s*-?[\d.]+px/g, '$1:*')) : null;
-    COMP_DATA[c.name] = JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(renders ? [renders] : []));
+    COMP_DATA[c.name] = noScopeIds(JSON.stringify([c.name, c.cls, c.role, c.markup, c.markups, c.controls, a].concat(renders ? [renders] : [])));
   });
   // The system's CSS as its rules, in any order: a bundler can write the same rules in another order on each build
   // (the project's Vite does), which changes nothing a result rests on.
-  function cssSigText(css) { return String(css).split('}').map(function (x) { return x.trim(); }).filter(Boolean).sort().join('}'); }
+  // A Vue component's scoped id (data-v-1a2b3c4d) is a hash of where its file sits on the computer that built the page:
+  // the same component built in another folder, or by the team's pipeline, gets another one. Left out of every
+  // signature, so results saved anywhere hold wherever the page is built.
+  function noScopeIds(text) { return String(text).replace(/data-v-[0-9a-f]{6,}/g, 'data-v'); }
+  function cssSigText(css) { return noScopeIds(css).split('}').map(function (x) { return x.trim(); }).filter(Boolean).sort().join('}'); }
   // What a component's accessibility result rests on beyond its own data: the system's CSS and the checks themselves
   // (wcag-page.js). Never the page's own code, its data or what a build measures, which change with every build: a
   // result kept in this browser holds until the code, Figma or the checks change, and only what changed is tried again.
   var PAGE_SIG = sigOf(Array.prototype.filter.call(document.querySelectorAll('style[data-system], script:not([type="application/json"])'), function (s) { return s.tagName === 'STYLE' || /wcag-page\.js/.test(s.textContent.slice(0, 200)); }).map(function (s) { return s.tagName === 'STYLE' ? cssSigText(s.textContent) : s.textContent; }).join('\u0000'));
   var html = document.documentElement, main = document.getElementById('sg-main'), nav = document.getElementById('sg-nav');
+  // A page opens at its top (route), a reload too: the browser puts back where the person had scrolled only once the
+  // page has loaded, after the page has opened at its top, so the page keeps its own place instead.
+  try { history.scrollRestoration = 'manual'; } catch (e) { /* an older browser: it keeps its own */ }
   // Opened in the Status page's panel (?embed): the component's page alone, no menu and no bar.
   if (/[?&]embed\b/.test(location.search)) html.classList.add('sg-embed');
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -7995,7 +8006,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (t) { document.addEventListener(t, function (e) { if (e.isTrusted) lastTouch = Date.now(); }, { capture: true, passive: true }); });
   var personBusy = function () { return !BAKING && (Date.now() - lastTouch < 2000 || !!document.querySelector('.sg-tip:hover, .sg-tip:focus-within, .sg-comp-panel:not([hidden])')); };
   function a11ySweep() {
-    if (ALL || sweeping) return;
+    // The component panel (?embed) is this page again: the page around it tries every component already.
+    if (ALL || sweeping || html.classList.contains('sg-embed')) return;
     var list = COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
     var share = /(?:^|[?&])bake=(\d+)\/(\d+)/.exec(location.hash);
     if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
@@ -9754,6 +9766,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function homeId() { return document.getElementById('status') || (typeof BUILDERS !== 'undefined' && BUILDERS.status) ? 'status' : 'index'; }
   // The component panel's page loaded once the page has settled and the browser is idle, so the first component opens at once.
   (function () { var go = function () { setTimeout(function () { (window.requestIdleCallback || setTimeout)(preloadComponentPanel); }, 1500); }; if (document.readyState === 'complete') go(); else window.addEventListener('load', go); })();
+  // Where the page shown starts, from the top of the document (under the bars, past the page's own padding): its
+  // sections' scroll margin, so the browser's own jump to the section the address names (#status, once the page has
+  // loaded) leaves the page at its top. Measured again as the bars or the page change size; not with ?all.
+  function pageTop() {
+    var s = ALL ? null : main.querySelector(':scope > section:not([hidden])');
+    if (s) html.style.setProperty('--sg-page-top', Math.max(0, Math.round(s.getBoundingClientRect().top + window.scrollY)) + 'px');
+  }
+  if (!ALL && window.ResizeObserver) new ResizeObserver(pageTop).observe(main);
   function route() {
     if (!location.hash || /^#(index|overview)$/.test(location.hash)) { if (homeId() !== 'index') history.replaceState(null, '', location.search + '#' + homeId()); }
     else if (/^#(documentation|coverage|intent-layer|for-agents)$/.test(location.hash)) history.replaceState(null, '', location.search + (document.getElementById('documentation') ? '#documentation' : '#status/documentation'));   // the address says where it lives now: the Documentation page, else (no intent layer) the Status page's
@@ -9772,6 +9792,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var target = document.getElementById(id) && document.getElementById(id).matches('main > section') ? document.getElementById(id) : document.getElementById(homeId()) || document.getElementById('index');
     if (target._screen) target._screen(at.slug);   // the Showroom: its grid, or the screen the address names (#showroom/<Screen>)
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
+    pageTop();
     links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (target.id === 'index') Object.keys(THUMBS).forEach(function (k) { fitThumb(THUMBS[k]); });
     if (target._dirty) { var drawNow = target._dirty; target._dirty = null; drawNow(); }   // drawn now it shows

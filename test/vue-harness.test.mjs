@@ -17,6 +17,7 @@ import { harnessCases } from '../component-harness.mjs';
 import { textComponentApi } from '../component-source.mjs';
 import { findChrome } from '../cdp.mjs';
 import { budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -90,7 +91,7 @@ test('the style guide draws a Vue component as the project\'s own Vite renders i
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /4 of 4 Vue components drawn as the project's own Vite renders them\./);
-  const page = readFileSync(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), 'utf8');
+  const page = readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'));
   // What it renders, its bound classes included (a template read cannot know hb-chip--quiet), from its own build.
   assert.match(page, /"name":"chip","cls":"hb-chip"[^}]*"markup":"\\u003cbutton data-v-[a-f0-9]+=\\"\\" class=\\"hb-chip hb-chip--quiet\\" type=\\"button\\" aria-pressed=\\"false\\">Filter\\u003c\/button>"/);
   assert.match(page, /\.hb-chip\[data-v-[a-f0-9]+\] \{\n {2}padding: 4px 8px;\n\}/, 'its scoped SCSS, compiled');
@@ -115,7 +116,7 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
   // The button and the badge it nests: the icon button and the chip are not rendered for this page.
   assert.match(r.stdout, /2 of 2 Vue components drawn as the project's own Vite renders them\./, r.stdout);
   const file = join(dir, '.design-system-engine-out', 'styleguide', 'button.html');
-  const data = JSON.parse(readFileSync(file, 'utf8').match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
+  const data = JSON.parse(readPage(file).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   const button = data.components.find((c) => c.name === 'button');
   assert.ok(button.renders?.some((x) => x.props.size === 'Large' && /hb-button-icon/.test(x.markup)), JSON.stringify(button.renders));
   const { launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');

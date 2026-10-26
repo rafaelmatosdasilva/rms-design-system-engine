@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { classRules, nearCopies, systemRules, productCopies } from '../system-advice.mjs';
 import { editCheck } from '../edit-check.mjs';
 import { makeFixture, fixtureProject, budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const system = '.button { display: inline-flex; padding: 4px 12px; border-radius: 6px; background: var(--button-background); color: var(--button-text); font: inherit; }\n.chip { display: inline-flex; }\n';
@@ -77,7 +78,7 @@ test('the audit says it under System health, and the style guide puts it in the 
     writeFileSync(join(shop, 'shop.css'), `/* the shop's own */\n.shopButton {\n  ${copy};\n}\n`);
     writeFileSync(join(shop, 'index.html'), '<link rel="stylesheet" href="shop.css">\n<button class="shopButton">Buy</button>\n');
     const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
-    const html = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
+    const html = readPage(join(dir, '.design-system-engine-out/styleguide/index.html'));
     const data = JSON.parse(html.match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
     const button = (data.allComponents ?? data.components).find((c) => c.name === 'button');
     assert.deepEqual(button?.copies?.map((x) => [x.product, x.file, x.line, x.cls]), [[basename(shop), 'shop.css', 2, 'shopButton']], r.stdout.slice(-2000));

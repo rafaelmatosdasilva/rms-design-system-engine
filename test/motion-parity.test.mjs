@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { figmaEasing, transitionsOf, codeMotion, motionFindings, motionSnapshot, MOTION_CAPTURE_JS, motionCaptureScript, prototypeTransitions } from '../motion-parity.mjs';
 import { motionTokens, motionTodos } from '../styleguide-data.mjs';
 import { fixtureProject, budget } from './helpers.mjs';
+import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -101,7 +102,7 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
     const saved = JSON.parse(readFileSync(join(dir, '.design-system-engine-out/motion.json'), 'utf8'));
     assert.equal(saved.findings[0].component, 'button');
     run('--styleguide', '--no-a11y-bake');
-    const html = readFileSync(join(dir, '.design-system-engine-out/styleguide/index.html'), 'utf8');
+    const html = readPage(join(dir, '.design-system-engine-out/styleguide/index.html'));
     const data = JSON.parse(html.match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
     const button = (data.allComponents ?? data.components).find((c) => c.name === 'button');
     assert.equal(button.motionDiffs?.[0]?.trigger, 'hover');

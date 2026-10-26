@@ -9,6 +9,8 @@
 // not try here (no Chrome, a time limit) is tried in the viewer's browser as before.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
+import { dirname } from 'node:path';
+import { inlinePage } from './styleguide-files.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from './cdp.mjs';
 
 export const BAKED_ID = 'sg-a11y-baked';
@@ -18,6 +20,17 @@ export const BAKED_ID = 'sg-a11y-baked';
 // An older file with one set (results) is the default theme's.
 export const RESULTS_FILE = 'a11y-results.snapshot.json';
 export function readSaved(path) { try { const j = JSON.parse(readFileSync(path, 'utf8')); return j && typeof j.themes === 'object' ? j.themes : j && typeof j.results === 'object' ? { default: j.results } : {}; } catch { return {}; } }
+// The saved results by the page's own themes: a file that calls the default theme by another name (an older build
+// named it after the system) has it read as default, when that is the one theme it holds the page does not offer.
+export function savedFor(saved, themes) {
+  if (!saved || saved.default) return saved ?? {};
+  const other = Object.keys(saved).filter((t) => !themes.includes(t));
+  if (other.length !== 1) return saved;
+  const { [other[0]]: base, ...rest } = saved;
+  return { default: base, ...rest };
+}
+// When the saved results were tried (the file's at), or null.
+export function savedAt(path) { try { return JSON.parse(readFileSync(path, 'utf8')).at ?? null; } catch { return null; } }
 // The themes the page offers: the default one, and each brand that is not only the base of others (the page's Theme choice).
 export function themesOf(html) {
   let d = {}; try { d = JSON.parse((/<script[^>]*\bid="sg-data"[^>]*>([\s\S]*?)<\/script>/.exec(html) ?? [])[1] || '{}'); } catch { d = {}; }
@@ -70,9 +83,11 @@ export async function bakeA11y(file, { saved = null, chromePath = process.env.CH
   const t0 = Date.now();
   // Results an earlier build kept in the page are taken out; the saved ones (saved: { theme: { name: result } }) go in
   // instead, and the page tries only the components whose signature changed since (its code, the system's CSS, the check).
-  const before = readFileSync(file, 'utf8'), clean = withoutBaked(before), start = saved && Object.keys(saved).length ? withBaked(clean, { at: null, themes: saved }) : clean;
+  const before = readFileSync(file, 'utf8'), clean = withoutBaked(before);
+  const themes = themesOf(inlinePage(clean, dirname(file)));   // its data may be a file beside it
+  saved = saved && savedFor(saved, themes);
+  const start = saved && Object.keys(saved).length ? withBaked(clean, { at: null, themes: saved }) : clean;
   if (start !== before) writeFileSync(file, start);
-  const themes = themesOf(clean);
   const { wsUrl, kill } = await launchChrome(chromePath);
   try {
     const { send, on, close } = await connectCDP(wsUrl, { timeoutMs: 120000 });
@@ -93,7 +108,7 @@ export async function bakeA11y(file, { saved = null, chromePath = process.env.CH
         const r = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.__sgA11yResults ? window.__sgA11yResults() : {})', returnByValue: true }, sessionId).catch(() => null);
         let results = {};
         try { results = JSON.parse(r?.result?.value || '{}'); } catch { results = {}; }
-        const n = await send('Runtime.evaluate', { expression: "(JSON.parse((document.getElementById('sg-data') || {}).textContent || '{}').components || []).length", returnByValue: true }, sessionId).catch(() => null);
+        const n = await send('Runtime.evaluate', { expression: "((self.SG_DATA || JSON.parse(self.SG_DATA_JSON || (document.getElementById('sg-data') || {}).textContent || '{}')).components || []).length", returnByValue: true }, sessionId).catch(() => null);
         // Every task this page found open (all of the page's, and the accessibility of the components it tried).
         const k = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.__sgOpenKeys ? window.__sgOpenKeys() : null)', returnByValue: true }, sessionId).catch(() => null);
         let open = null; try { open = JSON.parse(k?.result?.value || 'null'); } catch { open = null; }

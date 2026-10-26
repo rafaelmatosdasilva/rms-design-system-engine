@@ -33,6 +33,7 @@ import { spawnSync } from 'child_process';
 import { homedir } from 'os';
 import { OUT_DIR } from './names.mjs';
 import { storesOf, THEMES_DIR } from './stores.mjs';
+import { writeStyleguide } from './styleguide-files.mjs';
 
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
 // The engine's own template, used when the project has none (ds-config.json → styleguide.template wins).
@@ -1564,7 +1565,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const may = opts.out ? { ok: true } : mayWrite(outPath, built, { ROOT, label: relative(ROOT, outPath) });
   if (!may.ok) return { out: outPath, kept: may.line, filled, bytes: 0, components: 0 };
   html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, (m) => `${stampMeta(built)}\n${m}`) : html.replace(/<head>/i, (m) => `${m}\n${stampMeta(built)}`);
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, html);
-  return { out: outPath, fontsEmbedded: fontsEmbedded ? { embedded: fontsEmbedded.embedded.length, kept: fontsEmbedded.kept, missing: fontsEmbedded.missing } : null, filled, bytes: html.length, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, notInFigma: agreedSummary?.notInFigma ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
+  // The page and the files it links beside it (its styles, code, fonts and data: styleguide-files.mjs). The code
+  // capture's own copy (opts.out), read through a <base> pointing elsewhere, stays one file.
+  const written = writeStyleguide(outPath, html, { split: !opts.out });
+  return { out: outPath, files: written.files, fontsEmbedded: fontsEmbedded ? { embedded: fontsEmbedded.embedded.length, kept: fontsEmbedded.kept, missing: fontsEmbedded.missing } : null, filled, bytes: written.bytes, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, notInFigma: agreedSummary?.notInFigma ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
 }

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -270,4 +270,17 @@ test('a project link that moved, or names the project, is found: every call then
   assert.match(asked[1], /search=acme-intent-layer/);
   const lost = await projectApi(O, 'design/nothing', async () => res(404, []));
   assert.deepEqual(lost, { base: `${O}/api/v4/projects/${encodeURIComponent('design/nothing')}`, path: 'design/nothing', how: 'same', project: null });
+});
+
+test('mirrors: beside the work by default, or all in one folder on this computer when a setting says so', () => {
+  const p = { host: 'gitlab.acme.test', path: 'team/design-store' };
+  assert.equal(mirrorDir('/work', p, {}), join('/work', 'design-store'));
+  // Per host and project, so two companies' projects of the same name never share a folder.
+  assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' }), join('/srv/mirrors', 'gitlab.acme.test', 'design-store'));
+  assert.equal(mirrorDir('/work', { host: 'gitlab.other.test', path: 'x/design-store' }, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' }), join('/srv/mirrors', 'gitlab.other.test', 'design-store'));
+  assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '~/cache' }), join(homedir(), 'cache', 'gitlab.acme.test', 'design-store'));
+  // Nothing from a host or a project name ever escapes the folder it is given.
+  const hostile = mirrorDir('/work', { host: '../../etc', path: 'a/../../b' }, { DESIGN_SYSTEM_ENGINE_MIRRORS: '/srv/mirrors' });
+  assert.ok(hostile.startsWith('/srv/mirrors/') && !hostile.split('/').includes('..'), hostile);
+  assert.equal(mirrorDir('/work', p, { DESIGN_SYSTEM_ENGINE_MIRRORS: '   ' }), join('/work', 'design-store'), 'blank is not a setting');
 });

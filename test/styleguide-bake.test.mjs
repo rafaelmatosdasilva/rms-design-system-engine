@@ -2,7 +2,7 @@
 // in once, replace an earlier build's, and never close the page's own script early.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withBaked, withoutBaked, BAKED_ID, ageOpen, withOpenSince, OPEN_ID } from '../styleguide-bake.mjs';
+import { withBaked, withoutBaked, BAKED_ID, ageOpen, withOpenSince, OPEN_ID, savedFor } from '../styleguide-bake.mjs';
 import { budget } from './helpers.mjs';
 
 test('the results are kept in the page right after its data, before its script reads them; an earlier build\'s replaced', () => {
@@ -78,4 +78,27 @@ test('each open task keeps the day it was first found; a new one starts now, a c
   assert.match(once, new RegExp(`id="sg-data"[^>]*>{}</script><script id="${OPEN_ID}"`));
   assert.equal((twice.match(new RegExp(OPEN_ID, 'g')) || []).length, 1, 'replaced, never added twice');
   assert.doesNotMatch(twice, /"<\/script>"/, 'a value never closes the tag');
+});
+
+test('the default theme saved by another name (an older build named it after the system) is read as default, never a guess', () => {
+  assert.deepEqual(savedFor({ acme: { chip: {} }, retail: {} }, ['default', 'retail']), { default: { chip: {} }, retail: {} });
+  assert.deepEqual(savedFor({ acme: {}, northwind: {} }, ['default']), { acme: {}, northwind: {} }, 'never a guess between two');
+  assert.deepEqual(savedFor({ default: { chip: {} }, acme: {} }, ['default']), { default: { chip: {} }, acme: {} });
+});
+
+test('a page built without trying its accessibility carries the saved results: the browser tries only what changed', { timeout: budget(250000) }, async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { join, dirname } = await import('node:path');
+  const { writeFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { fixtureProject } = await import('./helpers.mjs');
+  const { readPage } = await import('../styleguide-files.mjs');
+  const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'sg-saved-');
+  writeFileSync(join(dir, 'a11y-results.snapshot.json'), JSON.stringify({ at: '2026-01-01T00:00:00.000Z', themes: { acme: { button: { sig: 'x.y', live: { ran: {} }, items: [] } } } }));
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /Accessibility from the saved results/);
+  const baked = JSON.parse(new RegExp(`<script id="${BAKED_ID}" type="application/json">([\\s\\S]*?)</script>`).exec(readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html')))[1]);
+  assert.deepEqual(baked, { at: '2026-01-01T00:00:00.000Z', themes: { default: { button: { sig: 'x.y', live: { ran: {} }, items: [] } } } });
 });
