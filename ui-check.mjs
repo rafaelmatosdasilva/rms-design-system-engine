@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { checkUi, RULES } from './ui-catalog.mjs';
 import { cardsRead } from './cards-read.mjs';
+import { noteInvented } from './invented.mjs';
 import { OUT_DIR } from './names.mjs';
 
 const ROOT = process.cwd();
@@ -58,6 +59,8 @@ const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
 // card has been handed over is there a basis to say another was not.
 const read = cardsRead(ROOT);
 const r = checkUi(ui, catalog, { cardsRead: read.size ? read : null });
+// What this page invented, kept so the catalog can reject it by name next time rather than after the fact.
+noteInvented(ROOT, r.findings);
 try {
   mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
   writeFileSync(join(ROOT, OUT_DIR, 'ui-check.json'), JSON.stringify({ input, checked: new Date().toISOString(), ...r }, null, 2) + '\n');
