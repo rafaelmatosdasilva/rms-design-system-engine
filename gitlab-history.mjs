@@ -34,7 +34,10 @@ export const mirrorRepo = (root) => { const st = mirrorState(root); return st ? 
 export const mirrorHead = (root) => mirrorState(root)?.sha ?? null;
 export const mirrorBranch = (root) => mirrorState(root)?.ref ?? null;
 
-const empty = (sha) => ({ sha, blame: {}, commits: {}, info: {}, diffs: {}, refs: {}, tags: {}, tagList: null, tagsAt: null, ranges: {} });
+const empty = (sha) => ({ sha, blame: {}, commits: {}, info: {}, diffs: {}, refs: {}, tags: {}, tagList: null, tagsAt: null, ranges: {}, where: {} });
+// The commits of the release log asked for where they changed things and their merge request, at most this many a run
+// (newest first; the next run asks the rest): what a commit changed never changes, so each is asked once.
+const WHERE_PER_RUN = 300;
 export function readHistory(root) {
   const st = mirrorState(root);
   if (!st) return null;
@@ -47,7 +50,7 @@ const rel = (root, file) => relative(resolve(root), resolve(root, String(file)))
 
 // What a request still needs from GitLab: the files to blame and the files whose commits to list (with a pattern a
 // changed line must hold, so their diffs are read). → null when the record already answers all of it.
-export function missing(root, { blame = [], paths = [], releases = 0 } = {}, h = readHistory(root)) {
+export function missing(root, { blame = [], paths = [], releases = 0, where = false } = {}, h = readHistory(root)) {
   const st = mirrorState(root);
   if (!st) return null;
   const fresh = h.sha === st.sha;
@@ -58,8 +61,12 @@ export function missing(root, { blame = [], paths = [], releases = 0 } = {}, h =
       || (h.commits[x.path] ?? []).some((id) => !(id in h.refs)));
   // The project's last releases, each with every commit it holds: the tags read at this commit, and each range read.
   const r = releases > 0 && (h.tagsAt !== st.sha || releaseRanges(h, st.sha, releases).some(([key]) => !(key in h.ranges)));
-  return b.length || p.length || r || undatedReleases(h).length || !fresh ? { blame: b, paths: p, releases } : null;
+  const w = where && releases > 0 && !r && whereWanted(h, st.sha, releases).length > 0;
+  return b.length || p.length || r || w || undatedReleases(h).length || !fresh ? { blame: b, paths: p, releases, where } : null;
 }
+
+// The release log's commits not asked yet where they changed things, newest first.
+const whereWanted = (h, sha, n) => [...new Set(releaseRanges(h, sha, n).flatMap(([key]) => h.ranges[key] ?? []))].filter((id) => !(id in (h.where ?? {})));
 
 // The ranges a release log reads, newest first: [key, from, to, release]. The commits not released yet (from the newest
 // version tag to the head) first, then each of the last n version tags from the one before it (v2.11.01..v2.12.00).
@@ -74,17 +81,17 @@ function releaseRanges(h, sha, n) {
 // The project's last releases, newest first, each with every commit it holds (merges left out), whatever files they
 // changed: [{ release, releasedAt, commits: [{ sha, short, date, subject, author }] }]; release null for what is merged
 // and not released yet. A commit is shown once, in the first release that holds it.
-export function releaseLogOf(root, { releases = 10 } = {}) {
+export function releaseLogOf(root, { releases = 10, where = false } = {}) {
   const st = mirrorState(root);
   if (!st) return null;
-  ensureHistory(root, { releases });
+  ensureHistory(root, { releases, where });
   const h = readHistory(root);
   if (h.tagsAt !== st.sha) return null;
   const seen = new Set(), out = [];
   for (const [key, , , release] of releaseRanges(h, st.sha, releases).reverse()) {
     const ids = (h.ranges[key] ?? []).filter((id) => !seen.has(id));
     ids.forEach((id) => seen.add(id));
-    const commits = ids.map((id) => { const i = h.info[id] ?? {}; return { sha: id, short: id.slice(0, 7), date: i.time ?? null, subject: i.subject ?? '', author: i.author ?? null }; })
+    const commits = ids.map((id) => { const i = h.info[id] ?? {}; return { sha: id, short: id.slice(0, 7), date: i.time ?? null, subject: i.subject ?? '', author: i.author ?? null, ...(h.where?.[id] ? { files: h.where[id].files, request: h.where[id].mr } : {}) }; })
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
     if (commits.length || release) out.push({ release, releasedAt: release ? h.tags?.[release] ?? null : null, commits });
   }
@@ -218,6 +225,26 @@ export async function fillHistory(root, req = {}, opts = {}) {
         h.ranges[key] = own.map((c) => c.id);
       });
     }
+  }
+  // Where each commit of the release log changed things (its files and what changed in them) and its merge request
+  // (what it says it closes), for the Changelog's rows (change-where.mjs).
+  if (want.where && h.tagsAt === st.sha) {
+    h.where ??= {};
+    await pool(whereWanted(h, st.sha, want.releases).slice(0, WHERE_PER_RUN), async (id) => {
+      const files = [];
+      for (let page = 1; page <= 3; page++) {
+        const r = await get(`/repository/commits/${id}/diff?per_page=100&page=${page}`);
+        if (!r) return;                                      // not reachable now: asked again next time
+        const list = r.missing ? [] : (Array.isArray(r.body) ? r.body : []);
+        for (const d of list) files.push({ path: d.new_path ?? d.old_path, diff: String(d.diff ?? '').split('\n').filter((l) => /^[+-](?![+-]{2} )/.test(l)).join('\n').slice(0, 20000) });
+        if (list.length < 100) break;
+      }
+      const m = await get(`/repository/commits/${id}/merge_requests`);
+      if (!m) return;
+      const mrs = m.missing ? [] : (Array.isArray(m.body) ? m.body : []);
+      const mr = mrs.find((x) => x.state === 'merged') ?? mrs[0];
+      h.where[id] = { files, mr: mr?.iid != null ? { iid: String(mr.iid), title: String(mr.title ?? ''), description: String(mr.description ?? '').slice(0, 4000) } : null };
+    });
   }
   writeFileSync(join(root, HISTORY_FILE), JSON.stringify(h) + '\n');
   return { asked, failed };
