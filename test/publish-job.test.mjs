@@ -75,3 +75,21 @@ test('--publish-styleguide writes the job and says what to do next; --print only
   const gl = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--publish-styleguide', '--host', 'gitlab'], { cwd: project(null), encoding: 'utf8' });
   assert.match(gl.stdout, /✅ Wrote \.gitlab-ci\.yml/);
 });
+
+test('a job that publishes the page alone (written before the page had files beside it, or by hand) is named, with the line to put instead', async () => {
+  const { pageOnlyCopies, pageOnlyLines, githubJob } = await import('../publish-job.mjs');
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const out = '.design-system-engine-out/styleguide/index.html';
+  const d = mkdtempSync(join(tmpdir(), 'pj-alone-'));
+  mkdirSync(join(d, '.github', 'workflows'), { recursive: true });
+  writeFileSync(join(d, '.github', 'workflows', 'style-guide.yml'), githubJob({ out }));
+  assert.deepEqual(pageOnlyCopies(d, out), [], 'the engine\'s own job copies the page with its files');
+  writeFileSync(join(d, '.github', 'workflows', 'acme-site.yml'), `jobs:\n  site:\n    steps:\n      - run: |\n          node ../engine/audit.mjs --styleguide\n          mkdir -p ../site && cp ${out} ../site/index.html\n`);
+  const found = pageOnlyCopies(d, out);
+  assert.deepEqual(found.map((f) => [f.file, f.line, f.fix]), [['.github/workflows/acme-site.yml', 6, `node ../engine/styleguide-files.mjs ${out} ../site`]]);
+  assert.match(pageOnlyLines(found, { stop: true }).join('\n'), /^❌ \.github\/workflows\/acme-site\.yml:6 publishes the style guide's page alone[\s\S]*Nothing is published until it copies them[\s\S]*Replace that line with: node \.\.\/engine\/styleguide-files\.mjs/);
+  writeFileSync(join(d, '.gitlab-ci.yml'), `pages:\n  script:\n    - cp public/notes.html public/index.html\n    - cp -r .design-system-engine-out/styleguide public\n`);
+  assert.equal(pageOnlyCopies(d, out).length, 1, 'another page copied, or the whole folder: nothing to say');
+});
