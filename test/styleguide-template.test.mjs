@@ -237,7 +237,11 @@ test('in the browser: no script error, a control changes the real component, the
       let v;
       // A deadline, not a count of tries: each read of the page costs more while the rest of the suite runs, so
       // counting tries and calling it seconds reported a number that was not the time spent. This says what it waited.
-      const began = Date.now(), deadline = began + budget(30000);
+      // Sixty seconds, times this machine's scale. Some of what the page writes it measures live in the browser
+      // (the keyboard rows), and the full suite starves that: ninety real seconds was not enough on a run of 1659
+      // tests, while the same file alone finishes it in moments. The ceiling is here to catch a hang, so it is set
+      // for the slowest honest case rather than the usual one; a passing test leaves it the moment it is ready.
+      const began = Date.now(), deadline = began + budget(60000);
       while (Date.now() < deadline) { v = await run(expr); if (ok(v)) return v; await new Promise((r) => setTimeout(r, 100)); }
       assert.fail(`${what} was not ready in ${Math.round((Date.now() - began) / 1000)}s, which a busy machine can take; last read: ${String(v).slice(0, 300)}`);
     };
