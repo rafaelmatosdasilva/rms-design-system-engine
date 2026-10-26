@@ -35,7 +35,7 @@ import { OUT_DIR, REFS_DIR, PROJECT } from './names.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, plainGet, plainSend, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { runBy } from './decided-by.mjs';
-import { isOwnFile, linksOf } from './styleguide-files.mjs';
+import { isOwnFile, linksOf, ASSETS } from './styleguide-files.mjs';
 
 export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes'];
 export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes' };
@@ -315,13 +315,14 @@ export function themesToShare(ROOT, dirs, sys) {
 }
 
 // The style guide's own files (styleguide-files.mjs) beside the pages sent that nothing links any more: neither a page
-// sent nor another page already there (read: its text). Only a file of its own, named as it names them, at the top.
+// sent nor another page already there (read: its text). Only a file of its own, named as it names them, in its assets
+// folder or beside the page (where an earlier build wrote them).
 function staleBeside(sendable, there, read) {
   const sent = new Set(sendable.map(([rel]) => rel));
   const linked = new Set();
   for (const [rel, data] of sendable) if (/\.html?$/i.test(rel)) linksOf(Buffer.from(data).toString('utf8')).forEach((l) => linked.add(l));
   for (const f of there) if (/^[^/]+\.html?$/i.test(f) && !sent.has(f)) linksOf(read(f)).forEach((l) => linked.add(l));
-  return there.filter((f) => !f.includes('/') && isOwnFile(f) && !sent.has(f) && !linked.has(f));
+  return there.filter((f) => isOwnFile(f) && !sent.has(f) && !linked.has(f));
 }
 
 // The page and what it links to beside it (another page, a picture, a stylesheet), followed from each page sent: never
@@ -455,7 +456,8 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
   if (a.mode === 'folder') {
     const dir = resolve(ROOT, place.folder, place.path || '');
     for (const [rel, data] of sendable) { const fp = join(dir, rel); mkdirSync(dirname(fp), { recursive: true }); writeFileSync(fp, data); }
-    let there = []; try { there = readdirSync(dir); } catch { /* nothing there */ }
+    const list = (d, pre = '') => { try { return readdirSync(join(dir, d)).map((f) => pre + f); } catch { return []; } };
+    const there = [...list(''), ...list(ASSETS, `${ASSETS}/`)];
     const gone = part !== 'styleguide' ? [] : staleBeside(sendable, there, (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch { return ''; } });
     for (const f of gone) { try { unlinkSync(join(dir, f)); } catch { /* gone already */ } }
     return { ok: true, line: `📤 ${label}: ${sendable.length} file${sendable.length === 1 ? '' : 's'} written to ${dir}${gone.length ? `, ${gone.length} an earlier page linked removed` : ''}` };
