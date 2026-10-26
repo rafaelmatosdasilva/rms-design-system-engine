@@ -147,7 +147,23 @@ export function infraFailure(events) {
   return null;
 }
 
-// One headless turn. Resolves { events, sessionId, cost, error, infra }.
+// A run stopped by a limit this harness set it — its turns, its budget — did not fail the task: it was never allowed
+// to finish. Counted as a plain failure it makes the skill read worse than it is and hides the runs that really broke
+// something, which is how one guide task came to read 69/70 on branches that had not touched its instructions.
+// → why it stopped, or null. Kept apart from infraFailure: that is the machine's fault and the run is thrown away;
+// this is the harness's own ceiling and the run is recorded, marked.
+export function limitReached(events) {
+  const result = events.filter((e) => e.type === 'result').at(-1);
+  if (!result) return null;
+  const sub = String(result.subtype ?? '');
+  if (/max.?turns/i.test(sub)) return 'ran out of turns';
+  if (/budget|max.?cost/i.test(sub)) return 'ran out of its budget';
+  const text = typeof result.result === 'string' ? result.result : '';
+  if (result.is_error && /max(imum)? turns|out of turns|budget/i.test(text)) return text.slice(0, 120).trim();
+  return null;
+}
+
+// One headless turn. Resolves { events, sessionId, cost, error, infra, limit }.
 export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTurns = 40, budget = 3, timeoutMs = 15 * 60 * 1000 }) {
   const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--model', model, '--max-turns', String(maxTurns),
     '--max-budget-usd', String(budget), '--tools', TOOLS, '--allowedTools', TOOLS.split(',').join(' '),
@@ -167,7 +183,7 @@ export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTu
       const events = out.split('\n').filter((l) => l.trim().startsWith('{')).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
       const result = events.filter((e) => e.type === 'result').at(-1);
       const error = timedOut ? `timed out after ${timeoutMs / 60000} min` : !result ? `no result (${err.slice(-300)})` : null;
-      resolve({ events, sessionId: result?.session_id ?? events.find((e) => e.session_id)?.session_id ?? null, cost: result?.total_cost_usd ?? 0, error, infra: timedOut ? null : infraFailure(events), stderr: err.slice(-2000) });
+      resolve({ events, sessionId: result?.session_id ?? events.find((e) => e.session_id)?.session_id ?? null, cost: result?.total_cost_usd ?? 0, error, infra: timedOut ? null : infraFailure(events), limit: timedOut ? 'timed out' : limitReached(events), stderr: err.slice(-2000) });
     });
   });
 }

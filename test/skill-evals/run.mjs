@@ -71,7 +71,7 @@ async function one({ t, run }) {
   const dir = makeProject(t.source ?? DEMO, t.setup, { engine: vr.engine !== false, skillFiles: t.skillFiles ?? [] });
   const { home, path } = makeHome(vr, { cliOnPath: t.cliOnPath !== false });
   const events = [];
-  let sessionId = null, error = null;
+  let sessionId = null, error = null, limit = null;
   for (const prompt of t.prompts ?? [t.prompt]) {
     const r = await runClaude({ cwd: dir, home, path, prompt: `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`, model: MODEL, resume: sessionId, budget: BUDGET });
     events.push(...r.events);
@@ -81,14 +81,16 @@ async function one({ t, run }) {
       cleanup(dir, home);
       throw new Refused(r.infra);
     }
+    // A ceiling this harness set, not the task being failed: kept on the row so a reading can tell the two apart.
+    if (r.limit) { limit = r.limit; break; }
     if (r.error) { error = r.error; break; }
   }
   const ctx = context(events, dir);
   let taskChecks;
-  try { taskChecks = error ? [{ name: 'the run finished', ok: false, detail: error }] : await t.score(ctx); }
+  try { taskChecks = limit ? [{ name: 'the run was given room to finish', ok: false, detail: limit }] : error ? [{ name: 'the run finished', ok: false, detail: error }] : await t.score(ctx); }
   catch (e) { taskChecks = [{ name: 'the scorer ran', ok: false, detail: e.message }]; }
   const rules = globalChecks(ctx, t);
-  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, at: new Date().toISOString() };
+  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, limit, at: new Date().toISOString() };
   writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   appendFileSync(resultsFile(t), JSON.stringify(row) + '\n');
   cleanup(dir, home);

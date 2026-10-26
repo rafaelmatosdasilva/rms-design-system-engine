@@ -46,3 +46,24 @@ test('recording an evaluation writes its RESULTS.md entry from the runs, against
   assert.match(md, /Haiku: 1 of 5 runs failed, fewer passes than the entry below\. Failed: b #1: does the task\./, 'a failure is named, task and check');
   assert.match(md, /Records: `records\/2026-10-05-x`\./);
 });
+
+test('a run stopped at the harness\'s own limit is recorded apart from one that broke a rule', () => {
+  const row = (task, run, pass, extra = {}) => ({ task, run, pass, engineHash: 'e2', project: 'p1', usage: { cost: 0.05, input: 100000 }, checks: [{ name: 'does the task', ok: pass }], rules: [{ name: 'never commits', ok: true }], ...extra });
+  // Four runs: two pass, one broke a rule, one was never allowed to finish.
+  const broke = row('b', 0, false, { rules: [{ name: 'never commits', ok: false, detail: 'it committed' }] });
+  const stopped = row('c', 0, false, { limit: 'ran out of turns', checks: [{ name: 'the run was given room to finish', ok: false, detail: 'ran out of turns' }] });
+  const s = runStats([row('a', 0, true), row('a', 1, true), broke, stopped]);
+  assert.equal(s.violations, 1, 'only the one that broke a rule');
+  assert.equal(s.limits, 1);
+  assert.deepEqual(s.limited, ['c #0: ran out of turns']);
+
+  // The entry says it, so a reading never takes the ceiling for the guide getting worse.
+  const md = resultsEntry({ title: 't', what: 'x', guideSet: 'abcdef123456', now: { 'claude-haiku-4-5-20251001': s }, name: 'n', date: '2026-10' });
+  assert.match(md, /\| Runs stopped at a limit \| - \| 1 \|/);
+  assert.match(md, /never finished: c #0: ran out of turns — read those as the ceiling, not the guide/);
+
+  // Nothing stopped: the row is left out entirely rather than printing a zero nobody needs.
+  const clean = runStats([row('a', 0, true), row('a', 1, true)]);
+  assert.equal(clean.limits, 0);
+  assert.doesNotMatch(resultsEntry({ title: 't', what: 'x', guideSet: 'abcdef123456', now: { 'claude-haiku-4-5-20251001': clean }, name: 'n', date: '2026-10' }), /stopped at a limit/);
+});
