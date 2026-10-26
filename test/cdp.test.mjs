@@ -4,9 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { pathToFileURL } from 'node:url';
+import { budget } from './helpers.mjs';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome, playwrightChromium, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
 
 const none = () => null;
@@ -33,6 +34,7 @@ test('playwrightChromium: picks the newest chromium-N build that has a binary', 
   assert.equal(playwrightChromium({ env: {}, exists: () => false, list: () => { throw new Error('none'); } }), null);
 });
 
+const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
 test('launch, open a file:// page, wait for load and evaluate', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cdp-test-'));
@@ -54,4 +56,29 @@ test('launch, open a file:// page, wait for load and evaluate', { skip: !CHROME 
     await assert.rejects(() => send('Runtime.evaluate', { expression: '1' }, sessionId), /connection closed/);
     assert.ok(Date.now() - t0 < 1000);
   } finally { browser.kill(); }
+});
+
+// A browser that outlives its run is how a machine comes to look like a failing engine: after a day of runs there
+// were forty headless Chromes holding three gigabytes, and every later run read as slow for it. Two halves: the run
+// must be able to end while a browser is open, and the browser must not survive the run that opened it.
+test('a browser never outlives the run that opened it, and never holds it open', { skip: CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
+  const { execFileSync } = await import('node:child_process');
+  const headless = () => { try { return execFileSync('pgrep', ['-f', '--', '--headless=new'], { encoding: 'utf8' }).split('\n').filter(Boolean).length; } catch { return 0; } };
+
+  const before = headless();
+  const began = Date.now();
+  // A run that opens a browser and ends without closing it: the forgetful caller this guards against.
+  execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import { launchChrome } from ${JSON.stringify(pathToFileURL(join(ENGINE, 'cdp.mjs')).href)};
+    const r = await launchChrome(${JSON.stringify(CHROME)});
+    if (!r.wsUrl.startsWith('ws://')) throw new Error('no socket');
+  `], { encoding: 'utf8', timeout: 90000 });
+  const took = Date.now() - began;
+
+  // It ended on its own: before this, a child with a pipe kept Node's loop alive and the run waited for a browser
+  // nobody was using. Generous, because the launch itself is a real Chrome start.
+  assert.ok(took < 60000, `the run took ${Math.round(took / 1000)}s to end while a browser was open`);
+  // And it took the browser with it.
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.ok(headless() <= before, `${headless() - before} headless Chrome left behind`);
 });
