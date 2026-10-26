@@ -1628,12 +1628,15 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 .sg-issues.sg-il th:nth-child(1) { width: 22%; }      /* For: a component's name or a layer */
 .sg-issues.sg-il th:nth-child(3) { width: 16%; }      /* Sources: Intent layer, Figma, Code */
 .sg-issues.sg-il th:nth-child(4) { width: 15%; }      /* Decision: Review and its topic, or Keep */
-.sg-issues.sg-il th:nth-child(5) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
-/* With no intent layer there is no File column: Sources, Status and Last updated each move one to the left. */
-.sg-issues.sg-il.sg-il-nofile th:nth-child(2) { width: 16%; }
-.sg-issues.sg-il.sg-il-nofile th:nth-child(3) { width: 15%; }
+.sg-issues.sg-il:not(.sg-il-nofile) th:nth-child(5) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
+/* With no intent layer there is no File column: For and Sources a share each, Status (its word and what it means under
+   it) what the others leave, Last updated a date and a time; the row's arrow keeps its narrow column. A narrow window
+   scrolls the table sideways rather than squeeze a component's name. */
+.sg-issues.sg-il.sg-il-nofile { min-width: 46rem; }
+.sg-issues.sg-il.sg-il-nofile th:nth-child(1) { width: 26%; }
+.sg-issues.sg-il.sg-il-nofile th:nth-child(2) { width: 20%; }
+.sg-issues.sg-il.sg-il-nofile th:nth-child(3) { width: auto; }
 .sg-issues.sg-il.sg-il-nofile th:nth-child(4) { width: 9.5rem; }
-.sg-issues.sg-il.sg-il-nofile th:nth-child(5) { width: auto; }
 /* File takes the rest: a page's name and its path. */
 /* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
 .sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
