@@ -1,5 +1,35 @@
 # Skill evaluation results
 
+## 2026-10: Each Changelog row says what it was for and where it changed the system (continuous evaluation)
+
+What changed since the entry below (engine 540a998): The engine says when the style guide the team opens is behind, and can publish it itself (#55); Every page the engine opens works at full speed: each in a window of its own (#56); A store's README stops flipping between runs, and a commit that landed despite a gateway timeout is sent (#58); Each Changelog row says what it was for and where it changed the system. The guide changed in `reference/usage.md`.
+
+Guide set measured: `73953ea5aea5` · Project measured: `13d811a9d668`
+
+| Haiku, engine 74a632e | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.064 |
+| Input a run | 105k | 131k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 131k a run against 105k. Records: `records/2026-10-26-each-changelog-row-says-what`.
+
+## 2026-10: The engine says when the style guide the team opens is behind, and can publish it itself (continuous evaluation)
+
+What changed since the entry below (engine 97de7da): A TypeScript that cannot read JSX is no TypeScript; headless Chrome starts in light (#35); The words of the web are nobody's secret (#39); Prototypes ask before they guess, and are reviewed as pages in any framework (#41); Stores: read without a token of your own, and say whose run wrote (#40); The style guide links its styles, code, fonts and data as files beside it (#42); A reloaded style guide opens at its top; publishing removes the last build's files (#43); Mirrors can live in a cache on this computer, and audit.mjs can be searched (#45); A store can live on GitHub; a run stopped at a limit is recorded apart (#44); A page says which components it wrote without reading their card (#47); Built around the same component twice over is a piece it does not have (#48); A job that would publish the style guide's page alone is named and stopped (#46); A system with no intent layer can finish its documentation (#49); The documentation table's columns spread across its width (#50); A static component's role is read from its code; developers' notes in the code are never to remove (#54); Coverage asks the questions agents actually get stuck on (#51); A check that cries wolf is named, and never silenced (#52); The style guide's files go in an assets folder beside the page (#53); The engine says when the style guide the team opens is behind, and can publish it itself. The guide changed in `reference/usage.md`.
+
+Guide set measured: `cb0fa1e34dba` · Project measured: `13d811a9d668`
+
+| Haiku, engine 540a998 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.063 | $0.058 |
+| Input a run | 124k | 105k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 105k a run against 124k. Records: `records/2026-10-26-the-engine-says-when-the`.
+
 ## 2026-10: Prototypes reviewed as pages, the same for every framework: the habits agents fall into, the states owed, every screen size (continuous evaluation)
 
 What changed since the entry below (engine ae4f913): A place's own write token, with a fallback for computers without it (#38); Prototypes ask before they guess, and a question the team left open is never guidance; Prototypes reviewed as pages, the same for every framework: the habits agents fall into, the states owed, every screen size. The guide changed in `cookbook/prototype.md`, `reference/usage.md`.

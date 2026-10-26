@@ -209,7 +209,7 @@ export function storeSection(entry, { name = 'the design system', tree = [], ci 
 
   if (parts.some((e) => e.part === 'styleguide' && e.write)) {
     const at = parts.find((e) => e.part === 'styleguide').path;
-    out.push('', '### The style guide', '', `**Open it:** \`${at ? at + '/' : ''}index.html\` in this repository. Nothing in it is written by hand: the engine builds it from the code, Figma (through the snapshots), the intent layer and the team's decisions, so it always says what the system is today.`, '',
+    out.push('', '### The style guide', '', `**Open it:** \`${at ? at + '/' : ''}index.html\` in this repository. On your computer: download \`index.html\` and the \`assets\` folder beside it (or the whole repository as a zip) and open \`index.html\`. Nothing in it is written by hand: the engine builds it from the code, Figma (through the snapshots), the intent layer and the team's decisions, so it always says what the system is today.`, '',
       '| Page | What it tells you |', '|---|---|',
       '| **Status** | How far the system is: parity with Figma, how much is built, accessibility, and documentation |',
       "| **Showroom** | The products' screens drawn with the system's components |",
@@ -349,6 +349,13 @@ export async function syncReadmes(ROOT, cfg, opts = {}) {
     }, { label: 'The profile\'s README and command' });
   }
   const name = cfg?.profile?.name ?? profile?.name ?? cfg?.name ?? 'the design system';
+  // The profile file, read once when a store's README is built and the profile's own repository was not visited this
+  // run: its project (the code) is in every store's section, so a section never loses it between runs.
+  const profileFile = async () => {
+    if (profile || !prof) return profile;
+    try { const r = await reader(ROOT, prof, opts); if (!r.error) profile = JSON.parse(await r.file(prof.file) ?? 'null'); } catch { profile = null; }
+    return profile;
+  };
   for (const entry of repos) {
     if (prof && keyOf(entry.repo) === keyOf(prof)) continue;
     const w = entry.parts.find((e) => e.write) ?? entry.parts[0];
@@ -357,7 +364,8 @@ export async function syncReadmes(ROOT, cfg, opts = {}) {
       const ci = tree.includes('.gitlab-ci.yml') ? await r.file('.gitlab-ci.yml') : null;
       const now = tree.includes(README) ? await r.file(README) : '';
       const title = `${name} ${list(entry.parts.map((e) => lower(LABEL[e.part])))}`;
-      return [[README, withSection(now, storeSection(entry, { name, tree, ci, others: repos, prof, project: cfg?.project ?? profile?.project }), { title })]];
+      const project = cfg?.project ?? (await profileFile())?.project;
+      return [[README, withSection(now, storeSection(entry, { name, tree, ci, others: repos, prof, project }), { title })]];
     }, { place: { tokenEnv: w.place?.tokenEnv ?? null, writeTokenEnv: w.place?.writeTokenEnv ?? null }, mode, label: 'README' });
   }
   if (JSON.stringify(next) !== JSON.stringify(st)) writeState(ROOT, next);

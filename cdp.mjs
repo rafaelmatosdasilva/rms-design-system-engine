@@ -61,7 +61,11 @@ export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engi
   // keychain, so no "Keychain Not Found" or keyring prompt appears while the engine or its tests read pages.
   const chrome = spawn(chromePath, [
     '--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-sandbox',
-    '--disable-gpu', '--disable-extensions', '--use-mock-keychain', '--password-store=basic', `--user-data-dir=${userDataDir}`, 'about:blank',
+    '--disable-gpu', '--disable-extensions', '--use-mock-keychain', '--password-store=basic', `--user-data-dir=${userDataDir}`,
+    // Every page the engine opens is one it is working in, though only one is in front: a page in a background tab keeps
+    // its timers and its rendering at full speed (Chrome otherwise wakes it once a second, then once a minute).
+    '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
+    'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   // Chrome must not outlive the run that started it. kill() is the caller's to call, and a caller that throws, or a
   // test runner that ends while a page is still open, would otherwise leave a headless browser alive for ever: after
@@ -147,7 +151,9 @@ export async function connectCDP(wsUrl, { timeoutMs = 30000 } = {}) {
 // prefers-color-scheme from the computer it runs on, so a page that reads it at load would come up dark on a
 // dark-mode machine and light on a light one. A caller that wants dark asks for it itself, after this.
 export async function openPage(send, url) {
-  const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+  // Each page in a window of its own: none is ever a background tab, which Chrome slows to a wake-up a second (the
+  // style guide's build tries its components in several pages at once).
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank', newWindow: true });
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
   await send('Runtime.enable', {}, sessionId);
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] }, sessionId).catch(() => {});

@@ -617,7 +617,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Its accessibility: what its role and Figma's notes ask of it, each with the WCAG criterion, and what the last
     // browser check (the audit's a11y.json) found on it. The page measures the text contrast itself, as it is drawn.
     try {
-      const { a11yView } = await import('./styleguide-data.mjs');
+      const { a11yView, staticRole } = await import('./styleguide-data.mjs');
       const { contractSemantics, A11Y_GUIDE, annotationUses } = await import('./a11y-check.mjs');
       const { partRolesOf } = await import('./behaviour-contract.mjs');
       const { annotationWording } = await import('./figma-edits.mjs');
@@ -629,6 +629,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const entry = requirementEntry(all, cats, cfg);   // its duties come only from the notes that are requirements
         c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, roleFrom: c.role ? 'figma' : authoredRoles[c.name] ? 'contract' : null,
           annotations: entry.annotations ?? [], parts: partRolesOf(entry), exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE, notes: annotationUses(all, { cats, cfg }) });
+        // No role said anywhere, and a plain element at its root: none is its role, read from the code.
+        if (!c.a11y.role) { const s = staticRole(c.markup); if (s) c.a11y.staticRole = s; }
       }
       // WCAG 2.2 at level A and AA: every criterion, how the engine covers it, in plain words, and what the checks
       // found (the page runs the in-page checks itself on every variant, wcag-page.js). What the code does (shortcuts,
@@ -916,6 +918,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     view.builtAt = new Date().toISOString();
     // What it was built from: the code commit, the Figma version and the engine, also in the page's <head>.
     view.built = buildStamp(ROOT, { vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), at: view.builtAt });
+    // Where the engine's commits are, so the Status page links the one it was built with (an old page shows it).
+    try { view.engineRepo = (await import('./publish-job.mjs')).ENGINE_REPO.replace(/\.git$/, ''); } catch { /* the page says the commit alone */ }
     try { const { tokenUses } = await import('./styleguide-data.mjs'); view.tokenUses = tokenUses(allCss, view.components); } catch { /* none listed */ }
     // Every token each component is drawn with (its parts and states too, seen in this variant or not), by Figma's name.
     try {
@@ -1269,7 +1273,27 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       }
       // Everything the developers did, release by release, whatever it changed: the Changelog page lists it all, each
       // commit with the components it changed (from their changelogs) when it changed any.
-      view.releaseLog = releaseLog(ROOT).map((g) => ({ ...g, commits: g.commits.map((r) => ({ ...r, url: commitUrl(repo, r.sha), ...(ticketOf(r.subject, cfg, ROOT) ?? {}) })) }));
+      // Each commit's issue: the one its message names, else the one its merge or pull request closes (said "via" it),
+      // else that request itself; and where it changed the system besides a component's code (change-where.mjs).
+      const cw = await import('./change-where.mjs');
+      const onGitlab = /gitlab/i.test(repo ?? '');
+      const ownFiles = new Set([...found.values()].flatMap((w) => w.files ?? []).map((f) => String(f).replace(/^\.\//, '')));
+      const outDir = cfg.styleguide?.out ? relative(ROOT, dirname(resolve(ROOT, cfg.styleguide.out))) : null;
+      const byKey = new Map(); for (const [name, w] of found) for (const f of w.files ?? []) byKey.set(cw.pathKey(f), name);
+      const whereCtx = { names: view.components.map((c) => c.name), componentFiles: ownFiles, byKey, themeFiles: themeFiles.map((f) => String(f).replace(/^\.\//, '')), styleguideDir: outDir && !outDir.startsWith('..') ? outDir : null };
+      const tagUrl = (t) => (repo && t ? `${repo}${onGitlab ? '/-/tags/' : '/releases/tag/'}${encodeURIComponent(t)}` : null);
+      const issueUrl = (t) => (/^#\d+$/.test(t) ? (cfg.changelog?.ticketUrl ? String(cfg.changelog.ticketUrl).replace(/\{id\}/g, t.slice(1)) : (repo ? `${repo}${onGitlab ? '/-/issues/' : '/issues/'}${t.slice(1)}` : null)) : (cfg.changelog?.ticketUrl ? String(cfg.changelog.ticketUrl).replace(/\{id\}/g, encodeURIComponent(t)) : null));
+      view.releaseLog = releaseLog(ROOT, { where: true }).map((g) => ({ ...g, commits: g.commits.map((r) => {
+        const own = ticketOf(r.subject, cfg, ROOT);
+        const n = r.request?.iid ?? cw.requestOf(r.subject)?.n ?? null;
+        const request = n ? { label: cw.requestLabel(n, onGitlab), url: prUrl(repo, n) } : null;
+        const closes = own ? [] : cw.closesOf(`${r.request?.title ?? ''}\n${r.request?.description ?? ''}`, cfg);
+        const via = !own && closes.length ? { ticket: closes[0], ticketUrl: issueUrl(closes[0]), via: request } : null;
+        const where = r.files ? cw.whereOf(r.files, whereCtx).map((w) => ({ ...w,
+          url: w.kind === 'tokens' ? '#tokens' : w.kind === 'version' ? tagUrl(g.release) ?? commitUrl(repo, r.sha) : ['docs', 'figma', 'examples', 'tests', 'code'].includes(w.kind) && w.names?.length === 1 ? null : w.kind === 'docs' ? '#documentation' : commitUrl(repo, r.sha) })) : null;
+        const { files, request: _r, ...rest } = r;
+        return { ...rest, url: commitUrl(repo, r.sha), ...(own ?? via ?? {}), ...(request ? { request } : {}), ...(where ? { where } : {}) };
+      }) }));
       view.links = [
         { label: 'Figma file', url: cfg.figmaFileKey ? `https://www.figma.com/design/${cfg.figmaFileKey}` : null },
         { label: 'Code repository', url: repo },

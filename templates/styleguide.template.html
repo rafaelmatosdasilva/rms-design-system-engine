@@ -1120,6 +1120,8 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 .pg-frame-stage { padding: var(--sg-space-xl); display: flex; flex-wrap: wrap; gap: var(--sg-space-m); justify-content: center; align-items: flex-start; }
 .pg-from, .pg-missing { color: var(--sg-muted); }
 .pg-log-date { color: var(--sg-muted); font-weight: var(--sg-text-weight); }
+/* Where a commit changed things besides a component: the same link, quieter, so a component still reads first. */
+.sg-log-where { color: var(--sg-muted); }
 .pg-inspect .pg-par-val { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); }   /* what a change did, under it */
 .pg-missing { font-style: italic; }
 .pg-doc > .pg-from { margin-top: var(--sg-space-s); }
@@ -1588,6 +1590,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-link-pill:hover { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
 .sg-link-pill--table { margin: var(--sg-space-xxs) var(--sg-space-xxs) var(--sg-space-xxs) 0; vertical-align: middle; }   /* a link in a table, as a pill: several in one cell sit apart */
 table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: var(--sg-text); }   /* never underlined, as a pill is not */
+table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where else a commit changed things: quieter than a component */
 .sg-link-pill > .sg-link-words > code { font-size: inherit; }
 /* A pill's words on one line, cut short with an ellipsis when they do not fit: its whole name shows on hover (its title). */
 .sg-link-pill > .sg-link-words { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -2171,7 +2174,24 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function commitLine(r, extra) {
     var sha = r.url ? '<a class="sg-uses-link" href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>';
     var says = String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
-    return esc(says) + ' ' + sha + (extra || '');
+    // The merge or pull request it came in by, after it, when its row is an issue's (a row with no issue leads with it).
+    var req = r.ticket && r.request ? ' <span class="pg-log-date">' + (r.via ? 'via' : '·') + '</span> ' + requestLink(r.request) : '';
+    return esc(says) + ' ' + sha + req + (extra || '');
+  }
+  function requestLink(q) { return q.url ? '<a class="sg-uses-link" href="' + esc(q.url) + '" target="_blank" rel="noopener">' + esc(q.label) + '</a>' : esc(q.label); }
+  // Where a commit changed the system besides a component's code (change-where.mjs): Figma's data, the documentation, the
+  // tokens, the version, the pipeline, the setup, a folder; each linked to where the change is seen, quieter than a
+  // component, after the components.
+  function whereHTML(list) {
+    return (list || []).map(function (w) {
+      var one = /^(docs|figma|examples|tests|code)$/.test(w.kind) && (w.names || []).length === 1 ? w.names[0] : null;
+      var label = w.label + (one ? ': ' + one : w.kind === 'figma' ? [w.count ? w.count + ' component' + (w.count === 1 ? '' : 's') : '', w.tokens ? w.tokens + ' token' + (w.tokens === 1 ? '' : 's') : ''].filter(Boolean).map(function (x) { return ' · ' + x; }).join('') : w.count && w.kind !== 'other' ? ' · ' + w.count : '');
+      // The components it names, when several: in its title, for whoever hovers.
+      var title = !one && (w.names || []).length > 1 ? ' title="' + esc(w.names.join(', ')) + '"' : '';
+      var href = one ? '#' + cid(one) : w.url;
+      var ext = href && !/^#/.test(href);
+      return href ? '<a class="sg-uses-link sg-where-pill" href="' + esc(href) + '"' + title + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + esc(label) + '</a>' : '<span class="sg-log-where"' + title + '>' + esc(label) + '</span>';
+    }).join(' ');
   }
   // A ticket's cell: the ticket (linked to its issue), then each of its commits on a line; a commit for no ticket, alone.
   function ticketHTML(t, line) {
@@ -2975,6 +2995,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Second in the list, under the index: where someone looks first after the system itself.
   (function () { var a = nav.querySelector('a[href="#status"]'), o = nav.querySelector('a[href="#index"]'); if (a && o) o.insertAdjacentElement('afterend', a); })();
   var td = section('status', 'Status', 'How the system is doing', '');   // no line under its title: the cards say it
+  // When this page was built and with which engine, by its title: a page the team opens days after a change shows it.
+  (function () {
+    var b = DATA.built || {}, at = b.at || DATA.builtAt; if (!at) return;
+    var d = new Date(at), when = isNaN(d) ? String(at).slice(0, 10) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    var eng = b.engine ? String(b.engine).slice(0, 7) : '';
+    pageBar(td, { links: [{ label: 'Built ' + when + (eng ? ' · engine ' + eng : ''), url: eng && DATA.engineRepo ? DATA.engineRepo + '/commit/' + b.engine : '#status' }] });
+  })();
   var hl = td, hlBox = document.createElement('div'); hlBox.className = 'sg-health-box'; td.appendChild(hlBox);
   // Changelog: every component's changes gathered by the release they shipped in, newest first, each a table of
   // the components it changed and what each change says, linked to its commit.
@@ -3007,7 +3034,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // components its commits changed (none for a change outside them). A commit made for no issue is a row of its own.
       return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">Issue</th><th scope="col">Affects</th></tr></thead><tbody>' + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
         var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
-        return '<tr><td>' + (t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">No issue</span></p><p class="sg-il-line">') + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>') + '</td><td>' + (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
+        // Where else its commits changed things, once each (the same part named by two commits of an issue: once).
+        var where = [], seenW = {}; t.items.forEach(function (x) { (x.r.where || []).forEach(function (w) { var k = w.kind + ':' + w.label + ':' + (w.names || []).join(','); if (!seenW[k]) { seenW[k] = 1; where.push(w); } }); });
+        // A row for no issue leads with the merge or pull request it came by, when there is one: only a commit made
+        // straight on the branch says no issue.
+        var first = t.items[0].r, lead = t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">' + (first.request ? requestLink(first.request) : 'No issue') + '</span></p><p class="sg-il-line">';
+        var affects = (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '') + (where.length ? (comps.length ? ' ' : '') + whereHTML(where) : '');
+        return '<tr><td>' + lead + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>') + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     }).join('');
   }
@@ -3377,9 +3410,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       function (c) { var g = guideDo(c); return [ilDoDont(c).length ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : g ? (/^[\w-]+\.\w/.test(g.from) ? g.from : capital(g.from)) : '', (c.examples || []).length ? 'Figma' : ''].filter(Boolean).join(' · '); }, 'Not written yet.'],
     // Its role: its intent-layer page first, else Figma's annotation, the contract or the code; Figma and the page
     // naming two roles is said, to check.
-    ['Role', function (c) { var a = c.a11y || {}; return ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') : a.role ? roleFrom(a) : ''; },
-      function (c) { var x = roleClash(c); return paras([ilRole(c) || c.a11y.role]) + (x ? '<p class="pg-missing">Figma\'s annotation says ' + esc(x.figma) + ', its page in the intent layer says ' + esc(x.il) + ': one of them is wrong.</p>' : ''); },
-      function (c) { return [ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : '', (c.a11y || {}).role ? ((c.a11y || {}).roleFrom === 'figma' ? 'From its annotation in Figma' : roleFrom(c.a11y)) : ''].filter(Boolean).join(' · '); }, 'Not written yet.']
+    // A plain element at its root with no role said anywhere: none, read from the code (a11y.staticRole).
+    ['Role', function (c) { var a = c.a11y || {}; return ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') : a.role ? roleFrom(a) : a.staticRole ? 'The code' : ''; },
+      function (c) { var x = roleClash(c), st = !ilRole(c) && !(c.a11y || {}).role && (c.a11y || {}).staticRole; if (st) return paras(['None: its root is a <' + st.tag + '>, nothing to press, type in or go to, so a screen reader reads what it holds as it is.']); return paras([ilRole(c) || c.a11y.role]) + (x ? '<p class="pg-missing">Figma\'s annotation says ' + esc(x.figma) + ', its page in the intent layer says ' + esc(x.il) + ': one of them is wrong.</p>' : ''); },
+      function (c) { if (!ilRole(c) && !(c.a11y || {}).role && (c.a11y || {}).staticRole) return 'From the code (its root element)'; return [ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : '', (c.a11y || {}).role ? ((c.a11y || {}).roleFrom === 'figma' ? 'From its annotation in Figma' : roleFrom(c.a11y)) : ''].filter(Boolean).join(' · '); }, 'Not written yet.']
   ];
   // Its Documentation, one row for each kind in the table every task shares: what was written (or that it is missing),
   // what to do and who writes it, and its status with where it was written. A component's own Documentation area lists
@@ -9876,7 +9910,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // link. Tables the system draws itself (a preview, a Showroom screen) are its own and left as they are.
   var PILL_SKIP = '.pg-preview, .pg-frame, .pg-frame-stage, .pg-variants, .pg-offstage, .pg-anat-wrap, .sg-thumb, .sg-showroom, thead, .sg-tip';
   function pillLinks(root) {
-    Array.prototype.forEach.call((root || document).querySelectorAll('table a[href^="#"]:not(.sg-link-pill):not(.sg-card):not(.sg-mx-go)'), function (a) {
+    // Where a Changelog row's commits changed things besides a component (sg-where-pill) is a pill too, in or out of the
+    // guide, so the cell reads as one row of pills.
+    Array.prototype.forEach.call((root || document).querySelectorAll('table a[href^="#"]:not(.sg-link-pill):not(.sg-card):not(.sg-mx-go), table a.sg-where-pill:not(.sg-link-pill)'), function (a) {
       if (a.closest(PILL_SKIP) || a.closest('.sg-link-pill')) return;
       a.classList.add('sg-link-pill', 'sg-link-pill--table');
       if (!a.title) a.title = a.textContent.trim();   // its whole name on hover, when the pill cuts it short

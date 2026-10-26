@@ -176,3 +176,17 @@ test('a protected branch: one merge request the engine keeps open, and turned of
   assert.equal(g.mrs.length, 1, 'the same merge request, not a new one');
   assert.deepEqual(await syncReadmes(dir(), { ...cfg, readmes: false }, { env, http: g.http }), []);
 });
+
+test('a later run where only a store moved keeps the code\'s line, read from the profile file', async () => {
+  const g = fakeGitlab({ projects: projects() });
+  const ROOT = dir();
+  const noProject = { profile: cfg.profile, stores: STORES };   // the code's link only in the profile file, as a setup from a profile has it
+  await syncReadmes(ROOT, noProject, { env, http: g.http });
+  assert.match(g.projects['design/acme-guide'].files['README.md'], /- `web\/acme-ui`: the code/);
+  const commits = g.commits().length;
+  g.projects['design/acme-guide'].files['snapshots/open-since.snapshot.json'] = '{"a":1}';
+  g.projects['design/acme-guide'].head = 'd'.repeat(40);
+  forgetAccess();
+  assert.deepEqual(await syncReadmes(ROOT, noProject, { env, http: g.http }), [], 'nothing to write: the section is the same');
+  assert.equal(g.commits().length, commits);
+});
