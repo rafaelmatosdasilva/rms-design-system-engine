@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { guidanceView, tokenDescriptions } from '../styleguide-data.mjs';
+import { guidanceView, tokenDescriptions, staticRole } from '../styleguide-data.mjs';
 import { contextFrom } from '../prototype-context.mjs';
 import { varsFromItems } from '../figma-capture.mjs';
 import { readPage } from '../styleguide-files.mjs';
@@ -31,6 +31,17 @@ test('Do and don\'t lines are read from Figma, the code and the contract, each u
   assert.equal(guidanceView({ description: 'Do not use it when: a list.' }).doDont, undefined);
   assert.deepEqual(guidanceView({ description: 'Do not use it when: a list.' }).sections[1].text, ['a list.']);
   assert.deepEqual(guidanceView({ authored: { doDont: '- Do: one\n- do not: two' } }).doDont.text, ['Do: one', 'Don\'t: two'], 'a string, one line each');
+});
+
+test('a plain element at a component\'s root, with nothing to press, type in or go to, has no role: read from its code', () => {
+  assert.deepEqual(staticRole('<span class="badge high"><span class="badge-label">High</span></span>'), { tag: 'span' });
+  assert.deepEqual(staticRole('<!-- a card -->\n<div class="card"><button>Go</button></div>'), { tag: 'div' }, 'a container is plain, whatever it holds');
+  assert.equal(staticRole('<button class="chip">x</button>'), null, 'a control');
+  assert.equal(staticRole('<div class="node" tabindex="0">x</div>'), null, 'a Tab stop');
+  assert.equal(staticRole('<div role="status">x</div>'), null, 'a role said');
+  assert.equal(staticRole('<span onclick="go()">x</span>'), null, 'a click handler');
+  assert.equal(staticRole('<nav class="tabs"></nav>'), null, 'a landmark');
+  assert.equal(staticRole(''), null);
 });
 
 test('an agent composing a prototype reads the Do: and Don\'t: lines beside the pictures\' captions', () => {
@@ -92,6 +103,8 @@ test('with no intent layer, a component\'s Do and don\'t and its properties in t
     assert.ok(await waitForTrue(send, sessionId, '!!document.querySelector("#c-badge .pg-knowledge tbody tr")', { attempts: 400, tolerateErrors: true }));
     const how = await run(`(() => { const tr = [...document.querySelectorAll('#c-badge .pg-knowledge tbody tr')].find((x) => /Do and don't/.test(x.cells[1].textContent)); return tr ? tr.dataset.status : 'none'; })()`);
     assert.equal(how, 'todo', 'nothing written for badge: still to write');
+    const role = await run(`(() => { const tr = [...document.querySelectorAll('#c-badge .pg-knowledge tbody tr')].find((x) => x.cells[1].textContent.trim() === 'Role'); return tr ? tr.dataset.status + '|' + tr.cells[2].textContent.trim() : 'none'; })()`);
+    assert.equal(role, 'done|Code', 'its root a plain span: no role, read from the code');
   } finally { close(); c.kill(); }
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /'Do and don\\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\\'t:[^']*' \+ \(DATA\.intentLayer \? [^)]*\) \+ 'its description in Figma; the comment above its rule in the code; or contract\.authored\.json under guidance\.doDont\./);

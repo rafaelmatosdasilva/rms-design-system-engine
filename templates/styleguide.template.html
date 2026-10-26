@@ -3377,9 +3377,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       function (c) { var g = guideDo(c); return [ilDoDont(c).length ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : g ? (/^[\w-]+\.\w/.test(g.from) ? g.from : capital(g.from)) : '', (c.examples || []).length ? 'Figma' : ''].filter(Boolean).join(' · '); }, 'Not written yet.'],
     // Its role: its intent-layer page first, else Figma's annotation, the contract or the code; Figma and the page
     // naming two roles is said, to check.
-    ['Role', function (c) { var a = c.a11y || {}; return ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') : a.role ? roleFrom(a) : ''; },
-      function (c) { var x = roleClash(c); return paras([ilRole(c) || c.a11y.role]) + (x ? '<p class="pg-missing">Figma\'s annotation says ' + esc(x.figma) + ', its page in the intent layer says ' + esc(x.il) + ': one of them is wrong.</p>' : ''); },
-      function (c) { return [ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : '', (c.a11y || {}).role ? ((c.a11y || {}).roleFrom === 'figma' ? 'From its annotation in Figma' : roleFrom(c.a11y)) : ''].filter(Boolean).join(' · '); }, 'Not written yet.']
+    // A plain element at its root with no role said anywhere: none, read from the code (a11y.staticRole).
+    ['Role', function (c) { var a = c.a11y || {}; return ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') : a.role ? roleFrom(a) : a.staticRole ? 'The code' : ''; },
+      function (c) { var x = roleClash(c), st = !ilRole(c) && !(c.a11y || {}).role && (c.a11y || {}).staticRole; if (st) return paras(['None: its root is a <' + st.tag + '>, nothing to press, type in or go to, so a screen reader reads what it holds as it is.']); return paras([ilRole(c) || c.a11y.role]) + (x ? '<p class="pg-missing">Figma\'s annotation says ' + esc(x.figma) + ', its page in the intent layer says ' + esc(x.il) + ': one of them is wrong.</p>' : ''); },
+      function (c) { if (!ilRole(c) && !(c.a11y || {}).role && (c.a11y || {}).staticRole) return 'From the code (its root element)'; return [ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : '', (c.a11y || {}).role ? ((c.a11y || {}).roleFrom === 'figma' ? 'From its annotation in Figma' : roleFrom(c.a11y)) : ''].filter(Boolean).join(' · '); }, 'Not written yet.']
   ];
   // Its Documentation, one row for each kind in the table every task shares: what was written (or that it is missing),
   // what to do and who writes it, and its status with where it was written. A component's own Documentation area lists
