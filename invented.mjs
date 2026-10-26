@@ -18,13 +18,39 @@ import { OUT_DIR } from './names.mjs';
 export const INVENTED_FILE = `${OUT_DIR}/invented.json`;
 const fileOf = (ROOT) => join(ROOT, INVENTED_FILE);
 
+// A page written as code is checked by another road (page-check.mjs), which keeps its own record of what agents got
+// wrong there: by component, with each mistake's message. Those messages carry the same "did you mean" the
+// composition check writes, so the inventions in them belong in the same table. Read rather than copied, so there is
+// one record of each kind of mistake and not two saying different things.
+const PAGE_RECORD = `${OUT_DIR}/prototypes/inventions.json`;
+function fromPageChecks(ROOT) {
+  try {
+    const j = JSON.parse(readFileSync(join(ROOT, PAGE_RECORD), 'utf8'));
+    return inventionsIn((j.runs ?? []).flatMap((r) => r.items ?? []));
+  } catch { return { components: {}, props: {}, values: {} }; }
+}
+
+// Only what this file holds. What is written back must never carry the other record's entries into it: they would
+// then be read twice, once from each file, and every lesson would count double.
+function readOwn(ROOT) {
+  const ok = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? o : {});
+  try { const j = JSON.parse(readFileSync(fileOf(ROOT), 'utf8')); return { components: ok(j.components), props: ok(j.props), values: ok(j.values) }; } catch { return { components: {}, props: {}, values: {} }; }
+}
+
+// Both records as one table: what the composition check saw, and what the page check saw.
 // → { components: { wrong: { right, times } }, props: { "Component.prop": { right, times } }, values: { ... } }
 export function readInvented(ROOT) {
-  try {
-    const j = JSON.parse(readFileSync(fileOf(ROOT), 'utf8'));
-    const ok = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? o : {});
-    return { components: ok(j.components), props: ok(j.props), values: ok(j.values) };
-  } catch { return { components: {}, props: {}, values: {} }; }
+  const ok = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? o : {});
+  const own = readOwn(ROOT);
+  const page = fromPageChecks(ROOT);
+  const out = { components: {}, props: {}, values: {} };
+  for (const kind of ['components', 'props', 'values']) {
+    for (const [wrong, e] of [...Object.entries(page[kind]), ...Object.entries(own[kind])]) {
+      const had = out[kind][wrong];
+      out[kind][wrong] = { right: e?.right ?? had?.right ?? null, times: (had?.times ?? 0) + (e?.times ?? 1) };
+    }
+  }
+  return out;
 }
 
 // The inventions in one check's findings. Pure, so a caller can read a saved run as well as a live one.
@@ -49,7 +75,7 @@ export function inventionsIn(findings = []) {
 // be written still gets its check.
 export function noteInvented(ROOT, findings = []) {
   const now = inventionsIn(findings);
-  const all = readInvented(ROOT);
+  const all = readOwn(ROOT);
   for (const kind of ['components', 'props', 'values']) {
     for (const [wrong, e] of Object.entries(now[kind])) {
       const had = all[kind][wrong];

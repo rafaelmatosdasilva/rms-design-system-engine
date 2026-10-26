@@ -48,3 +48,26 @@ test('inventions add up across runs, and feed the catalog so the next agent read
   // An unwritable folder is never an error: the check still reported.
   assert.doesNotThrow(() => noteInvented('/nowhere-at-all/x', findings));
 });
+
+test('the page check\'s own record feeds the same table: one lesson, whichever road found it', async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const dir = mkdtempSync(join(tmpdir(), 'invented-both-'));
+  // What page-check.mjs keeps for a page written as code: its messages carry the same "did you mean".
+  mkdirSync(join(dir, '.design-system-engine-out', 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'inventions.json'), JSON.stringify({
+    runs: [{ at: '2026-10-26T10:00:00Z', page: 'prototypes/Signup.vue', items: [
+      { kind: 'component', message: '"Pill" is not in the catalog (did you mean Chip?)' },
+      { kind: 'prop', message: 'Badge has no prop "colour" (did you mean tone?)' },
+    ] }],
+  }));
+  // And what the composition check keeps.
+  noteInvented(dir, [{ message: 'Badge.tone = "danger" is not one of info, warn' }]);
+
+  const all = readInvented(dir);
+  assert.equal(all.components.Pill.right, 'Chip', 'found by the page check');
+  assert.equal(all.props['Badge.colour'].right, 'tone');
+  assert.equal(all.values['Badge.tone.danger'].right, 'info', 'found by the composition check');
+  // The same lesson from both roads is one entry, counted twice, not two entries disagreeing.
+  noteInvented(dir, [{ message: '"Pill" is not in the catalog (did you mean Chip?)' }]);
+  assert.equal(readInvented(dir).components.Pill.times, 2);
+});
