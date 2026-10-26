@@ -60,25 +60,36 @@ test('launch, open a file:// page, wait for load and evaluate', { skip: !CHROME 
 
 // A browser that outlives its run is how a machine comes to look like a failing engine: after a day of runs there
 // were forty headless Chromes holding three gigabytes, and every later run read as slow for it. Two halves: the run
+// A browser that outlives its run is how a machine comes to look like a failing engine: after a day of runs there
+// were forty headless Chromes holding three gigabytes, and every later run read as slow for it. Two halves: the run
 // must be able to end while a browser is open, and the browser must not survive the run that opened it.
+//
+// Watched by the one process this test started, never by counting the machine's browsers: the suite runs many files
+// at once, each with browsers of its own, and a global count would read theirs as this one's leak. A test that
+// asserts on what it does not control is the very fault this one exists to catch.
 test('a browser never outlives the run that opened it, and never holds it open', { skip: CHROME ? false : 'no Chrome available', timeout: budget(120000) }, async () => {
   const { execFileSync } = await import('node:child_process');
-  const headless = () => { try { return execFileSync('pgrep', ['-f', '--', '--headless=new'], { encoding: 'utf8' }).split('\n').filter(Boolean).length; } catch { return 0; } };
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
-  const before = headless();
   const began = Date.now();
-  // A run that opens a browser and ends without closing it: the forgetful caller this guards against.
-  execFileSync(process.execPath, ['--input-type=module', '-e', `
+  // A run that opens a browser and ends without closing it: the forgetful caller this guards against. It prints the
+  // browser's own process id, which is what this test then follows.
+  const out = execFileSync(process.execPath, ['--input-type=module', '-e', `
     import { launchChrome } from ${JSON.stringify(pathToFileURL(join(ENGINE, 'cdp.mjs')).href)};
     const r = await launchChrome(${JSON.stringify(CHROME)});
     if (!r.wsUrl.startsWith('ws://')) throw new Error('no socket');
+    console.log(r.chrome.pid);
   `], { encoding: 'utf8', timeout: 90000 });
   const took = Date.now() - began;
+  const pid = Number(String(out).trim().split('\n').pop());
+  assert.ok(Number.isInteger(pid) && pid > 0, `no browser process id printed: ${out}`);
 
   // It ended on its own: before this, a child with a pipe kept Node's loop alive and the run waited for a browser
   // nobody was using. Generous, because the launch itself is a real Chrome start.
   assert.ok(took < 60000, `the run took ${Math.round(took / 1000)}s to end while a browser was open`);
-  // And it took the browser with it.
-  await new Promise((r) => setTimeout(r, 1500));
-  assert.ok(headless() <= before, `${headless() - before} headless Chrome left behind`);
+
+  // And it took that browser with it. Given a moment: the kill is sent as the run exits, and the process leaves a
+  // little after.
+  for (let n = 0; n < 50 && alive(pid); n++) await new Promise((r) => setTimeout(r, 100));
+  assert.equal(alive(pid), false, `the browser this run opened (pid ${pid}) outlived it`);
 });
