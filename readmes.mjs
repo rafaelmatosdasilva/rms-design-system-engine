@@ -231,7 +231,13 @@ export function storeSection(entry, { name = 'the design system', tree = [], ci 
   if (ci && /audit\.mjs/.test(ci)) {
     const vars = [...ci.matchAll(/^#\s+([A-Z][A-Z0-9_]{2,})\s{2,}(\S.*)$/gm)].map((m) => [m[1], m[2].trim()]);
     const hourly = /--ci-changed/.test(ci), weekly = /DOC_STRESS/.test(ci);
-    out.push('', '### The pipeline', '', `\`.gitlab-ci.yml\` runs the engine here${hourly ? ': each hour it asks whether anything it is built from moved (the code, the stores, the profile, the Figma file, the engine) and stops in seconds when nothing did' : ''}. To set it up (a maintainer, once):`, '');
+    // A rule that skips the build while a variable is unset (`- if: '$X == null'` then `when: never`): the team
+    // publishes by hand until it sets that variable, so the steps below turn the automatic build on.
+    const gate = ci.match(/-\s*if:\s*['"]?\$([A-Z][A-Z0-9_]*)\s*==\s*(?:null|""|'')['"]?\s*\n\s*when:\s*never/)?.[1];
+    const runs = `\`.gitlab-ci.yml\` runs the engine here${hourly ? ': each hour it asks whether anything it is built from moved (the code, the stores, the profile, the Figma file, the engine) and stops in seconds when nothing did' : ''}`;
+    out.push('', '### The pipeline', '', gate
+      ? `The style guide is published by hand for now: \`.gitlab-ci.yml\` skips the build while \`${gate}\` is not set, and whoever runs the engine publishes it. Once these steps are done, ${runs.replace('`.gitlab-ci.yml` runs', 'it runs')}. To turn the automatic build on (a maintainer, once):`
+      : `${runs}. To set it up (a maintainer, once):`, '');
     let n = 1;
     if (vars.length) out.push(`${n++}. **Settings → CI/CD → Variables**, each one masked and protected:`, '', '   | Key | What it is |', '   |---|---|', ...vars.map(([k, v]) => `   | \`${k}\` | ${v} |`), '');
     if (/CI_PIPELINE_SOURCE\s*==\s*"schedule"/.test(ci)) {
