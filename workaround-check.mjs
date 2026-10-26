@@ -1,5 +1,9 @@
 // workaround-check.mjs - a workaround built around a component is a missing API.
 //
+// Said twice over: every place one is built (workaroundLines), and the ones built the same way in more than one file
+// (missingApis), which are the component's gaps rather than one screen's oddity. Prototypes are read with product
+// screens: an agent drawing a page meets what a component lacks before any product does.
+//
 // When a screen places its own control over a design-system component to do what the component cannot
 // (a clear button over a text field, action buttons laid over a list row), the screen is not wrong: the
 // component is missing a slot or a prop for it. Documentation does not fix that; the fix lives in the
@@ -113,6 +117,26 @@ export function workaroundFindings({ styles = [], markup = [], dsClasses = new M
 }
 
 // Grouped by host: one line per component or field, with the actions laid over it.
+// The same thing built by hand around the same component in more than one place is no longer an improvisation: it is
+// a piece the component does not have. One screen doing it may be that screen's oddity; three doing it is the design
+// system's gap, and it belongs to whoever owns the component rather than in more documentation about working around
+// it. Prototypes count here with product screens, because that is where the need shows up first — an agent building
+// a page meets what the component lacks before any product does.
+// → [{ component, kind, action, files: [file], places }], the repeated ones first.
+export function missingApis(findings, { least = 2 } = {}) {
+  const by = new Map();
+  for (const f of findings) {
+    const k = `${f.host.kind}|${f.host.name}|${f.action}`;
+    if (!by.has(k)) by.set(k, { component: f.host.name, kind: f.host.kind, action: f.action, files: [], places: 0 });
+    const e = by.get(k);
+    e.places += 1;
+    if (!e.files.includes(f.file)) e.files.push(f.file);
+  }
+  // Counted by the files it appears in, not by how many times: one file laying three of the same control over a
+  // component says the same thing once.
+  return [...by.values()].filter((e) => e.files.length >= least).sort((a, b) => b.files.length - a.files.length || a.component.localeCompare(b.component));
+}
+
 export function workaroundLines(findings) {
   const by = new Map();
   for (const f of findings) {

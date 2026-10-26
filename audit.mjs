@@ -5890,7 +5890,7 @@ function reportFull(label, items, shown) {
   // wrong. Off with "workarounds": false.
   if (cfg.workarounds !== false) {
     try {
-      const { projectWorkarounds, workaroundLines } = await import('./workaround-check.mjs');
+      const { projectWorkarounds, workaroundLines, missingApis } = await import('./workaround-check.mjs');
       const { loadLocator } = await import('./component-locator.mjs');
       const loc = await loadLocator(ROOT, cfg);
       const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };
@@ -5902,6 +5902,15 @@ function reportFull(label, items, shown) {
         console.log(C.yellow(`\n🧩 Built around a component: ${lines.length} place${lines.length === 1 ? '' : 's'} where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.`));
         for (const l of lines) console.log(C.yellow(`     ${l}`));
       }
+      // The same thing built around the same component in more than one file is the component's gap, not one screen's
+      // oddity, and it belongs to whoever owns the component. Written out too, so the style guide's Documentation page
+      // can list it as a component lacking a piece rather than drafting more documentation about working around it.
+      const gaps = missingApis(found);
+      if (gaps.length) {
+        console.log(C.yellow(`\n🧩 Built around the same component in more than one place: ${gaps.length} piece${gaps.length === 1 ? '' : 's'} the design system does not have. Documentation does not fix these; the component does.`));
+        for (const g of gaps) console.log(C.yellow(`     ${g.component}: .${g.action} built by hand in ${g.files.length} files (${g.files.slice(0, 3).join(', ')}${g.files.length > 3 ? `, +${g.files.length - 3}` : ''})`));
+      }
+      try { mkdirSync(join(ROOT, OUT_DIR), { recursive: true }); writeFileSync(join(ROOT, OUT_DIR, 'missing-apis.json'), JSON.stringify({ $description: 'Pieces a component does not have, found by the same thing being built around it in more than one file.', at: new Date().toISOString(), gaps }, null, 2) + '\n'); } catch { /* the lines above still said it */ }
     } catch (e) { console.log(C.dim(`ℹ️  Workarounds around components not checked: ${e.message}`)); }
   }
 
