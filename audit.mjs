@@ -1678,7 +1678,7 @@ if (process.argv.includes('--styleguide')) {
     if (!failures(found).length && !STORE_OFFLINE && !SCOPE_COMPONENTS.length) {
       try {
         const g = await (await import('./guide-freshness.mjs')).freshness(ROOT, sgConfig, { ...(await guideEnv()), force: true });
-        if (g.behind && sgConfig.styleguide?.publish === 'auto') { console.log((await publishGuide(sgConfig, resolve(ROOT, r.out))).line); }
+        if (g.behind && sgConfig.styleguide?.publish === 'auto' && !process.argv.includes('--no-publish')) { console.log((await publishGuide(sgConfig, resolve(ROOT, r.out))).line); }
         else for (const l of g.lines ?? []) console.log(`${l}${g.behind ? ` Publish this build with rms-design-system-engine --publish-styleguide (or set "styleguide": { "publish": "auto" } so a build does it).` : ''}`);
       } catch { /* said on the next run */ }
     }
