@@ -2012,7 +2012,7 @@ async function refreshComponentProps(fileKey, token, outPath) {
 // full depth, fewer calls.
 const _nodeDocCache = new Map();
 async function fetchNodeDoc(fileKey, nodeId, token) {
-  const key = fileKey + ' ' + nodeId;
+  const key = fileKey + '\\0' + nodeId;
   if (_nodeDocCache.has(key)) return _nodeDocCache.get(key);
   const p = (async () => {
     const res = await figmaFetch(

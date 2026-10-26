@@ -5,7 +5,8 @@
 // GitLab REST API: no git, no clone, no SSH key. Every run asks GitLab for the branch's latest commit and fetches
 // the archive again only when it has moved, so the engine always checks what is on GitLab now. Files the engine
 // writes in the mirror (ds-config.json, snapshots, its output) are kept across refreshes; a file removed on GitLab
-// is removed from the mirror.
+// is removed from the mirror. DESIGN_SYSTEM_ENGINE_MIRRORS keeps them all in one folder instead, per host and
+// project — a cache on this computer rather than folders beside the work.
 //
 // Token: GITLAB_TOKEN (read_api is enough), from the environment or a .env where the engine runs (else in the
 // mirror, else, for a run inside the mirror, in the folder that holds it), never logged. It is only ever sent to gitlab.com or a host named in GITLAB_HOST (gitlab-fetch.mjs's rule),
@@ -19,7 +20,9 @@ import { join, dirname, resolve, sep } from 'path';
 import { gunzipSync } from 'zlib';
 import { request as httpRequest } from 'http';
 import { request as httpsRequest } from 'https';
+import { homedir } from 'os';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
+import { envVar } from './names.mjs';
 
 export const STATE_FILE = '.gitlab-source.json';
 const TIMEOUT_MS = Math.max(1000, parseInt(process.env.GITLAB_FETCH_TIMEOUT_MS, 10) || 30000);
@@ -46,7 +49,18 @@ export function parseGitlabProject(input, env = process.env) {
 }
 
 // The folder the mirror lives in: beside where the engine runs, named for the project.
-export const mirrorDir = (from, p) => join(from, p.path.split('/').pop().replace(/[^\w.-]/g, '') || 'project');
+//
+// DESIGN_SYSTEM_ENGINE_MIRRORS moves them all somewhere else, kept apart per host and project — a cache on this
+// computer (~/.cache/rms-engine/mirrors) rather than a folder beside the work. A mirror holds what the engine writes
+// into it (its setup, the snapshots, its output), so moving it moves those too: a run after the setting changes
+// starts a fresh mirror and fetches the project again, and what the old one held stays where it was.
+export const mirrorDir = (from, p, env = process.env) => {
+  const name = p.path.split('/').pop().replace(/[^\w.-]/g, '') || 'project';
+  const set = String(envVar(env, 'MIRRORS') ?? '').trim();
+  if (!set) return join(from, name);
+  const home = set.replace(/^~(?=\/|$)/, homedir());
+  return join(resolve(home), p.host.replace(/[^\w.-]/g, '') || 'host', name);
+};
 
 // A .env value: a quoted one up to its closing quote, else up to an inline " #" comment.
 function envValue(raw) {
@@ -231,7 +245,7 @@ function why(status, host) {
 // → { dir, path, ref, sha, title, committedAt, changed, stale?, warning?, error? }
 export async function syncGitlab(p, opts = {}) {
   const from = opts.from ?? process.cwd();
-  const dir = opts.dir ?? mirrorDir(from, p);
+  const dir = opts.dir ?? mirrorDir(from, p, opts.env ?? process.env);
   const statePath = join(dir, STATE_FILE);
   let state = null; try { state = JSON.parse(readFileSync(statePath, 'utf8')); } catch { /* first run */ }
   const env = { ...(opts.env ?? process.env) };
