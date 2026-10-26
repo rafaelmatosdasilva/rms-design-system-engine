@@ -122,6 +122,19 @@ test('a store\'s section: its parts, its snapshots, its pipeline\'s variables, t
   assert.match(t, /- `design\/acme-layer`: the intent layer and contracts/);
   assert.match(t, /- `web\/acme-ui`: the code/);
   assert.match(t, /\*\*Open it:\*\* `index\.html`/);
+  assert.doesNotMatch(t, /published by hand/, 'a pipeline with no gate runs on its own');
+});
+
+test('a store whose pipeline skips the build while a variable is unset says the guide is published by hand', () => {
+  const r = storeRepos(cfg);
+  const ps = projects()['design/acme-guide'].files;
+  const ci = ps['.gitlab-ci.yml'].replace("  rules:\n", "  rules:\n    - if: '$GITLAB_TOKEN == null'\n      when: never\n");
+  const t = storeSection(r[0], { name: 'Acme DS', tree: Object.keys(ps), ci, others: r, prof: profileRepo(cfg), project: cfg.project });
+  assert.match(t, /published by hand for now: `\.gitlab-ci\.yml` skips the build while `GITLAB_TOKEN` is not set/);
+  assert.match(t, /Once these steps are done, it runs the engine here: each hour/);
+  assert.match(t, /To turn the automatic build on \(a maintainer, once\):/);
+  assert.doesNotMatch(t, /To set it up/);
+  assert.match(t, /interval `0 \* \* \* \*`/, 'the steps are still listed');
 });
 
 test('a run writes what differs where GitLab lets it, keeps the team\'s text, and asks again only when something moved', async () => {
