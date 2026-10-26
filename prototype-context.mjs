@@ -70,7 +70,10 @@ export function notesOf(i = {}, purpose = null) {
   const notes = [], left = [];
   for (const n of raw) {
     const t = intentText(n.text);
-    const say = (reason) => left.push({ text: String(n.text).replace(/\s+/g, ' ').trim(), from: n.from, who: n.who, reason, ...NOTE_LEFT[reason] });
+    // A note in the code that only says how it is built, is only a link or repeats another is the developers' own, kept
+    // next to the code for them: never given to an agent, and never a note to remove either. Figma's notes, which
+    // people and agents read, are.
+    const say = (reason) => { if (n.who !== 'code') left.push({ text: String(n.text).replace(/\s+/g, ' ').trim(), from: n.from, who: n.who, reason, ...NOTE_LEFT[reason] }); };
     // Nothing left once what is there for whoever builds it is taken out: a link (the agent cannot open it), else build notes.
     if (!t || /^\S*https?:\/\/\S+$/.test(t)) { say(/https?:\/\//.test(n.text) ? 'linkOnly' : 'buildOnly'); continue; }
     if (same(t, purpose)) { say('repeatsDescription'); continue; }
