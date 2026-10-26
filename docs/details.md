@@ -254,6 +254,14 @@ A file that only says what not to use is noted too. Saying that the design syste
 
 Once the library owner declares which styling means which component (`primitives` in `ds-config.json`), the engine spots it written by hand. A `<span>` given the body text style and the secondary colour is `<Text size="medium" color="secondary">`, and a flex `<div>` with the system's gap is its `Stack`. No token check sees these, since their values are the system's own. The audit lists each one, the edit check hands it back when an AI adds one, and `llms.txt` gives generators the table.
 
+### When a check is wrong
+
+Not every finding is right. A check that raises things it should not is the quietest failure the engine can have: people stop reading its lines, and then miss the true one.
+
+`--wrong` records a finding as wrong, with why it is wrong, who said so and when, in `design-system-engine-wrong.json` (commit it). A check called wrong more than once is named in every run afterwards, however few findings it raised that day, because the thing to fix is the check.
+
+**A marked finding is never hidden.** Silencing a line because someone once called it wrong would turn one person's judgement into everybody's blind spot, and a check that misreads one project may be right in the same words in another. The record exists to get the check fixed. It is also not the same as keeping a difference (`--keep`): keeping one says the engine was right and the team chose otherwise; marking one wrong says the engine was wrong.
+
 ### Workarounds around a component
 
 A screen that lays its own control over a component (a clear button over a text field, actions over a list row) is doing what the component cannot. It is reported to the design system as a missing slot or prop, not as the screen's mistake.
