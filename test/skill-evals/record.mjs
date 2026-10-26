@@ -58,6 +58,11 @@ export function runStats(rows = []) {
     more: [...byTask].filter(([, n]) => n > usual).map(([t, n]) => `\`${t}\` at ${n} runs`),
     cost: mean(rows.map((r) => r.usage?.cost ?? 0)), input: mean(rows.map((r) => r.usage?.input ?? 0)),
     violations: rows.reduce((n, r) => n + (r.rules ?? []).filter((c) => !c.ok).length, 0),
+    // Runs the harness stopped at its own ceiling (turns, budget). Counted apart: a run never allowed to finish says
+    // nothing about the guide, and reading it as a failure is how a task came to read 69/70 on a branch that had not
+    // touched it. A number here means the ceiling wants raising, not that the skill got worse.
+    limits: rows.filter((r) => r.limit).length,
+    limited: rows.filter((r) => r.limit).map((r) => `${r.task} #${r.run}: ${r.limit}`),
     failed: rows.flatMap((r) => [...(r.checks ?? []), ...(r.rules ?? [])].filter((c) => !c.ok).map((c) => `${r.task} #${r.run}: ${c.name}${c.detail ? ` (${c.detail})` : ''}`)),
     engine: [...new Set(rows.map((r) => r.engineHash))].join(', '), project: rows[0]?.project ?? '',
   };
@@ -78,11 +83,13 @@ export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', gu
     out.push(`| The ${s.tasks} guide tasks${s.more.length ? ` (${s.more.join(', ')})` : ''} | ${b ? `${b.pass}/${b.runs}` : '-'} | ${s.pass}/${s.runs} |`);
     out.push(`| Mean cost a run | ${b ? usd(b.cost) : '-'} | ${usd(s.cost)} |`);
     out.push(`| Input a run | ${b ? k(b.input) : '-'} | ${k(s.input)} |`);
-    out.push(`| Rule violations | ${b ? b.violations : '-'} | ${s.violations} |`, '');
+    out.push(`| Rule violations | ${b ? b.violations : '-'} | ${s.violations} |`);
+    if (s.limits || b?.limits) out.push(`| Runs stopped at a limit | ${b ? b.limits ?? 0 : '-'} | ${s.limits} |`);
+    out.push('');
     const lower = b && s.pass / s.runs < b.pass / b.runs;
     reading.push(s.pass === s.runs && !s.violations
       ? `${MODEL_NAME(model)}: every task passes and no rule is broken${b ? `; runs read ${k(s.input)} a run against ${k(b.input)}` : ''}.`
-      : `${MODEL_NAME(model)}: ${s.runs - s.pass} of ${s.runs} runs failed${lower ? ', fewer passes than the entry below' : ''}${s.violations ? `, ${s.violations} rule violation${s.violations === 1 ? '' : 's'}` : ''}. Failed: ${s.failed.slice(0, 6).join('; ')}.`);
+      : `${MODEL_NAME(model)}: ${s.runs - s.pass} of ${s.runs} runs failed${lower ? ', fewer passes than the entry below' : ''}${s.violations ? `, ${s.violations} rule violation${s.violations === 1 ? '' : 's'}` : ''}${s.limits ? `, and ${s.limits} of them never finished: ${s.limited.slice(0, 3).join('; ')} — read those as the ceiling, not the guide` : ''}. Failed: ${s.failed.slice(0, 6).join('; ')}.`);
   }
   out.push(`**Reading.** ${reading.join(' ')} Records: \`records/${name}\`.`, '');
   return out.join('\n');

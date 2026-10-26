@@ -8,7 +8,8 @@
 //               "intentLayer": { "read": "<project link>", "mode": "merge-request" },
 //               "styleguide": { "write": { "folder": "../public" } } }
 //
-// A place is { gitlab: link, branch?, path?, tokenEnv? } or { folder: path, path? }; a link or a path alone is read as
+// A place is { gitlab: link, branch?, path?, tokenEnv? }, { github: link, branch?, path? } or { folder: path, path? };
+// a GitHub store is read with git, which the engine already speaks, rather than a second API; a link or a path alone is read as
 // one. `write` is where the part is written, the same place as `read` when not said, and null for nowhere. It is never
 // a claim that this person may write: GitLab answers that (writeAccess), from the token's role in the project and
 // whether it may push to the branch, and the engine writes only where GitLab says yes. GitLab still refuses on its own
@@ -161,6 +162,21 @@ export function gitlabApi(ROOT, place, { env = process.env, http } = {}) {
 // is turned into a plain failure (BatchMode, GIT_TERMINAL_PROMPT) and the run then says what it would have said.
 const GIT_SILENT = { GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new', GIT_ASKPASS: '', SSH_ASKPASS: '' };
 const gitMirrorDir = (host, path, home = homedir()) => join(home, '.cache', 'rms-engine', 'git', host, path.replace(/[^A-Za-z0-9._-]/g, '-') + '.git');
+
+// A place git can reach, from its link: { host, path, origin }, or null when the link is not a repository's.
+// Any host, because git is the same everywhere — which is what lets a store live on GitHub without the engine
+// learning a second API for it.
+export function gitPlaceOf(place) {
+  const url = place?.github ?? place?.gitlab;
+  if (!url) return null;
+  let u; try { u = new URL(String(url).trim()); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  // The project's own path: what comes before GitLab's "/-/" or GitHub's "/tree|/blob", without a .git suffix.
+  const parts = u.pathname.split('/').filter(Boolean).map((s) => decodeURIComponent(s));
+  const end = ['-', 'tree', 'blob'].map((m) => parts.indexOf(m)).filter((i) => i > 0);
+  const path = parts.slice(0, end.length ? Math.min(...end) : parts.length).join('/').replace(/\.git$/, '');
+  return path.includes('/') ? { host: u.host.toLowerCase(), path, origin: u.origin } : null;
+}
 
 // → { sha, files: Map<relative path, Buffer> } | null when git cannot reach it with what this person has.
 export function gitStoreFiles(p, place, { git = gitSilently, home = homedir() } = {}) {
@@ -346,13 +362,23 @@ export function folderFiles(dir, part) {
 // and said. → { line, changed, written: [rel] } | null (no store for the part)
 export async function pullStore(ROOT, cfg, part, opts = {}) {
   const place = storesOf(cfg)[part]?.read;
-  if (!place || place.github) return null;
+  if (!place) return null;
   const st = readState(ROOT), prev = st[part] ?? {};
   const label = LABEL[part];
   let remote, sha = null;
   try {
     if (place.folder) remote = folderFiles(resolve(ROOT, place.folder, place.path || ''), part);
-    else {
+    else if (place.github) {
+      // GitHub, read with git: the engine learns no second API for it, because git is the same on either host. A
+      // person reaches it the way they already clone from GitHub; there is no token of the engine's own here.
+      if (opts.offline) return { line: null, changed: false, written: [] };
+      const p = gitPlaceOf(place);
+      if (!p) return { line: `⚠️  ${label}: ${place.github} is not a repository link`, changed: false, written: [] };
+      const g = (opts.gitStore ?? gitStoreFiles)(p, place, opts);
+      if (!g) return { line: `⚠️  ${label} not read from ${describePlace(place)}: git could not reach it with this computer's own access`, changed: false, written: [] };
+      if (prev.sha === g.sha) return { line: null, changed: false, written: [] };
+      sha = g.sha; remote = g.files;
+    } else {
       if (opts.offline) return { line: null, changed: false, written: [] };
       const api = gitlabApi(ROOT, place, opts);
       if (api.error) return { line: `⚠️  ${label}: ${api.error}`, changed: false, written: [] };
