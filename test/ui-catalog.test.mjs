@@ -141,3 +141,28 @@ test('a real use of each component from the code, the products first, never its 
   const catalog = { components: { chip: { description: 'A filter chip.', props: {}, example: { code: '<Chip size="M" />', file: 'app/pages/Filters.jsx', line: 2 } } } };
   assert.ok(answerLines(answer('chip', { catalog })).includes('  as the code writes it: <Chip size="M" />  (app/pages/Filters.jsx:2)'));
 });
+
+test('rule 6: a component written from its name alone is said once, and only when cards are tracked', () => {
+  const catalog = { components: { Card: { props: {} }, Badge: { props: {} } } };
+  const ui = { root: 'c', components: [
+    { id: 'c', component: 'Card', children: ['b1', 'b2'] },
+    { id: 'b1', component: 'Badge' },
+    { id: 'b2', component: 'Badge' },
+  ] };
+  // Nothing tracked: the check says nothing about cards, so a caller that does not track them is unaffected.
+  assert.deepEqual(checkUi(ui, catalog).findings.filter((f) => f.rule === 6), []);
+
+  // Card read, Badge not: once for Badge, however many times it is used.
+  const r = checkUi(ui, catalog, { cardsRead: new Set(['Card']) });
+  const said = r.findings.filter((f) => f.rule === 6);
+  assert.equal(said.length, 1, JSON.stringify(said));
+  assert.equal(said[0].level, 'warning', 'never an error: a card can reach an agent another way');
+  assert.match(said[0].message, /Badge was used without its card being read: run --detail Badge/);
+  assert.equal(r.ok, true, 'a warning never fails the check');
+
+  // Both read: nothing to say.
+  assert.deepEqual(checkUi(ui, catalog, { cardsRead: new Set(['Card', 'Badge']) }).findings.filter((f) => f.rule === 6), []);
+  // A component the catalog does not have is already the stronger finding, and is not said twice.
+  const odd = { root: 'c', components: [{ id: 'c', component: 'Card', children: ['x'] }, { id: 'x', component: 'Nope' }] };
+  assert.deepEqual(checkUi(odd, catalog, { cardsRead: new Set(['Card']) }).findings.filter((f) => f.rule === 6), []);
+});

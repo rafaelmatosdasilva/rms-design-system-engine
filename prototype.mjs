@@ -20,6 +20,7 @@ import { OUT_DIR, SKILL as CLI, envVar } from './names.mjs';
 import { pageSystem, pageContext, checkPage, syntaxOf, usageCards, pageConventions, pageCache, importedComponents, recordInventions } from './page-check.mjs';
 import { importOf } from './styleguide-data.mjs';
 import { loadContext, purposeLines, ruleLines, detailFor, usesAgainstPurpose, requestFocus, focusLines, cut, screenUses } from './prototype-context.mjs';
+import { noteCardsRead } from './cards-read.mjs';
 
 // A system this small is shown whole in the catalog.
 const SMALL_SYSTEM = 30;
@@ -337,7 +338,7 @@ export function themeSpacing(css) {
 
 // --catalog: everything a prototype may use, in one screen: the system's components and options, the engine's pieces
 // with the tokens they take, the format, and the starting points already made.
-export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null, detail = [], pages = [] } = {}) {
+export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null, detail = [], pages = [], onServed = null } = {}) {
   const drawable = new Set((sys.parts.view.components ?? []).map((c) => c.name));
   const comps = Object.fromEntries(Object.entries(sys.catalog.components ?? {}).map(([n, c]) => [n, { ...c, ...(drawable.has(n) ? {} : { status: c.status ? `${c.status}, not built in code` : 'not built in code: drawn as a box' }) }]));
   // A small system is shown whole. A large one in full only where the request (and what it names) needs it, every other
@@ -349,6 +350,10 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
   const small = names.length <= SMALL_SYSTEM && (ctx.rules ?? []).length <= SMALL_SYSTEM;
   const first = page && focus ? [...new Set((focus.sections ?? []).flatMap((x) => importedComponents(page, x.text)))] : [];
   const want = small ? null : detailFor(ctx, focus, detail, { pages, first });
+  // Which components this hands over in full, for whoever wants to know later what was actually read (cards-read.mjs,
+  // and rule 6 of --check-ui). Told here rather than guessed from the arguments: what a request is given in full is
+  // worked out from the request, not only from the names a person typed after --detail.
+  if (want && onServed) onServed([...want.components]);
   const pieces = pieceCatalog(sys.scales, Object.keys(comps));
   const pieceRows = Object.entries(pieces).map(([n, d]) => `${n.padEnd(8)}  ${Object.entries(d.props).map(([k, e]) => `${k}=${e.type === 'enum' ? (e.values.length > 6 ? `<${k === 'style' ? 'text style' : 'spacing token'}>` : e.values.join('|')) : e.type === 'boolean' ? 'true|false' : `<${k === 'width' ? 'screen width in px' : k === 'need' ? 'what is needed' : k === 'closest' ? 'nearest system component' : 'text'}>`}`).join('  ')}`);
   const lines = [
@@ -836,7 +841,7 @@ export async function runPrototype(ROOT, argv) {
     const focus = req ? requestFocus(sys.page ? sys.page.context : sys.context, req, sys.page ? [] : list, { answered: args.includes('--answered') }) : null;
     const at = args.indexOf('--detail');
     const detail = at >= 0 && args[at + 1] ? args[at + 1].split(',') : [];
-    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list }) + '\n');
+    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list, onServed: (names) => noteCardsRead(ROOT, names) }) + '\n');
     return 0;
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);

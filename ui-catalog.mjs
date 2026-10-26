@@ -146,6 +146,7 @@ export const RULES = [
   'A boolean prop takes true or false.',
   'Every id is unique, there is one root, every child exists, and each node has one parent.',
   'Never put a component inside one it must never combine with.',
+  'Read a component\'s card before using it.',
 ];
 
 // The aligned table for llms.txt: one line per component, props as name=value|value.
@@ -205,7 +206,10 @@ const near = (name, list) => {
   return list.find((x) => x.toLowerCase() === k) ?? list.find((x) => x.toLowerCase().includes(k) || k.includes(x.toLowerCase())) ?? typo ?? null;
 };
 
-export function checkUi(ui, catalog) {
+// `cardsRead`: the components whose cards this project handed over recently (cards-read.mjs). Given, a component
+// used without its card is a warning — never an error, since a card can reach an agent another way. Not given, the
+// check says nothing about it, so a caller that does not track cards behaves exactly as before.
+export function checkUi(ui, catalog, { cardsRead = null } = {}) {
   const findings = [];
   const add = (rule, level, id, message) => findings.push({ rule, level, id, message });
   const comps = catalog.components ?? {};
@@ -261,6 +265,13 @@ export function checkUi(ui, catalog) {
     while (p != null) { if (seen.has(p)) { add(4, 'error', id, `"${id}" is inside itself (a cycle)`); break; } seen.add(p); p = parents.get(p); }
   }
   for (const id of byId.keys()) if (id !== root && !parents.has(id)) add(4, 'warning', id, `"${id}" is not attached to the tree`);
+  // Used without its card read: said once per component, not once per use, so a page with twelve chips says it once.
+  // Only for components the catalog has — one it does not is already the stronger finding above.
+  if (cardsRead) {
+    const unread = new Map();
+    for (const node of byId.values()) if (comps[node.component] && !cardsRead.has(node.component) && !unread.has(node.component)) unread.set(node.component, node.id);
+    for (const [name, id] of unread) add(6, 'warning', id, `${name} was used without its card being read: run --detail ${name} and write it from what the card lists`);
+  }
   const errors = findings.filter((f) => f.level === 'error').length;
   return { ok: errors === 0, findings, counts: { components: byId.size, errors, warnings: findings.length - errors } };
 }
