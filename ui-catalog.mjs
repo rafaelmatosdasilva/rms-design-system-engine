@@ -15,6 +15,7 @@
 // Pure: no I/O. contract-gen.mjs writes the catalog; ui-check.mjs is the command.
 
 import { rejectedNames, rightFor } from './prop-vocabulary.mjs';
+import { rejectedFrom } from './invented.mjs';
 
 const STATE_PROP = /^(state|states|interaction)$/i;
 const TYPE = { enum: 'enum', boolean: 'boolean', text: 'text', instance: 'slot', children: 'children' };
@@ -40,7 +41,9 @@ export function realExample(name, cls, files, { own = null } = {}) {
 
 // built: [{ name, contract }] (contract-gen). code: the code snapshot (optional, fresh only).
 // selectorFor: (name) → the component's selector (optional). examples: { name: realExample(…) } (optional).
-export function buildCatalog(built, { code = null, selectorFor = null, examples = {} } = {}) {
+// `invented`: the names agents actually invented here (invented.mjs). Merged into each prop's rejected table, so an
+// agent reads what this project's agents got wrong beside the real values, instead of finding out after writing.
+export function buildCatalog(built, { code = null, selectorFor = null, examples = {}, invented = null } = {}) {
   const names = new Set(built.map((b) => b.name));
   const components = {};
   for (const { name, contract: c } of built) {
@@ -62,7 +65,9 @@ export function buildCatalog(built, { code = null, selectorFor = null, examples 
       if (e.type === 'enum' && e.values) {
         const codeValues = codeName && Array.isArray(api?.props?.[codeName]?.options) ? api.props[codeName].options.map(String) : [];
         if (codeValues.length && (codeValues.length !== e.values.length || codeValues.some((v, i) => v !== String(e.values[i])))) e.codeValues = codeValues;
-        const rejected = rejectedNames({ figma: e.values.map(String), code: codeValues });
+        // What words alone would reject, then what agents here actually wrote: the second is the one worth having,
+        // so it wins where both name the same wrong word.
+        const rejected = { ...rejectedNames({ figma: e.values.map(String), code: codeValues }), ...(invented ? rejectedFrom(invented, name, p.name) : {}) };
         if (Object.keys(rejected).length) e.rejected = rejected;
       }
       props[p.name] = e;

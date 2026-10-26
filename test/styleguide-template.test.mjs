@@ -351,7 +351,10 @@ test('in the browser: no script error, a control changes the real component, the
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
     // What a criterion means shows from its name, in the page's one tooltip (the same as the Status page's), on hover
     // and focus; Escape hides it.
-    const tip = `[...document.querySelectorAll('#c-chip .pg-a11y .sg-mx-why')].find((w) => /^2\.1\.1/.test(w.textContent)).querySelector('.sg-tip-btn')`;
+    // ?. after find: the row is written by a measurement the page makes live, and a run where that has not finished
+    // has no 2.1.1 row at all. Without this the expression throws, the wait reports "undefined", and the failure
+    // reads as the tooltip being wrong rather than as the row never arriving.
+    const tip = `[...document.querySelectorAll('#c-chip .pg-a11y .sg-mx-why')].find((w) => /^2\.1\.1/.test(w.textContent))?.querySelector('.sg-tip-btn')`;
     // The tip is wired to its text as the table settles: waited for, not read before it is there.
     assert.match(await until(`document.getElementById(${tip}?.getAttribute('aria-describedby'))?.textContent ?? ''`, (v) => /How it is checked/.test(v ?? '')), /^WCAG 2\.1\.1 Keyboard \(A\)What it means.*How it is checked/);
     assert.equal(await run(`!document.querySelector('.sg-token-pop') || document.querySelector('.sg-token-pop').hidden`), true, 'no second kind of tip');

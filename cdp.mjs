@@ -67,10 +67,18 @@ export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engi
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  // Chrome must not outlive the run that started it. kill() is the caller's to call, and a caller that throws, or a
+  // test runner that ends while a page is still open, would otherwise leave a headless browser alive for ever: after
+  // a day of runs on one computer there were forty of them holding three gigabytes, and every later run read as slow
+  // because of it — which is exactly how a machine comes to look like a failing engine.
+  // The handler is removed as soon as kill runs, so a long session that opens many browsers does not pile listeners
+  // up, and everything it does is synchronous, which is all an exit handler may be.
   const kill = () => {
+    process.off('exit', kill);
     try { chrome.kill(); } catch { /* already dead */ }
     try { rmSync(userDataDir, { recursive: true, force: true }); } catch { /* best effort */ }
   };
+  process.on('exit', kill);
   try {
     const wsUrl = await new Promise((resolve, reject) => {
       let buf = '';
@@ -84,6 +92,11 @@ export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engi
       const timer = setTimeout(() => reject(new Error(`Chrome did not start within ${timeoutMs / 1000}s`)), timeoutMs);
       timer.unref?.();
     });
+    // Ready: from here it must not hold the run open either. A child with a pipe keeps Node's loop alive, so a run
+    // whose last page was read would wait for a browser nobody is using - the suite sat for twenty minutes after its
+    // final test for this. Only now, because until the socket is announced that same pipe is what the launch waits on.
+    chrome.unref?.();
+    chrome.stderr?.unref?.();
     return { chrome, userDataDir, wsUrl, kill };
   } catch (e) { kill(); throw e; }
 }
