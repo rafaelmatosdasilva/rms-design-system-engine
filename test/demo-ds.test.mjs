@@ -49,8 +49,8 @@ test('demo design system, with Chrome: every deliberate difference is found, and
   const saved = join(tmpdir(), `demo-run-${process.pid}.txt`); writeFileSync(saved, r.out);
   assert.match(r.out, /chip \(toggle button\)|component does not expose what its role requires/, `full output in ${saved}`);
   assert.doesNotMatch(r.out, /chip height \(Icon=True\)/);   // a single axis is never compared with a combination
-  assert.match(r.out, /🖼  ⚠️  button: [\d.]+% of pixels differ outside text/);   // a border only the Figma image has
-  assert.match(r.out, /🖼  ✓  chip: 0% of pixels differ outside text/);
+  assert.match(r.out, /🖼  ⚠️  button: <N>% of pixels differ outside text/);   // a border only the Figma image has
+  assert.match(r.out, /🖼  ✓  chip: <N>% of pixels differ outside text/);   // under the limit: the share moves with the machine's fonts
   golden('expected-report.txt', r.out);
 });
 

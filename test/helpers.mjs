@@ -101,6 +101,10 @@ export function normalise(text, dir) {
   return text.split(dir).join('<DIR>')
     .replace(/\x1b\[[0-9;]*m/g, '')
     .replace(/(% of pixels differ outside text, )[\d.]+% with it/g, '$1<N>% with it')
+    // How much of a picture differs, and its size, move with the fonts the machine has (a label 1px wider): the
+    // tests say which side of the limit each one is on, never the exact share.
+    .replace(/(🖼 {2}\S+ {2}[\w/-]+: )[\d.]+(% of pixels differ outside text)/g, '$1<N>$2')
+    .replace(/, Figma \d+×\d+ and code \d+×\d+ px/g, '')
     .replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, '<TS>')
     .replace(/PARITY AUDIT {2}· {2}[\d-]+/, 'PARITY AUDIT  ·  <DATE>')
     .replace(/\b\d+(\.\d+)?m?s\b/g, '<DUR>')
