@@ -22,11 +22,13 @@
 // A computer with no token reads a store with the person's own git access instead (gitStoreFiles): the projects they
 // already clone are reached over their SSH key or their credential helper, so nobody makes a token just to read. Only
 // where there is no token, so a setup that has one is unchanged, and git is never allowed to stop and ask for one.
-// Writing still goes through the API with a token: GitLab's roles and protected branches decide it, as before. Each
+// Writing without a token works the same way (gitStorePush): the commit is built from git's own plumbing inside that
+// mirror and pushed, so nothing is checked out. What a person may push is still the host's to say - a protected
+// branch refuses exactly as it would from their terminal, and the refusal is what the run reports. Each
 // commit the engine makes names whose run made it as its author (decided-by.mjs), the token's owner staying the
 // committer, so a store several people write tells their runs apart.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, accessSync, unlinkSync, constants } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, accessSync, unlinkSync, rmSync, constants } from 'node:fs';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { join, resolve, dirname, relative, sep, basename } from 'node:path';
@@ -212,7 +214,55 @@ export function gitStoreFiles(p, place, { git = gitSilently, home = homedir() } 
     return { sha, files };
   } catch { return null; }
 }
-const gitSilently = (args, input) => execFileSync('git', args, { input, maxBuffer: 256 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'ignore'], env: { ...process.env, ...GIT_SILENT } });
+// stderr is kept, not thrown away: when a host refuses a push (a protected branch, a role that may not write) what
+// it says is the only useful part of the failure, and the run passes it on word for word.
+const gitSilently = (args, input, env = {}) => execFileSync('git', args, { input, maxBuffer: 256 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...GIT_SILENT, ...env } });
+
+// Writing a store with the person's own git access, for a computer with no token. The mirror gitStoreFiles already
+// keeps is enough: a commit is built from git's own plumbing (hash-object, write-tree, commit-tree) and pushed, so
+// nothing is ever checked out and the person's folders are untouched.
+//
+// What the host allows is still the host's to say. A push to a protected branch is refused by GitLab or GitHub
+// exactly as it would be from a terminal, and the refusal is passed on in the line the run prints: this adds a way
+// in, never a permission.
+//
+// → { ok: true, sha } | { ok: false, why }
+export function gitStorePush(p, place, files, message, { git = gitSilently, home = homedir(), who = null } = {}) {
+  const dir = gitMirrorDir(p.host, p.path, home);
+  const under = place.path ? place.path.replace(/^\/+|\/+$/g, '') : '';
+  const branch = place.branch || 'HEAD';
+  const urls = [`git@${p.host}:${p.path}.git`, `${p.origin}/${p.path}.git`];
+  const g = (args, input) => git(['--git-dir', dir, ...args], input);
+  try {
+    if (!existsSync(join(dir, 'HEAD'))) { mkdirSync(dirname(dir), { recursive: true }); git(['init', '--bare', '-q', dir]); }
+    let url = null;
+    for (const u of urls) { try { g(['fetch', '-q', u, branch]); url = u; break; } catch { /* the next way in */ } }
+    if (!url) return { ok: false, why: 'git could not reach it with this computer\'s own access' };
+    const head = String(g(['rev-parse', 'FETCH_HEAD'])).trim();
+
+    // An index of its own, so nothing touches whatever index the mirror may hold.
+    const index = join(dir, `store-index-${process.pid}`);
+    const withIndex = (args, input) => git(['--git-dir', dir, ...args], input, { GIT_INDEX_FILE: index });
+    try {
+      withIndex(['read-tree', head]);
+      for (const [rel, data] of files) {
+        const blob = String(git(['--git-dir', dir, 'hash-object', '-w', '--stdin'], Buffer.from(data))).trim();
+        withIndex(['update-index', '--add', '--cacheinfo', `100644,${blob},${under ? `${under}/${rel}` : rel}`]);
+      }
+      const tree = String(withIndex(['write-tree'])).trim();
+      if (tree === String(g(['rev-parse', `${head}^{tree}`])).trim()) return { ok: true, sha: head, unchanged: true };
+      // Who ran it is the author, as it is for a commit made through the API; git needs a committer too, and uses
+      // this person's own, which is what a push from their terminal would carry.
+      const env = who ? { GIT_AUTHOR_NAME: who.name, GIT_AUTHOR_EMAIL: who.email } : {};
+      const sha = String(git(['--git-dir', dir, 'commit-tree', tree, '-p', head, '-m', message], undefined, env)).trim();
+      g(['push', '-q', url, `${sha}:refs/heads/${place.branch || 'HEAD'}`]);
+      return { ok: true, sha };
+    } finally { try { rmSync(index, { force: true }); } catch { /* never there on the first failure */ } }
+  } catch (e) {
+    // What git says is what the host said: a protected branch, a role that may not push, a stale branch.
+    return { ok: false, why: String(e?.stderr ?? e?.message ?? e).split('\n').filter(Boolean).slice(-2).join('; ').slice(0, 300) || 'git refused the push' };
+  }
+}
 
 // ── May this person write the part there? GitLab says ──────────────────────────────────────────────────────────────
 // Asked once per run and place, with the token that would write: the project's permissions (the token's role) and the
@@ -243,6 +293,15 @@ async function check(ROOT, place, want, opts) {
   const api = gitlabApi(ROOT, place, opts);
   if (api.error) return { mode: null, place, why: api.error };
   const name = api.p.path;
+  // No token to write with: this person's own git access may still reach it, as it does for reading. Offered when
+  // git can fetch the repository, which proves the access without writing anything; whether they may *push* is the
+  // host's to answer, and it answers on the push itself, in words this run passes on. A way in, never a permission.
+  if (!api.hasWriteToken) {
+    const gp = gitPlaceOf(place);
+    if (gp && (opts.gitStore ?? gitStoreFiles)(gp, { ...place, path: '' }, opts)) {
+      return { mode: 'push', place, gitPlace: gp, why: 'written with your own git access (no token); the host still decides what you may push' };
+    }
+  }
   if (!api.hasWriteToken) return { mode: null, place, why: api.notSent ? `a token is set but not sent to ${api.p.host}: add GITLAB_HOST=${api.p.host} to .env` : `no token to write ${name} with: add ${place.writeTokenEnv || place.tokenEnv || 'GITLAB_WRITE_TOKEN'} to .env (a token for ${name} only)` };
   try {
     const r = await api.get('', { write: true });
@@ -453,6 +512,17 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
   const place = a.place;
   const sendable = [...files].filter(([rel]) => safeRel(rel) && TAKES[part]?.(rel));
   if (!sendable.length) return { ok: true, line: `ℹ️  ${label}: nothing to send` };
+  // Written with this person's own git access, because there is no token. Built and pushed without a checkout; a
+  // host that will not take it says so and that is what the line carries.
+  if (a.mode === 'push') {
+    const r = (opts.gitPushStore ?? gitStorePush)(a.gitPlace, place, sendable, message, { ...opts, who: 'runBy' in opts ? opts.runBy : runBy(ROOT) });
+    if (!r.ok) return { ok: false, line: `⚠️  ${label} not sent: ${r.why}` };
+    if (r.unchanged) return { ok: true, line: `ℹ️  ${label}: ${describePlace(place)} already has these files` };
+    const st2 = readState(ROOT), prev2 = st2[part] ?? {};
+    st2[part] = { sha: r.sha, files: { ...(prev2.files ?? {}), ...Object.fromEntries(sendable.map(([rel, d]) => [rel, hash(d)])) }, readAt: new Date().toISOString() };
+    writeState(ROOT, st2);
+    return { ok: true, line: `📤 ${label}: ${sendable.length} file${sendable.length === 1 ? '' : 's'} pushed to ${describePlace(place)} with your own git access` };
+  }
   if (a.mode === 'folder') {
     const dir = resolve(ROOT, place.folder, place.path || '');
     for (const [rel, data] of sendable) { const fp = join(dir, rel); mkdirSync(dirname(fp), { recursive: true }); writeFileSync(fp, data); }

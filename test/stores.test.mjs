@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf } from '../stores.mjs';
+import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf, gitStorePush } from '../stores.mjs';
 import { execFileSync } from 'node:child_process';
 import { mayWrite } from '../intent-changes.mjs';
 
@@ -365,4 +365,49 @@ test('a commit the gateway timed out on but GitLab made is sent, said once and n
   other.http.send = async (url, o) => (o?.body?.branch ? { ok: false, status: 502, json: async () => ({}) } : (await fakeGitlab().http.send(url, o)));
   forgetAccess();
   assert.equal((await pushStore(project(), cfg, 'styleguide', new Map([['index.html', '<p>x</p>']]), 'Style guide published', { env, http: other.http, retryMs: 1 })).ok, false, 'one that did not land is not sent');
+});
+
+// ── Writing a store with the person's own git access ────────────────────────────────────────────────────────────
+test('no token: a store is written by git push, built without checking anything out, and a refusal is passed on', () => {
+  const home = mkdtempSync(join(tmpdir(), 'git-push-home-'));
+  const remote = mkdtempSync(join(tmpdir(), 'git-push-remote-'));
+  const seed = mkdtempSync(join(tmpdir(), 'git-push-seed-'));
+  const run = (args, cwd) => execFileSync('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+
+  // A repository to push into, with something already in it.
+  run(['init', '--bare', '-q', '-b', 'main', remote]);
+  run(['init', '-q', '-b', 'main'], seed);
+  run(['config', 'user.email', 'demo@example.com'], seed); run(['config', 'user.name', 'Demo'], seed);
+  mkdirSync(join(seed, 'protos'), { recursive: true });
+  writeFileSync(join(seed, 'protos', 'Old.json'), '{"a":1}');
+  run(['add', '-A'], seed); run(['commit', '-qm', 'one'], seed); run(['push', '-q', remote, 'main'], seed);
+
+  const git = (args, input, env) => execFileSync('git', args.map((a) => (/^(git@|https?:\/\/)/.test(a) ? remote : a)), { input, maxBuffer: 1 << 28, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...env } });
+  const p = { host: 'gitlab.acme.test', path: 'team/design', origin: 'https://gitlab.acme.test' };
+  const place = { branch: 'main', path: 'protos' };
+
+  const r = gitStorePush(p, place, new Map([['New.json', '{"b":2}']]), 'Prototypes', { git, home, who: { name: 'Acme Runner', email: 'runner@example.com' } });
+  assert.equal(r.ok, true, r.why);
+  assert.match(r.sha, /^[0-9a-f]{40}$/);
+
+  // It is really there, under the place's path, beside what was there before.
+  const names = String(run(['ls-tree', '-r', '--name-only', 'main'], remote)).split('\n').filter(Boolean);
+  assert.deepEqual(names.sort(), ['protos/New.json', 'protos/Old.json'], 'added, never replacing the tree');
+  assert.equal(String(run(['show', 'main:protos/New.json'], remote)).trim(), '{"b":2}');
+  // Whose run made it, as the API path records it too.
+  assert.match(String(run(['log', '-1', '--format=%an <%ae>', 'main'], remote)), /Acme Runner <runner@example\.com>/);
+
+  // The same content again changes nothing: no empty commit is pushed.
+  const again = gitStorePush(p, place, new Map([['New.json', '{"b":2}']]), 'Prototypes', { git, home });
+  assert.equal(again.unchanged, true, JSON.stringify(again));
+
+  // A host that refuses says why, in its own words, and nothing throws at the run. Everything but the push is the
+  // real git: a double that refuses every call would fail at the fetch and never reach the thing being tested.
+  const refusing = (args, input, env) => {
+    if (args.includes('push')) { const e = new Error('refused'); e.stderr = 'remote: GitLab: You are not allowed to push code to protected branches on this project.\n'; throw e; }
+    return git(args, input, env);
+  };
+  const no = gitStorePush(p, place, new Map([['x.json', '{}']]), 'Prototypes', { git: refusing, home });
+  assert.equal(no.ok, false);
+  assert.match(no.why, /not allowed to push code to protected branches/);
 });
