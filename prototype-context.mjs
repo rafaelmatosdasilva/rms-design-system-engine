@@ -70,7 +70,10 @@ export function notesOf(i = {}, purpose = null) {
   const notes = [], left = [];
   for (const n of raw) {
     const t = intentText(n.text);
-    const say = (reason) => left.push({ text: String(n.text).replace(/\s+/g, ' ').trim(), from: n.from, who: n.who, reason, ...NOTE_LEFT[reason] });
+    // A note in the code that only says how it is built, is only a link or repeats another is the developers' own, kept
+    // next to the code for them: never given to an agent, and never a note to remove either. Figma's notes, which
+    // people and agents read, are.
+    const say = (reason) => { if (n.who !== 'code') left.push({ text: String(n.text).replace(/\s+/g, ' ').trim(), from: n.from, who: n.who, reason, ...NOTE_LEFT[reason] }); };
     // Nothing left once what is there for whoever builds it is taken out: a link (the agent cannot open it), else build notes.
     if (!t || /^\S*https?:\/\/\S+$/.test(t)) { say(/https?:\/\//.test(n.text) ? 'linkOnly' : 'buildOnly'); continue; }
     if (same(t, purpose)) { say('repeatsDescription'); continue; }
@@ -266,8 +269,10 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
     const usage = guidanceView({ description: c.description ?? i.design?.description ?? '', annotations: i.design?.annotations ?? [], note: i.code?.note ?? '', authored: { ...(i.guidance ?? {}), ...(authored?.components?.[name]?.guidance ?? {}) } });
     const said = (key) => (usage.sections.find((x) => x.key === key)?.text ?? []).map(clean).filter(Boolean);
     const whenToUse = said('whenToUse'), mistakes = said('mistakes'), limitations = said('limitations');
-    const dos = (examples[name] ?? []).filter((e) => e.kind === 'do').map((e) => clean(e.caption)).filter(Boolean);
-    const donts = (examples[name] ?? []).filter((e) => e.kind === 'dont').map((e) => clean(e.caption)).filter(Boolean);
+    // Its Do and don't: the pictures' captions, then the Do: and Don't: lines written in Figma, the code or the contract.
+    const written = [...new Set([...(usage.doDont?.text ?? []), ...(usage.doDont?.also ?? []).flatMap((a) => a.text)])].map((t) => /^(Do|Don't):\s*(.+)$/.exec(t)).filter(Boolean);
+    const dos = [...(examples[name] ?? []).filter((e) => e.kind === 'do').map((e) => clean(e.caption)), ...written.filter((m) => m[1] === 'Do').map((m) => clean(m[2]))].filter(Boolean);
+    const donts = [...(examples[name] ?? []).filter((e) => e.kind === 'dont').map((e) => clean(e.caption)), ...written.filter((m) => m[1] === "Don't").map((m) => clean(m[2]))].filter(Boolean);
     const notFor = clean(c.whenNotToUse ?? i.guidance?.whenNotToUse) || said('whenNotToUse').join(' ') || null;
     // The team's intent layer, kept apart from Figma's and the code's words: what the agent composing a screen without a
     // Figma layout reads to know what each component is for and what not to do with it.

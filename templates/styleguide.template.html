@@ -1628,12 +1628,15 @@ table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: v
 .sg-issues.sg-il th:nth-child(1) { width: 22%; }      /* For: a component's name or a layer */
 .sg-issues.sg-il th:nth-child(3) { width: 16%; }      /* Sources: Intent layer, Figma, Code */
 .sg-issues.sg-il th:nth-child(4) { width: 15%; }      /* Decision: Review and its topic, or Keep */
-.sg-issues.sg-il th:nth-child(5) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
-/* With no intent layer there is no File column: Sources, Status and Last updated each move one to the left. */
-.sg-issues.sg-il.sg-il-nofile th:nth-child(2) { width: 16%; }
-.sg-issues.sg-il.sg-il-nofile th:nth-child(3) { width: 15%; }
+.sg-issues.sg-il:not(.sg-il-nofile) th:nth-child(5) { width: 9.5rem; }   /* Last updated: a date and a time on one line */
+/* With no intent layer there is no File column: For and Sources a share each, Status (its word and what it means under
+   it) what the others leave, Last updated a date and a time; the row's arrow keeps its narrow column. A narrow window
+   scrolls the table sideways rather than squeeze a component's name. */
+.sg-issues.sg-il.sg-il-nofile { min-width: 46rem; }
+.sg-issues.sg-il.sg-il-nofile th:nth-child(1) { width: 26%; }
+.sg-issues.sg-il.sg-il-nofile th:nth-child(2) { width: 20%; }
+.sg-issues.sg-il.sg-il-nofile th:nth-child(3) { width: auto; }
 .sg-issues.sg-il.sg-il-nofile th:nth-child(4) { width: 9.5rem; }
-.sg-issues.sg-il.sg-il-nofile th:nth-child(5) { width: auto; }
 /* File takes the rest: a page's name and its path. */
 /* A page title with what it links to at its right (pageBar): the title stays sticky; the links keep the page's text size. */
 .sg-section > h2.sg-h2-links { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-m); flex-wrap: wrap; }
@@ -3210,7 +3213,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
-          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for (agents read it, through tokens.json, to pick the right token).</span><span class="sg-il-label">Where</span><span class="sg-il-text">Figma, in each variable\'s Description (Local variables → select the variable → Description).</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
+          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for (agents read it, through tokens.json, to pick the right token).</span><span class="sg-il-label">Where</span><span class="sg-il-text">Figma, in each variable\'s Description (Local variables → select the variable → Description)' + (tm.some(function (m) { return /^text style /.test(m); }) ? '; a text style\'s in its own Description (select the style → Edit style → Description)' : '') + '.</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
           todo: tm.length ? '<p class="sg-il-line"><strong>Describe ' + tm.length + ' of the ' + tn + ' tokens the components use, in Figma.</strong></p>' : '',
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
@@ -3315,6 +3318,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // same things under the same names, in the same order: [name, where it was written (or '' when nobody wrote it), what
   // was written, where in full, what to say when it is missing].
   var guideOf = function (c, key) { return ((c.guidance || {}).sections || []).filter(function (x) { return x.key === key; })[0] || null; };
+  // Its Do: and Don't: lines from Figma, the code or the contract (guidanceView → doDont), when it has any.
+  var guideDo = function (c) { var d = (c.guidance || {}).doDont; return d && (d.text || []).length ? d : null; };
   var paras = function (list) { return list.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join(''); };
   var figmaWhat = function (c) { return (c.description || '').replace(/@\w+/g, '').trim(); };
   var ilWhat = function (c) { return ((c.intentLayer || {}).purpose || '').trim(); };
@@ -3365,15 +3370,17 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     guideKind('whenNotToUse', 'When not to use'),
     guideKind('mistakes', 'Common mistakes'),
     guideKind('limitations', 'Limitations'),
-    // Its do and don't: written in its intent-layer page (what agents read), and its pictures in Figma for people.
-    ['Do and don\'t', function (c) { var n = (c.examples || []).length; return ilDoDont(c).length ? capital(c.intentLayer.source || 'the intent layer') : n ? n + (n === 1 ? ' picture' : ' pictures') : ''; },
-      function (c) { return (ilDoDont(c).length ? paras(ilDoDont(c)) : '') + ((c.examples || []).length ? examplesGrid(c) : ''); },
-      function (c) { return [ilDoDont(c).length ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : '', (c.examples || []).length ? 'Figma' : ''].filter(Boolean).join(' · '); }, 'Not written yet.'],
+    // Its do and don't: written in its intent-layer page, else as Do: and Don't: lines in its Figma description, the
+    // code's note or the contract (what agents read), and its pictures in Figma for people.
+    ['Do and don\'t', function (c) { var n = (c.examples || []).length, g = guideDo(c); return ilDoDont(c).length ? capital(c.intentLayer.source || 'the intent layer') : g ? KNOW_FROM(g.from) : n ? n + (n === 1 ? ' picture' : ' pictures') : ''; },
+      function (c) { var g = guideDo(c); return (ilDoDont(c).length ? paras(ilDoDont(c)) : g ? paras(g.text) : '') + ((c.examples || []).length ? examplesGrid(c) : ''); },
+      function (c) { var g = guideDo(c); return [ilDoDont(c).length ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : g ? (/^[\w-]+\.\w/.test(g.from) ? g.from : capital(g.from)) : '', (c.examples || []).length ? 'Figma' : ''].filter(Boolean).join(' · '); }, 'Not written yet.'],
     // Its role: its intent-layer page first, else Figma's annotation, the contract or the code; Figma and the page
     // naming two roles is said, to check.
-    ['Role', function (c) { var a = c.a11y || {}; return ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') : a.role ? roleFrom(a) : ''; },
-      function (c) { var x = roleClash(c); return paras([ilRole(c) || c.a11y.role]) + (x ? '<p class="pg-missing">Figma\'s annotation says ' + esc(x.figma) + ', its page in the intent layer says ' + esc(x.il) + ': one of them is wrong.</p>' : ''); },
-      function (c) { return [ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : '', (c.a11y || {}).role ? ((c.a11y || {}).roleFrom === 'figma' ? 'From its annotation in Figma' : roleFrom(c.a11y)) : ''].filter(Boolean).join(' · '); }, 'Not written yet.']
+    // A plain element at its root with no role said anywhere: none, read from the code (a11y.staticRole).
+    ['Role', function (c) { var a = c.a11y || {}; return ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') : a.role ? roleFrom(a) : a.staticRole ? 'The code' : ''; },
+      function (c) { var x = roleClash(c), st = !ilRole(c) && !(c.a11y || {}).role && (c.a11y || {}).staticRole; if (st) return paras(['None: its root is a <' + st.tag + '>, nothing to press, type in or go to, so a screen reader reads what it holds as it is.']); return paras([ilRole(c) || c.a11y.role]) + (x ? '<p class="pg-missing">Figma\'s annotation says ' + esc(x.figma) + ', its page in the intent layer says ' + esc(x.il) + ': one of them is wrong.</p>' : ''); },
+      function (c) { if (!ilRole(c) && !(c.a11y || {}).role && (c.a11y || {}).staticRole) return 'From the code (its root element)'; return [ilRole(c) ? capital(c.intentLayer.source || 'the intent layer') + ' (' + c.intentLayer.file + ')' : '', (c.a11y || {}).role ? ((c.a11y || {}).roleFrom === 'figma' ? 'From its annotation in Figma' : roleFrom(c.a11y)) : ''].filter(Boolean).join(' · '); }, 'Not written yet.']
   ];
   // Its Documentation, one row for each kind in the table every task shares: what was written (or that it is missing),
   // what to do and who writes it, and its status with where it was written. A component's own Documentation area lists
@@ -3383,7 +3390,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     'its description in Figma, as a line that starts with that title (When to use: …); the comment above its rule in the code, the same way; or contract.authored.json under guidance.';
   var WRITE_HOW = {
     'What it is': 'Write it in any one place the engine reads: ' + (DATA.intentLayer ? 'its page in the intent layer (an Intent or Overview section), ' : '') + 'its description in Figma, or its note in the code.',
-    'Do and don\'t': 'Write it in its page in the intent layer, under a section titled Do and don\'t: each line starts with Do: or Don\'t:, with the markup when it helps. Agents read it there; pictures in Figma (frames named under examples in contract.authored.json) are for people, beside it.',
+    'Do and don\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\'t:, with the markup when it helps: ' + (DATA.intentLayer ? 'its page in the intent layer, under a section titled Do and don\'t; ' : '') + 'its description in Figma; the comment above its rule in the code; or contract.authored.json under guidance.doDont. Agents read it there; pictures in Figma (frames named under examples in contract.authored.json) are for people, beside it.',
     Role: 'Write it in its page in the intent layer, as a rule that starts with Role: (Role: button). Agents read it there; an annotation in Figma says the same to people and is checked against it.'
   };
   // Its tokens: how many say what they are for (Figma's variable descriptions, what an agent reads to pick the right
@@ -3412,13 +3419,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Still to write: a ready example from its own import and props, to start from.
     if (rows.length && !ex) { var exHow = 'Write an example of it in use (a code block, or Do and don\'t with its markup) ' + WHERE_TO_WRITE(); rows[rows.length - 1].todo = notesHTML(docNotes('Example', c), exHow); rows[rows.length - 1].notes = docNotes('Example', c); rows[rows.length - 1].how = exHow; }
     // Its properties, in its contract. The one everybody reads is in the intent layer: done while it still lists what the
-    // code and Figma have, a task to publish again when it does not. Only the engine's local one: a task to publish it.
+    // code and Figma have, a task to publish again when it does not. Only the engine's local one: a task to publish it,
+    // when the system has an intent layer to publish it to; with none, the local one is the one every agent reads.
     var k = c.contract;
     if (k && (k.props || []).length) {
       var where = k.href ? '<a href="' + esc(k.href) + '" target="_blank" rel="noopener"><code>' + esc(k.file) + '</code></a>' : '<code>' + esc(k.file) + '</code>';
       var listed = k.props.map(function (n) { return '<code>' + esc(n) + '</code>'; }).join(', ');
       var publish = 'Publish the contracts again from the code project (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request.';
-      var row = !k.shared
+      var row = !k.shared && !DATA.intentLayer
+        ? mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract, ' + where + ', which the engine generates from Figma and the code on every run: ' + listed + '. Agents read them there; nothing to write.</p>', 'done', '')
+        : !k.shared
         ? mk('props', 'Properties', '<p class="pg-missing">Its properties are only in the engine\'s local contract, ' + where + ', which nobody else reads.</p>', 'todo', 'Publish the contracts to the intent layer (rms-design-system-engine --contracts-out <intent layer>/specs/contracts) and open a merge request, so everybody reads the same one.')
         : (k.drift || []).length
           ? mk('props', 'Properties', '<p class="pg-missing">Its contract in the intent layer, ' + where + ', is out of date: ' + k.drift.map(esc).join('; ') + '.</p>', 'todo', publish)

@@ -283,6 +283,9 @@ export async function varsFromItems(items, cfg = {}, { engineDir = ENGINE } = {}
   // Each variable's own description (tokenMeta), as the recipe asks: @deprecated in it marks the token deprecated.
   const tokenMeta = {};
   for (const i of items) if (i.k === 'var' && !i.v.remote && String(i.v.description ?? '').trim()) tokenMeta[i.v.name] = { description: i.v.description.trim(), deprecated: /@deprecated/i.test(i.v.description) };
+  // Each text style's own description (textStyleMeta, by its name), read the same way: a text style is a token too.
+  const textStyleMeta = {};
+  for (const i of items) if (i.k === 'text' && String(i.v.description ?? '').trim()) textStyleMeta[i.v.name] = { description: i.v.description.trim(), deprecated: /@deprecated/i.test(i.v.description) };
   // The primitives as Figma has them in each colour mode (the ramp the tokens point at), each link followed.
   const primitives = primitivesFromItems(items, cfg);
   const figmaTokens = tokensFromItems(items);
@@ -295,6 +298,7 @@ export async function varsFromItems(items, cfg = {}, { engineDir = ENGINE } = {}
     ...(Object.keys(motion.effects ?? {}).length ? { effects: motion.effects } : {}),
     variableScopes: scopes.scopes ?? {},
     ...(Object.keys(tokenMeta).length ? { tokenMeta } : {}),
+    ...(Object.keys(textStyleMeta).length ? { textStyleMeta } : {}),
   };
 }
 

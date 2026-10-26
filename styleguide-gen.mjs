@@ -617,7 +617,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // Its accessibility: what its role and Figma's notes ask of it, each with the WCAG criterion, and what the last
     // browser check (the audit's a11y.json) found on it. The page measures the text contrast itself, as it is drawn.
     try {
-      const { a11yView } = await import('./styleguide-data.mjs');
+      const { a11yView, staticRole } = await import('./styleguide-data.mjs');
       const { contractSemantics, A11Y_GUIDE, annotationUses } = await import('./a11y-check.mjs');
       const { partRolesOf } = await import('./behaviour-contract.mjs');
       const { annotationWording } = await import('./figma-edits.mjs');
@@ -629,6 +629,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const entry = requirementEntry(all, cats, cfg);   // its duties come only from the notes that are requirements
         c.a11y = a11yView({ name: c.name, cls: c.cls, role: c.role ?? authoredRoles[c.name] ?? null, roleFrom: c.role ? 'figma' : authoredRoles[c.name] ? 'contract' : null,
           annotations: entry.annotations ?? [], parts: partRolesOf(entry), exceptions: authored[c.name]?.behaviourExceptions ?? {}, result, guide: A11Y_GUIDE, notes: annotationUses(all, { cats, cfg }) });
+        // No role said anywhere, and a plain element at its root: none is its role, read from the code.
+        if (!c.a11y.role) { const s = staticRole(c.markup); if (s) c.a11y.staticRole = s; }
       }
       // WCAG 2.2 at level A and AA: every criterion, how the engine covers it, in plain words, and what the checks
       // found (the page runs the in-page checks itself on every variant, wcag-page.js). What the code does (shortcuts,
@@ -934,10 +936,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const t of [...(c.ownTokens?.colors ?? []), ...(c.ownTokens?.sizes ?? [])]) if (!own.some((e) => e.var === t.var)) own.push({ var: t.var, props: [] });
         if (own.length) c.allTokens = own.map((e) => ({ var: e.var, figma: named.get(e.var) ?? null, props: e.props }));
       }
-      // What each component's tokens say they are for (Figma's variable descriptions), for its Documentation: an agent
-      // reads them to pick the right token, so a token with none is a line to write.
-      const meta = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.tokenMeta ?? {};
-      const said = (n) => String(meta[n]?.description ?? meta[`${n}/color`]?.description ?? meta[String(n).replace(/\/colou?r$/, '')]?.description ?? '').trim();
+      // What each component's tokens say they are for (Figma's variable descriptions, and a text style's own), for its
+      // Documentation: an agent reads them to pick the right token, so a token with none is a line to write.
+      const said = (await import('./styleguide-data.mjs')).tokenDescriptions(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {});
       // Every Figma variable named after a component (advanced/buttonPromo/shadow/X) is that component's too, the
       // code using it or not.
       const vsnap = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
