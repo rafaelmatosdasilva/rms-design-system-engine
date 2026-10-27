@@ -52,7 +52,7 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
     const authoredName = handWritten && typeof p.bindings.code.attribute === 'string' ? p.bindings.code.attribute : null;
     const found = handWritten
       ? (authoredName && codeProps[authoredName] ? { code: authoredName, as: 'prop', source: 'authored', exactName: true } : null)
-      : api ? bindFigmaProp(p.name, def, { codeProps, slots: api.slots ?? {}, recorded, authoredSlots }) : null;
+      : api ? bindFigmaProp(p.name, def, { codeProps, slots: api.slots ?? {}, recorded, authoredSlots, figmaSlots: [...defs].filter(([, d]) => d?.type === 'SLOT').map(([n]) => n) }) : null;
     // Nothing recorded and no same name: the design system's naming conventions, where the types agree (labelContent is
     // label; showLabel decides whether label is written). Never over what its Code Connect file says.
     const conv = !found && !handWritten && api && !readingsOf(p.name, api.codeConnectProps).length ? conventionFor(p.name, def, codeProps, { codeConnectProps: api.codeConnectProps }) : null;
