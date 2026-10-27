@@ -6052,6 +6052,36 @@ function reportFull(label, items, shown) {
     }
   } catch { /* nothing decided yet, or the files are not readable */ }
 
+  // ── What the engine is sure of, in the files it owns ───────────────────────
+  // A project with no intent layer gets everything the Documentation page finds as a list and nothing else, and most
+  // of those lines are never carried into a file by hand. Some of them the engine is not guessing at: it read the
+  // element a component renders, it can see an authored note that repeats its description, and a check already read
+  // the product's own first use of it. Those go into the authored contract - the engine's own file and no other -
+  // where the project says it may (ds-config.json → writes.engine). What is judgement is written as a draft, marked,
+  // and what needs a person stays a task.
+  if (cfg.engineFixes !== false) try {
+    const { sureFixes, applyFixes, fixLines } = await import('./engine-fixes.mjs');
+    const { mayWrite } = await import('./writes.mjs');
+    const { codeComponents, textReader } = await import('./component-source.mjs');
+    const read = textReader();
+    const snapDesc = (() => { try { return JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {}; } catch { return {}; } })();
+    const firstUse = (() => { try { return JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'prototypes', 'page-system.json'), 'utf8')).firstUse ?? {}; } catch { return {}; } })();
+    const clean = (c) => String(c ?? '').replace(/\s+(?:data-[\w-]+|class|className)=(?:"[^"]*"|'[^']*')/g, '').replace(/\s+/g, ' ').trim();
+    const components = {};
+    for (const k of codeComponents(ROOT, cfg, read)) {
+      components[k.name] = { codeText: read(join(ROOT, k.file)), description: snapDesc[k.name]?.description ?? null, realUse: clean(firstUse[k.name]?.code) || null };
+    }
+    const authoredFile = cfg.contracts?.authored ?? 'contract.authored.json';
+    let authored = {}; try { authored = JSON.parse(readFileSync(join(ROOT, authoredFile), 'utf8')); } catch { /* none yet: everything is empty */ }
+    const fixes = sureFixes({ components, authored });
+    const may = mayWrite(cfg, 'engine').answer;
+    if (fixes.length) {
+      if (may === 'yes') applyFixes(ROOT, fixes, { file: authoredFile });
+      for (const l of fixLines(fixes, { may, file: authoredFile })) console.log(may === 'no' ? C.yellow(l) : C.dim(l));
+      if (may === 'ask') console.log(C.dim('     Say yes and the engine writes them (rms-design-system-engine --writes engine yes writes them on every run from now on).'));
+    }
+  } catch (e) { console.log(C.dim(`ℹ️  What the engine is sure of was not written: ${e.message}`)); }
+
   // ── A primitive written by hand (advisory) ─────────────────────────────
   _section('advice');
   // A plain element styled as a primitive the owner declared in "primitives" (a <span> with the body text style
