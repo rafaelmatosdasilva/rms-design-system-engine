@@ -431,3 +431,71 @@ test('no token: a store is written by git push, built without checking anything 
   assert.equal(no.ok, false);
   assert.match(no.why, /not allowed to push code to protected branches/);
 });
+
+test('no token, a protected branch on GitLab: the push goes to a branch of its own with a merge request asked for through push options', () => {
+  const home = mkdtempSync(join(tmpdir(), 'git-mr-home-'));
+  const remote = mkdtempSync(join(tmpdir(), 'git-mr-remote-'));
+  const seed = mkdtempSync(join(tmpdir(), 'git-mr-seed-'));
+  const run = (args, cwd) => execFileSync('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+  run(['init', '--bare', '-q', '-b', 'main', remote]);
+  run(['config', 'receive.advertisePushOptions', 'true'], remote);   // GitLab takes push options; a bare repository must be told to
+  run(['init', '-q', '-b', 'main'], seed);
+  run(['config', 'user.email', 'demo@example.com'], seed); run(['config', 'user.name', 'Demo'], seed);
+  writeFileSync(join(seed, 'Old.json'), '{"a":1}');
+  run(['add', '-A'], seed); run(['commit', '-qm', 'one'], seed); run(['push', '-q', remote, 'main'], seed);
+  const before = String(run(['rev-parse', 'main'], remote)).trim();
+
+  // main is protected, as GitLab says it; any other branch takes the push. Every push's arguments are kept.
+  const pushes = [];
+  const git = (args, input, env) => {
+    const real = args.map((a) => (/^(git@|https?:\/\/)/.test(a) ? remote : a));
+    if (args.includes('push')) {
+      pushes.push(args);
+      if (args.some((a) => /:refs\/heads\/main$/.test(a))) { const e = new Error('refused'); e.stderr = 'remote: GitLab: You are not allowed to push code to protected branches on this project.\n'; throw e; }
+    }
+    return execFileSync('git', real, { input, maxBuffer: 1 << 28, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...env } });
+  };
+  const p = { host: 'gitlab.acme.test', path: 'team/design', origin: 'https://gitlab.acme.test' };
+  const mr = { always: false, branch: 'design-system-engine/snapshots-20261027120000' };
+  const r = gitStorePush(p, { branch: 'main' }, new Map([['New.json', '{"b":2}']]), 'Snapshots read from Figma\n\nmore', { git, home, mergeRequest: mr });
+  assert.equal(r.ok, true, r.why);
+  assert.deepEqual({ ...r.mergeRequest, url: undefined }, { branch: mr.branch, target: 'main', url: undefined });
+  assert.equal(r.mergeRequest.url, 'https://gitlab.acme.test/team/design/-/merge_requests?scope=all&state=opened&source_branch=design-system-engine%2Fsnapshots-20261027120000');
+  assert.equal(pushes.length, 2, 'the branch first, then the merge request');
+  const opts = pushes[1].flatMap((a, i, all) => (all[i - 1] === '-o' ? [a] : []));
+  assert.deepEqual(opts, ['merge_request.create', 'merge_request.target=main', 'merge_request.remove_source_branch', 'merge_request.title=Snapshots read from Figma']);
+  // main never moved; the change is on its own branch, beside what was there.
+  assert.equal(String(run(['rev-parse', 'main'], remote)).trim(), before);
+  assert.deepEqual(String(run(['ls-tree', '--name-only', mr.branch], remote)).split('\n').filter(Boolean).sort(), ['New.json', 'Old.json']);
+
+  // The setup asks for a merge request: the branch is never pushed to, and the default branch is the target the host names.
+  pushes.length = 0;
+  const always = gitStorePush(p, {}, new Map([['Other.json', '{}']]), 'Decisions', { git, home, mergeRequest: { always: true, branch: 'design-system-engine/decisions-1' } });
+  assert.equal(always.ok, true, always.why);
+  assert.equal(always.mergeRequest.target, 'main', 'read from the host: HEAD is main');
+  assert.equal(pushes.length, 1);
+  assert.ok(pushes[0].includes('merge_request.target=main'));
+
+  // A refusal that is not the branch's protection, and no merge request asked for: passed on as before.
+  const noAccess = (args, input, env) => { if (args.includes('push')) { const e = new Error('x'); e.stderr = 'ERROR: You are not allowed to access this project.\n'; throw e; } return git(args, input, env); };
+  const r2 = gitStorePush(p, { branch: 'main' }, new Map([['Third.json', '{}']]), 'x', { git: noAccess, home, mergeRequest: mr });
+  assert.equal(r2.ok, false);
+  assert.match(r2.why, /not allowed to access this project/);
+  const r3 = gitStorePush(p, { branch: 'main' }, new Map([['Third.json', '{}']]), 'x', { git, home });
+  assert.equal(r3.ok, false, 'no merge request asked for (GitHub): the protection\'s refusal is the answer');
+  assert.match(r3.why, /protected branches/);
+});
+
+test('no token on GitLab: pushStore asks for a merge request when the branch is protected, and says it was sent as one', async () => {
+  const cfg = cfgWith({ snapshots: { read: LINK, write: LINK } });
+  const noToken = { GITLAB_HOST: HOST };
+  let asked = null;
+  const w = await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"a":1}']]), 'Snapshots', {
+    env: noToken, gitStore: () => ({ sha: 'a'.repeat(40), files: new Map() }), runBy: null,
+    gitPushStore: (gp, place, files, message, o) => { asked = o.mergeRequest; return { ok: true, sha: 'c'.repeat(40), mergeRequest: { branch: o.mergeRequest.branch, target: 'main', url: 'https://x/mr' } }; },
+  });
+  assert.equal(w.ok, true, w.line);
+  assert.equal(asked.always, false);
+  assert.match(asked.branch, /^design-system-engine\/snapshots-\d{14}$/);
+  assert.match(w.line, /sent as a merge request into main with your own git access \(https:\/\/x\/mr\) - main is protected/);
+});
