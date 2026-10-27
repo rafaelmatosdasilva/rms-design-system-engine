@@ -1660,16 +1660,43 @@ test('History: a card with no code says it came after the last release and the d
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('    var lastRelease = order.filter'), tpl.indexOf('    box.innerHTML = order.map(function (g) {'));
   const releaseHead = (g) => (g.k || 'Merged, no release tag yet') + '  ·  ' + (g.k ? 'released ' + g.on : g.at);
-  const head = (order) => new Function('order', 'releaseHead', 'esc', src + 'return cardHead;')(order, releaseHead, (x) => String(x));
+  const byTicket = (cs) => cs.map((c) => ({ items: [c] })), figmaHead = (g) => 'Figma read ' + g.read;
+  const head = (order) => new Function('order', 'releaseHead', 'esc', 'byTicket', 'figmaHead', src + 'return cardHead;')(order, releaseHead, (x) => String(x), byTicket, figmaHead);
+  const CODE = '<span class="sg-log-tag">Code</span>';
   const v2 = { k: 'v2.0.0', on: '2026-10-21', commits: [{}] };
   assert.equal(head([v2])({ k: '', commits: [] }, ['2026-10-27', '2026-10-25', '2026-10-24']), 'After v2.0.0  ·  2026-10-24 – 2026-10-27', 'no code: after the last release, from its first day to its last');
   assert.equal(head([v2])({ k: '', commits: [] }, ['2026-10-25']), 'After v2.0.0  ·  2026-10-25');
-  assert.equal(head([v2])({ k: '', commits: [{}], at: '2026-10-25' }, ['2026-10-25']), 'Merged, no release tag yet  ·  2026-10-25', 'code merged and not released yet keeps its name');
-  assert.equal(head([v2])(v2, ['2026-10-21']), 'v2.0.0  ·  released 2026-10-21');
+  assert.equal(head([v2])({ k: '', commits: [{}], at: '2026-10-25' }, ['2026-10-25']), CODE + 'Merged, no release tag yet  ·  2026-10-25  ·  1 issue', 'code merged and not released yet keeps its name, tagged Code, with how many issues');
+  assert.equal(head([v2])(v2, ['2026-10-21']), CODE + 'v2.0.0  ·  released 2026-10-21  ·  1 issue');
+  assert.equal(head([v2])({ k: '', commits: [], read: 'x' }, []), 'Figma read x', 'a read of Figma is a card of its own, as a release is');
   assert.equal(head([])({ k: '', commits: [] }, ['2026-10-25', '2026-10-24']), '2026-10-24 – 2026-10-25', 'no release at all: the days alone');
   assert.doesNotMatch(tpl, /names\.length \+ ' components'/, 'a read of Figma names every component it affects, as a code row does');
   assert.doesNotMatch(tpl, /Read for the first time: ' \+ first\.length/, 'the components read for the first time are named, not counted');
   assert.match(tpl, /rows\.sort\(function \(a, b\) \{ return when\(b\.at\) - when\(a\.at\); \}\);/, 'decisions, reads of Figma and issues in one order, newest first');
+});
+
+test('History: a read of Figma is a release of the design, a card of its own: a row a changed component with what changed, then the ones read for the first time, counted and named', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 12;'), tpl.indexOf('    var decisionRow = function (d) {'));
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const fns = new Function('esc', 'cid', 'sysButton', src + 'return { figmaRows, figmaHead, figmaChange, pillsHTML };')(esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`);
+  assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
+  assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
+  const read = { r: { date: '2026-10-27T10:00:00Z', short: '9878c3f', url: 'https://example.test/c/9878c3f' }, comps: [
+    { name: 'navTab', changed: ['property tileSlot added'] }, { name: 'buttonFloat', changed: ['property showLabel added', 'property labelContent added'] },
+    { name: 'cardRow', changed: ['read from Figma for the first time'] }, { name: 'chipRow', changed: ['read from Figma for the first time'] }] };
+  const rows = [...fns.figmaRows(read).matchAll(/<tr data-chip="figma"><td>([\s\S]*?)<\/td><td>([\s\S]*?)<\/td><\/tr>/g)].map((m) => [m[1].replace(/<[^>]+>/g, ''), [...m[2].matchAll(/href="#([^"]+)"/g)].map((x) => x[1])]);
+  assert.deepEqual(rows, [
+    ['showLabel added; labelContent added', ['c-buttonFloat/history']],
+    ['tileSlot added', ['c-navTab/history']],
+    ['Read for the first time2 components', ['c-cardRow/history', 'c-chipRow/history']],
+  ], 'what changed on the left, the component it changed as its pill; the new ones counted, each its pill');
+  assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'FigmaRead on 2026-10-27  ·  saved in 9878c3f  ·  2 changed, 2 new');
+  assert.equal(fns.figmaHead({ read: { r: read.r, comps: read.comps.slice(2) }, firstRead: true }).replace(/<[^>]+>/g, ''), 'FigmaRead on 2026-10-27  ·  saved in 9878c3f  ·  the first read  ·  2 new');
+  const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
+  assert.equal((many.match(/ hidden>/g) ?? []).length, 2, 'the first twelve shown');
+  assert.match(many, /<button data-pills-more>2 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.match(tpl, /order\.sort\(function \(a, b\) \{ return dayOf\(b\) - dayOf\(a\) \|\| releaseOrder\(a, b\); \}\);/, 'the code\'s releases and the reads of Figma in one order, newest first');
 });
 
 test('a table filtered by a chip closes on the card\'s own edge: the last row shown has no line under it', () => {
