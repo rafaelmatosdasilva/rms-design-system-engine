@@ -1680,8 +1680,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
-.sg-row-detail-body .sg-il-draft-text { padding-bottom: var(--sg-space-m); margin-bottom: var(--sg-space-l); border-bottom: var(--sg-line); }   /* the draft itself, a line under it before what can be done with it, twice the room after the line as before it */
-.sg-row-detail-body .sg-il-line > strong.sg-decide-head:first-child { display: flex; align-items: center; gap: var(--sg-space-s); }   /* the mark, then the decision's name */
+.sg-row-detail-body .sg-il-draft-text { padding-bottom: var(--sg-space-xl); margin-bottom: var(--sg-space-xxl); border-bottom: var(--sg-line); }   /* the drafts, a line under them, then what can be done with them: room on both sides of the line */
+.sg-decide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--sg-space-l); align-items: start; margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* under them, the card's own side padding (its body's bottom padding is less) */   /* the three side by side, each as tall as it holds; under one another where there is no room */
+.sg-decide { display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-decide-hue) 12%, transparent); }
+.sg-decide--approve { --sg-decide-hue: #2e7d32; } .sg-decide--change { --sg-decide-hue: #b26a00; } .sg-decide--drop { --sg-decide-hue: var(--sg-danger); }   /* the page's own hues, only as a tint: the words stay the page's */
+:where(:root)[data-sg-scheme="dark"] .sg-decide--approve { --sg-decide-hue: #6fcf75; } :where(:root)[data-sg-scheme="dark"] .sg-decide--change { --sg-decide-hue: #f0b35a; }
+.sg-decide-head { display: flex; align-items: center; gap: var(--sg-space-s); color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.sg-decide-says { margin: 0; color: var(--sg-muted); }
+.sg-decide-do { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sg-space-s); }
+.sg-decide-said { color: var(--sg-muted); font-size: var(--sg-s); }
 .sg-decide-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); }   /* a decision's mark, there to tell the three apart at a glance */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
@@ -3186,12 +3193,19 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (!groups.length) return '';
       var n = groups.reduce(function (t, g) { return t + g.lines.length; }, 0), them = n === 1 ? 'it' : 'them';
       var cmd = function (a, rest) { return 'rms-design-system-engine --review-drafts --' + a + ' ' + shq(page) + (rest || ''); };
+      var one = n === 1, line = groups[0].lines[0], who = p.name || page;
+      // What Change copies is a request, not a command with blanks: Claude Code asks which draft and the words.
+      var change = one ? 'Change the draft on ' + who + '\'s intent layer page ("' + line + '"): ask me for my words, then run ' + cmd('change', ' ' + shq(line) + ' ' + shq('<my words>'))
+        : 'Change one of the ' + n + ' drafts on ' + who + '\'s intent layer page (' + page + '): ask me which one and my words, then run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>'));
+      // Three decisions side by side, each its own card: a mark, what it does in one sentence of the same length as the
+      // others', and one button that copies it for Claude Code. Each card is as tall as what it holds.
+      var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong><p class="sg-decide-says">' + esc(says) + '</p><div class="sg-decide-do">' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div></div>'; };
       return '<div class="sg-il-draft"><div class="sg-il-draft-text">' + groups.map(function (g) {
           return '<p class="sg-il-line"><strong>Proposed ' + (g.lines.length === 1 ? 'draft' : 'drafts') + ' · ' + esc(g.where) + '</strong>' + g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('') + '</p>';
-        }).join('') + '</div>' +
-        ilAnswer(n === 1 ? 'Approve' : 'Approve all', (n === 1 ? 'The draft becomes' : 'The ' + n + ' drafts become') + ' part of ' + on + '\'s page, as written: agents use ' + them + ' from the next run.', cmd('approve'), 'approve') +
-        ilAnswer('Change', 'Your words replace ' + (n === 1 ? 'the draft' : 'one draft') + ', and agents use them: put ' + (n === 1 ? 'yours' : 'the draft and yours') + ' where the command says.', cmd('change', ' ' + shq(n === 1 ? groups[0].lines[0] : 'the draft to change') + ' ' + shq('your words')), 'change') +
-        ilAnswer(n === 1 ? 'Drop' : 'Drop all', (n === 1 ? 'The draft is' : 'The ' + n + ' drafts are') + ' deleted from ' + on + '\'s page: agents never get ' + them + '.', cmd('drop'), 'drop') + '</div>';
+        }).join('') + '</div><div class="sg-decide-grid">' +
+        decide('approve', one ? 'Approve' : 'Approve all', one ? 'Agents use the draft as written from the next run.' : 'Agents use the ' + n + ' drafts as written from the next run.', cmd('approve')) +
+        decide('change', one ? 'Change' : 'Change one', one ? 'Claude Code asks for your words to replace the draft.' : 'Your words replace one draft; Claude Code asks which.', change) +
+        decide('drop', one ? 'Drop' : 'Drop all', one ? 'The draft is deleted, and no agent will ever get it.' : 'The ' + n + ' drafts are deleted; no agent will ever get them.', cmd('drop')) + '</div></div>';
     };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line"><strong>' + esc(capital(n.what)) + '</strong><span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // What is still to write about the component a row is for, from every source: each piece of its documentation not
@@ -3300,7 +3314,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Its status first, then the proposal to say yes or no to, then what to do: the task, each thing still to write (what
       // and where), the drafts to review under the task that asks for them, notes to remove; then what the page is and why.
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', c.todo + (p.missingFor ? '' : ilDrafts(p))) + card('Still to write', c.left) + card('To remove', c.remove) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, null); };
+      m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said')); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
@@ -7129,9 +7143,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     if (id === 'todo' || id === 'tasks' || id === 'health') return { id: 'status', area: null, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // the page was once To do, then Tasks and Health
     return { id: id === 'whats-new' ? 'changelog' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
   }
-  function copyText(text, btn, said) {
+  function copyText(text, btn, said, saidText) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
-    var done = function () { label('Copied'); if (said) said.textContent = 'Copied'; setTimeout(function () { label(was); if (said) said.textContent = ''; }, 1500); };
+    var done = function () { label('Copied'); if (said) said.textContent = saidText || 'Copied'; setTimeout(function () { label(was); if (said) said.textContent = ''; }, saidText ? 3000 : 1500); };
     // Where the browser lets no page write to the clipboard, the text beside the button is selected instead, and the
     // button says which keys copy it: the person is never left with a Copy that did nothing.
     var keys = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? 'Press \u2318C' : 'Press Ctrl+C';

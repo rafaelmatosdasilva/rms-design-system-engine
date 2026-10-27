@@ -8,13 +8,14 @@ import { fileURLToPath } from 'node:url';
 
 const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
 
-test('the drafts are in the What to do card, grouped by section, each once, then one decision for them all', () => {
+test('the drafts are in the What to do card, grouped by section, each once, then three decisions side by side', () => {
   assert.match(tpl, /card\('What to do', c\.todo \+ \(p\.missingFor \? '' : ilDrafts\(p\)\)\)/);
   assert.doesNotMatch(tpl, /card\('Drafts to review'/, 'no second card for them');
   const src = /var ilDrafts = (function \(p\) \{[\s\S]*?\n    \});/.exec(tpl)[1];
-  const answers = [];
-  const esc = (s) => String(s), shq = (s) => `'${s}'`, ilAnswer = (head, does, cmd, mark) => { answers.push({ head, does, cmd, mark }); return `[${head}]`; };
-  const ilDrafts = new Function('esc', 'shq', 'ilAnswer', `return (${src})`)(esc, shq, ilAnswer);
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), shq = (x) => `'${x}'`, decideMark = (k) => `<mark-${k}>`;
+  const sysButton = (tag, label, attrs) => `<button${attrs}>${label}</button>`;
+  const ilDrafts = new Function('esc', 'shq', 'decideMark', 'sysButton', `return (${src})`)(esc, shq, decideMark, sysButton);
+  const cards = (html) => [...html.matchAll(/<div class="sg-decide sg-decide--(\w+)"><strong class="sg-decide-head"><mark-\w+>([^<]+)<\/strong><p class="sg-decide-says">([^<]+)<\/p><div class="sg-decide-do"><button data-il-copy="([^"]*)" data-il-said="([^"]+)">([^<]+)<\/button>/g)].map((m) => ({ k: m[1], head: m[2], says: m[3], copy: m[4], said: m[5], label: m[6] }));
   const html = ilDrafts({ name: 'actionBar', file: 'specs/action-bar.dsds.json', drafts: [
     { where: 'Limitations', text: 'Does not show loading by itself.' },
     { where: 'Limitations', text: 'Takes at most two buttons.' },
@@ -24,17 +25,20 @@ test('the drafts are in the What to do card, grouped by section, each once, then
   assert.equal((html.match(/Proposed drafts · Limitations/g) ?? []).length, 1, 'a section\'s drafts together');
   assert.match(html, /Proposed draft · Do and don't/);
   assert.equal((html.match(/Does not show loading/g) ?? []).length, 1, 'the same draft once');
-  assert.deepEqual(answers.map((a) => a.head), ['Approve all', 'Change', 'Drop all']);
-  assert.deepEqual(answers.map((a) => a.mark), ['approve', 'change', 'drop'], 'each with its own mark');
-  assert.equal(answers[0].cmd, "rms-design-system-engine --review-drafts --approve 'specs/action-bar.dsds.json'", 'every draft on the page at once');
-  assert.match(answers[0].does, /The 3 drafts become part of actionBar's page, as written: agents use them from the next run/);
-  assert.equal(answers[1].cmd, "rms-design-system-engine --review-drafts --change 'specs/action-bar.dsds.json' 'the draft to change' 'your words'");
-  assert.match(answers[2].does, /The 3 drafts are deleted from actionBar's page: agents never get them/);
-  // One draft: its own words in the change, and the decisions said for one.
-  answers.length = 0;
-  ilDrafts({ name: 'error', file: 'e.json', drafts: [{ where: 'Limitations', text: 'Use an inline error.' }] });
-  assert.deepEqual(answers.map((a) => a.head), ['Approve', 'Change', 'Drop']);
-  assert.match(answers[1].cmd, /--change 'e\.json' 'Use an inline error\.' 'your words'$/);
+  const c = cards(html);
+  assert.deepEqual(c.map((x) => [x.k, x.head]), [['approve', 'Approve all'], ['change', 'Change one'], ['drop', 'Drop all']], 'three cards side by side, each with its own mark');
+  assert.ok(c.every((x) => x.label === 'Copy decision' && x.said === 'Paste it in Claude Code'), 'one button each, and where to paste it');
+  assert.equal(c[0].copy, "rms-design-system-engine --review-drafts --approve 'specs/action-bar.dsds.json'", 'every draft on the page at once');
+  assert.equal(c[2].copy, "rms-design-system-engine --review-drafts --drop 'specs/action-bar.dsds.json'");
+  assert.match(c[1].copy, /^Change one of the 3 drafts on actionBar's intent layer page \(specs\/action-bar\.dsds\.json\): ask me which one and my words, then run rms-design-system-engine --review-drafts --change/, 'a request Claude Code acts on, never a command with blanks');
+  const lengths = c.map((x) => x.says.length);
+  assert.ok(Math.max(...lengths) - Math.min(...lengths) <= 3, `one sentence each, of the same length (${lengths})`);
+  // One draft: the decisions said for one, the sentences still even.
+  const c1 = cards(ilDrafts({ name: 'error', file: 'e.json', drafts: [{ where: 'Limitations', text: 'Use an inline error.' }] }));
+  assert.deepEqual(c1.map((x) => x.head), ['Approve', 'Change', 'Drop']);
+  assert.match(c1[1].copy, /&quot;Use an inline error\.&quot;/);
+  const l1 = c1.map((x) => x.says.length);
+  assert.ok(Math.max(...l1) - Math.min(...l1) <= 3, `even for one draft (${l1})`);
 });
 
 test('a draft\'s words are quoted so a shell runs the command as written, backticks and quotes included', () => {
