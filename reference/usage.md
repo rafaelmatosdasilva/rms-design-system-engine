@@ -1024,7 +1024,7 @@ repository holds; and the command each person installs (`<command>/SKILL.md`). I
 `client`, else the command folder the repository holds. Every other repository a store names gets a section of the
 engine's in its README, between two markers (`<!-- rms-design-system-engine:start … -->` and `…:end -->`): what the
 engine keeps there and who writes it, the snapshots it holds, its pipeline (the variables `.gitlab-ci.yml` lists in its
-comments, and its schedules), who can do what, and the related projects. What the team wrote around the markers stays;
+comments, and its schedules) or, with none, that whoever runs the engine publishes the style guide, who can do what, and the related projects. What the team wrote around the markers stays;
 a README without them gets the section under its title. Each run generates them, compares them with what is there and
 writes only what differs, where GitLab lets the person running it write (a commit, or one merge request the engine keeps
 open); a run without that access changes nothing and says nothing. A repository is asked again only when its branch
