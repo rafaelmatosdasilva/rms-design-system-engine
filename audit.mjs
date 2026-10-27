@@ -5327,6 +5327,14 @@ function reportFull(label, items, shown) {
       if (dangling.length) { lines.push(`${dangling.length} token${dangling.length === 1 ? '' : 's'} in the code point at a token declared nowhere, so only the fallback shows (point each at the token that replaced it):`); for (const x of dangling.slice(0, 8)) lines.push(`   · ${x.file}:${x.line}  ${x.token ? `${x.token} → ` : ''}${x.target}${x.removed ? ` (removed in ${x.removed.sha}, ${x.removed.date})` : ''}`); }
       const look = sa.namedByLook([...colourNames, ...Object.keys(vsnap.sizing ?? {})], { primitivePrefix: prefix });
       if (look.length) lines.push(`${look.length} semantic token${look.length === 1 ? ' is' : 's are'} named by look rather than role (${look.slice(0, 5).map((x) => x.name).join(', ')}${look.length > 5 ? ', …' : ''}): agents then pick them by appearance.`);
+      // Each brand over the brand it extends (brand-layers.mjs): values it sets as it already inherits them, pinned.
+      try {
+        const brandsAt = join(ROOT, cfg.paths?.snapshotBrands ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-brands.snapshot.json'));
+        if (existsSync(brandsAt)) {
+          const bl = await import('./brand-layers.mjs');
+          lines.push(...bl.brandLayerLines(bl.brandLayering(JSON.parse(readFileSync(brandsAt, 'utf8')))));
+        }
+      } catch { /* no brands, or none readable */ }
       if (lines.length) {
         console.log(C.yellow(`\n🧭 System health: ${lines.filter((l) => !/^   ·/.test(l)).length} thing${lines.filter((l) => !/^   ·/.test(l)).length === 1 ? '' : 's'} to keep the system healthy as it grows. Advisory.`));
         for (const l of lines) console.log(C.yellow(`     ${l}`));
