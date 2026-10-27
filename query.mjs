@@ -29,7 +29,7 @@ export function flattenTokens(tree, prefix = []) {
   for (const [k, v] of Object.entries(tree ?? {})) {
     if (k.startsWith('$') || !v || typeof v !== 'object') continue;
     const ext = v.$extensions?.['com.rms.design-system-engine'];
-    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: ext?.modes ?? null, readableOn: ext?.readableOn ?? null, deprecated: v.$deprecated === true, ...(typeof v.$description === 'string' && v.$description.trim() ? { description: v.$description.trim() } : {}) });
+    if ('$value' in v) out.push({ path: [...prefix, k].join('/'), value: v.$value, modes: ext?.modes ?? null, readableOn: ext?.readableOn ?? null, goesWith: ext?.goesWith ?? null, deprecated: v.$deprecated === true, ...(typeof v.$description === 'string' && v.$description.trim() ? { description: v.$description.trim() } : {}) });
     else out.push(...flattenTokens(v, [...prefix, k]));
   }
   return out;
@@ -47,6 +47,9 @@ export function answer(term, { catalog = {}, tokens = [], varOf = (p) => null } 
   return { kind: 'none', term, near };
 }
 
+// The contrast a pair gives where its two colours are closest, and whether the names promise what the values break.
+const pairNote = (g) => (g.ratio == null ? '' : ` (${g.ratio}:1${g.ok ? '' : ', under 4.5:1: the names say they go together, the values do not'})`);
+
 export function answerLines(a) {
   if (a.kind === 'none') return [`${a.term}: no component or token of that name${a.near.length ? `. Closest: ${a.near.join(', ')}` : ''}`];
   if (a.kind === 'token') {
@@ -54,7 +57,10 @@ export function answerLines(a) {
     const modes = x.modes ? Object.entries(x.modes).map(([m, v]) => `${m} ${v}`).join(' · ') : String(x.value);
     return [`${x.path}${cssVar ? `  →  var(${cssVar})` : ''}  ${modes}${x.deprecated ? '  [deprecated]' : ''}`,
       ...(x.description ? [`  for: ${x.description}`] : []),   // what it is for, from its Figma description
-      ...(x.readableOn?.length ? [`  readable on (4.5:1 in every mode): ${x.readableOn.join(', ')}`] : [])];
+      // The one surface it was made for, before the list of every surface it would work on: an agent given only the
+      // shortlist picks a different grey on every card.
+      ...(x.goesWith ? [`  goes on: ${x.goesWith.surface}${pairNote(x.goesWith)}`] : []),
+      ...(x.readableOn?.length ? [`  also readable on (4.5:1 in every mode): ${x.readableOn.join(', ')}`] : [])];
   }
   const { name, entry: e } = a;
   const lines = [`${name}${e.selector ? `  (${e.selector})` : ''}${e.status ? `  [${e.status}]` : ''}`];
