@@ -69,3 +69,22 @@ test('a convention never says showX decides an x its Code Connect file always wr
   assert.deepEqual(conventionFor('showBadge', { type: 'BOOLEAN' }, cp, { codeConnectProps: [{ figma: 'Badge', code: 'badge', role: 'value' }, { figma: 'other', code: 'badge', role: 'condition' }] }), { code: 'badge', role: 'condition', source: 'convention' });
   assert.deepEqual(conventionFor('showBadgeCount', { type: 'VARIANT', variantOptions: ['false', 'true'] }, cp), { code: 'showBadgeCounts', role: 'value', source: 'convention' });
 });
+
+test('a Figma slot is the code\'s slot of its name, of the same word, or the only one each side has; an on/off that shows it is the slot filled', () => {
+  const dialog = { slots: { named: ['sheet-body'], default: false }, figmaSlots: ['slotBody'] };
+  assert.deepEqual(bindFigmaProp('slotBody', { type: 'SLOT' }, dialog), { code: 'sheet-body', as: 'slot', source: 'word', exactName: true });
+  assert.deepEqual(bindFigmaProp('showBody', { type: 'BOOLEAN' }, dialog), { code: 'sheet-body', as: 'slotShown', source: 'slot', exactName: true });
+  // The markup's case is the same name; an on/off for one slot of several finds its own.
+  const card = { slots: { named: ['lead-slot', 'tail-slot'] }, figmaSlots: ['leadSlot', 'tailSlot'] };
+  assert.equal(bindFigmaProp('tailSlot', { type: 'SLOT' }, card).code, 'tail-slot');
+  assert.equal(bindFigmaProp('tailSlot', { type: 'SLOT' }, card).exactName, true);
+  assert.equal(bindFigmaProp('showLeadSlot', { type: 'BOOLEAN' }, card).code, 'lead-slot');
+  // The only slot each side has, named otherwise: paired, as a name the two write differently.
+  assert.deepEqual(bindFigmaProp('slotBody', { type: 'SLOT' }, { slots: { named: ['mainAction'] }, figmaSlots: ['slotBody'] }), { code: 'mainAction', as: 'slot', source: 'only', exactName: false });
+  assert.equal(bindFigmaProp('Slot', { type: 'SLOT' }, { slots: { named: [], default: true }, figmaSlots: ['Slot'] }).as, 'defaultSlot');
+  // A slot the code fills through a prop is that prop; an on/off with a prop of its own name stays the prop.
+  assert.deepEqual(bindFigmaProp('bars', { type: 'SLOT' }, { codeProps: { bars: {} }, slots: { named: ['legend', 'axis'] }, figmaSlots: ['bars', 'legend'] }), { code: 'bars', as: 'prop', source: 'name', exactName: true });
+  assert.equal(bindFigmaProp('showBody', { type: 'BOOLEAN' }, { ...dialog, codeProps: { showBody: {} } }).as, 'prop');
+  // With no Figma slot, an on/off is never read as one.
+  assert.equal(bindFigmaProp('showFooter', { type: 'BOOLEAN' }, { slots: { named: ['footer'] } }), null);
+});

@@ -2,8 +2,9 @@
 // prop check (Gate 14) and the contract both ask here, so they never give two answers.
 //
 //   bindingSources({ codeConnect, aliases, authored }) → the names recorded for each Figma property, by who recorded them
-//   bindFigmaProp(fp, def, ctx) → { code, as: 'prop'|'slot'|'defaultSlot', source, exactName, key? } or null (key: the key of an
-//                                 object prop it fills, as Code Connect writes :opts="{ caption: … }")
+//   bindFigmaProp(fp, def, ctx) → { code, as: 'prop'|'slot'|'defaultSlot'|'slotShown', source, exactName, key? } or null (key:
+//                                 the key of an object prop it fills, as Code Connect writes :opts="{ caption: … }";
+//                                 slotShown: a Figma on/off that shows a slot, which the code shows when it is filled)
 //   valuesOf(fp, codeConnectProps) → every attribute or key the Code Connect file fills with the property's value
 //   invertsValue(fp, code, ctx) → true when a true/false binding writes the opposite value (show ↔ hide)
 //   readingsOf(fp, codeConnectProps) → what the project's Code Connect file does with the property beyond its value:
@@ -25,8 +26,10 @@ export function bindingSources({ codeConnect = null, aliases = null, authored = 
 }
 
 // ctx: { codeProps: { name: {…} } (the code's API props), slots: { named: [], default: bool }, recorded (bindingSources),
-//        authoredSlots: { figmaProp: true | 'slotName' } }
-export function bindFigmaProp(fp, def, { codeProps = {}, slots = { named: [], default: false }, recorded = {}, authoredSlots = {} } = {}) {
+//        authoredSlots: { figmaProp: true | 'slotName' }, figmaSlots: [the component's Figma SLOT properties] }
+// The word a slot is named for, without "slot" and without a family before it: slotBody and sheet-body are body.
+const slotWord = (n) => norm(String(n).replace(/slot/ig, ' ').split(/[-_\s]+|(?=[A-Z])/).filter(Boolean).pop() ?? '');
+export function bindFigmaProp(fp, def, { codeProps = {}, slots = { named: [], default: false }, recorded = {}, authoredSlots = {}, figmaSlots = [] } = {}) {
   const names = Object.keys(codeProps);
   const byNorm = new Map(names.map((p) => [norm(p), p]));
   const rec = recorded[fp];
@@ -43,6 +46,30 @@ export function bindFigmaProp(fp, def, { codeProps = {}, slots = { named: [], de
     const sb = authoredSlots[fp];
     if (typeof sb === 'string' && slotByNorm.has(norm(sb))) return { code: slotByNorm.get(norm(sb)), as: 'slot', source: 'authored', exactName: true };
     return null;
+  }
+  // A Figma slot (a place for other components): the code's slot of its name, of the same word (slotBody is
+  // sheet-body), recorded for it, or the only one each side has.
+  const named = slots.named ?? [];
+  const slotFor = (p) => {
+    // A slot is written in the markup's case (tail-slot for tailSlot): the same letters are the same name.
+    if (slotByNorm.has(norm(p))) return { code: slotByNorm.get(norm(p)), as: 'slot', source: 'name', exactName: true };
+    const sb = authoredSlots[p];
+    if (typeof sb === 'string' && slotByNorm.has(norm(sb))) return { code: slotByNorm.get(norm(sb)), as: 'slot', source: 'authored', exactName: true };
+    const same = named.filter((n) => slotWord(n) && slotWord(n) === slotWord(p));
+    if (same.length === 1) return { code: same[0], as: 'slot', source: 'word', exactName: true };
+    // The only slot on each side, named otherwise: paired, and said as a name the two sides write differently.
+    if (figmaSlots.length === 1 && named.length === 1) return { code: named[0], as: 'slot', source: 'only', exactName: false };
+    if (figmaSlots.length === 1 && !named.length && slots.default) return { code: 'default', as: 'defaultSlot', source: 'only', exactName: true };
+    return null;
+  };
+  // A slot the code fills through a prop (bars, items) is that prop: read below, as any other property.
+  if (def?.type === 'SLOT') { const sb = slotFor(fp); if (sb) return sb; }
+  // An on/off that shows the slot (showBody beside slotBody): the code shows it when it is filled.
+  const shows = def?.type === 'BOOLEAN' && !byNorm.has(norm(fp)) && !rec && /^show(.+)$/i.exec(fp);
+  if (shows && figmaSlots.length) {
+    const target = figmaSlots.find((f) => norm(shows[1]) === 'slot' || slotWord(f) === slotWord(shows[1]) || norm(f) === norm(shows[1]));
+    const b = target ? slotFor(target) : null;
+    if (b) return { ...b, as: 'slotShown', source: 'slot' };
   }
   // A recorded name, as written, is the agreed one: read before the letter-case comparison.
   if (rec && names.includes(rec.name)) return { code: rec.name, as: 'prop', source: rec.source, exactName: true };
