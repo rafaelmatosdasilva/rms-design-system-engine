@@ -83,3 +83,13 @@ test('agents place the root: llms.txt lists a part under it, never as a componen
   assert.doesNotMatch(txt, /\[tileListRow\]/);
   assert.match(txt, /- parts \(placed only inside it, never on their own\): tileListRow\n\s+- tileListRow: One line a row\./);
 });
+
+test('asked in words, a part goes to --part: the one named before "part of" is the part, the one after its root', async () => {
+  const { route } = await import('../route.mjs');
+  const P = { hasConfig: true, components: ['tileList', 'tileListRow'] };
+  assert.deepEqual(route('tileListRow is a part of tileList', P).run, ['rms-design-system-engine --part tileListRow tileList']);
+  assert.deepEqual(route('tileListRow is its own component', P).run, ['rms-design-system-engine --part tileListRow none']);
+  const vague = route('the row is a part of the tile list', P);
+  assert.deepEqual(vague.run, ['rms-design-system-engine --part <part> tileList']);
+  assert.ok(vague.ask, 'the part it does not name is asked');
+});
