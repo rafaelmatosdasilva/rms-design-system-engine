@@ -397,6 +397,23 @@ A short file listing which components go where, with which options (`prototypes/
 
 Where your system has no layout components, the engine lends neutral ones (a page, a stack, a row, columns) that use only your spacing tokens and text styles, and adds layout components to the list.
 
+### Where the engine may write, and where it must never
+
+Until now the answer was the same in every project, and it was always the most cautious one: write a script, show it, ask again. One setting in `ds-config.json` now says it per place, and the whole engine reads the same answer:
+
+| Place | What it holds |
+|---|---|
+| The design file | What Figma shows: a role, a name, an annotation, a component |
+| The product's code | The files people wrote, through a branch and a pull request |
+| The code the engine generated | The tokens, the contracts, the style guide |
+| The engine's own files | The authored contract, the structure contract's notes, the kept differences |
+
+Each gets **yes** (write it, and say what changed), **ask** (show the exact change and wait for a yes, every time) or **no** (never: the change goes on the Tasks page, for whoever owns that place). A place with no answer is asked about once, and the answer is recorded, so every session and every run read the same one. `rms-design-system-engine --writes` shows them; `--writes figma ask` sets one.
+
+Two things the setting cannot override. On CI there is nobody to answer, so **ask** becomes **no**. And CI never writes the design file or the product's code, whatever the setting says: a run nobody is watching changing what people wrote is how a team stops trusting the engine.
+
+A project that says never gets the list of Figma changes and no script to run. A script nobody may run is a loaded gun left on the table.
+
 ### What the team already decided
 
 Every decision somebody makes is recorded where it is made: a difference kept on purpose with its reason, a proposal answered yes or no, a difference accepted for now, a component checked by hand, a need nothing in the system fitted with what was looked at and why. Nothing gathered them, so a decision was only ever seen by whoever ran the command that made it.

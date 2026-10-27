@@ -404,7 +404,9 @@ return { changed, skipped, missing, todo };` : 'return { changed, skipped, missi
 }
 
 // The lines the run prints: what would change, what a person decides.
-export function editLines(edits, { fileKey = null } = {}) {
+// may: what this project lets the engine change in the design file (writes.mjs). A project that says never gets the
+// list and nothing else: the changes go on the Tasks page for whoever owns Figma, and no script is written to run.
+export function editLines(edits, { fileKey = null, may = 'ask', why = null } = {}) {
   const roles = edits.filter((e) => e.kind === 'role'), todo = edits.find((e) => e.kind === 'todo'), decide = edits.filter((e) => e.decision);
   const notes = edits.find((e) => e.kind === 'notes');
   const renames = edits.filter((e) => e.kind === 'rename');
@@ -419,13 +421,18 @@ export function editLines(edits, { fileKey = null } = {}) {
     ...(todo ? [`The design team's to do list in Figma, page "${todo.page}", frame "${todo.frame}" (${todo.why}), written afresh:`, ...todo.items.map((g) => `   • ${g.need}: ${todoText(g)}`)] : []),
     ...(notes ? [`Annotations no check reads, listed in Figma on the page "${notes.page}", frame "${notes.frame}" (${notes.why}); the annotations themselves are not changed:`, ...notes.items.map((n) => `   • ${n.component}${n.layer ? ` › ${n.layer}` : ''}: "${n.text}"${n.wording ? ` → write it as "${n.wording}"` : ' (an accessibility note: write it as Role:, Alt:, Heading level or a key, so a check reads it)'}`)] : []),
     ...(decide.length ? [`For a person to decide (${decide.length}), never applied:`, ...decide.map((e) => `   • ${e.component}: ${e.why}`)] : []),
-    ...(apply.length ? [`NEXT: show the person the ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', specs.length ? `${specs.length} accessibility spec${specs.length === 1 ? '' : 's'}` : '', review ? 'accessibility review' : '', todo ? 'to do list' : '', notes ? 'annotations no check reads' : ''].filter(Boolean).join(' and ')} above and ask; only when they say yes, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
+    ...(apply.length && may === 'no' ? [`NEXT: this project does not let the engine write the design file${why ? ` (${why})` : ''}, so nothing was written to run. The ${apply.length} change${apply.length === 1 ? '' : 's'} above ${apply.length === 1 ? 'is' : 'are'} on the Tasks page, for whoever owns Figma.`] : []),
+    ...(apply.length && may !== 'no' ? [`NEXT: ${may === 'yes' ? 'run' : 'show the person the'} ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', specs.length ? `${specs.length} accessibility spec${specs.length === 1 ? '' : 's'}` : '', review ? 'accessibility review' : '', todo ? 'to do list' : '', notes ? 'annotations no check reads' : ''].filter(Boolean).join(' and ')} above${may === 'yes' ? '' : ' and ask; only when they say yes'}, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
   ];
 }
 
-export function writeFigmaEdits(dir, edits) {
+// The list is always written: what Figma is missing is worth reading whoever may change it. The script that makes
+// the changes is written only where the project lets the engine change the design file - a script nobody may run is
+// a loaded gun left on the table.
+export function writeFigmaEdits(dir, edits, { may = 'ask' } = {}) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'figma-edits.json'), JSON.stringify(edits, null, 2) + '\n');
+  if (may === 'no') return { json: join(dir, 'figma-edits.json'), script: null };
   writeFileSync(join(dir, 'figma-apply.js'), applyScript(edits));
   return { json: join(dir, 'figma-edits.json'), script: join(dir, 'figma-apply.js') };
 }

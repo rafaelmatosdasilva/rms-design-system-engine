@@ -8,6 +8,7 @@
 // recipe, a pasted step list followed or asked about). Here it is a fixed table, tested, the same on any
 // model, in English and Portuguese. route() is pure: projectState() reads the project for it.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { PLACES as WRITE_PLACES, mayWrite } from './writes.mjs';
 import { codeRoots } from './code-roots.mjs';
 import { createPairing } from './component-pairing.mjs';
 import { join, relative, basename } from 'node:path';
@@ -37,6 +38,8 @@ export function projectState(ROOT, { engineDir, env = process.env } = {}) {
     rawColours: rawColoursOf(structure?.components ?? {}),
     components: withCodeNames(Object.keys(structure?.components ?? {}), () => createPairing({ ROOT, cfg: conf }).codeOnly()),
     snapshotDate: oldest ? oldest.toISOString().slice(0, 10) : null,
+    // What this project lets the engine change, one answer per place, as this run reads them (writes.mjs).
+    writes: Object.fromEntries(WRITE_PLACES.map((p) => [p, mayWrite(conf, p, { ci: !!env.CI }).answer])),
     cmd: onPath || !engineDir ? 'rms-design-system-engine' : `node ${shellPath(join(engineDir, 'audit.mjs'))}`,
   };
 }
@@ -254,7 +257,9 @@ export function otherSystem(text, names = []) {
   return null;
 }
 
-export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null, build = false, pages = [], rawColours = {}, names = [], cloud = false } = {}) {
+// writes: what this project lets the engine change, one answer per place (writes.mjs). A request that would change
+// something carries that project's own answer, so an agent is not told to ask where the answer is already no.
+export function route(text, { hasConfig = true, components = [], cmd = 'rms-design-system-engine', snapshotDate = null, build = false, pages = [], rawColours = {}, names = [], cloud = false, writes = null } = {}) {
   // Another system than the one set up here: where its code is and its Figma file are asked for at once, in one message,
   // and the request runs there (--project); this folder's system is never run in its place.
   const other = hasConfig ? otherSystem(text, names) : null;
@@ -267,7 +272,7 @@ export function route(text, { hasConfig = true, components = [], cmd = 'rms-desi
     const run = (inner.run ?? []).map((c) => c.startsWith(cmd) ? cmd + at + c.slice(cmd.length) : c);
     return { recipe: inner.recipe, question: false, run: run.length ? run : [`${cmd}${at}`], ...(ask.length ? { ask: ask.join(', and ') } : {}), notes, say: [], sayIf: null };
   }
-  const r = routeOnly(text, { hasConfig, components, cmd, build, pages, cloud });
+  const r = routeOnly(text, { hasConfig, components, cmd, build, pages, cloud, writes });
   const say = [];
   let sayIf = null;
   // Building a component Figma paints with a colour that has no variable: the person hears it, in the reply.
@@ -297,7 +302,7 @@ function routeOnly(text, opts) {
     notes: [`The request names a word several components share (${loose.names.join(', ')}): ask which one before running anything, never check the whole library in its place.`, ...r.notes] };
 }
 
-function routeRequest(text, { hasConfig, components, cmd, build = false, pages = [], cloud = false }) {
+function routeRequest(text, { hasConfig, components, cmd, build = false, pages = [], cloud = false, writes = null }) {
   const t = String(text ?? '');
   const question = QUESTION.test(t);
   const named = namedComponents(t, components);
@@ -334,7 +339,10 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
       return { recipe, question, run: question ? [] : named.length ? [`${cmd} --query ${named.join(' ')}`] : [cmd], notes };
     }
     if (recipe === 'figma-edits') {
-      notes.push('The engine lists every Figma edit and writes the script for it; show the person the list and ask. Only when they say yes, run .design-system-engine-out/handback/figma-apply.js with the Figma MCP\'s use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.');
+      const may = writes?.figma ?? 'ask';
+      notes.push(may === 'no'
+        ? 'The engine lists every Figma edit, and this project never lets it write the design file: no script is written, and the changes go on the Tasks page for whoever owns Figma. Show the person the list and say that. Never write a Figma script of your own.'
+        : `The engine lists every Figma edit and writes the script for it; ${may === 'yes' ? 'this project lets the engine change the design file, so run' : 'show the person the list and ask. Only when they say yes, run'} .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.`);
       return { recipe, question: false, run: [`${cmd} --figma-edits`], notes };
     }
     if (kind === 'intent-layer') return { recipe, question: false, run: [`${cmd} --intent-layer ${t.match(ANY_LINK)[0]}`], notes };
