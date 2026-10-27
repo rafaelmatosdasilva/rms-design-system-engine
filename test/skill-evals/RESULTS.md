@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A store's README says how its style guide is updated when no pipeline builds it (continuous evaluation)
+
+What changed since the entry below (engine 74a632e): Each Changelog row says what it was for and where it changed the system (#60); Writing a store needs no token of your own either (#59); A browser never outlives its run; invented names are rejected by name (#57); A store's README says its guide is published by hand while its pipeline is gated off (#62); A store on GitHub is written the same way it is read (#63); The demo report's pictures are compared by which side of the limit they fall, not by the exact share (#64); The accessibility check puts back each unchanged page's results instead of trying it again (#65); A store's README says how its style guide is updated when no pipeline builds it. The guide changed in `reference/usage.md`.
+
+Guide set measured: `4d5ae92ca627` · Project measured: `13d811a9d668`
+
+| Haiku, engine 848f5b6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.064 | $0.062 |
+| Input a run | 131k | 125k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below. Failed: fix-chip-height #2: the combination is 32px, the field still 36px. Records: `records/2026-10-27-a-store-s-readme-says`.
+
 ## 2026-10: Each Changelog row says what it was for and where it changed the system (continuous evaluation)
 
 What changed since the entry below (engine 540a998): The engine says when the style guide the team opens is behind, and can publish it itself (#55); Every page the engine opens works at full speed: each in a window of its own (#56); A store's README stops flipping between runs, and a commit that landed despite a gateway timeout is sent (#58); Each Changelog row says what it was for and where it changed the system. The guide changed in `reference/usage.md`.
