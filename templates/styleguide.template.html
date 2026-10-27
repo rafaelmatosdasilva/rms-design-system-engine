@@ -3076,12 +3076,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var figmaRow = function (x) {
       var first = x.comps.filter(function (c) { return c.changed.length === 1 && /first time/.test(c.changed[0]); }), changed = x.comps.filter(function (c) { return first.indexOf(c) < 0; });
       var lines = changed.map(function (c) { return '<p class="sg-il-line">' + esc(c.name) + ' <span class="pg-par-val">' + esc(c.changed.join('; ')) + '</span></p>'; }).join('') +
-        (first.length ? '<p class="sg-il-line">Read for the first time: ' + first.length + ' component' + (first.length === 1 ? '' : 's') + '.</p>' : '');
+        (first.length ? '<p class="sg-il-line">Read for the first time <span class="pg-par-val">' + first.map(function (c) { return c.name; }).sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>'; }).join(', ') + '</span></p>' : '');
       var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short || '') + '</code>';
       var names = x.comps.map(function (c) { return c.name; }).sort();
       return '<tr data-chip="figma"><td><p class="sg-il-line"><span class="sg-log-tag">Figma</span> <strong>' + esc(changed.length ? 'Figma changed' : 'Read from Figma') + '</strong></p>' + lines +
         '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + ' on ' + esc(String(x.r.date).slice(0, 10)) + '</span></p></td><td>' +
-        (names.length > 12 ? names.length + ' components' : names.map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>'; }).join(', ')) + '</td></tr>';
+        names.map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>'; }).join(', ') + '</td></tr>';
     };
     var decisionRow = function (d) {
       var about = d.component && COMPONENTS.some(function (c) { return c.name === d.component; }) ? '<a class="sg-uses-link" href="#' + esc(cid(d.component)) + '/history">' + esc(d.component) + '</a>'
@@ -3091,20 +3091,36 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         '<p class="sg-il-line"><span class="pg-log-date">' + esc(capital(d.said) + (d.by ? ' by ' + d.by : '') + (d.at ? ' on ' + String(d.at).slice(0, 10) : '')) + '</span></p></td><td>' + about + '</td></tr>';
     };
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
+    // One row per issue (the team's unit of work: its commits, whatever each changed), then what it affects: the
+    // components its commits changed (none for a change outside them). A commit made for no issue is a row of its own.
+    var codeRow = function (t) {
+      var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
+      // Where else its commits changed things, once each (the same part named by two commits of an issue: once).
+      var where = [], seenW = {}; t.items.forEach(function (x) { (x.r.where || []).forEach(function (w) { var k = w.kind + ':' + w.label + ':' + (w.names || []).join(','); if (!seenW[k]) { seenW[k] = 1; where.push(w); } }); });
+      // A row for no issue leads with the merge or pull request it came by, when there is one: only a commit made
+      // straight on the branch says no issue.
+      var first = t.items[0].r, lead = t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">' + (first.request ? requestLink(first.request) : 'No issue') + '</span></p><p class="sg-il-line">';
+      var affects = (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '') + (where.length ? (comps.length ? ' ' : '') + whereHTML(where) : '');
+      var cell = lead + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>');
+      return '<tr data-chip="code"><td>' + cell.replace('<p class="sg-il-line">', '<p class="sg-il-line"><span class="sg-log-tag">Code</span> ') + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
+    };
+    var when = function (x) { var t = Date.parse(x); return isNaN(t) ? 0 : t; };
+    // A card's head: its release, or the code merged since the last one; a card with no code (a decision, a read of
+    // Figma: neither has a code version) says it came after the last release and the days it covers.
+    var lastRelease = order.filter(function (g) { return g.k; })[0];
+    var cardHead = function (g, days) {
+      if (g.k || g.commits.length) return releaseHead(g);
+      var span = days.length ? (days[days.length - 1] === days[0] ? days[0] : days[days.length - 1] + ' – ' + days[0]) : '';
+      return (lastRelease ? 'After ' + esc(lastRelease.k) + (span ? '  ·  ' : '') : '') + esc(span);
+    };
     box.innerHTML = order.map(function (g) {
-      // One row per issue (the team's unit of work: its commits, whatever each changed), then what it affects: the
-      // components its commits changed (none for a change outside them). A commit made for no issue is a row of its own.
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + (g.decisions || []).map(decisionRow).join('') + (g.figma || []).map(figmaRow).join('') + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
-        var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
-        // Where else its commits changed things, once each (the same part named by two commits of an issue: once).
-        var where = [], seenW = {}; t.items.forEach(function (x) { (x.r.where || []).forEach(function (w) { var k = w.kind + ':' + w.label + ':' + (w.names || []).join(','); if (!seenW[k]) { seenW[k] = 1; where.push(w); } }); });
-        // A row for no issue leads with the merge or pull request it came by, when there is one: only a commit made
-        // straight on the branch says no issue.
-        var first = t.items[0].r, lead = t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">' + (first.request ? requestLink(first.request) : 'No issue') + '</span></p><p class="sg-il-line">';
-        var affects = (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '') + (where.length ? (comps.length ? ' ' : '') + whereHTML(where) : '');
-        var cell = lead + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>');
-        return '<tr data-chip="code"><td>' + cell.replace('<p class="sg-il-line">', '<p class="sg-il-line"><span class="sg-log-tag">Code</span> ') + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
+      // Its decisions, reads of Figma and issues together, newest first, each with its own date.
+      var rows = (g.decisions || []).map(function (d) { return { at: String(d.at || ''), html: decisionRow(d) }; })
+        .concat((g.figma || []).map(function (x) { return { at: String(x.r.date || ''), html: figmaRow(x) }; }))
+        .concat(byTicket(g.commits, function (x) { return x.r; }).map(function (t) { return { at: String(t.items[0].r.date || ''), html: codeRow(t) }; }));
+      rows.sort(function (a, b) { return when(b.at) - when(a.at); });
+      var days = rows.map(function (r) { return r.at.slice(0, 10); }).filter(Boolean);
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + cardHead(g, days) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + rows.map(function (r) { return r.html; }).join('') + '</tbody></table></div>';
     }).join('');
     // The code, Figma, the decisions or all: a chip for each kind the page has, when it has two, and a release with
     // nothing of the kind chosen out of the way (read from the page itself: box is a var another page reuses).

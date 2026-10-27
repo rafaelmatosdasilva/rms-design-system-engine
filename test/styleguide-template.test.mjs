@@ -1646,3 +1646,19 @@ test('a page opens at its top, reloaded too: the browser never puts back an earl
   assert.match(tpl, /history\.scrollRestoration = 'manual'/);
   assert.ok(tpl.indexOf("history.scrollRestoration = 'manual'") < tpl.indexOf('function route()'), 'set before the page routes');
 });
+
+test('History: a card with no code says it came after the last release and the days it covers; each card\'s rows newest first', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const src = tpl.slice(tpl.indexOf('    var lastRelease = order.filter'), tpl.indexOf('    box.innerHTML = order.map(function (g) {'));
+  const releaseHead = (g) => (g.k || 'Merged, no release tag yet') + '  ·  ' + (g.k ? 'released ' + g.on : g.at);
+  const head = (order) => new Function('order', 'releaseHead', 'esc', src + 'return cardHead;')(order, releaseHead, (x) => String(x));
+  const v2 = { k: 'v2.0.0', on: '2026-10-21', commits: [{}] };
+  assert.equal(head([v2])({ k: '', commits: [] }, ['2026-10-27', '2026-10-25', '2026-10-24']), 'After v2.0.0  ·  2026-10-24 – 2026-10-27', 'no code: after the last release, from its first day to its last');
+  assert.equal(head([v2])({ k: '', commits: [] }, ['2026-10-25']), 'After v2.0.0  ·  2026-10-25');
+  assert.equal(head([v2])({ k: '', commits: [{}], at: '2026-10-25' }, ['2026-10-25']), 'Merged, no release tag yet  ·  2026-10-25', 'code merged and not released yet keeps its name');
+  assert.equal(head([v2])(v2, ['2026-10-21']), 'v2.0.0  ·  released 2026-10-21');
+  assert.equal(head([])({ k: '', commits: [] }, ['2026-10-25', '2026-10-24']), '2026-10-24 – 2026-10-25', 'no release at all: the days alone');
+  assert.doesNotMatch(tpl, /names\.length \+ ' components'/, 'a read of Figma names every component it affects, as a code row does');
+  assert.doesNotMatch(tpl, /Read for the first time: ' \+ first\.length/, 'the components read for the first time are named, not counted');
+  assert.match(tpl, /rows\.sort\(function \(a, b\) \{ return when\(b\.at\) - when\(a\.at\); \}\);/, 'decisions, reads of Figma and issues in one order, newest first');
+});
