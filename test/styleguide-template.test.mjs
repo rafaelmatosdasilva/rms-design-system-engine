@@ -234,17 +234,26 @@ test('in the browser: no script error, a control changes the real component, the
     // Thirty, not six: the accessibility table settles last, and six times this machine's scale still missed it
     // under a full run. A longer wait costs nothing until something is actually wrong.
     const until = async (expr, ok, what = 'the page') => {
-      let v;
-      // A deadline, not a count of tries: each read of the page costs more while the rest of the suite runs, so
-      // counting tries and calling it seconds reported a number that was not the time spent. This says what it waited.
-      // Two minutes, times this machine's scale. Some of what the page writes it measures live in the browser
-      // (the keyboard rows), and the full suite starves that: ninety real seconds was not enough on a run of 1659
-      // tests, and a hundred and eighty not enough at 1742, while the same file alone finishes it in moments. The
-      // ceiling is here to catch a hang, so it is set for the slowest honest case rather than the usual one, and it
-      // is raised as the suite grows; a passing test leaves it the moment it is ready.
-      const began = Date.now(), deadline = began + budget(120000);
-      while (Date.now() < deadline) { v = await run(expr); if (ok(v)) return v; await new Promise((r) => setTimeout(r, 100)); }
-      assert.fail(`${what} was not ready in ${Math.round((Date.now() - began) / 1000)}s, which a busy machine can take; last read: ${String(v).slice(0, 300)}`);
+      let v, last;
+      // It gives up when the page stops changing, not when a clock runs out. The ceiling was raised three times -
+      // ninety seconds at 1659 tests, a hundred and eighty at 1742, three hundred and sixty after that - and each
+      // time the suite grew past it again, because some of what this page writes it measures live in the browser
+      // (the keyboard rows) and the full run starves that. A number picked on a quiet machine is a number that lies
+      // on a busy one.
+      //
+      // What the wait is actually for is a hang, and a hang looks different from slowness: a slow page keeps
+      // changing what it says, a hung one says the same thing for ever. So the window resets every time the read
+      // changes, and only an unchanging page runs it out. A test that passes leaves the moment it is ready, and one
+      // that hangs still fails - now with the thing the page got stuck on.
+      const began = Date.now();
+      let moved = Date.now();
+      while (Date.now() - moved < budget(60000)) {
+        v = await run(expr);
+        if (ok(v)) return v;
+        if (String(v) !== String(last)) { last = v; moved = Date.now(); }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      assert.fail(`${what} stopped changing ${Math.round((Date.now() - moved) / 1000)}s ago (${Math.round((Date.now() - began) / 1000)}s in all) without becoming ready; last read: ${String(v).slice(0, 300)}`);
     };
     const shownIs = (id) => until(`[...document.querySelectorAll('main > section')].filter((s) => !s.hidden).map((s) => s.id).join()`, (v) => v === id);
     // One view at a time: the page opens on Status (the index stays built, off the menu, each component's thumbnail in
