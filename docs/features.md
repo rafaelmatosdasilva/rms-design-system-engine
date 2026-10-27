@@ -397,6 +397,14 @@ A short file listing which components go where, with which options (`prototypes/
 
 Where your system has no layout components, the engine lends neutral ones (a page, a stack, a row, columns) that use only your spacing tokens and text styles, and adds layout components to the list.
 
+### What the team already decided
+
+Every decision somebody makes is recorded where it is made: a difference kept on purpose with its reason, a proposal answered yes or no, a difference accepted for now, a component checked by hand, a need nothing in the system fitted with what was looked at and why. Nothing gathered them, so a decision was only ever seen by whoever ran the command that made it.
+
+Now they come together in one log, shown beside each component's Changelog and written to `DECISIONS.md` in the output folder. A `DECISIONS.md` your team wrote by hand is read as one more source and never rewritten.
+
+The part that pays is what agents get. A card now carries what was already ruled out and why: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
+
 ### Your rules, read against each other
 
 Everything written for an agent reaches it at once: your guidelines, each layer of your intent, every component's page and your project's `AGENTS.md`. Written at different times by different people, they start to disagree. The engine reads them side by side and hands you three lists:

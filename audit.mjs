@@ -5972,6 +5972,21 @@ function reportFull(label, items, shown) {
     if (lines.length) { console.log(C.yellow(`\n🔁 ${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(`   ${l}`)); }
   } catch { /* nothing marked wrong, or the file is not readable */ }
 
+  // ── One log of what the team decided ───────────────────────────────────────
+  // Every decision a person makes is already recorded, each in its own file and each for its own reason. Gathered
+  // into one log, a person reads one page instead of four, and an agent is told what was already ruled out and why:
+  // an agent that does not know a thing was considered and rejected proposes it again, every time it is asked.
+  // Written, never decided here: the file is a view of decisions made elsewhere.
+  try {
+    const { gatherDecisions, decisionsMarkdown } = await import('./decisions.mjs');
+    const view = gatherDecisions(ROOT);
+    if (view.total) {
+      mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+      writeFileSync(join(ROOT, OUT_DIR, 'DECISIONS.md'), decisionsMarkdown(view));
+      console.log(C.dim(`\n🗒  ${view.total} decision${view.total === 1 ? '' : 's'} the team made${view.ruledOut ? `, ${view.ruledOut} ruling an option out` : ''}: ${OUT_DIR}/DECISIONS.md, and beside each component's Changelog in the style guide. Agents are given the ones that rule something out, so a rejected option is not proposed again.`));
+    }
+  } catch { /* nothing decided yet, or the files are not readable */ }
+
   // ── A primitive written by hand (advisory) ─────────────────────────────
   _section('advice');
   // A plain element styled as a primitive the owner declared in "primitives" (a <span> with the body text style
