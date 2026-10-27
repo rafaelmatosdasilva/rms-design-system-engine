@@ -498,6 +498,7 @@ test('no token on GitLab: pushStore asks for a merge request when the branch is 
   assert.equal(asked.always, false);
   assert.match(asked.branch, /^design-system-engine\/snapshots-\d{14}$/);
   assert.match(w.line, /sent as a merge request into main with your own git access \(https:\/\/x\/mr\) - main is protected/);
+});
 
 // ── Prototypes as a part of their own ───────────────────────────────────────────────────────────────────────────
 test('prototypes are a part: read into the project\'s own folder, and what a person drew is sent from it', async () => {
