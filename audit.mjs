@@ -4802,7 +4802,7 @@ function reportFull(label, items, shown) {
     const total = ONLY ? ONLY_LABELS.length : gates.length;
     const scope = cov && gates.some((g) => g.n === total) ? `checked ${cov[1]} of ${cov[2]} DS components` : null;
     if (gates.length) console.log(C.dim(`  [verified] the ${gates.length} gate${gates.length === 1 ? '' : 's'} above ${gates.length === 1 ? 'is' : 'are'} mechanically checked against Figma${scope ? `; ${scope} (see gate ${total})` : ''}.`));
-    console.log(C.dim('  [reported] the advisory notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail.'));
+    console.log(C.dim('  [advisory] the notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail; a gate marked ⏭ was not checked.'));
     console.log();
   }
 

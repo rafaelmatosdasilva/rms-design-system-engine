@@ -123,6 +123,8 @@ the same call. Opening this skill or printing a recipe runs nothing, so never sa
 snapshots were refreshed without that output. The SUMMARY's **Figma data** line says whether this run
 refreshed anything and how old the snapshots are: repeat it as it is.
 
+**Say where each claim comes from.** What you tell the person is one of three kinds, and reads as its kind: *verified*, read this session (the engine's output from this run, a file, Figma) and said with where ("gate 13 reports…", "Button.vue sets…"); *reported*, what the person said or what a page, a note or an earlier run's output says, never stated as fact ("you said…", "the intent layer says…", "the run on 20 October found…"); and *not checked*, said as that, with why (no token, a gate that skipped). An advisory note stays advisory: never call it a failure, and never call a gate that skipped a pass.
+
 **When sources disagree, the higher one decides:** the goal of the people who use the product, then verified research,
 then the system's documented standards (Figma, the contracts, the team's guidelines, WCAG 2.2 AA), then accepted past
 decisions, then general heuristics. WCAG 2.2 AA is the floor at every level. Say which source decided, and never put your
