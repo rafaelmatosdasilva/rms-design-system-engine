@@ -210,7 +210,7 @@
   ✅  [25]  What this audit actually checked                    Pass
 
   [verified] the 25 gates above are mechanically checked against Figma; checked 3 of 3 DS components (see gate 25).
-  [reported] the advisory notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail.
+  [advisory] the notes below (exemption debt, code drift, accessibility, layering) are signals, not pass/fail; a gate marked ⏭ was not checked.
 
 ────────────────────────────────────────────────────────────
 
