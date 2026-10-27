@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, ENGINE, DEMO, cliOf, cliChange, cliLine } from './lib.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
+import { engineFell, kindOf } from './reading.mjs';
 import { HELDOUT } from './heldout.mjs';
 import { BUILD, TIDEPOOL } from './build-tasks.mjs';
 import { PROTO } from './proto-tasks.mjs';
@@ -90,11 +91,14 @@ async function one({ t, run }) {
   try { taskChecks = limit ? [{ name: 'the run was given room to finish', ok: false, detail: limit }] : error ? [{ name: 'the run finished', ok: false, detail: error }] : await t.score(ctx); }
   catch (e) { taskChecks = [{ name: 'the scorer ran', ok: false, detail: e.message }]; }
   const rules = globalChecks(ctx, t);
-  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, run, pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, limit, at: new Date().toISOString() };
+  // A run that reached an engine which fell over is not the agent's failure: it is kept on the row and counted
+  // apart, the same as a run the harness stopped at its own ceiling.
+  const fell = engineFell(ctx);
+  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, kind: kindOf(t), run, ...(fell ? { fell } : {}), pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, limit, at: new Date().toISOString() };
   writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   appendFileSync(resultsFile(t), JSON.stringify(row) + '\n');
   cleanup(dir, home);
-  console.log(`  ${row.pass ? '✓' : '✗'} ${t.id} #${run}  $${ctx.usage.cost.toFixed(2)}  ${ctx.usage.turns} turns${row.pass ? '' : `  (${[...taskChecks, ...rules].filter((c) => !c.ok).map((c) => c.name).join('; ')})`}`);
+  console.log(`  ${fell ? '⚠' : row.pass ? '✓' : '✗'} ${t.id} #${run}  $${ctx.usage.cost.toFixed(2)}  ${ctx.usage.turns} turns${fell ? `  (the engine fell over: ${fell.said} — not the agent's failure)` : row.pass ? '' : `  (${[...taskChecks, ...rules].filter((c) => !c.ok).map((c) => c.name).join('; ')})`}`);
   return row;
 }
 
@@ -111,6 +115,13 @@ await Promise.all(Array.from({ length: Math.max(1, JOBS) }, async () => {
 }));
 const cost = rows.reduce((k, r) => k + r.usage.cost, 0);
 console.log(`\n${rows.filter((r) => r.pass).length}/${rows.length} passed · $${cost.toFixed(2)}`);
+// Loudest of all, and before anything else is read: a run that reached an engine which fell over measures the
+// engine, not the guide. A score read past this line is a score about the wrong thing.
+const fellRows = rows.filter((r) => r.fell);
+if (fellRows.length) {
+  console.log(`\n⚠️  ${fellRows.length} of ${rows.length} runs reached an engine that fell over. This measures the engine, not the guide: fix it and measure again.`);
+  for (const r of fellRows.slice(0, 5)) console.log(`     ${r.task} #${r.run}: ${r.fell.said} — ${r.fell.command}`);
+}
 // The agent's bundled skills, against the last recorded evaluation's: a new command line is said, never read as the guide.
 try {
   const { readFolder } = await import('./summarize.mjs');

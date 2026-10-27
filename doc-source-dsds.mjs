@@ -40,7 +40,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 14;   // 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
+export const READER = 15;   // 15: a page's Decisions section, read as its decisions (decisions.mjs); 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -85,6 +85,8 @@ export function layerOf(kind, group = '') {
 // ── The sections the style guide and the contracts read, by their title ─────────────────────────────────────────────
 // A title such as "Overview / When To Use" is read by its last part.
 const KEY_OF = [
+  // What the team decided about it, what it ruled out and why (decisions.mjs reads each line).
+  ['decisions', /^(decisions?|decided|design decisions)$/i],
   ['purpose', /^(intent|purpose|overview|what it is|description|summary|about)$/i],
   ['whenToUse', /^(when to use|use (it )?when|usage|usage rules|usage guidelines|how to use|do|dos)$/i],
   ['whenNotToUse', /^(when not to use|what not to do|do not use (it )?when|don'?t use (it )?when|avoid|don'?ts?)$/i],
@@ -163,7 +165,7 @@ export function entityView(entity, file, group = '', shared = null) {
   const view = {
     kind, layer: layerOf(kind, group), name: String(entity?.name ?? entity?.identifier ?? entity?.id ?? '').trim(), id: entity?.identifier ?? entity?.id ?? null,
     status: null, file, code: codeFileOf(entity), summary: null,
-    purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [],
+    purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], decisions: [],
     facts: [], repeated: 0,   // what was left out: the sections that are facts (by title), the lines repeated on every page
     // What its generated definitions sections name (Events, Properties, Slots), each term with whether it says more than
     // its name (a placeholder like "Event emitted by the component." says nothing): left out for agents, kept so a check

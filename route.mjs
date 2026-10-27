@@ -185,6 +185,10 @@ const SC = /\b[1-4]\.\d{1,2}\.\d{1,2}\b/;
 export const KEEP_SAYS = /\b(keep|kept|keeping)\b[^.\n]{0,60}\b(differences?|on purpose|intentional\w*|deliberate\w*|as (it|they) (is|are))\b|\b(on purpose|intentional(ly)?|deliberately|by design)\b|\b(mant[eé]m|manter|mantemos|mantenha|de prop[oó]sito|intencional\w*)\b/i;
 // The reason the person gives, in their words: what follows "because", "since", "porque".
 const KEEP_WHY = /\b(because|since|porque|pois|j[aá] que)\b\s+([^.!?\n]{4,200})/i;
+// A decision the team made, with what it ruled out ("record that the tile has no large size, we ruled out a size per
+// page because no screen needs it", "descartamos o tamanho grande"): written on its page in the intent layer.
+const DECISION_SAYS = /\bruled? out\b|\b(record|log|write down|note down)\b[^.\n]{0,40}\b(decision|decided)\b|\bwe decided\b|\bdecis[ãa]o\b|\bdecidimos\b|\bdescart(amos|ado|ada)\b/i;
+const RULED_OUT = /\b(?:ruled? out|descartamos)\s+(.+?)(?=\s+(?:because|since|porque|pois)\b|[.;!?\n]|$)/i;
 // A Figma link given to use from now on (a branch of the file, or another file): only the file key changes.
 const USE_FIGMA_FILE = /\b(use|using|switch\w*|point\w*|scan\w*|read\w*|change\w*|move\w*|instead|branch\w*|usa\w*|muda\w*|troca\w*|l[eê]r?)\b/i;
 const FIGMA_BRANCH = /\bfigma\b[\s\S]{0,30}\b(branch|ramo)\b|\b(branch|ramo)\b[\s\S]{0,30}\bfigma\b/i;
@@ -199,6 +203,7 @@ const RULES = [
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
+  ['guidelines-links', (t) => DECISION_SAYS.test(t) && !LINK.test(t), 'decision'],
   ['guidelines-links', (t) => LINK.test(t)],
   // A token renamed in Figma: one change renames it everywhere, the old name kept pointing at the new one.
   ['refresh-figma', (t) => /\b(renam\w*|renome\w*)\b/i.test(t) && /\btokens?\b|variab\w*|vari[aá]ve(l|is)|--[\w-]+/i.test(t), 'rename'],
@@ -367,6 +372,14 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
     if (kind === 'guidance-rating') {
       notes.push('Rates the guidance for what an agent can take from it: a class for the whole and for each component (ready, partial, thin) and what to add. --extract also asks a model questions answered from the guidance alone, which spends the person\'s model tokens: only when they ask for it. Each component\'s rating is also in its Documentation area of the style guide.');
       return { recipe, question: false, run: [`${cmd} --guidance-rating${EXTRACT_ASKED.test(t) ? ' --extract' : ''}`], notes, kind };
+    }
+    if (kind === 'decision') {
+      // On the page it is about (a component, a pattern, a template, a flow, a foundation, the system), one line with
+      // what was ruled out, why, who and when; written locally to read first, sent only when the person asks.
+      const why = KEEP_WHY.exec(t)?.[2]?.trim().replace(/"/g, "'"), out = RULED_OUT.exec(t)?.[1]?.trim().replace(/"/g, "'");
+      notes.push('A decision the team made: write it with --decision on the page it is about, in the person\'s own words (what was decided, what was ruled out, why), never words you add. It is written locally to read first; --commit or --merge-request sends it to the intent layer only when the person asks. It reaches agents on the next run and the style guide shows it in History.');
+      const run = `${cmd} --decision ${named[0] ?? '<what it is about>'} "<what was decided>"${out ? ` --ruled-out ${JSON.stringify(out)}` : ''}${why ? ` --why ${JSON.stringify(why)}` : ''}`;
+      return { recipe, question: false, run: [run], notes, kind, ask: named.length ? 'what was decided, in their words' : 'which page it is about and what was decided, in their words', askHow: 'the subject, then what was decided in quotes' };
     }
     if (kind === 'checked') {
       // Each criterion they named, on each component they named: recorded as theirs, then the page rebuilt.
