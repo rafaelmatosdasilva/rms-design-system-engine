@@ -28,10 +28,15 @@ const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
 
 // What a fall is, in the words a reader would see: a stack line, a name that is not there, a read off nothing.
-export const FELL_OVER = /\n\s+at .+\.mjs:\d+|is not defined|Cannot read properties of (undefined|null)/;
+// A stack line is the loud way to fall. The quiet way is a name that is not in scope inside a try, printed as a
+// note while the work it guarded never happens - the same defect, and the one that reached an evaluation twice.
+export const FELL_OVER = /\n\s+at .+\.mjs:\d+|is not defined|is not a function|Cannot read properties of (undefined|null)/;
 
 // Every command that should answer on any project, offline, without a token.
 const COMMANDS = [
+  // The command with no flag at all: the whole audit, which is what most people run and what every other command
+  // hangs off. It was not here when a name that is not in scope printed itself as a note instead of a list.
+  '',
   '--version', '--census', '--doctor', '--status', '--summary', '--trend', '--writes', '--findings', '--hygiene',
   '--duplication', '--agent-rules', '--annotation-categories', '--check-intent', '--code-drift',
   '--contract-completeness', '--exemption-debt', '--guidance-rating', '--guide-status', '--readmes', '--route',
@@ -47,7 +52,7 @@ const COMMANDS = [
 const runOne = (command) => new Promise((done) => {
   const dir = mkdtempSync(join(tmpdir(), 'cmd-run-'));
   cpSync(DEMO, dir, { recursive: true });
-  execFile(process.execPath, [join(ENGINE, 'audit.mjs'), ...command.split(' ')], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26 },
+  execFile(process.execPath, [join(ENGINE, 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26 },
     (err, stdout, stderr) => done({ command, out: `${stdout ?? ''}${stderr ?? ''}`, timedOut: err?.killed === true }));
 });
 
