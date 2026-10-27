@@ -98,6 +98,7 @@ rms-design-system-engine --watch-intent-layer [min]     # keep running: build th
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
 rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
+rms-design-system-engine --writes                       # what this project lets the engine change, one answer per place; --writes <figma|code|generated|engine> <yes|ask|no> records one
 rms-design-system-engine --intent-autofix on|off        # whether each run of the audit and of the style guide fixes the intent layer and commits it straight on its branch (ds-config.json → intentLayer.autoFix "commit")
 rms-design-system-engine --intent-decide                 # the engine's proposed answer to each of the team's decisions on the Documentation page (Fix, Add, Move), with its key and what it rests on
 rms-design-system-engine --intent-decide "<key>[,<key>]" yes|no  # the team's answer ("all" for every open one), kept in design-system-engine-intent-decisions.json; what the answer changes in the intent layer is made and committed at once (a no to a Move merges the part into its parent's page, a no to a Fix writes the sentence again as a draft, a page to write is started from its code), and a Fix not answered yet is left as it is
@@ -172,6 +173,15 @@ checks each piece once it exists.
   build list. Every line is what the structure check compares once the component exists, so a component built from
   the sheet needs no `structure-contract.mjs` entry; an entry the project writes always wins. When a product already
   uses the component, one line shows how its code writes it, with the file and line, to copy.
+- **Colour pairs.** For every text and icon colour, the engine works out the one surface it was made for: read from
+  the names (`content/on-interactive` goes with `surface/interactive`, `text/primary` with `surface/primary`) and
+  confirmed against the values in every mode. `--query` on that colour prints `goes on: <surface>` with the contrast
+  the two give, before the list of every surface it would also work on; `llms.txt` carries the whole list, and the
+  tokens contract keeps it per token. Given only the list of what would work, an agent picks a different grey on
+  every card, which is how a page ends up correct and wrong at once. The edit check flags a colour put on a surface
+  it was not made for, with the contrast there: every token is the system's own, so nothing is invented, and what is
+  wrong is the pairing. A pair whose names say they go together and whose values do not meet 4.5:1 is reported as
+  what it is, never dropped for failing: the system's own words against its own numbers.
 - **Component stylesheets.** A component built into its own stylesheet (`src/components/button.css`) is found by its
   class and added to `paths.themeCSS` after the token file, said once in the report, so every gate reads it.
 - **A token an edit invents.** In any project, a custom property an edit adds with a value of its own (a colour, a size) that Figma has no variable for is handed back, in the theme too; one that only points at the system's tokens, or that Figma has, is not.
@@ -183,6 +193,30 @@ checks each piece once it exists.
 - **The sentence owed.** Building a component Figma paints with a colour that has no variable, the route asks for one line in the reply saying so, and the Stop hook sends the agent back when the reply leaves it out: twice at most, so a first hand-back spent on something else does not lose it.
 - **While building.** The edit check counts the tokens still to build as the system's own, so a component written
   before its tokens is still checked against them. Unused tokens are expected and do not fail.
+
+### Where the engine may write
+
+**Read this before changing anything.** `ds-config.json` → `writes` gives one answer per place, and the whole engine
+reads the same one:
+
+| Place | What it holds |
+|---|---|
+| `figma` | the design file: what Figma shows (a role, a name, an annotation, a component) |
+| `code` | the product's code: the files people wrote |
+| `generated` | the code the engine generated: the tokens, the contracts, the style guide |
+| `engine` | the engine's own files: the authored contract, the structure contract's notes, the kept differences |
+
+Each is `yes` (write it, and say what changed; the product's code only through a branch and a pull request), `ask`
+(show the person the exact change and wait for a yes, every time) or `no` (never: the change goes on the Tasks page,
+for whoever owns that place). A place with no answer is `ask`, the engine asks once and records the answer, so every
+session and every run read the same one rather than each asking again. `rms-design-system-engine --writes` prints
+them; `--writes figma ask` records one.
+
+Two things the setting cannot override. On CI there is nobody to answer, so `ask` is `no`; and CI never writes the
+design file or the product's code whatever the setting says. Both are said out loud, never silently.
+
+A project whose answer for the design file is `no` gets the list of Figma changes and no script to run: never write a
+script of your own in its place, and say that the changes are on the Tasks page.
 
 ### The design-intent layer (auto OUTPUT, never a gate)
 
@@ -1210,13 +1244,29 @@ as moved.
 from (each Figma snapshot with its age, the code, the authored contract, each guidelines file with the Notion or GitLab
 link it came from, and a link not fetched yet); for this request, what applies to it; the catalog's components with
 their options (a component the code does not have is marked: it is drawn as a labelled box); what each component is for;
-the team's rules for the product; the rules the check holds every prototype to; the templates in Figma; how the
+the team's rules for the product, in tiers; the rules the check holds every prototype to; the templates in Figma; how the
 product's pages are arranged; the engine's layout pieces with the spacing tokens, text styles and screen widths they
 take; the format; and the prototypes already in `prototypes/`. For a request (`--for`) it first lists what the system cannot decide from it, under
 **ASK FIRST**: which kind of page, when the request names none of the system's page templates or fits several alike (a
 template that lays a panel, a drawer or a dialog over a page is not a kind of page); what the page is for, when nothing
 in the request matches what any component is for; and each question the documentation leaves open on what it touches.
 Its NEXT line then says to ask the person and wait; `--answered`, with the answers added to `--for`, asks nothing.
+
+**The rules come in tiers, and the more specific one wins.** Three kinds of rule reach an agent at once: the engine's
+own, true of any design system it checks; the design system's, written by the team that owns it; and a product's own
+(a product page or flow in the intent layer, and the project's own instruction file for agents). The catalog prints
+them in that order, from the most general to the most specific, with one line saying the ladder, so an agent that
+meets two rules it cannot both follow knows which one holds: the one written closer to what it is building. A rule is
+placed by where it was written, never by what it says, and a system whose rules are all of one tier reads as it always
+did. A product narrowing the system's general rule is how a design system is used, not a fault.
+
+**Each component carries what was already decided against it.** Every decision a person makes is recorded where it is
+made (a difference kept on purpose with its reason, a proposal answered yes or no, a difference accepted for now, a
+component checked by hand, a need nothing fitted with what was looked at and why). They are gathered into one log,
+written to `.design-system-engine-out/DECISIONS.md` and shown beside each component's Changelog, and a card carries
+the ones that rule an option out: `decided against: <what>, <why> (<how it was decided>, <who>, <when>)`. An agent
+that does not know a thing was considered and rejected proposes it again, confidently, every time it is asked. A
+`DECISIONS.md` the team wrote by hand is read as one more source and never rewritten.
 
 A system of more than 30 components or rules is shown in full only where the request needs it, so the catalog is read
 whole instead of skimmed: `--for "<the request>"` (or the request the project's hook saved) picks the components it
@@ -1288,6 +1338,15 @@ and whose examples (`Example:`) are shown as examples.
     slot no comment and no intent layer line names, a list whose items no comment describes, a field the product's
     code gives that no comment lists, and a component with no page, purpose or example (`doc-coverage.json`; the row
     **What its documentation does not say**, Missing).
+  - `--prototype --rules` (no agent, instant): everything written for the agent, read against itself
+    (`rules-sweep.json`). Three lists, and nothing is rewritten: pairs that cannot both be followed (opposite words
+    about the same component, two counts of it, two places it may only go), a rule written twice in two places in
+    different words, and rules that name nothing the system has and no check reads (advice, not rules). The project's
+    own instruction file for agents (`AGENTS.md` and the rest) is read for what it says about the system and nothing
+    else; the engine's own section in it is left out. Pairs written in two different tiers are settled by the ladder
+    (below) and only counted; what is listed to settle is the pairs written inside one tier, by two people with the
+    same authority. Each component's Documentation page lists the ones about it (the rows **Rules that cannot both
+    be followed** and **A rule written twice**).
   - `--prototype --scenarios [--model <id>]`: each component's "when to use" lines, its own names taken out (a line
     naming another component is skipped), become needs; an agent given only what each component is for picks one, and
     a wrong pick is a confusion (`stress.json`; the row **Agents picked another component**, to review). A "when to use"
