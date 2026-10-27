@@ -45,6 +45,8 @@ export function factsFrom({ components = {}, tokens = [], text = '', files = [],
   const allProps = new Set();
   for (const c of Object.values(components)) for (const p of Object.keys(c.props ?? {})) allProps.add(p);
   const words = new Set((text.match(/[A-Za-z_$][\w$-]*/g) ?? []).map(norm));
+  // Each part of a token's name is a name the system has (--x-tileHeader-color: tileHeader), the family a page names.
+  for (const t of [...tokens, ...(text.match(/--[\w-]+/g) ?? [])]) for (const w of String(t).replace(/^--/, '').split('-')) if (w.length > 2) words.add(norm(w));
   const noExt = (f) => String(f).replace(/^\.?\//, '').replace(/\.[\w]+$/, '');
   const fileKeys = files.map(noExt);
   const dirs = new Set(files.flatMap((f) => { const parts = String(f).replace(/^\.?\//, '').split('/'); return parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join('/')); }));
@@ -112,7 +114,12 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
   const files = [];
   for (const r of roots) { const p = resolve(ROOT, r); try { if (statSync(p).isDirectory()) walk(ROOT, p, files); else files.push({ path: r, size: statSync(p).size }); } catch { /* gone */ } }
   const texts = [];
-  for (const f of files) if (!/\.(png|svg)$/i.test(f.path) && f.size < 4e6) { try { texts.push(readFileSync(resolve(ROOT, f.path), 'utf8')); } catch { /* unreadable */ } }
+  // A name only a comment writes is not one the code has (a typo in a doc comment, copied into a page, stays a typo),
+  // and what the engine itself generates from the pages (design-intent.json) would only echo them back.
+  const own = new Set([cfg.docs?.out, 'design-intent.json'].filter(Boolean).map((x) => String(x).split('/').pop()));
+  const uncommented = (t, path) => (/\.(vue|svelte|html?|[cm]?[jt]sx?|s?css|less)$/i.test(path)
+    ? t.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1') : t);
+  for (const f of files) if (!/\.(png|svg)$/i.test(f.path) && f.size < 4e6 && !own.has(String(f.path).split('/').pop())) { try { texts.push(uncommented(readFileSync(resolve(ROOT, f.path), 'utf8'), f.path)); } catch { /* unreadable */ } }
   for (const k of ['snapshotStructure', 'compPropsSnapshot', 'snapshotVars', 'snapshotIcons', 'snapshotExamples', 'snapshotScreenComponents']) {
     const p = P[k] && resolve(ROOT, P[k]);
     if (p && existsSync(p) && !files.some((f) => resolve(ROOT, f.path) === p)) { try { texts.push(readFileSync(p, 'utf8')); } catch { /* unreadable */ } }
@@ -184,7 +191,7 @@ const sentenceOf = (text, at) => {
 // Names written as code that look like names (camelCase, kebab-case, a token, a path), not words of a sentence.
 const CODE_NAME = /^(?:[A-Za-z_$][\w$]*[a-z0-9][A-Z][\w$]*|[a-z][a-z0-9]*(?:-[a-z0-9]+)+)$/;
 const PATH = /^[\w.@-]+(?:\/[\w.@-]+)+\/?$/;
-const PLACEHOLDER = /^(folder|name|icon-name|path|file|component|x|y|n|foo|bar|your-?\w*|\.\.\.)$/i;
+const PLACEHOLDER = /^(folder|name|icon-name|path|file|component|token|x|y|n|foo|bar|your-?\w*|\.\.\.)$/i;
 // prop=value, prop="value", :prop="value"
 const SETS = /^:?([A-Za-z_][\w-]*)\s*=\s*["']?([^"'\s]*)["']?$/;
 // The web's own names, not the system's: ARIA and data attributes, and the HTML elements a page may name.
@@ -285,7 +292,7 @@ export function checkPage(e, facts, { component = null, strict = false } = {}) {
       // system's: there only a token, and a name one letter or two from one the system has (a typo), are held to it.
       const product = e.layer === 'flows' || e.layer === 'pages';
       let known = true, what = '';
-      if (/^--[\w-]+$/.test(span)) { known = facts.tokens.has(span) || facts.text.includes(span); what = 'token'; }
+      if (/^--[\w-]+$/.test(span)) { known = facts.tokens.has(span) || facts.text.includes(span) || PLACEHOLDER.test(span.slice(2)); what = 'token'; }
       else if (HTML_ATTR.test(span)) continue;
       // A label written as Title/Case (a state, a screen: `Data/Content`) is a name for people, not a path.
       else if (PATH.test(span) && !span.split('/').every((s) => /^[A-Z][a-z]+$/.test(s)) && !span.split('/').some((s) => PLACEHOLDER.test(s)) && span.split('/').some((s) => s.length > 2) && !span.split('/').every((s) => HTML_EL.test(s))) {
