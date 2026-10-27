@@ -137,6 +137,19 @@ test('a store whose pipeline skips the build while a variable is unset says the 
   assert.match(t, /interval `0 \* \* \* \*`/, 'the steps are still listed');
 });
 
+test('a store with no pipeline says the style guide is updated by whoever runs the engine', () => {
+  const r = storeRepos(cfg);
+  const ps = projects()['design/acme-guide'].files;
+  const tree = Object.keys(ps).filter((f) => f !== '.gitlab-ci.yml');
+  const t = storeSection(r[0], { name: 'Acme DS', tree, ci: null, others: r, prof: profileRepo(cfg), project: cfg.project });
+  assert.match(t, /\*\*How it is updated:\*\* nothing here builds it on its own; whoever runs the engine does\. `--styleguide` builds it; `--publish-styleguide` sends it at any time\./);
+  assert.doesNotMatch(t, /### The pipeline/);
+  const auto = storeSection(r[0], { name: 'Acme DS', tree, ci: null, others: r, prof: profileRepo(cfg), project: cfg.project, publish: 'auto' });
+  assert.match(auto, /`--styleguide` builds it and sends it here when it is behind what it is built from; `--publish-styleguide`/);
+  const piped = storeSection(r[0], { name: 'Acme DS', tree: Object.keys(ps), ci: ps['.gitlab-ci.yml'], others: r, prof: profileRepo(cfg), project: cfg.project, publish: 'auto' });
+  assert.doesNotMatch(piped, /How it is updated/, 'a pipeline here says how it runs instead');
+});
+
 test('a run writes what differs where GitLab lets it, keeps the team\'s text, and asks again only when something moved', async () => {
   const g = fakeGitlab({ projects: projects() });
   const ROOT = dir();

@@ -195,9 +195,10 @@ A location that changes is changed here, in \`${repo.file}\`: everyone's next ru
 
 // ── A store's section ──────────────────────────────────────────────────────────────────────────────────
 // entry: one of storeRepos(cfg); tree: the repository's files; ci: its .gitlab-ci.yml (or null); others: the other
-// entries; prof: profileRepo(cfg); project: the code's link.
-export function storeSection(entry, { name = 'the design system', tree = [], ci = null, others = [], prof = null, project = null } = {}) {
+// entries; prof: profileRepo(cfg); project: the code's link; publish: the setup's `styleguide.publish`.
+export function storeSection(entry, { name = 'the design system', tree = [], ci = null, others = [], prof = null, project = null, publish = null } = {}) {
   const { repo, parts } = entry;
+  const built = Boolean(ci && /audit\.mjs/.test(ci));   // a pipeline here runs the engine
   const out = [`## What ${SKILL} keeps here`, '', `| What | Where | Written by |`, '|---|---|---|'];
   for (const e of parts) out.push(`| ${PART_TEXT[e.part][0]} | ${whereIn(e)} | ${e.write ? PART_TEXT[e.part][1] : 'read here; written elsewhere'} |`);
   const read = parts.filter((e) => e.read).map((e) => lower(LABEL[e.part]));
@@ -210,6 +211,7 @@ export function storeSection(entry, { name = 'the design system', tree = [], ci 
   if (parts.some((e) => e.part === 'styleguide' && e.write)) {
     const at = parts.find((e) => e.part === 'styleguide').path;
     out.push('', '### The style guide', '', `**Open it:** \`${at ? at + '/' : ''}index.html\` in this repository. On your computer: download \`index.html\` and the \`assets\` folder beside it (or the whole repository as a zip) and open \`index.html\`. Nothing in it is written by hand: the engine builds it from the code, Figma (through the snapshots), the intent layer and the team's decisions, so it always says what the system is today.`, '',
+      ...(built ? [] : [`**How it is updated:** nothing here builds it on its own; whoever runs the engine does. \`--styleguide\` builds it${publish === 'auto' ? ' and sends it here when it is behind what it is built from' : ''}; \`--publish-styleguide\` sends it at any time.`, '']),
       '| Page | What it tells you |', '|---|---|',
       '| **Status** | How far the system is: parity with Figma, how much is built, accessibility, and documentation |',
       "| **Showroom** | The products' screens drawn with the system's components |",
@@ -228,7 +230,7 @@ export function storeSection(entry, { name = 'the design system', tree = [], ci 
     if (files.length) out.push('', '| File | What it holds |', '|---|---|', ...files.map((f) => `| \`${f}\` | ${snapshotText(f)} |`));
   }
 
-  if (ci && /audit\.mjs/.test(ci)) {
+  if (built) {
     const vars = [...ci.matchAll(/^#\s+([A-Z][A-Z0-9_]{2,})\s{2,}(\S.*)$/gm)].map((m) => [m[1], m[2].trim()]);
     const hourly = /--ci-changed/.test(ci), weekly = /DOC_STRESS/.test(ci);
     // A rule that skips the build while a variable is unset (`- if: '$X == null'` then `when: never`): the team
@@ -322,7 +324,7 @@ export async function syncReadmes(ROOT, cfg, opts = {}) {
   if (opts.offline || cfg?.readmes === false) return [];
   const lines = [], say = (l) => lines.push(l), note = (l) => { if (opts.verbose) lines.push(l); };
   const st = readState(ROOT), next = { ...st };
-  const setup = sha1(JSON.stringify([cfg?.stores ?? null, cfg?.profile?.sha ?? null, cfg?.project ?? null, GEN]));
+  const setup = sha1(JSON.stringify([cfg?.stores ?? null, cfg?.profile?.sha ?? null, cfg?.project ?? null, cfg?.styleguide?.publish ?? null, GEN]));
   const prof = profileRepo(cfg);
   const repos = storeRepos(cfg);
   let profile = null;
@@ -371,7 +373,7 @@ export async function syncReadmes(ROOT, cfg, opts = {}) {
       const now = tree.includes(README) ? await r.file(README) : '';
       const title = `${name} ${list(entry.parts.map((e) => lower(LABEL[e.part])))}`;
       const project = cfg?.project ?? (await profileFile())?.project;
-      return [[README, withSection(now, storeSection(entry, { name, tree, ci, others: repos, prof, project }), { title })]];
+      return [[README, withSection(now, storeSection(entry, { name, tree, ci, others: repos, prof, project, publish: cfg?.styleguide?.publish }), { title })]];
     }, { place: { tokenEnv: w.place?.tokenEnv ?? null, writeTokenEnv: w.place?.writeTokenEnv ?? null }, mode, label: 'README' });
   }
   if (JSON.stringify(next) !== JSON.stringify(st)) writeState(ROOT, next);
