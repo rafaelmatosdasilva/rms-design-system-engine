@@ -5055,6 +5055,32 @@ function reportFull(label, items, shown) {
         styles: files.flatMap((f) => blocks(f, /<style\b[^>]*>([\s\S]*?)<\/style>/gi)),
         scripts: files.flatMap((f) => (/\.(js|ts|mjs|jsx|tsx)$/.test(f.file) ? [f.text] : [...f.text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]))),
         files: files.filter((f) => /\.vue$/.test(f.file)),
+        // What each Figma on/off shows, to tell when the code's hides more (Figma's structure, by its own names).
+        toggles: (() => { try {
+          const st = JSON.parse(readFileSync(join(ROOT, SNAP_STRUCT), 'utf8')).components ?? {};
+          const flat = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+          const by = new Map(Object.entries(st).map(([k, v]) => [flat(k), v?.toggles]));
+          return Object.fromEntries(comps.map((c) => [c.name, by.get(flat(c.name))]).filter(([, t]) => t && Object.keys(t).length));
+        } catch { return {}; } })(),
+        // The slots Figma stretches what is put in them in, each with the code's slot it pairs with (prop-binding.mjs).
+        stretched: await (async () => { try {
+          const { bindFigmaProp } = await import('./prop-binding.mjs');
+          const fp = JSON.parse(readFileSync(join(ROOT, SNAP_COMP_PROPS), 'utf8'));
+          const flat = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+          const by = new Map(Object.entries(fp).map(([k, v]) => [flat(k), v?.properties ?? {}]));
+          const out = {};
+          for (const c of comps) {
+            const props = by.get(flat(c.name)); if (!props) continue;
+            const defs = Object.entries(props).map(([k, d]) => [k.split('#')[0], d]);
+            const figmaSlots = defs.filter(([, d]) => d?.type === 'SLOT').map(([n]) => n);
+            for (const [n, d] of defs) {
+              if (d?.type !== 'SLOT' || !d.slotSettings?.stretchChildOnInsert) continue;
+              const b = bindFigmaProp(n, d, { codeProps: api[c.name]?.props ?? {}, slots: api[c.name]?.slots ?? {}, figmaSlots });
+              if ((b?.as === 'slot' && b.exactName) || b?.as === 'defaultSlot') (out[c.name] ??= {})[b.as === 'defaultSlot' ? 'default' : b.code] = n;
+            }
+          }
+          return out;
+        } catch { return {}; } })(),
       });
       if (faults.length) {
         console.log(C.yellow(`\nℹ️  Component code: ${faults.length} thing${faults.length === 1 ? '' : 's'} a screen runs into in ${new Set(faults.map((f) => f.component)).size} component${faults.length === 1 ? '' : 's'}' own code. Advisory: each is a fact of the code, with its line; whether to change the component is the team's call.`));
@@ -5062,6 +5088,25 @@ function reportFull(label, items, shown) {
       }
     }
   } catch { /* the components' files could not be read: nothing to say */ }
+
+  // ── Dates the code writes, against the intent layer's writing rules (advisory, never a gate) ──────────
+  _section('advice');
+  // writing-formats.mjs: a whole date in a format no rule gives, a month written with a capital the rules write in
+  // lowercase (or the other way), two helpers that write the month two ways. Only when the layer gives a format.
+  try {
+    const il = await import('./intent-layer.mjs');
+    const snap = il.readIntentLayer(ROOT, cfg);
+    const rules = (snap?.entities ?? []).map((e) => JSON.stringify(e).replace(/\\n/g, '\n')).join('\n');
+    if (rules) {
+      const { sourceFiles } = await import('./code-roots.mjs');
+      const { writingFindings } = await import('./writing-formats.mjs');
+      const found = writingFindings({ rules, files: sourceFiles(ROOT, cfg).filter((f) => /\.(js|ts|mjs|jsx|tsx|vue|svelte)$/.test(f.file)) });
+      if (found.length) {
+        console.log(C.yellow(`\nℹ️  Writing rules: ${found.length} place${found.length === 1 ? '' : 's'} where the code writes a date otherwise than the intent layer's writing rules. Advisory: the rules are the team's; change the code, or the rule if the code is right.`));
+        for (const f of found) console.log(C.yellow(`     ${f.says}`));
+      }
+    }
+  } catch { /* no intent layer read: nothing to compare */ }
 
   // ── Code → design drift (advisory, never a gate) ───────────────────────
   _section('advice');

@@ -170,3 +170,48 @@ test('a fault of the code is the code\'s to fix, with the fix for its kind', asy
 test('a line that starts with the code\'s name for a component is that component\'s, written as Figma writes it', () => {
   assert.equal(componentOf('Component code :: acmePicker/Row: Fires twice. One click on acmeTick\'s <label>', ['acmePickerRow', 'acmeTick', 'acmePicker']), 'acmePickerRow');
 });
+
+test('an on/off that hides more in the code than in Figma: the parts another Figma on/off shows', async () => {
+  const drop = (cond) => ({ name: 'acmeDrop', file: 'src/drop/Drop.vue', text: `<template>
+  <div class="acme-drop">
+    <div v-if="${cond}" class="acme-drop-region">
+      <div v-if="label" class="acme-drop-label">{{ label }}</div>
+      <div v-if="showArea" class="acme-drop-area"/>
+      <p v-if="hint && showArea" class="acme-drop-hint">{{ hint }}</p>
+      <span v-if="showArea && Number(count) >= 3" class="count">3+</span>
+    </div>
+  </div>
+</template>
+<script setup>
+import { computed } from 'vue'
+const props = defineProps({ label: String, hint: String, count: Number, showArea: Boolean, readOnly: Boolean })
+const showRegion = computed(() => { if (props.readOnly) return false; return props.showArea || !!props.label })
+</script>` });
+  const toggles = { acmeDrop: { showArea: ['Area'], showLabel: ['Label'], showHint: ['Hint'], showCount: ['Count'] } };
+  const css = ['.acme-drop{} .acme-drop-region{} .acme-drop-label{} .acme-drop-area{} .acme-drop-hint{} .count{}'];
+  const f = componentFaults([drop('showRegion')], { styles: css, toggles }).filter((x) => x.kind === 'hidesMore');
+  assert.equal(f.length, 1);
+  assert.match(f[0].says, /turning `showArea` off in the code also hides its label \(\.acme-drop-label\) and hint \(\.acme-drop-hint\): in Figma, showArea hides only Area, and those parts stay on with showLabel and showHint/);
+  assert.ok(!/count/.test(f[0].says), 'a value compared in a condition is not a part it shows');
+  // Where the code hides only what Figma hides, nothing is said; nor when Figma's own layer holds the part.
+  assert.deepEqual(componentFaults([drop('true')], { styles: css, toggles: { acmeDrop: { showArea: ['Area'], showHint: ['Hint'] } } }).filter((x) => x.kind === 'hidesMore' && /label/.test(x.says)), []);
+  assert.deepEqual(componentFaults([drop('showRegion')], { styles: css, toggles: { acmeDrop: { showArea: ['Area', 'Label Container', 'Hint'], showLabel: ['Label'], showHint: ['Hint'] } } }).filter((x) => x.kind === 'hidesMore'), []);
+  const { plainAction } = await import('../run-diff.mjs');
+  assert.equal(plainAction(`acmeDrop: ${'Hides more than in Figma'}. Turning \`showArea\` off…`, 'acmeDrop').who, 'both');
+});
+
+test('a slot Figma stretches its content in, inside a column of the code that draws it at its own width', () => {
+  const sheet = (align) => ({ name: 'acmeSheet', file: 'src/sheet/Sheet.vue', text: `<template>
+  <div class="acme-sheet"><h2 class="acme-sheet-title">{{ title }}</h2><slot name="sheet-body"/></div>
+</template>
+<style scoped>
+.acme-sheet { display: flex; flex-direction: column; align-items: ${align}; }
+.acme-sheet-title { align-self: stretch }
+</style>` });
+  const css = (t) => [t.text.match(/<style scoped>([\s\S]*)<\/style>/)[1]];
+  const f = componentFaults([sheet('flex-start')], { styles: css(sheet('flex-start')), stretched: { acmeSheet: { 'sheet-body': 'slotBody' } } });
+  assert.deepEqual(f.map((x) => x.kind), ['shrinks']);
+  assert.match(f[0].says, /"sheet-body" slot is drawn at its own width: the element around it \(\.acme-sheet\) is a column with align-items: flex-start, while Figma's slotBody stretches/);
+  assert.deepEqual(componentFaults([sheet('stretch')], { styles: css(sheet('stretch')), stretched: { acmeSheet: { 'sheet-body': 'slotBody' } } }), []);
+  assert.deepEqual(componentFaults([sheet('flex-start')], { styles: css(sheet('flex-start')) }), [], 'a slot Figma does not stretch is not asked');
+});

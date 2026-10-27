@@ -139,6 +139,10 @@ Some faults show only when a screen uses the component, before any difference wi
 - **Read once.** A prop read only when the component appears, so a screen cannot open, close or change it afterwards.
 - **Line breaks lost.** A description or a message shown on one line, its new lines gone.
 - **Takes HTML in one, text in another.** The same prop in one family, bold and line breaks working in one component and not in its sibling.
+- **Hides more than in Figma.** An on/off that hides only its own part in Figma (a drop area) also hides the label or the helper in the code.
+- **Shrinks what Figma stretches.** A slot Figma stretches what is put in it to its width, where the code's column draws it at its own width.
+
+Dates are read too: a helper that writes a date in a format your intent layer's writing rules do not give, a month written with a capital the rules write in lowercase, or two helpers that write the same month two ways. Said for the whole system, with the helper and its line.
 
 Each is on the component's page and on the Tasks page, with the fix. They are advice, never a failed check: whether to change the component is your team's call.
 
