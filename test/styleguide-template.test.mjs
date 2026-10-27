@@ -673,6 +673,11 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#documentation thead th')].some((t) => t.textContent.trim() === 'File')`), false, 'no File column without an intent layer');
     assert.ok(await run(`document.querySelectorAll('#documentation tbody tr').length`) > 1, 'one row a component');
     assert.equal(await run(`document.querySelectorAll('#documentation [data-il-export], #documentation .pg-head-links button').length`), 0, 'no downloads on the Documentation page');
+    // Its sources at its top right, as the overview has them: the Figma file, then the code (and the intent layer, when it has one).
+    const heads = (sel) => run(`[...document.querySelectorAll('${sel} .pg-head-links a')].map((a) => a.textContent.trim()).filter((t) => t === 'Figma' || t === 'Code').join()`);
+    const own = await heads('#sg-hero-title');
+    assert.ok(own, 'the fixture links its Figma file or its code');
+    assert.equal(await heads('#documentation > h2'), own, 'the Documentation page links the sources it reads');
     // The System group of the menu ends with the Changelog, after the pages about the system as it is.
     const sysMenu = await run(`(() => { const lab = document.querySelector('.sg-nav-label'), out = []; for (let e = lab.nextElementSibling; e && !e.classList.contains('sg-nav-label'); e = e.nextElementSibling) if (e.tagName === 'A' && !e.hidden) out.push(e.getAttribute('href')); return out.join(); })()`);
     if (/#changelog/.test(sysMenu)) assert.match(sysMenu, /#changelog$/, `the Changelog last in the System group (${sysMenu})`);
