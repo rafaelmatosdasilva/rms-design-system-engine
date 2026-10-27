@@ -70,7 +70,7 @@
 
 import { appDir } from './code-roots.mjs';
 import './stdio-sync.mjs';   // the whole report reaches a pipe before process.exit
-import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync, renameSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync, renameSync, unlinkSync } from 'fs';
 import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { gunzipSync } from 'zlib';
@@ -97,6 +97,19 @@ import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, m
 // The time the browser check may take (a11y.timeoutSec sets it): each component on a style guide page adds its share,
 // each colour mode as much again, up to a cap that keeps a stuck run from holding a build for long.
 export const PER_COMPONENT_SEC = 15;
+// A run's result takes the last one's place only when it measured something (an element, a page): a check that could
+// not run writes nothing or measures nothing, and the last good result, with its own date, stays where it was. Returns
+// { replaced, keptFrom }: keptFrom, the date of the result kept, when one was.
+export function keepA11yResult(run, last) {
+  let now = null;
+  try { now = JSON.parse(readFileSync(run, 'utf8')); } catch { /* the check wrote nothing */ }
+  if (now && (now.total > 0 || (now.ran ?? []).length)) { renameSync(run, last); return { replaced: true, keptFrom: null }; }
+  try { unlinkSync(run); } catch { /* not there */ }
+  let keptFrom = null;
+  try { keptFrom = JSON.parse(readFileSync(last, 'utf8')).checkedAt ?? null; } catch { /* no earlier result either */ }
+  return { replaced: false, keptFrom };
+}
+
 export const LIMIT_CAP_SEC = 3600;
 export const SETTLE_TRANSITIONS = `document.getAnimations().forEach((a) => { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) { try { a.finish(); } catch (e) {} } })`;
 
