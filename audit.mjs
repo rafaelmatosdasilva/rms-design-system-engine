@@ -1874,7 +1874,7 @@ if (process.argv.includes('--figma-edits')) {
     // What this project lets the engine change in the design file decides whether the script that makes the changes
     // is written at all (writes.mjs). The list is written either way: what Figma is missing is worth reading.
     const { mayWrite } = await import('./writes.mjs');
-    const fig = mayWrite(cfg, 'figma');
+    const fig = mayWrite(feConfig, 'figma');
     const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits, { may: fig.answer });
     for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null, may: fig.answer, why: fig.why })) console.log(l);
     if (edits.length) console.log(`   (${relative(ROOT, files.json)}${files.script ? ` · ${relative(ROOT, files.script)}` : ''})`);
