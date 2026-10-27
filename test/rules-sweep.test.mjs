@@ -106,6 +106,21 @@ test('namesNothing: advice is told from a rule by what it names, never by how it
   assert.deepEqual(namesNothing({ rules: [{ title: 'Toasts', text: 'A message to the person is never left on the screen for good.' }], limits: [{ sentence: 'A message to the person is never left on the screen for good.' }] }), []);
 });
 
+test('the tiers settle what they can: a product narrowing the system is not a decision anybody owes', () => {
+  const agents = [{ file: 'AGENTS.md', text: 'A destructive action is never put behind a primary button.' }];
+  const all = contradictions(ctx(), { agents });
+  const across = all.find((c) => c.said.agent || c.against.agent);
+  assert.ok(across.settled, 'written in two tiers, so the ladder says which holds');
+  assert.equal(across.settled.from, 'AGENTS.md', "the product's own rule wins");
+  // Two rules of the system's own tier are the ones nobody has decided.
+  const inside = all.find((c) => c.why === 'count');
+  assert.equal(inside.settled, null);
+  const s = sweepRules(ctx(), { agents });
+  assert.equal(s.contradictions.every((c) => !c.settled), true, 'only the undecided ones are listed to settle');
+  assert.equal(s.narrowed.every((c) => !!c.settled), true);
+  assert.match(sweepLines(s).join('\n'), /disagree across tiers, and the ladder settles each/);
+});
+
 test('sweepLines: each pair with both sentences and where each came from; nothing to settle says so', () => {
   const lines = sweepLines(sweepRules(ctx()));
   const all = lines.join('\n');

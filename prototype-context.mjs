@@ -16,6 +16,7 @@
 // From the guidelines it also reads the rules a check can hold a prototype to ("one button per screen").
 //
 // loadContext reads files (and refreshes a guidelines link whose file is missing or old); the rest is pure.
+import { byTier, ladderLine } from './rule-tiers.mjs';
 import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { guidanceView } from './styleguide-data.mjs';
 import { isOpen } from './doc-source-dsds.mjs';
@@ -309,14 +310,14 @@ export function contextFrom(catalog = { components: {} }, intent = null, section
   for (const L of LAYERS) {
     const a = intent?.[L]?.authored;
     const text = typeof a === 'string' ? a.trim() : a && typeof a === 'object' ? JSON.stringify(a) : '';
-    if (text) rules.push({ title: `${L} (design intent)`, text, file: null });
+    if (text) rules.push({ title: `${L} (design intent)`, text, file: null, layer: L });
     // The intent layer's pages of this layer (a pattern, a template, a page): what each is for, when and when not.
     for (const pg of intent?.[L]?.intentLayer ?? []) {
       const body = [pg.purpose, ...(pg.whenToUse ?? []).map((x) => `Use when: ${x}`), ...(pg.whenNotToUse ?? []).map((x) => `Not when: ${x}`),
         ...(pg.mistakes ?? []).map((x) => `Common mistake: ${x}`), ...(pg.limitations ?? []).map((x) => `Limitation: ${x}`), ...(pg.rules ?? [])].filter(Boolean).join('\n');
-      if (body) rules.push({ title: `${pg.name} (${L}, intent layer)`, text: body, file: pg.url ?? pg.file ?? null, ...(pg.kind ? { kind: pg.kind } : {}) });
+      if (body) rules.push({ title: `${pg.name} (${L}, intent layer)`, text: body, file: pg.url ?? pg.file ?? null, layer: L, ...(pg.kind ? { kind: pg.kind } : {}) });
       for (const q of pg.open ?? []) open.push({ name: pg.name, layer: L, where: q.where ?? null, text: q.text, from: pg.url ?? pg.file ?? 'the intent layer' });
-      for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null, ...(pg.kind ? { kind: pg.kind } : {}) });
+      for (const sec of pg.sections ?? []) rules.push({ title: `${pg.name} · ${sec.title} (${L}, intent layer)`, text: sec.text, file: pg.url ?? pg.file ?? null, layer: L, ...(pg.kind ? { kind: pg.kind } : {}) });
     }
   }
   return { components, rules, open, limits: limitsFrom(components, rules, names), inside: insideFrom(components, rules, names, aliases) };
@@ -489,9 +490,14 @@ export function purposeLines(ctx, names, { width = 400, full = null } = {}) {
 
 // The team's rules for the product, each section on its own line (the full text stays in its file). full: the titles
 // shown with their text (a Set; null: every one); the others are named only, a few to a line.
+// In tiers, from the most general to the most specific (rule-tiers.mjs), so an agent that meets two rules it cannot
+// both follow knows which one holds: the one written closer to what it is building. A system whose rules are all of
+// one tier reads as it always did - the heading is only shown where there is more than one tier to tell apart.
 export function ruleLines(ctx, { width = 500, full = null, above = null } = {}) {
   const shown = ctx.rules.filter((r) => (!full || full.has(r.title)) && !above?.has(r.title));
-  const out = shown.map((r) => `  ${r.title}${r.file ? ` (${r.file})` : ''}: ${cut(r.text.replace(/\s+/g, ' '), width)}`);
+  const line = (r) => `  ${r.title}${r.file ? ` (${r.file})` : ''}: ${cut(r.text.replace(/\s+/g, ' '), width)}`;
+  const tiers = byTier(shown);
+  const out = tiers.length > 1 ? [`  ${ladderLine(tiers.map((t) => t.tier))}`, ...tiers.flatMap((t) => [`  ${t.said}:`, ...t.rules.map((r) => `  ${line(r)}`)])] : shown.map(line);
   // The others by the page they come from (Orders · Rules → Orders), each once; a token's page is in the scales.
   const rest = full ? ctx.rules.filter((r) => !full.has(r.title) && !above?.has(r.title)) : [];
   const tokenPages = rest.filter((r) => r.kind === 'token').length;

@@ -389,6 +389,8 @@ Before Claude writes a prototype, it sees what was read (Figma, the code, your r
 - A rule like one button per screen is checked.
 - A component your documentation rules out for a use is not used for it.
 
+The rules arrive in tiers, from the most general to the most specific: the engine's own, true of any design system; your design system's; and the product's own (a product page or flow in your intent layer, and the project's `AGENTS.md`). Where two disagree, the more specific one wins — a product narrowing a general rule is how a design system gets used, not a fault. Only a pair written inside one tier, by two people with the same authority, is a decision nobody has made, and those are the ones the sweep below hands you.
+
 ### What a prototype is
 
 A short file listing which components go where, with which options (`prototypes/<name>.json`). The engine checks it first. One that uses a component or an option the system lacks is not drawn, and each line says why.

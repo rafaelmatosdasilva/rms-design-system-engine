@@ -13,6 +13,15 @@ export const END = '<!-- rms-design-system-engine:end -->';
 export const RULE_FILES = ['AGENTS.md', 'CLAUDE.md', '.cursorrules', '.github/copilot-instructions.md', '.windsurfrules'];
 const CURSOR_RULES = '.cursor/rules/design-system.mdc';
 
+// The engine's own rules, true of any design system it checks. They are the first tier an agent reads (rule-tiers.mjs):
+// the team's rules are read after them and win where the two disagree, because a team knows its own system.
+export const ENGINE_RULES = [
+  'Before UI work on a component, ask for its contract: `rms-design-system-engine --query <component>` (its props, tokens, states, where it lives and what it is for). Ask the same for a token you are unsure of.',
+  'Use only the design system\'s components and tokens: no colour, size, radius, shadow or font written by hand, and no look-alike of a component the system has. When nothing fits, ask the person.',
+  'Before committing a UI change, run `rms-design-system-engine --edit-check` and fix everything it reports.',
+  'Never on your own: edit the Figma snapshots or `ds-config.json` by hand, accept a difference as debt (`--baseline`), mark a check as done, write to Figma, or ask for a token in the chat (a token goes in `.env`, set by the person).',
+];
+
 export function rulesSection() {
   return [
     START,
@@ -20,10 +29,7 @@ export function rulesSection() {
     '',
     'The UI in this project follows its design system, which rms-design-system-engine checks against Figma.',
     '',
-    '- Before UI work on a component, ask for its contract: `rms-design-system-engine --query <component>` (its props, tokens, states, where it lives and what it is for). Ask the same for a token you are unsure of.',
-    '- Use only the design system\'s components and tokens: no colour, size, radius, shadow or font written by hand, and no look-alike of a component the system has. When nothing fits, ask the person.',
-    '- Before committing a UI change, run `rms-design-system-engine --edit-check` and fix everything it reports.',
-    '- Never on your own: edit the Figma snapshots or `ds-config.json` by hand, accept a difference as debt (`--baseline`), mark a check as done, write to Figma, or ask for a token in the chat (a token goes in `.env`, set by the person).',
+    ...ENGINE_RULES.map((r) => `- ${r}`),
     END,
   ].join('\n');
 }
