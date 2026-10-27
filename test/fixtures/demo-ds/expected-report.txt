@@ -260,6 +260,7 @@ Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
      17 of 17 semantic tokens have no description in Figma (button/background/color, button/background/hover/color, button/text/color, chip/background/color, chip/text/color, …): what a token is for is what an agent reads to pick it.
 
 📐 Contracts → contracts  (4 components · 19 DTCG tokens)
+ℹ️  DSDS view → contracts/dsds: the 4 contracts in DSDS 0.23.0, for a team that documents its system in that format.
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
 ℹ️  Decision status: 1 experimental  (llms.txt tells agents which one won and why)
 ℹ️  Prune candidates: 6 (leaner library = cheaper agent context). Advisory - decide keep or drop.
