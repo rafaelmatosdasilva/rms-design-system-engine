@@ -67,6 +67,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine rename the tokens renamed in Figma everywhere` | One patch per product for every renamed token |
 | `/rms-design-system-engine accept the chip radius as known debt` | One known difference accepted, the rest still checked |
 | `/rms-design-system-engine keep the chip height on purpose because the product needs a larger tap target` | One difference kept with your reason, never failing a check |
+| `/rms-design-system-engine record that the tile has no large size, we ruled out a size per page because no screen needs it` | One decision on the tile's page in the intent layer, with what was ruled out and why, shown in History and given to agents |
 
 ## Update Figma
 

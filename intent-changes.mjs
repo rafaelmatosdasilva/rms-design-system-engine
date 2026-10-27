@@ -102,7 +102,7 @@ export function specOf(e, idx) {
 // ── Editing a Markdown spec ─────────────────────────────────────────────────────────────────────────────────────────
 // The written sections first, in the order a spec keeps them (Purpose to Limitations), then the reference ones (its role,
 // do and don't, an example): a spec checked for its section order takes a new one in its place.
-const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example', 'properties', 'data', 'events', 'slots'];
+const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example', 'properties', 'data', 'events', 'slots', 'decisions'];   // Decisions last: the team's record, apart from what it documents
 // The role of the element a component's code renders, as a screen reader names it (none for an element with no role).
 // An example of a component in use: its tag, and each prop that takes named values with the first of them (up to three),
 // so every name and value in it is one the code takes.
@@ -593,6 +593,31 @@ export function reviewPlan(snap, decisions, files, { check = () => null } = {}) 
   }
   return { files: next, pages: [...byPage.values()], problems };
 }
+// A decision written on the page it is about (decisions.mjs): its line under the page's Decisions heading, in the
+// Markdown spec a person edits (a new heading goes last), else in the page's own DSDS file as a section of that title.
+// Never a draft: a person stated it. → { files: Map(path → text), page, file } | { error }
+export function decisionPlan(snap, subject, line, files, { codes = [] } = {}) {
+  const want = norm(subject);
+  const e = (snap?.entities ?? []).find((x) => x.kind !== 'token' && (norm(x.name) === want || norm(String(x.file).replace(/^.*\//, '').replace(/\.dsds\.json$/, '')) === want));
+  if (!e) return { error: `no page in the intent layer is about "${subject}": name a component, a pattern, a template or a foundation as its page is titled` };
+  const idx = specIndex(files, { codes }), src = specOf(e, idx), next = new Map();
+  if (src && files.has(src.spec) && !src.shared) {
+    next.set(src.spec, mdAdd(files.get(src.spec), 'Decisions', line, { sure: true }));
+    return { files: next, page: e.name, file: src.spec };
+  }
+  const before = files.get(e.file); let doc = null; try { doc = JSON.parse(before); } catch { /* not JSON */ }
+  const entry = doc && (entriesOf(doc).find((x) => (x.id ?? x.name) === (e.id ?? e.name)) ?? entriesOf(doc)[0]);
+  if (!entry) return { error: `the page for "${subject}" (${e.file}) could not be read to write it` };
+  entry.sections ??= [];
+  let sec = entry.sections.find((x) => /^(decisions?|decided|design decisions)$/i.test(String(x.title ?? '').trim()));
+  if (!sec) { sec = { kind: 'section', for: 'all', title: 'Decisions', freeform: [{ title: 'Decisions', body: '' }] }; entry.sections.push(sec); }
+  sec.freeform ??= [{ title: 'Decisions', body: '' }];
+  const b = sec.freeform[0];
+  b.body = (String(b.body ?? '').replace(/\s*$/, '') + `\n- ${line}`).replace(/^\n/, '');
+  next.set(e.file, jsonText(doc, before));
+  return { files: next, page: e.name, file: e.file };
+}
+
 export function describeReview({ pages, problems }) {
   const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
   const out = [`Drafts reviewed on ${pages.length} page${pages.length === 1 ? '' : 's'}: ${n('approved')} approved, ${n('changed')} changed, ${n('dropped')} dropped.`, ''];

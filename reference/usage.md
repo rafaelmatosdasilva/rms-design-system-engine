@@ -106,6 +106,8 @@ rms-design-system-engine --review-drafts <file>          # a person's review of 
 rms-design-system-engine --review-drafts --approve <page>  # one decision, as each page's drafts give it: --approve or --drop every draft on the page (or one: <page> '<line>'), --change <page> '<line>' '<new words>'
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
+rms-design-system-engine --decision <what it is about> "<what was decided>" [--ruled-out "<option>"]... [--why "<reason>"]  # one line under the Decisions heading of that page in the intent layer (a component, pattern, template, flow, foundation or the system), with who and when; written locally to read first, --commit or --merge-request sends it, only when the person asks
+rms-design-system-engine --decisions                     # every decision recorded, newest first, wherever it was made
 rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, style guide, decisions, themes) and what this person may do there, as GitLab answers
 rms-design-system-engine --store <part>=<link|folder|nowhere> [--store <part>.path=<folder in it>] [--store <part>.branch=<branch>]   # name where a part lives (ds-config.json → stores); who may change it is GitLab's answer, never asked
 rms-design-system-engine --profile <link|file>           # set up from the company's profile (or take its new version): the shared setup and the stores, nothing asked; kept in ds-config.json and read again each run
@@ -542,7 +544,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   marks something (a row that differs, one only in Figma or only in code, a prop not built), Accessibility while a
   problem stands (the last browser check's or the audit's), and Documentation while a kind is not written yet (`docOpen`),
   what each marks said to a screen reader. Each section of rows (Anatomy in the Playground, Details in Documentation) is one of the
-  Playground's tables, its title the head; the Changelog is a table per release; Parity is one table of everything the
+  Playground's tables, its title the head; the History is a table per release; Parity is one table of everything the
   component has, whatever the Playground shows (each prop, each variable, each value the audit compares), the same
   table as the Status page's Parity (`issueTableHTML`, `ISSUE_COLS`): Task nr (the Status page's number, open rows
   only), Type, Figma (its name and value), Code (its name and value, and where in the
@@ -628,8 +630,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   "nodeId", "caption" }]`, fetched with `FIGMA_TOKEN`). Within the page's Figma image budget. A variant image of another
   scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
   uses in Figma.
-- **Changelog** (view `#changelog`, when the code has history; an old `#whats-new` link opens it): every component's changes gathered by release, newest
-  first (not released yet on top), one row per issue with its commits and what they affect. **Issue:** the one the
+- **History** (view `#history`, when the code has history or a decision is recorded; an old `#changelog` or `#whats-new` link opens it): every component's changes and every decision gathered by release, newest
+  first (not released yet on top), one row per issue with its commits and what they affect, one row per decision (tagged
+  Decision: what was ruled out, why, who) with the page it is about. Chips (All, Changes, Decisions) filter it, each with its own address (`?show=decisions`). **What:** the one the
   message starts with (`#4521 - …`, or the team's own pattern, `changelog.ticket`: `"#\\d+|REL-\\d+"`); else the one the
   merge or pull request it came by closes ("Closes #45" in its title or description), said `via !12`; else that request
   (`!12` on GitLab, `PR #70` elsewhere); "No issue" only for a commit made straight on the branch. A link pattern read
@@ -686,7 +689,7 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   description or annotations, or `@deprecated` / `@beta` / `@status x` in its code; never guessed. Coverage is its own
   file's line coverage from Istanbul's json-summary (`styleguide.coverage`, else `coverage/coverage-summary.json`).
   The overview counts each status and says what each group holds (`styleguide.groups: { foundations, components }`).
-- **Changelog**, an area of its own: when Figma was last read for it, then each commit that changed it (its own file,
+- **History**, an area of its own (`#c-chip/history`; an old `/changelog` link opens it): what the team decided about it first, then when Figma was last read for it, then each commit that changed it (its own file,
   or a line of the shared stylesheet holding its class; the project's own files only), grouped by the release tag
   (`v*`) that holds it, each linked to its commit and its pull request.
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else

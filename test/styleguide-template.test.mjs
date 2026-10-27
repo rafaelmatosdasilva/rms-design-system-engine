@@ -404,7 +404,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`(() => { const c = document.querySelector('#c-chip .pg-code'), t = document.querySelector('#c-chip .pg-tokens').closest('.pg-inspect'); return Math.abs(c.offsetTop - t.offsetTop) > 2 || (c.offsetHeight <= t.offsetHeight + 1 && c.offsetHeight < t.offsetHeight - 2); })()`), true, 'one line of code is not stretched to the tokens');
     // The page in areas, one at a time, switched with the system's own control; the chosen one stays for the next view.
     // Built with only where the component is made of others (the chip is not).
-    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Parity,Accessibility,Documentation,Motion,Code,Used in,Changelog', 'Specs is part of the Playground, not an area of its own');
+    assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].map((b) => b.textContent.split(',')[0]).join()`), 'Playground,Variants,Parity,Accessibility,Documentation,Motion,Code,Used in,History', 'Specs is part of the Playground, not an area of its own');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'play');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'parity').click()`);
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-area')].filter((a) => !a.hidden).map((a) => a.dataset.area).join()`), 'parity');
@@ -521,7 +521,7 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     assert.ok(await run(`(() => { const p = document.querySelector('#c-chip .pg-preview').getBoundingClientRect(), t = document.querySelector('#c-chip .pg-stage-bar--top').getBoundingClientRect(); return t.bottom <= p.top + 1; })()`), 'the bar sits above the stage, never over the component');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'log').click()`);
-    assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), b = s.querySelector('[data-v="log"]').getBoundingClientRect(), r = s.getBoundingClientRect(); return s.scrollLeft > 0 && b.right <= r.right + 1; })()`), true, 'Changelog scrolled into view');
+    assert.equal(await run(`(() => { const s = document.querySelector('#c-chip .pg-areas-scroll'), b = s.querySelector('[data-v="log"]').getBoundingClientRect(), r = s.getBoundingClientRect(); return s.scrollLeft > 0 && b.right <= r.right + 1; })()`), true, 'History scrolled into view');
     // On a phone a table of several columns is a block per row: no head row over the text, each value under the name of its
     // column, no cell narrower than the card, nothing wider than the screen.
     for (const area of ['parity', 'a11y']) {
@@ -673,9 +673,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`[...document.querySelectorAll('#documentation thead th')].some((t) => t.textContent.trim() === 'File')`), false, 'no File column without an intent layer');
     assert.ok(await run(`document.querySelectorAll('#documentation tbody tr').length`) > 1, 'one row a component');
     assert.equal(await run(`document.querySelectorAll('#documentation [data-il-export], #documentation .pg-head-links button').length`), 0, 'no downloads on the Documentation page');
-    // The System group of the menu ends with the Changelog, after the pages about the system as it is.
+    // The System group of the menu ends with the History, after the pages about the system as it is.
     const sysMenu = await run(`(() => { const lab = document.querySelector('.sg-nav-label'), out = []; for (let e = lab.nextElementSibling; e && !e.classList.contains('sg-nav-label'); e = e.nextElementSibling) if (e.tagName === 'A' && !e.hidden) out.push(e.getAttribute('href')); return out.join(); })()`);
-    if (/#changelog/.test(sysMenu)) assert.match(sysMenu, /#changelog$/, `the Changelog last in the System group (${sysMenu})`);
+    if (/#history/.test(sysMenu)) assert.match(sysMenu, /#history$/, `the History last in the System group (${sysMenu})`);
     assert.equal(await run(`(() => { const n = document.querySelectorAll('#documentation thead th').length; return [...document.querySelectorAll('#documentation tbody tr')].every((tr) => tr.cells.length === n); })()`), true, 'each row has the header\'s cells: no column shifted under the wrong heading');
     assert.equal(await run(`[...document.querySelectorAll('#documentation tbody tr')].every((r) => /\\d{4}/.test(r.cells[r.cells.length - 2].textContent))`), true, 'every row says when it was last updated');
     for (const old of ['#coverage', '#for-agents', '#intent-layer']) {
@@ -1185,16 +1185,16 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   const logs = changelogs(dir, [{ name: 'badge', files: ['theme.css'], pattern: '\\.badge[^a-zA-Z0-9_-]' }]);
   assert.deepEqual(logs.badge.map((r) => [r.subject, r.release, r.pr]), [['Badge colour', null, '4'], ['Badge and chip', 'v1.0.0', null]]);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  assert.match(tpl, /\['log', 'Changelog'\]/);
+  assert.match(tpl, /\['log', 'History'\]/);
   assert.match(tpl, /'<div class="pg-head"><h2>' \+ esc\(c\.name\) \+ '<\/h2>' \+ headLinksHTML\(c\.links\)/, 'its links at the top right, beside its name');
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
   // Changelog: every component's changes by release, newest version first, dated by its tag; one row per ticket (the
   // team's unit of work) with the components its commits touched, each commit a line; a commit for no ticket on its own.
-  assert.match(tpl, /navLink\('changelog', 'changelog'\)/);
-  assert.match(tpl, /The Changelog last in the System group/, 'moved after the other System pages');
+  assert.match(tpl, /navLink\('history', 'history'\)/);
+  assert.match(tpl, /The History last in the System group/, 'moved after the other System pages');
   assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
   assert.match(tpl, /One row per issue \(the team's unit of work/);
-  assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">Issue<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'the issue first, then what it affects, each column named');
+  assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">What<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'what was done or decided first, then what it affects, each column named');
   assert.match(tpl, /byTicket\(g\.commits, function \(x\) \{ return x\.r; \}\)/);
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
   assert.match(tpl, /'<span class="pg-log-date">No component<\/span>'/);
