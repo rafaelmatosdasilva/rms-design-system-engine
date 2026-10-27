@@ -7,6 +7,7 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addedLines, editFindings, editCheck, componentTagIn, normHex, themeSizes, importFindings, nestedComponents, nestingFindings } from '../edit-check.mjs';
+import { varsByMode, pairsOf } from '../token-pairs.mjs';
 import { steeringTruth } from '../steering-check.mjs';
 import { makeFixture } from './helpers.mjs';
 
@@ -285,4 +286,26 @@ test('a plain element the edit styled as a declared primitive: the component to 
   ]);
   assert.deepEqual(editFindings(added, full, { ...p, primitives: [] }), []);
   assert.deepEqual(editFindings(['.hint { font: var(--body-medium) }'], '.hint { font: var(--body-medium) }', p, { sheet: true }), []);
+});
+
+// A text or icon colour put on a surface it was not made for. Every token is the system's own, so nothing is
+// invented: what is wrong is the pairing, and it reads as a different grey on every card long before anyone notices.
+test('an edit that pairs a colour with the wrong surface is told so, with the contrast the two give', () => {
+  const theme = [':root {', '  --content-on-interactive: #ffffff;', '  --surface-interactive: #1a5fd0;', '  --surface-base: #ffffff;', '}'].join('\n');
+  const colorVars = varsByMode(theme);
+  const pairs = pairsOf(colorVars);
+  const full = ['.card {', '  color: var(--content-on-interactive);', '  background: var(--surface-base);', '}', '.btn { color: var(--content-on-interactive); background-color: var(--surface-interactive); }'].join('\n');
+  const lines = full.split('\n');
+  const only = { ...ctx, colorVars, pairs };
+  const run = (at) => editFindings(at.map((i) => lines[i]), full, only, { sheet: true }).filter((f) => f.kind === 'pair');
+  const found = run([1, 2]);
+  assert.equal(found.length, 1, JSON.stringify(found));
+  assert.equal(found[0].line, 2);
+  assert.match(found[0].text, /--content-on-interactive is the system's colour for --surface-interactive, not for --surface-base/);
+  assert.match(found[0].text, /1:1 there, under 4\.5:1/);
+  // The pair the system did make says nothing, and so does a theme file: that is where the pairs are declared.
+  assert.deepEqual(run([4]), []);
+  assert.deepEqual(editFindings([lines[1]], full, only, { sheet: true, isTheme: true }).filter((f) => f.kind === 'pair'), []);
+  // A rule that sets only the text colour pairs nothing: what is under it is whatever the page puts there.
+  assert.deepEqual(editFindings(['  color: var(--content-on-interactive);'], '.x {\n  color: var(--content-on-interactive);\n}', only, { sheet: true }).filter((f) => f.kind === 'pair'), []);
 });

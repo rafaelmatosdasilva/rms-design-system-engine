@@ -33,6 +33,7 @@
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
 import { resolveNamingSpec, tokenToVar } from './naming-convention.mjs';
+import { varsByMode, pairsOf, pairsInCss, wrongPairs } from './token-pairs.mjs';
 import { styleNames } from './text-styles.mjs';
 import { TOKENS_TO_BUILD } from './build-list.mjs';   // build mode: the tokens still to build
 import { readFileSync, existsSync } from 'node:fs';
@@ -316,12 +317,17 @@ export function editTruth(ROOT, cfg = {}) {
   const classes = Object.fromEntries(names.map((n) => [n, cfg.componentSelectors?.[n] ?? `.${n.charAt(0).toLowerCase()}${n.slice(1)}`]));
   let targets = null;
   const copies = names.length && cfg.systemHealth !== false ? { targets: () => (targets ??= systemRules(`${theme}\n${projectStyleText(ROOT)}`, classes)) } : null;
-  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, imports, nesting, copies, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  // The colour pairs the theme itself declares: which surface each text or icon colour was made for, read from the
+  // custom property names and confirmed against their values. An edit that puts a colour on another surface is
+  // writing a pair the system never made, and it is told so with the contrast the two give.
+  const colorVars = varsByMode(theme);
+  const pairs = Object.keys(colorVars).length ? pairsOf(colorVars) : [];
+  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, imports, nesting, copies, colorVars, pairs, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null, imports = null, nesting = null, copies = null }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null, imports = null, nesting = null, copies = null, colorVars = null, pairs = [] }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -432,6 +438,16 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
     if ([...found.values()].some((r) => addedAt.has(r.line))) {
       const { system, own } = copies.targets();
       for (const x of nearCopies(found, system, { own })) if (addedAt.has(x.line)) push(x.line, `.${x.cls} nearly copies the system's ${x.like} (${x.same} of ${x.of} declarations alike); a new component is a decision: use ${x.like}, with a new option if it needs one, or ask the person whether to add .${x.cls} to the system`, { kind: 'copy' });
+    }
+  }
+  // A text or icon colour put on a surface it was not made for. Every token is the system's own, so nothing here is
+  // invented: it is the pairing that was never made, and a wrong pair reads as a different grey on every card long
+  // before anyone notices. Said with the contrast the two give, because one that no longer reads is the urgent one.
+  if (pairs.length && !isTheme) {
+    const addedAt = new Set(added.map(lineOf).filter(Boolean));
+    const written = pairsInCss(sheet ? fullText : styleOnly(fullText)).filter((p) => addedAt.has(p.line));
+    for (const w of wrongPairs(written, pairs, colorVars ?? {})) {
+      push(w.line, `${w.text} is the system's colour for ${w.meant}, not for ${w.surface}${w.ratio == null ? '' : ` (${w.ratio}:1 there${w.readable ? '' : ', under 4.5:1'})`}: put it on ${w.meant}, or use the colour made for ${w.surface}`, { kind: 'pair' });
     }
   }
   return out;
