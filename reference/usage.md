@@ -801,7 +801,7 @@ and sent to their store as the results are. The page shows it under each open ta
 weeks), so what is stuck shows apart from what is new; a build without the browser shows the record as of the last
 one that had it.
 
-**Downloads** (the Documentation page's, the tokens, the icons, a component's file) go through one helper; in a page
+**Downloads** (the tokens, the icons, a component's file) go through one helper; in a page
 shown inside another one (a shared viewer, a sandboxed frame) that may not hand files over, a note says so, with the
 page's own address to open it alone and, for a text file, a button to copy it instead.
 
