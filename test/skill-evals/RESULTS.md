@@ -1,5 +1,34 @@
 # Skill evaluation results
 
+## 2026-10: The guide tells the agent about the rules sweep, the tiers, the colour pairs, the decisions log and where it may write (continuous evaluation)
+
+What changed since the entry below (engine a49be49, whose own commit was rewritten by the rebases behind this
+branch, so the engine could not list the commits itself): prototypes became a store part of their own; `--handoff`
+writes what a developer needs on one page; `--comment` keeps what a person said about a page beside it; one log of
+what the team decided, so nobody proposes a rejected option twice; each project says where the engine may write, and
+where it must never; and `--figma-edits` fell over on every project, with a test that now runs every command. The
+guide changed in `reference/usage.md` and `reference/config.md`: the rules sweep, the rules read in tiers, the
+colour pairs, the decisions log and the `writes` setting.
+
+**This measurement was made twice.** The first run scored 66/70 (`figma-roles` 0/3) against an engine whose
+`--figma-edits` exited with `cfg is not defined`: the agent ran the engine, got an error, and was marked down for
+what the engine failed to say. That entry and its records were taken out rather than kept with a note - an
+evaluation nobody can trust is worse than none. This is the run after the fix, and it puts the guide's own change at
+no cost: 70/70 again, and fewer tokens read a run than before it.
+
+Guide set measured: `465a11c3630a` · Project measured: `13d811a9d668`
+
+**The agent's command line changed.** The agent's command line bundles other skills than in the runs before (2.1.178 → 2.1.310; added dataviz, design, doctor, plugin-authoring, workflow-authoring): a change in the results may come from them, not from the guide.
+
+| Haiku, engine 36e816a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.062 |
+| Input a run | 134k | 121k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 121k a run against 134k. Records: `records/2026-10-27-figma-edits-fell-over-on`.
+
 ## 2026-10: The evidence convention, short enough for the guide's size limit (continuous evaluation)
 
 What changed since the entry below (engine e170521): The rules an agent reads come in tiers, and the more specific one wins (#71); Documentation page without downloads, Changelog last in the menu, table heads that stick cleanly in pages and side panels (#70); Every text and icon colour is given the surface it was made for, not a shortlist (#72); Every read through figma-cli is tried twice and says what figma-cli printed (#73); The icon gate reads icons kept as one SVG file each (#74); A stuck table head keeps its top line under a page's chip bar (#75); Every claim says where it comes from: verified, reported or not checked; The evidence convention, short enough for the guide's size limit. The guide changed in `rms-design-system-engine.md`.
