@@ -151,5 +151,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-26-the-engine-says-when-the` | The 21 guide tasks on Haiku (engine 540a998) | "The engine says when the style guide the team opens is behind, and can publish it itself" |
 | `2026-10-26-each-changelog-row-says-what` | The 21 guide tasks on Haiku (engine 74a632e) | "Each Changelog row says what it was for and where it changed the system" |
 | `2026-10-27-a-store-s-readme-says` | The 21 guide tasks on Haiku (engine 848f5b6) | "A store's README says how its style guide is updated when no pipeline builds it" |
+| `2026-10-27-documentation-page-without-downloads-changelog` | The 21 guide tasks on Haiku (engine a2a4ad4) | "Documentation page without downloads, Changelog last in the System menu, a stuck table head with no see-through pixel" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

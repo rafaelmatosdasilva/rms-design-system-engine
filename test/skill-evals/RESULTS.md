@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Documentation page without downloads, Changelog last in the System menu, a stuck table head with no see-through pixel (continuous evaluation)
+
+What changed since the entry below (engine 848f5b6): A store's README says how its style guide is updated when no pipeline builds it (#66); Documentation page without downloads, Changelog last in the System menu, a stuck table head with no see-through pixel. The guide changed in `reference/usage.md`.
+
+Guide set measured: `c566975dbfe6` · Project measured: `13d811a9d668`
+
+| Haiku, engine a2a4ad4 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.064 |
+| Input a run | 125k | 140k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 140k a run against 125k. Records: `records/2026-10-27-documentation-page-without-downloads-changelog`.
+
 ## 2026-10: A store's README says how its style guide is updated when no pipeline builds it (continuous evaluation)
 
 What changed since the entry below (engine 74a632e): Each Changelog row says what it was for and where it changed the system (#60); Writing a store needs no token of your own either (#59); A browser never outlives its run; invented names are rejected by name (#57); A store's README says its guide is published by hand while its pipeline is gated off (#62); A store on GitHub is written the same way it is read (#63); The demo report's pictures are compared by which side of the limit they fall, not by the exact share (#64); The accessibility check puts back each unchanged page's results instead of trying it again (#65); A store's README says how its style guide is updated when no pipeline builds it. The guide changed in `reference/usage.md`.
