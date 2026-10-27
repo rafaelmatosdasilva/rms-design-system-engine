@@ -53,5 +53,5 @@ test('a decision asked for in words goes to --decision with what was ruled out a
   const { route } = await import('../route.mjs');
   const r = route('we decided the chip has no large size, we ruled out a large chip because it breaks the row', { hasConfig: true, components: ['chip'] });
   assert.deepEqual(r.run, ['rms-design-system-engine --decision chip "<what was decided>" --ruled-out "a large chip" --why "it breaks the row"']);
-  assert.equal(route('keep the chip height on purpose because it needs room', { hasConfig: true, components: ['chip'] }).kind, 'keep');
+  assert.match(route('keep the chip height on purpose because the product needs a larger tap target', { hasConfig: true, components: ['chip'] }).run[0], / --keep /);
 });
