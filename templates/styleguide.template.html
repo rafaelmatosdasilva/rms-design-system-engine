@@ -1680,7 +1680,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
-.sg-row-detail-body .sg-il-draft-text { padding-bottom: var(--sg-space-m); margin-bottom: var(--sg-space-s); border-bottom: var(--sg-line); }   /* the draft itself, a line under it before what can be done with it */
+.sg-row-detail-body .sg-il-draft-text { padding-bottom: var(--sg-space-m); margin-bottom: var(--sg-space-l); border-bottom: var(--sg-line); }   /* the draft itself, a line under it before what can be done with it, twice the room after the line as before it */
+.sg-row-detail-body .sg-il-line > strong.sg-decide-head:first-child { display: flex; align-items: center; gap: var(--sg-space-s); }   /* the mark, then the decision's name */
+.sg-decide-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); }   /* a decision's mark, there to tell the three apart at a glance */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
 .sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }
@@ -3116,7 +3118,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Each answer apart, with what it does and the command that gives it, a Copy beside it: pasted into Claude (or run in a
     // terminal), the answer is recorded and its change made. A proposal that does not say what its no does falls back on
     // the page's own task.
-    var ilAnswer = function (head, does, cmd) { return '<div class="sg-il-line"><strong>' + esc(head) + '</strong>' + (does ? '<span class="pg-par-val">' + does + '</span>' : '') + '<span class="sg-tk-code-line sg-il-cmd"><code>' + esc(cmd) + '</code>' + sysButton('button', 'Copy', ' data-il-copy="' + esc(cmd) + '"') + '</span></div>'; };
+    // A decision's own mark, drawn with lines in the text's colour like the menu's (never one of the system's icons):
+    // a tick to approve, a pencil to change, a bin to drop, so each reads at a glance.
+    var DECIDE_MARK = { approve: '<path d="m3 8.5 3.2 3L13 4.5"/>', change: '<path d="M10.5 2.5 13.5 5.5 5.5 13.5H2.5V10.5Z"/><path d="m9 4 3 3"/>', drop: '<path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 9h6.6l.7-9"/>' };
+    var decideMark = function (k) { return DECIDE_MARK[k] ? '<svg class="sg-decide-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + DECIDE_MARK[k] + '</svg>' : ''; };
+    var ilAnswer = function (head, does, cmd, mark) { return '<div class="sg-il-line"><strong' + (mark ? ' class="sg-decide-head"' : '') + '>' + decideMark(mark) + esc(head) + '</strong>' + (does ? '<span class="pg-par-val">' + does + '</span>' : '') + '<span class="sg-tk-code-line sg-il-cmd"><code>' + esc(cmd) + '</code>' + sysButton('button', 'Copy', ' data-il-copy="' + esc(cmd) + '"') + '</span></div>'; };
     var ilIfNot = function (p, html) {
       var open = ilOpen(p); if (!open.length) return html;
       var todo = html ? html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
@@ -3183,9 +3189,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return '<div class="sg-il-draft"><div class="sg-il-draft-text">' + groups.map(function (g) {
           return '<p class="sg-il-line"><strong>Proposed ' + (g.lines.length === 1 ? 'draft' : 'drafts') + ' · ' + esc(g.where) + '</strong>' + g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('') + '</p>';
         }).join('') + '</div>' +
-        ilAnswer(n === 1 ? 'Approve' : 'Approve all', (n === 1 ? 'The draft becomes' : 'The ' + n + ' drafts become') + ' part of ' + on + '\'s page, as written: agents use ' + them + ' from the next run.', cmd('approve')) +
-        ilAnswer('Change', 'Your words replace ' + (n === 1 ? 'the draft' : 'one draft') + ', and agents use them: put ' + (n === 1 ? 'yours' : 'the draft and yours') + ' where the command says.', cmd('change', ' ' + shq(n === 1 ? groups[0].lines[0] : 'the draft to change') + ' ' + shq('your words'))) +
-        ilAnswer(n === 1 ? 'Drop' : 'Drop all', (n === 1 ? 'The draft is' : 'The ' + n + ' drafts are') + ' deleted from ' + on + '\'s page: agents never get ' + them + '.', cmd('drop')) + '</div>';
+        ilAnswer(n === 1 ? 'Approve' : 'Approve all', (n === 1 ? 'The draft becomes' : 'The ' + n + ' drafts become') + ' part of ' + on + '\'s page, as written: agents use ' + them + ' from the next run.', cmd('approve'), 'approve') +
+        ilAnswer('Change', 'Your words replace ' + (n === 1 ? 'the draft' : 'one draft') + ', and agents use them: put ' + (n === 1 ? 'yours' : 'the draft and yours') + ' where the command says.', cmd('change', ' ' + shq(n === 1 ? groups[0].lines[0] : 'the draft to change') + ' ' + shq('your words')), 'change') +
+        ilAnswer(n === 1 ? 'Drop' : 'Drop all', (n === 1 ? 'The draft is' : 'The ' + n + ' drafts are') + ' deleted from ' + on + '\'s page: agents never get ' + them + '.', cmd('drop'), 'drop') + '</div>';
     };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line"><strong>' + esc(capital(n.what)) + '</strong><span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // What is still to write about the component a row is for, from every source: each piece of its documentation not
