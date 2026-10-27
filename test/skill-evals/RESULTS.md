@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-10: History: Figma's changes beside the code's; --figma-edits runs again (continuous evaluation)
+
+What changed since the entry below (engine 37ce80b): Each project says where the engine may write, and where it must never (#82); A page's drafts: one card, then three decisions side by side, each with Copy decision (#83); Every side panel and every filter has its own address; panels open at their top; what to do in plain words (#84); Two questions agents ask the intent layer: which token is for this, and is there a component the system lacks (#85); A list an intent-layer page copies from what the engine generates is flagged, with the file to link to instead (#86); Decisions in the intent layer, and History in the style guide; Test the decision route against keep; History: Figma's changes beside the code's; --figma-edits runs again. The guide changed in `reference/usage.md`.
+
+Guide set measured: `19098a1972c1` · Project measured: `13d811a9d668`
+
+| Haiku, engine effaf9a | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.058 |
+| Input a run | 120k | 113k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 113k a run against 120k. Records: `records/2026-10-27-history-figma-s-changes-beside`.
+
+**Found by this evaluation and fixed.** On engine 3b52613 `figma-roles` failed 3 of 3: `--figma-edits` read a config name that is not defined where it runs (since #82), so it stopped before listing any edit, and Claude tried to patch the installed engine. It reads the project's config again (effaf9a), and the task passes 3 of 3.
+
 ## 2026-10: One decision for a page's drafts, the drafts grouped by section and each once; a card head never rests on its own first line (continuous evaluation)
 
 What changed since the entry below (engine a49be49): A protected branch on GitLab takes a merge request with no token too (#76); The contracts in DSDS 0.23 too, for a team that documents its system in that format (#77); The product's own screens are reviewed as pages too (#78); A brand that sets a value as it inherits it is named: it pins the value (#79); One log of what the team decided, so nobody proposes a rejected option twice (#81); Every claim says where it comes from: verified, reported or not checked (#80); A page's drafts sit under the task that asks for them, each with its decisions' commands; One decision for a page's drafts, the drafts grouped by section and each once; a card head never rests on its own first line. The guide changed in `reference/usage.md`.

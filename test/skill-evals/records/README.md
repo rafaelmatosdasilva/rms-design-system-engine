@@ -155,5 +155,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-27-documentation-page-without-downloads-changelog` | The 21 guide tasks on Haiku (engine e170521) | "Documentation page without downloads, Changelog last in the menu, table heads that stick cleanly in pages and side panels" |
 | `2026-10-27-the-evidence-convention-short-enough` | The 21 guide tasks on Haiku (engine a49be49) | "The evidence convention, short enough for the guide's size limit" |
 | `2026-10-27-one-decision-for-a-page` | The 21 guide tasks on Haiku (engine 37ce80b) | "One decision for a page's drafts, the drafts grouped by section and each once; a card head never rests on its own first line" |
+| `2026-10-27-history-figma-s-changes-beside` | The 21 guide tasks on Haiku (engine effaf9a) | "History: Figma's changes beside the code's; --figma-edits runs again" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
