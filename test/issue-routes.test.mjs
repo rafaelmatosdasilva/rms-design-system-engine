@@ -36,11 +36,11 @@ test('each open issue is routed against this run, and one nothing finds any more
   const issues = [...issuesFor(findings).map((i, n) => ({ ...i, iid: n + 1 })), { key: 'Structure :: a difference nobody finds now', iid: 9, title: 'gone' }];
   const plan = routePlan(issues, findings, { keyOf, writes: { code: 'ask', engine: 'yes' } });
   assert.equal(plan.length, 2, 'the issue no run finds is already being closed, not routed');
-  assert.deepEqual(plan.map((x) => `${x.iid}:${x.route}:${x.may}`), ['1:code:ask', '2:intent:yes']);
+  assert.deepEqual(plan.map((x) => `${x.iid}:${x.route}:${x.may}`), ['1:code:null', '2:intent:yes'], 'the code is never a place the engine may write');
   assert.equal(plan[0].component, 'chip');
   assert.deepEqual(routeCounts(plan), { intent: 1, code: 1 });
   // A place the project has not answered reads as ask, never as yes.
-  assert.equal(routePlan(issues, findings, { keyOf })[0].may, 'ask');
+  assert.equal(routePlan(issues, findings, { keyOf })[1].may, 'ask');
   assert.deepEqual(routePlan([], findings, { keyOf }), []);
 });
 
@@ -53,7 +53,7 @@ test('what a person reads: each kind together, with the command and what the pro
   const issues = findings.map((f, i) => ({ key: keyOf(f), iid: i + 1, title: f.evidence }));
   const lines = routeLines(routePlan(issues, findings, { keyOf, writes: { code: 'yes', figma: 'no' } })).join('\n');
   assert.match(lines, /^🛠 {2}3 open issues, by the fix each one needs:/);
-  assert.match(lines, /2 for the code: a branch and a merge request in the code project — rms-design-system-engine --component <name> \(this project lets the engine make it\)/);
+  assert.match(lines, /2 for the code: a patch handed back for a person to apply, and the difference on its page in the style guide — rms-design-system-engine --component <name>$/m);
   assert.match(lines, /1 for the design file: .* \(this project does not let the engine write there: a task for whoever owns it\)/);
   assert.deepEqual(routeLines([]), []);
   // A long list is cut and says it was.
