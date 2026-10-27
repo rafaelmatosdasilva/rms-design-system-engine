@@ -9,14 +9,19 @@
 import { itemsOf } from './prop-shapes.mjs';
 
 const words = (t) => new Set(String(t ?? '').toLowerCase().match(/[a-z_$][\w$:-]*/g) ?? []);
-const WRITE = {
-  prop: 'in its code comment (@name {Type} what it does)', event: 'in its code comment or its intent layer page: when it is sent and what it carries',
-  slot: 'in its code comment or its intent layer page: what goes in it', fields: 'in its code comment, under the prop (- field {Type} what it holds)',
-  field: 'in its code comment, under the prop', page: 'its page in the intent layer', purpose: 'its page in the intent layer: what it is for',
-  example: 'its page in the intent layer: an example of it in use (the engine writes one from the product\'s own code)',
-  values: 'in its code comment or its intent layer page: what each allowed value means, not only that it is allowed',
-  keyboard: 'its page in the intent layer: what Tab, Enter, Space, Escape and the arrows do in it',
-  apart: 'both pages in the intent layer: what each is for, in words the other does not use',
+// What to write, and where, as one plain sentence a person can follow.
+export const WRITE = {
+  prop: 'Describe each one in its code comment, with @name, its {Type} and what it does.',
+  event: 'Say when each one is sent and what it carries, in its code comment or on its intent layer page.',
+  slot: 'Say what goes in each one, in its code comment or on its intent layer page.',
+  fields: 'In the prop\'s code comment, add a line for each field with its {Type} and what it holds.',
+  field: 'Add each one to the prop\'s code comment.',
+  page: 'Write its page in the intent layer.',
+  purpose: 'Say what it is for on its intent layer page.',
+  example: 'Add an example of it in use to its intent layer page. The engine can write one from the product\'s own code.',
+  values: 'Say what each allowed value means, in its code comment or on its intent layer page, not only that it is allowed.',
+  keyboard: 'Say what Tab, Enter, Space, Escape and the arrow keys do in it, on its intent layer page.',
+  apart: 'Say what each one is for on both intent layer pages, in words the other page does not use.',
 };
 
 // What the keyboard behaviour of a component is said with. An agent asked "what does Enter do here?" finds nothing

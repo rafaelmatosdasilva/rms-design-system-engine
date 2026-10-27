@@ -187,17 +187,17 @@ export const REACH = {
 export const NOT_USED = {
   noComponent: {
     why: 'Its name matches no component of the system, nor does the code file it names, so the engine cannot tell which component it is about.',
-    fix: 'Name the page as the system names the component (Figma\'s name, or the code\'s with no Figma file), or point it at the component\'s code file.',
+    fix: 'Give the page the component\'s name as Figma has it, or as the code has it when there is no Figma file. Or point it at the component\'s code file.',
     remove: 'Only if the component no longer exists. Otherwise keep it: once it is named, the whole page reaches the agents.',
   },
   unknownTitle: {
     why: 'The engine sorts a component page by the title of each section, and this title is not one it knows, so no agent is given it.',
-    fix: 'If it tells someone when or how to use the component, title it Intent, When to use, When not to use, Common mistakes or Limitations.',
+    fix: 'If it says when or how to use the component, call it Intent, When to use, When not to use, Common mistakes or Limitations.',
     remove: 'No. It stays on the page for people and in design-intent.json, which a person or an agent can open.',
   },
   noReader: {
     why: 'No agent reads this kind of line on a page of this layer yet.',
-    fix: 'Nothing on the page: the engine would have to learn to read it.',
+    fix: 'Nothing to change on the page. The engine has to learn to read it first.',
     remove: 'No. It stays on the page for people.',
   },
   morePurpose: {
@@ -207,12 +207,12 @@ export const NOT_USED = {
   },
   facts: {
     why: 'The engine reads these from Figma and the code themselves, which are the source; a copy here is not read so that it can never contradict them.',
-    fix: 'Nothing: agents get them from the contracts, built from Figma and the code.',
+    fix: 'Nothing to change. Agents get these from the contracts, which come from Figma and the code.',
     remove: 'Yes, unless a script writes them from the code on every change: a copy written by hand goes out of date.',
   },
   repeated: {
     why: 'The same sentence is on every page of its kind with only the name changed, so it says nothing about this one.',
-    fix: 'Write what is true of this piece only (when to use it, what not to do with it), or leave it out.',
+    fix: 'Write only what is true of this piece, like when to use it and what not to do with it, or leave it out.',
     remove: 'Yes: change whatever writes it on every page.',
   },
 };
@@ -297,25 +297,25 @@ function decide(page, e, { comp, has }) {
     return { action, decision: label(action), todo: [o.fix] };
   }
   const todo = [];
-  if (!has('purpose')) todo.push(comp ? 'Add what it is for, as an Intent or Overview section.' : 'Add what it is for, as an Overview section.');
-  if (comp && !has('whenToUse') && !has('whenNotToUse')) todo.push('Add when to use it and when not to, as sections with those titles.');
+  if (!has('purpose')) todo.push(comp ? 'Add a section that says what it is for, and call it Intent or Overview.' : 'Add a section that says what it is for, and call it Overview.');
+  if (comp && !has('whenToUse') && !has('whenNotToUse')) todo.push('Add two sections called When to use and When not to use.');
   // Any other page that says what it is for but not how to compose by it: what to add (never Improve with nothing to do).
-  if (!comp && page.verdict === 'thin' && has('purpose')) todo.push('Add how to use it: When to use, When not to use, Common mistakes or a rule, as sections with those titles.');
+  if (!comp && page.verdict === 'thin' && has('purpose')) todo.push('Add a section that says how to use it, and call it When to use, When not to use or Common mistakes.');
   for (const n of page.notUsed) {
-    if (n.reason === 'unknownTitle') todo.push(`Retitle ${n.what.replace(/^\d+ sections? \((.*)\)$/, '$1')} as When to use, When not to use, Common mistakes or Limitations where they say how to use it; leave the rest as they are, for people.`);
-    if (n.reason === 'facts') todo.push(`Remove ${n.what}: the engine reads them from Figma and the code, and a copy here goes out of date.`);
-    if (n.reason === 'repeated') todo.push(`Remove the ${n.what.replace(/ repeated lines?$/, '')} lines written on every page alike, in whatever writes them.`);
-    if (n.reason === 'morePurpose') todo.push('Put the sentence that matters most first in what it is for: agents read that one.');
+    if (n.reason === 'unknownTitle') todo.push(`Retitle ${n.what.replace(/^\d+ sections? \((.*)\)$/, '$1')} to When to use, When not to use, Common mistakes or Limitations if they say how to use it. Leave the others as they are, they are for people.`);
+    if (n.reason === 'facts') todo.push(`Remove ${n.what}. The engine already reads them from Figma and the code, and a copy here goes out of date.`);
+    if (n.reason === 'repeated') todo.push(`Remove the ${n.what.replace(/ repeated lines?$/, '')} lines that are the same on every page, where they are generated.`);
+    if (n.reason === 'morePurpose') todo.push('Start what it is for with the sentence that matters most, because agents only read that one.');
   }
   // What on it the system contradicts, first: fix it before anything is added to it.
-  const fix = (page.wrong ?? []).map((f) => (f.kind === 'name' || f.kind === 'claim' ? `${f.says}: ${f.fix}` : f.fix));
+  const fix = (page.wrong ?? []).map((f) => (f.kind === 'name' ? `${f.says} is not a name the system has. ${f.fix}` : f.kind === 'claim' ? `The page says ${f.says}. ${f.fix}` : f.fix));
   if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...todo] };
   // Lines drafted for it, not the team's word yet: each read, edited as needed, its marker removed (or the line deleted).
   const drafts = page.drafts ?? [];
   // Questions the team left open on it ([open], TBD): a person settles each, writing the answer in its place. Until
   // then no agent reads the line, and a prototype that needs it asks.
-  const open = (page.open ?? []).map((q) => `Settle the open question${q.where ? ` under ${q.where}` : ''}: "${q.text}". Write the answer in its place, without the [open] or TBD marker; until then no agent reads it, and a prototype that needs it asks the person.`);
-  if (drafts.length || open.length) return { action: 'review', decision: label('review'), todo: [...open, ...(drafts.length ? [`Review ${drafts.length === 1 ? 'its draft' : `its ${drafts.length} drafts`} below: ${drafts.length === 1 ? 'approve, change or drop it' : 'approve them all, change one, or drop them all'}: copy your decision below and paste it in Claude Code (or, in the layer itself: remove the **Draft:** marker to approve, delete the line to drop). No agent gets ${drafts.length === 1 ? 'it' : 'them'} until then.`] : []), ...todo] };
+  const open = (page.open ?? []).map((q) => `Answer the open question${q.where ? ` under ${q.where}` : ''} "${q.text}". Write the answer in its place and remove the [open] or TBD marker. Agents skip it until then.`);
+  if (drafts.length || open.length) return { action: 'review', decision: label('review'), todo: [...open, ...(drafts.length ? [drafts.length === 1 ? 'Review its draft below. Approve it, change it or drop it, then copy your choice and paste it into Claude Code. Agents won\'t use it until you decide.' : `Review these ${drafts.length} drafts. Approve them all, change one or drop them all, then copy your choice and paste it into Claude Code. Agents won't use them until you decide.`] : []), ...todo] };
   // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
   // retitle or remove); keep it only when there is nothing to change.
   const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';
@@ -380,8 +380,8 @@ export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = 
       const parentPage = [...forEntity].find(([, n]) => n === parentName)?.[0]
         ?? others.find((x) => !forEntity.has(x) && norm(x.name).includes(norm(parentName)) && wordsOfName(x.name).filter((w) => !norm(parentName).includes(w)).every((w) => GENERIC.test(w)));
       return parentPage
-        ? say('subPart', `It is about ${target}, a part of ${parentName}, not a component agents place on its own.${twinNote}`, `Move what is true of ${target} and not yet on ${pageOf(parentPage)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.', { partOf: parentName })
-        : say('subPartAlone', `It is about ${target}, a part of ${parentName}, not a component agents place on its own, and no page documents ${parentName}.${twinNote}`, 'Delete this page, or, if what it says matters, make it the page of ' + parentName + ' first.', 'Yes.', { partOf: parentName });
+        ? say('subPart', `It is about ${target}, a part of ${parentName}, not a component agents place on its own.${twinNote}`, `Copy anything about ${target} that ${pageOf(parentPage)} doesn't say yet into that page, then delete this one.`, 'Yes, once that is moved.', { partOf: parentName })
+        : say('subPartAlone', `It is about ${target}, a part of ${parentName}, not a component agents place on its own, and no page documents ${parentName}.${twinNote}`, 'Delete this page. If what it says matters, turn it into the page for ' + parentName + ' first.', 'Yes.', { partOf: parentName });
     }
     return say('rename', `It names no component of the system as ${from} names it; ${target} is that component, under its own name, and no page documents ${target} yet.${twinNote}`, `Rename this page to ${target}, the component's name in ${from}.`, 'No.', { is: target });
   }
@@ -397,7 +397,7 @@ export function orphanAdvice(e, { entities = [], forEntity = new Map(), names = 
     return said >= 0.8
       ? say('partSaid', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in ${from}, and its page already says what this one says.${twinNote}`, 'Delete this page.', 'Yes.', { partOf: forEntity.get(parent) })
       : say('part', `${short} is a part of ${forEntity.get(parent)} (its file is beside it), not a component of its own in ${from}, so no agent is given this page.${twinNote}`,
-        `Move what is true of this part and not yet on ${pageOf(parent)} there (under When to use, When not to use, Limitations…), then delete this page.`, 'Yes, once that is moved.', { partOf: forEntity.get(parent) });
+        `Copy anything about this part that ${pageOf(parent)} doesn't say yet into that page, then delete this one.`, 'Yes, once that is moved.', { partOf: forEntity.get(parent) });
   }
   // The same words as a component's page.
   const copy = others.find((x) => forEntity.has(x) && shares(mine, linesOf(x)) >= 0.8);

@@ -1680,16 +1680,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
-.sg-row-detail-body .sg-il-draft-text { padding-bottom: var(--sg-space-xl); margin-bottom: var(--sg-space-xxl); border-bottom: var(--sg-line); }   /* the drafts, a line under them, then what can be done with them: room on both sides of the line */
-.sg-decide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--sg-space-l); align-items: start; margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* under them, the card's own side padding (its body's bottom padding is less) */   /* the three side by side, each as tall as it holds; under one another where there is no room */
-.sg-decide { display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-decide-hue) 12%, transparent); }
+.sg-row-detail-body .sg-il-draft-text { margin-bottom: var(--sg-cell-x); }   /* the drafts, then what can be done with them, as much room between as at the card's sides */
+.sg-decide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--sg-space-l); align-items: start; margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* under them, the card's own side padding (its body's bottom padding is less) */   /* the three side by side, each as tall as it holds; under one another where there is no room */
+.sg-decide { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-m) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-decide-hue) 12%, transparent); }
 .sg-decide--approve { --sg-decide-hue: #2e7d32; } .sg-decide--change { --sg-decide-hue: #b26a00; } .sg-decide--drop { --sg-decide-hue: var(--sg-danger); }   /* the page's own hues, only as a tint: the words stay the page's */
 :where(:root)[data-sg-scheme="dark"] .sg-decide--approve { --sg-decide-hue: #6fcf75; } :where(:root)[data-sg-scheme="dark"] .sg-decide--change { --sg-decide-hue: #f0b35a; }
-.sg-decide-head { display: flex; align-items: center; gap: var(--sg-space-s); color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.sg-decide-head { display: flex; align-items: center; gap: var(--sg-space-s); margin-right: auto; color: var(--sg-text); font-weight: var(--sg-heading-weight); }   /* its mark and name, the button at the other end */
 .sg-decide .sg-decide-mark { color: var(--sg-decide-hue); }   /* the mark takes the card's hue; the words keep the page's */
-.sg-decide-says { margin: 0; color: var(--sg-muted); }
-.sg-decide-do { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sg-space-s); }
-.sg-decide-said { color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-decide-said { flex-basis: 100%; color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-decide-said:empty { display: none; }   /* where to paste it, on its own line once copied */
 .sg-decide-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); }   /* a decision's mark, there to tell the three apart at a glance */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
@@ -2990,6 +2989,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         b.setAttribute('aria-pressed', b.dataset.v === shown ? 'true' : 'false');
         b.addEventListener('click', function () {
           shown = b.dataset.v; Array.prototype.forEach.call(filter.querySelectorAll('.sg-chip'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+          setHashQuery({ kind: shown });
           Array.prototype.forEach.call(srDetail.querySelectorAll('.sg-note'), function (li) { li.hidden = shown !== 'all' && li.dataset.kind !== shown; });
           closeCard(); placePins();
         });
@@ -3082,6 +3082,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       Array.prototype.forEach.call(bar.querySelectorAll('.sg-chip[data-chip]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
       Array.prototype.forEach.call(sec.querySelectorAll('tr[data-chip]'), function (tr) { tr.hidden = k !== 'all' && tr.getAttribute('data-chip') !== k && (' ' + (tr.getAttribute('data-chip-group') || '') + ' ').indexOf(' ' + k + ' ') < 0; });   // a chip shows its own rows, or a group of them (data-chip-group, one or several)
       sec.dispatchEvent(new CustomEvent('sg-chip', { detail: k }));
+      if (e.isTrusted) setHashQuery({ show: k });
     });
     return bar;
   }
@@ -3198,9 +3199,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // What Change copies is a request, not a command with blanks: Claude Code asks which draft and the words.
       var change = one ? 'Change the draft on ' + who + '\'s intent layer page ("' + line + '"): ask me for my words, then run ' + cmd('change', ' ' + shq(line) + ' ' + shq('<my words>'))
         : 'Change one of the ' + n + ' drafts on ' + who + '\'s intent layer page (' + page + '): ask me which one and my words, then run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>'));
-      // Three decisions side by side, each its own card: a mark, what it does in one sentence of the same length as the
-      // others', and one button that copies it for Claude Code. Each card is as tall as what it holds.
-      var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong><p class="sg-decide-says">' + esc(says) + '</p><div class="sg-decide-do">' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div></div>'; };
+      // Three decisions side by side, each its own card on one line: its mark, its name, and the button that copies it for
+      // Claude Code. What it does is the button's tip, for whoever wants it.
+      var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div>'; };
       return '<div class="sg-il-draft"><div class="sg-il-draft-text">' + groups.map(function (g) {
           return '<p class="sg-il-line"><strong>Proposed ' + (g.lines.length === 1 ? 'draft' : 'drafts') + ' · ' + esc(g.where) + '</strong>' + g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('') + '</p>';
         }).join('') + '</div><div class="sg-decide-grid">' +
@@ -3311,6 +3312,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
+      m._key = 'doc:' + (p.file || p.missingFor || p.name || i);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       // Its status first, then the proposal to say yes or no to, then what to do: the task, each thing still to write (what
       // and where), the drafts to review under the task that asks for them, notes to remove; then what the page is and why.
@@ -3319,6 +3321,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
+    // A link to a page's panel (panel=doc:<file>) opens it.
+    ilSec._openKey = function (key) { var i = rows.findIndex(function (p) { return 'doc:' + (p.file || p.missingFor || p.name) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
     pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(needsReview).length;
       return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
@@ -3473,11 +3477,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var groups = {}, LABEL = { prop: 'Props', event: 'Events', slot: 'Slots', fields: 'Lists with nothing on what they hold', field: 'Fields the product gives that no comment lists' };
       cov.forEach(function (m) { (groups[m.kind] = groups[m.kind] || []).push(m); });
       rows.push(mk('unsaid', 'What its documentation does not say', '<p class="pg-missing">' + cov.length + (cov.length === 1 ? ' thing an agent cannot learn' : ' things an agent cannot learn') + ' from its documentation:</p><ul>' + Object.keys(groups).map(function (k) { return '<li><strong>' + esc(LABEL[k] || k) + '</strong>: ' + groups[k].map(function (m) { return '<code>' + esc(m.what) + '</code>'; }).join(', ') + '</li>'; }).join('') + '</ul>', 'todo',
-        Object.keys(groups).map(function (k) { return (LABEL[k] || k) + ' (' + groups[k].map(function (m) { return m.what; }).join(', ') + '): write ' + groups[k][0].write + '.'; }).join(' ')));
+        Object.keys(groups).map(function (k) { return (LABEL[k] || k) + ' (' + groups[k].map(function (m) { return m.what; }).join(', ') + '). ' + groups[k][0].write; }).join(' ')));
       rows[rows.length - 1].src = ['Its code and its intent layer page'];
     }
     // Its "when to use" lines are all its family's: nothing tells an agent when this one and not a sibling (Missing).
-    if (c.noOwnUse) { rows.push(mk('ownuse', 'When to use it, not a sibling', '<p class="pg-missing">Every "when to use" line on its page is shared word for word with other components: none tells an agent when this one is right and its siblings are not.</p>', 'todo', 'Write one "when to use" line of its own on its intent layer page: the need only it meets.')); rows[rows.length - 1].src = ['The "which component?" test']; }
+    if (c.noOwnUse) { rows.push(mk('ownuse', 'When to use it, not a sibling', '<p class="pg-missing">Every "when to use" line on its page is shared word for word with other components: none tells an agent when this one is right and its siblings are not.</p>', 'todo', 'Write one "when to use" line on its intent layer page that says the need only it meets.')); rows[rows.length - 1].src = ['The "which component?" test']; }
     // Needs its own page names, for which agents picked another component: two pages claiming one use, or a purpose
     // that does not say enough (to review).
     if ((c.confusions || []).length) {
@@ -6767,6 +6771,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function firstLine(html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.sg-panel-only'), function (n) { n.remove(); }); return d.innerHTML; }
   function clip(html) { html = html || ''; return /<(p|div|details|table|ul)\b/i.test(html) || html.replace(/<[^>]+>/g, '').length > 180 ? '<div class="sg-cell-clip">' + html + '</div>' : html; }
   var ROW_DETAIL = [];   // every row drawn, by its index: what its side panel shows
+  // A row's own address in a link (panel=row:<area>:<component>|<what>), the same however many times it is drawn.
+  function rowKey(d) { return 'row:' + (d.area || '') + ':' + String(d.r.key || d.r.kind || '').replace(/\u0000/g, '|'); }
+  function openRowKey(key) { for (var i = ROW_DETAIL.length - 1; i >= 0; i--) if (rowKey(ROW_DETAIL[i]) === key) { openRowPanel(i, null); return true; } return false; }
   function issueRowHTML(r, area) {
     var a = area || r.area, id = ROW_DETAIL.push({ r: r, area: a }) - 1;
     return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
@@ -6777,6 +6784,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function openRowPanel(id, from) {
     var d = ROW_DETAIL[id]; if (!d) return;
     var r = d.r, m = panelShell('sg-row-panel', 'Row details');
+    m._key = rowKey(d);
     // Its title: what the row is about, its words alone (a criterion's tip, what it means, stays out of it).
     var tmp = document.createElement('div'); tmp.innerHTML = r.kind ? esc(r.kind) : r.kindHTML || '';
     Array.prototype.forEach.call(tmp.querySelectorAll('.sg-tip, [role="tooltip"], .sg-hidden-text'), function (x) { x.remove(); });
@@ -6845,7 +6853,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     m = document.createElement('div'); m.id = id; m.className = 'sg-comp-panel sg-comp-panel--wide'; m.hidden = true;
     m.innerHTML = '<div class="sg-comp-panel-scrim" data-panel-close></div><div class="sg-comp-panel-box" role="dialog" aria-modal="true" aria-label="' + esc(label) + '" tabindex="-1"><button type="button" class="sg-btn sg-comp-panel-close" data-panel-close aria-label="Close">' + MX_COLLAPSE + '</button><div class="sg-tk-detail sg-row-detail"></div></div>';
     (document.querySelector('.sg-layout') || document.body).appendChild(m);
-    m._shut = function () { m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
+    m._shut = function () { if (m._key && new URLSearchParams(location.hash.split('?')[1] || '').get('panel') === m._key) setHashQuery({ panel: null }); m._open = false; m.classList.remove('is-open'); document.documentElement.classList.remove('sg-panel-open'); setTimeout(function () { if (!m._open) m.hidden = true; }, 200); if (m._from && document.contains(m._from)) m._from.focus(); };
     m.addEventListener('click', function (e) { if (e.target.closest('[data-panel-close]') || e.target.closest('.sg-row-detail a[href^="#"]')) m._shut(); });
     m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.isTrusted) { e.stopPropagation(); m._shut(); } });
     return m;
@@ -6864,6 +6872,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   function panelShow(m, from) {
     m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
+    if (m._key) setHashQuery({ panel: m._key });   // its own address, to send
+    // Every panel opens at its top, whatever was opened in it before and how far it was scrolled.
+    var sc = m.querySelector('.sg-row-detail'); if (sc) sc.scrollTop = 0;
     panelHeads(m);
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
@@ -6920,7 +6931,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     Array.prototype.forEach.call(scope.querySelectorAll('table.sg-issues tbody tr'), function (tr) { tr.classList.toggle('sg-st-off', st !== 'all' && tr.dataset.status !== st); });
     Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) { card.classList.toggle('sg-st-empty', st !== 'all' && !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.hidden; })); });
   }
-  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sg-chip[data-st]'); if (b) applyChip(b); });
+  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sg-chip[data-st]'); if (b) { applyChip(b); if (e.isTrusted && hashParts().id !== 'status') setHashQuery({ st: b.dataset.st }); } });
   var ST_ORDER = { todo: 0, check: 1, done: 2, kept: 3, skip: 4, none: 5 };
   function byStatus(rows) { return rows.map(function (r, i) { return [r, i]; }).sort(function (p, q) { return (!!p[0].extra - !!q[0].extra) || ST_ORDER[p[0].st] - ST_ORDER[q[0].st] || p[1] - q[1]; }).map(function (x) { return x[0]; }); }
   function capital(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -7132,6 +7143,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // The address of a view, the area of a component after a / (#c-chip/accessibility), and after a ? the props of the
   // variant it shows (#c-chip?Size=L&Label=Save): each area has its own link to send someone to.
   var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'changelog' };
+  // What a page shows is in its address, so a link opens it as it is: each filter chosen (show, st, the Tokens page's
+  // coll, group, kind and q, a Showroom screen's kind) and the side panel open (panel=doc:<file> | row:<area>:<row>).
+  // Written in place (no new history entry); a filter at its All and a panel closed leave nothing.
+  function setHashQuery(o) {
+    if (ALL) return;
+    var h = location.hash.slice(1), i = h.indexOf('?'), path = i < 0 ? h : h.slice(0, i), q = new URLSearchParams(i < 0 ? '' : h.slice(i + 1));
+    Object.keys(o).forEach(function (k) { if (o[k] == null || o[k] === '' || o[k] === 'all') q.delete(k); else q.set(k, o[k]); });
+    var str = q.toString().replace(/%2F/g, '/').replace(/%3A/g, ':'), nh = '#' + path + (str ? '?' + str : '');
+    if (nh !== location.hash) history.replaceState(null, '', location.search + nh);
+  }
+  // Something the address names that is drawn a moment later (a table's rows, an area's chips): tried again until it is.
+  function whenThere(find, act, n) { var x = find(); if (x) act(x); else if ((n || 0) < 40) setTimeout(function () { whenThere(find, act, (n || 0) + 1); }, 100); }
   function hashParts() {
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
     var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
@@ -8272,11 +8295,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (WIDTH !== 'fit') q.push('width=' + WIDTH);
       // The props set are the Playground's: only its address carries them; another area's address is the area alone.
       var onPlay = !areaNow || areaNow === 'play';
-      return '#' + sec.id + (onPlay ? '' : '/' + AREA_SLUG[areaNow]) + (onPlay && q.length ? '?' + q.join('&') : '');
+      // Another area keeps what its own address says: its filter and the panel open in it (st, panel).
+      if (!onPlay) { var now = hashParts(); if (now.area === areaNow && now.q) ['st', 'panel'].forEach(function (k) { if (now.q.get(k)) q.push(k + '=' + encodeURIComponent(now.q.get(k)).replace(/%2F/g, '/').replace(/%3A/g, ':')); }); }
+      var keep = onPlay ? q : q.filter(function (x) { return /^(st|panel)=/.test(x); });
+      return '#' + sec.id + (onPlay ? '' : '/' + AREA_SLUG[areaNow]) + (keep.length ? '?' + keep.join('&') : '');
     }
     // Kept as the variant changes, without a new step in the browser's history; only while this view is the one shown.
     var probing = false;   // a test draw (where a text lands) is never written to the address or into a width frame
-    function writeLink() { if (ALL || probing || hashParts().id !== sec.id) return; var h = linkFor(); if (h !== location.hash) history.replaceState(null, '', h); }
+    // While the area the address names is not shown yet, nothing is written over it.
+    function writeLink() { if (ALL || probing || hashParts().id !== sec.id) return; if (!areaNow && hashParts().area) return; var h = linkFor(); if (h !== location.hash) history.replaceState(null, '', h); }
     var sec = document.createElement('section'); sec.id = cid(c.name); sec.className = 'sg-section pg-card-section';
     if (!ALL && hashParts().id === sec.id) fromLink(hashParts().q);
     var facts = factsOf(c), states = componentStates(c);
@@ -9857,6 +9884,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     route.last = id;
     var target = document.getElementById(id) && document.getElementById(id).matches('main > section') ? document.getElementById(id) : document.getElementById(homeId()) || document.getElementById('index');
     if (target._screen) target._screen(at.slug);   // the Showroom: its grid, or the screen the address names (#showroom/<Screen>)
+    // The filter and the panel the address names, once they are drawn: the page bar's chip (show), a Showroom screen's
+    // kind of note (kind), the side panel (panel).
+    var qWant = function (k) { return at.q && at.q.get(k); };
+    if (qWant('show')) whenThere(function () { return target.querySelector('.sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
+    if (qWant('kind')) whenThere(function () { return target.querySelector('.sg-showroom-filter .sg-chip[data-v="' + qWant('kind') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
+    var panelWant = qWant('panel'), openPanel = document.querySelector('.sg-comp-panel:not([hidden])');
+    if (panelWant && !(openPanel && openPanel._open && openPanel._key === panelWant)) whenThere(function () {
+      return /^doc:/.test(panelWant) ? (target._openKey && target._openKey(panelWant)) : /^row:/.test(panelWant) ? openRowKey(panelWant) : false;
+    }, function () {});
     if (!ALL) Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== target; });
     pageTop();
     links.forEach(function (a) { var on = a.getAttribute('href').slice(1) === target.id; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });

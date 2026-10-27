@@ -341,7 +341,7 @@ export function checkPage(e, facts, { component = null, strict = false } = {}) {
     if (ch && e.updatedAt && Date.parse(ch.at) > Date.parse(e.updatedAt)) {
       const what = ch.how === 'file' ? `${String(ch.file).split('/').pop()} changed on ${day(ch.at)}`
         : `${own} changed on ${day(ch.at)}${ch.added.length ? `: new props ${list(ch.added)}` : ''}${ch.removed.length ? `${ch.added.length ? ';' : ':'} props removed ${list(ch.removed)}` : ''}${!ch.added.length && !ch.removed.length ? `: ${ch.how}` : ''}`;
-      push({ kind: 'stale', where: 'The whole page', line: null, says: `last edited on ${day(e.updatedAt)}`, truth: `${what}, after this page was last edited.`, source: ch.how === 'file' ? 'the code\'s history' : 'the engine\'s record of the component', fix: 'Read it against the component as it is now and update what no longer holds; editing the page clears this.' });
+      push({ kind: 'stale', where: 'The whole page', line: null, says: `last edited on ${day(e.updatedAt)}`, truth: `${what}, after this page was last edited.`, source: ch.how === 'file' ? 'the code\'s history' : 'the engine\'s record of the component', fix: 'Check the page against the component as it is today and update anything that is no longer true. This goes away once the page is edited.' });
     }
   }
   return out;
@@ -370,7 +370,7 @@ export function twins(pages) {
       const otherNames = [b.comp, b.e.name, String(b.e.code ?? '').split('/').pop()].filter(Boolean);
       if (otherNames.some((n) => raw.includes(n) || norm(raw).includes(norm(n)) && norm(n).length > 6)) continue;
       if (same >= 2 && same / a.own.length >= 0.8) {
-        (out.get(a.e) ?? out.set(a.e, []).get(a.e)).push({ kind: 'twin', where: 'The whole page', line: null, says: `${same} of its ${a.own.length} lines`, truth: `${b.comp}'s page (${b.e.file}) says the same, so an agent cannot tell from them when to use one and not the other.`, source: 'the intent layer', fix: `Say what is particular to ${a.comp}: when to use it rather than ${b.comp}, and when not to.`, other: b.comp });
+        (out.get(a.e) ?? out.set(a.e, []).get(a.e)).push({ kind: 'twin', where: 'The whole page', line: null, says: `${same} of its ${a.own.length} lines`, truth: `${b.comp}'s page (${b.e.file}) says the same, so an agent cannot tell from them when to use one and not the other.`, source: 'the intent layer', fix: `Say what is particular to ${a.comp}, when to use it rather than ${b.comp} and when not to.`, other: b.comp });
       }
     }
   }
