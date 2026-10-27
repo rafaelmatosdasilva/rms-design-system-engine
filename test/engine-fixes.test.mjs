@@ -103,6 +103,8 @@ test('what a person reads follows what the project lets the engine write', () =>
   assert.match(fixLines(fixes, { may: 'yes' })[0], /written into contract\.authored\.json/);
   assert.match(fixLines(fixes, { may: 'ask' })[0], /to write into contract\.authored\.json, once you say yes/);
   assert.match(fixLines(fixes, { may: 'no' })[0], /does not let the engine write its own files/);
+  // When the engine knows why it may not, it says that instead of the general sentence.
+  assert.match(fixLines(fixes, { may: 'no', why: 'on CI there is nobody to ask' })[0], /a task for whoever owns contract\.authored\.json \(on CI there is nobody to ask\)/);
   // A draft is always said to be one, and said apart from what is certain.
   const lines = fixLines(fixes, { may: 'ask' }).join('\n');
   assert.match(lines, /1 draft for a person to approve \(marked \*\*Draft:\*\*, never read as the team's own word\)/);

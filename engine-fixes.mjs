@@ -103,13 +103,13 @@ export function applyFixes(ROOT, fixes, { file = 'contract.authored.json' } = {}
 }
 
 // What a person reads, and what happens next, by what the project allows (writes.mjs → `engine`).
-export function fixLines(fixes = [], { may = 'ask', file = 'contract.authored.json' } = {}) {
+export function fixLines(fixes = [], { may = 'ask', why = null, file = 'contract.authored.json' } = {}) {
   if (!fixes.length) return [];
   const sure = fixes.filter((f) => !f.draft), drafts = fixes.filter((f) => f.draft);
   const said = (f) => `  ${f.component} · ${f.field}: ${f.kind === 'note' ? `take out "${String(f.from).replace(/\s+/g, ' ').slice(0, 80)}"` : f.to} - ${f.why}`;
   const head = may === 'yes' ? `written into ${file}`
     : may === 'ask' ? `to write into ${file}, once you say yes`
-      : `for whoever owns ${file}: this project does not let the engine write its own files`;
+      : `a task for whoever owns ${file} (${why ?? 'this project does not let the engine write its own files'})`;
   return [`🧾 ${fixes.length} thing${fixes.length === 1 ? '' : 's'} the engine is sure of, ${head}:`,
     ...sure.map(said),
     ...(drafts.length ? [`  and ${drafts.length} draft${drafts.length === 1 ? '' : 's'} for a person to approve (marked ${DRAFT}, never read as the team's own word):`, ...drafts.map(said)] : [])];

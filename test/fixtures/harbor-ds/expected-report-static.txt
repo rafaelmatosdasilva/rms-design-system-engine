@@ -227,6 +227,9 @@
 🧩 Built around a component: 2 places where a screen lays its own control over a component. The component may be missing a slot or prop: send it to the design system, the screen is not wrong. Advisory.
      badge: .hb-badge-remove laid over it (pages/index.html:7). The component may be missing a slot or prop for this action.
      a text field (.hb-search-input): .hb-search-clear laid over it (pages/index.html:10). The design system's field may be missing this action.
+🧾 2 things the engine is sure of, a task for whoever owns contract.authored.json (on CI there is nobody to ask):
+  HbButton · semantics.element: button - its code renders <button>
+  HbIconButton · semantics.element: button - its code renders <button>
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      10/25 gates pass

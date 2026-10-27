@@ -6074,10 +6074,10 @@ function reportFull(label, items, shown) {
     const authoredFile = cfg.contracts?.authored ?? 'contract.authored.json';
     let authored = {}; try { authored = JSON.parse(readFileSync(join(ROOT, authoredFile), 'utf8')); } catch { /* none yet: everything is empty */ }
     const fixes = sureFixes({ components, authored });
-    const may = mayWrite(cfg, 'engine').answer;
+    const { answer: may, why: whyNot } = mayWrite(cfg, 'engine');
     if (fixes.length) {
       if (may === 'yes') applyFixes(ROOT, fixes, { file: authoredFile });
-      for (const l of fixLines(fixes, { may, file: authoredFile })) console.log(may === 'no' ? C.yellow(l) : C.dim(l));
+      for (const l of fixLines(fixes, { may, why: whyNot, file: authoredFile })) console.log(may === 'no' ? C.yellow(l) : C.dim(l));
       if (may === 'ask') console.log(C.dim('     Say yes and the engine writes them (rms-design-system-engine --writes engine yes writes them on every run from now on).'));
     }
   } catch (e) { console.log(C.dim(`ℹ️  What the engine is sure of was not written: ${e.message}`)); }
