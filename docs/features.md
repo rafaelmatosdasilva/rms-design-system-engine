@@ -129,6 +129,19 @@ A component can match Figma on its own while a product puts it in the wrong plac
 
 A list (three or more of one component) is compared by whether it is there and where it starts, since how many rows it shows is data. A page that opens in another state than its screen, empty before its data arrives, is said once and not compared until its screen has a `setup`, a script that puts the page in that state. Each product with a difference is a row on the Status page, under Products.
 
+### What a screen runs into in a component's own code
+
+Some faults show only when a screen uses the component, before any difference with Figma. The engine reads each component's own file (Vue for now) and names them, each with its line:
+
+- **No style.** An element whose class no rule styles, drawn with the browser's defaults, or a modifier class that changes nothing (a read-only class with no rule).
+- **Fires twice.** One click on a child sends the same event twice, because the click also reaches a parent that sends it.
+- **Same content in every row.** A slot inside a repeated row that passes nothing to it.
+- **Read once.** A prop read only when the component appears, so a screen cannot open, close or change it afterwards.
+- **Line breaks lost.** A description or a message shown on one line, its new lines gone.
+- **Takes HTML in one, text in another.** The same prop in one family, bold and line breaks working in one component and not in its sibling.
+
+Each is on the component's page and on the Tasks page, with the fix. They are advice, never a failed check: whether to change the component is your team's call.
+
 ### Nothing passes by accident
 
 - A check that had nothing to read shows **Not run** with the reason, never Pass.

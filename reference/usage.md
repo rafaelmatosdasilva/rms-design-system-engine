@@ -356,7 +356,8 @@ layer: the changes are the team's. The audit prints how many pages each decision
 
 **What a page says is checked against the system, on every run** (`intent-truth.mjs`, no flag): every name it writes as
 code (`tileOne`, `dense`, `--tile-color`, `icons/check`, a file) must be one the system has (a component, a prop,
-a token, a Figma variable, an icon, a file, a word of its code), unless the page gives it as the one not to use ("not
+a token, a Figma variable, an icon, a file, a word of its code or of a token's name; never a word only a comment of
+the code has, nor one of the engine's own `design-intent.json`, which repeats the pages), unless the page gives it as the one not to use ("not
 `x`"); a flow's or a page's own screens are the product's, so there only tokens and near misses of a system name are
 held to it. A prop it sets (`prop="value"`) must be one some component has, and the value one the prop takes (its
 options in the code or Figma, true or false for an on-off one); a list of values given for a prop must be its values.
@@ -934,7 +935,12 @@ temporary vs permanent, owner, and review-by, so temporary bypasses get cleared 
 accountable; totals each run, full list with `--exemption-debt`); **code→design drift** (props that
 exist in code but not in Figma, surfaced as a "sync back to the design" advisory so code-ahead-of-design
 is visible; the engine only surfaces it, the designer decides; totals each run, full list with
-`--code-drift`); and **token layering** (a structure-agnostic check: it imposes no
+`--code-drift`; each component's line names its props); **component code** (`component-faults.mjs`: what a screen
+runs into in a Vue component's own file, read without running it, each with its line: an element no rule styles, a
+modifier class with no rule, one click firing an event twice, a slot repeated by a `v-for` with nothing passed, a prop
+read only when mounted, a longer text prop whose line breaks are lost, and a prop that takes HTML in one component of a
+folder and text in another; a part it imports to draw itself, such as a base picked at run time, is read as its own; the
+code's to fix, on the component's page and the Tasks page); and **token layering** (a structure-agnostic check: it imposes no
 tier model, only measures the DS's own aliasing rate and, when references are the DS's norm, surfaces
 the few tokens that hold a raw value instead); **token contrast** (computes WCAG contrast from the token
 values, per mode, and flags pairs below AA; a no-browser complement to the render a11y gate. Pairs are

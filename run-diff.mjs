@@ -86,6 +86,11 @@ export function diffReport(d, { max = 15 } = {}) {
 const kebab = (x) => x.replace(/([a-z0-9])([A-Z])/g, '$1-$2');
 const words = (name) => [name, kebab(name)].map((x) => x.toLowerCase());
 export function componentOf(finding, names) {
+  // A line that starts with a component's name ("tileCard: …") is that component's, whatever other one it names.
+  const lead = /(?:^| :: )\s*([\w/-]+):\s/.exec(String(finding));
+  // The code's name for it may be Figma's written another way (tile/Head for tileHead): the same letters count.
+  const k = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (lead) { const n = names.includes(lead[1]) ? lead[1] : names.find((x) => k(x) === k(lead[1])); if (n) return n; }
   // The text as written, and with its PascalCase split, so HbIconButton.vue names iconButton.
   const texts = [String(finding).toLowerCase(), kebab(String(finding)).toLowerCase()];
   const hits = names.filter((n) => words(n).some((w) => { const re = new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`); return texts.some((t) => re.test(t)); }));
@@ -335,6 +340,15 @@ export function plainAction(what = '', component = '') {
   if ((m = /^·\s+([\w/ -]+)$/.exec(s))) return { who: 'figma', todo: `In Figma, point ${m[1].trim()} at another token instead of a raw colour.` };
   if ((m = /^[\w-]+ is built differently from the other ([\w-]+) components: .+?\); (.+), or keep it as a known exception$/.exec(s))) return { who: 'both', todo: /^check whether/.test(m[2]) ? `In Figma, ${m[2]} (most ${m[1]} components have it), or keep it as a known exception.` : `In Figma, ${m[2]}, as the other ${m[1]} components do, or keep it as a known exception.` };
   if ((m = /^[\w/-]+ (property|option) "([^"]+)"(?: of (.+?))? is named differently from the rest of the system: rename it "([^"]+)" in Figma/.exec(s))) return { who: 'figma', todo: `In Figma, rename the ${m[1]} "${m[2]}" of ${name}${m[3] ? `'s ${m[3]}` : ''} to "${m[4]}". Then update the code's contract to the new name.` };
+  // A fault of the component's own code (component-faults.mjs): the code's to fix, the fix said for its kind.
+  if ((m = /^[\w/-]+: (No style|Fires twice|Same content in every row|Read once|Line breaks lost|Takes HTML in one, text in another)\. /.exec(s))) return { who: 'code', todo: {
+    'No style': `Style it in ${name} (or take the class out), so what it wraps is drawn as the system draws it.`,
+    'Fires twice': `Add .stop to the inner click, or stop passing the event on, so one click is one event.`,
+    'Same content in every row': `Pass each row to the slot (a scoped slot), so every row can show its own content.`,
+    'Read once': `Follow the prop with a watch, or let the screen own it (v-model), so a screen can change it after it is shown.`,
+    'Line breaks lost': `Add white-space: pre-line where ${name} shows it, so a new line in the text is kept.`,
+    'Takes HTML in one, text in another': `Make the family agree: the same prop takes the same kind of text in each component.`,
+  }[m[1]] };
   if (/ laid over it /.test(s)) return { who: 'both', todo: `Decide: add a slot or prop for this action to ${name} in Figma (then build it in the code), or leave it as the product's own.` };
   return { who: 'both', todo: 'Decide which side is right, then change the other to match, or keep it as a known exception.' };
 }

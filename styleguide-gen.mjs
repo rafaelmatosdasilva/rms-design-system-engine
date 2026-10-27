@@ -480,6 +480,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const { OUT_DIR } = await import('./names.mjs');
       const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8'));
       const by = new Map((d.groups ?? []).map((g) => [g.component, g.items ?? []]));
+      // A page named as the code names it (picker/Row) finds what was found under Figma's name (pickerRow).
+      const flat = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const [k, v] of [...by]) if (k && !by.has(flat(k))) by.set(flat(k), v);
+      const own = (n) => by.get(n) ?? (n && by.get(flat(n))) ?? [];
       // The differences the team decided to keep, with why, who and when: shown on the component as kept, never open.
       const keptBy = new Map();
       for (const k of d.kept ?? []) if (k.component) (keptBy.get(k.component) ?? keptBy.set(k.component, []).get(k.component)).push(k);
@@ -489,14 +493,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // Accessibility area, the rest to its Parity.
       const { splitFindings } = await import('./styleguide-data.mjs');
       for (const c of view.components) {
-        const { parity, a11y } = splitFindings((by.get(c.name) ?? []).map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), ...plainAction(x.what, c.name), new: !!x.new })));
+        const { parity, a11y } = splitFindings(own(c.name).map((x) => ({ check: x.check, what: x.what, plain: plainDifference(x.what), ...plainAction(x.what, c.name), new: !!x.new })));
         if (parity.length) c.differences = parity;
         const kept = (keptBy.get(c.name) ?? []).map((k) => ({ check: k.check, what: k.what, plain: plainDifference(k.what), reason: k.reason, by: k.by ?? null, at: k.at ?? null, ...(k.truth ? { truth: k.truth } : {}), ...(k.review ? { review: k.review } : {}), ...(k.due ? { due: true } : {}) }));
         if (kept.length) c.kept = kept;
         if (a11y.length) c.a11yFindings = a11y;
         // A product that draws its own version of it (Gate [10]) is in its Used in too, said so, so a product never
         // reads as not using it when it shows one of its own.
-        for (const x of by.get(c.name) ?? []) {
+        for (const x of own(c.name)) {
           const m = /^[\w-]+: (.+?) draws its own instead of using it \((.+) in (.+)\)$/.exec(x.what ?? '');
           if (!m) continue;
           const g = (cfg.styleguide?.plugins ?? []).find((p) => p.name === m[1] || m[3].includes(p.match ?? '\u0000'));

@@ -5038,6 +5038,31 @@ function reportFull(label, items, shown) {
     }
   } catch { /* the census reads the project's styles; nothing to read */ }
 
+  // ── What a screen runs into in a component's own code (advisory, never a gate) ──────────
+  _section('advice');
+  // Read from each component's own file without running it (component-faults.mjs): a block no rule styles, one click
+  // firing an event twice, a slot that repeats the same content in every row, a prop read only when mounted, a line
+  // break lost in a longer text, a prop that takes HTML in one component of a family and text in another.
+  try {
+    const api = JSON.parse(readFileSync(join(ROOT, codeSnapshotPath(cfg)), 'utf8')).api ?? {};
+    const { sourceFiles } = await import('./code-roots.mjs');
+    const files = sourceFiles(ROOT, cfg);
+    const comps = Object.entries(api).filter(([, a]) => /\.vue$/.test(a?.file ?? '')).map(([name, a]) => ({ name, file: a.file, text: files.find((f) => f.file === a.file)?.text ?? (() => { try { return readFileSync(join(ROOT, a.file), 'utf8'); } catch { return null; } })() })).filter((c) => c.text);
+    if (comps.length) {
+      const { componentFaults, faultLines } = await import('./component-faults.mjs');
+      const blocks = (f, re) => (/\.(css|scss|less)$/.test(f.file) ? [f.text] : [...f.text.matchAll(re)].map((m) => m[1]));
+      const faults = componentFaults(comps, {
+        styles: files.flatMap((f) => blocks(f, /<style\b[^>]*>([\s\S]*?)<\/style>/gi)),
+        scripts: files.flatMap((f) => (/\.(js|ts|mjs|jsx|tsx)$/.test(f.file) ? [f.text] : [...f.text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]))),
+        files: files.filter((f) => /\.vue$/.test(f.file)),
+      });
+      if (faults.length) {
+        console.log(C.yellow(`\nℹ️  Component code: ${faults.length} thing${faults.length === 1 ? '' : 's'} a screen runs into in ${new Set(faults.map((f) => f.component)).size} component${faults.length === 1 ? '' : 's'}' own code. Advisory: each is a fact of the code, with its line; whether to change the component is the team's call.`));
+        for (const l of faultLines(faults)) console.log(C.yellow(`     ${l}`));
+      }
+    }
+  } catch { /* the components' files could not be read: nothing to say */ }
+
   // ── Code → design drift (advisory, never a gate) ───────────────────────
   _section('advice');
   // A diagnostic layer must work BOTH directions. The parity is design → code; this surfaces
@@ -5058,13 +5083,14 @@ function reportFull(label, items, shown) {
       for (const r of extra) { if (!byComp.has(r.component)) byComp.set(r.component, []); byComp.get(r.component).push(r.codeProp); }
       console.log(C.yellow(`\nℹ️  Code → design drift: ${extra.length} code prop(s)${rename.length ? ` and ${rename.length} likely rename(s)` : ''} exist in code but not in Figma. Decide whether to sync them back to the design or document them. Advisory only.`));
       for (const [comp, props] of byComp) {
-        console.log(C.yellow(`     ${comp}: ${props.length}` + (detail ? C.dim(`  (${props.join(', ')})`) : '')));
+        // Its props named, so the line says what to sync or document rather than only how many.
+        console.log(C.yellow(`     ${comp}: ${props.length} (${props.join(', ')})`));
       }
       if (detail && rename.length) {
         console.log(C.yellow('   likely renames (Figma prop ~ code prop):'));
         for (const r of rename) console.log(`       · ${r.component}: Figma "${r.figmaProp}" ~ code "${r.codeProp}"`);
       }
-      if (!detail) console.log('   Run with --code-drift to list them.');
+      if (!detail && rename.length) console.log('   Run with --code-drift to list the likely renames.');
     }
   }
 
