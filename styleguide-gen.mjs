@@ -795,7 +795,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // What an agent cannot learn about it from its documentation (--prototype --coverage).
       const cov = readJson(join(ROOT, OUT_DIR, 'prototypes', 'doc-coverage.json'))?.components ?? {};
       const covKey = new Map(Object.entries(cov).map(([n, b]) => [key(n), b]));
-      for (const c of view.components) { const b = covKey.get(key(c.name)); if (b?.missing?.length) c.docCoverage = b.missing.filter((m) => !['page', 'purpose', 'example'].includes(m.kind)); }
+      // What to write is said in today's words, whenever the coverage was saved.
+      const { WRITE } = await import('./doc-coverage.mjs');
+      for (const c of view.components) { const b = covKey.get(key(c.name)); if (b?.missing?.length) c.docCoverage = b.missing.filter((m) => !['page', 'purpose', 'example'].includes(m.kind)).map((m) => ({ ...m, write: WRITE[m.kind] ?? m.write })); }
       // Needs its page names for which agents picked another component (--prototype --scenarios).
       const conf = readJson(join(ROOT, OUT_DIR, 'prototypes', 'stress.json'))?.scenarios?.confusions ?? {};
       const confKey = new Map(Object.entries(conf).map(([n, b]) => [key(n), b]));

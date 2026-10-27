@@ -118,7 +118,7 @@ test('a page with a finding is Fix, above Write and Improve, its findings first 
   const rep = useReport(snap, matched, { names: ['tileOne'], wrongOf: (x) => found.get(x) ?? [] });
   assert.equal(rep.pages[0].action, 'fix');
   assert.equal(rep.actions.fix, 1);
-  assert.match(rep.pages[0].todo[0], /^`showBadgeCount`: Write the name the system uses/);
+  assert.match(rep.pages[0].todo[0], /^`showBadgeCount` is not a name the system has\. Write the name the system uses/);
   assert.equal(rep.pages[0].wrong[0].kind, 'name');
   // What the agents get leaves the wrong sentence out, and lists it.
   const ci = componentIntent(e, {}, found.get(e));

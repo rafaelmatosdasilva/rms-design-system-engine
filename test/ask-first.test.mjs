@@ -20,7 +20,7 @@ test('an open line is set apart: never guidance, listed for a person to settle',
   assert.deepEqual(v.open, [{ where: 'Rules', text: 'Can two be selected at once?' }]);
   const r = useReport({ entities: [v] }, new Map([['acmeChip', v]]), { names: ['acmeChip'] });
   assert.equal(r.pages[0].action, 'review');
-  assert.match(r.pages[0].todo[0], /Settle the open question under Rules: "Can two be selected at once\?"/);
+  assert.match(r.pages[0].todo[0], /^Answer the open question under Rules "Can two be selected at once\?"\. Write the answer in its place and remove the \[open\] or TBD marker\./);
 });
 
 test('a code example keeps a line that only looks open', () => {

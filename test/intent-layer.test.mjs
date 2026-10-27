@@ -188,7 +188,7 @@ test('a token\'s page is used when it says what the token is for; Improve always
   const [token, pattern] = r.pages;
   assert.deepEqual([token.verdict, token.action, token.todo], ['used', 'keep', []]);
   assert.deepEqual([pattern.verdict, pattern.action], ['thin', 'improve']);
-  assert.match(pattern.todo[0], /^Add how to use it: When to use/);
+  assert.match(pattern.todo[0], /^Add a section that says how to use it, and call it When to use/);
   for (const p of r.pages) if (p.action === 'improve') assert.ok(p.todo.length, `${p.name}: Improve with nothing to do`);
 });
 
@@ -586,17 +586,17 @@ test('each page gets one decision, said as an instruction, with why: delete, mov
   assert.equal(at('Banner').action, 'keep');
   assert.deepEqual(at('Banner').todo, []);
   assert.equal(at('Point List').action, 'improve');                  // a section under a title no agent reads
-  assert.match(at('Point List').todo[0], /^Retitle Decision Rules as When to use, When not to use/);
+  assert.match(at('Point List').todo[0], /^Retitle Decision Rules to When to use, When not to use/);
   assert.deepEqual([at('Point List Item').action, at('Point List Item').notUsed[0].reason], ['move', 'part']);
-  assert.match(at('Point List Item').todo[0], /^Move what is true of this part and not yet on Point List \(lists\/point-list\.json\) there.*then delete this page\.$/);
+  assert.match(at('Point List Item').todo[0], /^Copy anything about this part that Point List \(lists\/point-list\.json\) doesn't say yet into that page, then delete this one\.$/);
   assert.match(at('Point List Item').notUsed[0].why, /PointListItem\.vue is a part of pointList/);
   assert.deepEqual([at('Point List Row').action, at('Point List Row').decision, at('Point List Row').todo], ['delete', 'Delete', ['Delete this page.']]);   // its parent's page says it all
   assert.deepEqual([at('Calendar General').action, at('Calendar General').todo[0]], ['rename', 'Rename this page to calendar, the component\'s name in Figma.']);
   assert.deepEqual([at('Old Widget').action, at('Old Widget').notUsed[0].reason], ['delete', 'codeGone']);
   assert.deepEqual([at('Empty Thing').action, at('Empty Thing').notUsed[0].reason], ['delete', 'emptyPage']);
   assert.deepEqual([at('Mystery Panel').action, at('Mystery Panel').notUsed[0].reason], ['name', 'noComponent']);
-  assert.deepEqual([at('Tag').action, at('Tag').todo], ['improve', ['Add when to use it and when not to, as sections with those titles.']]);
-  assert.deepEqual([at('Chip').action, at('Chip').todo], ['improve', ['Remove the 2 lines written on every page alike, in whatever writes them.']]);
+  assert.deepEqual([at('Tag').action, at('Tag').todo], ['improve', ['Add two sections called When to use and When not to use.']]);
+  assert.deepEqual([at('Chip').action, at('Chip').todo], ['improve', ['Remove the 2 lines that are the same on every page, where they are generated.']]);
   assert.equal(rep.actions.delete, 3);
   for (const p of rep.pages) assert.ok(p.decision && Array.isArray(p.todo), p.name);
 });
@@ -623,7 +623,7 @@ test('a rename never goes to a part of a component: its page moves to the parent
   const at = (n) => rep.pages.find((p) => p.name === n);
   assert.equal(at('Grid General').action, 'rename');                                          // grid: a component of its own
   assert.deepEqual([at('Grid Header Base').action, at('Grid Header Base').notUsed[0].reason], ['move', 'subPart']);
-  assert.match(at('Grid Header Base').todo[0], /^Move what is true of grid\/Header and not yet on Grid General \(grid\/general\.json\) there/);
+  assert.match(at('Grid Header Base').todo[0], /^Copy anything about grid\/Header that Grid General \(grid\/general\.json\) doesn't say yet into that page, then delete this one\./);
   assert.deepEqual([at('List Row Base').action, at('List Row Base').notUsed[0].reason], ['delete', 'subPartAlone']);   // list has no page at all
 });
 
