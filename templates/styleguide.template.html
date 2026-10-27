@@ -5415,13 +5415,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Token</div><table class="pg-par-table sg-tk-facts"><tbody>' + [['What it styles', esc(TYPE_LABEL[r.t.type] || r.t.type)], ['In the code', r.t.var ? '<span class="sg-tk-code-line"><code>' + esc(r.t.var) + '</code><button type="button" class="sg-token-link sg-tk-copy" data-copy-text="' + esc(r.t.var) + '">Copy</button></span>' : '<span class="pg-missing">Not in the code</span>'], ['What it is for', r.t.description ? esc(r.t.description) : '<span class="pg-missing">Not written yet</span>']].map(function (x) { return '<tr><th scope="row">' + esc(x[0]) + '</th><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table></div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Values</div>' + vals + '</div>' +
         '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">Used by ' + plural(comps.length, 'component', 'components') + '</div>' + usersTable(comps) + '</div>' });
-      // The table's head stuck under the panel's head as the panel scrolls.
-      var ph = det.querySelector('.sg-panel-head'), ch = det.querySelector('.sg-panel-body .pg-inspect-head');
-      var heads = function () { if (ph && ph.offsetHeight) det.style.setProperty('--sg-panel-head-h', stuckH(ph) + 'px'); if (ch && ch.offsetHeight) det.style.setProperty('--pg-card-head-h', stuckH(ch) + 'px'); };
       m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
-      heads();   // measured once shown
-      setTimeout(heads, 300);   // and again once it has slid in and its title has its final lines
-      if (typeof ResizeObserver !== 'undefined' && ph && !ph._sized) { ph._sized = true; new ResizeObserver(heads).observe(ph); }
+      panelHeads(m);   // its tables' heads stuck under the panel's head as it scrolls
       requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
       m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
     };
@@ -6791,8 +6786,21 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.isTrusted) { e.stopPropagation(); m._shut(); } });
     return m;
   }
+  // Every side panel's tables keep their heads in view as the panel scrolls, as the page's do: each card's head stuck
+  // under the panel's head, its table's head under the card's. The CSS places them from the heights measured here, once
+  // the panel is shown, again once it has slid in and its title has its final lines, and whenever its head changes size.
+  function panelHeads(m) {
+    var det = m.querySelector('.sg-row-detail'), ph = det && det.querySelector('.sg-panel-head'); if (!det) return;
+    var heads = function () {
+      if (ph && ph.offsetHeight) det.style.setProperty('--sg-panel-head-h', stuckH(ph) + 'px');
+      Array.prototype.forEach.call(det.querySelectorAll('.sg-panel-body .pg-inspect'), function (c) { var h = c.querySelector(':scope > .pg-inspect-head'); if (h && h.offsetHeight) c.style.setProperty('--pg-card-head-h', stuckH(h) + 'px'); });
+    };
+    heads(); setTimeout(heads, 300);
+    if (typeof ResizeObserver !== 'undefined' && ph && !ph._sized) { ph._sized = true; new ResizeObserver(heads).observe(ph); }
+  }
   function panelShow(m, from) {
     m._from = from || null; m.hidden = false; m._open = true; document.documentElement.classList.add('sg-panel-open');
+    panelHeads(m);
     requestAnimationFrame(function () { requestAnimationFrame(function () { if (m._open) m.classList.add('is-open'); }); });
     m.querySelector('.sg-comp-panel-box').focus({ preventScroll: true });
   }

@@ -266,6 +266,11 @@ test('in the browser: no script error, a control changes the real component, the
     const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
       return p && !p.hidden ? { title: p.querySelector('.sg-panel-head h2').textContent, cards: p.querySelectorAll('.sg-row-detail-body').length, sub: p.querySelector('.sg-panel-sub')?.textContent ?? '' } : null; })()`, (v) => !!v);
     assert.ok(rowPanel && rowPanel.title && rowPanel.cards >= 2, JSON.stringify(rowPanel));
+    // Its cards' heads, and their tables' heads, stick under the panel's head as it scrolls, as the token panel's do: each
+    // panel measures its head, and each card its own.
+    const rowHeads = await until(`(() => { const d = document.querySelector('#sg-row-panel .sg-row-detail'), h = d.querySelector('.sg-panel-head'), c = d.querySelector('.sg-panel-body .pg-inspect'), ch = c && c.querySelector('.pg-inspect-head'); const ph = parseFloat(d.style.getPropertyValue('--sg-panel-head-h')), cardH = c ? parseFloat(c.style.getPropertyValue('--pg-card-head-h')) : 0; return ph > 0 && cardH > 0 ? { ph: Math.round(ph), head: Math.round(h.getBoundingClientRect().height - 1), top: parseFloat(getComputedStyle(ch).top) } : null; })()`, (v) => !!v);
+    assert.equal(rowHeads.ph, rowHeads.head, 'the panel head measured');
+    assert.ok(rowHeads.top > rowHeads.ph, `a card's head sticks under the panel's head (${JSON.stringify(rowHeads)})`);
     await run(`document.querySelector('#sg-row-panel [data-panel-close]').click()`);
     assert.equal(await until(`document.getElementById('sg-row-panel').hidden`, (v) => v === true), true, 'it closes');
     assert.equal(await run(`document.querySelectorAll('.pg-preview').length`), 1);
