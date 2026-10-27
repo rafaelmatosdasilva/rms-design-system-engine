@@ -5366,6 +5366,18 @@ function reportFull(label, items, shown) {
           lines.push(...bl.brandLayerLines(bl.brandLayering(JSON.parse(readFileSync(brandsAt, 'utf8')))));
         }
       } catch { /* no brands, or none readable */ }
+      // Is there a component the system does not have? (layer-questions.mjs) The intent layer should say what an agent
+      // does when none fits; without that it builds one of its own.
+      try {
+        const layer = (await import('./intent-layer.mjs')).readIntentLayer(ROOT, cfg);
+        if (layer) {
+          const lq = await import('./layer-questions.mjs'), { RULE_FILES } = await import('./agent-rules.mjs');
+          const more = RULE_FILES.map((f) => { try { return { name: f, lines: readFileSync(join(ROOT, f), 'utf8').split(/\n+/) }; } catch { return null; } }).filter(Boolean);
+          const names = Object.keys(JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json'), 'utf8')).components ?? {});
+          const ab = lq.absentComponent(names, { layer, more });
+          if (ab.asked && !ab.rule) lines.push(...lq.questionLines(null, ab));
+        }
+      } catch { /* no intent layer, or none readable */ }
       if (lines.length) {
         console.log(C.yellow(`\n🧭 System health: ${lines.filter((l) => !/^   ·/.test(l)).length} thing${lines.filter((l) => !/^   ·/.test(l)).length === 1 ? '' : 's'} to keep the system healthy as it grows. Advisory.`));
         for (const l of lines) console.log(C.yellow(`     ${l}`));

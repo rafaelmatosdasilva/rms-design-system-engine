@@ -3177,7 +3177,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return order.map(function (w) { return ilSourceHead(w) + by[w].map(function (r) { return '<div class="sg-il-group"><p class="sg-il-head">' + esc(r.kind) + '</p>' + r.written + '</div>'; }).join(''); }).join('');
     };
     // The sources a row's content comes from, in a word each, for the table.
-    var ilSources = function (p) { if (p.tokens) return 'Figma';
+    var ilSources = function (p) { if (p.tokens) return 'Figma, Intent layer'; if (p.absent) return 'Intent layer';
       if (p.noLayer) { var c0 = docComp(p), w0 = []; try { docIssueRows(c0).forEach(function (r) { if (r.st === 'done') srcNames(r.src || []).forEach(function (x) { if (x && w0.indexOf(x) < 0) w0.push(x); }); }); } catch (e) { /* none */ } return w0.length ? esc(w0.join(', ')) : '<span class="pg-missing">None</span>'; } var r = p.reads || {}, out = []; if (!p.missingFor && IL_READ.some(function (k) { return (r[k[0]] || []).length; })) out.push('Intent layer'); ilOthersOf(p).forEach(function (o) { var w = /^Figma/.test(o.source) ? 'Figma' : o.source; if (out.indexOf(w) < 0) out.push(w); }); return out.length ? esc(out.join(', ')) : '<span class="pg-missing">None</span>'; };
     // Lines drafted for it (by the engine or a person), each under its section: the team's to review.
     // The page's drafts under the task that asks for them, each section's lines together and each line once, a line
@@ -3229,7 +3229,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Where what is missing is written: "in Figma", "in the intent layer", or both.
     var docWhere = function (p, st) { var w = []; docLeft(p).filter(function (x) { return !st || x.st === st; }).forEach(function (x) { String(x.where || '').split(' · ').forEach(function (s) { if (s && w.indexOf(s) < 0) w.push(s); }); }); return w; };
     // Where what is missing is to be written, said under Missing: In Figma, In the intent layer, or both.
-    var docTopic = function (p) { if (p.tokens) return 'In Figma'; var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
+    var docTopic = function (p) { if (p.tokens) return 'In Figma or the intent layer'; if (p.absent) return 'In the intent layer'; var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
     // Each thing still to write, as one block: what to write (or check), and exactly where: the spec file a person edits
     // and its section (the page's JSON is generated from it), Figma's description, or the code's comment.
     var SECTION_OF = { 'What it is': 'Purpose', 'When to use': 'When to use', 'When not to use': 'When not to use', 'Common mistakes': 'Common mistakes', Limitations: 'Limitations', Example: 'Example', Role: 'Role', 'Do and don\'t': 'Do and don\'t' };
@@ -3253,8 +3253,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var notesOff = function (p) { var c = !p.tokens && docComp(p); return (c && c.notesLeft) || []; };
     var needsRemove = function (p) { return notesOff(p).length > 0; };
     var removeTopic = function (p) { var n = notesOff(p).length; return n + (n === 1 ? ' note no agent reads' : ' notes no agent reads'); };
-    var needsReview = function (p) { return !p.tokens && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
-    var needsWrite = function (p) { return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
+    var needsReview = function (p) { return !p.tokens && !p.absent && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
+    var needsWrite = function (p) { if (p.absent) return true; return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p) && !needsRemove(p); };
     var reviewTopic = function (p) { return p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
@@ -3270,6 +3270,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var total = Object.keys(used).length; if (!total && !Object.keys(missing).length) return;
       rows.unshift({ action: 'keep', tokens: { missing: Object.keys(missing).sort(), total: Math.max(total, Object.keys(missing).length) } });
     })();
+    // The system's row, first, while the layer does not say what to do when no component fits (layer-questions.mjs).
+    if (IL.absent && !IL.absent.rule && IL.absent.asked) rows.unshift({ action: 'write', absent: IL.absent });
     // Every row but Keep waits on a person: its status is Review, and what kind of review is said under it (a draft's
     // review is "Drafts", the others their decision: Move, Fix, Add…).
     // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
@@ -3297,9 +3299,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
-          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for (agents read it, through tokens.json, to pick the right token).</span><span class="sg-il-label">Where</span><span class="sg-il-text">Figma, in each variable\'s Description (Local variables → select the variable → Description)' + (tm.some(function (m) { return /^text style /.test(m); }) ? '; a text style\'s in its own Description (select the style → Edit style → Description)' : '') + '.</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
-          todo: tm.length ? '<p class="sg-il-line"><strong>Describe ' + tm.length + ' of the ' + tn + ' tokens the components use, in Figma.</strong></p>' : '',
-          why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for.') + '</p>', gets: '' }; }
+          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for. Agents read it to pick the right token. A line that only repeats the token\'s name, its modes or what it points to does not count.</span><span class="sg-il-label">Where</span><span class="sg-il-text">In Figma, in each variable\'s Description' + (tm.some(function (m) { return /^text style /.test(m); }) ? ', or a text style\'s own Description' : '') + '. Or in the intent layer, on the token\'s own entry or on a page that names it, like Colors.</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
+          todo: tm.length ? '<p class="sg-il-line"><strong>Say what ' + tm.length + ' of the ' + tn + ' tokens the components use are for. An agent asking which token to use for something finds nothing on them yet.</strong></p>' : '',
+          why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.') + '</p>', gets: '' }; }
+      if (p.absent) { var ab = p.absent, asked = ab.kinds.filter(function (k) { return !k.said; }).map(function (k) { return k.kind; });
+        return { decision: decisionCell('write', p), file: ab.entry ? (ab.entryUrl ? '<a class="sg-uses-link" href="' + esc(ab.entryUrl) + '" target="_blank" rel="noopener">' + esc(ab.entry) + '</a>' : esc(ab.entry)) : '<span class="pg-missing">—</span>', forWhat: 'The system', updated: docAt(p), reads: '', remove: '',
+          left: '<div class="sg-il-line"><strong>What to do when no component fits</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span><span class="sg-il-codes">' + asked.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join('') + '</span>' : '') + '</div>',
+          todo: '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits. Today an agent asked for a component the system does not have builds one of its own.</strong></p>',
+          why: '<p class="sg-il-line">' + esc(ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: docAt(p), reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
       if (p.noLayer) return { decision: decisionCell('keep', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
@@ -3307,12 +3314,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
+    // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
+    var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || p.name || i); };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
-      m._key = 'doc:' + (p.file || p.missingFor || p.name || i);
+      m._key = ilKey(p, i);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
       // Its status first, then the proposal to say yes or no to, then what to do: the task, each thing still to write (what
       // and where), the drafts to review under the task that asks for them, notes to remove; then what the page is and why.
@@ -3322,7 +3331,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       panelShow(m, from);
     };
     // A link to a page's panel (panel=doc:<file>) opens it.
-    ilSec._openKey = function (key) { var i = rows.findIndex(function (p) { return 'doc:' + (p.file || p.missingFor || p.name) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
+    ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
     pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(needsReview).length;
       return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
