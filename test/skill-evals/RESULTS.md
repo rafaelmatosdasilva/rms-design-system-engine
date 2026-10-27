@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The evidence convention, short enough for the guide's size limit (continuous evaluation)
+
+What changed since the entry below (engine e170521): The rules an agent reads come in tiers, and the more specific one wins (#71); Documentation page without downloads, Changelog last in the menu, table heads that stick cleanly in pages and side panels (#70); Every text and icon colour is given the surface it was made for, not a shortlist (#72); Every read through figma-cli is tried twice and says what figma-cli printed (#73); The icon gate reads icons kept as one SVG file each (#74); A stuck table head keeps its top line under a page's chip bar (#75); Every claim says where it comes from: verified, reported or not checked; The evidence convention, short enough for the guide's size limit. The guide changed in `rms-design-system-engine.md`.
+
+Guide set measured: `0199583aee08` · Project measured: `13d811a9d668`
+
+| Haiku, engine a49be49 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.062 |
+| Input a run | 124k | 134k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 134k a run against 124k. Records: `records/2026-10-27-the-evidence-convention-short-enough`.
+
 ## 2026-10: Documentation page without downloads, Changelog last in the menu, table heads that stick cleanly in pages and side panels (continuous evaluation)
 
 What changed since the entry below (engine 260ee52): Documentation page without downloads, Changelog last in the System menu, a stuck table head with no see-through pixel; Every side panel's tables keep their heads in view as it scrolls; The rules an agent reads, swept: a pair that cannot both be followed, one said twice, one no check reads (#68); A request that asks for the fix is the ask: the agent makes it without asking again (#69). The guide changed in `reference/usage.md`.
