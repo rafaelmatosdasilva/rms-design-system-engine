@@ -426,7 +426,7 @@ Now they come together in one log, written to `DECISIONS.md` in the output folde
 
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#tokens-and-changes) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
-The style guide shows them in **History** (it was the Changelog): one table for what changed and what was decided, by release, each decision tagged. Chips show all, only the changes or only the decisions. Each component's History area does the same for that component.
+The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma and what was decided, each row tagged Code, Figma or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 

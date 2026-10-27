@@ -665,8 +665,9 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
   scale says so in its name (`Size=L@1x.png`); 2x by default. The Figma panel says its image is in the mode its frame
   uses in Figma.
 - **History** (view `#history`, when the code has history or a decision is recorded; an old `#changelog` or `#whats-new` link opens it): every component's changes and every decision gathered by release, newest
-  first (not released yet on top), one row per issue with its commits and what they affect, one row per decision (tagged
-  Decision: what was ruled out, why, who) with the page it is about. Chips (All, Changes, Decisions) filter it, each with its own address (`?show=decisions`). **What:** the one the
+  first (not released yet on top), one row per issue with its commits and what they affect, one row per read of Figma that changed a component
+  (tagged Figma: what changed in each), one row per decision (tagged Decision: what was ruled out, why, who) with the page it is
+  about. Chips (All, Code, Figma, Decisions, each when it has rows) filter it, each with its own address (`#history?show=decisions`). **What:** the one the
   message starts with (`#4521 - …`, or the team's own pattern, `changelog.ticket`: `"#\\d+|REL-\\d+"`); else the one the
   merge or pull request it came by closes ("Closes #45" in its title or description), said `via !12`; else that request
   (`!12` on GitLab, `PR #70` elsewhere); "No issue" only for a commit made straight on the branch. A link pattern read

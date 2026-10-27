@@ -3024,7 +3024,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // History: every change gathered by the release it shipped in, newest first, each a table of what was done and what
   // it affects: the code's commits, each read of Figma that changed what Figma says of a component, and what the team
   // decided in that time (a component, a pattern, a template, a foundation, the system), what it ruled out and why.
-  // Chips show the changes (the code's and Figma's, each row tagged with which), the decisions, or both.
+  // Chips show the code's changes, Figma's, the decisions, or all of them (each row tagged with which).
   var CHANGES = [];
   COMPONENTS.forEach(function (c) { (c.changelog || []).forEach(function (r) { CHANGES.push({ comp: c.name, r: r }); }); });
   // Everything the developers did, release by release (DATA.releaseLog: every commit, whatever it changed); without it,
@@ -3079,7 +3079,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         (first.length ? '<p class="sg-il-line">Read for the first time: ' + first.length + ' component' + (first.length === 1 ? '' : 's') + '.</p>' : '');
       var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short || '') + '</code>';
       var names = x.comps.map(function (c) { return c.name; }).sort();
-      return '<tr data-chip="figma" data-chip-group="changes"><td><p class="sg-il-line"><span class="sg-log-tag">Figma</span> <strong>' + esc(changed.length ? 'Figma changed' : 'Read from Figma') + '</strong></p>' + lines +
+      return '<tr data-chip="figma"><td><p class="sg-il-line"><span class="sg-log-tag">Figma</span> <strong>' + esc(changed.length ? 'Figma changed' : 'Read from Figma') + '</strong></p>' + lines +
         '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + ' on ' + esc(String(x.r.date).slice(0, 10)) + '</span></p></td><td>' +
         (names.length > 12 ? names.length + ' components' : names.map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>'; }).join(', ')) + '</td></tr>';
     };
@@ -3103,13 +3103,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var first = t.items[0].r, lead = t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">' + (first.request ? requestLink(first.request) : 'No issue') + '</span></p><p class="sg-il-line">';
         var affects = (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '') + (where.length ? (comps.length ? ' ' : '') + whereHTML(where) : '');
         var cell = lead + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>');
-        return '<tr data-chip="code" data-chip-group="changes"><td>' + cell.replace('<p class="sg-il-line">', '<p class="sg-il-line"><span class="sg-log-tag">Code</span> ') + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
+        return '<tr data-chip="code"><td>' + cell.replace('<p class="sg-il-line">', '<p class="sg-il-line"><span class="sg-log-tag">Code</span> ') + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     }).join('');
-    // Changes (the code's and Figma's), decisions or both: the page's chips when it has both, and a release with nothing
-    // of the kind chosen out of the way (read from the page itself: box is a var another page reuses).
-    var nChanges = box.querySelectorAll('tr[data-chip-group="changes"]').length;
-    if (nChanges && DECISIONS.length) pageBar(wn, { chips: [{ key: 'changes', label: 'Changes', n: nChanges }, { key: 'decisions', label: 'Decisions', n: DECISIONS.length }] });
+    // The code, Figma, the decisions or all: a chip for each kind the page has, when it has two, and a release with
+    // nothing of the kind chosen out of the way (read from the page itself: box is a var another page reuses).
+    var kinds = [['code', 'Code'], ['figma', 'Figma'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
+    if (kinds.length > 1) pageBar(wn, { chips: kinds });
     wn.addEventListener('sg-chip', function (e) { Array.prototype.forEach.call(e.currentTarget.querySelectorAll('.pg-inspect'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); }); });
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
@@ -7173,7 +7173,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   function changelogHTML(c) {
     var u = c.updated || {}, log = c.changelog || [], figma = c.figmaLog || [];
-    var card = function (head, rows, kind) { return '<div class="pg-inspect" data-hist="' + (kind || 'changes') + '"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>'; };
+    var card = function (head, rows, kind) { return '<div class="pg-inspect" data-hist="' + (kind || 'code') + '"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>'; };
     var link = function (r) { return r.url ? '<a class="sg-uses-link" href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>'; };
     var what = function (list) { return (list || []).length ? '<span class="pg-par-val">' + esc(list.join('; ')) + '</span>' : ''; };
     var day = function (d) { return '<span class="pg-log-date">' + esc(String(d).slice(0, 10)) + '</span>'; };
@@ -7187,9 +7187,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return '<tr><td>' + esc(d.what) + (d.ruledOut && d.ruledOut.length ? '<br><span class="pg-dim">ruled out: ' + esc(d.ruledOut.join(', ')) + '</span>' : '') + '</td><td>' +
         (d.why ? esc(d.why) + ' ' : '') + '<span class="pg-dim">' + esc(d.said + (d.by ? ', ' + d.by : '')) + '</span>' + (d.at ? ' ' + day(d.at) : '') + '</td></tr>';
     }).join('');
-    var out = (dec ? card('Decisions', dec, 'decisions') : '') + (fig ? card('Figma', fig) : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
-    // Its changes (Figma's and the code's) and its decisions: chips, as the History page has, when it has both.
-    var hist = dec && (fig || u.uncommitted || log.length) ? '<p class="pg-par-sum"><span class="sg-chips" role="group" aria-label="Show">' + [['all', 'All'], ['changes', 'Changes'], ['decisions', 'Decisions']].map(function (x) { return '<button type="button" class="sg-chip" data-hist="' + x[0] + '" aria-pressed="' + (x[0] === 'all') + '">' + x[1] + '</button>'; }).join('') + '</span></p>' : '';
+    var out = (dec ? card('Decisions', dec, 'decisions') : '') + (fig ? card('Figma', fig, 'figma') : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
+    // Its code, Figma and its decisions: chips, as the History page has, for each kind it has when it has two.
+    var has = [['code', 'Code', log.length || u.uncommitted], ['figma', 'Figma', fig], ['decisions', 'Decisions', dec]].filter(function (x) { return x[2]; });
+    var hist = has.length > 1 ? '<p class="pg-par-sum"><span class="sg-chips" role="group" aria-label="Show">' + [['all', 'All']].concat(has).map(function (x) { return '<button type="button" class="sg-chip" data-hist="' + x[0] + '" aria-pressed="' + (x[0] === 'all') + '">' + x[1] + '</button>'; }).join('') + '</span></p>' : '';
     if (!log.length) return hist + '<div class="pg-cards">' + out + areaInfo('No commit has changed it yet, or the project is not in git.') + '</div>';
 
     // Its code: every commit that changed it, by the release it shipped in (newest first), each linked, with its pull
