@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { availableParallelism } from 'node:os';
 import { budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -53,9 +54,12 @@ const runOne = (command) => new Promise((done) => {
 test('no command of the engine ever answers with a stack trace', { timeout: budget(240000) }, async () => {
   const left = [...COMMANDS];
   const results = [];
-  // A few at a time: the whole list one after another is minutes of gate for a guard that is only about reaching
-  // each command's own code.
-  await Promise.all(Array.from({ length: 5 }, async () => { while (left.length) results.push(await runOne(left.shift())); }));
+  // A few at a time, by what the machine has: the whole list one after another is minutes of gate for a guard that is
+  // only about reaching each command's own code, and five at a time starved the browser test in the same run until it
+  // read an empty page. The runner already has every test file going at once; this is on top of that, so it takes a
+  // quarter of the machine and no more.
+  const atOnce = Math.max(2, Math.round(availableParallelism() / 4));
+  await Promise.all(Array.from({ length: atOnce }, async () => { while (left.length) results.push(await runOne(left.shift())); }));
   const fell = results.filter((r) => FELL_OVER.test(r.out));
   assert.deepEqual(fell.map((r) => `${r.command}: ${(r.out.match(FELL_OVER) ?? [''])[0].trim().slice(0, 80)}`), [], 'a command fell over');
   const stuck = results.filter((r) => r.timedOut);
