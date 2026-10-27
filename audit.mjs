@@ -696,7 +696,7 @@ if (process.argv.includes('--intent-changes')) {
   process.exit(0);
 }
 
-// ── --review-drafts [decisions.json]: a person's review of the drafted lines in the intent layer ──
+// ── --review-drafts [decisions.json | --approve|--change|--drop <page> <line> [<to>]]: a person's review of the drafts ──
 // With no file, lists every draft (its page, its section, its text). With a file of decisions ({ page, line, do:
 // approve | change | drop, to }), makes them in the layer's own files: an approved line loses its **Draft:** marker,
 // a changed one takes its new text (checked against the system first), a dropped one is deleted. Written to
@@ -712,14 +712,21 @@ if (process.argv.includes('--review-drafts')) {
   if (!snap?._source?.sha) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run again.'); process.exit(2); }
   const withDrafts = snap.entities.filter((e) => (e.drafts ?? []).length);
   const at = process.argv.indexOf('--review-drafts'), given = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? resolve(process.argv[at + 1]) : null;
-  if (!given) {
+  // One decision on the command line, as each page's drafts in the style guide give it: --approve|--drop <page> [<line>]
+  // (every draft on the page without one), --change <page> <line> <new text>.
+  const one = ['approve', 'change', 'drop'].map((d) => [d, process.argv.indexOf(`--${d}`)]).find(([, i]) => i > 0);
+  const inline = one ? [{ do: one[0], page: process.argv[one[1] + 1], line: process.argv[one[1] + 2], ...(one[0] === 'change' ? { to: process.argv[one[1] + 3] } : {}) }] : null;
+  // Without a line, an approval or a drop is for every draft on the page; a change always names its line.
+  if (inline && (!inline[0].page || (one[0] === 'change' && (!inline[0].line || !inline[0].to)))) { console.log(`❌ --${one[0]} takes the page${one[0] === 'change' ? ', the draft\'s words and the new words' : ', and the draft\'s words for one draft only'} (rms-design-system-engine --review-drafts lists them).`); process.exit(2); }
+  if (inline && !inline[0].line) delete inline[0].line;
+  if (!given && !inline) {
     if (!withDrafts.length) { console.log('✅ No drafts to review in the intent layer.'); console.log('NEXT: none'); process.exit(0); }
     console.log(`📝 ${withDrafts.reduce((t, e) => t + e.drafts.length, 0)} drafts to review on ${withDrafts.length} page${withDrafts.length === 1 ? '' : 's'}:`);
     for (const e of withDrafts) { console.log(`\n${e.name} (${e.file})`); for (const d of e.drafts) console.log(`  · ${d.where}: "${d.text}"`); }
     console.log('\nNEXT: ask the person what to do with each (approve, change or drop); write their decisions as [{ "page", "line", "do", "to" }] in a file and run --review-drafts <file>; never decide for them.');
     process.exit(0);
   }
-  let decisions; try { const j = JSON.parse(readFileSync(given, 'utf8')); decisions = Array.isArray(j) ? j : j.decisions ?? []; } catch (e) { console.log(`❌ ${relative(ROOT, given) || given}: ${e.message}`); process.exit(2); }
+  let decisions = inline; if (!decisions) try { const j = JSON.parse(readFileSync(given, 'utf8')); decisions = Array.isArray(j) ? j : j.decisions ?? []; } catch (e) { console.log(`❌ ${relative(ROOT, given) || given}: ${e.message}`); process.exit(2); }
   const facts = truth.systemFacts(ROOT, pcfg, { record: false });
   const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
   const forEntity = new Map([...il.matchComponents(names, snap.entities, il.codeFilesOf(ROOT, pcfg))].map(([n, e]) => [e, n]));
@@ -750,7 +757,7 @@ if (process.argv.includes('--review-drafts')) {
     console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
     process.exit(0);
   }
-  console.log('NEXT: read the changes; to send them: rms-design-system-engine --review-drafts <file> --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
+  console.log(`NEXT: read the changes; to send them: the same command with --commit (straight on the layer's branch) or --merge-request${inline ? '' : ' (rms-design-system-engine --review-drafts <file> --commit)'}, only when the person asks`);
   process.exit(0);
 }
 

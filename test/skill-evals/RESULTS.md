@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: One decision for a page's drafts, the drafts grouped by section and each once; a card head never rests on its own first line (continuous evaluation)
+
+What changed since the entry below (engine a49be49): A protected branch on GitLab takes a merge request with no token too (#76); The contracts in DSDS 0.23 too, for a team that documents its system in that format (#77); The product's own screens are reviewed as pages too (#78); A brand that sets a value as it inherits it is named: it pins the value (#79); One log of what the team decided, so nobody proposes a rejected option twice (#81); Every claim says where it comes from: verified, reported or not checked (#80); A page's drafts sit under the task that asks for them, each with its decisions' commands; One decision for a page's drafts, the drafts grouped by section and each once; a card head never rests on its own first line. The guide changed in `reference/usage.md`.
+
+Guide set measured: `694e54f305b7` · Project measured: `13d811a9d668`
+
+| Haiku, engine 37ce80b | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.060 |
+| Input a run | 134k | 120k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 134k. Records: `records/2026-10-27-one-decision-for-a-page`.
+
 ## 2026-10: The guide tells the agent about the rules sweep, the tiers, the colour pairs, the decisions log and where it may write (continuous evaluation)
 
 What changed since the entry below (engine a49be49, whose own commit was rewritten by the rebases behind this
