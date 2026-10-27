@@ -5334,6 +5334,17 @@ function reportFull(label, items, shown) {
     } catch { /* advisory: never fails */ }
   }
 
+  // ── The Showroom's screens, read as pages (advisory) ─────────────────────────
+  // The product's own screens, built with the system, get the review a page in the code gets (showroom-quality.mjs):
+  // one main action, nothing destructive in front, no card in a card, headings in order. Silent with no Showroom.
+  if (!ONLY) {
+    try {
+      const sq = await import('./showroom-quality.mjs');
+      const lines = sq.showroomQualityLines(await sq.showroomQuality(ROOT, cfg));
+      if (lines.length) { console.log(''); for (const l of lines) console.log(C.yellow(l)); }
+    } catch { /* advisory: never fails */ }
+  }
+
   // ── Every combination of modes (advisory) ──────────────────────────────────
   _section('advice');
   // Each switch is checked on its own by the gates; this turns every combination on at once (Dark on a phone), in the
