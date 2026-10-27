@@ -215,7 +215,9 @@ test('--figma-edits lists each edit on the demo design system, and the engine ne
   const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
   const dir = mkdtempSync(join(tmpdir(), 'figma-edits-cli-'));
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true, filter: (p) => !/node_modules|\.design-system-engine-out|\.git(\/|$)/.test(p) });
-  const out = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--figma-edits'], { cwd: dir, encoding: 'utf8', timeout: 100000 });
+  // Run as a person runs it: on CI (CI set) the engine never writes the design file, and says so instead of asking.
+  const { CI: _ci, ...asPerson } = process.env;
+  const out = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--figma-edits'], { cwd: dir, encoding: 'utf8', timeout: 100000, env: asPerson });
   assert.doesNotMatch(out, /❌|is not defined|Cannot read/, out.slice(0, 400));
   // What each edit is, named: the evaluation holds an agent to saying these, so the engine owes them.
   assert.match(out, /field: a textbox/);
