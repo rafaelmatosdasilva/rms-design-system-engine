@@ -7,6 +7,7 @@ import { figmaWriteVerdict } from '../guard.mjs';
 import { route } from '../route.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { budget } from './helpers.mjs';
 import { tmpdir } from 'node:os';
 
 test('the role a component has in code, read from its markup', () => {
@@ -199,4 +200,26 @@ test('a project that never lets the engine write Figma gets the list and no scri
   assert.match(editLines(edits, { may: 'yes' }).join('\n'), /^NEXT: run /m);
   assert.match(editLines(edits, { may: 'ask' }).join('\n'), /and ask; only when they say yes/);
   assert.equal(writeFigmaEdits(dir, edits, { may: 'ask' }).script !== null, true);
+});
+
+// The command itself, run end to end on the demo design system. Every test above reads the pure functions, and a
+// broken command still printed nothing but an error: a run that reaches the engine and comes back with "cfg is not
+// defined" scores as a run, so an evaluation reads it as the agent's fault rather than the engine's. This is the
+// cheapest guard there is against that.
+test('--figma-edits lists each edit on the demo design system, and the engine never falls over', { timeout: budget(120000) }, async () => {
+  const { mkdtempSync, cpSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname } = await import('node:path');
+  const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
+  const dir = mkdtempSync(join(tmpdir(), 'figma-edits-cli-'));
+  cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true, filter: (p) => !/node_modules|\.design-system-engine-out|\.git(\/|$)/.test(p) });
+  const out = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--figma-edits'], { cwd: dir, encoding: 'utf8', timeout: 100000 });
+  assert.doesNotMatch(out, /❌|is not defined|Cannot read/, out.slice(0, 400));
+  // What each edit is, named: the evaluation holds an agent to saying these, so the engine owes them.
+  assert.match(out, /field: a textbox/);
+  assert.match(out, /chip: Figma says togglebutton, the code renders a button/);
+  assert.match(out, /^NEXT: show the person the/m, 'with no answer recorded, the project is asked before Figma is changed');
+  assert.equal(existsSync(join(dir, '.design-system-engine-out', 'handback', 'figma-apply.js')), true);
 });

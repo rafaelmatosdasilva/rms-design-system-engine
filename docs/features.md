@@ -368,6 +368,10 @@ Describe a screen in your own words and get it made only of your design system's
 
 Measured on twelve prototype requests, Claude alone made 17 of 36 right with Opus and 3 of 36 with Haiku. With the engine, 36 of 36 and 35 of 36 ([case study](../CASE-STUDY.md)).
 
+**Handing one over.** A prototype is usually handed over by sending someone the file, and they read it to work out what it uses, where each component lives and what is still open. `--handoff` writes that as one page beside the prototype: what it is made of, what the design system lacked for it, and what is unresolved. It measures nothing new, and it is written whether or not the page is ready - a page that is not ready is exactly the one someone else needs the facts about.
+
+**What you said about it, kept with it.** A prototype is reviewed by someone saying what is wrong, usually in a chat window nobody reads again - and the agent that changes the page next gets the request and the findings, but not the one thing that matters most: what the person who asked for it said when they saw it. `--comment` keeps that beside the prototype, pinned to a component when it is about one, and every later run shows what nobody has answered yet. Closing a comment records what changed because of it.
+
 What to ask is in [Prototypes and building](commands.md#prototypes-and-building) on the Commands page.
 
 ### What you get
