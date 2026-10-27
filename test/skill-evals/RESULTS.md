@@ -1,6 +1,5 @@
 # Skill evaluation results
 
-<<<<<<< HEAD
 ## 2026-10: The evidence convention, short enough for the guide's size limit (continuous evaluation)
 
 What changed since the entry below (engine e170521): The rules an agent reads come in tiers, and the more specific one wins (#71); Documentation page without downloads, Changelog last in the menu, table heads that stick cleanly in pages and side panels (#70); Every text and icon colour is given the surface it was made for, not a shortlist (#72); Every read through figma-cli is tried twice and says what figma-cli printed (#73); The icon gate reads icons kept as one SVG file each (#74); A stuck table head keeps its top line under a page's chip bar (#75); Every claim says where it comes from: verified, reported or not checked; The evidence convention, short enough for the guide's size limit. The guide changed in `rms-design-system-engine.md`.
@@ -45,7 +44,7 @@ Guide set measured: `6db433ef3358` · Project measured: `13d811a9d668`
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 130k a run against 125k. Records: `records/2026-10-27-a-request-that-asks-for`.
-=======
+
 ## 2026-10: Prototypes as a part, a handoff page, and what people say about a prototype (continuous evaluation)
 
 What changed since engine 74a632e, the baseline this and the entry below were both measured from: prototypes became a store part of their own; --handoff writes what a developer needs on one page; --comment keeps what a person said about a page beside it. The guide changed in `reference/config.md`, `reference/usage.md`.
@@ -62,7 +61,6 @@ Guide set measured: `4591dec0d7da` · Project measured: `13d811a9d668`
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 131k. Records: `records/2026-10-27-what-a-person-said-about`.
->>>>>>> 5cba9b4 (The evaluation for the three prototype changes)
 
 ## 2026-10: A store's README says how its style guide is updated when no pipeline builds it (continuous evaluation)
 
