@@ -1286,13 +1286,21 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       };
       const found = new Map(view.components.map((c) => [c.name, where(c)]));
       const logs = changelogs(ROOT, view.components.map((c) => ({ name: c.name, ...found.get(c.name) })));
-      // Each read of Figma that changed what it says of a component, from the snapshots the project commits.
-      const figmaLogs = figmaChangelogs(ROOT, { props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json', vars: cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json' }, view.components.map((c) => c.name));
+      // Each read of Figma that changed what it says of a component, from the snapshots the project commits; a team
+      // that keeps them in a store (stores.snapshots) has that history in the store's commits instead.
+      const snaps = { props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json', vars: cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json' };
+      let figmaLogs = figmaChangelogs(ROOT, snaps, view.components.map((c) => c.name));
+      if (!Object.keys(figmaLogs).length) {
+        const sh = await import('./snapshot-history.mjs');
+        const filled = await sh.fillSnapshotHistory(ROOT, cfg, snaps, { offline: opts.offline });
+        if (filled.line) console.log('   ⚠️  ' + filled.line);
+        figmaLogs = sh.storeFigmaChangelogs(ROOT, view.components.map((c) => c.name));
+      }
       for (const c of view.components) {
         const w = found.get(c.name);
         // Each commit with the ticket it was made for (the team's own unit of work), so the changelog groups by it.
         c.changelog = (logs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha), prUrl: prUrl(repo, r.pr), ...(ticketOf(r.subject, cfg, ROOT) ?? {}) }));
-        c.figmaLog = (figmaLogs[c.name] ?? []).map((r) => ({ ...r, url: commitUrl(repo, r.sha) }));
+        c.figmaLog = (figmaLogs[c.name] ?? []).map((r) => ({ ...r, url: r.url ?? commitUrl(repo, r.sha) }));
         const extra = Array.isArray(authored[c.name]?.links) ? authored[c.name].links.filter((l) => l?.url) : [];
         c.links = [
           { label: 'Figma', url: figmaLink(cfg.figmaFileKey, ids[c.name]) },

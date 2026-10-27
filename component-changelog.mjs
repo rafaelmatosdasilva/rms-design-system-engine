@@ -132,7 +132,7 @@ export function ruleChanges(patch = [], { most = 4 } = {}) {
 
 // What Figma says of a component in one read of its snapshots: its properties (type, options, default) and its own
 // variables (named after it) in every mode. → { props: { name: 'type: options · default' }, vars: { 'mode name': value } }
-function figmaOf(props, vars, name) {
+export function figmaOf(props, vars, name) {
   const p = {}, v = {};
   for (const [k, e] of Object.entries(props?.[name]?.properties ?? {})) p[k.replace(/#[\d:]+$/, '')] = [e?.type, (e?.variantOptions ?? []).join(', '), typeof e?.defaultValue === 'object' ? null : e?.defaultValue].filter((x) => x != null && x !== '').join(' · ');
   for (const [mode, map] of Object.entries(vars ?? {})) {
@@ -141,7 +141,7 @@ function figmaOf(props, vars, name) {
   }
   return { props: p, vars: v, known: !!props?.[name] };
 }
-function figmaDiff(a, b, { most = 4 } = {}) {
+export function figmaDiff(a, b, { most = 4 } = {}) {
   const out = [];
   if (!a.known && b.known) return ['read from Figma for the first time'];
   // A property only written another way (show-icon → Show Icon) is renamed, not removed and added.
