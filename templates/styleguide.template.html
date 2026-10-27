@@ -788,7 +788,7 @@ a.pg-usage-name { color: var(--sg-text); }
 .pg-par-card + .pg-par-card { margin-top: var(--sg-card-gap); }
 .pg-par-card[hidden], .pg-par-table tr[hidden] { display: none; }
 .pg-par-card .pg-par-table th { background: var(--sg-bg-2); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
-.pg-par-card .pg-par-table tr:last-child td { border-bottom: none; }
+.pg-par-card .pg-par-table tr:last-child td, .pg-par-card .pg-par-table tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) td { border-bottom: none; }   /* the last row shown, when a chip hides the rows after it */
 .pg-par-card .pg-par-table tr:first-child > th:first-child { border-top-left-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)); }   /* stuck, the head keeps its card's top corners */
 .pg-par-card .pg-par-table tr:first-child > th:last-child { border-top-right-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)); }
 .pg-par-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--sg-m); }
@@ -888,7 +888,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
   .pg-par-table, .pg-par-table tbody, .pg-par-table tr, .pg-par-table td { display: block; width: auto; }
   .pg-par-table tr { padding: var(--sg-space-m); border-bottom: var(--sg-line); min-height: var(--sg-row-h); }
   .pg-par-table td { height: auto; }
-  .pg-par-card .pg-par-table tr:last-child { border-bottom: none; }
+  .pg-par-card .pg-par-table tr:last-child, .pg-par-card .pg-par-table tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) { border-bottom: none; }
   .pg-par-table td, .pg-par-table .pg-par-type, .pg-par-table .pg-par-at { border-bottom: none; padding: var(--sg-space-xs) 0; white-space: normal; overflow-wrap: break-word; min-width: 0; }
   .pg-par-table td:first-child { font-weight: var(--sg-heading-weight); color: var(--sg-text); padding-bottom: var(--sg-space-xs); }
   .pg-par-table td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
@@ -1605,7 +1605,7 @@ table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where 
 /* A colour inside a link pill, wherever the pill is (a table, a panel): the same small circle. */
 .sg-link-pill > .sg-token-swatch { flex: none; width: var(--sg-space-l); height: var(--sg-space-l); margin: 0; border-radius: 50%; }
 .sg-tk-facts th[scope="row"] { width: 30%; position: static; background: none; font-weight: var(--sg-text-weight); color: var(--sg-muted); }
-.sg-tk-facts tr:last-child > * { border-bottom: 0; }   /* the card's own edge closes it */
+.sg-tk-facts tr:last-child > *, .sg-tk-facts tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) > * { border-bottom: 0; }   /* the card's own edge closes it */
 .sg-tk-code-line { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sg-space-s); }   /* its name and Copy on one line */
 .sg-tk-alias > .sg-tk-mark { width: var(--sg-space-l); height: var(--sg-space-l); }
 .sg-tk-table tr[data-token] { cursor: pointer; }   /* the whole row opens the token's details, as a Status row opens its component */
@@ -1715,7 +1715,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 :is(.pg-inspect-head, .pg-code-head, .pg-stage-bar, .pg-variant-row) { padding-left: var(--sg-cell-x); padding-right: var(--sg-cell-x); }
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
-.pg-inspect tr:last-child td { border-bottom: none; }
+.pg-inspect tr:last-child td, .pg-inspect tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) td { border-bottom: none; }   /* the last row shown, when a chip hides the rows after it */
 /* The Changelog's tables: the issue (its commits under it) first, then what it affects; named in a head. */
 .sg-log th { text-align: left; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
 /* Its head stays in view under the card's head as the rows scroll by, as a token table's does, drawing its own line. */

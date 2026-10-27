@@ -1671,3 +1671,8 @@ test('History: a card with no code says it came after the last release and the d
   assert.doesNotMatch(tpl, /Read for the first time: ' \+ first\.length/, 'the components read for the first time are named, not counted');
   assert.match(tpl, /rows\.sort\(function \(a, b\) \{ return when\(b\.at\) - when\(a\.at\); \}\);/, 'decisions, reads of Figma and issues in one order, newest first');
 });
+
+test('a table filtered by a chip closes on the card\'s own edge: the last row shown has no line under it', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  for (const box of ['.pg-inspect', '.pg-par-card .pg-par-table', '.sg-tk-facts']) assert.ok(tpl.includes(`${box} tbody tr:not([hidden]):not(:has(~ tr:not([hidden])))`), box);
+});
