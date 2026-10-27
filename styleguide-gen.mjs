@@ -830,6 +830,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const list = decidedBy.get(key(c.name));
         if (list?.length) c.decisions = list.map((d) => ({ what: d.what, ruledOut: d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said }));
       }
+      // Every decision, for the History page: what it is about (a component, or a page of the layer), and where it is written.
+      view.decisions = decided.all.map((d) => ({ what: d.what, ruledOut: d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, kind: d.kind,
+        component: d.component ?? null, page: d.page ?? null, about: d.about ?? (d.component ? 'Components' : 'System'), url: d.url ?? null }));
     } catch { /* no prototype checked yet */ }
     // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
     // --contracts-out through a merge request): its Contract button opens it on GitLab, and its Documentation says what it

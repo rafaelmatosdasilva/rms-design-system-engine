@@ -761,6 +761,54 @@ if (process.argv.includes('--review-drafts')) {
   process.exit(0);
 }
 
+// ── --decision <about> "<what was decided>" [--ruled-out "<option>"]… [--why "<reason>"]: a decision, in the intent layer ──
+// Written on the page it is about (a component's, a pattern's, a template's, a foundation's) under its Decisions
+// heading, as one line a person reads (decisions.mjs). Written to .design-system-engine-out/intent-changes/ to read
+// first; --commit or --merge-request sends it, only when the person asks. --decisions lists every decision recorded.
+if (process.argv.includes('--decision') || process.argv.includes('--decisions')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const il = await import('./intent-layer.mjs'), ch = await import('./intent-changes.mjs'), dl = await import('./decisions.mjs');
+  if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+  const snap = il.readIntentLayer(ROOT, pcfg);
+  if (!snap?._source?.sha) { console.log('❌ No intent layer read yet. Decisions are written in it: ds-config.json → intentLayer, then run again.'); process.exit(2); }
+  if (process.argv.includes('--decisions')) {
+    const log = dl.gatherDecisions(ROOT).all;
+    if (!log.length) { console.log('No decision recorded yet. Record one: rms-design-system-engine --decision <what it is about> "<what was decided>" --ruled-out "<option>" --why "<reason>"'); console.log('NEXT: none'); process.exit(0); }
+    console.log(`🧭 ${log.length} decision${log.length === 1 ? '' : 's'}, newest first:`);
+    for (const d of log) console.log(`  ${String(d.at ?? '').slice(0, 10).padEnd(10)}  ${d.page ?? d.component ?? 'The system'}: ${dl.decisionLine({ ...d, by: null, at: null })} (${dl.KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''})`);
+    console.log('NEXT: none'); process.exit(0);
+  }
+  const at = process.argv.indexOf('--decision'), subject = process.argv[at + 1], decided = process.argv[at + 2];
+  const vals = (flag) => process.argv.flatMap((x, i) => (x === flag && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? [process.argv[i + 1]] : []));
+  if (!subject || subject.startsWith('--') || !decided || decided.startsWith('--')) { console.log('❌ --decision takes what it is about and what was decided: rms-design-system-engine --decision <what it is about> "<what was decided>" --ruled-out "<option>" --why "<reason>"'); process.exit(2); }
+  const { decidedBy } = await import('./decided-by.mjs');
+  const line = dl.decisionLine({ what: decided, ruledOut: vals('--ruled-out'), why: vals('--why')[0] ?? null, by: decidedBy(ROOT), at: new Date().toISOString().slice(0, 10) });
+  const access = ch.layerAccess(ROOT, pcfg);
+  if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
+  let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+  const plan = ch.decisionPlan(snap, subject, line, files, { codes: Object.values(il.codeFilesOf(ROOT, pcfg)) });
+  if (plan.error) { console.log(`❌ ${plan.error}.`); process.exit(2); }
+  const summary = `A decision on ${plan.page}, in ${plan.file}.\n\n- ${line}\n`;
+  const dir = ch.writeLocal(ROOT, plan.files, summary);
+  console.log(`🧭 ${line}\n   on ${plan.page} (${plan.file}) → ${relative(ROOT, dir)} (CHANGES.md says it)`);
+  const message = `Intent layer: a decision on ${plan.page}\n\n${line}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
+  for (const how of ['commit', 'merge-request']) {
+    if (!process.argv.includes('--' + how)) continue;
+    const may = await ch.mayWrite(ROOT, pcfg, how);
+    if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the change is in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person where the change is.'); process.exit(0); }
+    const done = how === 'commit'
+      ? await ch.commitToBranch(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, message })
+      : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/decision-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: a decision on ${plan.page}`, description: summary, message });
+    if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
+    console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
+    console.log('NEXT: the decision reaches agents on the next run; the style guide shows it in History.');
+    process.exit(0);
+  }
+  console.log('NEXT: read the change; to send it: the same command with --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
+  process.exit(0);
+}
+
 // ── --contracts-out <dir>: the component contracts, published for a shared repository (an intent layer) ──
 // Only what belongs in a shared repository: one contract per code file, the schema, and a README. No token values,
 // no catalog, no copy of the intent layer's own text. Contracts the code no longer has are removed. Nothing is pushed.

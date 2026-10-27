@@ -16,6 +16,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { projectPath } from './names.mjs';
+import { readIntentLayer, systemNames, matchComponents, codeFilesOf } from './intent-layer.mjs';
 
 // What each kind of decision is called where a person reads it, and whether it rules an option out for an agent.
 export const KINDS = {
@@ -25,6 +26,7 @@ export const KINDS = {
   debt: { said: 'accepted for now', rules: false },
   checked: { said: 'checked by hand', rules: false },
   written: { said: 'written by the team', rules: true },
+  layer: { said: 'written in the intent layer', rules: true },
 };
 
 const trim = (s, n = 300) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : t; };
@@ -32,7 +34,7 @@ const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // Every decision in one shape, whatever file it came from.
 // → { component, kind, what, ruledOut: [string], why, by, at, from }
-export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [] } = {}) {
+export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [] } = {}) {
   const out = [];
   const add = (d) => { if (d.what) out.push({ component: null, ruledOut: [], why: null, by: null, at: null, ...d, what: trim(d.what), why: d.why ? trim(d.why) : null }); };
 
@@ -56,6 +58,8 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
   for (const d of debt) add({ component: d.component ?? null, kind: 'debt', what: d.label ?? d.what ?? d.key, why: d.reason ?? null, by: d.by, at: d.at, from: 'the accepted differences' });
   for (const c of checked) add({ component: c.component ?? c.name ?? null, kind: 'checked', what: c.what ?? `${c.component ?? c.name} checked against its design`, why: c.reason ?? null, by: c.by, at: c.at, from: 'the checks made by hand' });
   for (const w of written) add({ ...w, kind: 'written', from: w.from ?? 'DECISIONS.md' });
+  // Written on the page of the intent layer it is about, under its Decisions heading (the team's own record).
+  for (const l of layer) add({ ...l, kind: 'layer', from: l.from ?? 'the intent layer' });
 
   return out.sort((a, b) => String(b.at ?? '').localeCompare(String(a.at ?? '')));
 }
@@ -88,7 +92,7 @@ export function gatherDecisions(ROOT, { gaps = null, writtenFile = 'DECISIONS.md
   const checked = Object.entries(checkedFile?.components ?? {}).map(([name, c]) => ({ name, ...(c ?? {}) }));
   const merged = gaps ?? json(join('.design-system-engine-out', 'prototypes', 'gaps.json'), {}).merged ?? [];
   const written = existsSync(resolve(ROOT, writtenFile)) ? writtenDecisions(readFileSync(resolve(ROOT, writtenFile), 'utf8'), writtenFile) : [];
-  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written }));
+  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written, layer: layerDecisions(ROOT) }));
 }
 
 // A DECISIONS.md the team wrote: each `## <heading>` a decision, the component when the heading names one, and a
@@ -131,4 +135,61 @@ export function decisionsMarkdown(view, { title = 'Decisions' } = {}) {
   }
   if (view.general.length) lines.push('## The system as a whole', '', ...view.general.map(one), '');
   return lines.join('\n') + '\n';
+}
+
+// ── Decisions written in the intent layer ──────────────────────────────────────────────────────────────────────────
+// A page of the layer (a component's, a pattern's, a template's, a foundation's, the system's own) holds what the team
+// decided about it under a Decisions heading, one line each, in words a person reads as they are:
+//
+//   - Chip has no Large size. Ruled out: a Large size. Why: no screen needs it. Decided by Rafael on 27 Oct 2026.
+//
+// --decision writes such a line on its page (through the layer's own review), and every reader here takes it.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dayOf = (iso) => { const d = new Date(iso); return isNaN(d) ? null : `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+const isoOf = (day) => { const d = new Date(String(day ?? '').trim() + ' UTC'); return isNaN(d) ? null : d.toISOString().slice(0, 10); };
+const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').replace(/^[\s.;]+|[\s.;]+$/g, '').trim();
+export const DECISIONS_TITLE = /^(decisions?|decided|design decisions)$/i;
+
+// One line split at its markers, whatever their order: what was decided, then Ruled out, Why and Decided by.
+export function parseDecision(text) {
+  let t = String(text ?? '').trim(), by = null, at = null;
+  const who = /\s*\bDecided(?: by (.+?))?(?: on (\d{1,2} \w+ \d{4}|\d{4}-\d{2}-\d{2}))?\.?\s*$/i.exec(t);
+  if (who && who.index > 0 && (who[1] || who[2])) { by = clean(who[1]) || null; at = who[2] ? (/^\d{4}-/.test(who[2]) ? who[2] : isoOf(who[2])) : null; t = t.slice(0, who.index); }
+  const marks = [['ruledOut', /\bRuled out:\s*/i], ['why', /\bWhy:\s*/i]].map(([k, re]) => { const m = re.exec(t); return m ? { k, at: m.index, len: m[0].length } : null; }).filter(Boolean).sort((a, b) => a.at - b.at);
+  const parts = {};
+  marks.forEach((m, i) => { parts[m.k] = t.slice(m.at + m.len, i + 1 < marks.length ? marks[i + 1].at : t.length); });
+  return { what: clean(t.slice(0, marks.length ? marks[0].at : t.length)), ruledOut: clean(parts.ruledOut ?? '').split(/\s*(?:;|,? or )\s*/).map(clean).filter(Boolean), why: clean(parts.why ?? '') || null, by, at };
+}
+
+// The line parseDecision reads back.
+export function decisionLine({ what, ruledOut = [], why = null, by = null, at = null }) {
+  const end = (x) => (/[.!?]$/.test(x) ? x : x + '.');
+  return [end(clean(what)), ruledOut.length ? end(`Ruled out: ${ruledOut.map(clean).join('; ')}`) : '', why ? end(`Why: ${clean(why)}`) : '',
+    by || at ? end(`Decided${by ? ` by ${clean(by)}` : ''}${at ? ` on ${dayOf(at)}` : ''}`) : ''].filter(Boolean).join(' ');
+}
+
+// What a page is about, in the words the History page filters by.
+const ABOUT = { components: 'Components', patterns: 'Patterns', templates: 'Templates', foundations: 'Foundations' };
+// Every decision the layer's pages hold. snap: the layer (intent-layer.mjs readIntentLayer); componentOf(entity) → the
+// component a component's page is about, by the system's own name. → [{ component, about, page, file, url, what, … }]
+export function layerDecisionsOf(snap, componentOf = () => null) {
+  const out = [];
+  const lines = (text) => String(text ?? '').split('\n').map((l) => l.replace(/^\s*(?:[-*•+]|\d+[.)])\s+/, '').trim()).filter(Boolean);
+  const add = (base, line) => { if (/^\*\*Draft:\*\*/i.test(line)) return; const d = parseDecision(line); if (d.what) out.push({ ...base, ...d }); };
+  for (const e of snap?.entities ?? []) {
+    if (e.kind === 'token') continue;
+    for (const line of e.decisions ?? []) add({ component: componentOf(e), about: ABOUT[e.layer] ?? 'Other', page: e.name, file: e.file ?? null, url: e.url ?? null }, line);
+  }
+  for (const s of snap?.system?.sections ?? []) if (DECISIONS_TITLE.test(String(s.title ?? '').trim())) for (const line of lines(s.text)) add({ component: null, about: 'System', page: 'The system', file: snap._source?.entry ?? null, url: null }, line);
+  return out;
+}
+// The same, read from the project: its layer as last read, each component page matched to its component.
+function layerDecisions(ROOT) {
+  try {
+    const cfg = JSON.parse(readFileSync(resolve(ROOT, 'ds-config.json'), 'utf8'));
+    const snap = readIntentLayer(ROOT, cfg);
+    if (!snap) return [];
+    const forEntity = new Map([...matchComponents(systemNames(ROOT, cfg), snap.entities, codeFilesOf(ROOT, cfg))].map(([n, e]) => [e, n]));
+    return layerDecisionsOf(snap, (e) => forEntity.get(e) ?? null);
+  } catch { return []; }
 }

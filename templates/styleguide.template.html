@@ -1622,6 +1622,7 @@ table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where 
 @media (max-width: 720px) { .sg-tk { grid-template-columns: 1fr; } .sg-tk-side { position: static; max-height: none; } .sg-tk-main { min-height: 0; } .sg-tk-groups { max-height: 40vh; } .sg-tk > .sg-tk-side { border-radius: var(--sg-radius) var(--sg-radius) 0 0; } .sg-tk > .sg-tk-main .sg-tk-table { border-left: var(--sg-line); border-radius: 0 0 var(--sg-radius) var(--sg-radius); border-top: 0; } }
 .sg-token-name, .sg-token-var { display: block; overflow-wrap: break-word; word-break: normal; }   /* a name breaks after a slash, never inside a word */
 .sg-token-var { margin-top: var(--sg-space-xxs); font-size: var(--sg-s); color: var(--sg-muted); }   /* the code's variable under Figma's name, quieter */   /* a mode a column: a narrow window scrolls the table sideways */
+.pg-inspect[hidden] { display: none; }
 .pg-inspect { border: var(--sg-line); border-radius: var(--sg-radius); overflow: clip; box-shadow: var(--sg-shadow); }
 .pg-inspect-head { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-cell-x); border-bottom: var(--sg-line); background: var(--sg-bg-2); }
 /* The Intent layer and For agents pages: a card's line under its head, and its rows read from the top. */
@@ -1680,6 +1681,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
+.sg-log-tag { display: inline-block; margin-right: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); color: var(--sg-muted); }   /* a decision among the changes */
 .sg-row-detail-body .sg-il-draft-text { margin-bottom: var(--sg-cell-x); }   /* the drafts, then what can be done with them, as much room between as at the card's sides */
 .sg-decide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--sg-space-l); align-items: start; margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* under them, the card's own side padding (its body's bottom padding is less) */   /* the three side by side, each as tall as it holds; under one another where there is no room */
 .sg-decide { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-m) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-decide-hue) 12%, transparent); }
@@ -1929,7 +1931,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     index: '<rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/>',
     health: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
     status: '<path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>',
-    changelog: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
+    history: '<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
     documentation: '<path d="M4 2h5.5L12 4.5V14H4Z"/><path d="M6 7h4M6 9.5h4M6 12h2.5"/>',
     colors: '<circle cx="8" cy="8" r="6"/><path d="M8 2v12M2.8 5h10.4M2.8 11h10.4"/>',
     typography: '<path d="M3 4V3h10v1M8 3v10M6 13h4"/>',
@@ -1953,7 +1955,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var START = (function () {
     if (/[?&]all\b/.test(location.search)) return null;   // ?all: every page shows
     var id = decodeURIComponent(location.hash.slice(1).split(/[\/?]/)[0] || '');
-    return !id || /^(documentation|coverage|todo|tasks|health)$/.test(id) ? 'status' : id === 'overview' ? 'index' : id === 'whats-new' ? 'changelog' : id;
+    return !id || /^(documentation|coverage|todo|tasks|health)$/.test(id) ? 'status' : id === 'overview' ? 'index' : id === 'whats-new' || id === 'changelog' ? 'history' : id;
   })();
   function section(id, badge, title, lead) {
     var s = document.createElement('section'); s.id = id; s.className = 'sg-section';
@@ -2169,7 +2171,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   if (!newest) (DATA.components || []).forEach(function (k) { (k.changelog || []).forEach(function (r) { if (r.release && (!newest || versionAfter(r.release, newest))) newest = r.release; }); });
   if (lfirst && newest) {
     var row = document.createElement('div'); row.className = 'sg-logo-row'; lhead.insertBefore(row, lfirst); row.appendChild(lfirst);
-    var vtag = document.createElement('a'); vtag.className = 'sg-logo-version'; vtag.href = '#changelog'; vtag.setAttribute('aria-label', 'Version ' + newest + ', changelog');
+    var vtag = document.createElement('a'); vtag.className = 'sg-logo-version'; vtag.href = '#history'; vtag.setAttribute('aria-label', 'Version ' + newest + ', changelog');
     vtag.innerHTML = '<span class="sg-status">' + esc(/^v/i.test(newest) ? newest : 'v' + newest) + '</span>';   // the page's tag, inside a plain link
     row.appendChild(vtag);
   }
@@ -3019,16 +3021,19 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     pageBar(td, { links: [{ label: 'Built ' + when + (eng ? ' · engine ' + eng : ''), url: eng && DATA.engineRepo ? DATA.engineRepo + '/commit/' + b.engine : '#status' }] });
   })();
   var hl = td, hlBox = document.createElement('div'); hlBox.className = 'sg-health-box'; td.appendChild(hlBox);
-  // Changelog: every component's changes gathered by the release they shipped in, newest first, each a table of
-  // the components it changed and what each change says, linked to its commit.
+  // History: every change gathered by the release it shipped in, newest first, each a table of what was done and what
+  // it affects: the code's commits, each read of Figma that changed what Figma says of a component, and what the team
+  // decided in that time (a component, a pattern, a template, a foundation, the system), what it ruled out and why.
+  // Chips show the code's changes, Figma's, the decisions, or all of them (each row tagged with which).
   var CHANGES = [];
   COMPONENTS.forEach(function (c) { (c.changelog || []).forEach(function (r) { CHANGES.push({ comp: c.name, r: r }); }); });
   // Everything the developers did, release by release (DATA.releaseLog: every commit, whatever it changed); without it,
   // the commits that changed a component, from the components' changelogs.
   var RLOG = DATA.releaseLog || [];
-  if (CHANGES.length || RLOG.length) {
-    hr(); navLink('changelog', 'changelog');
-    var wn = section('changelog', 'Changes', 'Changelog', '');
+  var DECISIONS = (DATA.decisions || []).slice();
+  if (CHANGES.length || RLOG.length || DECISIONS.length) {
+    hr(); navLink('history', 'history');
+    var wn = section('history', 'Changes', 'History', '');
     // The components each commit changed, from their changelogs.
     var compsOf = {};
     CHANGES.forEach(function (x) { var k = x.r.sha || x.r.subject, l = compsOf[k] = compsOf[k] || []; if (l.indexOf(x.comp) < 0) l.push(x.comp); });
@@ -3044,11 +3049,52 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       order.forEach(function (g) { g.commits.sort(newestFirst); });
     }
     order.sort(releaseOrder);
+    // Each decision in the release that shipped after it was made; one made since the last release, with the work not
+    // released yet.
+    DECISIONS.forEach(function (d) {
+      var at = String(d.at || '').slice(0, 10), home = null;
+      for (var i = order.length - 1; i >= 0; i--) if (order[i].k && order[i].on && String(order[i].on).slice(0, 10) >= at) { home = order[i]; break; }
+      if (!home) { home = order.filter(function (g) { return !g.k; })[0]; if (!home) { home = { k: '', on: '', at: at, commits: [] }; order.unshift(home); } }
+      (home.decisions = home.decisions || []).push(d);
+    });
+    // Each read of Figma that changed what it says of a component: one row a read (the commit that saved it), the
+    // components it changed and what changed in each, in the release that holds it. Its commit is not a code row too.
+    var FIGMA = {}, figmaReads = [];
+    COMPONENTS.forEach(function (c) { (c.figmaLog || []).forEach(function (r) {
+      var k = r.sha || r.subject, x = FIGMA[k];
+      if (!x) { x = FIGMA[k] = { r: r, comps: [] }; figmaReads.push(x); }
+      x.comps.push({ name: c.name, changed: r.changed || [] });
+    }); });
+    order.forEach(function (g) { g.commits = g.commits.filter(function (x) { return !FIGMA[x.r.sha || x.r.subject]; }); });
+    figmaReads.sort(newestFirst).forEach(function (x) {
+      var k = x.r.release || '', home = order.filter(function (g) { return g.k === k; })[0];
+      if (!home) { home = { k: k, on: x.r.releasedAt || '', at: String(x.r.date), commits: [] }; order.push(home); }
+      (home.figma = home.figma || []).push(x);
+    });
+    order = order.filter(function (g) { return g.commits.length || (g.figma || []).length || (g.decisions || []).length; });
+    order.sort(releaseOrder);
+    var figmaRow = function (x) {
+      var first = x.comps.filter(function (c) { return c.changed.length === 1 && /first time/.test(c.changed[0]); }), changed = x.comps.filter(function (c) { return first.indexOf(c) < 0; });
+      var lines = changed.map(function (c) { return '<p class="sg-il-line">' + esc(c.name) + ' <span class="pg-par-val">' + esc(c.changed.join('; ')) + '</span></p>'; }).join('') +
+        (first.length ? '<p class="sg-il-line">Read for the first time: ' + first.length + ' component' + (first.length === 1 ? '' : 's') + '.</p>' : '');
+      var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short || '') + '</code>';
+      var names = x.comps.map(function (c) { return c.name; }).sort();
+      return '<tr data-chip="figma"><td><p class="sg-il-line"><span class="sg-log-tag">Figma</span> <strong>' + esc(changed.length ? 'Figma changed' : 'Read from Figma') + '</strong></p>' + lines +
+        '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + ' on ' + esc(String(x.r.date).slice(0, 10)) + '</span></p></td><td>' +
+        (names.length > 12 ? names.length + ' components' : names.map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>'; }).join(', ')) + '</td></tr>';
+    };
+    var decisionRow = function (d) {
+      var about = d.component && COMPONENTS.some(function (c) { return c.name === d.component; }) ? '<a class="sg-uses-link" href="#' + esc(cid(d.component)) + '/history">' + esc(d.component) + '</a>'
+        : d.url ? '<a class="sg-uses-link" href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.page || d.about) + '</a>' : esc(d.page || d.component || 'The system');
+      return '<tr data-chip="decisions"><td><p class="sg-il-line"><span class="sg-log-tag">Decision</span> <strong>' + esc(d.what) + '</strong></p>' +
+        (d.ruledOut && d.ruledOut.length ? '<p class="sg-il-line">Ruled out ' + esc(d.ruledOut.join(', ')) + '.</p>' : '') + (d.why ? '<p class="sg-il-line">' + esc(capital(d.why).replace(/\.?$/, '.')) + '</p>' : '') +
+        '<p class="sg-il-line"><span class="pg-log-date">' + esc(capital(d.said) + (d.by ? ' by ' + d.by : '') + (d.at ? ' on ' + String(d.at).slice(0, 10) : '')) + '</span></p></td><td>' + about + '</td></tr>';
+    };
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
     box.innerHTML = order.map(function (g) {
       // One row per issue (the team's unit of work: its commits, whatever each changed), then what it affects: the
       // components its commits changed (none for a change outside them). A commit made for no issue is a row of its own.
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">Issue</th><th scope="col">Affects</th></tr></thead><tbody>' + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + releaseHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + (g.decisions || []).map(decisionRow).join('') + (g.figma || []).map(figmaRow).join('') + byTicket(g.commits, function (x) { return x.r; }).map(function (t) {
         var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
         // Where else its commits changed things, once each (the same part named by two commits of an issue: once).
         var where = [], seenW = {}; t.items.forEach(function (x) { (x.r.where || []).forEach(function (w) { var k = w.kind + ':' + w.label + ':' + (w.names || []).join(','); if (!seenW[k]) { seenW[k] = 1; where.push(w); } }); });
@@ -3056,9 +3102,15 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // straight on the branch says no issue.
         var first = t.items[0].r, lead = t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">' + (first.request ? requestLink(first.request) : 'No issue') + '</span></p><p class="sg-il-line">';
         var affects = (comps.length ? comps.sort().map(function (n) { return '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>'; }).join(', ') : '') + (where.length ? (comps.length ? ' ' : '') + whereHTML(where) : '');
-        return '<tr><td>' + lead + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>') + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
+        var cell = lead + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>');
+        return '<tr data-chip="code"><td>' + cell.replace('<p class="sg-il-line">', '<p class="sg-il-line"><span class="sg-log-tag">Code</span> ') + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     }).join('');
+    // The code, Figma, the decisions or all: a chip for each kind the page has, when it has two, and a release with
+    // nothing of the kind chosen out of the way (read from the page itself: box is a var another page reuses).
+    var kinds = [['code', 'Code'], ['figma', 'Figma'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
+    if (kinds.length > 1) pageBar(wn, { chips: kinds });
+    wn.addEventListener('sg-chip', function (e) { Array.prototype.forEach.call(e.currentTarget.querySelectorAll('.pg-inspect'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); }); });
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
   var leftHTML = function (list) { return list.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what || n.text)) + '</strong>' + (n.from ? '<span class="pg-par-val">' + esc(capital(n.from)) + '</span>' : '') + '</p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join(''); };
@@ -3629,8 +3681,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var sc = document.createElement('div'); sc.className = 'sg-screens'; iu.appendChild(sc);
     DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
   }
-  // The Changelog last in the System group: first the pages about the system as it is, then what changed in it.
-  (function () { var a = nav.querySelector('a[href="#changelog"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#in-use"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
+  // The History last in the System group: first the pages about the system as it is, then what changed in it and why.
+  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#in-use"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
 
   /* ── Every mode at once: a foundation's values in one column per mode (Phone, Tablet, Laptop, Desktop; Light, Dark) ── */
   // Each mode is the attributes that put it on an element (data-size="phone"), the system's own mode CSS reads them on
@@ -7077,6 +7129,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   // ── Built with: the system's components it is made of, each the card the overview shows (its own preview, drawn
   // small, and its name), linked to its page ──────────────────────────────────────────────────────────────────────────
+  // A component's History chips: its changes, its decisions, or both.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.sg-chip[data-hist]'); if (!b) return;
+    var area = b.closest('.pg-area'), k = b.getAttribute('data-hist'); if (!area) return;
+    Array.prototype.forEach.call(area.querySelectorAll('.sg-chip[data-hist]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    Array.prototype.forEach.call(area.querySelectorAll('.pg-inspect[data-hist]'), function (card) { card.hidden = k !== 'all' && card.getAttribute('data-hist') !== k; });
+    if (e.isTrusted) setHashQuery({ show: k });
+  });
   function builtWithHTML(c) {
     return '<div class="sg-card-grid">' + (c.uses || []).map(function (n) {
       return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : ' sg-card--own') + '" href="#' + esc(cid(n)) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';
@@ -7113,7 +7173,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   }
   function changelogHTML(c) {
     var u = c.updated || {}, log = c.changelog || [], figma = c.figmaLog || [];
-    var card = function (head, rows) { return '<div class="pg-inspect"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>'; };
+    var card = function (head, rows, kind) { return '<div class="pg-inspect" data-hist="' + (kind || 'code') + '"><div class="pg-inspect-head">' + head + '</div><table>' + rows + '</table></div>'; };
     var link = function (r) { return r.url ? '<a class="sg-uses-link" href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' + esc(r.short) + '</code></a>' : '<code>' + esc(r.short) + '</code>'; };
     var what = function (list) { return (list || []).length ? '<span class="pg-par-val">' + esc(list.join('; ')) + '</span>' : ''; };
     var day = function (d) { return '<span class="pg-log-date">' + esc(String(d).slice(0, 10)) + '</span>'; };
@@ -7127,15 +7187,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return '<tr><td>' + esc(d.what) + (d.ruledOut && d.ruledOut.length ? '<br><span class="pg-dim">ruled out: ' + esc(d.ruledOut.join(', ')) + '</span>' : '') + '</td><td>' +
         (d.why ? esc(d.why) + ' ' : '') + '<span class="pg-dim">' + esc(d.said + (d.by ? ', ' + d.by : '')) + '</span>' + (d.at ? ' ' + day(d.at) : '') + '</td></tr>';
     }).join('');
-    var out = (dec ? card('Decided', dec) : '') + (fig ? card('Figma', fig) : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
-    if (!log.length) return '<div class="pg-cards">' + out + areaInfo('No commit has changed it yet, or the project is not in git.') + '</div>';
+    var out = (dec ? card('Decisions', dec, 'decisions') : '') + (fig ? card('Figma', fig, 'figma') : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
+    // Its code, Figma and its decisions: chips, as the History page has, for each kind it has when it has two.
+    var has = [['code', 'Code', log.length || u.uncommitted], ['figma', 'Figma', fig], ['decisions', 'Decisions', dec]].filter(function (x) { return x[2]; });
+    var hist = has.length > 1 ? '<p class="pg-par-sum"><span class="sg-chips" role="group" aria-label="Show">' + [['all', 'All']].concat(has).map(function (x) { return '<button type="button" class="sg-chip" data-hist="' + x[0] + '" aria-pressed="' + (x[0] === 'all') + '">' + x[1] + '</button>'; }).join('') + '</span></p>' : '';
+    if (!log.length) return hist + '<div class="pg-cards">' + out + areaInfo('No commit has changed it yet, or the project is not in git.') + '</div>';
 
     // Its code: every commit that changed it, by the release it shipped in (newest first), each linked, with its pull
     // request and what it changed in the component's own rules.
     var groups = [], by = {};
     log.forEach(function (r) { var k = r.release || ''; if (!by[k]) { by[k] = { k: k, rows: [], at: String(r.date), on: r.releasedAt || '' }; groups.push(by[k]); } by[k].rows.push(r); });
     groups.sort(releaseOrder);
-    return '<div class="pg-cards">' + out + groups.map(function (g) {
+    return hist + '<div class="pg-cards">' + out + groups.map(function (g) {
       var k = g.k, rows = g.rows, first = rows[0], rel = k && first.url ? first.url.replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(k)) : null;
       // One row per ticket, each of its commits a line (what it says, its commit, its day, what it changed); a commit for
       // no ticket keeps its own row, its commit and pull request on the left.
@@ -7158,7 +7221,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // A text copied, the button says so for a moment and a screen reader hears it.
   // The address of a view, the area of a component after a / (#c-chip/accessibility), and after a ? the props of the
   // variant it shows (#c-chip?Size=L&Label=Save): each area has its own link to send someone to.
-  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'changelog' };
+  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'history' };
   // What a page shows is in its address, so a link opens it as it is: each filter chosen (show, st, the Tokens page's
   // coll, group, kind and q, a Showroom screen's kind) and the side panel open (panel=doc:<file> | row:<area>:<row>).
   // Written in place (no new history entry); a filter at its All and a panel closed leave nothing.
@@ -7173,7 +7236,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function whenThere(find, act, n) { var x = find(); if (x) act(x); else if ((n || 0) < 40) setTimeout(function () { whenThere(find, act, (n || 0) + 1); }, 100); }
   function hashParts() {
     var h = location.hash.slice(1), i = h.indexOf('?'), path = decodeURIComponent(i < 0 ? h : h.slice(0, i)), j = path.indexOf('/');
-    var slug = j < 0 ? '' : path.slice(j + 1), area = Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;
+    var slug = j < 0 ? '' : path.slice(j + 1), area = slug === 'changelog' ? 'log' : Object.keys(AREA_SLUG).find(function (k) { return AREA_SLUG[k] === slug; }) || null;   // a component's History was once its Changelog
     var id = j < 0 ? path : path.slice(0, j);
     // Documentation was once Coverage, then the Intent layer page: their links open it; with no page of its own (no
     // intent layer), the Status page's Documentation.
@@ -7181,7 +7244,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     if (id === 'overview') return { id: 'index', area: null, slug: '', q: null };   // the index was once Overview
     if (id === 'brand-kit') id = 'identity';   // Identity was once the brand kit
     if (id === 'todo' || id === 'tasks' || id === 'health') return { id: 'status', area: null, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };   // the page was once To do, then Tasks and Health
-    return { id: id === 'whats-new' ? 'changelog' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
+    return { id: id === 'whats-new' || id === 'changelog' ? 'history' : id, area: area, slug: slug, q: i < 0 ? null : new URLSearchParams(h.slice(i + 1)) };
   }
   function copyText(text, btn, said, saidText) {
     var label = function (t) { var leaf = btn.querySelector('*') || btn; leaf.textContent = t; }, was = (btn.querySelector('*') || btn).textContent;
@@ -7225,7 +7288,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // width, where the system's own media queries apply. The one chosen stays for the next component.
   // The widths Figma sets for each breakpoint mode (a viewport width variable), else the common phone, tablet and desktop.
   var WIDTHS = [['fit', 'Fit']].concat((DATA.widths || []).length ? DATA.widths.map(function (w) { return [w.value, w.label, w.px]; }) : [['phone', 'Phone', 375], ['tablet', 'Tablet', 768], ['desktop', 'Desktop', 1280]]), WIDTH = 'fit';
-  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['parity', 'Parity'], ['a11y', 'Accessibility'], ['docs', 'Documentation'], ['motion', 'Motion'], ['api', 'Code'], ['built', 'Built with'], ['used', 'Used in'], ['products', 'Products'], ['log', 'Changelog']], AREA = 'play';
+  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['parity', 'Parity'], ['a11y', 'Accessibility'], ['docs', 'Documentation'], ['motion', 'Motion'], ['api', 'Code'], ['built', 'Built with'], ['used', 'Used in'], ['products', 'Products'], ['log', 'History']], AREA = 'play';
   // The props whose options are its variants (two or more built), in Figma's order.
   function variantProps(c) { return (c.controls || []).filter(function (p) { return p.type === 'VARIANT' && (p.options || []).filter(function (o) { return !o.unbuilt; }).length > 1; }); }
   // What the Variants area shows: each variant prop's options, and each on/off prop the code builds as off and on.
@@ -8312,8 +8375,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // The props set are the Playground's: only its address carries them; another area's address is the area alone.
       var onPlay = !areaNow || areaNow === 'play';
       // Another area keeps what its own address says: its filter and the panel open in it (st, panel).
-      if (!onPlay) { var now = hashParts(); if (now.area === areaNow && now.q) ['st', 'panel'].forEach(function (k) { if (now.q.get(k)) q.push(k + '=' + encodeURIComponent(now.q.get(k)).replace(/%2F/g, '/').replace(/%3A/g, ':')); }); }
-      var keep = onPlay ? q : q.filter(function (x) { return /^(st|panel)=/.test(x); });
+      if (!onPlay) { var now = hashParts(); if (now.area === areaNow && now.q) ['st', 'show', 'panel'].forEach(function (k) { if (now.q.get(k)) q.push(k + '=' + encodeURIComponent(now.q.get(k)).replace(/%2F/g, '/').replace(/%3A/g, ':')); }); }
+      var keep = onPlay ? q : q.filter(function (x) { return /^(st|show|panel)=/.test(x); });
       return '#' + sec.id + (onPlay ? '' : '/' + AREA_SLUG[areaNow]) + (keep.length ? '?' + keep.join('&') : '');
     }
     // Kept as the variant changes, without a new step in the browser's history; only while this view is the one shown.
@@ -9886,6 +9949,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function route() {
     if (!location.hash || /^#(index|overview)$/.test(location.hash)) { if (homeId() !== 'index') history.replaceState(null, '', location.search + '#' + homeId()); }
     else if (/^#(documentation|coverage|intent-layer|for-agents)$/.test(location.hash)) history.replaceState(null, '', location.search + (document.getElementById('documentation') ? '#documentation' : '#status/documentation'));   // the address says where it lives now: the Documentation page, else (no intent layer) the Status page's
+    else if (/^#(changelog|whats-new)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#history' + location.hash.replace(/^#(changelog|whats-new)/, ''));   // History was once the Changelog
     else if (/^#brand-kit([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#identity' + location.hash.replace(/^#brand-kit/, ''));   // Identity was once the brand kit
     else if (/^#(todo|tasks|health)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', '#status' + location.hash.replace(/^#(todo|tasks|health)/, ''));   // the page was once To do, then Tasks and Health
     var at = hashParts(), id = at.id || homeId(), built = !!document.getElementById(id);
@@ -9903,7 +9967,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // The filter and the panel the address names, once they are drawn: the page bar's chip (show), a Showroom screen's
     // kind of note (kind), the side panel (panel).
     var qWant = function (k) { return at.q && at.q.get(k); };
-    if (qWant('show')) whenThere(function () { return target.querySelector('.sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
+    if (qWant('show')) whenThere(function () { return target.querySelector('.sg-todo-head .sg-chip[data-chip="' + qWant('show') + '"], .pg-area:not([hidden]) .sg-chip[data-hist="' + qWant('show') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
     if (qWant('kind')) whenThere(function () { return target.querySelector('.sg-showroom-filter .sg-chip[data-v="' + qWant('kind') + '"]'); }, function (c) { if (c.getAttribute('aria-pressed') !== 'true') c.click(); });
     var panelWant = qWant('panel'), openPanel = document.querySelector('.sg-comp-panel:not([hidden])');
     if (panelWant && !(openPanel && openPanel._open && openPanel._key === panelWant)) whenThere(function () {

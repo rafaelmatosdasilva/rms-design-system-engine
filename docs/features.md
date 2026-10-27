@@ -280,7 +280,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Motion | Everything that moves in it, the code's timing beside Figma's |
 | Built with | The system's components it is made of |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
-| Changelog | Each Figma change and each code commit, by release, with links |
+| History | Each Figma change and each code commit, by release, with links, and what the team decided about it |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
 
@@ -422,9 +422,13 @@ A project that says never gets the list of Figma changes and no script to run. A
 
 Every decision somebody makes is recorded where it is made: a difference kept on purpose with its reason, a proposal answered yes or no, a difference accepted for now, a component checked by hand, a need nothing in the system fitted with what was looked at and why. Nothing gathered them, so a decision was only ever seen by whoever ran the command that made it.
 
-Now they come together in one log, shown beside each component's Changelog and written to `DECISIONS.md` in the output folder. A `DECISIONS.md` your team wrote by hand is read as one more source and never rewritten.
+Now they come together in one log, written to `DECISIONS.md` in the output folder. A `DECISIONS.md` your team wrote by hand is read as one more source and never rewritten.
 
-The part that pays is what agents get. A card now carries what was already ruled out and why: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
+A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#tokens-and-changes) and it writes the line for you to read first, and sends it to the layer only when you ask.
+
+The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma and what was decided, each row tagged Code, Figma or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
+
+The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 
 ### Your rules, read against each other
 
