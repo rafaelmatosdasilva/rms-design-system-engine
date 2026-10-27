@@ -15,6 +15,7 @@
 // Transcripts are never copied (they stay in results/, gitignored). Rescore and summarize read the copies as they read
 // results/.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readingLine } from './reading.mjs';
 import { homedir } from 'node:os';
 import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,6 +64,12 @@ export function runStats(rows = []) {
     // touched it. A number here means the ceiling wants raising, not that the skill got worse.
     limits: rows.filter((r) => r.limit).length,
     limited: rows.filter((r) => r.limit).map((r) => `${r.task} #${r.run}: ${r.limit}`),
+    // Runs that reached an engine which fell over. The same reasoning as the ceiling above, from the other side: the
+    // agent did everything right, got a stack back, and was marked down for what the engine failed to say. A number
+    // here means the measurement is about the engine, and reading it as the guide is how 66/70 was believed once.
+    fell: rows.filter((r) => r.fell).length,
+    fellOver: rows.filter((r) => r.fell).map((r) => `${r.task} #${r.run}: ${r.fell.said} (${r.fell.command})`),
+    rows,
     failed: rows.flatMap((r) => [...(r.checks ?? []), ...(r.rules ?? [])].filter((c) => !c.ok).map((c) => `${r.task} #${r.run}: ${c.name}${c.detail ? ` (${c.detail})` : ''}`)),
     engine: [...new Set(rows.map((r) => r.engineHash))].join(', '), project: rows[0]?.project ?? '',
   };
@@ -85,11 +92,17 @@ export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', gu
     out.push(`| Input a run | ${b ? k(b.input) : '-'} | ${k(s.input)} |`);
     out.push(`| Rule violations | ${b ? b.violations : '-'} | ${s.violations} |`);
     if (s.limits || b?.limits) out.push(`| Runs stopped at a limit | ${b ? b.limits ?? 0 : '-'} | ${s.limits} |`);
+    if (s.fell || b?.fell) out.push(`| Runs that reached an engine that fell over | ${b ? b.fell ?? 0 : '-'} | ${s.fell} |`);
     out.push('');
     const lower = b && s.pass / s.runs < b.pass / b.runs;
     reading.push(s.pass === s.runs && !s.violations
       ? `${MODEL_NAME(model)}: every task passes and no rule is broken${b ? `; runs read ${k(s.input)} a run against ${k(b.input)}` : ''}.`
       : `${MODEL_NAME(model)}: ${s.runs - s.pass} of ${s.runs} runs failed${lower ? ', fewer passes than the entry below' : ''}${s.violations ? `, ${s.violations} rule violation${s.violations === 1 ? '' : 's'}` : ''}${s.limits ? `, and ${s.limits} of them never finished: ${s.limited.slice(0, 3).join('; ')} — read those as the ceiling, not the guide` : ''}. Failed: ${s.failed.slice(0, 6).join('; ')}.`);
+    // What actually changed, task by task: a count that moved by one is a task that passes sometimes, not a
+    // difference. Said after the failures, because it is what a person should act on.
+    if (b?.rows?.length && s.rows?.length) reading.push(readingLine(b.rows, s.rows));
+    // And loudest of all, because it says the measurement is not about the guide at all.
+    if (s.fell) reading.push(`${s.fell} run${s.fell === 1 ? '' : 's'} reached an engine that fell over (${s.fellOver.slice(0, 3).join('; ')}): this measures the engine, not the guide. Fix it and measure again.`);
   }
   out.push(`**Reading.** ${reading.join(' ')} Records: \`records/${name}\`.`, '');
   return out.join('\n');

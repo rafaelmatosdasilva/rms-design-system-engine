@@ -85,6 +85,9 @@ export function figmaRolesScore(ctx) {
   ];
 }
 
+// Every task here guards something the engine already does: a failure is a regression, never a measurement of a
+// skill still being built, and one failing run is one too many. A task that measures something in progress says so
+// with `kind: 'capability'` (reading.mjs), and then its number is a direction of travel rather than a verdict.
 export const DEV = [
   { id: 'audit-chip', prompt: 'audit the chip',
     score: (ctx) => [check('scoped to the chip', scoped(ctx, 'chip')), check('names the 36 vs 32 combination', COMBO.test(ctx.all))] },
