@@ -1681,15 +1681,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
 .sg-row-detail-body .sg-il-draft-text { margin-bottom: var(--sg-cell-x); }   /* the drafts, then what can be done with them, as much room between as at the card's sides */
-.sg-decide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--sg-space-l); align-items: start; margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* under them, the card's own side padding (its body's bottom padding is less) */   /* the three side by side, each as tall as it holds; under one another where there is no room */
-.sg-decide { display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-decide-hue) 12%, transparent); }
+.sg-decide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--sg-space-l); align-items: start; margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* under them, the card's own side padding (its body's bottom padding is less) */   /* the three side by side, each as tall as it holds; under one another where there is no room */
+.sg-decide { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-m) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-decide-hue) 12%, transparent); }
 .sg-decide--approve { --sg-decide-hue: #2e7d32; } .sg-decide--change { --sg-decide-hue: #b26a00; } .sg-decide--drop { --sg-decide-hue: var(--sg-danger); }   /* the page's own hues, only as a tint: the words stay the page's */
 :where(:root)[data-sg-scheme="dark"] .sg-decide--approve { --sg-decide-hue: #6fcf75; } :where(:root)[data-sg-scheme="dark"] .sg-decide--change { --sg-decide-hue: #f0b35a; }
-.sg-decide-head { display: flex; align-items: center; gap: var(--sg-space-s); color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.sg-decide-head { display: flex; align-items: center; gap: var(--sg-space-s); margin-right: auto; color: var(--sg-text); font-weight: var(--sg-heading-weight); }   /* its mark and name, the button at the other end */
 .sg-decide .sg-decide-mark { color: var(--sg-decide-hue); }   /* the mark takes the card's hue; the words keep the page's */
-.sg-decide-says { margin: 0; color: var(--sg-muted); }
-.sg-decide-do { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sg-space-s); }
-.sg-decide-said { color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-decide-said { flex-basis: 100%; color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-decide-said:empty { display: none; }   /* where to paste it, on its own line once copied */
 .sg-decide-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); }   /* a decision's mark, there to tell the three apart at a glance */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
@@ -3200,9 +3199,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // What Change copies is a request, not a command with blanks: Claude Code asks which draft and the words.
       var change = one ? 'Change the draft on ' + who + '\'s intent layer page ("' + line + '"): ask me for my words, then run ' + cmd('change', ' ' + shq(line) + ' ' + shq('<my words>'))
         : 'Change one of the ' + n + ' drafts on ' + who + '\'s intent layer page (' + page + '): ask me which one and my words, then run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>'));
-      // Three decisions side by side, each its own card: a mark, what it does in one sentence of the same length as the
-      // others', and one button that copies it for Claude Code. Each card is as tall as what it holds.
-      var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong><p class="sg-decide-says">' + esc(says) + '</p><div class="sg-decide-do">' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div></div>'; };
+      // Three decisions side by side, each its own card on one line: its mark, its name, and the button that copies it for
+      // Claude Code. What it does is the button's tip, for whoever wants it.
+      var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div>'; };
       return '<div class="sg-il-draft"><div class="sg-il-draft-text">' + groups.map(function (g) {
           return '<p class="sg-il-line"><strong>Proposed ' + (g.lines.length === 1 ? 'draft' : 'drafts') + ' · ' + esc(g.where) + '</strong>' + g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('') + '</p>';
         }).join('') + '</div><div class="sg-decide-grid">' +

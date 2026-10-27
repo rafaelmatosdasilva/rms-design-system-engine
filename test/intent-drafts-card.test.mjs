@@ -15,7 +15,7 @@ test('the drafts are in the What to do card, grouped by section, each once, then
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), shq = (x) => `'${x}'`, decideMark = (k) => `<mark-${k}>`;
   const sysButton = (tag, label, attrs) => `<button${attrs}>${label}</button>`;
   const ilDrafts = new Function('esc', 'shq', 'decideMark', 'sysButton', `return (${src})`)(esc, shq, decideMark, sysButton);
-  const cards = (html) => [...html.matchAll(/<div class="sg-decide sg-decide--(\w+)"><strong class="sg-decide-head"><mark-\w+>([^<]+)<\/strong><p class="sg-decide-says">([^<]+)<\/p><div class="sg-decide-do"><button data-il-copy="([^"]*)" data-il-said="([^"]+)">([^<]+)<\/button>/g)].map((m) => ({ k: m[1], head: m[2], says: m[3], copy: m[4], said: m[5], label: m[6] }));
+  const cards = (html) => [...html.matchAll(/<div class="sg-decide sg-decide--(\w+)" title="([^"]+)"><strong class="sg-decide-head"><mark-\w+>([^<]+)<\/strong><button data-il-copy="([^"]*)" data-il-said="([^"]+)">([^<]+)<\/button>/g)].map((m) => ({ k: m[1], says: m[2], head: m[3], copy: m[4], said: m[5], label: m[6] }));
   const html = ilDrafts({ name: 'actionBar', file: 'specs/action-bar.dsds.json', drafts: [
     { where: 'Limitations', text: 'Does not show loading by itself.' },
     { where: 'Limitations', text: 'Takes at most two buttons.' },
@@ -32,7 +32,7 @@ test('the drafts are in the What to do card, grouped by section, each once, then
   assert.equal(c[2].copy, "rms-design-system-engine --review-drafts --drop 'specs/action-bar.dsds.json'");
   assert.match(c[1].copy, /^Change one of the 3 drafts on actionBar's intent layer page \(specs\/action-bar\.dsds\.json\): ask me which one and my words, then run rms-design-system-engine --review-drafts --change/, 'a request Claude Code acts on, never a command with blanks');
   const lengths = c.map((x) => x.says.length);
-  assert.ok(Math.max(...lengths) - Math.min(...lengths) <= 3, `one sentence each, of the same length (${lengths})`);
+  assert.ok(Math.max(...lengths) - Math.min(...lengths) <= 3, `what each does, in its tip, of the same length (${lengths})`);
   // One draft: the decisions said for one, the sentences still even.
   const c1 = cards(ilDrafts({ name: 'error', file: 'e.json', drafts: [{ where: 'Limitations', text: 'Use an inline error.' }] }));
   assert.deepEqual(c1.map((x) => x.head), ['Approve', 'Change', 'Drop']);
