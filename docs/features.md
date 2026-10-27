@@ -54,6 +54,7 @@ The engine reads what your design system defines in Figma, its tokens and each c
 
 - **Tokens.** Colours, sizes, fonts, shadows and durations, in every mode (Light and Dark, Desktop and Phone).
 - **Components.** Props, defaults and options, every state (hover, focus, pressed, disabled, selected), heights, spacing, corners and markup.
+- **Slots.** A Figma slot is paired with the code's slot of the same word (Figma's slotBody is the code's sheet-body), and an on/off that shows it with the slot being filled. When each side has one slot named otherwise, they are paired and the name difference is said.
 - **Icons.** From the shared set, drawn the same way as in Figma, whether the code keeps them in one sprite or as one SVG file each (Figma's icons matched to the files by Code Connect's links).
 - **Motion and effects.** How each component moves, and what it draws beyond its colours (both below).
 - **Product screens.** Where each product puts each component (below).
@@ -139,6 +140,10 @@ Some faults show only when a screen uses the component, before any difference wi
 - **Read once.** A prop read only when the component appears, so a screen cannot open, close or change it afterwards.
 - **Line breaks lost.** A description or a message shown on one line, its new lines gone.
 - **Takes HTML in one, text in another.** The same prop in one family, bold and line breaks working in one component and not in its sibling.
+- **Hides more than in Figma.** An on/off that hides only its own part in Figma (a drop area) also hides the label or the helper in the code.
+- **Shrinks what Figma stretches.** A slot Figma stretches what is put in it to its width, where the code's column draws it at its own width.
+
+Dates are read too: a helper that writes a date in a format your intent layer's writing rules do not give, a month written with a capital the rules write in lowercase, or two helpers that write the same month two ways. Said for the whole system, with the helper and its line.
 
 Each is on the component's page and on the Tasks page, with the fix. They are advice, never a failed check: whether to change the component is your team's call.
 
@@ -339,6 +344,7 @@ Agents read your guidelines and Figma's descriptions to pick and use each compon
 - **Where you see it.** In each component's Documentation area, one row per piece (Example; Properties, done, naming the contract file that holds them; Names that do not exist; beside What it is and When to use), and on the Status page's tasks under Documentation while something is missing.
 - **A test with a model, when you ask.** A model answers questions from your guidance alone, such as the options of each property, and the engine scores the answers against the real ones. It uses your model tokens.
 - **The whole document** gets a class too, from how many of its components are ready.
+- **What a screen meets first.** Each component's Documentation area also asks what its page leaves open at the edges: what it does when its content does not fit (it scrolls, wraps, is cut or grows), and, for a component with two actions, what it shows with one. Asked only where it applies, and no more once the page says it.
 
 ### Foundations
 

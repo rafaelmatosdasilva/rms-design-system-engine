@@ -938,9 +938,13 @@ is visible; the engine only surfaces it, the designer decides; totals each run, 
 `--code-drift`; each component's line names its props); **component code** (`component-faults.mjs`: what a screen
 runs into in a Vue component's own file, read without running it, each with its line: an element no rule styles, a
 modifier class with no rule, one click firing an event twice, a slot repeated by a `v-for` with nothing passed, a prop
-read only when mounted, a longer text prop whose line breaks are lost, and a prop that takes HTML in one component of a
-folder and text in another; a part it imports to draw itself, such as a base picked at run time, is read as its own; the
-code's to fix, on the component's page and the Tasks page); and **token layering** (a structure-agnostic check: it imposes no
+read only when mounted, a longer text prop whose line breaks are lost, a prop that takes HTML in one component of a
+folder and text in another, an on/off that hides more than Figma's (the parts another Figma on/off shows, read from the
+structure snapshot's toggles), and a slot Figma stretches its content in that sits in a column of the code drawing it at
+its own width; a part it imports to draw itself, such as a base picked at run time, is read as its own; the
+code's to fix, on the component's page and the Tasks page); **writing rules** (`writing-formats.mjs`: each date helper
+of the code, as its moment/dayjs format, against the formats the intent layer's writing rules give (`d mmm yyyy`) and
+how their examples write the month; a date for a machine, `YYYY-MM-DD`, is left alone; said for the whole system); and **token layering** (a structure-agnostic check: it imposes no
 tier model, only measures the DS's own aliasing rate and, when references are the DS's norm, surfaces
 the few tokens that hold a raw value instead); **token contrast** (computes WCAG contrast from the token
 values, per mode, and flags pairs below AA; a no-browser complement to the render a11y gate. Pairs are

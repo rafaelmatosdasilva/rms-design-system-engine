@@ -22,6 +22,8 @@ export const WRITE = {
   values: 'Say what each allowed value means, in its code comment or on its intent layer page, not only that it is allowed.',
   keyboard: 'Say what Tab, Enter, Space, Escape and the arrow keys do in it, on its intent layer page.',
   apart: 'Say what each one is for on both intent layer pages, in words the other page does not use.',
+  overflow: 'Say what it does when its content does not fit (it scrolls, wraps, is cut with an ellipsis or grows, and up to what size), on its intent layer page.',
+  oneAction: 'Say what it shows with one action only (which button stays, how wide and where), on its intent layer page.',
 };
 
 // What the keyboard behaviour of a component is said with. An agent asked "what does Enter do here?" finds nothing
@@ -29,6 +31,11 @@ export const WRITE = {
 const KEYS = /\b(tab|shift ?\+ ?tab|enter|return|space(bar)?|escape|esc|arrow|up and down|left and right|home|end|page ?up|page ?down|keyboard|focus(es|ed)? (moves|returns|goes))\b/i;
 // A component whose keyboard behaviour is the browser's own: nothing to write, and asking for it would be noise.
 const NO_KEYS = /^(icon|image|img|avatar|badge|chip|tag|divider|separator|spacer|skeleton|spinner|progress|text|heading|title|label|caption|logo|illustration|thumbnail|surface|card)/i;
+// The edges a screen meets first and a page rarely says: content that does not fit, and one action where there are two.
+const FITS = /\b(scroll(s|ing|able)?|overflow(s)?|truncat\w*|ellipsis|wraps?|wrapping|max(imum)?[- ]?(height|width|lines?)|line[- ]clamp|clamp(ed)?|does ?n[o']t fit|too long|long (text|content|labels?|titles?)|grows?|expands? to fit)\b/i;
+const ONE = /\b(one|single|only one|a lone|just one) (button|action|cta)s?\b|\bone[- ]button\b|\bwithout (a |the )?(secondary|second|left|cancel) (button|action)\b/i;
+// Props that each give a button or an action of its own (buttonPrimaryLabel, secondaryAction, leftButtonParams).
+const ACTION = /(button|action|cta)/i;
 // Two components an agent will confuse: names alike to the eye, as a reader skimming a list sees them.
 const alike = (a, b) => {
   const x = a.toLowerCase().replace(/[^a-z0-9]/g, ''), y = b.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -79,6 +86,15 @@ export function docCoverage(page, context = null) {
       const text = [k?.purpose, k?.guidelines, il.purpose, ...(il.whenToUse ?? []), ...(il.rules ?? []), ...(il.limitations ?? []), ...(il.mistakes ?? [])].join(' ');
       check(KEYS.test(text) || KEYS.test([...(c.commentWords ?? [])].join(' ')), { kind: 'keyboard', what: name, why: `nothing says what the keyboard does in ${name}` });
     }
+    // What it does when its content does not fit: asked where it holds content (a slot, a longer text, a list).
+    if (il) {
+      const text = [k?.purpose, k?.guidelines, il.purpose, ...(il.whenToUse ?? []), ...(il.whenNotToUse ?? []), ...(il.rules ?? []), ...(il.limitations ?? []), ...(il.mistakes ?? [])].join(' ');
+      const holds = (c.slots?.named ?? []).length || c.slots?.default || Object.entries(c.props ?? {}).some(([p, d]) => /description|content|message|body|items|list|rows|options/i.test(p) || /array/i.test(String(d?.type ?? '')));
+      if (holds) check(FITS.test(text) || FITS.test([...(c.commentWords ?? [])].join(' ')), { kind: 'overflow', what: name, why: `nothing says what ${name} does when its content does not fit` });
+      // One action where it takes two or more: which stays, how wide, where.
+      const actions = Object.keys(c.props ?? {}).filter((p) => ACTION.test(p));
+      if (actions.length >= 2) check(ONE.test(text), { kind: 'oneAction', what: name, why: `nothing says what ${name} shows with one action only` });
+    }
     for (const e of c.events ?? []) check(named(e) || defines('events', e), { kind: 'event', what: e, why: `nothing says when ${e} is sent or what it carries` });
     for (const sl of c.slots?.named ?? []) check(named(sl) || defines('slots', sl), { kind: 'slot', what: sl, why: `nothing says what goes in the ${sl} slot` });
     components[name] = { missing, asked, said: 0, total: 0 };
@@ -116,8 +132,8 @@ export function coverageLines(cov, { top = 25 } = {}) {
   for (const [name, c] of list.slice(0, top)) {
     const by = {};
     for (const m of c.missing) (by[m.kind] = by[m.kind] ?? []).push(m.what);
-    const LABEL = { prop: 'props', event: 'events', slot: 'slots', fields: 'lists with nothing on what they hold', field: 'fields the product gives', values: 'values nothing helps choose between', apart: 'nothing tells these apart' };
-    out.push(`  ${name}: ${Object.entries(by).map(([k, v]) => (LABEL[k] ? `${LABEL[k]} ${v.slice(0, 6).join(', ')}${v.length > 6 ? ` +${v.length - 6}` : ''}` : `no ${k}`)).join(' · ')}`);
+    const LABEL = { overflow: 'nothing on content that does not fit', oneAction: 'nothing on one action only', prop: 'props', event: 'events', slot: 'slots', fields: 'lists with nothing on what they hold', field: 'fields the product gives', values: 'values nothing helps choose between', apart: 'nothing tells these apart' };
+    out.push(`  ${name}: ${Object.entries(by).map(([k, v]) => (LABEL[k] ? `${LABEL[k]}${v.every((x) => x === name) ? '' : ` ${v.slice(0, 6).join(', ')}${v.length > 6 ? ` +${v.length - 6}` : ''}`}` : `no ${k}`)).join(' · ')}`);
   }
   if (list.length > top) out.push(`  … and ${list.length - top} more (the Documentation page lists each)`);
   return out;

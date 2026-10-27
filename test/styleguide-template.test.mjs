@@ -1698,3 +1698,8 @@ test('History: a read of Figma is a release of the design, a card of its own: a 
   assert.match(many, /<button data-pills-more>2 more<\/button>$/, 'the rest one click away, with the system\'s button');
   assert.match(tpl, /order\.sort\(function \(a, b\) \{ return dayOf\(b\) - dayOf\(a\) \|\| releaseOrder\(a, b\); \}\);/, 'the code\'s releases and the reads of Figma in one order, newest first');
 });
+
+test('a table filtered by a chip closes on the card\'s own edge: the last row shown has no line under it', () => {
+  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  for (const box of ['.pg-inspect', '.pg-par-card .pg-par-table', '.sg-tk-facts']) assert.ok(tpl.includes(`${box} tbody tr:not([hidden]):not(:has(~ tr:not([hidden])))`), box);
+});

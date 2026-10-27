@@ -339,7 +339,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
 
     // Which code prop or slot it is: one decision for the prop check and the contract (prop-binding.mjs). An
     // INSTANCE_SWAP (e.g. an icon) is NOT assumed to be a slot: the code may expose it as a prop OR a slot.
-    const b = bindFigmaProp(fp, def, { codeProps: api.props, slots: api.slots, recorded, authoredSlots: cbind.slot });
+    const b = bindFigmaProp(fp, def, { codeProps: api.props, slots: api.slots, recorded, authoredSlots: cbind.slot, figmaSlots: [...figDefs].filter(([, d]) => d?.type === 'SLOT').map(([n]) => n) });
     if (def?.type === 'INSTANCE_SWAP') {
       if (!b) { SLOT_FAIL.push(`${figmaName}: Figma instance-swap "${fp}" has no code prop or slot  (${rel})`); pushRow('not in code', '-', 'missing'); continue; }
       if (b.as === 'defaultSlot') { OK.push(`${figmaName}/${fp} (default slot)`); pushRow('(default slot)', 'slot', 'match'); continue; }
@@ -348,6 +348,13 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
       if (b.source === 'name' && !b.exactName) { NAME_FAIL.push(`${figmaName}/${fp}: the code names ${kind === 'slot' ? 'its slot' : 'it'} "${b.code}" (${nameDiff(fp, b.code)})  (${rel})`); pushRow(b.code, kind, 'name'); continue; }
       OK.push(b.source === 'name' ? `${figmaName}/${fp} (${kind})` : `${figmaName}/${fp} → ${b.code} (${kind}, ${b.source === 'authored' && kind === 'slot' ? 'contract' : 'alias'})`);
       pushRow(b.code, kind, 'match'); continue;
+    }
+    // A Figma slot and the code's slot for it, or the on/off that shows it (the code shows a slot when it is filled).
+    if (b && (b.as === 'slot' || b.as === 'defaultSlot' || b.as === 'slotShown')) {
+      const where = b.as === 'defaultSlot' ? '(default slot)' : b.code;
+      if (!b.exactName && b.as === 'slot') { NAME_FAIL.push(`${figmaName}/${fp}: the code's only slot is "${b.code}" (${nameDiff(fp, b.code)})  (${rel})`); pushRow(b.code, 'slot', 'name'); continue; }
+      OK.push(`${figmaName}/${fp} → ${where} (${b.as === 'slotShown' ? 'shown when filled' : 'slot'})`);
+      pushRow(b.as === 'slotShown' ? `(shown when ${where} is filled)` : where, b.as === 'slotShown' ? 'slot filled' : 'slot', 'match'); continue;
     }
     // A name the project recorded for this prop (contract.authored.json bindings, componentPropAliases, its Code
     // Connect file) is the agreed one: it is read before the letter-case comparison, so Disabled bound to "disabled" is
