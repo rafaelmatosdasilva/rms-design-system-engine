@@ -875,8 +875,9 @@ export async function captureWithFigmaCli(ROOT, cfg = {}, { run = figmaCliEval(R
 }
 // One script through figma-cli. A call that fails (Safe Mode's plugin can drop one, right after a snapshot or while it
 // reconnects) is tried once more after a pause, so one dropped call does not end a capture; the error says what
-// figma-cli printed, which in Safe Mode is on stdout, stderr left empty.
-export function figmaCliEval(ROOT, { spawn = spawnSync, pause = (ms) => new Promise((r) => setTimeout(r, ms)), retryMs = 5000 } = {}) {
+// figma-cli printed, which in Safe Mode is on stdout, stderr left empty. Every read through figma-cli goes through here
+// (the capture, the examples, the brands, a screen's layout), so none of them loses a failure.
+export function figmaCliEval(ROOT, { spawn = spawnSync, pause = (ms) => new Promise((r) => setTimeout(r, ms)), retryMs = 5000, timeout = 120000 } = {}) {
   const lastLine = (s) => String(s ?? '').trim().split('\n').map((l) => l.trim()).filter(Boolean).slice(-1)[0];
   return async (code) => {
     const file = join(tmpdir(), `rms-capture-${process.pid}-${Date.now()}.js`);
@@ -885,7 +886,7 @@ export function figmaCliEval(ROOT, { spawn = spawnSync, pause = (ms) => new Prom
       let why = null;
       for (let attempt = 0; attempt < 2; attempt++) {
         if (attempt) await pause(retryMs);
-        const r = spawn('figma-cli', ['eval', '--file', file], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
+        const r = spawn('figma-cli', ['eval', '--file', file], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1e8, timeout });
         if (!r.error && r.status === 0) return r.stdout;
         why = r.error?.message ?? lastLine(r.stderr) ?? lastLine(r.stdout) ?? `exit ${r.status}`;
       }

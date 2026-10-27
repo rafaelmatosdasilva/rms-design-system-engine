@@ -145,7 +145,7 @@ export async function compareShowroom(ROOT, cfg, pageFile, { refresh = false, to
   let screens = []; try { screens = readdirSync(dir).filter((f) => /\.vue$/.test(f)).map((f) => f.replace(/\.vue$/, '')); } catch { /* none */ }
   if (!screens.length) return { results: {}, next: [], why: 'no Showroom screen' };
   if (!existsSync(pageFile)) return { results: {}, next: [], why: `no built style guide at ${relative(ROOT, pageFile)}` };
-  const cli = (script) => spawnSync('figma-cli', ['eval', script], { encoding: 'utf8', maxBuffer: 1e8, timeout: 600000 }).stdout ?? '';
+  const cli = (await import('./figma-capture.mjs')).figmaCliEval(ROOT, { timeout: 600000 });
   let cliOk = null;
   const metas = {}, layouts = {}, next = [];
   for (const k of screens) {
@@ -156,13 +156,13 @@ export async function compareShowroom(ROOT, cfg, pageFile, { refresh = false, to
       const node = /node-id=(\d+)[-:](\d+)/.exec(meta.figma ?? '');
       if (!node) continue;
       const id = `${node[1]}:${node[2]}`;
-      if (cliOk == null) cliOk = /^\s*1\s*$/m.test(cli('return 1'));
+      if (cliOk == null) cliOk = /^\s*1\s*$/m.test(spawnSync('figma-cli', ['eval', 'return 1'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '');
       if (!cliOk) { const f = join(dir, `${k}.figma-layout.js`); writeFileSync(f, layoutCaptureScript(id)); next.push(`run ${relative(ROOT, f)} with the Figma tool of this session on the file that holds the screen (in parts: from, count) and save what it returns as ${relative(ROOT, file)}`); continue; }
       try {
         const out = { texts: [], instances: [] };
-        for (let from = 0; from != null;) { const r = cli(layoutCaptureScript(id, { from, count: 80 })); const d = JSON.parse(r.slice(r.indexOf('{'), r.lastIndexOf('}') + 1)); out.texts.push(...d.texts); out.instances.push(...d.instances); out.size = d.size; out.node = d.node; from = d.next ?? null; }
+        for (let from = 0; from != null;) { const r = await cli(layoutCaptureScript(id, { from, count: 80 })); const d = JSON.parse(r.slice(r.indexOf('{'), r.lastIndexOf('}') + 1)); out.texts.push(...d.texts); out.instances.push(...d.instances); out.size = d.size; out.node = d.node; from = d.next ?? null; }
         writeFileSync(file, JSON.stringify(out));
-      } catch { next.push(`${k}: the Figma file that holds the screen is not the one open in Figma (open it, then build again)`); continue; }
+      } catch (e) { next.push(/figma-cli eval did not finish/.test(e.message) ? `${k}: ${e.message}` : `${k}: the Figma file that holds the screen is not the one open in Figma (open it, then build again)`); continue; }
     }
     try { layouts[k] = JSON.parse(readFileSync(file, 'utf8')); } catch { /* unreadable */ }
   }
