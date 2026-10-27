@@ -802,6 +802,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) { const b = confKey.get(key(c.name)); if (b?.length) c.confusions = b; }
       const ownless = new Set((readJson(join(ROOT, OUT_DIR, 'prototypes', 'stress.json'))?.scenarios?.ownless ?? []).map(key));
       for (const c of view.components) if (ownless.has(key(c.name))) c.noOwnUse = true;
+      // Rules about it that cannot both be followed, and rules about it said twice (--prototype --rules). Listed where
+      // the team writes them: a contradiction is a decision nobody has made, and only a person can settle it.
+      const sweep = readJson(join(ROOT, OUT_DIR, 'prototypes', 'rules-sweep.json')) ?? {};
+      const forName = (list, make) => { const by = new Map(); for (const x of list ?? []) { if (!x.about) continue; const k = key(x.about); if (!by.has(k)) by.set(k, []); by.get(k).push(make(x)); } return by; };
+      const clash = forName(sweep.contradictions, (c) => ({ why: c.why, said: c.said.text, saidFrom: c.said.from, against: c.against.text, againstFrom: c.against.from }));
+      const again = forName(sweep.twice, (t) => ({ kept: t.kept.text, keptFrom: t.kept.from, repeat: t.repeat.text, repeatFrom: t.repeat.from }));
+      for (const c of view.components) {
+        const a = clash.get(key(c.name)), b = again.get(key(c.name));
+        if (a?.length) c.ruleClash = a;
+        if (b?.length) c.ruleTwice = b;
+      }
     } catch { /* no prototype checked yet */ }
     // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
     // --contracts-out through a merge request): its Contract button opens it on GitLab, and its Documentation says what it
