@@ -430,6 +430,17 @@ Issues a person wrote are never touched: the engine finds its own by a mark in t
 
 The plan is always written to `.design-system-engine-out/issues.json`, whether or not it is sent, and sending follows the `writes` setting above. CI never sends: a run nobody is watching filling your tracker is how a team stops trusting the engine.
 
+Each open issue also says **which of three fixes it needs**, read from the check it came from rather than from how bad the finding sounds:
+
+| | |
+|---|---|
+| **written** | what is written is wrong or missing: drafts in the intent layer, always for a person to approve |
+| **the code** | a value the code can change to match Figma: a branch and a merge request, where the host lets the token |
+| **the design file** | work in Figma: the hand-back, for a person. The engine never decides a design |
+| **a person** | everything else. Saying "a person decides" is an answer |
+
+The engine already built all three; what was missing was the sentence saying which one this issue needs, so whoever reads the tracker is not the one working it out every time. Where it cannot tell, it says a person decides rather than guessing: a wrong route costs more than no route, because somebody follows it.
+
 ### What the engine is sure of, it writes
 
 A project with no intent layer gets everything the Documentation page finds as a list and nothing else, and most of those lines are never carried into a file by hand. Some of them the engine is not guessing at:
