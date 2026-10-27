@@ -250,5 +250,5 @@ Fix first: badge. Run with --component badge, fix, run again.
 
 Every difference between Figma and the code, 7 open, in one list: .design-system-engine-out/differences.md
 
-NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix, then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
+NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix (a request to fix it is that ask: make the change, do not ask again), then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

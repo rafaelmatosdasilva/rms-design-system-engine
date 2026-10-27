@@ -8,9 +8,9 @@ const tokens = gate('Token values  (color · sizing)', false, ['✅ PASS  25', '
 const structure = gate('Structure', true, ['⚠️  MEASURED 1  (rendered in the browser)', '⚠️  chip height (Size=L, Icon=True): Figma 32, rendered 36px  (.tp-chip · src/theme.css:60)  → set 32px']);
 
 test('NEXT: failing gates first, then the hand-back, then the burndown, else nothing to do', () => {
-  assert.match(nextStep({ failing: [tokens] }), /^NEXT: tell the user what fails under "Token values" and the fix it names\. Change the code only when they ask for that fix, then run rms-design-system-engine\./);
+  assert.match(nextStep({ failing: [tokens] }), /^NEXT: tell the user what fails under "Token values" and the fix it names\. Change the code only when they ask for that fix \(a request to fix it is that ask: make the change, do not ask again\), then run rms-design-system-engine\./);
   assert.match(nextStep({ failing: [tokens], scope: ['chip'] }), /then run rms-design-system-engine --component chip\./);
-  assert.match(nextStep({ handback: { code: '.design-system-engine-out/handback/code-changes.diff' } }), /apply it only when they ask \(git apply/);
+  assert.match(nextStep({ handback: { code: '.design-system-engine-out/handback/code-changes.diff' } }), /apply it only when they ask \(git apply \S+; a request to fix it is that ask: do not ask again\)/);
   assert.equal(nextStep({ burndownNext: 'chip' }), 'NEXT: rms-design-system-engine --component chip');
   assert.match(nextStep({ burndownNext: 'chip', scope: ['chip'] }), /nothing to do/);
   assert.match(nextStep({}), /nothing to do/);

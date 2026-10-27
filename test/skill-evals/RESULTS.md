@@ -1,19 +1,19 @@
 # Skill evaluation results
 
-## 2026-10: Documentation page without downloads, Changelog last in the System menu, a stuck table head with no see-through pixel (continuous evaluation)
+## 2026-10: A request that asks for the fix is the ask: the agent makes it without asking again (continuous evaluation)
 
-What changed since the entry below (engine 848f5b6): A store's README says how its style guide is updated when no pipeline builds it (#66); Documentation page without downloads, Changelog last in the System menu, a stuck table head with no see-through pixel. The guide changed in `reference/usage.md`.
+What changed since the entry below (engine 848f5b6): A store's README says how its style guide is updated when no pipeline builds it (#66); A request that asks for the fix is the ask: the agent makes it without asking again. The guide changed in `rms-design-system-engine.md`.
 
-Guide set measured: `c566975dbfe6` · Project measured: `13d811a9d668`
+Guide set measured: `6db433ef3358` · Project measured: `13d811a9d668`
 
-| Haiku, engine a2a4ad4 | Entry below | This version |
+| Haiku, engine 260ee52 | Entry below | This version |
 |---|---|---|
 | The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
-| Mean cost a run | $0.062 | $0.064 |
-| Input a run | 125k | 140k |
+| Mean cost a run | $0.062 | $0.061 |
+| Input a run | 125k | 130k |
 | Rule violations | 0 | 0 |
 
-**Reading.** Haiku: every task passes and no rule is broken; runs read 140k a run against 125k. Records: `records/2026-10-27-documentation-page-without-downloads-changelog`.
+**Reading.** Haiku: every task passes and no rule is broken; runs read 130k a run against 125k. Records: `records/2026-10-27-a-request-that-asks-for`.
 
 ## 2026-10: A store's README says how its style guide is updated when no pipeline builds it (continuous evaluation)
 
