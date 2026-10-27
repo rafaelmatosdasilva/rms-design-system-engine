@@ -813,6 +813,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         if (a?.length) c.ruleClash = a;
         if (b?.length) c.ruleTwice = b;
       }
+      // What the team decided about each component, from wherever each decision was made: beside its Changelog,
+      // because a decision outlives every commit under it.
+      const { gatherDecisions, KINDS } = await import('./decisions.mjs');
+      const decided = gatherDecisions(ROOT);
+      const decidedBy = new Map(Object.entries(decided.byComponent).map(([n, list]) => [key(n), list]));
+      for (const c of view.components) {
+        const list = decidedBy.get(key(c.name));
+        if (list?.length) c.decisions = list.map((d) => ({ what: d.what, ruledOut: d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said }));
+      }
     } catch { /* no prototype checked yet */ }
     // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
     // --contracts-out through a merge request): its Contract button opens it on GitLab, and its Documentation says what it

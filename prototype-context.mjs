@@ -17,6 +17,7 @@
 //
 // loadContext reads files (and refreshes a guidelines link whose file is missing or old); the rest is pure.
 import { byTier, ladderLine } from './rule-tiers.mjs';
+import { ruledOutLines } from './decisions.mjs';
 import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { guidanceView } from './styleguide-data.mjs';
 import { isOpen } from './doc-source-dsds.mjs';
@@ -452,7 +453,9 @@ const said = (k) => k && (k.kept?.length || k.purpose || k.role || k.notes.lengt
 // One block per component for the catalog: what it is for, its role, its options' meaning, when not to use it, the
 // team's notes and its guidelines. full: the names shown in full (a Set; null: every one); each other one is its
 // first line only, so a catalog of hundreds of components stays short enough to be read whole.
-export function purposeLines(ctx, names, { width = 400, full = null } = {}) {
+// decided: the decisions view (decisions.mjs), so each component carries what was already ruled out and why. An
+// agent that does not know a thing was considered and rejected proposes it again, confidently, every time it is asked.
+export function purposeLines(ctx, names, { width = 400, full = null, decided = null } = {}) {
   const list = names.filter((n) => said(ctx.components[n]));
   if (!list.length) return [];
   const pad = Math.min(28, Math.max(...list.map((n) => n.length)));
@@ -473,6 +476,7 @@ export function purposeLines(ctx, names, { width = 400, full = null } = {}) {
     for (const note of k.notes.slice(0, NOTES_SHOWN)) more('note', note);
     if (k.guidelines) more('guidelines', k.guidelines);
     for (const d of k.kept ?? []) more('kept on purpose', `${d.what}${d.truth ? ` (${d.truth === 'code' ? 'the code' : 'Figma'} is right)` : ''}: ${d.reason}`);
+    for (const line of decided ? ruledOutLines(decided, n) : []) more('decided', line.replace(/^decided against: /, 'against: '));
     // The intent layer, under its own name.
     const il = k.intentLayer;
     if (il) {

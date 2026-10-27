@@ -7045,8 +7045,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Figma: when it was last read, then every read that changed what Figma says of it, with what changed.
     var fig = (u.figmaRead ? '<tr><td>Last read</td><td>' + esc(when(u.figmaRead)) + '</td></tr>' : '') +
       figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + what(/first time/.test(r.changed[0]) ? [] : r.changed) + '</td></tr>'; }).join('');
-    var out = (fig ? card('Figma', fig) : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
+    // What the team decided about it, gathered from wherever each decision was made (decisions.mjs). First, because
+    // a decision outlives every commit under it: an option somebody looked at and did not want is the one thing a
+    // reader needs before proposing it again. Each says what was ruled out, why, who, and when.
+    var dec = (c.decisions || []).map(function (d) {
+      return '<tr><td>' + esc(d.what) + (d.ruledOut && d.ruledOut.length ? '<br><span class="pg-dim">ruled out: ' + esc(d.ruledOut.join(', ')) + '</span>' : '') + '</td><td>' +
+        (d.why ? esc(d.why) + ' ' : '') + '<span class="pg-dim">' + esc(d.said + (d.by ? ', ' + d.by : '')) + '</span>' + (d.at ? ' ' + day(d.at) : '') + '</td></tr>';
+    }).join('');
+    var out = (dec ? card('Decided', dec) : '') + (fig ? card('Figma', fig) : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
     if (!log.length) return '<div class="pg-cards">' + out + areaInfo('No commit has changed it yet, or the project is not in git.') + '</div>';
+
     // Its code: every commit that changed it, by the release it shipped in (newest first), each linked, with its pull
     // request and what it changed in the component's own rules.
     var groups = [], by = {};

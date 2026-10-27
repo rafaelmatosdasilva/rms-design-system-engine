@@ -338,7 +338,7 @@ export function themeSpacing(css) {
 
 // --catalog: everything a prototype may use, in one screen: the system's components and options, the engine's pieces
 // with the tokens they take, the format, and the starting points already made.
-export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null, detail = [], pages = [], onServed = null } = {}) {
+export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, focus = null, detail = [], pages = [], onServed = null, decided = null } = {}) {
   const drawable = new Set((sys.parts.view.components ?? []).map((c) => c.name));
   const comps = Object.fromEntries(Object.entries(sys.catalog.components ?? {}).map(([n, c]) => [n, { ...c, ...(drawable.has(n) ? {} : { status: c.status ? `${c.status}, not built in code` : 'not built in code: drawn as a box' }) }]));
   // A small system is shown whole. A large one in full only where the request (and what it names) needs it, every other
@@ -378,7 +378,7 @@ export function catalogText(sys, { cmd = CLI, starts = [], conventions = null, f
       want ? `The design system's components in full (name, options; code: is a prop only the code has, written as the code names it; any other one's options with --detail <name>,…):` : 'The design system\'s components (name, options; code: is a prop only the code has, written as the code names it):',
       catalogTable({ components: want ? Object.fromEntries(Object.entries(comps).filter(([n]) => want.components.has(n))) : comps }),
     ]),
-    ...(() => { const l = purposeLines(ctx, names, { full: want?.components ?? null }); return l.length ? ['', `What each component is for (${page ? 'the intent layer' : 'Figma descriptions and annotations, code notes, the team\'s guidelines, the intent layer'}); use it only for that${want ? `. In full: ${want.components.size ? [...want.components].join(', ') : 'none yet'}; every other one in a line, in full with --detail <name>,…` : ''}:`, ...l] : []; })(),
+    ...(() => { const l = purposeLines(ctx, names, { full: want?.components ?? null, decided }); return l.length ? ['', `What each component is for (${page ? 'the intent layer' : 'Figma descriptions and annotations, code notes, the team\'s guidelines, the intent layer'}); use it only for that${want ? `. In full: ${want.components.size ? [...want.components].join(', ') : 'none yet'}; every other one in a line, in full with --detail <name>,…` : ''}:`, ...l] : []; })(),
     ...(() => { const l = ruleLines(ctx, { full: want?.rules ?? null, above: want?.shownAbove ?? null, width: want ? 4000 : 500 }); return l.length ? ['', `The team's rules for the product${want ? ' (the ones this request touches in full; any other with --detail "<title>")' : ''}:`, ...l] : []; })(),
     ...(want && !focus && !detail.length ? ['', `This system is large: run ${cmd} --prototype --catalog --for "<the request>" to see in full what the request needs.`] : []),
     ...((sys.context?.limits ?? []).length ? ['', 'Rules the check holds every prototype to (read from the guidelines):', ...sys.context.limits.map((l) => `  at most ${l.max} ${l.component} per ${l.per}: "${cut(l.sentence, 160)}" (${l.from})`)] : []),
@@ -868,7 +868,9 @@ export async function runPrototype(ROOT, argv) {
     const focus = req ? requestFocus(sys.page ? sys.page.context : sys.context, req, sys.page ? [] : list, { answered: args.includes('--answered') }) : null;
     const at = args.indexOf('--detail');
     const detail = at >= 0 && args[at + 1] ? args[at + 1].split(',') : [];
-    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list, onServed: (names) => noteCardsRead(ROOT, names) }) + '\n');
+    // What the team already decided against, so a card never offers back an option somebody looked at and did not want.
+    const decided = (await import('./decisions.mjs')).gatherDecisions(ROOT);
+    console.log('\n' + catalogText(sys, { starts, conventions: deriveConventions(pages, authored), focus, detail, pages: list, onServed: (names) => noteCardsRead(ROOT, names), decided }) + '\n');
     return 0;
   }
   if (args.includes('--consistency')) return consistencyReport(ROOT, sys);
