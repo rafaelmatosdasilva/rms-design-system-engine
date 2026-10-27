@@ -18,6 +18,7 @@
 //
 // Pure: everything reads the context prototype-context.mjs built (ctx.components, ctx.rules, ctx.inside).
 import { wordsOf } from './prototype-context.mjs';
+import { tierOf, beats, TIER_SAID } from './rule-tiers.mjs';
 
 // The words that carry a rule's force rather than its subject: "never place a modal over a modal" and "always place a
 // modal over a modal" are about the same thing, and only these tell them apart. Dropped before two rules are
@@ -65,7 +66,7 @@ export function countOf(text) {
 // → [{ text, about, from, force, agent }], about: the component whose page it is on, null for a rule of the product.
 export function rulesRead(ctx = {}, { agents = [] } = {}) {
   const out = [], seen = new Set();
-  const add = (text, about, from, agent = false) => {
+  const add = (text, about, from, tier, agent = false) => {
     for (const line of String(text ?? '').split(/\n+/).flatMap((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').split(/(?<=[.!?])\s+/))) {
       const t = line.trim().replace(/^#+\s*/, '');
       // A heading, a bare name or a fragment is not a rule: a rule is a sentence with something in it.
@@ -73,27 +74,28 @@ export function rulesRead(ctx = {}, { agents = [] } = {}) {
       const k = `${about ?? ''}|${key(t)}|${from}`;
       if (seen.has(k)) continue;
       seen.add(k);
-      out.push({ text: t, about, from, force: forceOf(t), ...(agent ? { agent: true } : {}) });
+      out.push({ text: t, about, from, tier, force: forceOf(t), ...(agent ? { agent: true } : {}) });
     }
   };
-  for (const r of ctx.rules ?? []) if (r.kind !== 'token') add(r.text, null, r.title);
+  for (const r of ctx.rules ?? []) if (r.kind !== 'token') add(r.text, null, r.title, tierOf(r));
   for (const [name, k] of Object.entries(ctx.components ?? {})) {
     const page = k.intentLayer;
-    add(k.guidelines, name, `${name}, the team's guidelines`);
-    for (const m of k.mistakes ?? []) add(`Common mistake: ${m}`, name, `${name}'s usage`);
-    for (const l of k.limitations ?? []) add(`Limitation: ${l}`, name, `${name}'s usage`);
-    for (const d of k.donts ?? []) add(`Don't: ${d}`, name, `${name}'s Do and Don't`);
-    if (k.notFor) add(`Not when: ${k.notFor}`, name, `${name}'s When not to use`);
+    // A component's own page is the design system's tier: the team that owns the system wrote it.
+    add(k.guidelines, name, `${name}, the team's guidelines`, 'system');
+    for (const m of k.mistakes ?? []) add(`Common mistake: ${m}`, name, `${name}'s usage`, 'system');
+    for (const l of k.limitations ?? []) add(`Limitation: ${l}`, name, `${name}'s usage`, 'system');
+    for (const d of k.donts ?? []) add(`Don't: ${d}`, name, `${name}'s Do and Don't`, 'system');
+    if (k.notFor) add(`Not when: ${k.notFor}`, name, `${name}'s When not to use`, 'system');
     const from = `${name}'s intent layer page`;
-    for (const r of page?.rules ?? []) add(r, name, from);
-    for (const m of page?.mistakes ?? []) add(`Common mistake: ${m}`, name, from);
-    for (const l of page?.limitations ?? []) add(`Limitation: ${l}`, name, from);
-    for (const u of page?.whenNotToUse ?? []) add(`Not when: ${u}`, name, from);
-    for (const u of page?.whenToUse ?? []) add(`Use when: ${u}`, name, from);
+    for (const r of page?.rules ?? []) add(r, name, from, 'system');
+    for (const m of page?.mistakes ?? []) add(`Common mistake: ${m}`, name, from, 'system');
+    for (const l of page?.limitations ?? []) add(`Limitation: ${l}`, name, from, 'system');
+    for (const u of page?.whenNotToUse ?? []) add(`Not when: ${u}`, name, from, 'system');
+    for (const u of page?.whenToUse ?? []) add(`Use when: ${u}`, name, from, 'system');
   }
   const names = Object.keys(ctx.components ?? {});
   const at = out.length;
-  for (const a of agents) add(a.text, null, a.file, true);
+  for (const a of agents) add(a.text, null, a.file, 'product', true);
   // Of an instruction file, only what is about the system: the rest is the project's own, and not this sweep's to read.
   return [...out.slice(0, at), ...out.slice(at).filter((r) => aboutOf(r, names)[0] !== '*' || subject(r.text).some((w) => SYSTEM_WORDS.has(w)))];
 }
@@ -138,7 +140,10 @@ function pairs(rules, names) {
 //   words:  alike in subject, apart in force — "never put it in a toolbar" against "put it in the toolbar";
 //   count:  two counts of the same component — "exactly one per screen" against "several, one to a section";
 //   place:  two places the same component may only go.
-// → [{ about, why, said, against, shared }], the closest match first: that pair is the hardest to tell apart when read.
+// Each carries what the tiers settle (rule-tiers.mjs): a product narrowing the system's general rule is how a design
+// system is used, and the pair is settled by the ladder, with `settled` naming the rule that wins. Only a pair written
+// inside one tier, by two people with the same authority, is a decision nobody has made — `settled` is then null.
+// → [{ about, why, said, against, settled, shared }], the closest match first: that pair is hardest to tell apart.
 export function contradictions(ctx = {}, { least = ALIKE.least, of = ALIKE.contradiction, agents = [] } = {}) {
   const rules = rulesRead(ctx, { agents }), names = Object.keys(ctx.components ?? {});
   const all = pairs(rules, names);
@@ -157,7 +162,7 @@ export function contradictions(ctx = {}, { least = ALIKE.least, of = ALIKE.contr
     if (!/\bonly\b/i.test(i.sentence)) continue;                    // "may go in a toolbar" rules nothing out
     for (const w of i.within ?? []) {
       if (!places.has(i.component)) places.set(i.component, []);
-      places.get(i.component).push({ text: i.sentence, from: i.from, force: 'yes', within: w });
+      places.get(i.component).push({ text: i.sentence, from: i.from, tier: tierOf({ title: i.from }), force: 'yes', within: w });
     }
   }
   for (const [about, list] of places) {
@@ -168,7 +173,8 @@ export function contradictions(ctx = {}, { least = ALIKE.least, of = ALIKE.contr
   }
   const seen = new Set();
   return out.sort((x, y) => y.of - x.of || y.shared - x.shared)
-    .filter((c) => { const k = [key(c.said.text), key(c.against.text)].sort().join('|'); return !seen.has(k) && seen.add(k); });
+    .filter((c) => { const k = [key(c.said.text), key(c.against.text)].sort().join('|'); return !seen.has(k) && seen.add(k); })
+    .map((c) => ({ ...c, settled: beats(c.said, c.against) }));
 }
 
 // One rule written twice in different words, in two places. The longer is kept as the one said: the shorter says
@@ -206,7 +212,8 @@ export function namesNothing(ctx = {}) {
 
 // The three read in one pass, with how many rules they were read from.
 export function sweepRules(ctx = {}, opts = {}) {
-  return { read: rulesRead(ctx, opts).length, contradictions: contradictions(ctx, opts), twice: saidTwice(ctx, opts), nothing: namesNothing(ctx) };
+  const all = contradictions(ctx, opts);
+  return { read: rulesRead(ctx, opts).length, contradictions: all.filter((c) => !c.settled), narrowed: all.filter((c) => c.settled), twice: saidTwice(ctx, opts), nothing: namesNothing(ctx) };
 }
 
 const WHY = { words: 'one allows what the other rules out', count: 'two counts of the same component', place: 'two places it may only go' };
@@ -223,8 +230,11 @@ export function sweepLines(s, { most = 12 } = {}) {
     for (const x of list.slice(0, most)) for (const l of line(x)) out.push(`     ${l}`);
     if (list.length > most) out.push(`     …and ${list.length - most} more`);
   };
-  part(s.contradictions, `${s.contradictions.length} pair${s.contradictions.length === 1 ? '' : 's'} cannot both be followed — whichever the agent reads last wins, so each is a decision nobody has made:`,
+  part(s.contradictions, `${s.contradictions.length} pair${s.contradictions.length === 1 ? '' : 's'} cannot both be followed, both written with the same authority — whichever the agent reads last wins, so each is a decision nobody has made:`,
     (c) => [`${c.about ? `${c.about}: ` : ''}${where(c.said)}`, `against (${WHY[c.why]}): ${where(c.against)}`]);
+  // A product narrowing the system's rule is how a design system is used: counted, so a person sees it was read, and
+  // never listed as something to settle.
+  if (s.narrowed?.length) out.push(`   ${s.narrowed.length} more disagree across tiers, and the ladder settles each: ${TIER_SAID.product.toLowerCase()} beat ${TIER_SAID.system.toLowerCase()}, which beat ${TIER_SAID.universal.toLowerCase()}.`);
   part(s.twice, `${s.twice.length} rule${s.twice.length === 1 ? '' : 's'} said twice in different words — two rules to read, one rule to follow:`,
     (t) => [`${t.about ? `${t.about}: ` : ''}${where(t.kept)}`, `again: ${where(t.repeat)}`]);
   part(s.nothing, `${s.nothing.length} rule${s.nothing.length === 1 ? '' : 's'} name nothing the system has and no check reads — advice the agent carries into every request, with nothing able to say whether a prototype followed it:`,
