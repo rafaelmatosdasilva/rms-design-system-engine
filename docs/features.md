@@ -418,6 +418,18 @@ Two things the setting cannot override. On CI there is nobody to answer, so **as
 
 A project that says never gets the list of Figma changes and no script to run. A script nobody may run is a loaded gun left on the table.
 
+### Differences become issues, and close themselves
+
+A difference reaches whoever can fix it only if somebody carries it there by hand, and a list read once is a list nobody acts on. Name a project for issues and the engine keeps one issue per difference:
+
+- **Never twice.** An issue is keyed the way a kept difference is keyed — its check and its words, without the icon and without a line number — so the same difference found again finds its own issue instead of opening another. An edit higher up the file does not make it a new problem.
+- **Closed by the check, not by hand.** An issue the next run no longer finds is closed, with a line saying why. Nobody tidies up after the engine.
+- **A difference kept on purpose never opens one.** Your team already decided it. Reopening it every week is how a team learns to ignore the engine.
+
+Issues a person wrote are never touched: the engine finds its own by a mark in the body. It opens, comments why it is closing, and closes — nothing else. Reporter is enough for all of it, so GitLab still decides who may.
+
+The plan is always written to `.design-system-engine-out/issues.json`, whether or not it is sent, and sending follows the `writes` setting above. CI never sends: a run nobody is watching filling your tracker is how a team stops trusting the engine.
+
 ### What the engine is sure of, it writes
 
 A project with no intent layer gets everything the Documentation page finds as a list and nothing else, and most of those lines are never carried into a file by hand. Some of them the engine is not guessing at:

@@ -5,7 +5,7 @@
 // answer was the same everywhere, and it was always the most cautious one: write a script, show it, ask again.
 //
 // One answer per place, in ds-config.json:
-//   "writes": { "figma": "ask", "code": "no", "generated": "yes", "engine": "yes" }
+//   "writes": { "figma": "ask", "code": "no", "generated": "yes", "engine": "yes", "issues": "ask" }
 //   yes  write it, and say what changed; the product's code only through a branch and a pull request.
 //   ask  show the exact change and wait for a yes, every time.
 //   no   never. The change goes on the Tasks page, for whoever owns that place.
@@ -13,18 +13,20 @@
 // answer, so every session and every run read the same one rather than each asking again.
 //
 // Two things the config cannot override. On CI nobody is there to answer, so `ask` is `no`; and CI never writes the
-// design file or the product's code whatever the config says, because a run nobody is watching changing what people
-// wrote is how a team stops trusting the engine. Both are said out loud, never silently.
+// design file, the product's code or the team's issue tracker whatever the config says, because a run nobody is
+// watching changing what people wrote - or filling their tracker - is how a team stops trusting the engine. Both are
+// said out loud, never silently.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Each place, what it is called, and whether CI may ever write it.
-export const PLACES = ['figma', 'code', 'generated', 'engine'];
+export const PLACES = ['figma', 'code', 'generated', 'engine', 'issues'];
 export const PLACE = {
   figma: { said: 'the design file', holds: 'what Figma shows: a role, a name, an annotation, a component', onCI: false },
   code: { said: "the product's code", holds: 'the files people wrote, through a branch and a pull request', onCI: false },
   generated: { said: 'the code the engine generated', holds: 'the tokens, the contracts, the style guide: files the engine wrote before', onCI: true },
   engine: { said: "the engine's own files", holds: "the authored contract, the structure contract's notes, the kept differences", onCI: true },
+  issues: { said: "the team's issue tracker", holds: 'one issue per difference a check finds, closed when no run finds it any more', onCI: false },
 };
 export const ANSWERS = ['yes', 'ask', 'no'];
 
