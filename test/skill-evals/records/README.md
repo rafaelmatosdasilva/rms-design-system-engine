@@ -159,5 +159,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-27-what-a-person-said-about` | The 21 guide tasks on Haiku (engine 3080190) | "Prototypes as a part, a handoff page, and what people say about a prototype" |
 | `2026-10-27-figma-edits-fell-over-on` | The 21 guide tasks on Haiku (engine 36e816a) | "--figma-edits fell over on every project, and no test ran the command" |
 | `2026-10-27-the-command-sweep-takes-a` | The 21 guide tasks on Haiku (engine 6da56a7) | "The command sweep takes a quarter of the machine, not half: five at a time starved the browser test" |
+| `2026-10-27-merge-remote-tracking-branch-origin` | The 21 guide tasks on Haiku (engine e4dfff7) | "Merge remote-tracking branch 'origin/main' into decisions-history" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
