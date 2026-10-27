@@ -8,6 +8,9 @@
 //   once:      a prop read only when the component is mounted: changing it later does nothing.
 //   breaks:    a longer text prop shown with its line breaks lost (no white-space: pre-line on it).
 //   unlike:    the same prop takes HTML in one component of a family and only text in another.
+//   shrinks:   a slot Figma stretches its content in sits in a column of the code that shrinks it to its own width.
+//   hidesMore: an on/off Figma says hides some layers hides more in the code (Figma's showArea hides the area; the code's
+//              hides the label with it), read from what each Figma on/off shows (its toggles) and the code's v-if.
 // Vue single-file components only, read from their text: pure, framework-light and advisory. A fault is a fact about
 // the code, with the file and line it is on; whether to change the component is the team's call.
 //
@@ -16,7 +19,7 @@
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const lineAt = (text, i) => String(text).slice(0, i).split('\n').length;
-export const KINDS = { unstyled: 'No style', twice: 'Fires twice', sameSlot: 'Same content in every row', once: 'Read once', breaks: 'Line breaks lost', unlike: 'Takes HTML in one, text in another' };
+export const KINDS = { shrinks: 'Shrinks what Figma stretches', hidesMore: 'Hides more than in Figma', unstyled: 'No style', twice: 'Fires twice', sameSlot: 'Same content in every row', once: 'Read once', breaks: 'Line breaks lost', unlike: 'Takes HTML in one, text in another' };
 
 // ── The template as a tree ───────────────────────────────────────────────────────────────────────────────────
 // Its outermost <template>, read as elements: { tag, attrs: [[name, value]], kids, texts, at (offset), parent }.
@@ -117,7 +120,83 @@ function propNames(script) {
 }
 
 // ── One component ────────────────────────────────────────────────────────────────────────────────────────────
-export function faultsOf(c, { sourceOf = () => null, defined = null, styleText = '', hooked = () => false } = {}) {
+// ── What an on/off hides ─────────────────────────────────────────────────────────────────────────────────────
+// The names a condition depends on: its own words, and the words of each computed or function it calls, a few deep
+// (showRegion → props.readOnly, showArea).
+function dependsOn(expr, defs, depth = 3, seen = new Set()) {
+  const out = new Set();
+  for (const m of String(expr ?? '').matchAll(/(?:props\.)?([A-Za-z_$][\w$]*)/g)) {
+    const w = m[1]; if (out.has(w)) continue; out.add(w);
+    if (depth && defs.has(w) && !seen.has(w)) { seen.add(w); for (const x of dependsOn(defs.get(w), defs, depth - 1, seen)) out.add(x); }
+  }
+  return out;
+}
+// Each computed, function and arrow function of the script, by name, with its body.
+function definitions(script) {
+  const defs = new Map();
+  for (const m of script.matchAll(/(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:computed\s*\(|(?:async\s*)?\([^)]*\)\s*=>|function\b)/g)) { const b = blockAfter(script, m.index + m[0].length - 1); if (b) defs.set(m[1], script.slice(b[0], b[1] + 1)); }
+  for (const m of script.matchAll(/function\s+([A-Za-z_$][\w$]*)\s*\(/g)) { const b = blockAfter(script, script.indexOf('{', m.index)); if (b) defs.set(m[1], script.slice(b[0], b[1] + 1)); }
+  return defs;
+}
+const baseOf = (b) => norm(String(b).replace(/^show/i, ''));
+// The names a condition shows a part for, as they stand (label, props.helperText), not one compared or passed to a call
+// (Number(percentage) >= 100 is a threshold, not the percentage shown).
+const bare = (expr) => String(expr ?? '').replace(/[\w$.]+\([^()]*\)/g, ' ').replace(/[\w$.'"]+\s*(===?|!==?|>=?|<=?)\s*[\w$.'"-]+/g, ' ')
+  .split(/&&|\|\||[()!?:]/).map((t) => t.trim().replace(/^props\./, '').replace(/\.value$/, '')).filter((t) => /^[A-Za-z_$][\w$]*$/.test(t));
+// toggles: { figmaBoolean: [the layers it shows] } for this component, as Figma's structure records them.
+function hidesMore(c, tree, script, props, toggles, push) {
+  const defs = definitions(script);
+  const cond = (el) => (el.attrs.find(([k]) => /^v-(if|else-if|show)$/.test(k)) ?? [])[1] ?? null;
+  for (const [b, layers] of Object.entries(toggles ?? {})) {
+    const p = props.find((x) => norm(x) === norm(b));
+    if (!p) continue;
+    const own = new Set((layers ?? []).map(norm));
+    const told = new Map();
+    walk(tree, (el) => {
+      const e = cond(el);
+      if (!e || new RegExp(`!\\s*(props\\.)?${p}\\b`).test(e) || !dependsOn(e, defs).has(p)) return;
+      // Every part inside what it hides that another of Figma's on/offs shows, and this one leaves showing in Figma.
+      const look = (x) => {
+        // Its class names it only when it is not the switch's own part (a marker shown with the switch is named for what it marks).
+        const mine = new RegExp(`(^|[^\\w.])(props\\.)?${p}\\b`).test(cond(x) ?? '');
+        const words = bare(cond(x)).concat(x.texts.flatMap((t) => [...String(t.text).matchAll(/\{\{([\s\S]*?)\}\}/g)].map((m) => m[1].trim()))).concat(mine ? [] : classesOf(x));
+        for (const [b2, l2] of Object.entries(toggles)) {
+          if (b2 === b || told.has(b2) || !/^show/i.test(b2)) continue;
+          const base = baseOf(b2);
+          // Figma hides it too: its own layers are the part's, or hold it (Label Container holds the label).
+          if (base.length < 4 || (l2 ?? []).every((l) => own.has(norm(l))) || [...own].some((l) => l.includes(base))) continue;
+          const hit = words.find((w) => { const n = norm(w); return n !== norm(p) && n.length >= 4 && (n.startsWith(base) || (base.startsWith(n) && n.length >= base.length - 4)); });
+          if (hit) told.set(b2, { at: x.at, part: String(b2).replace(/^show/i, '').replace(/^./, (ch) => ch.toLowerCase()), hit, cls: classesOf(x)[0] });
+        }
+      };
+      // The innermost part first, so the line names the element itself, not the region around it.
+      walk(el, look); look(el);
+    });
+    if (told.size) {
+      const parts = [...told.values()];
+      push('hidesMore', `turning \`${p}\` off in the code also hides its ${parts.map((x) => `${x.part}${x.cls ? ` (.${x.cls})` : ''}`).join(' and ')}: in Figma, ${b} hides only ${[...new Set(layers)].join(', ')}, and ${parts.length === 1 ? 'that part stays' : 'those parts stay'} on with ${[...told.keys()].join(' and ')}.`, parts[0].at);
+    }
+  }
+}
+
+// slots: { codeSlotName: figmaSlotName } for the slots Figma stretches its content in (stretchChildOnInsert).
+function shrinks(c, tree, own, slots, push) {
+  walk(tree, (el) => {
+    if (el.tag !== 'slot') return;
+    const name = el.attrs.find(([k]) => k === 'name')?.[1] ?? 'default';
+    if (!(name in slots)) return;
+    const box = el.parent;
+    if (!box || box.tag === '#root' || box.tag === 'template') return;
+    // The rules of the element around it: a column that places its children at their own width.
+    const rules = classesOf(box).flatMap((k) => [...own.matchAll(new RegExp(`\\.${k}(?![\\w-])[^{]*\\{([^}]*)\\}`, 'g'))].map((m) => m[1]));
+    const has = (re) => rules.some((r) => re.test(r));
+    if (!has(/display\s*:\s*(inline-)?flex/) || !has(/flex-direction\s*:\s*column/) || !has(/align-items\s*:\s*(flex-start|start|center|flex-end|end|baseline)/)) return;
+    const how = rules.map((r) => /align-items\s*:\s*([\w-]+)/.exec(r)?.[1]).find(Boolean);
+    push('shrinks', `what goes in its "${name}" slot is drawn at its own width: the element around it (.${classesOf(box)[0]}) is a column with align-items: ${how}, while Figma's ${slots[name]} stretches what is put in it to the slot's width.`, el.at);
+  });
+}
+
+export function faultsOf(c, { sourceOf = () => null, defined = null, styleText = '', hooked = () => false, toggles = null, stretched = null } = {}) {
   const out = [];
   const src = String(c.text ?? '');
   const tree = templateTree(src);
@@ -194,6 +273,12 @@ export function faultsOf(c, { sourceOf = () => null, defined = null, styleText =
     }
   });
 
+  // A slot Figma stretches its content in, shrunk by the code's layout around it.
+  if (stretched && Object.keys(stretched).length) shrinks(c, tree, own, stretched, push);
+
+  // An on/off that hides more in the code than Figma says it does.
+  if (toggles && props.length) hidesMore(c, tree, script, props, toggles, push);
+
   // A prop read only when it is mounted (or copied into its own state once), never again.
   if (props.length) {
     const tpl = src.slice(...(templateRange(src) ?? [0, 0]));
@@ -225,7 +310,9 @@ export function partsOf(c, files = []) {
 
 // scripts: the project's script texts, where a class a script looks for (closest('.x'), classList…) is a hook, not a style.
 // files: every .vue file ({ file, text }), so a component's own parts (a base it draws with) are read as its own.
-export function componentFaults(components = [], { styles = [], scripts = [], sourceOf = null, files = [] } = {}) {
+// toggles: { component: { figmaBoolean: [the layers it shows] } }, from Figma's structure snapshot.
+// stretched: { component: { codeSlotName: figmaSlotName } }, the slots Figma stretches what is put in them in.
+export function componentFaults(components = [], { styles = [], scripts = [], sourceOf = null, files = [], toggles = {}, stretched = {} } = {}) {
   const defined = classesDefined(styles);
   const js = scripts.join('\n');
   const hookCache = new Map();
@@ -243,7 +330,7 @@ export function componentFaults(components = [], { styles = [], scripts = [], so
   const listed = new Set(components.map((c) => c.file));
   const styleText = styles.join('\n');
   for (const c of components) {
-    out.push(...faultsOf(c, { sourceOf: find, defined, hooked, styleText }));
+    out.push(...faultsOf(c, { sourceOf: find, defined, hooked, styleText, toggles: toggles[c.name] ?? null, stretched: stretched[c.name] ?? null }));
     // What a part it draws with does wrong is the component's to fix: said on it, with the part's file.
     for (const part of partsOf(c, files).filter((f) => !listed.has(f.file))) {
       for (const f of faultsOf({ name: c.name, file: part.file, text: part.text }, { sourceOf: find, defined, hooked, styleText })) if ((f.kind === 'breaks' || f.kind === 'unstyled') && !out.some((o) => o.component === c.name && o.says === f.says)) out.push(f);
