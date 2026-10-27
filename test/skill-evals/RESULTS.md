@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: An on/off that hides more than Figma's, a slot that shrinks what Figma stretches, and dates against the writing rules (continuous evaluation)
+
+What changed since the entry below (engine 73933d0): A number that means what it says: a fallen engine, a regression, and a count that moved by one (#95); The --figma-edits test runs the command as a person does, so main passes on CI (#93); What to do holds every change a page asks for, under one decision (#90); A browser accessibility check that measured nothing keeps the last good result (#92); Each component's Figma history from the snapshots store's commits, when the project has no git history of them (#91); A difference becomes an issue, once, and the run that stops finding it closes it (#96); What a screen runs into in a component's own code, named with its line (#94); History: a card with no code says it came after the last release; rows newest first; each component named (#97); An on/off that hides more than Figma's, a slot that shrinks what Figma stretches, and dates against the writing rules. The guide changed in `reference/usage.md`.
+
+Guide set measured: `3cdf1bd65541` · Project measured: `13d811a9d668`
+
+| Haiku, engine 42058be | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.065 | $0.063 |
+| Input a run | 152k | 128k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 128k a run against 152k. no task changed state, and no run moved: the same result. Records: `records/2026-10-27-an-on-off-that-hides`.
+
 ## 2026-10: A finding said under the code's name for a component (picker/Row) reaches its page (continuous evaluation)
 
 What changed since the entry below (engine c5af798): Decisions in the intent layer, and History in the style guide (#88); What the engine is sure of, it writes into the files it owns (#89); What a screen runs into in a component's own code, named with its line; a page's name only a comment has is no longer real; A finding said under the code's name for a component (picker/Row) reaches its page. The guide changed in `reference/usage.md`.
