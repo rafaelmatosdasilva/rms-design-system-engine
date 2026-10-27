@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: History: a chip each for the code, Figma and the decisions (continuous evaluation)
+
+What changed since the entry below (engine e4dfff7): History: a chip each for the code, Figma and the decisions. The guide changed in `reference/usage.md`.
+
+Guide set measured: `2b44e9e7cd6b` · Project measured: `13d811a9d668`
+
+| Haiku, engine c5af798 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.060 | $0.059 |
+| Input a run | 121k | 111k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 111k a run against 121k. Records: `records/2026-10-27-history-a-chip-each-for`.
+
 ## 2026-10: Decisions in the intent layer, and History in the style guide (continuous evaluation)
 
 What changed since the entry below (engine 6da56a7): Every side panel and every filter has its own address; panels open at their top; what to do in plain words (#84); Two questions agents ask the intent layer: which token is for this, and is there a component the system lacks (#85); A list an intent-layer page copies from what the engine generates is flagged, with the file to link to instead (#86); Decisions in the intent layer, and History in the style guide; Test the decision route against keep; History: Figma's changes beside the code's; --figma-edits runs again; Prototypes as a part, a handoff page, comments, and the guide for everything built since (#67); The Documentation page links its sources at its top right: Figma, the code, the intent layer (#87); History: a release with nothing under the chosen chip hides. The guide changed in `reference/usage.md`.
