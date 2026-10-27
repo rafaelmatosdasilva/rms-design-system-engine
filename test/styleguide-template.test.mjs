@@ -1153,7 +1153,7 @@ test('usage on every component, from Figma, the code or the authored contract; t
 
 test('built with: its own area, each component the overview\'s card with its preview, linked to its page', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  assert.match(tpl, /\['built', 'Built with'\], \['used', 'Used in'\]/);
+  assert.match(tpl, /\['built', 'Built with'\], \['parts', 'Parts'\], \['used', 'Used in'\]/, 'its parts beside what it is built with');
   const src = tpl.slice(tpl.indexOf('function builtWithHTML'), tpl.indexOf('function builtThumbs'));
   const html = new Function('DATA', 'esc', 'cid', src + 'return builtWithHTML;')({ ui: { card: { cls: 'card' } } }, (x) => String(x), (n) => 'c-' + n)({ uses: ['buttonPrimary', 'buttonSecondary'] });
   assert.equal(html, '<div class="sg-card-grid"><a class="sg-card card" href="#c-buttonPrimary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonPrimary"></div><h3>buttonPrimary</h3></a><a class="sg-card card" href="#c-buttonSecondary"><div class="sg-thumb" aria-hidden="true" data-thumb="buttonSecondary"></div><h3>buttonSecondary</h3></a></div>');

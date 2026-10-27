@@ -2484,6 +2484,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var bareName = function (n) { return String(n).replace(/^[^A-Za-z0-9]+/, '').replace(/\s*\([^)]*\)\s*$/, '').trim(); };
   var PARENT_NAME = {};
   COMPONENTS.forEach(function (c) { if (c.name.indexOf('/') < 0) PARENT_NAME[bareName(c.name).toLowerCase()] = c.name; });
+  // A part the engine found by its name and its root's nesting (component-parts.mjs: tileListRow is
+  // tileList's), or the team said: its root, as a slash names it.
+  var PART_ROOT = {};
+  COMPONENTS.forEach(function (c) { if (c.partOf && c.partOf.root) PART_ROOT[String(c.name).trim()] = c.partOf.root; });
   TODO.forEach(function (t) { var n = String(t.figmaOnly || t.pairing || '').trim(); if (n && n.indexOf('/') < 0 && !PARENT_NAME[bareName(n).toLowerCase()]) PARENT_NAME[bareName(n).toLowerCase()] = n; });
   // A component listed in the menu: not a part (its page opens from its parent's), and, when the system is compared
   // with Figma, one both sides have: one only the code has is flagged on Status, as one only Figma has, not listed.
@@ -2497,7 +2501,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     return COMPONENTS.some(function (x) { return x.name === f; }) ? null : f;
   }
   function menuCount() { var fam = {}; COMPONENTS.forEach(function (c) { var f = menuFamily(c); if (f) fam[f] = 1; }); return COMPONENTS.filter(inMenu).length + Object.keys(fam).length; }
-  function parentOf(n) { var x = String(n).trim(), i = x.indexOf('/'); if (i <= 0) return null; var f = bareName(x.slice(0, i)); return PARENT_NAME[f.toLowerCase()] || f; }
+  function parentOf(n) { var x = String(n).trim(), i = x.indexOf('/'); if (PART_ROOT[x]) return PART_ROOT[x]; if (i <= 0) return null; var f = bareName(x.slice(0, i)); return PARENT_NAME[f.toLowerCase()] || f; }
   function familyKey(n) { return parentOf(n) || (String(n).trim() || '(no name)'); }
   // A component a Showroom screen found missing from the code (checked when the screen was built): Missing, whatever
   // file the pairing only suggests.
@@ -3172,6 +3176,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Documentation (once the Intent layer page): every page of the intent layer and every component, what is written
   // about it from every source (the intent layer, Figma, the code, the contract) and what is still to write, and where.
   // Its rows read each component's documentation, defined further down: it is drawn with the Status page's first lists.
+  // A decision's own mark (Documentation's drafts, a part's question): a tick, a pencil, a bin.
+  var DECIDE_MARK = { approve: '<path d="m3 8.5 3.2 3L13 4.5"/>', change: '<path d="M10.5 2.5 13.5 5.5 5.5 13.5H2.5V10.5Z"/><path d="m9 4 3 3"/>', drop: '<path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 9h6.6l.7-9"/>' };
+  var decideMark = function (k) { return DECIDE_MARK[k] ? '<svg class="sg-decide-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + DECIDE_MARK[k] + '</svg>' : ''; };
+  // A word quoted for the shell, as a command to paste takes it.
+  var shq = function (s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; };
   var IL = DATA.intentLayer, fillDocs = null;
   // A system with no intent layer has the page too: one row a component, its documentation read from Figma and the code.
   var NO_LAYER = !(IL && (IL.pages || []).length);
@@ -3209,8 +3218,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // the page's own task.
     // A decision's own mark, drawn with lines in the text's colour like the menu's (never one of the system's icons):
     // a tick to approve, a pencil to change, a bin to drop, so each reads at a glance.
-    var DECIDE_MARK = { approve: '<path d="m3 8.5 3.2 3L13 4.5"/>', change: '<path d="M10.5 2.5 13.5 5.5 5.5 13.5H2.5V10.5Z"/><path d="m9 4 3 3"/>', drop: '<path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 9h6.6l.7-9"/>' };
-    var decideMark = function (k) { return DECIDE_MARK[k] ? '<svg class="sg-decide-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + DECIDE_MARK[k] + '</svg>' : ''; };
     var ilAnswer = function (head, does, cmd, mark) { return '<div class="sg-il-line"><strong' + (mark ? ' class="sg-decide-head"' : '') + '>' + decideMark(mark) + esc(head) + '</strong>' + (does ? '<span class="pg-par-val">' + does + '</span>' : '') + '<span class="sg-tk-code-line sg-il-cmd"><code>' + esc(cmd) + '</code>' + sysButton('button', 'Copy', ' data-il-copy="' + esc(cmd) + '"') + '</span></div>'; };
     var ilIfNot = function (p, html) {
       var open = ilOpen(p); if (!open.length) return html;
@@ -3263,7 +3270,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // The page's drafts under the task that asks for them, each section's lines together and each line once, a line
     // under them, then one decision for them all, each with the command that makes it and a Copy beside it (pasted into
     // Claude, or run in a terminal). Quoted for a shell: a line may hold backticks.
-    var shq = function (s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; };
     // Everything a page asks to change, in one place, each under what it is: its drafts (by section, each once), what is
     // still to write (what and where), each note no agent reads (to remove, or to change as it says); then one decision on
     // all of them, three cards side by side: approve all, change one, drop all, each copied for Claude Code.
@@ -3645,6 +3651,27 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       writtenFull: link + '<p class="pg-par-val">What was read from its page (' + n + (n === 1 ? ' line' : ' lines') + ')</p>' + body + none,
       todo: said ? '' : esc('Change its page as the Intent layer page says.'), who: said ? '' : WHO.person, st: said ? 'done' : 'check', rel: '', at: DATA.builtAt || null, src: [capital(il.source || 'the intent layer') + ' (' + il.file + ')'] };
   };
+  // What the engine could not settle about it (component-parts.mjs): is it a part of another component? Each answer a
+  // card to copy into Claude Code, which records it in the intent layer.
+  var partQuestionRow = function (c) {
+    var q = (DATA.partQuestions || []).filter(function (x) { return x.part === c.name; })[0]; if (!q) return null;
+    var run = function (to) { return 'rms-design-system-engine --part ' + shq(c.name) + ' ' + shq(to); };
+    var card = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-part-copy="' + esc(copy) + '"') + '</div>'; };
+    var cards = q.roots.map(function (r) { return card('approve', 'Part of ' + r, 'Shown and documented inside ' + r + ', never on its own.', run(r)); })
+      .concat(q.roots.length ? [] : [card('change', 'Part of another', 'Claude Code asks which component it belongs to.', 'Ask me which component ' + c.name + ' is a part of, then run ' + run('<that component>'))])
+      .concat([card('drop', 'Its own component', 'It stays a component of the system, placed on its own.', run('none'))]);
+    var ask = q.roots.length ? 'Is ' + c.name + ' a part of ' + q.roots.join(' or ') + '?' : 'Is ' + c.name + ' a part of another component?';
+    return { key: c.name + '\u0000doc:part?', area: 'Documentation', kind: 'Part or component', written: '<p class="sg-il-line"><strong>' + esc(ask) + '</strong></p><p class="sg-il-line">' + esc(capital(q.why)) + '.</p><div class="sg-decide-grid">' + cards.join('') + '</div>',
+      todo: esc('Say whether it is a part, then copy your choice and paste it into Claude Code.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: [] };
+  };
+  document.addEventListener('click', function (e) { var cp = e.target.closest && e.target.closest('[data-part-copy]'); if (cp) copyText(cp.getAttribute('data-part-copy'), cp); });
+  // A part's documentation: what its root's page says of it under Parts (### its name), or where to write it.
+  var partDocRow = function (c) {
+    var lines = c.partOf.docs || [], page = c.partOf.page, root = c.partOf.root;
+    var where = page ? (page.url ? '<a class="sg-uses-link" href="' + esc(page.url) + '" target="_blank" rel="noopener">' + esc(page.file) + '</a>' : esc(page.file)) : esc(root + '\'s page in the intent layer');
+    return { key: c.name + '\u0000doc:part', area: 'Documentation', kind: 'In ' + root + '\'s page', written: lines.length ? '<p class="pg-par-val">Under Parts, in ' + where + '</p>' + paras(lines) : '<p class="pg-missing">' + esc(root) + '\'s page says nothing of it yet.</p>',
+      todo: lines.length ? '' : esc('Write it in ' + (page ? page.file : root + '\'s page') + ', under Parts, as ### ' + c.name + ': what it is in ' + root + ' and how it is used there.'), who: lines.length ? '' : WHO.person, st: lines.length ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: page ? [capital('the intent layer') + ' (' + page.file + ')'] : [] };
+  };
   // Its notes no agent is given (Figma's annotations, the code's notes): each with why, what to do, and whether to remove
   // it; who acts is whoever wrote it.
   var leftRow = function (c) {
@@ -3665,6 +3692,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var writeTo = function (r) { return r.st === 'todo' && WRITE_TO[r.kind] ? Object.assign({}, r, { src: [WRITE_TO[r.kind]()], writeTo: true }) : r; };
   function docIssueRows(c) {
     if (c.codeOnly) return [];
+    // A part is documented in its root's page, under Parts: that section is all it asks for.
+    if (c.partOf && c.partOf.root) return [partDocRow(c)].map(writeTo);
+    var asked = partQuestionRow(c);
+    if (asked) return [asked].concat(docRowsOf(c, tokenDocRow(c), agentRows(c), intentRow(c), leftRow(c))).map(writeTo);
     var tok = tokenDocRow(c), ag = agentRows(c), ir = intentRow(c), lr = leftRow(c);
     return docRowsOf(c, tok, ag, ir, lr).map(writeTo);
   }
@@ -7190,9 +7221,25 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     if (e.isTrusted) setHashQuery({ show: k });
   });
   function builtWithHTML(c) {
-    return '<div class="sg-card-grid">' + (c.uses || []).map(function (n) {
+    return '<div class="sg-card-grid">' + builtUses(c).map(function (n) {
       return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : ' sg-card--own') + '" href="#' + esc(cid(n)) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(n) + '"></div><h3>' + esc(n) + '</h3></a>';
     }).join('') + '</div>';
+  }
+  // What it is built with: the system's components it holds, its own parts aside (they have the Parts area).
+  function builtUses(c) { return (c.uses || []).filter(function (n) { return (c.parts || []).indexOf(n) < 0; }); }
+  // Its parts: the components only placed inside it, each a card to its own page, then what its page says of each
+  // (the root's Parts section, under the part's name), or where to write it.
+  function partsHTML(c) {
+    var parts = (c.parts || []).map(function (n) { return COMPONENTS.find(function (k) { return k.name === n; }); }).filter(Boolean);
+    var cardOf = function (p) { return '<a class="sg-card' + (DATA.ui && DATA.ui.card ? ' ' + esc(DATA.ui.card.cls) : ' sg-card--own') + '" href="#' + esc(cid(p.name)) + '"><div class="sg-thumb" aria-hidden="true" data-thumb="' + esc(p.name) + '"></div><h3>' + esc(p.name) + '</h3></a>'; };
+    var page = parts[0] && parts[0].partOf && parts[0].partOf.page;
+    var docs = parts.map(function (p) {
+      var lines = (p.partOf && p.partOf.docs) || [];
+      return '<div class="pg-inspect"><div class="pg-inspect-head"><a class="sg-uses-link" href="#' + esc(cid(p.name)) + '">' + esc(p.name) + '</a></div><table>' +
+        (lines.length ? lines.map(function (l) { return '<tr><td>' + esc(l) + '</td></tr>'; }).join('')
+          : '<tr><td><span class="pg-dim">Not documented yet. Write it in ' + (page ? esc(page.file) : 'its page in the intent layer') + ', under Parts, as ### ' + esc(p.name) + '.</span></td></tr>') + '</table></div>';
+    }).join('');
+    return '<p class="pg-par-sum">Placed only inside ' + esc(c.name) + ', never on their own. Each is documented here, in its page\'s Parts section.</p><div class="sg-card-grid">' + parts.map(cardOf).join('') + '</div><div class="pg-cards">' + docs + '</div>';
   }
   // ── Links: where else it lives (Figma, its code, the team's documentation), each opening in a new tab ────────────
   function headLinksHTML(list) {
@@ -7273,7 +7320,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // A text copied, the button says so for a moment and a screen reader hears it.
   // The address of a view, the area of a component after a / (#c-chip/accessibility), and after a ? the props of the
   // variant it shows (#c-chip?Size=L&Label=Save): each area has its own link to send someone to.
-  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', used: 'used-in', log: 'history' };
+  var AREA_SLUG = { play: 'playground', variants: 'variants', docs: 'documentation', api: 'code', motion: 'motion', a11y: 'accessibility', parity: 'parity', built: 'built-with', parts: 'parts', used: 'used-in', log: 'history' };
   // What a page shows is in its address, so a link opens it as it is: each filter chosen (show, st, the Tokens page's
   // coll, group, kind and q, a Showroom screen's kind) and the side panel open (panel=doc:<file> | row:<area>:<row>).
   // Written in place (no new history entry); a filter at its All and a panel closed leave nothing.
@@ -7340,7 +7387,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // width, where the system's own media queries apply. The one chosen stays for the next component.
   // The widths Figma sets for each breakpoint mode (a viewport width variable), else the common phone, tablet and desktop.
   var WIDTHS = [['fit', 'Fit']].concat((DATA.widths || []).length ? DATA.widths.map(function (w) { return [w.value, w.label, w.px]; }) : [['phone', 'Phone', 375], ['tablet', 'Tablet', 768], ['desktop', 'Desktop', 1280]]), WIDTH = 'fit';
-  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['parity', 'Parity'], ['a11y', 'Accessibility'], ['docs', 'Documentation'], ['motion', 'Motion'], ['api', 'Code'], ['built', 'Built with'], ['used', 'Used in'], ['products', 'Products'], ['log', 'History']], AREA = 'play';
+  var AREAS = [['play', 'Playground'], ['variants', 'Variants'], ['parity', 'Parity'], ['a11y', 'Accessibility'], ['docs', 'Documentation'], ['motion', 'Motion'], ['api', 'Code'], ['built', 'Built with'], ['parts', 'Parts'], ['used', 'Used in'], ['products', 'Products'], ['log', 'History']], AREA = 'play';
   // The props whose options are its variants (two or more built), in Figma's order.
   function variantProps(c) { return (c.controls || []).filter(function (p) { return p.type === 'VARIANT' && (p.options || []).filter(function (o) { return !o.unbuilt; }).length > 1; }); }
   // What the Variants area shows: each variant prop's options, and each on/off prop the code builds as off and on.
@@ -8458,6 +8505,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       '<div class="pg-header"><div class="sg-section-badge">Component</div>' +
         // Its name, and at its top right where else it lives (its Figma node, its code, the team's pages).
         '<div class="pg-head"><h2>' + esc(c.name) + '</h2>' + headLinksHTML(c.links) + '</div>' +
+        // A part: placed only inside its root, documented in the root's page.
+        (parentOf(c.name) && COMPONENTS.some(function (x) { return x.name === parentOf(c.name); }) ? '<p class="pg-status"><span class="sg-status">Part</span><span>Of <a class="sg-uses-link" href="#' + esc(cid(parentOf(c.name))) + '/parts">' + esc(parentOf(c.name)) + '</a>, placed only inside it. Its documentation is in ' + esc(parentOf(c.name)) + '\'s page.</span></p>' : '') +
         // A component only the code has: said at its top, so nothing on its page reads as agreed with Figma.
         (c.codeOnly ? '<p class="pg-status pg-code-only"><span class="sg-status sg-status--code-only">Only in the code</span><span>' + (c.codeOnly.figma ? 'Figma has no component for it: compared with nothing in Figma.' : 'No Figma data yet: compared with nothing in Figma.') + '</span></p>' : '') +
         // One the code has only as a CSS class: said at its top, so its preview and its missing props read for what they are.
@@ -8471,7 +8520,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
-      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'built' || (c.uses || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
+      '<div class="pg-areas"><div class="pg-areas-scroll">' + tabsHTML(AREAS.filter(function (a) { return (a[0] !== 'products' || copyRows(c).length) && (a[0] !== 'built' || builtUses(c).length) && (a[0] !== 'parts' || (c.parts || []).length) && (a[0] !== 'variants' || (!ALL && variantRows(c).length)) && (a[0] !== 'api' || !!apiHTML(c) || !!docRows || !!importHTML(c)); }).map(function (a) {
         // Parity, Accessibility and Documentation carry their state, the Status row's word (componentStates); Motion,
         // which the Status page does not rate, its alert icon while something is to do.
         if (AREA_STATE[a[0]]) return { v: a[0], label: a[1], state: states[AREA_STATE[a[0]]] };
@@ -8507,7 +8556,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       '<div class="pg-area" data-area="motion"><div class="pg-footer">' + motionHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="a11y"><div class="pg-footer">' + naInfo(states.acc) + a11yHTML(c) + '</div></div>' +
       '<div class="pg-area" data-area="parity"><div class="pg-footer">' + (states.par.say === 'N/A' ? naInfo(states.par) : parityHTML(c)) + '</div></div>' +
-      ((c.uses || []).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc">' + builtWithHTML(c) + '</div></div></div>' : '') +
+      (builtUses(c).length ? '<div class="pg-area" data-area="built"><div class="pg-footer"><div class="pg-doc">' + builtWithHTML(c) + '</div></div></div>' : '') +
+      ((c.parts || []).length ? '<div class="pg-area" data-area="parts"><div class="pg-footer"><div class="pg-doc">' + partsHTML(c) + '</div></div></div>' : '') +
       '<div class="pg-area" data-area="used"><div class="pg-footer"><div class="pg-doc">' + usedInHTML(c) + '</div></div></div>' +
       // Products: a class a product styles almost as this one, a decision each (use it, or add the new one on purpose).
       (copyRows(c).length ? '<div class="pg-area" data-area="products"><div class="pg-footer"><div class="pg-doc pg-par">' + issueTableHTML(byStatus(copyRows(c)), '', '', 'Products') + '</div></div></div>' : '') +
@@ -8634,7 +8684,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (v === 'variants') requestAnimationFrame(drawVariants);
       if (v !== 'a11y' && wcagStop) wcagStop();
       if (v === 'a11y') checkLive();
-      if (v === 'built') requestAnimationFrame(function () { builtThumbs(sec); });
+      if (v === 'built' || v === 'parts') requestAnimationFrame(function () { builtThumbs(sec); });
       if (!kept) writeLink();   // the address names the area, to send someone straight to it
       markTaskCols(sec);
       stickHeight(sec);   // its cards' heads, now in view, measured for the table heads under them

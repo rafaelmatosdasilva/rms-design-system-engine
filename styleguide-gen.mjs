@@ -1270,6 +1270,47 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         if (!c.import && (!c.api?.tag || c.api.syntax === 'html')) { const own = cssImport(c); if (own) c.import = own; }
       }
     } catch { /* the page shows what it has */ }
+    // Its parts: the components only ever placed inside it (component-parts.mjs), each shown and documented in it, never
+    // listed as a component of its own; and what the engine could not settle, asked of the team.
+    try {
+      const { partsOf, partAnswers, OWN_COMPONENT } = await import('./component-parts.mjs');
+      const ilMod = await import('./intent-layer.mjs');
+      const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
+      const names = view.components.map((c) => c.name);
+      const pageOf = ilSnap ? ilMod.matchComponents(names, ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
+      const said = partAnswers({
+        descriptions: Object.fromEntries(view.components.map((c) => [c.name, c.description ?? ''])),
+        rootParts: Object.fromEntries(names.map((n) => [n, Object.keys(pageOf.get(n)?.parts ?? {}).filter((p) => names.includes(p))])),
+        // "tileCardRow is a component of its own, not a part of tileCardBank.": a decision on any page.
+        ownComponents: (ilSnap?.entities ?? []).flatMap((e) => e.decisions ?? []).map((d) => OWN_COMPONENT.exec(typeof d === 'string' ? d : d?.text ?? d?.what ?? '')?.[1]).filter((n) => n && names.includes(n)),
+      });
+      const { partOf, partsByRoot, questions } = partsOf({ names, uses: Object.fromEntries(view.components.map((c) => [c.name, c.uses ?? []])), said });
+      for (const c of view.components) {
+        if (partOf[c.name]) {
+          const root = partOf[c.name].root, page = pageOf.get(root);
+          c.partOf = { root, by: partOf[c.name].by, docs: page?.parts?.[c.name] ?? [], page: page ? { file: page.file, url: page.url ?? null } : null };
+        }
+        if (partsByRoot[c.name]) c.parts = partsByRoot[c.name];
+      }
+      if (questions.length) view.partQuestions = questions;
+      // The Documentation page: a part asks for no page of its own (its documentation is its root's Parts section), and
+      // a page of its own is moved there: what it says copied under Parts, then the page deleted.
+      if (view.intentLayer?.pages) {
+        view.intentLayer.noPage = (view.intentLayer.noPage ?? []).filter((n) => !partOf[n]);
+        for (const n of Object.keys(view.intentLayer.noPageOthers ?? {})) if (partOf[n]) delete view.intentLayer.noPageOthers[n];
+        for (const p of view.intentLayer.pages) {
+          const root = p.component && partOf[p.component]?.root;
+          if (!root || p.action === 'delete') continue;
+          p.partOf = root;
+          p.action = 'move'; p.decision = 'Move';
+          p.todo = [`${p.component} is a part of ${root}, placed only inside it. Copy what this page says into ${root}'s page, under Parts, as ### ${p.component}, then delete this page.`];
+        }
+      }
+      // Kept for the contracts and llms.txt, which the next run writes from it.
+      const { PARTS_FILE } = await import('./component-parts.mjs');
+      mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+      writeFileSync(join(ROOT, OUT_DIR, PARTS_FILE), JSON.stringify({ partOf: Object.fromEntries(view.components.filter((c) => c.partOf).map((c) => [c.name, c.partOf])), questions }, null, 2) + '\n');
+    } catch { /* every component stands on its own */ }
     // Its links (Figma, its code, the team's documentation) and its changelog: the commits that changed it, each with
     // the release it shipped in and its pull request. The system's own links go on the overview.
     try {

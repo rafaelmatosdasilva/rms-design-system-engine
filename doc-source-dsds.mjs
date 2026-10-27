@@ -40,7 +40,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 15;   // 15: a page's Decisions section, read as its decisions (decisions.mjs); 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
+export const READER = 16;   // 16: a root's Parts section, each part's documentation under its name (component-parts.mjs); 15: a page's Decisions section, read as its decisions (decisions.mjs); 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -111,6 +111,25 @@ export function keyOfTitle(title) {
   return KEY_OF.find(([, re]) => re.test(last))?.[0] ?? null;
 }
 
+// The line that says a part belongs to its root ("Part of tileCardBank, placed only inside it."): what makes it a
+// part, not documentation of it.
+export const PART_SAID = /^part of [\w/.-]+\b/i;
+// A Markdown spec's Parts section: each ### heading under ## Parts is a part, its text its documentation.
+export function mdParts(text) {
+  const out = {};
+  let inParts = false, name = null, body = [];
+  const flush = () => { if (name) out[name] = itemsOf(body.join('\n')).filter((l) => !PART_SAID.test(l)); name = null; body = []; };
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const h2 = /^##\s+(.+?)\s*$/.exec(line), h3 = /^###\s+(.+?)\s*$/.exec(line);
+    if (h2 && !h3) { flush(); inParts = /^parts?$/i.test(h2[1]); continue; }
+    if (!inParts) continue;
+    if (h3) { flush(); name = h3[1].replace(/`/g, '').trim(); continue; }
+    if (name) body.push(line);
+  }
+  flush();
+  return out;
+}
+
 // A Markdown body → its lines: each bullet or paragraph one item, markers dropped.
 export function itemsOf(body) {
   const out = [];
@@ -166,6 +185,9 @@ export function entityView(entity, file, group = '', shared = null) {
     kind, layer: layerOf(kind, group), name: String(entity?.name ?? entity?.identifier ?? entity?.id ?? '').trim(), id: entity?.identifier ?? entity?.id ?? null,
     status: null, file, code: codeFileOf(entity), summary: null,
     purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], decisions: [],
+    // The documentation of its parts, the components only placed inside it (a dropdown's row): each under its own name
+    // in the page's Parts section (### tileListRow, or a section titled "Parts / tileListRow").
+    parts: {},
     facts: [], repeated: 0,   // what was left out: the sections that are facts (by title), the lines repeated on every page
     // What its generated definitions sections name (Events, Properties, Slots), each term with whether it says more than
     // its name (a placeholder like "Event emitted by the component." says nothing): left out for agents, kept so a check
@@ -196,6 +218,8 @@ export function entityView(entity, file, group = '', shared = null) {
       const key = keyOfTitle(x.title);
       return [key && key !== 'purpose' ? { kind: 'guided', key, items } : { kind: 'checklist', title: x.title, items }];
     }
+    // A Parts section: each of its titled parts is a part's documentation, under that part's name.
+    if (x.kind === 'section' && /^parts?$/i.test(titleWords(x.title))) return [{ kind: 'sections', items: (x.freeform ?? []).filter((f) => f?.title).map((f) => ({ ...f, title: `Parts / ${f.title}` })) }];
     if (x.kind === 'section') return [{ kind: 'sections', items: (x.freeform ?? []).concat(x.body || x.content ? [{ title: x.title, body: x.body ?? x.content }] : []) }];
     return [x];
   });
@@ -208,6 +232,8 @@ export function entityView(entity, file, group = '', shared = null) {
         if (!title || !body) continue;
         if (/^metadata$/i.test(titleWords(title))) { statusLine ??= /(?:^|\n)\s*[-*]?\s*status\s*:\s*([^\n]+)/i.exec(body)?.[1]?.trim() ?? null; continue; }
         if (FACT_TITLE.test(titleWords(title))) { view.facts.push(title); continue; }
+        const part = /^parts?\s*\/\s*(.+)$/i.exec(title)?.[1]?.trim();
+        if (part) { (view.parts[part] ??= []).push(...itemsOf(body).filter((l) => !PART_SAID.test(l))); continue; }
         // A body that only names its own section ("Do / Don't section.") is a placeholder: nothing to read.
         if (/^[\w\s/'’&-]{1,60}\bsection\.?$/i.test(body) && body.toLowerCase().startsWith(title.split('/').pop().trim().toLowerCase().slice(0, 4)) || body.replace(/\s*section\.?$/i, '').trim().toLowerCase() === title.trim().toLowerCase()) continue;
         const key = keyOfTitle(title);
@@ -481,7 +507,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     try {
       const { specIndex, specOf } = await import('./intent-changes.mjs');
       const idx = specIndex(specs, { codes: entities.map((e) => e.code) });
-      for (const e of entities) { const sp = specOf(e, idx); if (sp) { e.spec = sp.spec; e.specUrl = fileUrl(source, sp.spec); if (sp.shared) e.specShared = true; } }
+      for (const e of entities) { const sp = specOf(e, idx); if (sp) { e.spec = sp.spec; e.specUrl = fileUrl(source, sp.spec); if (sp.shared) e.specShared = true; else { const mp = mdParts(specs.get(sp.spec)); if (Object.keys(mp).length) e.parts = { ...(e.parts ?? {}), ...mp }; } } }
     } catch { /* the pages stand without it */ }
     // When each page's file last changed: the files a new commit changed (one compare with the commit read before) take
     // its date; a file not dated yet asks for its own last commit, once. A date not known is left out, never guessed.
