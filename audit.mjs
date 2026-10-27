@@ -4491,7 +4491,13 @@ function reportFull(label, items, shown) {
   // Accessibility gate args: forward the --component scope and --a11y verbosity so the
   // audit's a11y advisory covers the same components the user scoped the run to.
   const A11Y_JSON = join(ROOT, OUT_DIR, 'a11y.json');
-  try { unlinkSync(A11Y_JSON); } catch { /* not there */ }
+  // This run's result is written beside the last one and takes its place only when it measured something
+  // (a11y-check.mjs → keepA11yResult): a check that could not run (no browser, stopped at its limit, nothing to open)
+  // leaves the last good result, with its own date, for the style guide and the next run, never nothing.
+  // What this run reports reads A11Y_NOW: this run's result, or none.
+  const A11Y_RUN = join(ROOT, OUT_DIR, 'a11y.run.json');
+  try { unlinkSync(A11Y_RUN); } catch { /* not there */ }
+  let A11Y_NOW = A11Y_RUN, a11yKept = null;
   // Building a component: every accessibility line is listed element by element, as it is part of building it.
   // axe-core's rules and the hover, focus and pressed states run in every accessibility check: --no-axe, --no-states leave one out.
   // The accessibility check keeps its own time: it grows with the pages and the style guide's components, and a check
@@ -4502,7 +4508,7 @@ function reportFull(label, items, shown) {
   const { LIMIT_CAP_SEC: A11Y_CAP_SEC } = await import('./a11y-check.mjs');
   const a11yWaitMs = hookRun ? GATE_TIMEOUT_MS : Math.max(GATE_TIMEOUT_MS, ((Number(cfg.a11y?.timeoutSec) || A11Y_CAP_SEC) + 180) * 1000);
   const a11yArgs = [...SCOPE_COMPONENTS.flatMap((c) => ['--component', c]), ...(process.argv.includes('--a11y') || (cfg.build === true && SCOPE_COMPONENTS.length) ? ['--a11y'] : []),
-    ...['--no-axe', '--no-states', '--fresh'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_JSON,
+    ...['--no-axe', '--no-states', '--fresh'].filter((f) => process.argv.includes(f)), '--json-out', A11Y_RUN,
     ...(hookRun ? ['--time-limit', String(Math.max(10, GATE_TIMEOUT_MS / 1000 - 90))] : [])];
 
   // Code capture: the code side read once per run (code-capture.mjs), the mirror of the Figma
@@ -4569,6 +4575,7 @@ function reportFull(label, items, shown) {
     runScriptAsync('case-check.mjs'),
   ]);
   const [rRendered, rA11y] = await browserGates;
+  if (rA11y) { const { keepA11yResult } = await import('./a11y-check.mjs'); a11yKept = keepA11yResult(A11Y_RUN, A11Y_JSON); if (a11yKept.replaced) A11Y_NOW = A11Y_JSON; }
 
   // Accessibility: advisory by default; a11yStrict promotes any finding to a hard fail.
   // Set the fail flag BEFORE the gate summary so the verdict stays consistent; the a11y detail
@@ -5124,6 +5131,7 @@ function reportFull(label, items, shown) {
     process.stdout.write(rA11y.stdout.replace(/\s+$/, '') + '\n');
     _reportLines.push(rA11y.stdout);
   }
+  if (a11yKept && !a11yKept.replaced && a11yKept.keptFrom && (!ONLY || ONLY.a11y)) console.log(`   ℹ️  The accessibility check measured nothing this run: the last result (${a11yKept.keptFrom.slice(0, 10)}) is kept for the style guide.`);
 
   // ── Token layering (agnostic, descriptive — never a gate) ───────────────────
   _section('advice');
@@ -6292,7 +6300,7 @@ function reportFull(label, items, shown) {
     const now = collectFindings(_reportLines);
     // Accessibility, element by element (the report shows counts): from the check's structured result.
     try {
-      const a = JSON.parse(readFileSync(A11Y_JSON, 'utf8'));
+      const a = JSON.parse(readFileSync(A11Y_NOW, 'utf8'));
       for (const i of a.issues ?? []) now.push(`Accessibility :: ${i.issue} ${i.selector ?? ''}${i.theme ? ` (${i.theme})` : ''}${i.contrast != null ? ` ${i.contrast}:1` : ''}`);
     } catch { /* no browser this run: nothing to add */ }
     // Kept on purpose: a kept difference is neither open nor new; the decisions not found this run are said.
@@ -6453,7 +6461,7 @@ function reportFull(label, items, shown) {
       if (toBuildLine) console.log(`\n${toBuildLine}`);
     }
     let a11yFound = null;
-    try { a11yFound = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
+    try { a11yFound = (JSON.parse(readFileSync(A11Y_NOW, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     // A Figma file set up, and no Figma data readable (nothing captured yet): nothing was compared with Figma, so the
     // run never reads as parity, and the capture comes first.
     const readable = (file) => { try { JSON.parse(readFileSync(join(ROOT, file), 'utf8')); return true; } catch { return false; } };
@@ -6464,7 +6472,7 @@ function reportFull(label, items, shown) {
     const ageOf = (file) => { try { const u = JSON.parse(readFileSync(join(ROOT, file), 'utf8'))._updated; return u ? Math.floor((Date.now() - new Date(u).getTime()) / 3_600_000) : null; } catch { return null; } };
     const data = NO_FIGMA ? null : dataStateLine({ refreshedFromApi: !!(process.env.FIGMA_TOKEN && cfg.figmaFileKey), fromFigmaCli: _figmaCliRead, noLink: cfg.figmaFileKey === '', snapshots: [SNAP_VARS, SNAP_STRUCT].map((file) => ({ file, ageHours: ageOf(file), readable: readable(file) })) });
     let a11yIssues = null;
-    try { a11yIssues = (JSON.parse(readFileSync(A11Y_JSON, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
+    try { a11yIssues = (JSON.parse(readFileSync(A11Y_NOW, 'utf8')).issues ?? []).length; } catch { /* no browser this run */ }
     const only = ONLY ? { words: onlyWords(ONLY, ONLY_LABELS), noFigma: NO_FIGMA, a11y: ONLY.a11y ? { static: _a11yCount.static, browser: a11yIssues, why: (rA11y?.stdout ?? '').match(/⏭\s+\[a11y\]\s+(.+)/)?.[1]?.replace(/\.$/, '') ?? null } : null } : null;
     // The verification headline, for a full run: each component passing, drifting or not checked, from this
     // run's differences and, when it measured in a browser, this run's census.
@@ -6494,7 +6502,7 @@ function reportFull(label, items, shown) {
     try { const d = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'differences.json'), 'utf8')); if (!ONLY && !_scopeNames.length && d.total) diffLine = `\nEvery difference between Figma and the code, ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list: ${OUT_DIR}/differences.md\n`; } catch { /* none written */ }
     // The accessibility verdict and its problems, kind by kind, so the chat carries the result and not only a count.
     let a11yBlock = '';
-    try { const { a11ySummaryLines } = await import('./a11y-check.mjs'); const l = a11ySummaryLines(JSON.parse(readFileSync(A11Y_JSON, 'utf8'))); if (l.length) a11yBlock = `\n${l.join('\n')}\n`; } catch { /* no browser this run */ }
+    try { const { a11ySummaryLines } = await import('./a11y-check.mjs'); const l = a11ySummaryLines(JSON.parse(readFileSync(A11Y_NOW, 'utf8'))); if (l.length) a11yBlock = `\n${l.join('\n')}\n`; } catch { /* no browser this run */ }
     // Which code was checked, when it was read from GitLab: the commit, so the result is never taken for another one.
     const codeLine = GITLAB_SOURCE ? `\nCode checked: GitLab ${GITLAB_SOURCE.path} @ ${GITLAB_SOURCE.ref} ${GITLAB_SOURCE.sha.slice(0, 8)}${GITLAB_SOURCE.committedAt ? ` (${GITLAB_SOURCE.committedAt.slice(0, 10)})` : ''}${GITLAB_SOURCE.stale ? ' - GitLab was not reached, so this is the copy of that commit' : ''}\n` : '';
     summary = summary.replace(/\n(NEXT:)/, `${codeLine}${a11yBlock}${diffLine}\n$1`);
