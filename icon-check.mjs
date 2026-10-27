@@ -37,6 +37,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join }            from 'path';
 import { readSymbols, extractPathDs, iconUsage } from './icon-source.mjs';
+import { iconFolder, svgFiles } from './icon-folder.mjs';
 import { pathToFileURL } from 'url';
 
 const ROOT = process.cwd();
@@ -53,6 +54,17 @@ const SHARED_SOURCES = (cfg.paths?.sharedIconSources ?? [])
   .filter(f => existsSync(join(ROOT, f)));
 
 const HTML_SOURCES = [...PLUGIN_SOURCES, ...SHARED_SOURCES];
+
+// Icons kept as one SVG file each, with no sprite: the folder is their declaration, so no hand-written list is asked
+// for; how each stands against Figma is the inventory check's (icon-inventory-check.mjs).
+if (!HTML_SOURCES.length) {
+  const folder = iconFolder(ROOT, cfg);
+  const n = folder ? svgFiles(join(ROOT, folder)).length : 0;
+  console.log(n
+    ? `\n⏭  SVG symbol audit: no sprite; ${n} icon file(s) in ${folder} are the system's own, checked against Figma by the icon inventory\n`
+    : '\n⏭  SVG symbol audit: no sprite and no icon folder - nothing to check\n');
+  process.exit(0);
+}
 
 // Configuring sharedIconSources declares the intent to keep one icon sheet. Once that
 // exists, a symbol defined inside an individual plugin is a fork waiting to happen: it

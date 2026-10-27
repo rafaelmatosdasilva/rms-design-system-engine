@@ -9,7 +9,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
 import { createApiReader } from './component-api.mjs';
-import { readSymbols, iconRefs, pathHash } from './icon-source.mjs';
+import { readSymbols, iconRefs, pathHash, symbolsIn } from './icon-source.mjs';
+import { iconFolder, folderSymbols, svgFiles } from './icon-folder.mjs';
 import { fingerprint, markupClassSet } from './markup-source.mjs';
 import { norm, usedComponents, extractEventPayloads, extractSlotProps } from './component-source.mjs';
 
@@ -30,6 +31,8 @@ export function structureInputFiles(ROOT, cfg = {}, apiReader) {
     ...[cfg.codeReading?.docgen ?? []].flat(), cfg.codeReading?.storybookIndex ?? 'storybook-static/index.json',
   ].map((p) => resolve(ROOT, p));
   if (apiReader) list.push(...apiReader.files);
+  const folder = iconFolder(ROOT, cfg);
+  if (folder) list.push(...svgFiles(join(ROOT, folder)).map((rel) => resolve(ROOT, folder, rel)));
   return [...new Set(list)];
 }
 
@@ -81,6 +84,19 @@ export function captureIcons(ROOT, cfg) {
       usedAt: refs[s.id] ?? [],
     };
     e.definedAt.push(`${s.file}:${s.line}`);
+  }
+  // Icons kept as one SVG file each (icon-folder.mjs), read the same way, by their path in the folder. They are loaded
+  // by path, so where each is used is not known (usedAt left out, never counted as unused).
+  const folder = iconFolder(ROOT, cfg);
+  for (const f of folder ? folderSymbols(ROOT, folder) : []) {
+    const s = symbolsIn(f.symbol)[0];
+    if (!s || icons[s.id]) continue;
+    icons[s.id] = {
+      viewBox: s.viewBox, paths: s.paths.length, pathHash: pathHash(s.paths),
+      fillNone: s.fillNone, strokeNone: s.strokeNone,
+      ...(s.transforms.length ? { transforms: s.transforms } : {}),
+      definedAt: [f.file],
+    };
   }
   return icons;
 }

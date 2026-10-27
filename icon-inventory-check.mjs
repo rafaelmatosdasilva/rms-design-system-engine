@@ -9,6 +9,10 @@
 //
 // Inert until that snapshot exists, so it never false-positives before capture.
 //
+// A system that keeps its icons as one SVG file each (icon-folder.mjs) is read from that folder. With no snapshot,
+// Figma's list is taken from Code Connect's batch files, which link each Figma icon to its file: every icon is then
+// matched on its path, and the files Figma has no icon for are listed too (advisory: they may be the product's own).
+//
 // Exit 0 = every Figma icon has a code symbol (or nothing to check).
 // Exit 1 = a Figma icon has no code symbol (an unimplemented DS icon).
 
@@ -16,6 +20,7 @@ import { readFileSync, existsSync, readdirSync } from 'fs';
 import { codeRoots } from './code-roots.mjs';
 import { join, extname } from 'path';
 import { ENGINE_DIRS } from './names.mjs';
+import { iconFolder, svgFiles, symbolId, codeConnectIcons } from './icon-folder.mjs';
 
 const ROOT = process.cwd();
 let cfg = {};
@@ -26,9 +31,28 @@ try { cfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } ca
 // The inventory lives in figma-icon-inventory.snapshot.json when figma-icons.snapshot.json holds the
 // icon path data (paths.snapshotIcons pointing at it); otherwise in figma-icons.snapshot.json.
 const SNAP = existsSync(join(ROOT, 'figma-icon-inventory.snapshot.json')) ? 'figma-icon-inventory.snapshot.json' : 'figma-icons.snapshot.json';
+const FOLDER = iconFolder(ROOT, cfg);
+const folderIds = FOLDER ? svgFiles(join(ROOT, FOLDER)).map((rel) => symbolId(rel)).filter(Boolean) : [];
 if (!existsSync(join(ROOT, SNAP))) {
-  console.log(`⏭  icon inventory: no ${SNAP} - skipped (capture it to enable)`);
-  process.exit(0);
+  const linked = folderIds.length ? codeConnectIcons(ROOT) : [];
+  if (!linked.length) {
+    console.log(folderIds.length
+      ? `⏭  icon inventory: ${folderIds.length} icon file(s) in ${FOLDER}, but Figma's icons are not captured (no ${SNAP}, no Code Connect batch linking them) - skipped`
+      : `⏭  icon inventory: no ${SNAP} - skipped (capture it to enable)`);
+    process.exit(0);
+  }
+  // Figma's icons as Code Connect links them, each to its file in the folder.
+  const have = new Set(folderIds), inFigma = new Set(linked.map((l) => l.id));
+  const MISSING = linked.filter((l) => !have.has(l.id));
+  const CODE_ONLY = folderIds.filter((id) => !inFigma.has(id));
+  console.log(`\n   ${linked.length} Figma icon(s) linked by Code Connect, ${folderIds.length} file(s) in ${FOLDER}`);
+  console.log(`✅ IN BOTH     ${linked.length - MISSING.length}`);
+  console.log(`❌ MISSING     ${MISSING.length}   (Figma icon whose file is not in the folder)`);
+  console.log(`ℹ️  CODE ONLY   ${CODE_ONLY.length}   (file with no Figma icon linked: the product's own, or a link to add)`);
+  if (MISSING.length) { console.log('\n─── Figma icons with no file ──'); for (const l of MISSING.slice(0, 40)) console.log(`  ❌ Figma icon "${l.name}" has no file at ${FOLDER}/${l.icon}.svg${l.url ? `  (${l.url})` : ''}`); }
+  if (CODE_ONLY.length) { console.log('\n─── Files with no Figma icon linked ──'); for (const id of CODE_ONLY.slice(0, 40)) console.log(`  ℹ️  ${id}`); if (CODE_ONLY.length > 40) console.log(`  … ${CODE_ONLY.length - 40} more`); }
+  if (!MISSING.length) console.log('   Every Figma icon has its file. ✓');
+  process.exit(MISSING.length ? 1 : 0);
 }
 let icons = [];
 try { icons = JSON.parse(readFileSync(join(ROOT, SNAP), 'utf8')).icons ?? []; } catch { /* malformed */ }
@@ -65,6 +89,9 @@ for (const f of files) {
   let t = ''; try { t = readFileSync(f, 'utf8'); } catch { continue; }
   for (const re of [symRe, hrefRe, idRe]) { re.lastIndex = 0; let m; while ((m = re.exec(t))) codeIcons.add(norm(m[1])); }
 }
+// An icon kept as its own file is in the code by its path in the folder (m/alert-m.svg) and by its file name.
+for (const id of folderIds) codeIcons.add(norm(id));
+if (FOLDER) for (const rel of svgFiles(join(ROOT, FOLDER))) codeIcons.add(norm(rel.split('/').pop().replace(/\.svg$/i, '')));
 
 // ── Compare ─────────────────────────────────────────────────────────────────
 const OK = [], MISSING = [];

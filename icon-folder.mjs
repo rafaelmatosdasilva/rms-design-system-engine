@@ -3,6 +3,8 @@
 //
 //   findIconFolder(root)            → the folder that holds the icons, relative to root, or null
 //   folderSymbols(root, folder)     → [{ id, file, symbol }], one per SVG file, sorted by id
+//   iconFolder(root, cfg)           → paths.iconFolder when set, else findIconFolder(root)
+//   codeConnectIcons(root)          → [{ id, icon, name, url }], Figma's icons as Code Connect's batch files map them
 //
 // A folder counts as the icon folder when it is named icon or icons and holds at least MIN_FILES SVG files at any depth;
 // the one under src/ comes first, then the one with the most files. Each symbol's id is its path inside the folder with
@@ -95,4 +97,38 @@ export function folderSymbols(root, folder) {
     if (symbol) out.push({ id, file: `${folder}/${rel}`, symbol });
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+// The icon folder: the one ds-config.json names (paths.iconFolder), else the one found.
+export function iconFolder(root, cfg = {}) {
+  const set = cfg.paths?.iconFolder;
+  return set && existsSync(join(root, set)) ? String(set).replace(/\/+$/, '') : findIconFolder(root);
+}
+
+// Figma's icons as Code Connect's batch files (*.figma.batch.json) map them: each entry links a Figma component (its
+// url) to the icon file it stands for ("icon": "l/error-l"), so Figma's list and the folder meet on the file's path
+// with no list written by hand. Entries without an icon path are not icons; [] when there is no such file.
+export function codeConnectIcons(root, { maxDepth = 6 } = {}) {
+  const files = [];
+  const walk = (d, depth) => {
+    if (depth > maxDepth) return;
+    let names; try { names = readdirSync(d); } catch { return; }
+    for (const n of names) {
+      if (SKIP.has(n) || n.startsWith('.')) continue;
+      const p = join(d, n); let st; try { st = statSync(p); } catch { continue; }
+      if (st.isDirectory()) walk(p, depth + 1);
+      else if (/\.figma\.batch\.json$/i.test(n)) files.push(p);
+    }
+  };
+  walk(root, 0);
+  const out = new Map();
+  for (const f of files.sort()) {
+    let list; try { list = JSON.parse(readFileSync(f, 'utf8')).components; } catch { continue; }
+    for (const c of Array.isArray(list) ? list : []) {
+      if (typeof c?.icon !== 'string' || !c.icon.trim()) continue;
+      const id = symbolId(c.icon);
+      if (id && !out.has(id)) out.set(id, { id, icon: c.icon, name: c.component ?? c.icon, url: c.url ?? null });
+    }
+  }
+  return [...out.values()].sort((a, b) => a.id.localeCompare(b.id));
 }

@@ -54,7 +54,7 @@ The engine reads what your design system defines in Figma, its tokens and each c
 
 - **Tokens.** Colours, sizes, fonts, shadows and durations, in every mode (Light and Dark, Desktop and Phone).
 - **Components.** Props, defaults and options, every state (hover, focus, pressed, disabled, selected), heights, spacing, corners and markup.
-- **Icons.** From the shared set, drawn the same way as in Figma.
+- **Icons.** From the shared set, drawn the same way as in Figma, whether the code keeps them in one sprite or as one SVG file each (Figma's icons matched to the files by Code Connect's links).
 - **Motion and effects.** How each component moves, and what it draws beyond its colours (both below).
 - **Product screens.** Where each product puts each component (below).
 

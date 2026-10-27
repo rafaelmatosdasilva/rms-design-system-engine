@@ -101,7 +101,7 @@
 
 ✅  [20] Icons  (symbol markup · path data · live Figma check · every Figma icon is in the code)
        ✅ No undocumented content-setting pseudo-elements.
-       ✅ No undocumented or misconfigured SVG symbols.
+       ⏭  SVG symbol audit: no sprite and no icon folder - nothing to check
        ⏭  skipped - FIGMA_TOKEN not set (add to .env to enable icon freshness checks)
        ⏭  icon inventory: no figma-icons.snapshot.json - skipped (capture it to enable)
 
@@ -256,14 +256,14 @@
   - chip/Label: the code names it "label" (letter case L → l)  (src/components/Chip.jsx)
   - and 1 more
 
-**Not checked in this run**: 21
+**Not checked in this run**: 22
 - Data is up to date: Build freshness skipped on CI (mtime unreliable after fresh clone)
 - Figma frame unchanged: No frames configured in ds-config.json - visual regression skipped
 - Tokens used in screens exist in CSS: no frames[] configured in ds-config.json
 - Exception lists are valid: no design-system-engine-map.mjs - no exception list to check
 - Docs tell the truth: no documentation surfaces configured
 - No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
-- and 15 more
+- and 16 more
 
 Burndown, open findings per component: chip 5 · button 2 · field 1 · 1 not tied to a component
 Fix first: chip. Run with --component chip, fix, run again.
