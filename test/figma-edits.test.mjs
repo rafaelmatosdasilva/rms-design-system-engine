@@ -2,7 +2,7 @@
 // listed as an edit, and applied by a script that changes only what was listed, once.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { codeRole, componentRole, figmaEdits, applyScript, editLines } from '../figma-edits.mjs';
+import { codeRole, componentRole, figmaEdits, applyScript, editLines, writeFigmaEdits } from '../figma-edits.mjs';
 import { figmaWriteVerdict } from '../guard.mjs';
 import { route } from '../route.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -179,4 +179,24 @@ test('with Figma\'s categories: a note in a design-intent category is never a to
   assert.match(editLines(edits).join('\n'), /"Announce the total when it changes\." \(an accessibility note: write it as Role:/);
   // The capture script only reads Figma: the guard never takes it for a change.
   assert.equal(figmaWriteVerdict(captureScript(), { root: mkdtempSync(join(tmpdir(), 'cap-')) }), null);
+});
+
+// What this project lets the engine change in the design file decides whether a script that makes the changes is
+// written at all: one nobody may run is a loaded gun left on the table.
+test('a project that never lets the engine write Figma gets the list and no script', async () => {
+  const { mkdtempSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const edits = [{ kind: 'role', component: 'chip', label: 'Role: button', why: 'the code renders a <button>' }];
+  const dir = mkdtempSync(join(tmpdir(), 'figma-edits-'));
+  const files = writeFigmaEdits(dir, edits, { may: 'no' });
+  assert.equal(existsSync(files.json), true, 'what Figma is missing is worth reading whoever may change it');
+  assert.equal(files.script, null);
+  assert.equal(existsSync(join(dir, 'figma-apply.js')), false);
+  const lines = editLines(edits, { may: 'no', why: 'on CI the engine never writes the design file' }).join('\n');
+  assert.match(lines, /does not let the engine write the design file \(on CI the engine never writes the design file\), so nothing was written to run/);
+  assert.match(lines, /on the Tasks page, for whoever owns Figma/);
+  // Allowed outright, the run says to make the changes; asked, it says to ask first.
+  assert.match(editLines(edits, { may: 'yes' }).join('\n'), /^NEXT: run /m);
+  assert.match(editLines(edits, { may: 'ask' }).join('\n'), /and ask; only when they say yes/);
+  assert.equal(writeFigmaEdits(dir, edits, { may: 'ask' }).script !== null, true);
 });

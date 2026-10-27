@@ -601,6 +601,26 @@ if (process.argv.includes('--ci-changed')) {
   process.exit(3);
 }
 
+// ── --writes [<place> <yes|ask|no>]: what this project lets the engine change, and where it must never ──
+// With nothing after it, the four answers as they stand now. With a place and an answer, that one is recorded in
+// ds-config.json, and every session and every run read the same one rather than each asking again.
+if (process.argv.includes('--writes')) {
+  const { PLACES, ANSWERS, writesLines, recordWrite, mayWrite, PLACE } = await import('./writes.mjs');
+  const at = process.argv.indexOf('--writes');
+  const place = process.argv[at + 1], answer = process.argv[at + 2];
+  let pcfg = {}; try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* none yet: every place is unanswered */ }
+  if (place && !place.startsWith('--')) {
+    if (!PLACES.includes(place)) { console.log(`Say one of ${PLACES.join(', ')}: rms-design-system-engine --writes figma ask`); process.exit(2); }
+    if (!ANSWERS.includes(answer)) { console.log(`Say ${ANSWERS.join(', ')} for ${PLACE[place].said}: rms-design-system-engine --writes ${place} ask`); process.exit(2); }
+    try { recordWrite(ROOT, place, answer); } catch (e) { console.error(`❌ ${e.message}`); process.exit(1); }
+    pcfg.writes = { ...(pcfg.writes ?? {}), [place]: answer };
+    console.log(`✅ ${PLACE[place].said}: ${mayWrite(pcfg, place, { ci: false }).answer === 'yes' ? 'the engine writes it and says what changed' : answer === 'ask' ? 'the engine shows the change and waits for a yes' : 'the engine never writes it; the change goes on the Tasks page'}.`);
+  }
+  console.log('\n' + writesLines(pcfg).join('\n'));
+  console.log(`\nNEXT: ${place ? 'none' : 'answer a place with rms-design-system-engine --writes <place> <yes|ask|no>'}\n`);
+  process.exit(0);
+}
+
 // ── --intent-autofix on|off: whether each run fixes the intent layer and commits it straight on its branch ──
 // Writes ds-config.json → intentLayer.autoFix ("commit", or taken out), keeping the file's own indentation.
 if (process.argv.includes('--intent-autofix')) {
@@ -1796,9 +1816,13 @@ if (process.argv.includes('--figma-edits')) {
     } catch { /* the screens not read for accessibility yet (--figma-a11y) */ }
     // A role the spec states is not added twice.
     const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []).filter((e) => !(e.kind === 'role' && specRole.has(e.component))) : []), ...specs, ...review, ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses, loadCategories(ROOT, feConfig), feConfig) : [])];
-    const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits);
-    for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null })) console.log(l);
-    if (edits.length) console.log(`   (${relative(ROOT, files.json)} · ${relative(ROOT, files.script)})`);
+    // What this project lets the engine change in the design file decides whether the script that makes the changes
+    // is written at all (writes.mjs). The list is written either way: what Figma is missing is worth reading.
+    const { mayWrite } = await import('./writes.mjs');
+    const fig = mayWrite(cfg, 'figma');
+    const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits, { may: fig.answer });
+    for (const l of editLines(edits, { fileKey: feConfig.figmaFileKey ?? null, may: fig.answer, why: fig.why })) console.log(l);
+    if (edits.length) console.log(`   (${relative(ROOT, files.json)}${files.script ? ` · ${relative(ROOT, files.script)}` : ''})`);
     process.exit(0);
   } catch (e) { console.error(`❌ Figma edits not listed: ${e.message}`); process.exit(1); }
 }
