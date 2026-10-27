@@ -5627,6 +5627,7 @@ function reportFull(label, items, shown) {
       const r = await generateContracts(ROOT, cfg, {});
       const issues = r.invalid.length ? ` · ⚠️ ${r.invalid.length} schema issue(s)` : '';
       console.log(r.kept ? `\n📐 ${r.kept}` : `\n📐 Contracts → ${r.outDir.replace(ROOT + '/', '')}  (${r.components.length} component${r.components.length === 1 ? '' : 's'} · ${r.tokenCount} DTCG tokens${issues})`);
+      if (r.dsdsOut && r.components?.length) console.log(`ℹ️  DSDS view → ${r.dsdsOut.replace(ROOT + '/', '')}: the ${r.components.length} contract${r.components.length === 1 ? '' : 's'} in DSDS ${(await import('./contract-dsds.mjs')).DSDS_VERSION}, for a team that documents its system in that format.`);
       if (r.propTypesOut) console.log(`ℹ️  Figma prop types → ${r.propTypesOut.replace(ROOT + '/', '')}: type a component's props with its <Name>FigmaProps so tsc shows prop drift.`);
       if (r.authoredIssues?.length) {
         console.log(C.yellow(`⚠️  contract.authored.json has ${r.authoredIssues.length} issue(s) — the malformed binding(s) below are ignored until fixed:`));

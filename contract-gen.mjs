@@ -20,7 +20,7 @@
 //
 // Generic: no project names, tokens, or components are hardcoded.
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, rmdirSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, rmdirSync, rmSync } from 'node:fs';
 import { dirname, resolve, join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pruneCandidates } from './prune-check.mjs';
@@ -1113,6 +1113,19 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const llmsOut = cc.llmsOut ? resolve(ROOT, cc.llmsOut) : join(outDir, 'llms.txt');
   try { writeFileSync(llmsOut, buildLlms(built, tokens, countLeaves(tokens), catalog, { primitives: primitiveGuideLines(cfg), authority: authorityLines(cfg, ROOT), intentLayer: IL ? { source: IL._source?.url ?? 'intent layer', pages: layerPages(IL) } : null, pairs: tokenPairList, from: codeOnly ? 'the code alone (no Figma file)' : 'Figma + code' }) + '\n'); } catch { /* best-effort */ }
 
+  // The same contracts in DSDS 0.23 (contract-dsds.mjs), for a team that documents its system in that format: an index
+  // and a file a component, under dsds/, each linking its contract. Rewritten whole each build, so none outlives its
+  // component.
+  let dsdsOut = null;
+  try {
+    const { dsdsDocuments } = await import('./contract-dsds.mjs');
+    const dir = join(outDir, 'dsds');
+    const docs = dsdsDocuments(built.map((b) => ({ ...b, file: placeOf.get(b.name) })), { system: cfg.name || 'Design system', framework: cfg.framework || null });
+    try { rmSync(join(dir, 'components'), { recursive: true, force: true }); } catch { /* none yet */ }
+    for (const { rel, doc } of docs) { ensureDir(dirname(join(dir, rel))); writeFileSync(join(dir, rel), JSON.stringify(doc, null, 2) + '\n'); }
+    dsdsOut = dir;
+  } catch { /* best-effort */ }
+
   // Figma prop types: the component properties as TypeScript, for a compile-time prop check.
   let propTypesOut = null;
   try {
@@ -1134,5 +1147,5 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const statusCounts = built.reduce((acc, b) => { const st = b.contract.status?.state; if (st) acc[st] = (acc[st] || 0) + 1; return acc; }, {});
 
   try { ensureDir(outDir); writeFileSync(builtFile, JSON.stringify({ _built: stamp }, null, 2) + '\n'); } catch { /* best-effort */ }
-  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
+  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, dsdsOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
 }
