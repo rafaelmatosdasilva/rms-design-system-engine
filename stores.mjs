@@ -218,6 +218,8 @@ export function gitStoreFiles(p, place, { git = gitSilently, home = homedir() } 
 }
 // stderr is kept, not thrown away: when a host refuses a push (a protected branch, a role that may not write) what
 // it says is the only useful part of the failure, and the run passes it on word for word.
+// What GitLab and GitHub say when a branch's protection refuses a push (GitLab's own words, and a hook declining it).
+const PROTECTED = /protected branch|not allowed to push|pre-receive hook declined/i;
 const gitSilently = (args, input, env = {}) => execFileSync('git', args, { input, maxBuffer: 256 * 1024 * 1024, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...GIT_SILENT, ...env } });
 
 // Writing a store with the person's own git access, for a computer with no token. The mirror gitStoreFiles already
@@ -228,8 +230,13 @@ const gitSilently = (args, input, env = {}) => execFileSync('git', args, { input
 // exactly as it would be from a terminal, and the refusal is passed on in the line the run prints: this adds a way
 // in, never a permission.
 //
-// → { ok: true, sha } | { ok: false, why }
-export function gitStorePush(p, place, files, message, { git = gitSilently, home = homedir(), who = null } = {}) {
+// On GitLab a refused branch is what a merge request is for, as the API path does it: with mergeRequest set, a push
+// the branch's protection refuses is sent again to a branch of its own, with GitLab's push options asking for a merge
+// request into the branch it was meant for (mergeRequest.always: the setup asks for one, so the branch is never pushed
+// to). Whether this person may open one is still GitLab's to say, on that push.
+//
+// → { ok: true, sha } | { ok: true, sha, mergeRequest: { branch, target, url } } | { ok: false, why }
+export function gitStorePush(p, place, files, message, { git = gitSilently, home = homedir(), who = null, mergeRequest = null } = {}) {
   const dir = gitMirrorDir(p.host, p.path, home);
   const under = place.path ? place.path.replace(/^\/+|\/+$/g, '') : '';
   const branch = place.branch || 'HEAD';
@@ -262,8 +269,21 @@ export function gitStorePush(p, place, files, message, { git = gitSilently, home
         GIT_COMMITTER_NAME: who?.name || SKILL, GIT_COMMITTER_EMAIL: who?.email || NOREPLY,
       };
       const sha = String(git(['--git-dir', dir, 'commit-tree', tree, '-p', head, '-m', message], undefined, env)).trim();
-      g(['push', '-q', url, `${sha}:refs/heads/${place.branch || 'HEAD'}`]);
-      return { ok: true, sha };
+      if (!mergeRequest?.always) {
+        try { g(['push', '-q', url, `${sha}:refs/heads/${branch}`]); return { ok: true, sha }; }
+        catch (e) { if (!mergeRequest || !PROTECTED.test(String(e?.stderr ?? e?.message ?? ''))) throw e; }
+      }
+      // A merge request: the target is the branch's own name (HEAD is the default branch, which the host names).
+      let target = place.branch;
+      if (!target) { const m = /^ref: refs\/heads\/(\S+)\s+HEAD/m.exec(String(g(['ls-remote', '--symref', url, 'HEAD']))); target = m?.[1]; }
+      if (!target) return { ok: false, why: 'the branch to send a merge request into is not known: name it in the setup (branch)' };
+      const source = mergeRequest.branch;
+      const title = String(message).split('\n')[0].slice(0, 250);
+      g(['push', '-q', '-o', 'merge_request.create', '-o', `merge_request.target=${target}`, '-o', 'merge_request.remove_source_branch', '-o', `merge_request.title=${title}`, url, `${sha}:refs/heads/${source}`]);
+      // GitLab prints the merge request's link on stderr, which a push that worked does not hand back: its list,
+      // filtered to the branch, is always right.
+      const web = `${p.origin}/${p.path}/-/merge_requests?scope=all&state=opened&source_branch=${encodeURIComponent(source)}`;
+      return { ok: true, sha, mergeRequest: { branch: source, target, url: web } };
     } finally { try { rmSync(index, { force: true }); } catch { /* never there on the first failure */ } }
   } catch (e) {
     // What git says is what the host said: a protected branch, a role that may not push, a stale branch.
@@ -530,9 +550,13 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
   // Written with this person's own git access, because there is no token. Built and pushed without a checkout; a
   // host that will not take it says so and that is what the line carries.
   if (a.mode === 'push') {
-    const r = (opts.gitPushStore ?? gitStorePush)(a.gitPlace, place, sendable, message, { ...opts, who: 'runBy' in opts ? opts.runBy : runBy(ROOT) });
+    // On GitLab, a protected branch takes a merge request instead, as with a token; GitHub has no push options for one.
+    const mergeRequest = place.github ? null : { always: storesOf(cfg)[part]?.mode === 'merge-request', branch: `design-system-engine/${part}-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}` };
+    const r = (opts.gitPushStore ?? gitStorePush)(a.gitPlace, place, sendable, message, { ...opts, who: 'runBy' in opts ? opts.runBy : runBy(ROOT), mergeRequest });
     if (!r.ok) return { ok: false, line: `⚠️  ${label} not sent: ${r.why}` };
     if (r.unchanged) return { ok: true, line: `ℹ️  ${label}: ${describePlace(place)} already has these files` };
+    // The branch did not move, so what the store was read at stays; the merge request is for a Maintainer to merge.
+    if (r.mergeRequest) return { ok: true, url: r.mergeRequest.url, line: `📤 ${label}: ${sendable.length} file${sendable.length === 1 ? '' : 's'} sent as a merge request into ${r.mergeRequest.target} with your own git access (${r.mergeRequest.url})${mergeRequest.always ? '' : ` - ${r.mergeRequest.target} is protected: a Maintainer merges it`}` };
     const st2 = readState(ROOT), prev2 = st2[part] ?? {};
     st2[part] = { sha: r.sha, files: { ...(prev2.files ?? {}), ...Object.fromEntries(sendable.map(([rel, d]) => [rel, hash(d)])) }, readAt: new Date().toISOString() };
     writeState(ROOT, st2);
