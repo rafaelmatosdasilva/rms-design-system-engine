@@ -2536,7 +2536,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // with the title as the page scrolls.
   if ((DATA.links || []).length) {
     var ovTitle = document.getElementById('sg-hero-title'), ovActs = document.createElement('div'); ovActs.className = 'sg-section-actions';
-    ovActs.innerHTML = headLinksHTML(DATA.links.map(function (l) { return { url: l.url, label: /figma/i.test(l.label + ' ' + l.url) ? 'Figma' : /code|repo|git/i.test(l.label + ' ' + l.url) ? 'Code' : l.label }; }));
+    ovActs.innerHTML = headLinksHTML(DATA.links.map(sourceLink));
     ovTitle.appendChild(ovActs);
   }
   // A page for some components only (--component X --styleguide): which ones, what they nest, and where the rest is.
@@ -3385,7 +3385,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A link to a page's panel (panel=doc:<file>) opens it.
     ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
-    pageBar(ilSec, { links: ilSrc.url ? [{ label: 'See intent layer', url: ilSrc.url }] : [], chips: (function () { var toReview = rows.filter(needsReview).length;
+    pageBar(ilSec, { links: sourceLinks(ilSrc.url), chips: (function () { var toReview = rows.filter(needsReview).length;
       return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
@@ -7148,6 +7148,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Named for where it takes you (Figma, Code), each with the page's own mark for it, never one of the system's icons.
     var mark = function (label) { return /^figma$/i.test(label) ? FIGMA_SVG : /^code$/i.test(label) ? CODE_SVG : EXTERNAL_SVG; };   // any other: the mark of a link to another site
     return '<div class="pg-head-links">' + list.map(function (l) { return sysButton('a', /^code$/i.test(l.label) ? 'Code' : /^figma$/i.test(l.label) ? 'Figma' : l.label, ' href="' + esc(l.url) + '" target="_blank" rel="noopener"', null, null, mark(l.label)); }).join('') + '</div>';
+  }
+  // A link of the system's named for where it takes you: its Figma file is Figma, its repository Code, any other its own.
+  function sourceLink(l) { return { url: l.url, label: /figma/i.test(l.label + ' ' + l.url) ? 'Figma' : /code|repo|git/i.test(l.label + ' ' + l.url) ? 'Code' : l.label }; }
+  // Where a page's documentation is read from, each a link at its top right: the Figma file, the code, the intent layer.
+  function sourceLinks(layer) {
+    var own = (DATA.links || []).map(sourceLink), pick = function (k) { return own.filter(function (l) { return l.label === k; }).slice(0, 1); };
+    return pick('Figma').concat(pick('Code'), layer ? [{ label: 'Intent layer', url: layer }] : []);
   }
   function linksHTML(list) {
     if (!(list || []).length) return '';

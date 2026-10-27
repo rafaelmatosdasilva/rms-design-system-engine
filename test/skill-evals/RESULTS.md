@@ -1,21 +1,36 @@
 # Skill evaluation results
 
-## 2026-10: History: Figma's changes beside the code's; --figma-edits runs again (continuous evaluation)
+## 2026-10: Prototypes as a part, a handoff page, comments, and the guide for five things the skill did not know about (continuous evaluation)
 
-What changed since the entry below (engine 37ce80b): Each project says where the engine may write, and where it must never (#82); A page's drafts: one card, then three decisions side by side, each with Copy decision (#83); Every side panel and every filter has its own address; panels open at their top; what to do in plain words (#84); Two questions agents ask the intent layer: which token is for this, and is there a component the system lacks (#85); A list an intent-layer page copies from what the engine generates is flagged, with the file to link to instead (#86); Decisions in the intent layer, and History in the style guide; Test the decision route against keep; History: Figma's changes beside the code's; --figma-edits runs again. The guide changed in `reference/usage.md`.
+What changed since the entry below (engine 37ce80b, whose commit the rebases behind this branch rewrote, so the
+engine could not list them itself): prototypes became a store part of their own; `--handoff` writes what a developer
+needs on one page; `--comment` keeps what a person said about a page beside it; one log of what the team decided, so
+nobody proposes a rejected option twice; each project says where the engine may write and where it must never; and
+`--figma-edits` fell over on every project, with a test that now runs all 55 commands against one rule. The guide
+changed in `reference/usage.md` and `reference/config.md`: the rules sweep, the rules read in tiers, the colour
+pairs, the decisions log and the `writes` setting.
 
-Guide set measured: `19098a1972c1` · Project measured: `13d811a9d668`
+Guide set measured: `9350b38b7036` · Project measured: `13d811a9d668`
 
-| Haiku, engine effaf9a | Entry below | This version |
+**The agent's command line changed.** The agent's command line bundles other skills than in the runs before (2.1.178 → 2.1.310; added dataviz, design, doctor, plugin-authoring, workflow-authoring): a change in the results may come from them, not from the guide.
+
+| Haiku, engine 6da56a7 | Entry below | This version |
 |---|---|---|
 | The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
-| Mean cost a run | $0.060 | $0.058 |
-| Input a run | 120k | 113k |
+| Mean cost a run | $0.060 | $0.061 |
+| Input a run | 120k | 109k |
 | Rule violations | 0 | 0 |
 
-**Reading.** Haiku: every task passes and no rule is broken; runs read 113k a run against 120k. Records: `records/2026-10-27-history-figma-s-changes-beside`.
+**Reading.** Haiku: every task passes and no rule is broken; runs read 109k a run against 120k. The guide gained
+five sections and got cheaper to read. Records: `records/2026-10-27-the-command-sweep-takes-a`.
 
-**Found by this evaluation and fixed.** On engine 3b52613 `figma-roles` failed 3 of 3: `--figma-edits` read a config name that is not defined where it runs (since #82), so it stopped before listing any edit, and Claude tried to patch the installed engine. It reads the project's config again (effaf9a), and the task passes 3 of 3.
+**This was measured three times, and only the last one shipped.** The first run scored 66/70 (`figma-roles` 0/3)
+against an engine whose `--figma-edits` exited with `cfg is not defined`: the agent ran the engine, got an error,
+and was marked down for what the engine failed to say. That entry and its records were taken out rather than kept
+with a note - an evaluation nobody can trust is worse than none - and `test/commands-run.test.mjs` now runs every
+command so a broken one cannot reach an evaluation again. The second run, after the fix, was 70/70; a change landed
+on `main` that added one line to `reference/usage.md` while it ran, so the guide set in the repository was a
+combination nobody had measured, and that entry is gone with it. This is the third, on what actually ships.
 
 ## 2026-10: One decision for a page's drafts, the drafts grouped by section and each once; a card head never rests on its own first line (continuous evaluation)
 
@@ -31,6 +46,7 @@ Guide set measured: `694e54f305b7` · Project measured: `13d811a9d668`
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 120k a run against 134k. Records: `records/2026-10-27-one-decision-for-a-page`.
+
 
 ## 2026-10: The evidence convention, short enough for the guide's size limit (continuous evaluation)
 
@@ -76,6 +92,23 @@ Guide set measured: `6db433ef3358` · Project measured: `13d811a9d668`
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 130k a run against 125k. Records: `records/2026-10-27-a-request-that-asks-for`.
+
+## 2026-10: Prototypes as a part, a handoff page, and what people say about a prototype (continuous evaluation)
+
+What changed since engine 74a632e, the baseline this and the entry below were both measured from: prototypes became a store part of their own; --handoff writes what a developer needs on one page; --comment keeps what a person said about a page beside it. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `4591dec0d7da` · Project measured: `13d811a9d668`
+
+**The agent's command line changed.** The agent's command line bundles other skills than in the runs before (2.1.178 → 2.1.310; added dataviz, design, doctor, plugin-authoring, workflow-authoring): a change in the results may come from them, not from the guide.
+
+| Haiku, engine 3080190 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.064 | $0.058 |
+| Input a run | 131k | 101k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 101k a run against 131k. Records: `records/2026-10-27-what-a-person-said-about`.
 
 ## 2026-10: A store's README says how its style guide is updated when no pipeline builds it (continuous evaluation)
 
