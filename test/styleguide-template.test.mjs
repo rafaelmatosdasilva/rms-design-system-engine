@@ -644,7 +644,9 @@ test('in the browser: no script error, a control changes the real component, the
     // (read from the template: the lowest stuck bar is marked on a scroll frame, which a headless page times freely)
     const sgTpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
     assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, \.sg-token-card thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over tables, the gap under the line');
-    assert.match(sgTpl, /\.sg-sticky-edge\.sg-sticky-band \{ box-shadow:/);
+    // It stops a line short of the gap: a table's head sticks a pixel under the bars' bottom plus the gap (at.th, -1,
+    // above), so its top line is two under; a band a line longer is drawn over that line (the bar is above the table).
+    assert.match(sgTpl, /\.sg-sticky-edge\.sg-sticky-band \{ box-shadow: 0 calc\(var\(--sg-stick-gap\) - 2 \* var\(--sg-line-width, 1px\)\) 0 0 var\(--sg-bg\); \}/, 'the band ends where a stuck head\'s top line begins');
     await run(`location.hash = '#brand-kit'`); await shownIs('identity');
     await run(`window.scrollTo({ top: 1200, behavior: 'instant' })`); await new Promise((r) => setTimeout(r, 400));
     assert.equal(await run(`(() => { const e = document.querySelector('.sg-sticky-edge'); return !e || !e.classList.contains('sg-sticky-band'); })()`), true, 'no gap cut under the line on a page with no table');
