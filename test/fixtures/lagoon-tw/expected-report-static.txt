@@ -85,7 +85,7 @@
 
 ✅  [20] Icons  (symbol markup · path data · live Figma check · every Figma icon is in the code)
        ✅ No undocumented content-setting pseudo-elements.
-       ✅ No undocumented or misconfigured SVG symbols.
+       ⏭  SVG symbol audit: no sprite and no icon folder - nothing to check
        ⏭  skipped - FIGMA_TOKEN not set (add to .env to enable icon freshness checks)
        ⏭  icon inventory: no figma-icons.snapshot.json - skipped (capture it to enable)
 
@@ -236,14 +236,14 @@
 - **Component props match Figma** fails:
   - badge/Tone: the code names it "tone" (letter case T → t)  (src/components/Badge.tsx)
 
-**Not checked in this run**: 21
+**Not checked in this run**: 22
 - Data is up to date: No plugins configured in ds-config.json
 - Figma frame unchanged: No frames configured in ds-config.json - visual regression skipped
 - Tokens used in screens exist in CSS: no frames[] configured in ds-config.json
 - Exception lists are valid: no design-system-engine-map.mjs - no exception list to check
 - Docs tell the truth: no documentation surfaces configured
 - No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
-- and 15 more
+- and 16 more
 
 Burndown, open findings per component: badge 4 · 5 not tied to a component
 Fix first: badge. Run with --component badge, fix, run again.

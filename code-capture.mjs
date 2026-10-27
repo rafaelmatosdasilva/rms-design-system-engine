@@ -606,7 +606,7 @@ export async function captureCode(ROOT, cfg, { force = false, browser: wantBrows
       appTokens: Object.keys(appTokens).length,
       components: compCoverage,
       api: apiCoverage(api, apiNote, apiSources),
-      icons: { symbols: Object.keys(icons).length, unused: Object.values(icons).filter((i) => !i.usedAt.length).length },
+      icons: { symbols: Object.keys(icons).length, unused: Object.values(icons).filter((i) => i.usedAt && !i.usedAt.length).length },
       markup: { apps: Object.keys(markup).filter((k) => !k.startsWith('_')).length, classesFrom: markup._classes.from },
       nesting: { components: Object.keys(nesting).length, rendered: !!nestingRendered, source: !!apiReader },
       styleguide: styleguide.generate && pages.some((p) => p.generated) ? { built: true, template: styleguide.template } : { built: false, ...(styleguide.note ? { note: styleguide.note } : {}) },
