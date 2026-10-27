@@ -55,3 +55,13 @@ test('a decision asked for in words goes to --decision with what was ruled out a
   assert.deepEqual(r.run, ['rms-design-system-engine --decision chip "<what was decided>" --ruled-out "a large chip" --why "it breaks the row"']);
   assert.match(route('keep the chip height on purpose because the product needs a larger tap target', { hasConfig: true, components: ['chip'] }).run[0], / --keep /);
 });
+
+test('History: one table of changes (the code\'s and Figma\'s, each tagged) and decisions; a release with nothing chosen hides', async () => {
+  const { readFileSync } = await import('node:fs');
+  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  assert.match(tpl, /<tr data-chip="figma" data-chip-group="changes">/);
+  assert.match(tpl, /<tr data-chip="code" data-chip-group="changes">/);
+  assert.match(tpl, /\{ key: 'changes', label: 'Changes', n: nChanges \}, \{ key: 'decisions', label: 'Decisions'/);
+  assert.match(tpl, /wn\.addEventListener\('sg-chip', function \(e\) \{ Array\.prototype\.forEach\.call\(e\.currentTarget\.querySelectorAll\('\.pg-inspect'\)/, 'never a var another page reuses');
+  assert.match(tpl, /\.pg-inspect\[hidden\] \{ display: none; \}/);
+});

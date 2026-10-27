@@ -3107,10 +3107,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       }).join('') + '</tbody></table></div>';
     }).join('');
     // Changes (the code's and Figma's), decisions or both: the page's chips when it has both, and a release with nothing
-    // of the kind chosen out of the way.
+    // of the kind chosen out of the way (read from the page itself: box is a var another page reuses).
     var nChanges = box.querySelectorAll('tr[data-chip-group="changes"]').length;
     if (nChanges && DECISIONS.length) pageBar(wn, { chips: [{ key: 'changes', label: 'Changes', n: nChanges }, { key: 'decisions', label: 'Decisions', n: DECISIONS.length }] });
-    wn.addEventListener('sg-chip', function () { Array.prototype.forEach.call(box.querySelectorAll('.pg-inspect'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); }); });
+    wn.addEventListener('sg-chip', function (e) { Array.prototype.forEach.call(e.currentTarget.querySelectorAll('.pg-inspect'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); }); });
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
   var leftHTML = function (list) { return list.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what || n.text)) + '</strong>' + (n.from ? '<span class="pg-par-val">' + esc(capital(n.from)) + '</span>' : '') + '</p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join(''); };
