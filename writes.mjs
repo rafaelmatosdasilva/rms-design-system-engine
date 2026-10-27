@@ -5,25 +5,27 @@
 // answer was the same everywhere, and it was always the most cautious one: write a script, show it, ask again.
 //
 // One answer per place, in ds-config.json:
-//   "writes": { "figma": "ask", "code": "no", "generated": "yes", "engine": "yes", "issues": "ask" }
-//   yes  write it, and say what changed; the product's code only through a branch and a pull request.
+//   "writes": { "figma": "ask", "generated": "yes", "engine": "yes", "issues": "ask" }
+//   yes  write it, and say what changed.
 //   ask  show the exact change and wait for a yes, every time.
 //   no   never. The change goes on the Tasks page, for whoever owns that place.
 // Not set is `ask`: the engine asks once, at setup or the first time it has something to write there, and records the
 // answer, so every session and every run read the same one rather than each asking again.
 //
 // Two things the config cannot override. On CI nobody is there to answer, so `ask` is `no`; and CI never writes the
-// design file, the product's code or the team's issue tracker whatever the config says, because a run nobody is
-// watching changing what people wrote - or filling their tracker - is how a team stops trusting the engine. Both are
-// said out loud, never silently.
+// design file or the team's issue tracker whatever the config says, because a run nobody is watching changing what
+// people made - or filling their tracker - is how a team stops trusting the engine. Both are said out loud, never
+// silently.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Each place, what it is called, and whether CI may ever write it.
-export const PLACES = ['figma', 'code', 'generated', 'engine', 'issues'];
+// The product's code is not here, and never will be: the engine does not change code people wrote. What it finds
+// there is handed back as a patch for a person to apply and shown on the component's own page in the style guide.
+// A setting with one possible answer is a lie, so there is none.
+export const PLACES = ['figma', 'generated', 'engine', 'issues'];
 export const PLACE = {
   figma: { said: 'the design file', holds: 'what Figma shows: a role, a name, an annotation, a component', onCI: false },
-  code: { said: "the product's code", holds: 'the files people wrote, through a branch and a pull request', onCI: false },
   generated: { said: 'the code the engine generated', holds: 'the tokens, the contracts, the style guide: files the engine wrote before', onCI: true },
   engine: { said: "the engine's own files", holds: "the authored contract, the structure contract's notes, the kept differences", onCI: true },
   issues: { said: "the team's issue tracker", holds: 'one issue per difference a check finds, closed when no run finds it any more', onCI: false },
@@ -77,7 +79,7 @@ export function writesLines(cfg = {}, { ci = !!process.env.CI } = {}) {
 export function writeRule(cfg = {}, place, { ci = !!process.env.CI } = {}) {
   const { answer, why } = mayWrite(cfg, place, { ci });
   const head = `${PLACE[place].said}: `;
-  if (answer === 'yes') return `${head}write it, and say what changed${place === 'code' ? ', on a branch and through a pull request' : ''}.`;
+  if (answer === 'yes') return `${head}write it, and say what changed.`;
   if (answer === 'ask') return `${head}show the person the exact change and wait for a yes. Never write it on your own.`;
   return `${head}never write it${why ? ` (${why})` : ''}. Put the change on the Tasks page, for whoever owns it.`;
 }

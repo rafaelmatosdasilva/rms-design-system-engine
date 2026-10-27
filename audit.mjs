@@ -6418,6 +6418,17 @@ function reportFull(label, items, shown) {
       mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
       writeFileSync(join(ROOT, OUT_DIR, 'issues.json'), JSON.stringify({ $description: 'One issue per difference, for the project the team names for them. Generated; sent only where ds-config.json → writes.issues allows it.', at: new Date().toISOString(), where, may, ...plan }, null, 2) + '\n');
       for (const l of issueLines(plan, { may, where, why: whyNot ?? host.why })) console.log(may === 'no' ? C.yellow(l) : C.dim(l));
+      // And which fix each open issue needs. The engine already builds all three; what was missing was the sentence
+      // saying which one this issue needs, so whoever reads the tracker is not the one working it out every time.
+      try {
+        const { routePlan, routeLines } = await import('./issue-routes.mjs');
+        const { keptKey } = await import('./kept.mjs');
+        const { keyIn } = await import('./issues.mjs');
+        // Both what is already open and what this run would open: a person reads one list of what needs doing.
+        const all = [...plan.open, ...open.map((i) => ({ key: keyIn(i.body), iid: i.iid, title: i.title })).filter((i) => i.key)];
+        const routed = routePlan(all, found, { keyOf: (f) => keptKey(`${f.check} :: ${f.evidence}`), writes: cfg.writes ?? {} });
+        for (const l of routeLines(routed)) console.log(C.dim(l));
+      } catch { /* the issues above still say what was found */ }
       if (may === 'yes' && host.base) {
         const sent = await sendIssues(plan, gitlabSender(host.base, host.headers));
         console.log(C.dim(`     ${sent.opened} opened, ${sent.closed} closed${sent.failed.length ? `; ${sent.failed.length} the host refused: ${sent.failed.slice(0, 3).map((f) => `${f.what} (${f.why})`).join('; ')}` : ''}.`));

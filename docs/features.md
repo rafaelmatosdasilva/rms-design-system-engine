@@ -421,9 +421,11 @@ Until now the answer was the same in every project, and it was always the most c
 | Place | What it holds |
 |---|---|
 | The design file | What Figma shows: a role, a name, an annotation, a component |
-| The product's code | The files people wrote, through a branch and a pull request |
 | The code the engine generated | The tokens, the contracts, the style guide |
 | The engine's own files | The authored contract, the structure contract's notes, the kept differences |
+| The team's issue tracker | One issue per difference, closed when no run finds it any more |
+
+**Your product's code is not on that list, and never will be.** The engine does not change code people wrote. What it finds there comes back as a patch for a person to apply and as the difference on that component's page in the style guide. At most it writes the intent layer; everything else it flags.
 
 Each gets **yes** (write it, and say what changed), **ask** (show the exact change and wait for a yes, every time) or **no** (never: the change goes on the Tasks page, for whoever owns that place). A place with no answer is asked about once, and the answer is recorded, so every session and every run read the same one. `rms-design-system-engine --writes` shows them; `--writes figma ask` sets one.
 
@@ -442,6 +444,17 @@ A difference reaches whoever can fix it only if somebody carries it there by han
 Issues a person wrote are never touched: the engine finds its own by a mark in the body. It opens, comments why it is closing, and closes — nothing else. Reporter is enough for all of it, so GitLab still decides who may.
 
 The plan is always written to `.design-system-engine-out/issues.json`, whether or not it is sent, and sending follows the `writes` setting above. CI never sends: a run nobody is watching filling your tracker is how a team stops trusting the engine.
+
+Each open issue also says **which of three fixes it needs**, read from the check it came from rather than from how bad the finding sounds:
+
+| | |
+|---|---|
+| **written** | what is written is wrong or missing: drafts in the intent layer, always for a person to approve |
+| **the code** | a value that does not match Figma: a patch handed back for a person to apply, and the difference on the component's page |
+| **the design file** | work in Figma: the hand-back, for a person. The engine never decides a design |
+| **a person** | everything else. Saying "a person decides" is an answer |
+
+The engine already built all three; what was missing was the sentence saying which one this issue needs, so whoever reads the tracker is not the one working it out every time. Where it cannot tell, it says a person decides rather than guessing: a wrong route costs more than no route, because somebody follows it.
 
 ### What the engine is sure of, it writes
 

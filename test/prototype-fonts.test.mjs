@@ -83,7 +83,10 @@ test('a prototype draws at once wherever its fonts are: installed, served, faili
     // Any other is asked of Google Fonts, and the page does not wait: served, refused, or never answered.
     for (const [path, end] of [['ok', 'google'], ['fail', 'missing'], ['hang', 'loading']]) {
       const { sessionId, drewIn } = await open(page(path, 'Pt Probe Sans'));
-      assert.ok(drewIn < 2000, `${path}: drawn in ${drewIn}ms, without waiting for the font`);
+      // Under the engine's own font wait (FONTS_IN races a 3s timer), because that is what the assertion is about:
+      // a page that waited for the font cannot have drawn in less than the wait. A plain number was 2000, which is
+      // how long a page takes to open on a machine running the rest of the suite, not how long waiting takes.
+      assert.ok(drewIn < 3000, `${path}: drawn in ${drewIn}ms, which is the font wait or longer: it waited`);
       assert.equal(await ev(sessionId, `getComputedStyle(document.querySelector('[data-pt-path="0"]')).fontFamily`), '"Pt Probe Sans", ui-sans-serif, sans-serif', 'the system\'s stack behind it meanwhile');
       const waited = Date.now();
       assert.deepEqual(await ev(sessionId, FONTS_IN), { 'Pt Probe Sans': end });
