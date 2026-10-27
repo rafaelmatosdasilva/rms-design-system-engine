@@ -310,3 +310,13 @@ test('figma-cli: a call that fails is tried once more after a pause; two failure
   assert.equal(await figmaCliEval(root, { spawn: f.spawn, pause })('return 1'), '1\n');
   assert.equal(f.asked.length, 1, 'a call that works is made once');
 });
+
+test('figma-cli: a long read is given its own timeout and room for a large answer', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'figma-cli-eval-'));
+  const opts = [];
+  const spawn = (cmd, args, o) => { opts.push(o); return { status: 0, stdout: '1\n' }; };
+  await figmaCliEval(root, { spawn })('return 1');
+  await figmaCliEval(root, { spawn, timeout: 600000 })('return 1');
+  assert.deepEqual(opts.map((o) => o.timeout), [120000, 600000]);
+  assert.ok(opts.every((o) => o.maxBuffer >= 1e8), 'an examples or brands answer is larger than the default buffer');
+});
