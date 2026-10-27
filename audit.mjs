@@ -6130,6 +6130,7 @@ function reportFull(label, items, shown) {
     }
   } catch (e) { console.log(C.dim(`ℹ️  What the engine is sure of was not written: ${e.message}`)); }
 
+
   // ── A primitive written by hand (advisory) ─────────────────────────────
   _section('advice');
   // A plain element styled as a primitive the owner declared in "primitives" (a <span> with the body text style
@@ -6359,6 +6360,35 @@ function reportFull(label, items, shown) {
       writeFileSync(join(ROOT, OUT_DIR, 'differences.md'), differencesMarkdown(d, { at: new Date().toISOString().slice(0, 16).replace('T', ' '), handback: { code: hb('code-changes.diff'), figma: hb('figma-changes.md') }, livesIn }));
       console.log(`\n📋 Differences between Figma and the code: ${d.total} open${d.fresh ? ` (${d.fresh} new)` : ''}, in one list → ${OUT_DIR}/differences.md`);
     } catch { /* a convenience */ }
+
+    // ── One issue per difference, never twice, closed when no run finds it ─────
+    // A difference reaches whoever can fix it only if somebody carries it there by hand, and a list read once is a
+    // list nobody acts on. Where the team names a project for issues, the engine keeps one issue per difference: keyed
+    // as kept differences are keyed, so the same difference finds its own issue instead of opening another; closed by
+    // the run that stops finding it; and never opened at all for a difference the team decided to keep.
+    // The plan is always computed and written. It is sent only where the project says the engine may (writes.issues),
+    // and never on CI, where nobody is watching the run that fills the team's tracker.
+    const issuesLink = cfg.issues?.gitlab ?? (typeof cfg.issues === 'string' ? cfg.issues : null);
+    if (issuesLink) try {
+      const { issuesFor, issuePlan, issueLines, sendIssues } = await import('./issues.mjs');
+      const { mayWrite } = await import('./writes.mjs');
+      const { readKept } = await import('./kept.mjs');
+      const found = (() => { try { return JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'findings.json'), 'utf8')).findings ?? []; } catch { return []; } })();
+      const wanted = issuesFor(found, { kept: readKept(ROOT), who: cfg.issues?.who ?? null });
+      const { answer: may, why: whyNot } = mayWrite(cfg, 'issues');
+      const { openIssues, gitlabSender, issuesProject } = await import('./issues-gitlab.mjs');
+      const host = may === 'yes' ? await issuesProject(issuesLink, { ROOT }) : { why: null };
+      const open = host.base ? await openIssues(host.base, host.headers) : [];
+      const plan = issuePlan(wanted, open);
+      const where = host.where ?? String(issuesLink);
+      mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+      writeFileSync(join(ROOT, OUT_DIR, 'issues.json'), JSON.stringify({ $description: 'One issue per difference, for the project the team names for them. Generated; sent only where ds-config.json → writes.issues allows it.', at: new Date().toISOString(), where, may, ...plan }, null, 2) + '\n');
+      for (const l of issueLines(plan, { may, where, why: whyNot ?? host.why })) console.log(may === 'no' ? C.yellow(l) : C.dim(l));
+      if (may === 'yes' && host.base) {
+        const sent = await sendIssues(plan, gitlabSender(host.base, host.headers));
+        console.log(C.dim(`     ${sent.opened} opened, ${sent.closed} closed${sent.failed.length ? `; ${sent.failed.length} the host refused: ${sent.failed.slice(0, 3).map((f) => `${f.what} (${f.why})`).join('; ')}` : ''}.`));
+      } else if (may === 'yes' && host.why) console.log(C.dim(`     ${host.why}`));
+    } catch (e) { console.log(C.dim(`ℹ️  The issues were not kept: ${e.message}`)); }
     // The components only the code has: what to build in Figma, with their props and the tokens their styles use.
     if (!_scopeNames.length && !NO_FIGMA) try {
       const readJ = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return {}; } };

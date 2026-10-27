@@ -9,7 +9,7 @@ import { PLACES, PLACE, ANSWERS, mayWrite, unanswered, recordWrite, writesLines,
 import { makeFixture } from './helpers.mjs';
 
 test('one answer per place; not answered is ask, and the engine records what the person says', () => {
-  assert.deepEqual(PLACES, ['figma', 'code', 'generated', 'engine']);
+  assert.deepEqual(PLACES, ['figma', 'code', 'generated', 'engine', 'issues']);
   assert.deepEqual(ANSWERS, ['yes', 'ask', 'no']);
   const cfg = { writes: { figma: 'yes', code: 'no' } };
   assert.equal(mayWrite(cfg, 'figma', { ci: false }).answer, 'yes');
@@ -19,7 +19,7 @@ test('one answer per place; not answered is ask, and the engine records what the
   assert.equal(open.answer, 'ask');
   assert.equal(open.set, false);
   assert.match(open.why, /no answer in ds-config.json yet/);
-  assert.deepEqual(unanswered(cfg), ['generated', 'engine']);
+  assert.deepEqual(unanswered(cfg), ['generated', 'engine', 'issues']);
   assert.deepEqual(unanswered({}), PLACES);
   // A value that is not an answer is not one: it falls back to asking rather than being read as a yes.
   assert.equal(mayWrite({ writes: { figma: 'sure' } }, 'figma', { ci: false }).answer, 'ask');
@@ -27,10 +27,11 @@ test('one answer per place; not answered is ask, and the engine records what the
 });
 
 test('CI cannot be talked into it: nobody to ask, and never the design file or the code', () => {
-  const all = { writes: { figma: 'yes', code: 'yes', generated: 'yes', engine: 'yes' } };
+  const all = { writes: { figma: 'yes', code: 'yes', generated: 'yes', engine: 'yes', issues: 'yes' } };
   assert.equal(mayWrite(all, 'figma', { ci: true }).answer, 'no');
   assert.equal(mayWrite(all, 'code', { ci: true }).answer, 'no');
   assert.match(mayWrite(all, 'code', { ci: true }).why, /nobody is watching the run/);
+  assert.equal(mayWrite(all, 'issues', { ci: true }).answer, 'no', "a run nobody is watching never fills a team's tracker");
   // What CI may write, it writes: the files the engine wrote before are its own to keep fresh.
   assert.equal(mayWrite(all, 'generated', { ci: true }).answer, 'yes');
   assert.equal(mayWrite(all, 'engine', { ci: true }).answer, 'yes');
@@ -60,7 +61,7 @@ test('what a person reads, and the one sentence an agent is given before it chan
   const lines = writesLines({ writes: { figma: 'ask', code: 'no' } }, { ci: false }).join('\n');
   assert.match(lines, /the design file: shows the change and waits for a yes/);
   assert.match(lines, /the product's code: never: the change goes on the Tasks page/);
-  assert.match(lines, /2 places with no answer/);
+  assert.match(lines, /3 places with no answer/);
   assert.match(writesLines({}, { ci: true }).join('\n'), /\(on CI\)/);
   assert.match(writeRule({ writes: { code: 'yes' } }, 'code', { ci: false }), /on a branch and through a pull request/);
   assert.match(writeRule({ writes: { figma: 'ask' } }, 'figma', { ci: false }), /wait for a yes\. Never write it on your own\./);
