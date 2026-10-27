@@ -166,3 +166,7 @@ test('a fault of the code is the code\'s to fix, with the fix for its kind', asy
     { who: 'code', todo: 'Follow the prop with a watch, or let the screen own it (v-model), so a screen can change it after it is shown.' });
   assert.equal(plainAction('acmeNote: Line breaks lost. A line break in its `description` is lost', 'acmeNote').who, 'code');
 });
+
+test('a line that starts with the code\'s name for a component is that component\'s, written as Figma writes it', () => {
+  assert.equal(componentOf('Component code :: acmePicker/Row: Fires twice. One click on acmeTick\'s <label>', ['acmePickerRow', 'acmeTick', 'acmePicker']), 'acmePickerRow');
+});

@@ -88,7 +88,9 @@ const words = (name) => [name, kebab(name)].map((x) => x.toLowerCase());
 export function componentOf(finding, names) {
   // A line that starts with a component's name ("tileCard: …") is that component's, whatever other one it names.
   const lead = /(?:^| :: )\s*([\w/-]+):\s/.exec(String(finding));
-  if (lead && names.includes(lead[1])) return lead[1];
+  // The code's name for it may be Figma's written another way (tile/Head for tileHead): the same letters count.
+  const k = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (lead) { const n = names.includes(lead[1]) ? lead[1] : names.find((x) => k(x) === k(lead[1])); if (n) return n; }
   // The text as written, and with its PascalCase split, so HbIconButton.vue names iconButton.
   const texts = [String(finding).toLowerCase(), kebab(String(finding)).toLowerCase()];
   const hits = names.filter((n) => words(n).some((w) => { const re = new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`); return texts.some((t) => re.test(t)); }));
