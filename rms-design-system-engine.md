@@ -117,8 +117,8 @@ listed steps.**
 to `.design-system-engine-out/summary.md`; `rms-design-system-engine --summary` prints the last one again) and one `NEXT:` line.
 Relay the summary in the chat as it is, without rewording its facts, then take the `NEXT:` line as the next
 step. `--init`, `--guidelines`, `--intent-layer`, `--baseline` and `--install-hooks` end with a `NEXT:` line too. When a `NEXT:`
-line says to do something only when the person asks (commit, apply the hand-back), ask them; never do it on
-your own. **Say that an audit ran only when its output is in front of you**: the engine prints its SUMMARY in
+line says to do something only when the person asks (commit, apply the hand-back): when their request already
+asked for it ("fix it in the code"), do it without asking again; otherwise ask them, and never do it on your own. **Say that an audit ran only when its output is in front of you**: the engine prints its SUMMARY in
 the same call. Opening this skill or printing a recipe runs nothing, so never say an audit is running or that
 snapshots were refreshed without that output. The SUMMARY's **Figma data** line says whether this run
 refreshed anything and how old the snapshots are: repeat it as it is.
