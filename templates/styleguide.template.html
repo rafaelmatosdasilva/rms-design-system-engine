@@ -1686,6 +1686,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-decide--approve { --sg-decide-hue: #2e7d32; } .sg-decide--change { --sg-decide-hue: #b26a00; } .sg-decide--drop { --sg-decide-hue: var(--sg-danger); }   /* the page's own hues, only as a tint: the words stay the page's */
 :where(:root)[data-sg-scheme="dark"] .sg-decide--approve { --sg-decide-hue: #6fcf75; } :where(:root)[data-sg-scheme="dark"] .sg-decide--change { --sg-decide-hue: #f0b35a; }
 .sg-decide-head { display: flex; align-items: center; gap: var(--sg-space-s); color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.sg-decide .sg-decide-mark { color: var(--sg-decide-hue); }   /* the mark takes the card's hue; the words keep the page's */
 .sg-decide-says { margin: 0; color: var(--sg-muted); }
 .sg-decide-do { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sg-space-s); }
 .sg-decide-said { color: var(--sg-muted); font-size: var(--sg-s); }
