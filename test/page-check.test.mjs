@@ -308,3 +308,22 @@ test('coverage asks the questions an agent actually gets stuck on: which value, 
   // A component is never counted as fully said while a question about it is unanswered.
   assert.ok(cov.components.menu.total >= cov.components.menu.said + 2);
 });
+
+test('coverage asks the edges a screen meets first: content that does not fit, and one action where there are two', async () => {
+  const { docCoverage, coverageLines } = await import('../doc-coverage.mjs');
+  const page = { components: {
+    // A dialog with two actions and a place for content.
+    sheet: { props: { primaryButtonLabel: {}, secondaryButtonLabel: {}, description: {} }, slots: { named: ['body'] } },
+    // Nothing it holds can overflow, and it has one action: neither question is asked.
+    dot: { props: { tone: {} } },
+  } };
+  const il = (purpose, rules = []) => ({ intentLayer: { purpose, whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules, examples: ['<x/>'] }, purpose });
+  const kinds = (cov, n) => cov.components[n].missing.map((m) => m.kind);
+  const silent = docCoverage(page, { components: { sheet: il('asks the person to confirm'), dot: il('a status mark') } });
+  assert.ok(kinds(silent, 'sheet').includes('overflow') && kinds(silent, 'sheet').includes('oneAction'), JSON.stringify(kinds(silent, 'sheet')));
+  assert.deepEqual(kinds(silent, 'dot').filter((k) => k === 'overflow' || k === 'oneAction'), []);
+  assert.match(coverageLines(silent).join('\n'), /sheet: .*nothing on content that does not fit · nothing on one action only/);
+  // Said on its page, and asked no more.
+  const said = docCoverage(page, { components: { sheet: il('asks the person to confirm', ['Its body scrolls past 60% of the window; the title and buttons stay.', 'With one button only, the primary one stays, full width.']), dot: il('a status mark') } });
+  assert.deepEqual(kinds(said, 'sheet').filter((k) => k === 'overflow' || k === 'oneAction'), []);
+});

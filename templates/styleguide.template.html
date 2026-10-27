@@ -3559,10 +3559,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // What an agent cannot learn about it (its props, events, slots and lists no comment and no page explains).
     var cov = c.docCoverage || [];
     if (cov.length) {
-      var groups = {}, LABEL = { prop: 'Props', event: 'Events', slot: 'Slots', fields: 'Lists with nothing on what they hold', field: 'Fields the product gives that no comment lists' };
+      var groups = {}, LABEL = { prop: 'Props', event: 'Events', slot: 'Slots', fields: 'Lists with nothing on what they hold', field: 'Fields the product gives that no comment lists', values: 'Values nothing helps choose between', keyboard: 'What the keyboard does', apart: 'What tells it apart', overflow: 'What it does when its content does not fit', oneAction: 'What it shows with one action only' };
       cov.forEach(function (m) { (groups[m.kind] = groups[m.kind] || []).push(m); });
-      rows.push(mk('unsaid', 'What its documentation does not say', '<p class="pg-missing">' + cov.length + (cov.length === 1 ? ' thing an agent cannot learn' : ' things an agent cannot learn') + ' from its documentation:</p><ul>' + Object.keys(groups).map(function (k) { return '<li><strong>' + esc(LABEL[k] || k) + '</strong>: ' + groups[k].map(function (m) { return '<code>' + esc(m.what) + '</code>'; }).join(', ') + '</li>'; }).join('') + '</ul>', 'todo',
-        Object.keys(groups).map(function (k) { return (LABEL[k] || k) + ' (' + groups[k].map(function (m) { return m.what; }).join(', ') + '). ' + groups[k][0].write; }).join(' ')));
+      rows.push(mk('unsaid', 'What its documentation does not say', '<p class="pg-missing">' + cov.length + (cov.length === 1 ? ' thing an agent cannot learn' : ' things an agent cannot learn') + ' from its documentation:</p><ul>' + Object.keys(groups).map(function (k) { return '<li><strong>' + esc(LABEL[k] || k) + '</strong>: ' + (groups[k].every(function (m) { return m.what === c.name; }) ? esc(groups[k][0].why.charAt(0).toUpperCase() + groups[k][0].why.slice(1)) + '.' : groups[k].map(function (m) { return '<code>' + esc(m.what) + '</code>'; }).join(', ')) + '</li>'; }).join('') + '</ul>', 'todo',
+        Object.keys(groups).map(function (k) { var w = groups[k].map(function (m) { return m.what; }).filter(function (x) { return x !== c.name; }); return (LABEL[k] || k) + (w.length ? ' (' + w.join(', ') + ')' : '') + '. ' + groups[k][0].write; }).join(' ')));
       rows[rows.length - 1].src = ['Its code and its intent layer page'];
     }
     // Its "when to use" lines are all its family's: nothing tells an agent when this one and not a sibling (Missing).
