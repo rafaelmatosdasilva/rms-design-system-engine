@@ -58,6 +58,8 @@ export function readIntentLayer(ROOT, cfg) {
     entities: snaps.flatMap(({ s, x }) => x.entities.map((e) => ({ ...e, source: src(s, x), url: e.url ?? dsds.fileUrl(x._source, e.file) }))),
     // The component contracts kept beside the layer (shared-contracts.mjs): their links and what each lists.
     contracts: snaps.flatMap(({ x }) => x.contracts ?? []),
+    // Every file of the layer, by path: what a page may point to (its generated tokens file, its contracts).
+    layerFiles: snaps.flatMap(({ x }) => x.layerFiles ?? []),
   };
 }
 
@@ -308,7 +310,9 @@ function decide(page, e, { comp, has }) {
     if (n.reason === 'morePurpose') todo.push('Start what it is for with the sentence that matters most, because agents only read that one.');
   }
   // What on it the system contradicts, first: fix it before anything is added to it.
-  const fix = (page.wrong ?? []).map((f) => (f.kind === 'name' ? `${f.says} is not a name the system has. ${f.fix}` : f.kind === 'claim' ? `The page says ${f.says}. ${f.fix}` : f.fix));
+  // A copied list is not wrong, only bound to go stale: it is a change to make, not a fix (below).
+  const fix = (page.wrong ?? []).filter((f) => f.kind !== 'copy').map((f) => (f.kind === 'name' ? `${f.says} is not a name the system has. ${f.fix}` : f.kind === 'claim' ? `The page says ${f.says}. ${f.fix}` : f.fix));
+  for (const f of page.wrong ?? []) if (f.kind === 'copy') todo.push(`${f.fix} ${f.truth}`);
   if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...todo] };
   // Lines drafted for it, not the team's word yet: each read, edited as needed, its marker removed (or the line deleted).
   const drafts = page.drafts ?? [];

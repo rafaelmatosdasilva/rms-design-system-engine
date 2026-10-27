@@ -9,6 +9,8 @@
 //          component does for accessibility, the accessibility check did not find broken.
 //   stale: the component changed (its props, in the code or Figma, or its code file) after the page was last edited.
 //   twin:  it says what another component's page says, so it does not help an agent choose between the two.
+//   copy:  a list it writes out by hand that the engine generates (a prop table, a token family, a catalog of
+//          components): right today, stale tomorrow, and taken for the whole list (copied-lists.mjs).
 // A finding: { kind, line (the sentence), says, truth, source, fix }. Nothing here is a judgement of the writing: a
 // page with no finding can still be unclear, but none of what it states is contradicted by the system.
 
@@ -19,8 +21,9 @@ import { codeSnapshotPath, OUT_DIR, ENGINE_DIRS } from './names.mjs';
 import { resolveStatus } from './decision-status.mjs';
 import { matchComponents, systemNames, codeFilesOf } from './intent-layer.mjs';
 import { readDecisions } from './intent-proposals.mjs';
+import { copiedLists } from './copied-lists.mjs';
 
-export const KINDS = { name: 'Not in the system', claim: 'Disagrees with the system', stale: 'Out of date', twin: 'Same as another page' };
+export const KINDS = { name: 'Not in the system', claim: 'Disagrees with the system', stale: 'Out of date', twin: 'Same as another page', copy: 'Copies a generated list' };
 // What the engine keeps of each component's props between runs, to tell when one changed.
 export const CHANGES_FILE = `${OUT_DIR}/component-changes.json`;
 
@@ -382,11 +385,21 @@ export function twins(pages) {
 export function checkLayer(snap, matched, facts) {
   const out = new Map();
   const forEntity = new Map([...matched].map(([n, e]) => [e, n]));
+  const contracts = new Map((snap?.contracts ?? []).map((c) => [c.name, c.file]));
+  // What a copied list is pointed to: the layer's own generated files when it has them (a DTCG tokens file, the
+  // contracts' folder), else the engine's.
+  const tokensFile = (snap?.layerFiles ?? []).find((f) => /\.tokens\.json$/.test(f)) ?? 'tokens.json';
+  // Each token's own entry in the layer says which of its files holds it.
+  const tokenFile = new Map((snap?.entities ?? []).filter((t) => t.kind === 'token').flatMap((t) => [[norm(t.name), t.file], [norm('--' + String(t.name).replace(/\//g, '-')), t.file]]));
+  const dirs = (snap?.contracts ?? []).map((c) => String(c.file).split('/'));
+  let common = dirs[0] ?? []; for (const d of dirs) { let i = 0; while (i < common.length && common[i] === d[i]) i++; common = common.slice(0, i); }
+  const catalog = common.length && dirs.length > 1 ? `the contracts in ${common.join('/')}` : 'the contracts';
   for (const e of snap?.entities ?? []) {
     if (e.kind === 'token') continue;
     const component = forEntity.get(e) ?? null;
     if (e.layer === 'components' && !component) continue;
-    const f = checkPage(e, facts, { component });
+    // And the lists it copies from what the engine generates (copied-lists.mjs): right today, stale tomorrow.
+    const f = [...checkPage(e, facts, { component }), ...copiedLists(e, facts, { component, contractOf: (c) => contracts.get(c) ?? null, tokensFile, tokenFileOf: (n) => tokenFile.get(norm(n)) ?? null, catalog })];
     if (f.length) out.set(e, f);
   }
   for (const [e, f] of twins([...matched].map(([n, e]) => [e, n]))) out.set(e, [...(out.get(e) ?? []), ...f]);
