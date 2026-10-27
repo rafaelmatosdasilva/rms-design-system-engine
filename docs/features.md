@@ -395,6 +395,16 @@ A short file listing which components go where, with which options (`prototypes/
 
 Where your system has no layout components, the engine lends neutral ones (a page, a stack, a row, columns) that use only your spacing tokens and text styles, and adds layout components to the list.
 
+### Your rules, read against each other
+
+Everything written for an agent reaches it at once: your guidelines, each layer of your intent, every component's page and your project's `AGENTS.md`. Written at different times by different people, they start to disagree. The engine reads them side by side and hands you three lists:
+
+- **Pairs that cannot both be followed.** Two rules about the same component where one allows what the other rules out, two counts of it (exactly one, against several), or two places it may only go. Whichever the agent reads last wins, so each pair is a decision nobody has made yet.
+- **A rule written twice.** The same rule in two places in different words: two rules to read, one rule to follow.
+- **Rules nothing can check.** A rule that names nothing your system has and that no check reads. It may still be good advice, but the agent carries it into every request and nothing can say whether a prototype followed it.
+
+Nothing is rewritten. Each line comes with both sentences and where each came from, for the person who owns the words, and each component's Documentation page lists the ones about it.
+
 ### The gap list
 
 Every prototype's gaps are kept in `.design-system-engine-out/prototypes/gaps.json`, the most needed first. Each says what was searched, the nearest components, what stands in meanwhile and why none fit, so whoever decides works from the evidence. Ask to send them to Figma and they become your design team's to do list there, one card per need, written only after you say yes.

@@ -3496,6 +3496,22 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         'Say in its purpose what sets it apart from ' + [...new Set(c.confusions.map(function (x) { return x.chose; }).filter(Boolean))].slice(0, 3).join(', ') + ', and name the other one in its "when not to use", or take the need off the page that does not own it.'));
       rows[rows.length - 1].src = ['The "which component?" test'];
     }
+    // Two rules about it that cannot both be followed, and the same rule written twice in two places
+    // (--prototype --rules). Nothing is rewritten for the team: whichever the agent reads last wins, so the pair is a
+    // decision for whoever owns the words.
+    var WHY = { words: 'one allows what the other rules out', count: 'two counts of it', place: 'two places it may only go' };
+    if ((c.ruleClash || []).length) {
+      rows.push(mk('clash', 'Rules that cannot both be followed', '<p class="pg-missing">' + c.ruleClash.length + (c.ruleClash.length === 1 ? ' pair of rules about it disagrees' : ' pairs of rules about it disagree') + ', so whichever an agent reads last wins:</p><ul>' +
+        c.ruleClash.slice(0, 6).map(function (x) { return '<li>"' + esc(x.said) + '" <span class="pg-dim">(' + esc(x.saidFrom) + ')</span><br>against <span class="pg-dim">' + esc(WHY[x.why] || x.why) + '</span>: "' + esc(x.against) + '" <span class="pg-dim">(' + esc(x.againstFrom) + ')</span></li>'; }).join('') + '</ul>', 'todo',
+        'Settle each pair where it is written: keep one sentence, and take the other out or say when each holds.'));
+      rows[rows.length - 1].src = ['The rules read against each other'];
+    }
+    if ((c.ruleTwice || []).length) {
+      rows.push(mk('twice', 'A rule written twice', '<p>' + c.ruleTwice.length + (c.ruleTwice.length === 1 ? ' rule about it is' : ' rules about it are') + ' written in two places in different words: two rules to read, one rule to follow.</p><ul>' +
+        c.ruleTwice.slice(0, 6).map(function (x) { return '<li>"' + esc(x.kept) + '" <span class="pg-dim">(' + esc(x.keptFrom) + ')</span><br>again: "' + esc(x.repeat) + '" <span class="pg-dim">(' + esc(x.repeatFrom) + ')</span></li>'; }).join('') + '</ul>', 'check',
+        'Keep the sentence that says more, and take the other out or point it at the first.'));
+      rows[rows.length - 1].src = ['The rules read against each other'];
+    }
     if ((a.unknown || []).length) rows.push(mk('unknown', 'Names that do not exist', '<p class="pg-missing">' + a.unknown.map(function (u) { return '<code>' + esc(u) + '</code>'; }).join(', ') + ': named in what is written, but the system has no token, property or component by that name.</p>', 'todo',
       'Rename each to the name the system uses, or take it out: an agent would look for something that is not there.'));
     return rows;
