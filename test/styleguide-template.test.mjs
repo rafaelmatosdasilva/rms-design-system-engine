@@ -266,6 +266,11 @@ test('in the browser: no script error, a control changes the real component, the
     const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
       return p && !p.hidden ? { title: p.querySelector('.sg-panel-head h2').textContent, cards: p.querySelectorAll('.sg-row-detail-body').length, sub: p.querySelector('.sg-panel-sub')?.textContent ?? '' } : null; })()`, (v) => !!v);
     assert.ok(rowPanel && rowPanel.title && rowPanel.cards >= 2, JSON.stringify(rowPanel));
+    // Its cards' heads, and their tables' heads, stick under the panel's head as it scrolls, as the token panel's do: each
+    // panel measures its head, and each card its own.
+    const rowHeads = await until(`(() => { const d = document.querySelector('#sg-row-panel .sg-row-detail'), h = d.querySelector('.sg-panel-head'), c = d.querySelector('.sg-panel-body .pg-inspect'), ch = c && c.querySelector('.pg-inspect-head'); const ph = parseFloat(d.style.getPropertyValue('--sg-panel-head-h')), cardH = c ? parseFloat(c.style.getPropertyValue('--pg-card-head-h')) : 0; return ph > 0 && cardH > 0 ? { ph: Math.round(ph), head: Math.round(h.getBoundingClientRect().height - 1), top: parseFloat(getComputedStyle(ch).top) } : null; })()`, (v) => !!v);
+    assert.equal(rowHeads.ph, rowHeads.head, 'the panel head measured');
+    assert.ok(rowHeads.top > rowHeads.ph, `a card's head sticks under the panel's head (${JSON.stringify(rowHeads)})`);
     await run(`document.querySelector('#sg-row-panel [data-panel-close]').click()`);
     assert.equal(await until(`document.getElementById('sg-row-panel').hidden`, (v) => v === true), true, 'it closes');
     assert.equal(await run(`document.querySelectorAll('.pg-preview').length`), 1);
@@ -630,6 +635,8 @@ test('in the browser: no script error, a control changes the real component, the
       assert.equal(at.card, true, `${sel}: the card scrolled past the top`);
       assert.ok(at.head === 0 || at.head === -1, `${sel}: its head right under the page's bars, at most a pixel under their edge (${at.head})`);
       assert.equal(at.th, -1, `${sel}: the table's head tucked a pixel under the card's head`);
+      // Its line is the head's last pixel: no border under it, not even a transparent one, for the rows to show through.
+      assert.equal(await run(`(() => { const th = (${pick}).querySelector('thead th, tr > th'); return getComputedStyle(th).borderBottomWidth + '|' + /inset/.test(getComputedStyle(th).boxShadow); })()`), '0px|true', `${sel}: the head's line drawn inside it, with no border under it`);
     };
     await run(`location.hash = '#colors'`); await shownIs('colors'); await headsStick('#colors');
     // Over tables the lowest stuck bar paints the page's gap under its line (where a table's head will stick); a page
@@ -661,6 +668,10 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`!!document.getElementById('documentation') && !!document.querySelector('nav a[href="#documentation"]') && !document.getElementById('for-agents')`), true);
     assert.equal(await run(`[...document.querySelectorAll('#documentation thead th')].some((t) => t.textContent.trim() === 'File')`), false, 'no File column without an intent layer');
     assert.ok(await run(`document.querySelectorAll('#documentation tbody tr').length`) > 1, 'one row a component');
+    assert.equal(await run(`document.querySelectorAll('#documentation [data-il-export], #documentation .pg-head-links button').length`), 0, 'no downloads on the Documentation page');
+    // The System group of the menu ends with the Changelog, after the pages about the system as it is.
+    const sysMenu = await run(`(() => { const lab = document.querySelector('.sg-nav-label'), out = []; for (let e = lab.nextElementSibling; e && !e.classList.contains('sg-nav-label'); e = e.nextElementSibling) if (e.tagName === 'A' && !e.hidden) out.push(e.getAttribute('href')); return out.join(); })()`);
+    if (/#changelog/.test(sysMenu)) assert.match(sysMenu, /#changelog$/, `the Changelog last in the System group (${sysMenu})`);
     assert.equal(await run(`(() => { const n = document.querySelectorAll('#documentation thead th').length; return [...document.querySelectorAll('#documentation tbody tr')].every((tr) => tr.cells.length === n); })()`), true, 'each row has the header\'s cells: no column shifted under the wrong heading');
     assert.equal(await run(`[...document.querySelectorAll('#documentation tbody tr')].every((r) => /\\d{4}/.test(r.cells[r.cells.length - 2].textContent))`), true, 'every row says when it was last updated');
     for (const old of ['#coverage', '#for-agents', '#intent-layer']) {
@@ -1176,6 +1187,8 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   // Changelog: every component's changes by release, newest version first, dated by its tag; one row per ticket (the
   // team's unit of work) with the components its commits touched, each commit a line; a commit for no ticket on its own.
   assert.match(tpl, /navLink\('changelog', 'changelog'\)/);
+  assert.match(tpl, /The Changelog last in the System group/, 'moved after the other System pages');
+  assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
   assert.match(tpl, /One row per issue \(the team's unit of work/);
   assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">Issue<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'the issue first, then what it affects, each column named');
   assert.match(tpl, /byTicket\(g\.commits, function \(x\) \{ return x\.r; \}\)/);

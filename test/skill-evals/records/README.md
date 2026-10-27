@@ -152,5 +152,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-26-each-changelog-row-says-what` | The 21 guide tasks on Haiku (engine 74a632e) | "Each Changelog row says what it was for and where it changed the system" |
 | `2026-10-27-a-store-s-readme-says` | The 21 guide tasks on Haiku (engine 848f5b6) | "A store's README says how its style guide is updated when no pipeline builds it" |
 | `2026-10-27-a-request-that-asks-for` | The 21 guide tasks on Haiku (engine 260ee52) | "A request that asks for the fix is the ask: the agent makes it without asking again" |
+| `2026-10-27-documentation-page-without-downloads-changelog` | The 21 guide tasks on Haiku (engine e170521) | "Documentation page without downloads, Changelog last in the menu, table heads that stick cleanly in pages and side panels" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
