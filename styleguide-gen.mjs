@@ -734,7 +734,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const report = decided.report, wrongOf = decided.wrongOf;
         const counts = report.pages.reduce((t, p) => (t[p.action] = (t[p.action] ?? 0) + 1, t), {});
         const src = snap._source ?? {};
-        view.intentLayer = { source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
+        // Is there a component the system does not have? (layer-questions.mjs) Answered when the layer says what to do
+        // when none fits; otherwise an agent builds one of its own.
+        const { RULE_FILES } = await import('./agent-rules.mjs');
+        const agentFiles = RULE_FILES.map((f) => { try { return { name: f, lines: readFileSync(join(ROOT, f), 'utf8').split(/\n+/) }; } catch { return null; } }).filter(Boolean);
+        const absent = (await import('./layer-questions.mjs')).absentComponent([...view.components.map((c) => c.name), ...Object.keys(readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {})], { layer: snap, more: agentFiles });
+        absent.entry = src.entry ?? null; absent.entryUrl = src.url && src.entry ? `${src.url}/-/blob/${src.ref || 'HEAD'}/${src.entry}` : null;
+        view.intentLayer = { absent, source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
           noPage: decided.noPage, addProposals: decided.addProposals };
         // What else the agents read about each component, beside its intent-layer page, each with where it comes
         // from: Figma's description and annotations, the code's own note. And the spec a page is written from, when
@@ -963,6 +969,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // What each component's tokens say they are for (Figma's variable descriptions, and a text style's own), for its
       // Documentation: an agent reads them to pick the right token, so a token with none is a line to write.
       const said = (await import('./styleguide-data.mjs')).tokenDescriptions(readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {});
+      // Which token is for this? (layer-questions.mjs) A token says what it is for in Figma's description, or in the
+      // intent layer: its own entry when it says more than its name and modes, or a line on a page that names it.
+      const lq = await import('./layer-questions.mjs');
+      const layerNow = (await import('./intent-layer.mjs')).readIntentLayer(ROOT, cfg);
+      const answer = lq.tokenAnswerer({ layer: layerNow, describe: said });
       // Every Figma variable named after a component (advanced/buttonPromo/shadow/X) is that component's too, the
       // code using it or not.
       const vsnap = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
@@ -996,7 +1007,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         namesOf.set(c.name, names);
         names.forEach((n) => used.add(n));
         if (!names.length) continue;
-        c.tokenDocs = { total: names.length, described: names.filter(said).map((n) => ({ figma: n, description: said(n) })), missing: names.filter((n) => !said(n)) };
+        c.tokenDocs = { total: names.length, described: names.filter(said).map((n) => ({ figma: n, description: said(n) })), inLayer: names.filter((n) => !said(n) && answer(n)).map((n) => ({ figma: n, from: answer(n) })), missing: names.filter((n) => !answer(n)) };
       }
       // A Figma component with no page of its own (one the code does not have, or one to confirm): its tokens too, for
       // its row on the Status page.
@@ -1006,7 +1017,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const names = tokensOf(name);
         namesOf.set(name, names);
         names.forEach((n) => used.add(n));
-        const missing = names.filter((n) => !said(n));
+        const missing = names.filter((n) => !answer(n));
         if (missing.length) (view.pagelessTokens ??= {})[name] = { total: names.length, missing };
       }
       // Which components use each token, by its Figma name (without /color): the same reach as above (its code, its name,
