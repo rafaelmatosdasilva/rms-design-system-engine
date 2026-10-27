@@ -3184,30 +3184,52 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // under them, then one decision for them all, each with the command that makes it and a Copy beside it (pasted into
     // Claude, or run in a terminal). Quoted for a shell: a line may hold backticks.
     var shq = function (s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; };
-    var ilDrafts = function (p) {
-      var page = p.file || p.name, on = esc(p.name || page), groups = [], seen = {};
-      (p.drafts || []).forEach(function (d) {
+    // Everything a page asks to change, in one place, each under what it is: its drafts (by section, each once), what is
+    // still to write (what and where), each note no agent reads (to remove, or to change as it says); then one decision on
+    // all of them, three cards side by side: approve all, change one, drop all, each copied for Claude Code.
+    var REVIEW_LINE = /^Review (its draft|these \d+ drafts)\b/;   // the engine's line for the drafts alone (intent-layer.mjs): the card says it for every change
+    var ilChanges = function (p, write, notes) {
+      var page = p.file || p.name || p.missingFor || 'the system', groups = [], seen = {};
+      (p.missingFor ? [] : p.drafts || []).forEach(function (d) {
         var k = String(d.where) + '\u0000' + String(d.text).replace(/\s+/g, ' ').trim();
         if (seen[k]) return; seen[k] = 1;
         var g = groups.filter(function (x) { return x.where === d.where; })[0] || (groups.push({ where: d.where, lines: [] }), groups[groups.length - 1]);
         g.lines.push(d.text);
       });
-      if (!groups.length) return '';
-      var n = groups.reduce(function (t, g) { return t + g.lines.length; }, 0), them = n === 1 ? 'it' : 'them';
+      write = write || []; notes = notes || [];
+      var off = notes.filter(function (n) { return /^yes/i.test(n.remove || ''); }), fix = notes.filter(function (n) { return off.indexOf(n) < 0; });
+      var nd = groups.reduce(function (t, g) { return t + g.lines.length; }, 0), n = nd + write.length + notes.length;
+      if (!n) return '';
+      var noteOf = function (x) { return capital(x.what || x.text); };
+      var section = function (head, body) { return '<div class="sg-il-line sg-il-change"><strong>' + esc(head) + '</strong>' + body + '</div>'; };
+      var noteBody = function (x, how) { return (x.from ? '<span class="pg-par-val">' + esc(capital(x.from)) + '</span>' : '') + '<span class="sg-il-text">' + esc(x.why) + '</span>' + (how ? '<span class="sg-il-label">' + esc(how[0]) + '</span><span class="sg-il-text">' + esc(how[1]) + '</span>' : ''); };
+      var html = groups.map(function (g) { return section('Proposed ' + (g.lines.length === 1 ? 'draft' : 'drafts') + ' · ' + g.where, g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('')); }).join('')
+        + write.map(function (x) { return section((x.check ? 'To check · ' : 'To write · ') + x.what, x.html); }).join('')
+        + off.map(function (x) { return section('To remove · ' + noteOf(x), noteBody(x, ['Why remove it', x.remove.replace(/^yes[:,]?\s*/i, '') || 'Nothing in it reaches an agent.'])); }).join('')
+        + fix.map(function (x) { return section('To change · ' + noteOf(x), noteBody(x, x.fix ? ['What to change', x.fix] : null)); }).join('');
       var cmd = function (a, rest) { return 'rms-design-system-engine --review-drafts --' + a + ' ' + shq(page) + (rest || ''); };
-      var one = n === 1, line = groups[0].lines[0], who = p.name || page;
-      // What Change copies is a request, not a command with blanks: Claude Code asks which draft and the words.
-      var change = one ? 'Change the draft on ' + who + '\'s intent layer page ("' + line + '"): ask me for my words, then run ' + cmd('change', ' ' + shq(line) + ' ' + shq('<my words>'))
-        : 'Change one of the ' + n + ' drafts on ' + who + '\'s intent layer page (' + page + '): ask me which one and my words, then run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>'));
+      var one = n === 1, who = p.name || p.missingFor || page, only = nd === n, line = nd ? groups[0].lines[0] : '';
+      var on = 'On ' + who + '\'s intent layer page (' + page + '): ', list = function (xs) { return xs.map(function (x) { return '"' + x + '"'; }).join(', '); };
+      var drafts = nd === 1 ? 'its draft' : 'its ' + nd + ' drafts';
+      // Approve: each change made as proposed. Drafts alone: the command itself.
+      var approve = only ? cmd('approve') : on + [nd ? 'approve ' + drafts + ' (run ' + cmd('approve') + ')' : '',
+        write.length ? 'write ' + list(write.map(function (x) { return x.what; })) + ' where each says, as drafts I review' : '',
+        off.length ? 'remove ' + list(off.map(noteOf)) + ' where each lives' : '',
+        fix.length ? fix.map(function (x) { return 'for ' + list([noteOf(x)]) + ', ' + (x.fix ? x.fix.charAt(0).toLowerCase() + x.fix.slice(1).replace(/\.$/, '') : 'say what an agent should take from it'); }).join('; ') : ''].filter(Boolean).join('; then ') + '.';
+      var change = only ? (one ? 'Change the draft on ' + who + '\'s intent layer page ("' + line + '"): ask me for my words, then run ' + cmd('change', ' ' + shq(line) + ' ' + shq('<my words>'))
+          : 'Change one of the ' + n + ' drafts on ' + who + '\'s intent layer page (' + page + '): ask me which one and my words, then run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>')))
+        : on + (one ? 'ask me for my words for this change, then make it with them' : 'ask me which of its ' + n + ' changes and my words, then make that one with them') + (nd ? ' (a draft: run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>')) + ')' : '') + '.';
+      // Drop: nothing is made. Its drafts are deleted; what is to write stays to write; the notes stay as they are.
+      var drop = only ? cmd('drop') : on + [nd ? 'drop ' + drafts + ' (run ' + cmd('drop') + ')' : '', write.length || notes.length ? 'write nothing new and leave ' + (notes.length ? 'its notes' : 'the page') + ' as ' + (notes.length ? 'they are' : 'it is') : ''].filter(Boolean).join('; ') + '.';
       // Three decisions side by side, each its own card on one line: its mark, its name, and the button that copies it for
       // Claude Code. What it does is the button's tip, for whoever wants it.
       var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div>'; };
-      return '<div class="sg-il-draft"><div class="sg-il-draft-text">' + groups.map(function (g) {
-          return '<p class="sg-il-line"><strong>Proposed ' + (g.lines.length === 1 ? 'draft' : 'drafts') + ' · ' + esc(g.where) + '</strong>' + g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('') + '</p>';
-        }).join('') + '</div><div class="sg-decide-grid">' +
-        decide('approve', one ? 'Approve' : 'Approve all', one ? 'Agents use the draft as written from the next run.' : 'Agents use the ' + n + ' drafts as written from the next run.', cmd('approve')) +
-        decide('change', one ? 'Change' : 'Change one', one ? 'Claude Code asks for your words to replace the draft.' : 'Your words replace one draft; Claude Code asks which.', change) +
-        decide('drop', one ? 'Drop' : 'Drop all', one ? 'The draft is deleted, and no agent will ever get it.' : 'The ' + n + ' drafts are deleted; no agent will ever get them.', cmd('drop')) + '</div></div>';
+      var them = only ? (one ? 'the draft' : 'the ' + n + ' drafts') : (one ? 'the change' : 'the ' + n + ' changes');
+      var lead = '<p class="sg-il-line"><strong>' + esc((one ? 'Review ' + (only ? 'its draft' : 'this change') + '. Approve it, change it or drop it' : 'Review these ' + n + (only ? ' drafts' : ' changes') + '. Approve them all, change one or drop them all') + ', then copy your choice and paste it into Claude Code.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you decide.' : '')) + '</strong></p>';
+      return lead + '<div class="sg-il-draft"><div class="sg-il-draft-text">' + html + '</div><div class="sg-decide-grid">' +
+        decide('approve', one ? 'Approve' : 'Approve all', only ? (one ? 'Agents use the draft as written from the next run.' : 'Agents use the ' + n + ' drafts as written from the next run.') : 'Each change is made as it is proposed here.', approve) +
+        decide('change', one ? 'Change' : 'Change one', only ? (one ? 'Claude Code asks for your words to replace the draft.' : 'Your words replace one draft; Claude Code asks which.') : 'Your words replace one; Claude Code asks which.', change) +
+        decide('drop', one ? 'Drop' : 'Drop all', only ? (one ? 'The draft is deleted, and no agent will ever get it.' : 'The ' + n + ' drafts are deleted; no agent will ever get them.') : 'Nothing is made; ' + (nd ? 'drafts are deleted.' : 'it all stays as it is.'), drop) + '</div></div>';
     };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line"><strong>' + esc(capital(n.what)) + '</strong><span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // What is still to write about the component a row is for, from every source: each piece of its documentation not
@@ -3241,11 +3263,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         return esc(w);
       }).join(' <span class="pg-muted">or</span> ');
     };
-    var docLeftHTML = function (p) { return docLeft(p).map(function (x) { var where = whereHTML(p, x); return '<div class="sg-il-line"><strong>' + esc(x.kind) + (x.st === 'check' ? ' (to check)' : '') + '</strong>'
+    var docWriteOf = function (p) { return docLeft(p).map(function (x) { var where = whereHTML(p, x); return { what: x.kind, check: x.st === 'check', html: ''
       // Its parts apart, each under a small label: the points to cover as a list, how to write it, and where.
       + ((x.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + x.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' : '')
       + ((x.how || x.todo) ? '<span class="sg-il-label">' + ((x.notes || []).length ? 'How to write it' : 'What to write') + '</span><span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '')
-      + (where ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + where + '</span>' : '') + '</div>'; }).join(''); };
+      + (where ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + where + '</span>' : '') }; }); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
@@ -3299,18 +3321,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilCellsOf = function (p) {
       if (p.tokens) { var tm = p.tokens.missing, tn = p.tokens.total;
         return { decision: decisionCell('keep', p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#tokens">Tokens</a>', updated: docAt(p), reads: '',
-          left: tm.length ? '<div class="sg-il-line"><strong>Their descriptions (' + tm.length + ')</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for. Agents read it to pick the right token. A line that only repeats the token\'s name, its modes or what it points to does not count.</span><span class="sg-il-label">Where</span><span class="sg-il-text">In Figma, in each variable\'s Description' + (tm.some(function (m) { return /^text style /.test(m); }) ? ', or a text style\'s own Description' : '') + '. Or in the intent layer, on the token\'s own entry or on a page that names it, like Colors.</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span></div>' : '',
+          write: tm.length ? [{ what: 'Their descriptions (' + tm.length + ')', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One sentence on what each token is for. Agents read it to pick the right token. A line that only repeats the token\'s name, its modes or what it points to does not count.</span><span class="sg-il-label">Where</span><span class="sg-il-text">In Figma, in each variable\'s Description' + (tm.some(function (m) { return /^text style /.test(m); }) ? ', or a text style\'s own Description' : '') + '. Or in the intent layer, on the token\'s own entry or on a page that names it, like Colors.</span><span class="sg-il-label">The tokens</span><span class="sg-il-codes">' + tm.map(function (m) { return '<code>' + esc(m) + '</code>'; }).join('') + '</span>' }] : [],
           todo: tm.length ? '<p class="sg-il-line"><strong>Say what ' + tm.length + ' of the ' + tn + ' tokens the components use are for. An agent asking which token to use for something finds nothing on them yet.</strong></p>' : '',
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.') + '</p>', gets: '' }; }
       if (p.absent) { var ab = p.absent, asked = ab.kinds.filter(function (k) { return !k.said; }).map(function (k) { return k.kind; });
         return { decision: decisionCell('write', p), file: ab.entry ? (ab.entryUrl ? '<a class="sg-uses-link" href="' + esc(ab.entryUrl) + '" target="_blank" rel="noopener">' + esc(ab.entry) + '</a>' : esc(ab.entry)) : '<span class="pg-missing">—</span>', forWhat: 'The system', updated: docAt(p), reads: '', remove: '',
-          left: '<div class="sg-il-line"><strong>What to do when no component fits</strong><span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span><span class="sg-il-codes">' + asked.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join('') + '</span>' : '') + '</div>',
+          write: [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span><span class="sg-il-codes">' + asked.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join('') + '</span>' : '') }],
           todo: '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits. Today an agent asked for a component the system does not have builds one of its own.</strong></p>',
           why: '<p class="sg-il-line">' + esc(ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
-      if (p.missingFor) return { decision: decisionCell('missing', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
+      if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: docAt(p), reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
-      if (p.noLayer) return { decision: decisionCell('keep', p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
-      return { decision: decisionCell(p.action, p), left: docLeftHTML(p), remove: leftHTML(notesOff(p)), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
+      if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
+      return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
@@ -3323,9 +3345,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       m._key = ilKey(p, i);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
-      // Its status first, then the proposal to say yes or no to, then what to do: the task, each thing still to write (what
-      // and where), the drafts to review under the task that asks for them, notes to remove; then what the page is and why.
-      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', c.todo + (p.missingFor ? '' : ilDrafts(p))) + card('Still to write', c.left) + card('To remove', c.remove) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      // Its status first, then the proposal to say yes or no to, then what to do: every change it proposes in one place
+      // (its drafts, what is still to write, the notes to remove or change) and one decision on all of them; then what the
+      // page is and why.
+      var todo = ilChanges(p, c.write, c.notes), task = todo && !(p.tokens || p.absent || p.missingFor || p.noLayer) ? ilTodo(Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) })) : c.todo;
+      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', (todo && /pg-missing/.test(task) ? '' : task) + todo) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said')); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
