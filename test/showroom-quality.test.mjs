@@ -1,15 +1,15 @@
 // The Showroom's screens read as pages (showroom-quality.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { cpSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { showroomQuality, showroomQualityLines, titledHeadings } from '../showroom-quality.mjs';
+import { tempDir } from './helpers.mjs';
 
 const DEMO = fileURLToPath(new URL('./fixtures/demo-ds', import.meta.url));
 const demoWith = (screens) => {
-  const root = mkdtempSync(join(tmpdir(), 'showroom-quality-'));
+  const root = tempDir('showroom-quality-');
   cpSync(DEMO, root, { recursive: true });
   mkdirSync(join(root, 'showroom'), { recursive: true });
   for (const [f, text] of Object.entries(screens)) writeFileSync(join(root, 'showroom', f), text);
@@ -42,7 +42,7 @@ export default function Checkout() {
   assert.match(lines[0], /^🎨 Showroom screens as pages: 1 of 2 with something a page should not do/);
   assert.match(lines[1], /Checkout \d+\/10 {2}\(showroom\/Checkout\.jsx\)/);
   // No Showroom: nothing said.
-  assert.deepEqual(await showroomQuality(mkdtempSync(join(tmpdir(), 'no-showroom-')), {}), []);
+  assert.deepEqual(await showroomQuality(tempDir('no-showroom-'), {}), []);
   assert.deepEqual(showroomQualityLines([]), []);
 });
 

@@ -2,13 +2,13 @@
 // each mode in its own block, and never asks which to take.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { mergeHosted, takeableUrls, fetchHosted, hostedAxes } from '../hosted-tokens.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const sheet = (c, s) => `:root { --bg: ${c === 'dark' ? '#000' : '#fff'}; --pad: ${{ desktop: 16, laptop: 12, tablet: 8 }[s]}px; --edge: ${c === 'dark' && s === 'tablet' ? 1 : 0}px; }`;
@@ -41,7 +41,7 @@ test('setup takes every hosted mode file it is given, writes them to one local f
   const server = createServer((req, res) => { const m = /\/(\w+)-(\w+)\.css$/.exec(req.url); if (!m || !SIX.some(([c, s]) => c === m[1] && s === m[2])) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'content-type': 'text/css' }); res.end(sheet(m[1], m[2])); });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}/ds`;
-  const dir = mkdtempSync(join(tmpdir(), 'hosted-'));
+  const dir = tempDir('hosted-');
   mkdirSync(join(dir, 'src'), { recursive: true });
   writeFileSync(join(dir, 'src', 'app.js'), SIX.map(([c, s]) => `// ${base}/${c}-${s}.css`).join('\n'));
   writeFileSync(join(dir, 'package.json'), '{"name":"p"}');

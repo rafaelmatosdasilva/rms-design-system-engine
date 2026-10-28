@@ -3,11 +3,10 @@
 // GitLab for an invented company (Acme), with several projects.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { withSection, storeRepos, profileRepo, clientOf, profileReadme, storeSection, syncReadmes, START, END } from '../readmes.mjs';
 import { forgetAccess } from '../stores.mjs';
+import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';
 const env = { GITLAB_TOKEN: 'read-token', GITLAB_WRITE_TOKEN: 'write-token', GITLAB_HOST: HOST };
@@ -76,7 +75,7 @@ const projects = () => ({
   'design/acme-guide': { files: { 'README.md': '# Acme guide\n\nThe team\'s own words.\n', 'snapshots/src/figma-vars.snapshot.json': '{}', 'snapshots/open-since.snapshot.json': '{}', '.gitlab-ci.yml': '# CI/CD variables:\n#   GITLAB_TOKEN    reads everything\n#   FIGMA_TOKEN     optional: the Figma file\nbuild:\n  script:\n    - node /engine/audit.mjs --ci-changed\n  rules:\n    - if: \'$CI_PIPELINE_SOURCE == "schedule"\'\n' } },
   'design/acme-layer': { files: { 'specs/button.md': '# Button' } },
 });
-const dir = () => mkdtempSync(join(tmpdir(), 'readmes-'));
+const dir = () => tempDir('readmes-');
 beforeEach(() => forgetAccess());
 
 test('the section: in place of the last one wherever it was moved, after the team\'s text, or a new README', () => {

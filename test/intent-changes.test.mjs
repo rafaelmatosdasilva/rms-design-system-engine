@@ -8,6 +8,7 @@ import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText,
 import { entityView, dropBoilerplate, DRAFT } from '../doc-source-dsds.mjs';
 import { factsFrom } from '../intent-truth.mjs';
 import { useReport } from '../intent-layer.mjs';
+import { tempDir } from './helpers.mjs';
 
 const SPEC = `# Tile One
 
@@ -159,8 +160,8 @@ test('the merge request is written with GITLAB_WRITE_TOKEN when there is one; ev
   const cfg = { intentLayer: 'https://gitlab.acme.test/ux/layer' };
   assert.equal(layerAccess('.', cfg, { env: { GITLAB_HOST: 'gitlab.acme.test', GITLAB_TOKEN: 'reads', GITLAB_WRITE_TOKEN: 'writes' } }).writesWith, 'GITLAB_WRITE_TOKEN');
   assert.equal(layerAccess('.', cfg, { env: { GITLAB_HOST: 'gitlab.acme.test', GITLAB_TOKEN: 'reads' } }).writesWith, 'GITLAB_TOKEN');
-  const { mkdtempSync, writeFileSync } = await import('node:fs');
-  const dir = mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'wt-'));
+  const { writeFileSync } = await import('node:fs');
+  const dir = tempDir('wt-');
   writeFileSync(dir + '/.env', 'GITLAB_TOKEN=reads\nGITLAB_WRITE_TOKEN="writes" # the layer only\n');
   assert.equal(writeTokenFrom({}, [dir]), 'writes');
 });
@@ -210,11 +211,10 @@ test('each run fixes the layer only where intentLayer.autoFix is "commit", never
   const { autoFix } = await import('../intent-changes.mjs');
   assert.equal(await autoFix('.', { intentLayer: 'https://gitlab.acme.test/ux/layer' }), null);
   assert.equal(await autoFix('.', { intentLayer: { gitlab: 'https://gitlab.acme.test/ux/layer', autoFix: 'commit' } }, { offline: true }), null);
-  const { mkdtempSync, writeFileSync, readFileSync } = await import('node:fs');
+  const { writeFileSync, readFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { tmpdir } = await import('node:os');
   const { spawnSync } = await import('node:child_process');
-  const root = mkdtempSync(join(tmpdir(), 'autofix-'));
+  const root = tempDir('autofix-');
   writeFileSync(join(root, 'ds-config.json'), '{\n    "name": "Acme",\n    "intentLayer": "https://gitlab.acme.test/ux/layer"\n}\n');
   const engine = new URL('../audit.mjs', import.meta.url).pathname;
   assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'on'], { cwd: root, encoding: 'utf8' }).status, 0);

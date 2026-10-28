@@ -6,12 +6,10 @@ import { readFileSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'node
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { tokenCss, modeBlock, buildOrder, buildLine, TOKENS_TO_BUILD } from '../build-list.mjs';
 import { inProgressList, inProgressNames } from '../in-progress.mjs';
 import { nextStep, buildSummary } from '../next-step.mjs';
-import { fixtureProject, budget } from './helpers.mjs';
+import { fixtureProject, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -89,7 +87,7 @@ test('the next step builds the tokens first, then a component only when the pers
 });
 
 test('setup asks where the code is before it writes anything; told it starts here from Figma, it is in build mode', { timeout: budget(120000) }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'build-init-'));
+  const dir = tempDir('build-init-');
   execFileSync('git', ['init', '-q'], { cwd: dir });
   const init = (...more) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks', ...more], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   const asked = init();

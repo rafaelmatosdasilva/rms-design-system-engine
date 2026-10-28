@@ -3,16 +3,15 @@
 // stack meanwhile, and a font found nowhere (not installed, not served, no network) is said on the page and by the engine.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { prototypePage, fontLoader, fontLines, shippedFamilies, designFamilies } from '../prototype.mjs';
 import { fontStack, systemFamily, systemScales } from '../prototype-pieces.mjs';
 import { FONTS_IN } from '../prototype-render.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 
@@ -51,7 +50,7 @@ test('a prototype draws at once wherever its fonts are: installed, served, faili
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const dir = mkdtempSync(join(tmpdir(), 'proto-fonts-'));
+  const dir = tempDir('proto-fonts-');
   const tree = { component: 'Page', props: { width: '400' }, children: [{ component: 'Text', props: { text: 'Scan history' } }] };
   const page = (path, family, css = '') => {
     const file = join(dir, `${path}.html`);

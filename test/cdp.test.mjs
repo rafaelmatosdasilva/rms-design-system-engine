@@ -3,10 +3,9 @@
 // and evaluates end to end.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome, playwrightChromium, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
 
@@ -37,7 +36,7 @@ test('playwrightChromium: picks the newest chromium-N build that has a binary', 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
 test('launch, open a file:// page, wait for load and evaluate', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cdp-test-'));
+  const dir = tempDir('cdp-test-');
   const page = join(dir, 'p.html');
   writeFileSync(page, '<!doctype html><style>:root{--gap-s:8px}</style><div id="x" style="padding:var(--gap-s)"></div>');
   const browser = await launchChrome(CHROME, { tmpPrefix: 'cdp-test-' });
@@ -94,4 +93,16 @@ test('a browser never outlives the run that opened it, and never holds it open',
   const gone = Date.now() + budget(15000);
   while (alive(pid) && Date.now() < gone) await new Promise((r) => setTimeout(r, 100));
   assert.equal(alive(pid), false, `the browser this run opened (pid ${pid}) outlived it`);
+});
+
+// Chrome writes its profile until it has shut down, so a profile deleted at once was written again: a folder left per
+// browser, and the folder Chrome keeps its socket in, until a disk filled with them.
+test('a browser killed leaves neither its profile nor its socket folder behind', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false, timeout: budget(60000) }, async () => {
+  const { readlinkSync, existsSync } = await import('node:fs');
+  const browser = await launchChrome(CHROME, { tmpPrefix: 'cdp-kill-' });
+  const socketDir = dirname(readlinkSync(join(browser.userDataDir, 'SingletonSocket')));
+  browser.kill();
+  await new Promise((r) => setTimeout(r, 1000));
+  assert.equal(existsSync(browser.userDataDir), false, 'the profile was left behind');
+  assert.equal(existsSync(socketDir), false, 'the socket folder was left behind');
 });

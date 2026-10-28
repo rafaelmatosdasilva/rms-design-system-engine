@@ -6,9 +6,8 @@
 // returned them in the format before.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, readdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { unpublished, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
@@ -22,6 +21,7 @@ import { screenCaptureScript } from '../screen-layout.mjs';
 import { screenA11yCaptureScript } from '../screen-a11y.mjs';
 import { captureScript as annotationScript } from '../annotation-categories.mjs';
 import { hygieneOf } from '../figma-hygiene.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
@@ -95,7 +95,7 @@ const asFigma = (f) => {
 };
 const runIn = (f) => async (code) => new AsyncFunction('figma', code)(asFigma(f));
 const cfg = { paths: { snapshotStructure: 'src/figma-structure.snapshot.json', compPropsSnapshot: 'src/figma-component-props.snapshot.json' } };
-const project = () => { const d = mkdtempSync(join(tmpdir(), 'capture-components-')); writeFileSync(join(d, 'ds-config.json'), JSON.stringify(cfg)); mkdirSync(join(d, 'cap'), { recursive: true }); return d; };
+const project = () => { const d = tempDir('capture-components-'); writeFileSync(join(d, 'ds-config.json'), JSON.stringify(cfg)); mkdirSync(join(d, 'cap'), { recursive: true }); return d; };
 const save = (dir, file, a) => writeFileSync(join(dir, file), JSON.stringify(a));
 const json = (root, p) => JSON.parse(readFileSync(join(root, p), 'utf8'));
 // The checksums, page by page, then the reads, one after the other, each saved as the engine says. → the answers' sizes.
@@ -455,10 +455,10 @@ test('components: checksums saved in the form before are read again, and the imp
 // and the states (test/fixtures/tidepool-figma/figma-capture).
 test('components on a real file: Figma\'s checksums hold, the import gives what the recipe captured by hand, and keeps the files those answers did not read', async () => {
   const TP = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
-  const root = mkdtempSync(join(tmpdir(), 'capture-tidepool-'));
+  const root = tempDir('capture-tidepool-');
   cpSync(join(TP, 'ds-config.json'), join(root, 'ds-config.json'));
   const tpCfg = JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8'));
-  const dir = mkdtempSync(join(tmpdir(), 'capture-tidepool-answers-'));
+  const dir = tempDir('capture-tidepool-answers-');
   for (const f of readdirSync(join(TP, 'figma-capture')).filter((x) => x.startsWith('components-'))) cpSync(join(TP, 'figma-capture', f), join(dir, f));
   const c = readComponents(dir);
   assert.equal(c.v, 1);

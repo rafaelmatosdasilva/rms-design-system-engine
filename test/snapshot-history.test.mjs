@@ -2,10 +2,9 @@
 // read from the store's commits when the project has no git history of its snapshots.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fillSnapshotHistory, storeFigmaChangelogs } from '../snapshot-history.mjs';
+import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';
 const env = { GITLAB_TOKEN: 'read-token', GITLAB_HOST: HOST };
@@ -43,7 +42,7 @@ function fakeStore() {
 }
 
 test('a store\'s refreshes become each component\'s Figma history, newest first, linked to the store\'s commit', async () => {
-  const ROOT = mkdtempSync(join(tmpdir(), 'snap-history-'));
+  const ROOT = tempDir('snap-history-');
   const g = fakeStore();
   const r = await fillSnapshotHistory(ROOT, cfg, { props: 'src/props.json', vars: 'src/vars.json' }, { env, http: g.http });
   assert.deepEqual(r, { read: 3, line: null });
@@ -62,7 +61,7 @@ test('a store\'s refreshes become each component\'s Figma history, newest first,
 });
 
 test('no store, offline or GitLab refusing: no history and nothing thrown', async () => {
-  const ROOT = mkdtempSync(join(tmpdir(), 'snap-history-'));
+  const ROOT = tempDir('snap-history-');
   const g = fakeStore();
   assert.deepEqual(await fillSnapshotHistory(ROOT, {}, { props: 'src/props.json' }, { env, http: g.http }), { read: 0, line: null });
   assert.deepEqual(await fillSnapshotHistory(ROOT, cfg, { props: 'src/props.json' }, { env, http: g.http, offline: true }), { read: 0, line: null });

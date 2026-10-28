@@ -3,15 +3,15 @@
 // the code has no CSS for fails with every value it owes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 function project(theme) {
-  const dir = mkdtempSync(join(tmpdir(), 'modes-auto-'));
+  const dir = tempDir('modes-auto-');
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css', snapshotVars: 'vars.json' }, figma: { colorCollection: 'Styling' } }));
   writeFileSync(join(dir, 'vars.json'), JSON.stringify({ color: { light: {}, dark: {} }, modeVariants: { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/s': { kind: 'scalar', values: { desktop: '8px', phone: '10px' } } } } } }));
   writeFileSync(join(dir, 'theme.css'), theme);
@@ -33,7 +33,7 @@ test('a mode the theme sets in an @media block, or a [data-…] block, is found 
 });
 
 test('a component\'s height is read from the base values, not from a breakpoint\'s :root inside @media', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'modes-height-'));
+  const dir = tempDir('modes-height-');
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css', structureContract: 'structure-contract.mjs', snapshotStructure: 'structure.json' } }));
   const facts = { h: 24, paddingVar: { tb: null, lr: null }, gapVar: null, fontSizeVar: null, fontWeightVar: null, fillStructure: 'none', innerRadiusVar: null, strokeOnDefault: false, strokeOnAnyState: false };
   writeFileSync(join(dir, 'structure.json'), JSON.stringify({ _updated: new Date().toISOString(), components: { chip: facts } }));

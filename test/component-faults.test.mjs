@@ -2,13 +2,13 @@
 // (Acme): a tile, a picker row around a tick box, a stepper, a panel, notes and a dialog family.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { componentFaults, faultLines, partsOf } from '../component-faults.mjs';
 import { componentOf } from '../run-diff.mjs';
 import { systemFacts, checkPage } from '../intent-truth.mjs';
 import { codeSnapshotPath } from '../names.mjs';
+import { tempDir } from './helpers.mjs';
 
 const kinds = (list, name) => list.filter((f) => f.component === name).map((f) => f.kind);
 
@@ -140,7 +140,7 @@ const base = defineAsyncComponent(() => import(\`./bases/\${props.kind}.vue\`))
 });
 
 test('a name a page writes as code that only a comment of the code has, or that the engine generated, is not in the system', () => {
-  const root = mkdtempSync(join(tmpdir(), 'faults-truth-'));
+  const root = tempDir('faults-truth-');
   mkdirSync(join(root, 'src', 'panels'), { recursive: true });
   writeFileSync(join(root, 'src', 'panels', 'Panel.vue'), `<template><section class="acme-panel"/></template>
 <script setup>

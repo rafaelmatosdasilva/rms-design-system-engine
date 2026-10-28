@@ -1,13 +1,13 @@
 // names.mjs: every name the engine keeps in a project, in one place, and only those.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { PROJECT, projectPath, newPath, codeSnapshotPath, envVar, ENGINE_DIRS, SKILL } from '../names.mjs';
+import { tempDir } from './helpers.mjs';
 
-const tmp = () => mkdtempSync(join(tmpdir(), 'names-'));
+const tmp = () => tempDir('names-');
 
 test('every project name is under design-system-engine, read and written the same', () => {
   const dir = tmp();

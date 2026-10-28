@@ -3,14 +3,13 @@
 // guidance evaluation; and each component's rating in its Documentation area of the style guide.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { systemFacts, rateComponent, rateGuidance, sectionsFrom, figmaWords, extractionQuestions, extractionPrompt, scoreExtraction, askModel, ratingLines, readFacts } from '../guidance-rating.mjs';
 import { levelContext } from '../eval-run.mjs';
-import { bareEnv, budget } from './helpers.mjs';
+import { bareEnv, budget, tempDir } from './helpers.mjs';
 import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -33,7 +32,7 @@ Example:
 const GUIDE = `Harbor guidance.\n\n## button\n${BUTTON}\n## Badge\nShows a status.\nWhen to use: a short status of an item.\nRole: status. Use \`--hb-old-tone\` for its colour.\n\n## Card\nNot a component here.\n`;
 
 const harbor = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'guidance-rating-'));
+  const dir = tempDir('guidance-rating-');
   cpSync(HARBOR, dir, { recursive: true });
   writeFileSync(join(dir, 'guidelines.md'), GUIDE);
   const cfg = cfgOf(dir); cfg.guidelines = { sources: ['guidelines.md'] };

@@ -9,12 +9,11 @@ import {
   styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
   iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS, STATE_CLASSES, stateHeard,
 } from '../a11y-check.mjs';
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('[axe] summarizeAxe collapses per-node rows into one per rule, busiest first', () => {
@@ -216,7 +215,7 @@ test('namedByTitleOnly: the name the browser settled on came from the title', ()
 // colour transitions and whose background does not read 1:1 for a moment in the dark mode (a false contrast failure).
 const CHROME = findChrome({ playwright: true });
 test('[modes] after a mode switch the colours are read settled, never halfway through a transition', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'settle-test-'));
+  const dir = tempDir('settle-test-');
   const page = join(dir, 'p.html');
   writeFileSync(page, '<!doctype html><style>b{color:#111;background:#fff;transition:color 5s 60s}:root[data-c=dark] b{color:#eee;background:#111}</style><b id="x">Cancel</b>');
   const browser = await launchChrome(CHROME, { tmpPrefix: 'settle-test-' });
@@ -235,11 +234,10 @@ test('[modes] after a mode switch the colours are read settled, never halfway th
 
 test('a project whose packages are not installed is told so, not "auto-discovery found nothing"', { timeout: budget(60000) }, async () => {
   const { spawnSync } = await import('node:child_process');
-  const { mkdtempSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { writeFileSync } = await import('node:fs');
   const { join: j, dirname: d } = await import('node:path');
   const { fileURLToPath: f } = await import('node:url');
-  const dir = mkdtempSync(j(tmpdir(), 'a11y-nopkg-'));
+  const dir = tempDir('a11y-nopkg-');
   writeFileSync(j(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css' } }));
   writeFileSync(j(dir, 'theme.css'), ':root { --a: #fff; }');
   writeFileSync(j(dir, 'package.json'), JSON.stringify({ name: 'p', scripts: { serve: 'vite' } }));
@@ -281,10 +279,9 @@ test('a style guide with many components is checked in parts of a few components
 
 test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: budget(30000) }, async () => {
   const { startDevServer } = await import('../a11y-check.mjs');
-  const { mkdtempSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { writeFileSync } = await import('node:fs');
   const { join: j } = await import('node:path');
-  const dir = mkdtempSync(j(tmpdir(), 'a11y-serve-'));
+  const dir = tempDir('a11y-serve-');
   writeFileSync(j(dir, 'serve.mjs'), "process.stdout.write('  \\x1b[32m➜\\x1b[39m  Local:   \\x1b[36mhttp://localhost:\\x1b[1m5173\\x1b[22m/\\x1b[39m\\n'); setInterval(() => {}, 1000);");
   const srv = startDevServer(`${process.execPath} serve.mjs`, dir);
   try { assert.equal(await srv.url, 'http://localhost:5173'); } finally { srv.stop(); }
@@ -292,10 +289,9 @@ test('a dev server that prints its address in colour (Vite\'s bold port) is read
 
 test('pages from a router in modules with hash history; scoped, the pages that use the component, its own first', async () => {
   const { discoverRoutes } = await import('../a11y-check.mjs');
-  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join: j, dirname: d } = await import('node:path');
-  const dir = mkdtempSync(j(tmpdir(), 'routes-'));
+  const dir = tempDir('routes-');
   const put = (rel, text) => { mkdirSync(d(j(dir, rel)), { recursive: true }); writeFileSync(j(dir, rel), text); };
   put('src/router/router.js', "import { createRouter, createWebHashHistory } from 'vue-router'\nimport buttons from './modules/buttons.js'\nexport default createRouter({ history: createWebHashHistory(), routes: [{ path: '/', component: () => import('@/views/Home.vue') }, ...buttons] })\n");
   put('src/router/modules/buttons.js', "import ButtonsPrimary from '@/views/buttons/Primary.vue'\nimport ButtonsLink from '@/views/buttons/Link.vue'\nexport default [\n  { path: '/components/buttons/link', name: 'link', component: ButtonsLink },\n  { path: '/components/buttons/primary', name: 'primary', component: ButtonsPrimary },\n  { path: '/components/:id', component: ButtonsLink },\n]\n");
@@ -320,7 +316,7 @@ test('a component looked for by a class the code never gives an element is said 
 
 test('[axe] the pinned copy is kept under the home cache and fetched by --fetch-axe, which the install and --update run', async () => {
   const { axeCachePath, axeCached } = await import('../a11y-check.mjs');
-  const home = mkdtempSync(join(tmpdir(), 'axe-home-'));
+  const home = tempDir('axe-home-');
   assert.match(axeCachePath(home), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
   assert.equal(axeCached(home), null, 'nothing kept yet');
   mkdirSync(dirname(axeCachePath(home)), { recursive: true });

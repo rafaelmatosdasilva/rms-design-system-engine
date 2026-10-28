@@ -2,13 +2,12 @@
 // link is optional: without it the code's own checks run and the summary says nothing was compared with Figma.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { nextStep, buildSummary } from '../next-step.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIGMA = '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X';
@@ -17,7 +16,7 @@ const init = (dir, ...args) => engine(dir, '--init', '--no-hooks', ...args);
 
 // A folder of other code: a plugin's page with its own styles, no stylesheet of design tokens.
 function otherCode() {
-  const dir = mkdtempSync(join(tmpdir(), 'setup-other-'));
+  const dir = tempDir('setup-other-');
   mkdirSync(join(dir, 'plugin'));
   writeFileSync(join(dir, 'plugin', 'ui.src.html'), '<html><style>.a { color: red; }</style><body></body></html>');
   return dir;
@@ -55,7 +54,7 @@ test('with no Figma link, there must be design tokens to check; building needs t
 });
 
 test('set up without Figma, only the code is checked and the summary says nothing was compared with Figma', { timeout: budget(300000) }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'setup-nofigma-'));
+  const dir = tempDir('setup-nofigma-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'theme.css'), ':root { --text: #111; }\nbody { color: var(--text); }\n');
   const r = init(dir, '--project=.');

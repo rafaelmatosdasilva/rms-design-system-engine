@@ -1,16 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { tempDir } from './helpers.mjs';
 
 const MOTION = fileURLToPath(new URL('../motion-check.mjs', import.meta.url));
 const EFFECT = fileURLToPath(new URL('../effect-check.mjs', import.meta.url));
 
 function run(gate, { themeCss, snapshot, config }) {
-  const dir = mkdtempSync(join(tmpdir(), 'me-gate-'));
+  const dir = tempDir('me-gate-');
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify(config));
   writeFileSync(join(dir, 'theme.css'), themeCss);
   writeFileSync(join(dir, 'figma-vars.snapshot.json'), JSON.stringify(snapshot));

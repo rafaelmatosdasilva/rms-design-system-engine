@@ -2,11 +2,10 @@
 // style guide store, its code and a snapshots store on a fake GitLab.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { freshness, builtFrom, BUILT_FROM } from '../guide-freshness.mjs';
 import { forgetAccess } from '../stores.mjs';
+import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';
 const env = { GITLAB_TOKEN: 'read-token', GITLAB_HOST: HOST };
@@ -27,7 +26,7 @@ function fakeGitlab({ record = null, heads = { snapshots: 'a'.repeat(40) }, pipe
   };
   return { http: { get, send: async () => res(404, {}) }, get: (url) => get(url) };
 }
-const dir = () => mkdtempSync(join(tmpdir(), 'freshness-'));
+const dir = () => tempDir('freshness-');
 
 test('published from what is there now: up to date, nothing said', async () => {
   forgetAccess();

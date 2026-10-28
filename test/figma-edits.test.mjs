@@ -5,10 +5,9 @@ import assert from 'node:assert/strict';
 import { codeRole, componentRole, figmaEdits, applyScript, editLines, writeFigmaEdits } from '../figma-edits.mjs';
 import { figmaWriteVerdict } from '../guard.mjs';
 import { route } from '../route.mjs';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { budget } from './helpers.mjs';
-import { tmpdir } from 'node:os';
+import { budget, tempDir } from './helpers.mjs';
 
 test('the role a component has in code, read from its markup', () => {
   assert.equal(codeRole('<button class="b">Save</button>').role, 'button');
@@ -68,7 +67,7 @@ test('the script adds only the listed role, keeps what was there, skips a role a
 });
 
 test('guard: Figma is written only by the engine\'s script, and only after a yes; reading is never stopped', () => {
-  const root = mkdtempSync(join(tmpdir(), 'figma-guard-'));
+  const root = tempDir('figma-guard-');
   mkdirSync(join(root, '.design-system-engine-out', 'handback'), { recursive: true });
   const script = applyScript(figmaEdits(SNAP, VIEW));
   writeFileSync(join(root, '.design-system-engine-out', 'handback', 'figma-apply.js'), script);
@@ -179,16 +178,15 @@ test('with Figma\'s categories: a note in a design-intent category is never a to
   assert.deepEqual(edits[0].items.map((i) => [i.text, i.wording]), [['Announce the total when it changes.', null], ['Esc', 'Escape closes it']]);
   assert.match(editLines(edits).join('\n'), /"Announce the total when it changes\." \(an accessibility note: write it as Role:/);
   // The capture script only reads Figma: the guard never takes it for a change.
-  assert.equal(figmaWriteVerdict(captureScript(), { root: mkdtempSync(join(tmpdir(), 'cap-')) }), null);
+  assert.equal(figmaWriteVerdict(captureScript(), { root: tempDir('cap-') }), null);
 });
 
 // What this project lets the engine change in the design file decides whether a script that makes the changes is
 // written at all: one nobody may run is a loaded gun left on the table.
 test('a project that never lets the engine write Figma gets the list and no script', async () => {
-  const { mkdtempSync, existsSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { existsSync } = await import('node:fs');
   const edits = [{ kind: 'role', component: 'chip', label: 'Role: button', why: 'the code renders a <button>' }];
-  const dir = mkdtempSync(join(tmpdir(), 'figma-edits-'));
+  const dir = tempDir('figma-edits-');
   const files = writeFigmaEdits(dir, edits, { may: 'no' });
   assert.equal(existsSync(files.json), true, 'what Figma is missing is worth reading whoever may change it');
   assert.equal(files.script, null);
@@ -207,13 +205,12 @@ test('a project that never lets the engine write Figma gets the list and no scri
 // defined" scores as a run, so an evaluation reads it as the agent's fault rather than the engine's. This is the
 // cheapest guard there is against that.
 test('--figma-edits lists each edit on the demo design system, and the engine never falls over', { timeout: budget(120000) }, async () => {
-  const { mkdtempSync, cpSync, existsSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { cpSync, existsSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
   const { dirname } = await import('node:path');
   const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
-  const dir = mkdtempSync(join(tmpdir(), 'figma-edits-cli-'));
+  const dir = tempDir('figma-edits-cli-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true, filter: (p) => !/node_modules|\.design-system-engine-out|\.git(\/|$)/.test(p) });
   // Run as a person runs it: on CI (CI set) the engine never writes the design file, and says so instead of asking.
   const { CI: _ci, ...asPerson } = process.env;

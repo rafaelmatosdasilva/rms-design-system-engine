@@ -2,16 +2,16 @@
 // "the audit has not run in a browser yet" on every component (a11y-check.mjs → keepA11yResult, audit.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { keepA11yResult } from '../a11y-check.mjs';
+import { tempDir } from './helpers.mjs';
 
 const last = { total: 172, ran: ['keyboard trap'], checkedAt: '2026-10-26T22:10:49.406Z', issues: [] };
 
 test('a run that measured nothing, or wrote nothing, leaves the last result where it was', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'a11y-keep-'));
+  const dir = tempDir('a11y-keep-');
   const run = join(dir, 'a11y.run.json'), kept = join(dir, 'a11y.json');
   writeFileSync(kept, JSON.stringify(last));
   writeFileSync(run, JSON.stringify({ total: 0, ran: [], checkedAt: '2026-10-27T19:13:00.000Z', issues: [] }));
@@ -22,7 +22,7 @@ test('a run that measured nothing, or wrote nothing, leaves the last result wher
 });
 
 test('a run that measured something takes the last one\'s place', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'a11y-keep-'));
+  const dir = tempDir('a11y-keep-');
   const run = join(dir, 'a11y.run.json'), kept = join(dir, 'a11y.json');
   writeFileSync(kept, JSON.stringify(last));
   writeFileSync(run, JSON.stringify({ total: 12, ran: [], checkedAt: '2026-10-27T20:00:00.000Z', issues: [] }));
@@ -30,7 +30,7 @@ test('a run that measured something takes the last one\'s place', () => {
   assert.equal(JSON.parse(readFileSync(kept, 'utf8')).total, 12);
   assert.equal(existsSync(run), false);
   // No earlier result and nothing measured: nothing kept, nothing invented.
-  const fresh = mkdtempSync(join(tmpdir(), 'a11y-keep-'));
+  const fresh = tempDir('a11y-keep-');
   assert.deepEqual(keepA11yResult(join(fresh, 'a11y.run.json'), join(fresh, 'a11y.json')), { replaced: false, keptFrom: null });
 });
 

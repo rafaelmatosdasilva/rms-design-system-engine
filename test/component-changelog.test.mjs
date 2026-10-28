@@ -2,11 +2,11 @@
 // changed what Figma says of it, from a project's git history.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ruleChanges, changelogs, figmaChangelogs, releaseLog } from '../component-changelog.mjs';
+import { tempDir } from './helpers.mjs';
 
 test('ruleChanges: each declaration changed, added or removed, in a few words', () => {
   const patch = ['   .chip {', '-    padding: var(--padding-s); /* old */', '+    padding: var(--padding-m);', '+    gap: 4px;', '-    color: red;', '   }'];
@@ -16,7 +16,7 @@ test('ruleChanges: each declaration changed, added or removed, in a few words', 
 
 const run = (dir, ...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
 test('a change inside a rule counts, not only one to the line that names the class; Figma reads say what changed', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'changelog-'));
+  const dir = tempDir('changelog-');
   run(dir, 'init', '-q', '-b', 'main');
   const css = (pad) => `.other { color: red; }\n.chip {\n  padding: ${pad};\n  gap: 4px;\n}\n`;
   const snap = (opts) => JSON.stringify({ chip: { properties: { 'Size#1:0': { type: 'VARIANT', variantOptions: opts, defaultValue: opts[0] } } } }, null, 2);
@@ -43,7 +43,7 @@ test('ticketOf: the ticket a commit was made for, its address, and what the comm
   assert.equal(ticketOf('Tile caption wraps (#12)'), null, 'a pull request at its end is not a ticket');
   assert.equal(ticketOf('Fixed the menu position'), null);
   // No address set: the project's own changelog says how it links a ticket.
-  const dir = mkdtempSync(join(tmpdir(), 'tickets-'));
+  const dir = tempDir('tickets-');
   spawnSync('mkdir', ['-p', join(dir, 'docs')]);
   writeFileSync(join(dir, 'docs', 'CHANGELOG.md'), '## 1.0.0\n* [#77](https://tracker.example/issues/77) - first\n');
   assert.equal(ticketLinks(dir), 'https://tracker.example/issues/{id}');

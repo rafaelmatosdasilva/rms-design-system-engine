@@ -3,13 +3,13 @@
 // it was written, and pages that say the same. An invented system (Acme): tileOne, listMain, a few tokens and files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { factsFrom, checkPage, twins, checkLayer, componentChanges, report, CHANGES_FILE } from '../intent-truth.mjs';
 import { useReport, componentIntent, matchComponents, ACTIONS } from '../intent-layer.mjs';
+import { tempDir } from './helpers.mjs';
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
 
 const FACTS = () => factsFrom({
@@ -89,7 +89,7 @@ test('a page is out of date when its component changed after it was last edited'
 });
 
 test('the engine keeps each component\'s props between runs and dates the run that saw them change', () => {
-  const root = mkdtempSync(join(tmpdir(), 'truth-'));
+  const root = tempDir('truth-');
   const v1 = { tileOne: { props: { tone: { options: ['calm'] }, dense: {} } } };
   assert.deepEqual(componentChanges(root, v1, { now: '2026-01-01T00:00:00Z' }), {});
   assert.deepEqual(componentChanges(root, v1, { now: '2026-01-02T00:00:00Z' }), {});
@@ -134,7 +134,7 @@ test('the report says each finding with the sentence, what the system has and wh
 });
 
 test('--check-intent checks a page before it is written, and exits 1 on a finding', () => {
-  const root = mkdtempSync(join(tmpdir(), 'truth-cli-'));
+  const root = tempDir('truth-cli-');
   writeFileSync(join(root, 'ds-config.json'), JSON.stringify({ name: 'Acme' }));
   mkdirSync(join(root, '.design-system-engine-out'), { recursive: true });
   writeFileSync(join(root, '.design-system-engine-out', 'code.snapshot.json'), JSON.stringify({ api: { tileOne: { file: 'src/TileOne.vue', props: { tone: { type: 'string', options: ['calm', 'loud'] } } } }, tokens: {} }));

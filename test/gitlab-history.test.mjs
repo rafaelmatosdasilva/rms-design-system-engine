@@ -3,16 +3,15 @@
 // records. Kept per commit: nothing is asked twice, and when the branch moves only the files that moved are.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { fillHistory, blameOf, commitsOf, readHistory, missing, releaseLogOf, HISTORY_FILE } from '../gitlab-history.mjs';
 import { STATE_FILE } from '../gitlab-source.mjs';
 import { codeReason, reasonLine } from '../change-reason.mjs';
 import { changelogs, repoUrl, defaultBranch, ruleChanges } from '../component-changelog.mjs';
 import { recordAgreed } from '../agreed.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40), HEAD = 'd'.repeat(40), NEXT = 'e'.repeat(40);
 const commit = (id, title, date, parents = 1) => ({ id, short_id: id.slice(0, 8), title, authored_date: date, author_name: 'QA', parent_ids: Array.from({ length: parents }, (_, i) => String(i).repeat(40)) });
@@ -50,7 +49,7 @@ function standIn() {
   return { calls, answer };
 }
 const mirror = (origin, host, sha = HEAD) => {
-  const dir = mkdtempSync(join(tmpdir(), 'gl-history-'));
+  const dir = tempDir('gl-history-');
   mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, STATE_FILE), JSON.stringify({ source: `${origin}/acme/ui-kit`, origin, host, path: 'acme/ui-kit', branch: null, ref: 'main', sha }));
   writeFileSync(join(dir, 'src', 'theme.css'), ':root {\n  --x: 1px;\n.card {\n  border-radius: var(--radius-m);\n}\n');
@@ -96,7 +95,7 @@ test('blame, the commits of a file with a pattern, their releases and merge requ
 
 test('the readers the engine already has read GitLab in a mirror (changelog, reason, repository, branch, agreed commit)', { timeout: budget(120000) }, async () => {
   // The readers are synchronous and ask GitLab from a child process, so the stand-in GitLab runs in a process of its own.
-  const work = mkdtempSync(join(tmpdir(), 'gl-server-'));
+  const work = tempDir('gl-server-');
   writeFileSync(join(work, 'routes.json'), JSON.stringify(ROUTES));
   writeFileSync(join(work, 'server.mjs'), `import { createServer } from 'node:http'; import { readFileSync, appendFileSync } from 'node:fs';
     const routes = JSON.parse(readFileSync(${JSON.stringify(join(work, 'routes.json'))}, 'utf8'));
@@ -134,7 +133,7 @@ test('the readers the engine already has read GitLab in a mirror (changelog, rea
 });
 
 test('a project that is not a GitLab mirror is never asked', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'not-mirror-'));
+  const dir = tempDir('not-mirror-');
   assert.equal(blameOf(dir, 'a.css'), undefined);
   assert.equal(commitsOf(dir, ['a.css']), null);
   assert.equal(missing(dir, { blame: ['a.css'] }), null);

@@ -2,11 +2,10 @@
 // and background pair that passes alone and fails together.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { switchFor, collectionSwitches, comboAxes, combinations, mergeSwitches, comboFindings, comboContrast, modeCombinations } from '../mode-combos.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 // Dark sets the text colour; the phone block sets it too, later, so Dark on a phone gets the light one.
 const THEME = `:root { --text-body: #111111; --surface-base: #ffffff; --space-m: 12px; }
@@ -49,7 +48,7 @@ test('only what goes wrong together is listed: the token and the pair, with the 
 test('in the browser: the theme with every combination on, read as the browser resolves it', { timeout: budget(120000) }, async (t) => {
   const { findChrome } = await import('../cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
-  const dir = mkdtempSync(join(tmpdir(), 'dse-combos-'));
+  const dir = tempDir('dse-combos-');
   try {
     mkdirSync(join(dir, 'src'), { recursive: true });
     writeFileSync(join(dir, 'src/theme.css'), THEME);

@@ -2,12 +2,12 @@
 // most first, and a baseline so the count only falls.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { censusTokens, censusText, censusOf, censusAgainst, censusLines, CENSUS_FILE } from '../raw-census.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const THEME = `:root {
@@ -74,7 +74,7 @@ test('the baseline: written first, lowered when the count falls, and a file with
 });
 
 test('the whole project: style files, component files and pages, the theme\'s own rules, the files that guess most first; --census keeps the count falling', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'census-'));
+  const dir = tempDir('census-');
   const put = (p, t) => { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), t); };
   put('ds-config.json', JSON.stringify({ paths: { themeCSS: 'src/theme.css' } }));
   put('src/theme.css', `${THEME}\n.button { padding: 12px; }\n`);

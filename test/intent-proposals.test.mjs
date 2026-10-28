@@ -2,12 +2,12 @@
 // Add, Move), what it rests on, and the team's yes or no, kept and acted on. An invented system (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf } from '../intent-proposals.mjs';
+import { tempDir } from './helpers.mjs';
 
-const ROOT = mkdtempSync(join(tmpdir(), 'proposals-'));
+const ROOT = tempDir('proposals-');
 const file = (p, t) => { mkdirSync(join(ROOT, p, '..'), { recursive: true }); writeFileSync(join(ROOT, p), t); };
 file('src/lists/List.vue', "import Row from './Row'\n");
 file('src/lists/Row.vue', '<template><li /></template>');

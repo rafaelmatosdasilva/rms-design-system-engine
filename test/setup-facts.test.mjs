@@ -3,14 +3,13 @@
 // snapshot names. And a project set up with no Figma link is told its snapshots cannot be refreshed, never failed for it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { namingFromCode, snapshotPaths, systemScripts, productsBeside, framesFromSnapshot, figmaTokenNames } from '../setup-facts.mjs';
 import { dataStateLine } from '../next-step.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const put = (root, rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), typeof text === 'string' ? text : JSON.stringify(text, null, 2)); };
@@ -33,7 +32,7 @@ test('every snapshot is beside the token CSS; the system\'s own scripts and the 
     compPropsSnapshot: 'packages/ui/src/figma-component-props.snapshot.json', snapshotFrameGeometry: 'packages/ui/src/figma-frame-geometry.snapshot.json',
     snapshotIcons: 'packages/ui/src/figma-icons.snapshot.json', snapshotScreenComponents: 'packages/ui/src/figma-screen-components.snapshot.json',
   });
-  const root = mkdtempSync(join(tmpdir(), 'setup-scripts-'));
+  const root = tempDir('setup-scripts-');
   put(root, 'src/theme.css', ':root { --a: 1px }');
   put(root, 'src/shared.js', 'document.addEventListener("click", () => {}); const sheet = "<svg><symbol id=\\"icon-a\\"></symbol></svg>";');
   put(root, 'src/wire.js', 'window.addEventListener("load", () => document.body.dataset.ready = "1");');
@@ -44,7 +43,7 @@ test('every snapshot is beside the token CSS; the system\'s own scripts and the 
 });
 
 test('the products checked out beside the system are the folders whose package depends on it; one it lists and lacks is said', () => {
-  const parent = mkdtempSync(join(tmpdir(), 'setup-products-'));
+  const parent = tempDir('setup-products-');
   const ds = join(parent, 'tidal-ds');
   put(ds, 'package.json', { name: '@tidal/ds-core' });
   put(ds, '.git/config', '[remote "origin"]\n\turl = https://github.com/tidal-co/tidal-ds.git\n');
@@ -72,7 +71,7 @@ test('the frames and screens a captured screen snapshot names: each product\'s w
 });
 
 test('setup writes what the project says into ds-config.json', () => {
-  const parent = mkdtempSync(join(tmpdir(), 'setup-writes-'));
+  const parent = tempDir('setup-writes-');
   const ds = join(parent, 'tidal-ds');
   put(ds, 'package.json', { name: '@tidal/ds-core' });
   put(ds, 'src/theme.css', ':root { --button-iconText: #000; --button-background: #fff; --gap-m: 8px }\n@media (prefers-color-scheme: dark) { :root { --button-iconText: #fff } }');
@@ -127,7 +126,7 @@ test('setup reached from another request routes that request again once it is do
   assert.equal(r.recipe, 'first-setup');
   assert.match(r.run[0], / --then='check buttonPrimary'\\''s accessibility'$/);
   assert.doesNotMatch(route('set up this project', { hasConfig: false }).run[0], /--then/);
-  const dir = mkdtempSync(join(tmpdir(), 'setup-then-'));
+  const dir = tempDir('setup-then-');
   put(dir, 'src/theme.css', ':root { --button-background: #fff }');
   const out = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--no-hooks', "--then=check buttonPrimary's accessibility"], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
   assert.equal(out.status, 0, out.stdout + out.stderr);
@@ -142,7 +141,7 @@ test('a Figma file set up and nothing captured from it: the run says nothing was
   assert.doesNotMatch(buildSummary({ verdict: 'pass', gates: [], noSnapshot: true }), /In parity/);
   assert.equal(dataStateLine({ snapshots: [{ file: 'src/figma-vars.snapshot.json', ageHours: null, readable: false }] }), '**No Figma data captured yet, so nothing was compared with Figma.** Not readable: src/figma-vars.snapshot.json. To capture it: rms-design-system-engine --recipe refresh-figma.');
   assert.match(dataStateLine({ snapshots: [{ file: 'a', ageHours: null, readable: true }] }), /^\*\*Figma data was not refreshed in this run\.\*\*/, 'a snapshot with no date is still data');
-  const dir = mkdtempSync(join(tmpdir(), 'no-snapshot-'));
+  const dir = tempDir('no-snapshot-');
   put(dir, 'src/theme.css', ':root { --button-background: #fff; }\n.button { background: var(--button-background); }\n');
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--figma-url=https://www.figma.com/design/AbC123def/Demo', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
   spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });

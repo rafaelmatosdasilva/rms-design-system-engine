@@ -3,13 +3,13 @@
 // sized like a real design system's, read in compact answers that give the same snapshot as the full form before.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { varsScript, readCapture, importCapture, captureWithFigmaCli, figmaCliEval, parseAnswer, cyrb53, recipeScripts, importLines, varsItems, encodeValue, decodeValue } from '../figma-capture.mjs';
 import { snapshotsFromDesign } from '../figma-cli-import.mjs';
 import { largeVarsFile, asFigma as asLargeFigma } from './figma-standin.mjs';
+import { tempDir } from './helpers.mjs';
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 const rgb = (r, g, b, a = 1) => ({ r, g, b, a });
@@ -48,7 +48,7 @@ const asFigma = (f) => ({
 });
 const runIn = (f) => async (code) => new AsyncFunction('figma', code)(asFigma(f));
 const cfg = { figma: { colorCollection: 'Theme', sizingCollection: 'Sizing', primitivePrefix: 'primitives/', modes: [{ name: 'Light', snapshotKey: 'light' }, { name: 'Dark', snapshotKey: 'dark' }] }, paths: { snapshotVars: 'src/figma-vars.snapshot.json' } };
-const project = () => { const d = mkdtempSync(join(tmpdir(), 'capture-')); writeFileSync(join(d, 'ds-config.json'), JSON.stringify(cfg)); return d; };
+const project = () => { const d = tempDir('capture-'); writeFileSync(join(d, 'ds-config.json'), JSON.stringify(cfg)); return d; };
 
 test('a file of 1,900 variables reads in about ten answers, each near the cap, with the checksums of every chunk and checked against its own', async () => {
   const f = largeVarsFile(), run = async (code) => new AsyncFunction('figma', code)(asLargeFigma(f));
@@ -296,7 +296,7 @@ test('answers saved in the form before still read; new checksums name every chun
 });
 
 test('figma-cli: a call that fails is tried once more after a pause; two failures say what figma-cli printed', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'figma-cli-eval-'));
+  const root = tempDir('figma-cli-eval-');
   const answers = (list) => { const left = [...list], asked = []; return { asked, spawn: (cmd, args) => { asked.push([cmd, args[0]]); return left.shift(); } }; };
   const paused = [];
   const pause = async (ms) => { paused.push(ms); };
@@ -312,7 +312,7 @@ test('figma-cli: a call that fails is tried once more after a pause; two failure
 });
 
 test('figma-cli: a long read is given its own timeout and room for a large answer', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'figma-cli-eval-'));
+  const root = tempDir('figma-cli-eval-');
   const opts = [];
   const spawn = (cmd, args, o) => { opts.push(o); return { status: 0, stdout: '1\n' }; };
   await figmaCliEval(root, { spawn })('return 1');

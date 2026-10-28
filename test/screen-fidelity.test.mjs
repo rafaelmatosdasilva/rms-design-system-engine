@@ -2,15 +2,14 @@
 // components the code lacks, surfaces bound to the system's tokens, each side's padding, and each instance's words.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { screenToPrototype } from '../screen-layout.mjs';
 import { checkPrototype } from '../prototype-pieces.mjs';
 import { prototypePage } from '../prototype.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
 import { pathToFileURL } from 'node:url';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const scales = { spacing: [{ name: 'padding/l', var: '--padding-l', value: '16px' }, { name: 'gap/m', var: '--gap-m', value: '8px' }], text: [], colors: [{ name: 'panel/background', var: '--panel-background' }] };
@@ -49,7 +48,7 @@ test('page: drawn in the screen\'s mode, at its size, an option value turns on i
   const { prototype: tree } = screenToPrototype(screen, { catalog, scales, drawable: new Set(['node']) });
   const parts = { view: { components: [{ name: 'node', cls: 'node', markup: '<button class="node"><span>x</span></button>', controls: [] }], modes: [{ attr: 'data-theme', values: [{ label: 'Light', value: '' }, { label: 'Dark', value: 'dark' }] }] }, themeCSS: ':root{--panel-background:#111} [data-theme=dark]{--panel-background:#000}', componentCSS: '.node{color:red} .node.node-selected{outline:2px solid white}', iconSheet: '' };
   const html = prototypePage({ name: 'plugin', tree, parts, scales, gaps: [], catalog });
-  const dir = mkdtempSync(join(tmpdir(), 'fidelity-'));
+  const dir = tempDir('fidelity-');
   writeFileSync(join(dir, 'p.html'), html);
   const chrome = await launchChrome(CHROME);
   try {

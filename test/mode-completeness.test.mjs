@@ -1,17 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { tempDir } from './helpers.mjs';
 
 const GATE = fileURLToPath(new URL('../mode-completeness-check.mjs', import.meta.url));
 
 // Build a throwaway project fixture and run the gate against it (cwd = fixture).
 // Returns { code, out }. The gate reads ds-config.json / design-system-engine-map.mjs / the snapshot from cwd.
 function runGate({ themeCss, snapshot, config }) {
-  const dir = mkdtempSync(join(tmpdir(), 'mode-gate-'));
+  const dir = tempDir('mode-gate-');
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify(config));
   writeFileSync(join(dir, 'design-system-engine-map.mjs'), 'export const EXPLICIT={};export const SKIP_TOKENS=new Set();');
   writeFileSync(join(dir, 'theme.css'), themeCss);

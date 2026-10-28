@@ -1,13 +1,12 @@
 // The engine's default style guide: only what Figma and the code agree on, controls labelled with Figma's names.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { agreedView, modeAxes, optionEffect, instanceMarkup, componentTokens, agreedTokens } from '../styleguide-data.mjs';
-import { fixtureProject, budget } from './helpers.mjs';
+import { fixtureProject, budget, tempDir } from './helpers.mjs';
 import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -1060,7 +1059,7 @@ test('product pictures: a product\'s own picture first, its window from its code
   const { windowSize, productShots } = await import('../product-shots.mjs');
   assert.deepEqual(windowSize('figma.showUI(__html__,{width:1e3,height:540,title:"Demo"})'), { w: 1000, h: 540 });
   assert.equal(windowSize('no window here'), null);
-  const dir = mkdtempSync(join(tmpdir(), 'shots-'));
+  const dir = tempDir('shots-');
   mkdirSync(join(dir, 'app', 'docs'), { recursive: true });
   writeFileSync(join(dir, 'app', 'ui.html'), '<!doctype html><button class="btn">Go</button>');
   writeFileSync(join(dir, 'app', 'docs', 'preview.png'), Buffer.from('89504e470d0a1a0a', 'hex'));
@@ -1188,7 +1187,7 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.equal(prUrl('https://github.com/o/r', '7'), 'https://github.com/o/r/pull/7');
   // A small repository: a commit on the badge's rule, released as v1.0.0, then one on another rule, then a pull request
   // that changes the badge again; a commit that did not touch the badge is never in its changelog.
-  const dir = mkdtempSync(join(tmpdir(), 'changelog-'));
+  const dir = tempDir('changelog-');
   const git = (...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8' });
   git('init', '-q', '-b', 'main'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
   const css = (s) => writeFileSync(join(dir, 'theme.css'), s);
@@ -1287,7 +1286,7 @@ test('what uses each token: in a component\'s own rules, or through another toke
 
 test('Figma images of each variant: the reference folder first, never the network without a token', async () => {
   const { figmaVariantImages } = await import('../visual-diff.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'figma-variants-'));
+  const dir = tempDir('figma-variants-');
   try {
     mkdirSync(join(dir, 'refs', 'components', 'chip'), { recursive: true });
     writeFileSync(join(dir, 'refs', 'components', 'chip', 'Size=L.png'), 'x');
@@ -1321,7 +1320,7 @@ test('every box on the page looks like the system\'s own card: its border colour
 
 test('Do and Don\'t: pictures in the references, each named for its caption, do\'s first; a variant image can say its scale', async () => {
   const { exampleImages, figmaVariantImages } = await import('../visual-diff.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'figma-examples-'));
+  const dir = tempDir('figma-examples-');
   try {
     for (const [kind, f] of [['dont', '2 Two buttons.png'], ['do', '1 One button.png'], ['do', 'notes.txt']]) { mkdirSync(join(dir, 'refs', 'components', 'button', kind), { recursive: true }); writeFileSync(join(dir, 'refs', 'components', 'button', kind, f), 'x'); }
     const ex = await exampleImages(dir, { visualRefs: 'refs' }, 'button', { token: null });

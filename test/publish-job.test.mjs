@@ -3,17 +3,17 @@
 // never commits, and says who can open the page.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { hostOf, githubJob, gitlabJob, writePublishJob, productRepos, ENGINE_REPO } from '../publish-job.mjs';
 import { route } from '../route.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const project = (remote, files = {}) => {
-  const dir = mkdtempSync(join(tmpdir(), 'publish-'));
+  const dir = tempDir('publish-');
   mkdirSync(join(dir, '.git'), { recursive: true });
   if (remote) writeFileSync(join(dir, '.git', 'config'), `[remote "origin"]\n\turl = ${remote}\n`);
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'src/theme.css' } }));
@@ -78,11 +78,10 @@ test('--publish-styleguide writes the job and says what to do next; --print only
 
 test('a job that publishes the page alone (written before the page had files beside it, or by hand) is named, with the line to put instead', async () => {
   const { pageOnlyCopies, pageOnlyLines, githubJob } = await import('../publish-job.mjs');
-  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const out = '.design-system-engine-out/styleguide/index.html';
-  const d = mkdtempSync(join(tmpdir(), 'pj-alone-'));
+  const d = tempDir('pj-alone-');
   mkdirSync(join(d, '.github', 'workflows'), { recursive: true });
   writeFileSync(join(d, '.github', 'workflows', 'style-guide.yml'), githubJob({ out }));
   assert.deepEqual(pageOnlyCopies(d, out), [], 'the engine\'s own job copies the page with its files');

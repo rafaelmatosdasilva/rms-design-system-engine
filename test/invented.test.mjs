@@ -1,11 +1,11 @@
 // invented.mjs - the names agents actually invented here, kept so the catalog rejects them by name next time.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { inventionsIn, noteInvented, readInvented, rejectedFrom, INVENTED_FILE } from '../invented.mjs';
 import { buildCatalog } from '../ui-catalog.mjs';
+import { tempDir } from './helpers.mjs';
 
 const findings = [
   { rule: 1, level: 'error', id: 'a', message: '"Pill" is not in the catalog (did you mean Chip?)' },
@@ -28,7 +28,7 @@ test('what a check saw an agent invent: the wrong name, and the right one where 
 });
 
 test('inventions add up across runs, and feed the catalog so the next agent reads them beside the real values', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'invented-'));
+  const dir = tempDir('invented-');
   assert.deepEqual(readInvented(dir), { components: {}, props: {}, values: {} });
 
   noteInvented(dir, findings);
@@ -51,7 +51,7 @@ test('inventions add up across runs, and feed the catalog so the next agent read
 
 test('the page check\'s own record feeds the same table: one lesson, whichever road found it', async () => {
   const { mkdirSync, writeFileSync } = await import('node:fs');
-  const dir = mkdtempSync(join(tmpdir(), 'invented-both-'));
+  const dir = tempDir('invented-both-');
   // What page-check.mjs keeps for a page written as code: its messages carry the same "did you mean".
   mkdirSync(join(dir, '.design-system-engine-out', 'prototypes'), { recursive: true });
   writeFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'inventions.json'), JSON.stringify({

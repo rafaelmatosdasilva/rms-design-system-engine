@@ -2,18 +2,18 @@
 // never overwrites one built from newer inputs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, cpSync, appendFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, cpSync, appendFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildStamp, compareStamps, mayWrite, stampOf, stampMeta, stampLine } from '../stamp.mjs';
 import { generateContracts } from '../contract-gen.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const git = (cwd, ...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8' }).stdout.trim();
 function repo() {
-  const d = mkdtempSync(join(tmpdir(), 'stamp-'));
+  const d = tempDir('stamp-');
   git(d, 'init', '-q');
   writeFileSync(join(d, 'a.txt'), '1'); git(d, 'add', '-A'); git(d, 'commit', '-qm', 'one');
   const one = git(d, 'rev-parse', 'HEAD');
@@ -70,7 +70,7 @@ test('an older run keeps the newer output and says why; --force replaces it; the
 });
 
 test('contracts built from an older commit never replace those built from a newer one', async () => {
-  const d = mkdtempSync(join(tmpdir(), 'stamp-contracts-'));
+  const d = tempDir('stamp-contracts-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), d, { recursive: true });
   git(d, 'init', '-q'); git(d, 'add', '-A'); git(d, 'commit', '-qm', 'one');
   const cfg = JSON.parse(readFileSync(join(d, 'ds-config.json'), 'utf8'));

@@ -1,15 +1,15 @@
 // Gate [1] build freshness: a newer date is a stale build only when the content changed since the build.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, utimesSync, readFileSync } from 'node:fs';
+import { writeFileSync, utimesSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { buildFreshness } from '../build-freshness.mjs';
+import { tempDir } from './helpers.mjs';
 
 const at = (file, minutes) => { const t = new Date(Date.UTC(2026, 0, 1, 12, minutes)); utimesSync(file, t, t); };
 
 function project() {
-  const dir = mkdtempSync(join(tmpdir(), 'build-freshness-'));
+  const dir = tempDir('build-freshness-');
   const f = (name, text, minutes) => { const p = join(dir, name); writeFileSync(p, text); at(p, minutes); return p; };
   const theme = f('theme.css', ':root { --a: #000; }', 0);
   const src = f('ui.src.html', '<p>one</p>', 1);

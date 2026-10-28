@@ -6,8 +6,7 @@
 //   npm install --prefix test/.vue-tools vite@6 @vitejs/plugin-vue@5 vue@3 sass@1 pinia@3 vue-router@4
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, writeFileSync, readFileSync, symlinkSync, existsSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, writeFileSync, readFileSync, symlinkSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +15,7 @@ import { globalStyles, renderedVue, appPlugins, appSetup, runtimeDeps, propSampl
 import { harnessCases } from '../component-harness.mjs';
 import { textComponentApi } from '../component-source.mjs';
 import { findChrome } from '../cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -37,7 +36,7 @@ $pad: 4px;
 `;
 // Harbor, its Vue components and a chip only the code has, with its packages installed.
 const harbor = (prefix) => {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
+  const dir = tempDir(prefix);
   cpSync(HARBOR, dir, { recursive: true });
   writeFileSync(join(dir, 'components', 'HbChip.vue'), CHIP);
   symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
@@ -54,14 +53,14 @@ test('with no Figma variants, the code\'s own props give them: each option, each
 });
 
 test('the global styles a Vue project\'s entry loads, and its token CSS', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'vue-styles-'));
+  const dir = tempDir('vue-styles-');
   mkdirSync(join(dir, 'src', 'styles'), { recursive: true });
   writeFileSync(join(dir, 'src', 'main.ts'), "import { createApp } from 'vue';\nimport './styles/main.scss';\nimport '@acme/ui/dist/style.css';\nimport App from './App.vue';\n");
   assert.deepEqual(globalStyles(dir, { paths: { themeCSS: 'src/styles/tokens.css' } }), ['/src/styles/tokens.css', '/src/styles/main.scss', '@acme/ui/dist/style.css']);
 });
 
 test('a React component with no Figma variants is rendered in its code\'s', { skip: loadTypeScript(ENGINE) ? false : 'no TypeScript' }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'react-code-variants-'));
+  const dir = tempDir('react-code-variants-');
   mkdirSync(join(dir, 'src', 'components'), { recursive: true });
   writeFileSync(join(dir, 'src', 'components', 'Tag.jsx'), 'export function Tag({ tone = "info", dismissible = false }) { return <span className={"tag tag--" + tone}>x</span>; }\n');
   const h = await startHarness(dir, {}, ['tag'], { locate: () => join(dir, 'src', 'components', 'Tag.jsx') });
@@ -96,7 +95,7 @@ test('the style guide draws a Vue component as the project\'s own Vite renders i
   assert.match(page, /"name":"chip","cls":"hb-chip"[^}]*"markup":"\\u003cbutton data-v-[a-f0-9]+=\\"\\" class=\\"hb-chip hb-chip--quiet\\" type=\\"button\\" aria-pressed=\\"false\\">Filter\\u003c\/button>"/);
   assert.match(page, /\.hb-chip\[data-v-[a-f0-9]+\] \{\n {2}padding: 4px 8px;\n\}/, 'its scoped SCSS, compiled');
   // Without the packages, its template is read as before, and the summary says why.
-  const bare = mkdtempSync(join(tmpdir(), 'vue-sg-bare-'));
+  const bare = tempDir('vue-sg-bare-');
   cpSync(HARBOR, bare, { recursive: true });
   const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: bare, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.match(b.stdout, /Vue components drawn from their templates: the project has no vue package installed\./);
@@ -148,7 +147,7 @@ const STORES = existsSync(join(TOOLS, 'pinia')) && existsSync(join(TOOLS, 'vue-r
 
 test('a Vue component that reads a Pinia store and links with the router renders with the project\'s own Pinia and router', { skip: STORES, timeout: budget(300000) }, async () => {
   const project = (deps) => {
-    const dir = mkdtempSync(join(tmpdir(), 'vue-store-'));
+    const dir = tempDir('vue-store-');
     mkdirSync(join(dir, 'components'));
     writeFileSync(join(dir, 'components', 'HbCart.vue'), CART);
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'store-ds', private: true, dependencies: { vue: '^3.5.0', ...deps } }));
@@ -197,7 +196,7 @@ defineProps({ label: String, icon: String, buttonSize: { type: String, default: 
 };
 
 test('the app\'s own modules load first, in its entry\'s order; its plugins and global components are installed', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'vue-app-')); APP(dir);
+  const dir = tempDir('vue-app-'); APP(dir);
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'app', dependencies: { vue: '^3.5.0' } }));
   assert.deepEqual(appSetup(dir).map((x) => `${x.kind} ${x.spec}`), [
     'import /src/App.vue', 'import /src/router/router', 'import @/shout', 'import @/components/BaseIcon.vue',
@@ -206,7 +205,7 @@ test('the app\'s own modules load first, in its entry\'s order; its plugins and 
 });
 
 test('the packages the code imports are bundled before the page loads, never a tool only its scripts run', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'vue-deps-'));
+  const dir = tempDir('vue-deps-');
   mkdirSync(join(dir, 'src', 'figma'), { recursive: true });
   writeFileSync(join(dir, 'src', 'a.vue'), "<script setup>import moment from 'moment-timezone'\nimport './local.js'\nimport '@/b'\nimport 'prismjs/themes/prism.css'\nimport Prism from 'prismjs'</script>");
   writeFileSync(join(dir, 'src', 'figma', 'a.figma.js'), "import figma from '@figma/code-connect'");
@@ -215,7 +214,7 @@ test('the packages the code imports are bundled before the page loads, never a t
 });
 
 test('a text with no default takes the value the project\'s own pages pass it most', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'vue-samples-')); mkdirSync(join(dir, 'src'));
+  const dir = tempDir('vue-samples-'); mkdirSync(join(dir, 'src'));
   writeFileSync(join(dir, 'src', 'A.vue'), '<template><X icon="m/home-m" label="Save" class="a" :title="t" /><X icon="m/home-m" /><X icon="s/x" button-size="l" /></template>');
   const s = propSamples(dir);
   assert.equal(s.icon, 'm/home-m'); assert.equal(s.label, 'Save'); assert.equal(s.buttonSize, 'l');
@@ -230,7 +229,7 @@ test('a state Figma\'s default variant has on (Disabled) starts off; its on is a
 });
 
 test('a Vue component drawn as the product draws it: Figma\'s names in the code\'s words, its icon, its app\'s plugins', { skip: READY, timeout: budget(300000) }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'vue-figma-names-')); APP(dir);
+  const dir = tempDir('vue-figma-names-'); APP(dir);
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'app', private: true, dependencies: { vue: '^3.5.0' } }));
   writeFileSync(join(dir, 'vite.config.js'), "import vue from '@vitejs/plugin-vue'\nimport { fileURLToPath } from 'node:url'\nexport default { plugins: [vue()], resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } } }");
   symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
@@ -247,11 +246,10 @@ test('a Vue component drawn as the product draws it: Figma\'s names in the code\
 });
 
 test('a component draws with the data its own documentation page gives it, read as plain data and never run', async () => {
-  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { pageSamples } = await import('../vue-harness.mjs');
-  const root = mkdtempSync(join(tmpdir(), 'page-samples-'));
+  const root = tempDir('page-samples-');
   mkdirSync(join(root, 'src', 'components', 'charts'), { recursive: true });
   mkdirSync(join(root, 'src', 'views'), { recursive: true });
   writeFileSync(join(root, 'src', 'components', 'charts', 'Donut.vue'), '<template><div/></template>');

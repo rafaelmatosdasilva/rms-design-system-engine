@@ -2,16 +2,15 @@
 // the contract; its properties in the engine's own contract; a text style's description.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { guidanceView, tokenDescriptions, staticRole } from '../styleguide-data.mjs';
 import { contextFrom } from '../prototype-context.mjs';
 import { varsFromItems } from '../figma-capture.mjs';
 import { readPage } from '../styleguide-files.mjs';
-import { bareEnv, budget } from './helpers.mjs';
+import { bareEnv, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -75,7 +74,7 @@ test('with no intent layer, a component\'s Do and don\'t and its properties in t
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
-  const dir = mkdtempSync(join(tmpdir(), 'doc-rows-'));
+  const dir = tempDir('doc-rows-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'harbor-ds'), dir, { recursive: true });
   const authored = JSON.parse(readFileSync(join(dir, 'contract.authored.json'), 'utf8'));
   authored.components.button.guidance = { doDont: ['Do: one per form', 'Don\'t: two side by side'] };

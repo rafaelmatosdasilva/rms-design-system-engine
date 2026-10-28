@@ -3,14 +3,14 @@
 // is read as it is written.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { namingFromCode, namingWords, settleFromCapture, FROM_CAPTURE } from '../setup-facts.mjs';
 import { varsFromDesign } from '../figma-cli-import.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const vars = (tokens, more = {}) => ({ color: { light: Object.fromEntries(tokens.map((t) => [t, '#000000'])) }, ...more });
@@ -92,7 +92,7 @@ test('the figma-cli import records the collections it read, and takes the file\'
 });
 
 test('end to end: setup lists what it cannot know, and the first capture fills ds-config.json', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'from-capture-'));
+  const dir = tempDir('from-capture-');
   const design = tidepoolDesign();
   const theme = design.variables.find((c) => c.name === 'Theme').variables;
   const val = (v, mode) => (typeof v.values[mode] === 'string' ? v.values[mode] : '#123456');

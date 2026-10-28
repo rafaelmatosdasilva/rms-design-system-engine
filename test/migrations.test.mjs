@@ -2,12 +2,11 @@
 // for each token swap.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { retired, usesOf, migrationSteps, migrationPatches, migrationsMarkdown, migrationView, projectMigrations } from '../migrations.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 test('what is retired: a deprecated component, a deprecated token with its replacement, an old name a rename kept', () => {
   const items = retired({
@@ -70,7 +69,7 @@ test('the steps by product, a patch for each token swap, and the list a person r
 });
 
 test('read from a project: the authored status, the token\'s Figma description, the product beside it; the patch applies there', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'dse-mig-')), dir = join(root, 'ds'), shop = join(root, 'shop');
+  const root = tempDir('dse-mig-'), dir = join(root, 'ds'), shop = join(root, 'shop');
   try {
     const put = (base, p, text) => { mkdirSync(dirname(join(base, p)), { recursive: true }); writeFileSync(join(base, p), text); };
     put(dir, 'ds-config.json', JSON.stringify({ paths: { themeCSS: 'src/theme.css', snapshotVars: 'src/figma-vars.snapshot.json' }, pluginDirs: { shop: '../shop' } }));

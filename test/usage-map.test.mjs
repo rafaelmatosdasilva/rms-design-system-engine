@@ -3,15 +3,15 @@
 // printed by --query and beside each component in the differences list.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { productFiles, usageMap, usageLines, usesIn } from '../usage-map.mjs';
 import { answerLines } from '../query.mjs';
 import { differencesMarkdown } from '../run-diff.mjs';
+import { tempDir } from './helpers.mjs';
 
 const project = (files) => {
-  const dir = mkdtempSync(join(tmpdir(), 'usage-'));
+  const dir = tempDir('usage-');
   for (const [f, text] of Object.entries(files)) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), text); }
   return dir;
 };

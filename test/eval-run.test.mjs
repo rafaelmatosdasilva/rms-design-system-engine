@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runEvals, loadContext, generateCandidate, judgeCandidate, summarize } from '../eval-run.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, tempDir } from './helpers.mjs';
 
 const ctx = { cssVars: new Set(['--color-bg']), dsClasses: new Set(['.buttonPrimary']) };
 
@@ -183,10 +183,9 @@ test('a component name with a regex character is found in a prompt as written', 
 
 test('the tokens a generation spent, from the file EVAL_USAGE names', async () => {
   const { readUsage } = await import('../eval-run.mjs');
-  const { writeFileSync, existsSync, mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { writeFileSync, existsSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const dir = mkdtempSync(join(tmpdir(), 'usage-'));
+  const dir = tempDir('usage-');
   const f = (name, text) => { const p = join(dir, name); writeFileSync(p, text); return p; };
   assert.equal(readUsage(f('a', '1234')), 1234);
   assert.equal(readUsage(f('b', JSON.stringify({ input_tokens: 900, output_tokens: 100, cache_read_input_tokens: 50 }))), 1050);

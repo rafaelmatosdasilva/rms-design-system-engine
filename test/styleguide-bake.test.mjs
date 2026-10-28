@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { withBaked, withoutBaked, BAKED_ID, ageOpen, withOpenSince, OPEN_ID, savedFor } from '../styleguide-bake.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 test('the results are kept in the page right after its data, before its script reads them; an earlier build\'s replaced', () => {
   const page = '<html><body><main></main><script type="application/json" id="sg-data">{}</script><script>var x = 1;</script></body></html>';
@@ -26,11 +26,10 @@ test('what a component holds never closes the script it is kept in', () => {
 test('a page whose script stops is said at once, never waited out for an hour', { timeout: budget(120000) }, async (t) => {
   const { findChrome } = await import('../cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
-  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { writeFileSync, rmSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { bakeA11y } = await import('../styleguide-bake.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'sg-dead-'));
+  const dir = tempDir('sg-dead-');
   try {
     const file = join(dir, 'index.html');
     writeFileSync(file, '<html><body><script type="application/json" id="sg-data">{"components":[{"name":"chip"}]}</script><script>rows.push(1); window.__sgA11yResults = function () { return {}; };</script></body></html>');
@@ -45,11 +44,10 @@ test('a page whose script stops is said at once, never waited out for an hour', 
 test('saved results go into the page before it tries anything, so it tries only what changed; they come back with the new ones', { timeout: budget(120000) }, async (t) => {
   const { findChrome } = await import('../cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
-  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { writeFileSync, readFileSync, rmSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { bakeA11y, readSaved, RESULTS_FILE } = await import('../styleguide-bake.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'sg-saved-'));
+  const dir = tempDir('sg-saved-');
   try {
     const file = join(dir, 'index.html');
     // A page with two themes (the default one and a brand, Acme Retail) that keeps what it was given for the theme it is opened
