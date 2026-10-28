@@ -126,7 +126,8 @@ test('a run killed before it cleaned up has its browser ended and its folders sw
   assert.ok(sweepDeadProfiles() >= 1);
   assert.equal(existsSync(dir), false, 'the profile was left behind');
   assert.equal(existsSync(socketDir), false, 'the socket folder was left behind');
+  // Ended, not yet gone: a browser takes a moment to exit once it is told to, longer on a busy machine.
   let gone = false;
-  try { process.kill(Number(chromePid), 0); } catch { gone = true; }
+  for (let i = 0; i < 50 && !gone; i++) { try { process.kill(Number(chromePid), 0); await new Promise((r) => setTimeout(r, 100)); } catch { gone = true; } }
   assert.ok(gone, 'the orphaned browser was left running');
 });
