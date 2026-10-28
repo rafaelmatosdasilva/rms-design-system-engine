@@ -563,7 +563,9 @@ export function jsonReview(entry, text, to) {
 }
 // The system's own page, as a page with drafts: its entry in the layer's index (doc-source-dsds.mjs → readDsds).
 export const SYSTEM_PAGE = 'the System page';
-export const systemPage = (snap) => (snap?.system?.drafts?.length ? { name: SYSTEM_PAGE, id: snap.system.id ?? snap.system.name, file: snap.system.file, drafts: snap.system.drafts } : null);
+// Its file: the one the snapshot names, else the layer's index (a snapshot an older engine wrote names only that).
+const systemFile = (snap) => snap?.system?.file ?? snap?._source?.entry ?? null;
+export const systemPage = (snap) => (snap?.system?.drafts?.length ? { name: SYSTEM_PAGE, id: snap.system.id ?? snap.system.name, file: systemFile(snap), drafts: snap.system.drafts } : null);
 const isSystemPage = (page) => ['thesystempage', 'systempage', 'thesystem'].includes(norm(page));
 // decisions: [{ page (its name or file, or the System page), line (a draft's text; left out: every draft of the page),
 // do: 'approve' | 'change' | 'drop', to (change's new text), task (only the drafts that task wrote), expect (how many
@@ -639,9 +641,9 @@ export function draftLinesPlan(snap, subject, section, lines, files, { task = nu
   if (!said.length) return { error: 'give the lines to draft' };
   const mark = `**Draft${task ? ` (${flat(task).replace(/[()]/g, '')}, ${at})` : ''}:** `;
   const marked = said.map((l) => mark + l);
-  const system = isSystemPage(subject) && snap?.system?.file;
+  const system = isSystemPage(subject) && !!snap?.system && !!systemFile(snap);
   const want = norm(subject);
-  const e = system ? { name: SYSTEM_PAGE, id: snap.system.id ?? snap.system.name, file: snap.system.file }
+  const e = system ? { name: SYSTEM_PAGE, id: snap.system.id ?? snap.system.name, file: systemFile(snap) }
     : (snap?.entities ?? []).find((x) => x.kind !== 'token' && (norm(x.name) === want || norm(String(x.file).replace(/^.*\//, '').replace(/\.dsds\.json$/, '')) === want));
   if (!e) return { error: `no page in the intent layer is about "${subject}": name a component, a pattern, a template, a foundation as its page is titled, or the System page` };
   const idx = specIndex(files, { codes }), src = system ? null : specOf(e, idx), next = new Map();

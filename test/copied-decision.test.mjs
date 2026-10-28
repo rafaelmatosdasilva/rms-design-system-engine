@@ -113,3 +113,11 @@ test('a decision keeps the words it was given in, shown beside who made it and w
   assert.match(decisionLine(d), /Decided by Sam on .+\. As given: `on Component Icon, Yes to "Icon is a part of Button"`$/);
   assert.doesNotMatch(decisionLine({ what: 'X' }), /As given/);
 });
+
+test('a snapshot an older engine wrote names only the index: the System page is still found by it', () => {
+  const file = 'specs/system.dsds.json', raw = JSON.stringify(index('- Use what fits.'), null, 2);
+  const { system } = readDsds(new Map([[file, JSON.parse(raw)]]), file);
+  delete system.file;
+  const plan = draftLinesPlan({ system, entities: [], _source: { entry: file } }, 'the System page', 'Rules', ['Ask first.'], new Map([[file, raw]]), { task: 'T', at: '2026-10-28' });
+  assert.equal(plan.file, file);
+});
