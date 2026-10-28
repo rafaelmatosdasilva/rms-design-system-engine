@@ -13,7 +13,7 @@
 // when its maintainers changed it. Whether this person may write each part is never in it: GitLab answers that.
 // `--make-command <client>` writes the command a team installs: rms-design-system-engine-<client>.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
@@ -101,7 +101,7 @@ export function applyProfile(cfg, profile, { source, sha, now = new Date().toISO
   for (const [k, v] of Object.entries(shared)) next[k] = isObj(v) && isObj(mine[k]) ? { ...mine[k], ...clone(v) } : clone(v);
   for (const p of PERSONAL) { const v = getPath(mine, p); if (v !== undefined) setPath(next, p, v); else delPath(next, p); }
   if (profile.stores) next.stores = dropSecrets(clone(profile.stores));
-  next.profile = { source, sha, ...(profile.name ? { name: profile.name } : {}), readAt: now };
+  next.profile = { source, sha, ...(profile.name ? { name: profile.name } : {}), ...(profile.command ? { command: String(profile.command).replace(/^\//, '') } : {}), readAt: now };
   return next;
 }
 
@@ -135,6 +135,26 @@ export async function refreshProfile(ROOT, { given = null, read = null, env, htt
 }
 
 // ── The company's command ───────────────────────────────────────────────────────────────────────────────────────────
+// The command a decision copied from the style guide starts with, so whoever pastes it runs it for this system and no
+// other: the company's own command (/rms-design-system-engine-<client>), named by the profile ("command") or found
+// among the commands installed here by the profile it runs; else the engine with the profile's link; else the engine.
+export function engineCommand(cfg, { home = homedir() } = {}) {
+  const source = cfg?.profile?.source ?? null;
+  if (cfg?.profile?.command) return `/${cfg.profile.command}`;
+  if (source) {
+    const dir = join(home, '.claude', 'skills');
+    let found = null;
+    try {
+      for (const d of readdirSync(dir).filter((x) => x.startsWith(`${SKILL}-`)).sort()) {
+        let t = ''; try { t = readFileSync(join(dir, d, 'SKILL.md'), 'utf8'); } catch { continue; }
+        if (t.includes(`--profile '${String(source).replace(/'/g, `'\\''`)}'`)) { found = d; break; }
+      }
+    } catch { /* no commands installed here */ }
+    if (found) return `/${found}`;
+    return `${SKILL} --profile '${String(source).replace(/'/g, `'\\''`)}'`;
+  }
+  return SKILL;
+}
 export const commandName = (client) => `${SKILL}-${String(client ?? '').toLowerCase().replace(/^rms-design-system-engine-/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 export function commandSkill(client, source, { name } = {}) {
   const cmd = commandName(client);
@@ -151,15 +171,17 @@ ${who}'s setup of /${SKILL}: where the code, the Figma file and each of the engi
 ${who}'s profile, kept by its maintainers. Your tokens stay in your own .env; what you may write is what GitLab
 lets your tokens write.
 
-Run, in the shell, now:
+Run, in the shell, now. With a request, route it first, passing it exactly as the person wrote it:
 
 \`\`\`bash
-${SKILL} --profile ${q} $ARGUMENTS
+${SKILL} --profile ${q} --route "$ARGUMENTS"
 \`\`\`
 
-(Not on PATH: \`node ~/.claude/skills/${SKILL}/audit.mjs --profile ${q} $ARGUMENTS\`.)
+With no request: \`${SKILL} --profile ${q}\`. (Not on PATH: \`node ~/.claude/skills/${SKILL}/audit.mjs\` in place of
+\`${SKILL}\`.)
 
-Then do what /${SKILL} says for the request: relay its SUMMARY and follow its NEXT line.
+Then do what /${SKILL} says for the request: run the \`RUN:\` command the route prints, relay its SUMMARY and follow its
+NEXT line. The request is for ${who}'s design system: never another's.
 `;
 }
 // → the file written

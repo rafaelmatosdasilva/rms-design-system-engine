@@ -33,21 +33,21 @@ const trim = (s, n = 300) => { const t = String(s ?? '').replace(/\s+/g, ' ').tr
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // Every decision in one shape, whatever file it came from.
-// → { component, kind, what, ruledOut: [string], why, by, at, from }
+// → { component, kind, what, ruledOut: [string], why, by, at, from, said } (said: the decision as the person gave it)
 export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [] } = {}) {
   const out = [];
-  const add = (d) => { if (d.what) out.push({ component: null, ruledOut: [], why: null, by: null, at: null, ...d, what: trim(d.what), why: d.why ? trim(d.why) : null }); };
+  const add = (d) => { if (d.what) out.push({ component: null, ruledOut: [], why: null, by: null, at: null, said: null, ...d, what: trim(d.what), why: d.why ? trim(d.why) : null, said: d.said ? trim(d.said, 600) : null }); };
 
   // A difference the team decided to keep: the side it did not take is ruled out, and the reason is why.
   for (const k of kept) {
     const side = k.truth === 'figma' ? "the code's value" : k.truth === 'code' ? "Figma's value" : null;
-    add({ component: k.component ?? null, kind: 'kept', what: `${k.check ? `${k.check}: ` : ''}${k.what ?? k.key}`, ruledOut: side ? [side] : [], why: k.reason, by: k.by, at: k.at, from: 'the kept differences' });
+    add({ component: k.component ?? null, kind: 'kept', what: `${k.check ? `${k.check}: ` : ''}${k.what ?? k.key}`, ruledOut: side ? [side] : [], why: k.reason, by: k.by, at: k.at, said: k.said, from: 'the kept differences' });
   }
   // A proposal the engine made and a person answered. A no is the sharpest thing in this file: it is an option
   // somebody looked at and did not want, and it is exactly what an agent proposes again.
   for (const [key, a] of Object.entries(answered ?? {})) {
     const text = a?.proposal ?? key;
-    add({ component: componentOf(key), kind: 'answered', what: `${a?.answer === 'no' ? 'No' : 'Yes'}: ${text}`, ruledOut: a?.answer === 'no' ? [trim(text)] : [], why: a?.why ?? null, by: a?.by, at: a?.at, from: 'the answered proposals' });
+    add({ component: componentOf(key), kind: 'answered', what: `${a?.answer === 'no' ? 'No' : 'Yes'}: ${text}`, ruledOut: a?.answer === 'no' ? [trim(text)] : [], why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' });
   }
   // A need nothing in the system fitted: what was looked at is what was ruled out, with why in the team's own words.
   for (const g of gaps) {
@@ -162,10 +162,10 @@ export function parseDecision(text) {
 }
 
 // The line parseDecision reads back.
-export function decisionLine({ what, ruledOut = [], why = null, by = null, at = null }) {
+export function decisionLine({ what, ruledOut = [], why = null, by = null, at = null, said = null }) {
   const end = (x) => (/[.!?]$/.test(x) ? x : x + '.');
   return [end(clean(what)), ruledOut.length ? end(`Ruled out: ${ruledOut.map(clean).join('; ')}`) : '', why ? end(`Why: ${clean(why)}`) : '',
-    by || at ? end(`Decided${by ? ` by ${clean(by)}` : ''}${at ? ` on ${dayOf(at)}` : ''}`) : ''].filter(Boolean).join(' ');
+    by || at ? end(`Decided${by ? ` by ${clean(by)}` : ''}${at ? ` on ${dayOf(at)}` : ''}`) : '', said ? `As given: \`${clean(said)}\`` : ''].filter(Boolean).join(' ');
 }
 
 // What a page is about, in the words the History page filters by.

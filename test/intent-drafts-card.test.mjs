@@ -13,8 +13,11 @@ const loadChanges = () => {
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), shq = (x) => `'${x}'`, decideMark = (k) => `<mark-${k}>`;
   const sysButton = (tag, label, attrs) => `<button${attrs}>${label}</button>`;
   const capital = (x) => String(x).charAt(0).toUpperCase() + String(x).slice(1);
-  return new Function('esc', 'shq', 'decideMark', 'sysButton', 'capital', `return (${src})`)(esc, shq, decideMark, sysButton, capital);
+  const ilOn = new Function(`return (${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
+  const ilTaskOf = new Function(`return (${/var ilTaskOf = (function \(drafts\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
+  return new Function('esc', 'shq', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', `return (${src})`)(esc, shq, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf);
 };
+const ENGINE = '/rms-design-system-engine-acme';
 const cards = (html) => [...html.matchAll(/<div class="sg-decide sg-decide--(\w+)" title="([^"]+)"><strong class="sg-decide-head"><mark-\w+>([^<]+)<\/strong><button data-il-copy="([^"]*)" data-il-said="([^"]+)">([^<]+)<\/button>/g)].map((m) => ({ k: m[1], says: m[2], head: m[3], copy: m[4].replace(/&quot;/g, '"').replace(/&amp;/g, '&'), said: m[5], label: m[6] }));
 
 test('the drafts are in the What to do card, grouped by section, each once, then three decisions side by side', () => {
@@ -36,15 +39,16 @@ test('the drafts are in the What to do card, grouped by section, each once, then
   const c = cards(html);
   assert.deepEqual(c.map((x) => [x.k, x.head]), [['approve', 'Approve all'], ['change', 'Change one'], ['drop', 'Drop all']], 'three cards side by side, each with its own mark');
   assert.ok(c.every((x) => x.label === 'Copy decision' && x.said === 'Paste it in Claude Code'), 'one button each, and where to paste it');
-  assert.equal(c[0].copy, "rms-design-system-engine --review-drafts --approve 'specs/action-bar.dsds.json'", 'every draft on the page at once');
-  assert.equal(c[2].copy, "rms-design-system-engine --review-drafts --drop 'specs/action-bar.dsds.json'");
-  assert.match(c[1].copy, /^Change one of the 3 drafts on actionBar's intent layer page \(specs\/action-bar\.dsds\.json\): ask me which one and my words, then run rms-design-system-engine --review-drafts --change/, 'a request Claude Code acts on, never a command with blanks');
+  assert.equal(c[0].copy, '/rms-design-system-engine-acme on Component actionBar, Approve all 3 drafts.', 'the system\'s command, the page by its kind and name, the decision: never a file or a flag');
+  assert.equal(c[2].copy, '/rms-design-system-engine-acme on Component actionBar, Drop all 3 drafts.');
+  assert.equal(c[1].copy, '/rms-design-system-engine-acme on Component actionBar, Change one of the 3 drafts: ask me which one and my words.', 'a request Claude Code acts on, never a command with blanks');
+  assert.ok(c.every((x) => !/\.json|\.md|--/.test(x.copy)), 'no file, no flag');
   const lengths = c.map((x) => x.says.length);
   assert.ok(Math.max(...lengths) - Math.min(...lengths) <= 3, `what each does, in its tip, of the same length (${lengths})`);
   // One draft: the decisions said for one, the sentences still even.
   const c1 = cards(ilDrafts({ name: 'error', file: 'e.json', drafts: [{ where: 'Limitations', text: 'Use an inline error.' }] }));
   assert.deepEqual(c1.map((x) => x.head), ['Approve', 'Change', 'Drop']);
-  assert.match(c1[1].copy, /&quot;Use an inline error\.&quot;/);
+  assert.match(c1[1].copy, /^\/rms-design-system-engine-acme on Component error, Change its draft &quot;Use an inline error\.&quot;: ask me for my words\.$/);
   const l1 = c1.map((x) => x.says.length);
   assert.ok(Math.max(...l1) - Math.min(...l1) <= 3, `even for one draft (${l1})`);
 });
@@ -74,8 +78,8 @@ test('every change a page asks for is in What to do, under one decision: its dra
   assert.doesNotMatch(html, /Why remove it|What to change|>Where</, 'no labels, no file to find');
   const c = cards(html);
   assert.deepEqual(c.map((x) => x.head), ['Approve all', 'Change one', 'Drop all'], 'one decision for all of them');
-  assert.match(c[0].copy, /approve its draft \(run rms-design-system-engine --review-drafts --approve 'specs\/action-bar\.dsds\.json'\); then write "When to use it, not a sibling" in specs\/action-bar\.md, under ## When to use, as drafts I review; then remove "A copy of its description" where each lives; then for "Save flow pattern available here: a link", write in words what to take from it\./);
-  assert.match(c[2].copy, /drop its draft \(run rms-design-system-engine --review-drafts --drop 'specs\/action-bar\.dsds\.json'\); write nothing new and leave its notes as they are\./);
+  assert.equal(c[0].copy, '/rms-design-system-engine-acme on Component actionBar, Approve its draft; then write "When to use it, not a sibling" under ## When to use as drafts I review; then remove "A copy of its description" where each lives; then for "Save flow pattern available here: a link", write in words what to take from it.');
+  assert.equal(c[2].copy, '/rms-design-system-engine-acme on Component actionBar, Drop its draft; write nothing new and leave its notes as they are.');
   // The page's task under the heading, in plain words.
   assert.match(loadChanges()({ name: 'a', file: 'a.json', drafts: [{ where: 'Purpose', text: 'X.' }] }, [], [], '<p class="sg-il-line">Its task.</p>'), /^<p class="sg-il-line"><strong>1 proposed draft<\/strong><\/p><p class="sg-il-line">Its task\.<\/p><p class="sg-il-line">Approve it, change it or drop it,/);
   // Nothing to change: no card.
@@ -96,11 +100,34 @@ test('a part\'s page: what moves to its root\'s page is shown as it will read th
   assert.deepEqual([...html.matchAll(/sg-il-change"><strong>([^<]+)</g)].map((m) => m[1]), ['Purpose', 'Add to tileList\'s page']);
   assert.doesNotMatch(html.split('sg-decide-grid')[0], /Write it in|under Parts/, 'nothing for the person to do by hand, no file to find');
   const c = cards(html);
-  assert.match(c[0].copy, /approve its draft \(run [^)]+\); then copy what this page says into specs\/tile-list\.md, under Parts, as ### tileListRow, then delete this page\.$/);
+  assert.equal(c[0].copy, '/rms-design-system-engine-acme on Component tileListRow, Approve its draft; then copy what this page says into Component tileList\'s page, under Parts, as ### tileListRow, then delete this page.');
   assert.match(tpl, /if \(x\.part\) \{ var says = /, 'it opens with what this page says it is');
 });
 
 test('a part\'s page says what happens to it in plain words', () => {
   const gen = readFileSync(fileURLToPath(new URL('../styleguide-gen.mjs', import.meta.url)), 'utf8');
   assert.match(gen, /p\.todo = \[`\$\{p\.component\} only lives inside \$\{root\}, so its guidance moves to \$\{root\}'s page and this page goes away\.`\]/);
+});
+
+test('a decision copied names the task that wrote the drafts, and the page by its kind: a template, a part, the System page', () => {
+  const at = { task: 'What to do when no component fits', at: '2026-10-28' };
+  const sys = cards(loadChanges()({ action: 'review', absent: {}, system: true, drafts: [{ where: 'What to do when no component fits', text: 'Use only the system\'s components.', ...at }, { where: 'What to do when no component fits', text: 'Ask before building one.', ...at }] }, [], []));
+  assert.equal(sys[0].copy, '/rms-design-system-engine-acme on the System page, Approve all 2 drafts from the task "What to do when no component fits" (28 Oct).');
+  assert.equal(sys[2].copy, '/rms-design-system-engine-acme on the System page, Drop all 2 drafts from the task "What to do when no component fits" (28 Oct).');
+  const tpl2 = cards(loadChanges()({ name: 'Checkout', layer: 'templates', file: 't.json', drafts: [{ where: 'Rules', text: 'One primary action.' }] }, [], []));
+  assert.equal(tpl2[0].copy, '/rms-design-system-engine-acme on Template Checkout, Approve its draft.');
+  const part = cards(loadChanges()({ name: 'Legend', about: { partOf: 'Pie chart' }, file: 'l.json', drafts: [{ where: 'Purpose', text: 'Names each slice.' }] }, [], []));
+  assert.equal(part[0].copy, '/rms-design-system-engine-acme on Legend, part of Component Pie chart, Approve its draft.');
+  // Drafts from two tasks: none is named, so the decision is for all of them.
+  const two = cards(loadChanges()({ name: 'x', file: 'x.json', drafts: [{ where: 'Rules', text: 'A.', task: 'One' }, { where: 'Rules', text: 'B.', task: 'Two' }] }, [], []));
+  assert.equal(two[0].copy, '/rms-design-system-engine-acme on Component x, Approve all 2 drafts.');
+  // Nothing drafted yet on the System page: what to write, as the request it becomes.
+  const write = cards(loadChanges()({ action: 'write', absent: {} }, [{ what: 'What to do when no component fits', html: '' }], []));
+  assert.equal(write[0].copy, '/rms-design-system-engine-acme on the System page, Write "What to do when no component fits" as drafts I review.');
+});
+
+test('the proposals and the part questions are copied in words too', () => {
+  assert.match(tpl, /var cmd = function \(a\) \{ return ENGINE \+ ' on ' \+ ilOn\(p\) \+ ', ' \+ \(a === 'yes' \? 'Yes' : a === 'no' \? 'No'/);
+  assert.match(tpl, /var run = function \(to\) \{ return ENGINE \+ ' on Component ' \+ c\.name \+ ', ' \+ \(to === 'none' \? 'It is its own component' : 'It is a part of Component ' \+ to\); \};/);
+  assert.doesNotMatch(tpl, /'rms-design-system-engine --(intent-decide|review-drafts|part) /, 'no copied decision names a flag');
 });
