@@ -78,7 +78,7 @@ The engine finds the code file of each Figma component on its own, so you write 
 
 The components of one type in Figma (every button, every input) are compared with each other, not only with the code.
 
-- **One state, one shape.** Disabled is a property of its own on most buttons and an option of State on a few: those few are named, with the way most of them do it.
+- **States set the same way.** Disabled is a property of its own on most buttons and an option of State on a few: those few are named, with the way most of them do it.
 - **One thing, one name.** `labelContent` on most buttons and `Label` on one: that one is named.
 - **What most of them have.** Most inputs have a label and a required mark: one without them is listed to check.
 
@@ -183,11 +183,13 @@ Each check is called a gate. To run just one, see [Parity](commands.md#parity) o
 | 22 | Motion matches | When your design defines it |
 | 23 | Shadows match | When your design defines them |
 | 24 | Renders correctly in a browser | Checked on the real page, not only in the code, every text style and mode included |
-| 25 | What this audit actually checked | So you can see that nothing slipped through |
+| 25 | What this audit actually checked | Which components and states were covered, and which were skipped |
 
 ## Accessibility
 
-Each component is tried in a real browser against WCAG 2.2 at level A and AA. axe-core, the scanner most accessibility tools are built on, runs on the same page every time. One run is the whole check, so nothing else needs to run beside it.
+Each component is tried in a real browser against WCAG 2.2 at level A and AA. axe-core, the scanner most accessibility tools are built on, runs on the same page every time.
+
+It finds many failures, and says what it could not check. It does not certify that a product meets WCAG: whether a label makes sense, or whether someone using a screen reader can finish a task, still needs a person ([what it cannot tell you](details.md#what-it-cannot-tell-you)).
 
 ### Where it runs
 
@@ -212,7 +214,7 @@ Each component is tried in a real browser against WCAG 2.2 at level A and AA. ax
 
 - Every problem with its fix in plain words, named after the component it is in.
 - How many texts, icons and controls were measured, and every element with its verdict.
-- One verdict line, such as `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.1 AA`.
+- One verdict line, such as `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA`.
 
 How sure each finding is.
 
@@ -230,7 +232,7 @@ How sure each finding is.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
 - `--fresh` (or `a11y.reuse: false`) tries every page again.
 
-### What the design owes
+### What the Figma file is missing
 
 Some problems belong to the Figma file. They are listed for whoever keeps it.
 
@@ -250,7 +252,7 @@ Every rule the check applies is in the [technical documentation](details.md#acce
 
 - **One component at a time.** A page for one component checks it first, against Figma and for accessibility, then shows it and the components it nests, `styleguide/modal.html`.
 - **One link for the team.** Publishing writes the CI job that publishes it on every push, to GitHub Pages or GitLab Pages, so everyone opens the same page built from what is merged. A local run stays a preview.
-- **Light to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
+- **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 
 ### What's in it
@@ -265,10 +267,10 @@ Every rule the check applies is in the [technical documentation](details.md#acce
 
 ### Status
 
-One page for how the system stands and what is left. It is second in the list, under the index; `#health` and `#tasks` open it.
+One page for how the system stands and what is left. It is second in the list, under the index.
 
-- **Four cards at the top.** Parity, Code, Accessibility and Documentation, read from the table's rows: the big number is what is done (Match, Found, Pass, Ready) out of the same components, and the bar and its legend split the rest in the table's own states and colours (Not checked grey).
-- **One table of the components.** A row for each component, in one word per state, the same in the cards and the chips: Figma and Code (Found, Unsure, Missing), Parity (Match, Partial, Differs, Unsure), Accessibility (Pass, Issues, Review, Untested), Documentation (Ready, Partial, Missing), and when it was last checked. A part (a Figma name with a slash, `chartBars/bar`) is no row of its own: its parent's row counts what it has left and the parent's details list it under Parts. A row, or its arrow at the end, opens the component's own page in a panel that slides in from the right at the window's full height (the same view as its page, with its tabs); a Parity, Accessibility or Documentation cell with something left opens it on that area, filtered to what is to fix or to decide. N/A has no dot and no arrow: there is nothing to open. N/A and Untested carry an i that says why; a component only one side has says what to do in an i on the side that lacks it. The address says it all (#status/parity?code=Missing&doc=Missing&open=c-chip/accessibility), the panel's tab included, so a link opens the page as it was. Every column sorts both ways with a triangle, Parity first. The filters are one chip a column (Figma, Code, Parity, Accessibility, Documentation), named only until a state is chosen, so nothing looks applied: each opens a list (the Brand selector's) of All and the column's states with how many rows each would show. The chips combine (Code: Found and Documentation: Missing is what is built and undocumented), each list counting beside the others' choices and leaving out a state with none; Clear filters drops them all. Choosing a state sorts the table by its column. Each card's button opens one of them (See the 60 missing components).
+- **Four cards at the top.** Parity, Code, Accessibility and Documentation: how many components are done in each, and what is left.
+- **One table of the components.** A row for each component, with its state in Figma, Code, Parity, Accessibility and Documentation, and when it was last checked. A row opens the component's page in a side panel. Filters narrow the table by state, and a link keeps what you chose. How the table works is in the [technical documentation](details.md#the-status-table).
 - **Not tied to one component.** Under the table, the system's own tasks: token descriptions, components whose file is still to confirm, controls the page stands in for.
 
 Every row says what to do and who acts.
@@ -384,7 +386,7 @@ Every page fits a 320 pixel screen (WCAG 1.4.10). Cards sit two side by side, ev
 
 ## Prototype with your design system
 
-Describe a screen in your own words and get it made only of your design system's components, with their own options. Nothing is invented and nothing in the system changes. When a screen needs something the system lacks, the prototype shows a labelled box or marks the component standing in, and the need goes on a list for your design team.
+Describe a screen in your own words and get it made only of your design system's components, with their own options. Nothing in the system changes, and the page check flags anything on the page that is not from the system. When a screen needs something the system lacks, the prototype shows a labelled box or marks the component standing in, and the need goes on a list for your design team.
 
 Measured on twelve prototype requests, Claude alone made 17 of 36 right with Opus and 3 of 36 with Haiku. With the engine, 36 of 36 and 35 of 36 ([case study](../CASE-STUDY.md)).
 

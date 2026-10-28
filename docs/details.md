@@ -12,6 +12,7 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 - [What it checks](#what-it-checks)
 - [More checks beside the gates](#more-checks-beside-the-gates)
 - [Accessibility](#accessibility)
+- [The style guide](#the-style-guide)
 - [Working with AI tools](#working-with-ai-tools)
 - [Inside Claude Code](#inside-claude-code)
 - [The files it creates](#the-files-it-creates)
@@ -336,7 +337,7 @@ The census (`🧮`) counts each colour, spacing, radius, font size, duration, la
 
 ## Accessibility
 
-The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the same check, and every control is tried hovered, focused and pressed, so it is the whole check in one run. Every problem comes with its fix in plain words.
+The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the same check, and every control is tried hovered, focused and pressed, so one run covers all of it (see [what it cannot tell you](#what-it-cannot-tell-you)). Every problem comes with its fix in plain words.
 
 ### Two parts
 
@@ -368,7 +369,36 @@ Run on the style guide, it also opens each product's built page whole, with ever
 - **Warning.** Read from the code, a contract or a Figma note, and can be wrong.
 - **Advisory.** Beyond AA, or for a person to judge.
 
-The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.1 AA`. A must-pass check (`"a11yStrict": true`) never stops on an advisory.
+The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA`. A must-pass check (`"a11yStrict": true`) never stops on an advisory.
+
+### What it cannot tell you
+
+An automated check finds many failures, but it cannot show that a product meets WCAG.
+
+- **Meaning.** Whether a label, an error message or a heading makes sense is for a person to judge.
+- **Whole tasks.** Whether someone using a screen reader or only a keyboard can finish a flow from start to end is tried by a person.
+- **Where it shows.** These are listed as You check by hand on the Status page, and a row stays open until someone says it was checked.
+
+## The style guide
+
+### The Status table
+
+One row for each component, with one word per state. The cards above the table and the filter chips use the same words.
+
+| Column | States |
+|---|---|
+| Figma, Code | Found, Unsure, Missing |
+| Parity | Match, Partial, Differs, Unsure |
+| Accessibility | Pass, Issues, Review, Untested |
+| Documentation | Ready, Partial, Missing |
+
+- **Cards.** Parity, Code, Accessibility and Documentation, read from the table's rows. The big number is what is done (Match, Found, Pass, Ready) out of the same components; the bar splits the rest in the table's own states and colours (Not checked grey). Each card's button opens the table filtered to what is left (See the 60 missing components).
+- **Parts.** A Figma name with a slash (`chartBars/bar`) is a part, not a row: its parent's row counts what it has left, and the parent's details list it under Parts.
+- **Opening a component.** A row, or its arrow, opens the component's page in a panel from the right, with its tabs. A Parity, Accessibility or Documentation cell with something left opens that area, filtered to what is to fix or decide.
+- **N/A and Untested.** N/A has no dot and no arrow, since there is nothing to open. N/A and Untested carry an i that says why. A component only one side has says what to do in an i on the side that lacks it.
+- **Sorting.** Every column sorts both ways, Parity first.
+- **Filters.** One chip per column, named only until a state is chosen, so nothing looks applied. Each opens a list of All and the column's states, with how many rows each would show. Chips combine (Code: Found and Documentation: Missing is what is built and undocumented), each list counting beside the others' choices. Choosing a state sorts by its column; Clear filters drops them all.
+- **The address.** It keeps the view, the filters and the open panel with its tab (`#status/parity?code=Missing&doc=Missing&open=c-chip/accessibility`), so a link opens the page as it was. `#health` and `#tasks` open the Status page too.
 
 ## Working with AI tools
 
