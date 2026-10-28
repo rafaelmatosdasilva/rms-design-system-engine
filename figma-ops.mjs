@@ -159,8 +159,8 @@ function systemName(kind, name, g, { axis = null, propKind = null } = {}) {
     : kind === 'option' ? [/^(true|false)$/i.test(name) ? 'variant-boolean-options' : 'variant-option-case']
       : kind === 'axis' ? ['variant-property-case'] : [`${KIND_ID[propKind] ?? 'boolean'}-property-case`, `${KIND_ID[propKind] ?? 'boolean'}-property-prefix`, `${KIND_ID[propKind] ?? 'boolean'}-property-suffix`];
   // A word in capitals (XL, CTA) is one word: written in lower case before a case is applied.
-  let to = kind !== 'component' && /^[A-Z]{2,}\d*$/.test(name) ? name.toLowerCase() : name;
-  if (to !== name && !rules.some((r) => ids.includes(r.id) && /-case$|-options$/.test(r.id))) to = name;
+  const lowerCase = rules.some((r) => ids.includes(r.id) && /-case$/.test(r.id) && /in (camelCase|kebab-case|snake_case)/.test(r.says));
+  let to = kind !== 'component' && lowerCase && /^[A-Z]{2,}\d*$/.test(name) ? name.toLowerCase() : name;
   for (const id of ids) {
     const r = rules.find((x) => x.id === id);
     if (!r) continue;
@@ -216,7 +216,9 @@ export function ground(input = [], { captures = {}, grammar = null, target = nul
       if (o.what === 'property' && m && !m.properties.some((p) => p.name === o.from)) { ask(at, `${m.name} has no property ${o.from}.`); return; }
       if (o.what === 'layer' && !layerOk(at, o.from)) return;
       const kind = m?.properties.find((p) => p.name === o.from)?.kind;
+      const was = named.length;
       o.to = nameIt(o.what, o.what === 'layer' ? o.to.split('/').at(-1) : o.to, { axis: o.axis, propKind: kind });
+      if (o.to === (o.what === 'layer' ? o.from.split('/').at(-1) : o.from)) { named.length = was; ask(at, `${raw.to} is not how this system names ${o.what === 'axis' ? 'a variant axis' : `a${/^[aeiou]/.test(o.what) ? 'n' : ''} ${o.what}`}: written its way it is ${o.to}, the name it already has. Nothing to rename; ask whether the system's rule should change instead (--query construction).`); return; }
       if (existing && o.what !== 'layer') breaking.push({ what: `the ${o.what} ${o.what === 'option' ? `${o.axis}=${o.from}` : o.from} renamed ${o.to}: an instance keeps working, but the code and every product that names it must follow` });
     }
     if (o.op === 'addOption') {

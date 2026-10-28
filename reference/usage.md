@@ -74,6 +74,7 @@ rms-design-system-engine --contract-completeness         # list components whose
 rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules for an agent with no hooks (Cursor, Copilot): shown, and asked about; --write puts them in AGENTS.md, CLAUDE.md, .cursorrules, .github/copilot-instructions.md or .cursor/rules (those the project has, else AGENTS.md), between markers, once the person says yes (the hook holds it until then)
 rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
+rms-design-system-engine --figma-change chip "add xl to size like l"  # a change to a component Figma has, only what changes, with its report (what changes, where it is used, what breaks); --change-report chip after, the read before beside the read after
 rms-design-system-engine --spec "a tag like the chip"     # the spec of a new component built in Figma like one the system has: only its variables, components and names; what it cannot ground is a question (--ops adds the steps; --figma-build <name> writes the Figma script)
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
@@ -1350,6 +1351,25 @@ script the project's hooks let `use_figma` run, once the person says yes; a proj
 steps alone). The script copies the component it is like beside it, makes only the listed steps in every variant, and
 returns what it changed, skipped and could not find. Then the Figma snapshots are refreshed and `--construction-check`
 and `--hygiene` say what they find on it.
+
+**--figma-change.** `--figma-change <component> "<change>" [--ops <file.json>] [--task <issue link>] [--signed-off "<who>"]`
+changes a component the system has, only what changes, with the same operations. It reads a few changes in words (`add
+xl to size like l`, `add a boolean showBadge on Content/Badge`, `rename Label to Text`, `remove the option size=xs`, `bind
+Content gap to spacing/s`, `move chip/label/color to text/default`, `description: "…"`) and says what it could not read;
+`--ops` gives them as operations, `--task` reads the change from a GitLab issue. It writes the change to
+`.design-system-engine-out/changes/<component>.change.json` and prints its report, from two structured reads of the
+component (the capture now, and the same once the change is made), never from memory: its skeleton (each layer added,
+removed or renamed, matched by node id, so a rename is never a removal and an addition), its architecture (variant axes
+and options, properties, what each drives, the variants), its variables (each layer and field's bindings, from → to),
+and where it is used (its contract's products, the components it sits inside, the screens; team files the engine does
+not read are said, not counted). A removal or a rename breaks what leans on it; a new option, axis or property adds to
+the system: both wait for `--signed-off`. The faults the component already has by the construction grammar's rules are
+listed apart, never fixed with the change. Then the script (`handback/figma-apply.js`), run with `use_figma` once the
+person says yes.
+
+**--change-report.** `--change-report <component>`, once Figma is read again: the read before beside the read after,
+section by section, and each place where it is not what the change said (warned when Figma was last read before the
+change). Each report is kept in the change's file (`done`).
 
 #### A scheduled pipeline (`--ci-changed`)
 

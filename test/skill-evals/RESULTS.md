@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A component changed in Figma with its report: the change-component-figma recipe, and evals for building (continuous evaluation)
+
+What changed since the entry below (engine 33f86b6): A component changed in Figma with its change report: --figma-change, --change-report, and evals for building; A change said with "like the L one" routes to the change, not to a new component. The guide changed in `cookbook/build-component-figma.md`, `cookbook/change-component-figma.md`, `cookbook/refresh-figma.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `f572868a7525` · Project measured: `13d811a9d668`
+
+| Haiku, engine 02226fe | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 79/79 |
+| Mean cost a run | $0.058 | $0.056 |
+| Input a run | 102k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 102k. no task changed state, and no run moved: the same result. Records: `records/component-change`.
+
 ## 2026-10: A new component built in Figma from a spec: the build-component-figma recipe (continuous evaluation)
 
 What changed since the entry below (engine d6fb706): Construction: a yes/no variant that should be a boolean, padding, layer order and page; decided rules checked on every run (#118); The accessibility check keeps each page's results again, and an engine update re-checks only what it changes (#119); Construction: the layer order names the few layers most components have, each where it sits on average (#120); A new component in Figma, built the system's way: --spec from a description, --figma-build writes the script. The guide changed in `cookbook/build-component-figma.md`, `reference/usage.md`, `rms-design-system-engine.md`.
