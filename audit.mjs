@@ -1925,6 +1925,25 @@ if (process.argv.includes('--census')) {
 }
 
 // ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
+// The construction grammar as this project's Figma capture and the team's decisions give it (construction-grammar.mjs).
+async function constructionGrammar(ROOT, ccfg) {
+  const { grammarOf } = await import('./construction-grammar.mjs');
+  const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
+  const authored = read(resolve(ROOT, ccfg.contracts?.authored ?? 'contract.authored.json')) ?? {};
+  return grammarOf({ props: read(ccfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {}, structure: read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: read('component-values.snapshot.json') ?? {}, varNames: read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {}, skeleton: read((await import('./figma-capture.mjs')).componentFiles(ccfg).skeleton) ?? {} }, { answers: authored.construction ?? {} });
+}
+// ── --construction-check: fails (exit 1) when a component breaks a rule the team decided; for CI, beside the gates ──
+if (process.argv.includes('--construction-check')) {
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { constructionLines, decidedRules } = await import('./construction-grammar.mjs');
+  const g = await constructionGrammar(ROOT, ccfg);
+  if (!g.figma.rules.length) { console.log('❌ No construction grammar: it is read from the Figma capture. Refresh Figma (--recipe refresh-figma), then ask again.'); process.exit(2); }
+  const lines = constructionLines(g), { broken } = decidedRules(g);
+  console.log(lines.length ? lines.join('\n') : 'ℹ️  The team has not decided any construction rule yet: nothing to fail. The style guide\'s Construction page lists the rules to decide.');
+  console.log(broken.length ? 'NEXT: tell the person which components break which rule, and the fix the Construction page names; change nothing in Figma unless they ask.' : 'NEXT: none');
+  process.exit(broken.length ? 1 : 0);
+}
 // ── The construction grammar's decisions and fixes (construction-grammar.mjs) ──
 // --construction <rule id> yes|no: the team's decision on one still to decide, in the authored contract (construction):
 // yes makes it the rule (its components to fix), no drops it.
@@ -6794,7 +6813,10 @@ function reportFull(label, items, shown) {
     try { const { a11ySummaryLines } = await import('./a11y-check.mjs'); const l = a11ySummaryLines(JSON.parse(readFileSync(A11Y_NOW, 'utf8'))); if (l.length) a11yBlock = `\n${l.join('\n')}\n`; } catch { /* no browser this run */ }
     // Which code was checked, when it was read from GitLab: the commit, so the result is never taken for another one.
     const codeLine = GITLAB_SOURCE ? `\nCode checked: GitLab ${GITLAB_SOURCE.path} @ ${GITLAB_SOURCE.ref} ${GITLAB_SOURCE.sha.slice(0, 8)}${GITLAB_SOURCE.committedAt ? ` (${GITLAB_SOURCE.committedAt.slice(0, 10)})` : ''}${GITLAB_SOURCE.stale ? ' - GitLab was not reached, so this is the copy of that commit' : ''}\n` : '';
-    summary = summary.replace(/\n(NEXT:)/, `${codeLine}${a11yBlock}${diffLine}\n$1`);
+    // The rules the team decided for how a component is built in Figma, and what breaks them (beside the gates).
+    let constructionBlock = '';
+    try { const { constructionLines } = await import('./construction-grammar.mjs'); const l = constructionLines(await constructionGrammar(ROOT, cfg)); if (l.length) constructionBlock = `\n${l.join('\n')}\n`; } catch { /* no Figma capture */ }
+    summary = summary.replace(/\n(NEXT:)/, `${codeLine}${a11yBlock}${constructionBlock}${diffLine}\n$1`);
     writeFileSync(join(ROOT, OUT_DIR, 'summary.md'), summary);
     console.log(`\n${C.bold(`─── SUMMARY (relay this in the chat as is; also in ${OUT_DIR}/summary.md) ───`)}\n\n${summary}`);
   } catch { /* the full report above still stands */ }
