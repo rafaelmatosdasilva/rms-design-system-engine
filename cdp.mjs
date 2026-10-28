@@ -52,15 +52,32 @@ function whichBin(name) {
   return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : null;
 }
 
-// Wait, synchronously (an exit handler may not wait any other way), until a child process has ended. The pid is asked of
-// ps rather than signalled, since a child Node has not reaped yet still answers a signal. Without ps, it does not wait.
-function waitGone(child, ms = 3000) {
-  if (child.exitCode !== null || child.signalCode !== null || !child.pid) return true;
+// A process and every process under it, read once from ps (Chrome's helpers: renderers, the network service, the crash
+// reporter), and any process whose command names `marker` (on Linux the crash reporter leaves the tree). Without ps,
+// the process alone.
+function processTree(pid, marker = null) {
+  const r = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,args='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (r.error || r.status !== 0) return [pid];
+  const kids = new Map(), named = [];
+  for (const line of r.stdout.split('\n')) {
+    const m = /^\s*(\d+)\s+(\d+)\s(.*)$/.exec(line);
+    if (!m) continue;
+    kids.set(Number(m[2]), [...(kids.get(Number(m[2])) || []), Number(m[1])]);
+    if (marker && m[3].includes(marker)) named.push(Number(m[1]));
+  }
+  const tree = [pid];
+  for (let i = 0; i < tree.length; i++) tree.push(...(kids.get(tree[i]) || []));
+  return [...new Set([...tree, ...named])].filter((p) => p !== process.pid);
+}
+
+// Wait, synchronously (an exit handler may not wait any other way), until every process given has ended. Each is asked
+// of ps rather than signalled, since a child Node has not reaped yet still answers a signal. Without ps, it does not wait.
+function waitGone(pids, ms = 3000) {
   const pause = new Int32Array(new SharedArrayBuffer(4));
   for (const end = Date.now() + ms; Date.now() < end; Atomics.wait(pause, 0, 0, 10)) {
-    const r = spawnSync('ps', ['-p', String(child.pid), '-o', 'stat='], { encoding: 'utf8' });
+    const r = spawnSync('ps', ['-p', pids.join(','), '-o', 'stat='], { encoding: 'utf8' });
     if (r.error) return false;
-    if (!r.stdout.trim() || r.stdout.trim().startsWith('Z')) return true;
+    if (r.stdout.split('\n').every((l) => !l.trim() || l.trim().startsWith('Z'))) return true;
   }
   return false;
 }
@@ -94,8 +111,13 @@ export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engi
     process.off('exit', kill);
     let socketDir = null;
     try { socketDir = dirname(readlinkSync(join(userDataDir, 'SingletonSocket'))); } catch { /* not started */ }
+    // The helpers write to the profile too, and outlive the browser by a moment: all of them are waited for.
+    const tree = chrome.pid && chrome.exitCode === null && chrome.signalCode === null ? processTree(chrome.pid, userDataDir) : [];
     try { chrome.kill(); } catch { /* already dead */ }
-    if (!waitGone(chrome)) try { chrome.kill('SIGKILL'); waitGone(chrome, 1000); } catch { /* already dead */ }
+    if (tree.length && !waitGone(tree)) {
+      for (const pid of tree) try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+      waitGone(tree, 1000);
+    }
     for (const d of [userDataDir, socketDir]) if (d) try { rmSync(d, { recursive: true, force: true, maxRetries: 3 }); } catch { /* best effort */ }
   };
   process.on('exit', kill);
