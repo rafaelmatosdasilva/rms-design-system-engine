@@ -3229,7 +3229,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         return opts.map(function (o) { return ilAnswer(o.label, esc(o.does), cmd(o.answer)); }).join('');
       }).join('');
     };
-    var ilTodo = function (p) { return ilIfNot(p, (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i ? '' : '<strong>') + esc(t) + (i ? '' : '</strong>') + '</p>'; }).join('')) || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
+    // Its first line in bold, unless plain: under the proposed changes' own heading, which is bold.
+    var ilTodo = function (p, plain) { return ilIfNot(p, (p.todo || []).map(function (t, i) { return '<p class="sg-il-line">' + (i || plain ? '' : '<strong>') + esc(t) + (i || plain ? '' : '</strong>') + '</p>'; }).join('')) || (p.action === 'keep' ? '' : '<p class="pg-missing">Nothing to change.</p>'); };
     // What on it the system contradicts (the content check), first: each finding, the sentence it is in, and what the
     // system has instead, with where that comes from.
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + '<span class="sg-il-text">' + (f.line ? '\u201c' + esc(f.line) + '\u201d' : esc(f.says)) + '</span><span class="sg-il-label">What the system has</span><span class="sg-il-text">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
@@ -3271,10 +3272,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // under them, then one decision for them all, each with the command that makes it and a Copy beside it (pasted into
     // Claude, or run in a terminal). Quoted for a shell: a line may hold backticks.
     // Everything a page asks to change, in one place, each under what it is: its drafts (by section, each once), what is
-    // still to write (what and where), each note no agent reads (to remove, or to change as it says); then one decision on
-    // all of them, three cards side by side: approve all, change one, drop all, each copied for Claude Code.
+    // still to write, each note no agent reads (to remove, or to change as it says); then one decision on all of them,
+    // three cards side by side: approve all, change one, drop all, each copied for Claude Code. Said for a person: a
+    // heading that counts them, the page's task in plain words, then what to do; never where each is written (the
+    // decision copied tells Claude Code that), never "proposed" again on each.
     var REVIEW_LINE = /^Review (its draft|these \d+ drafts)\b/;   // the engine's line for the drafts alone (intent-layer.mjs): the card says it for every change
-    var ilChanges = function (p, write, notes) {
+    var ilChanges = function (p, write, notes, task) {
       var page = p.file || p.name || p.missingFor || 'the system', groups = [], seen = {};
       (p.missingFor ? [] : p.drafts || []).forEach(function (d) {
         var k = String(d.where) + '\u0000' + String(d.text).replace(/\s+/g, ' ').trim();
@@ -3288,20 +3291,24 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (!n) return '';
       var noteOf = function (x) { return capital(x.what || x.text); };
       var section = function (head, body) { return '<div class="sg-il-line sg-il-change"><strong>' + esc(head) + '</strong>' + body + '</div>'; };
-      var noteBody = function (x, how) { return (x.from ? '<span class="pg-par-val">' + esc(capital(x.from)) + '</span>' : '') + '<span class="sg-il-text">' + esc(x.why) + '</span>' + (how ? '<span class="sg-il-label">' + esc(how[0]) + '</span><span class="sg-il-text">' + esc(how[1]) + '</span>' : ''); };
-      var html = groups.map(function (g) { return section('Proposed ' + (g.lines.length === 1 ? 'draft' : 'drafts') + ' · ' + g.where, g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('')); }).join('')
-        + write.map(function (x) { return section((x.check ? 'To check · ' : 'To write · ') + x.what, x.html); }).join('')
-        + off.map(function (x) { return section('To remove · ' + noteOf(x), noteBody(x, ['Why remove it', x.remove.replace(/^yes[:,]?\s*/i, '') || 'Nothing in it reaches an agent.'])); }).join('')
-        + fix.map(function (x) { return section('To change · ' + noteOf(x), noteBody(x, x.fix ? ['What to change', x.fix] : null)); }).join('');
+      // A note: the note itself, then the issue and why, in one sentence or two.
+      var noteBody = function (x, why) { return '<span class="pg-par-val">\u201c' + esc(noteOf(x)) + '\u201d</span><span class="sg-il-text">' + esc(why) + '</span>'; };
+      var parts = write.filter(function (x) { return x.part; }), toWrite = write.filter(function (x) { return !x.part; });
+      var html = groups.map(function (g) { return section(g.where, g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('')); }).join('')
+        + toWrite.map(function (x) { return section((x.check ? 'To check · ' : 'To draft · ') + x.what, x.html); }).join('')
+        + parts.map(function (x) { return section(x.what, x.html); }).join('')
+        + off.map(function (x) { return section('Remove · ' + capital(x.from || 'a note'), noteBody(x, x.why || x.remove.replace(/^yes[:,]?\s*/i, '') || 'Nothing in it reaches an agent.')); }).join('')
+        + fix.map(function (x) { return section('Change · ' + capital(x.from || 'a note'), noteBody(x, [x.why, x.fix].filter(Boolean).join(' '))); }).join('');
       var cmd = function (a, rest) { return 'rms-design-system-engine --review-drafts --' + a + ' ' + shq(page) + (rest || ''); };
       var one = n === 1, who = p.name || p.missingFor || page, only = nd === n, line = nd ? groups[0].lines[0] : '';
       var on = 'On ' + who + '\'s intent layer page (' + page + '): ', list = function (xs) { return xs.map(function (x) { return '"' + x + '"'; }).join(', '); };
       var drafts = nd === 1 ? 'its draft' : 'its ' + nd + ' drafts';
       // Approve: each change made as proposed. Drafts alone: the command itself.
       var approve = only ? cmd('approve') : on + [nd ? 'approve ' + drafts + ' (run ' + cmd('approve') + ')' : '',
-        write.length ? 'write ' + list(write.map(function (x) { return x.what; })) + ' where each says, as drafts I review' : '',
+        toWrite.length ? 'write ' + toWrite.map(function (x) { return '"' + x.what + '"' + (x.where ? ' in ' + x.where : ''); }).join(', ') + ', as drafts I review' : '',
         off.length ? 'remove ' + list(off.map(noteOf)) + ' where each lives' : '',
-        fix.length ? fix.map(function (x) { return 'for ' + list([noteOf(x)]) + ', ' + (x.fix ? x.fix.charAt(0).toLowerCase() + x.fix.slice(1).replace(/\.$/, '') : 'say what an agent should take from it'); }).join('; ') : ''].filter(Boolean).join('; then ') + '.';
+        fix.length ? fix.map(function (x) { return 'for ' + list([noteOf(x)]) + ', ' + (x.fix ? x.fix.charAt(0).toLowerCase() + x.fix.slice(1).replace(/\.$/, '') : 'say what an agent should take from it'); }).join('; ') : '',
+        parts.map(function (x) { return 'copy what this page says into ' + (x.part.file || x.part.root + '\'s page') + ', under Parts, as ### ' + x.part.name + ', then delete this page'; }).join('; ')].filter(Boolean).join('; then ') + '.';
       var change = only ? (one ? 'Change the draft on ' + who + '\'s intent layer page ("' + line + '"): ask me for my words, then run ' + cmd('change', ' ' + shq(line) + ' ' + shq('<my words>'))
           : 'Change one of the ' + n + ' drafts on ' + who + '\'s intent layer page (' + page + '): ask me which one and my words, then run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>')))
         : on + (one ? 'ask me for my words for this change, then make it with them' : 'ask me which of its ' + n + ' changes and my words, then make that one with them') + (nd ? ' (a draft: run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>')) + ')' : '') + '.';
@@ -3311,7 +3318,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Claude Code. What it does is the button's tip, for whoever wants it.
       var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div>'; };
       var them = only ? (one ? 'the draft' : 'the ' + n + ' drafts') : (one ? 'the change' : 'the ' + n + ' changes');
-      var lead = '<p class="sg-il-line"><strong>' + esc((one ? 'Review ' + (only ? 'its draft' : 'this change') + '. Approve it, change it or drop it' : 'Review these ' + n + (only ? ' drafts' : ' changes') + '. Approve them all, change one or drop them all') + ', then copy your choice and paste it into Claude Code.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you decide.' : '')) + '</strong></p>';
+      var lead = '<p class="sg-il-line"><strong>' + esc(n + ' proposed ' + (only ? 'draft' : 'change') + (one ? '' : 's')) + '</strong></p>' + (task && !/pg-missing/.test(task) ? task : '')
+        + '<p class="sg-il-line">' + esc((one ? 'Approve it, change it or drop it' : 'Approve all ' + n + ', change one or drop them all') + ', then copy your decision into Claude Code.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you decide.' : '')) + '</p>';
       return lead + '<div class="sg-il-draft"><div class="sg-il-draft-text">' + html + '</div><div class="sg-decide-grid">' +
         decide('approve', one ? 'Approve' : 'Approve all', only ? (one ? 'Agents use the draft as written from the next run.' : 'Agents use the ' + n + ' drafts as written from the next run.') : 'Each change is made as it is proposed here.', approve) +
         decide('change', one ? 'Change' : 'Change one', only ? (one ? 'Claude Code asks for your words to replace the draft.' : 'Your words replace one draft; Claude Code asks which.') : 'Your words replace one; Claude Code asks which.', change) +
@@ -3329,7 +3337,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
       // A "when to use" line drafted is also the line of its own the "which component?" test asks for, once approved.
       if (drafted['When to use']) drafted['When to use it, not a sibling'] = 1;
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, where: srcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: srcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
@@ -3338,22 +3346,26 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var docWhere = function (p, st) { var w = []; docLeft(p).filter(function (x) { return !st || x.st === st; }).forEach(function (x) { String(x.where || '').split(' · ').forEach(function (s) { if (s && w.indexOf(s) < 0) w.push(s); }); }); return w; };
     // Where what is missing is to be written, said under Missing: In Figma, In the intent layer, or both.
     var docTopic = function (p) { if (p.tokens) return 'In Figma or the intent layer'; if (p.absent) return 'In the intent layer'; var w = docWhere(p, 'todo').map(function (x) { return /^Figma$/.test(x) ? 'Figma' : 'the ' + x.replace(/^The /, '').toLowerCase(); }); return !w.length ? '' : 'In ' + w.join(' and '); };
-    // Each thing still to write, as one block: what to write (or check), and exactly where: the spec file a person edits
-    // and its section (the page's JSON is generated from it), Figma's description, or the code's comment.
+    // Each thing still to write, as one block: what to write (or check). Where it goes (the spec file and its section, the
+    // page's JSON being generated from it; Figma's description; the code's comment) is said only in the decision Claude
+    // Code is given, which writes it.
     var SECTION_OF = { 'What it is': 'Purpose', 'When to use': 'When to use', 'When not to use': 'When not to use', 'Common mistakes': 'Common mistakes', Limitations: 'Limitations', Example: 'Example', Role: 'Role', 'Do and don\'t': 'Do and don\'t' };
-    var whereHTML = function (p, x) {
+    var wherePlain = function (p, x) {
       return String(x.where || '').split(' · ').filter(Boolean).map(function (w) {
-        if (/intent layer/i.test(w)) { var f = p.spec || p.file; return f ? (p.specUrl || p.url ? '<a class="sg-uses-link" href="' + esc(p.specUrl || p.url) + '" target="_blank" rel="noopener"><code>' + esc(f) + '</code></a>' : '<code>' + esc(f) + '</code>') + (SECTION_OF[x.kind] ? ', under <b>## ' + esc(SECTION_OF[x.kind]) + '</b>' : '') + (p.specShared ? ' (a spec several components share: write it for this one by name)' : '') : 'its page in the intent layer'; }
-        if (/^figma$/i.test(w)) return 'Figma: select the component, then its <b>Description</b> in the right panel';
-        if (/code/i.test(w)) return p.code ? 'its code comment, in <code>' + esc(p.code) + '</code>' : 'its code comment';
-        return esc(w);
-      }).join(' <span class="pg-muted">or</span> ');
+        if (/intent layer/i.test(w)) { var f = p.spec || p.file; return f ? f + (SECTION_OF[x.kind] ? ', under ## ' + SECTION_OF[x.kind] : '') + (p.specShared ? ' (a spec several components share: written for this one by name)' : '') : 'its page in the intent layer'; }
+        if (/^figma$/i.test(w)) return 'its Description in Figma';
+        if (/code/i.test(w)) return p.code ? 'its code comment, in ' + p.code : 'its code comment';
+        return w;
+      }).join(' or ');
     };
-    var docWriteOf = function (p) { return docLeft(p).map(function (x) { var where = whereHTML(p, x); return { what: x.kind, check: x.st === 'check', html: ''
-      // Its parts apart, each under a small label: the points to cover as a list, how to write it, and where.
+    var docWriteOf = function (p) { return docLeft(p).map(function (x) {
+      // A part's documentation goes in its root's page under its name, opening with what this page says it is.
+      if (x.part) { var says = (p.drafts || []).filter(function (d) { return /purpose|intent/i.test(d.where); }).map(function (d) { return d.text; })[0] || ((p.reads || {}).purpose || [])[0];
+        return { what: 'Add to ' + x.part.root + '\'s page', part: x.part, html: '<span class="sg-il-text"><strong>' + esc(x.part.name) + '</strong>: ' + esc(says || 'everything this page says.') + '</span>' }; }
+      return { what: x.kind, check: x.st === 'check', where: wherePlain(p, x), html: ''
+      // The points to cover as a list, then how to write it.
       + ((x.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + x.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' : '')
-      + ((x.how || x.todo) ? '<span class="sg-il-label">' + ((x.notes || []).length ? 'How to write it' : 'What to write') + '</span><span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '')
-      + (where ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + where + '</span>' : '') }; }); };
+      + ((x.how || x.todo) ? ((x.notes || []).length ? '<span class="sg-il-label">How to write it</span>' : '') + '<span class="sg-il-text">' + esc(x.how || x.todo) + '</span>' : '') }; }); };
     // Review: a person decides or checks (a decision of the intent layer's, a draft, a piece written too thin to use).
     // Missing: only to write, nothing to decide. A row can be both; Keep, neither.
     // Remove: the notes on the component (Figma's annotations, the code's) that no agent is given, each with why, how to
@@ -3434,8 +3446,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Its status first, then the proposal to say yes or no to, then what to do: every change it proposes in one place
       // (its drafts, what is still to write, the notes to remove or change) and one decision on all of them; then what the
       // page is and why.
-      var todo = ilChanges(p, c.write, c.notes), task = todo && !(p.tokens || p.absent || p.missingFor || p.noLayer) ? ilTodo(Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) })) : c.todo;
-      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', (todo && /pg-missing/.test(task) ? '' : task) + todo) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      var own = !(p.tokens || p.absent || p.missingFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
+      var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo), task = own ? ilTodo(own) : c.todo;
+      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said')); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
@@ -3662,7 +3675,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       .concat([card('drop', 'Its own component', 'It stays a component of the system, placed on its own.', run('none'))]);
     var ask = q.roots.length ? 'Is ' + c.name + ' a part of ' + q.roots.join(' or ') + '?' : 'Is ' + c.name + ' a part of another component?';
     return { key: c.name + '\u0000doc:part?', area: 'Documentation', kind: 'Part or component', written: '<p class="sg-il-line"><strong>' + esc(ask) + '</strong></p><p class="sg-il-line">' + esc(capital(q.why)) + '.</p><div class="sg-decide-grid">' + cards.join('') + '</div>',
-      todo: esc('Say whether it is a part, then copy your choice and paste it into Claude Code.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: ['Figma\'s names', 'The code (what each component holds)'] };
+      todo: esc('Say whether it is a part, then copy your decision and paste it into Claude Code.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: ['Figma\'s names', 'The code (what each component holds)'] };
   };
   document.addEventListener('click', function (e) { var cp = e.target.closest && e.target.closest('[data-part-copy]'); if (cp) copyText(cp.getAttribute('data-part-copy'), cp); });
   // A part's documentation: what its root's page says of it under Parts (### its name), or where to write it.
@@ -3670,7 +3683,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var lines = c.partOf.docs || [], page = c.partOf.page, root = c.partOf.root;
     var where = page ? (page.url ? '<a class="sg-uses-link" href="' + esc(page.url) + '" target="_blank" rel="noopener">' + esc(page.file) + '</a>' : esc(page.file)) : esc(root + '\'s page in the intent layer');
     return { key: c.name + '\u0000doc:part', area: 'Documentation', kind: 'In ' + root + '\'s page', written: lines.length ? '<p class="pg-par-val">Under Parts, in ' + where + '</p>' + paras(lines) : '<p class="pg-missing">' + esc(root) + '\'s page says nothing of it yet.</p>',
-      todo: lines.length ? '' : esc('Write it in ' + (page ? page.file : root + '\'s page') + ', under Parts, as ### ' + c.name + ': what it is in ' + root + ' and how it is used there.'), who: lines.length ? '' : WHO.person, st: lines.length ? 'done' : 'todo', rel: '', at: DATA.builtAt || null, src: page ? [capital('the intent layer') + ' (' + page.file + ')'] : [] };
+      todo: lines.length ? '' : esc('Write it in ' + (page ? page.file : root + '\'s page') + ', under Parts, as ### ' + c.name + ': what it is in ' + root + ' and how it is used there.'), who: lines.length ? '' : WHO.person, st: lines.length ? 'done' : 'todo', part: { name: c.name, root: root, file: page ? page.file : '' }, rel: '', at: DATA.builtAt || null, src: page ? [capital('the intent layer') + ' (' + page.file + ')'] : [] };
   };
   // Its notes no agent is given (Figma's annotations, the code's notes): each with why, what to do, and whether to remove
   // it; who acts is whoever wrote it.

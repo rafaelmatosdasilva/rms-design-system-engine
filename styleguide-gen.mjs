@@ -1303,7 +1303,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           if (!root || p.action === 'delete') continue;
           p.partOf = root;
           p.action = 'move'; p.decision = 'Move';
-          p.todo = [`${p.component} is a part of ${root}, placed only inside it. Copy what this page says into ${root}'s page, under Parts, as ### ${p.component}, then delete this page.`];
+          p.todo = [`${p.component} only lives inside ${root}, so its guidance moves to ${root}'s page and this page goes away.`];
         }
       }
       // Kept for the contracts and llms.txt, which the next run writes from it.

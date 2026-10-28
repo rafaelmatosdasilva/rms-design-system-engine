@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
 
 const loadChanges = () => {
-  const src = /var ilChanges = (function \(p, write, notes\) \{[\s\S]*?\n    \});/.exec(tpl)[1];
+  const src = /var ilChanges = (function \(p, write, notes, task\) \{[\s\S]*?\n    \});/.exec(tpl)[1];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), shq = (x) => `'${x}'`, decideMark = (k) => `<mark-${k}>`;
   const sysButton = (tag, label, attrs) => `<button${attrs}>${label}</button>`;
   const capital = (x) => String(x).charAt(0).toUpperCase() + String(x).slice(1);
@@ -18,7 +18,7 @@ const loadChanges = () => {
 const cards = (html) => [...html.matchAll(/<div class="sg-decide sg-decide--(\w+)" title="([^"]+)"><strong class="sg-decide-head"><mark-\w+>([^<]+)<\/strong><button data-il-copy="([^"]*)" data-il-said="([^"]+)">([^<]+)<\/button>/g)].map((m) => ({ k: m[1], says: m[2], head: m[3], copy: m[4].replace(/&quot;/g, '"').replace(/&amp;/g, '&'), said: m[5], label: m[6] }));
 
 test('the drafts are in the What to do card, grouped by section, each once, then three decisions side by side', () => {
-  assert.match(tpl, /card\('What to do', \(todo && \/pg-missing\/\.test\(task\) \? '' : task\) \+ todo\)/);
+  assert.match(tpl, /card\('What to do', todo \|\| task\)/);
   assert.doesNotMatch(tpl, /card\('(Drafts to review|Still to write|To remove)'/, 'no second card for any change');
   const ilDrafts = (p) => loadChanges()(p);
   const cards = (html) => [...html.matchAll(/<div class="sg-decide sg-decide--(\w+)" title="([^"]+)"><strong class="sg-decide-head"><mark-\w+>([^<]+)<\/strong><button data-il-copy="([^"]*)" data-il-said="([^"]+)">([^<]+)<\/button>/g)].map((m) => ({ k: m[1], says: m[2], head: m[3], copy: m[4], said: m[5], label: m[6] }));
@@ -28,8 +28,10 @@ test('the drafts are in the What to do card, grouped by section, each once, then
     { where: 'Do and don\'t', text: 'Do: dock it to the bottom.' },
     { where: 'Limitations', text: 'Does not show loading  by itself.' },   // the same draft again
   ] });
-  assert.equal((html.match(/Proposed drafts · Limitations/g) ?? []).length, 1, 'a section\'s drafts together');
-  assert.match(html, /Proposed draft · Do and don't/);
+  assert.equal((html.match(/<strong>Limitations</g) ?? []).length, 1, 'a section\'s drafts together');
+  assert.match(html, /<strong>Do and don't</);
+  assert.doesNotMatch(html, /Proposed draft/, 'the heading says they are proposed, never each section');
+  assert.match(html, /^<p class="sg-il-line"><strong>3 proposed drafts<\/strong><\/p><p class="sg-il-line">Approve all 3, change one or drop them all, then copy your decision into Claude Code\. Agents won't use the drafts until you decide\.<\/p>/);
   assert.equal((html.match(/Does not show loading/g) ?? []).length, 1, 'the same draft once');
   const c = cards(html);
   assert.deepEqual(c.map((x) => [x.k, x.head]), [['approve', 'Approve all'], ['change', 'Change one'], ['drop', 'Drop all']], 'three cards side by side, each with its own mark');
@@ -61,23 +63,44 @@ test('a "when to use" draft also answers the "which component?" test, so it is n
 
 test('every change a page asks for is in What to do, under one decision: its drafts, what to write, the notes to remove or change', () => {
   const html = loadChanges()({ name: 'actionBar', file: 'specs/action-bar.dsds.json', todo: [], drafts: [{ where: 'Limitations', text: 'Does not show loading by itself.' }] },
-    [{ what: 'When to use it, not a sibling', html: '<span class="sg-il-text">One line.</span>' }],
+    [{ what: 'When to use it, not a sibling', where: 'specs/action-bar.md, under ## When to use', html: '<span class="sg-il-text">One line.</span>' }],
     [{ what: 'Save flow pattern available here: a link', from: 'Figma annotation', why: 'The agent cannot open a link.', fix: 'Write in words what to take from it.', remove: 'No: keep the link and add the words.' },
      { what: 'A copy of its description', from: 'Code note', why: 'Figma says it already.', remove: 'Yes: the description already carries it.' }]);
   assert.deepEqual([...html.matchAll(/sg-il-change"><strong>([^<]+)</g)].map((m) => m[1]),
-    ['Proposed draft · Limitations', 'To write · When to use it, not a sibling', 'To remove · A copy of its description', 'To change · Save flow pattern available here: a link'], 'each change under what it is, in one place');
-  assert.match(html, /Review these 4 changes\. Approve them all, change one or drop them all/);
+    ['Limitations', 'To draft · When to use it, not a sibling', 'Remove · Code note', 'Change · Figma annotation'], 'each change under what it is, in one place');
+  assert.match(html, /<strong>4 proposed changes<\/strong><\/p><p class="sg-il-line">Approve all 4, change one or drop them all/);
+  assert.match(html, /Remove · Code note<\/strong><span class="pg-par-val">\u201cA copy of its description\u201d<\/span><span class="sg-il-text">Figma says it already\.<\/span><\/div>/, 'a note and why, in one place');
+  assert.match(html, /\u201cSave flow pattern available here: a link\u201d<\/span><span class="sg-il-text">The agent cannot open a link\. Write in words what to take from it\.</);
+  assert.doesNotMatch(html, /Why remove it|What to change|>Where</, 'no labels, no file to find');
   const c = cards(html);
   assert.deepEqual(c.map((x) => x.head), ['Approve all', 'Change one', 'Drop all'], 'one decision for all of them');
-  assert.match(c[0].copy, /approve its draft \(run rms-design-system-engine --review-drafts --approve 'specs\/action-bar\.dsds\.json'\); then write "When to use it, not a sibling" where each says, as drafts I review; then remove "A copy of its description" where each lives; then for "Save flow pattern available here: a link", write in words what to take from it\./);
+  assert.match(c[0].copy, /approve its draft \(run rms-design-system-engine --review-drafts --approve 'specs\/action-bar\.dsds\.json'\); then write "When to use it, not a sibling" in specs\/action-bar\.md, under ## When to use, as drafts I review; then remove "A copy of its description" where each lives; then for "Save flow pattern available here: a link", write in words what to take from it\./);
   assert.match(c[2].copy, /drop its draft \(run rms-design-system-engine --review-drafts --drop 'specs\/action-bar\.dsds\.json'\); write nothing new and leave its notes as they are\./);
+  // The page's task under the heading, in plain words.
+  assert.match(loadChanges()({ name: 'a', file: 'a.json', drafts: [{ where: 'Purpose', text: 'X.' }] }, [], [], '<p class="sg-il-line">Its task.</p>'), /^<p class="sg-il-line"><strong>1 proposed draft<\/strong><\/p><p class="sg-il-line">Its task\.<\/p><p class="sg-il-line">Approve it, change it or drop it,/);
   // Nothing to change: no card.
   assert.equal(loadChanges()({ name: 'chip', file: 'c.json' }, [], []), '');
 });
 
 test('the engine\'s own line for the drafts is not said twice: the card says it for every change', () => {
   const re = new RegExp(/var REVIEW_LINE = \/(.+)\/;/.exec(tpl)[1]);
-  assert.ok(re.test('Review these 5 drafts. Approve them all, change one or drop them all, then copy your choice and paste it into Claude Code.'));
+  assert.ok(re.test('Review these 5 drafts. Approve them all, change one or drop them all, then copy your decision and paste it into Claude Code.'));
   assert.ok(re.test('Review its draft below. Approve it, change it or drop it.'));
   assert.ok(!re.test('Check the page against the component as it is today.'));
+});
+
+test('a part\'s page: what moves to its root\'s page is shown as it will read there, and the decision copied says where', () => {
+  const part = { name: 'tileListRow', root: 'tileList', file: 'specs/tile-list.md' };
+  const html = loadChanges()({ name: 'tileListRow', file: 'specs/tile-list-row.md', drafts: [{ where: 'Purpose', text: 'One row of a tile list.' }] },
+    [{ what: 'Add to tileList\'s page', part, html: '<span class="sg-il-text"><strong>tileListRow</strong>: One row of a tile list.</span>' }], []);
+  assert.deepEqual([...html.matchAll(/sg-il-change"><strong>([^<]+)</g)].map((m) => m[1]), ['Purpose', 'Add to tileList\'s page']);
+  assert.doesNotMatch(html.split('sg-decide-grid')[0], /Write it in|under Parts/, 'nothing for the person to do by hand, no file to find');
+  const c = cards(html);
+  assert.match(c[0].copy, /approve its draft \(run [^)]+\); then copy what this page says into specs\/tile-list\.md, under Parts, as ### tileListRow, then delete this page\.$/);
+  assert.match(tpl, /if \(x\.part\) \{ var says = /, 'it opens with what this page says it is');
+});
+
+test('a part\'s page says what happens to it in plain words', () => {
+  const gen = readFileSync(fileURLToPath(new URL('../styleguide-gen.mjs', import.meta.url)), 'utf8');
+  assert.match(gen, /p\.todo = \[`\$\{p\.component\} only lives inside \$\{root\}, so its guidance moves to \$\{root\}'s page and this page goes away\.`\]/);
 });
