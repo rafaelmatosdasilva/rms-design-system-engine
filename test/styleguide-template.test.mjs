@@ -1656,26 +1656,26 @@ test('a page opens at its top, reloaded too: the browser never puts back an earl
   assert.ok(tpl.indexOf("history.scrollRestoration = 'manual'") < tpl.indexOf('function route()'), 'set before the page routes');
 });
 
-test('History: a card with no code says it came after the last release and the days it covers; each card\'s rows newest first', () => {
+test('History: each card dated as what it holds is: the code by its release, a read of Figma by its day, the decisions of a day by that day; rows newest first', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  const src = tpl.slice(tpl.indexOf('    var lastRelease = order.filter'), tpl.indexOf('    box.innerHTML = order.map(function (g) {'));
+  const src = tpl.slice(tpl.indexOf('    var cardHead = function (g) {'), tpl.indexOf('    box.innerHTML = order.map(function (g) {'));
   const releaseHead = (g) => (g.k || 'Merged, no release tag yet') + '  ·  ' + (g.k ? 'released ' + g.on : g.at);
   const byTicket = (cs) => cs.map((c) => ({ items: [c] })), figmaHead = (g) => 'Figma read ' + g.read;
-  const head = (order) => new Function('order', 'releaseHead', 'esc', 'byTicket', 'figmaHead', src + 'return cardHead;')(order, releaseHead, (x) => String(x), byTicket, figmaHead);
+  const head = new Function('releaseHead', 'esc', 'byTicket', 'figmaHead', src + 'return cardHead;')(releaseHead, (x) => String(x), byTicket, figmaHead);
   const CODE = '<span class="sg-log-tag">Code</span>';
   const v2 = { k: 'v2.0.0', on: '2026-10-21', commits: [{}] };
-  assert.equal(head([v2])({ k: '', commits: [] }, ['2026-10-27', '2026-10-25', '2026-10-24']), 'After v2.0.0  ·  2026-10-24 – 2026-10-27', 'no code: after the last release, from its first day to its last');
-  assert.equal(head([v2])({ k: '', commits: [] }, ['2026-10-25']), 'After v2.0.0  ·  2026-10-25');
-  assert.equal(head([v2])({ k: '', commits: [{}], at: '2026-10-25' }, ['2026-10-25']), CODE + 'Merged, no release tag yet  ·  2026-10-25  ·  1 issue', 'code merged and not released yet keeps its name, tagged Code, with how many issues');
-  assert.equal(head([v2])(v2, ['2026-10-21']), CODE + 'v2.0.0  ·  released 2026-10-21  ·  1 issue');
-  assert.equal(head([v2])({ k: '', commits: [], read: 'x' }, []), 'Figma read x', 'a read of Figma is a card of its own, as a release is');
-  assert.equal(head([])({ k: '', commits: [] }, ['2026-10-25', '2026-10-24']), '2026-10-24 – 2026-10-25', 'no release at all: the days alone');
+  assert.equal(head({ k: '', commits: [], day: '2026-10-25', decisions: [{}] }), '2026-10-25', 'the decisions of a day: the day alone');
+  assert.equal(head({ k: '', commits: [{}], at: '2026-10-25' }), CODE + 'Merged, no release tag yet  ·  2026-10-25  ·  1 issue', 'code merged and not released yet keeps its name, tagged Code, with how many issues');
+  assert.equal(head(v2), CODE + 'v2.0.0  ·  released 2026-10-21  ·  1 issue');
+  assert.equal(head({ k: '', commits: [], read: 'x' }), 'Figma read x', 'a read of Figma is a card of its own, as a release is');
+  assert.doesNotMatch(tpl, /'After ' \+ esc/, 'nothing is said to come after a release: what is not code is dated');
+  assert.match(tpl, /if \(!home\) \{ home = byDay\[at\] = \{ k: '', on: '', at: at, commits: \[\], day: at, decisions: \[\] \}; order\.push\(home\); \}/, 'the decisions of each day, a card of their own');
   assert.doesNotMatch(tpl, /names\.length \+ ' components'/, 'a read of Figma names every component it affects, as a code row does');
   assert.doesNotMatch(tpl, /Read for the first time: ' \+ first\.length/, 'the components read for the first time are named, not counted');
   assert.match(tpl, /rows\.sort\(function \(a, b\) \{ return when\(b\.at\) - when\(a\.at\); \}\);/, 'decisions, reads of Figma and issues in one order, newest first');
 });
 
-test('History: a read of Figma is a release of the design, a card of its own: a row a changed component with what changed, then the ones read for the first time, counted and named', () => {
+test('History: a read of Figma is a card of its own, dated: a row a changed component with what changed, then the ones read for the first time, named, the pills only under Affects', () => {
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
   const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 12;'), tpl.indexOf('    var decisionRow = function (d) {'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -1689,10 +1689,10 @@ test('History: a read of Figma is a release of the design, a card of its own: a 
   assert.deepEqual(rows, [
     ['showLabel added; labelContent added', ['c-buttonFloat/history']],
     ['tileSlot added', ['c-navTab/history']],
-    ['Read for the first time2 components', ['c-cardRow/history', 'c-chipRow/history']],
-  ], 'what changed on the left, the component it changed as its pill; the new ones counted, each its pill');
-  assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'FigmaRead on 2026-10-27  ·  saved in 9878c3f  ·  2 changed, 2 new');
-  assert.equal(fns.figmaHead({ read: { r: read.r, comps: read.comps.slice(2) }, firstRead: true }).replace(/<[^>]+>/g, ''), 'FigmaRead on 2026-10-27  ·  saved in 9878c3f  ·  the first read  ·  2 new');
+    ['Read for the first timecardRow, chipRowSaved in 9878c3f', ['c-cardRow/history', 'c-chipRow/history']],
+  ], 'what changed on the left, the component it changed as its pill; the new ones named in plain words, each its pill; the commit that saved the read under the last');
+  assert.doesNotMatch(fns.figmaRows(read).split('<td>').filter((_, i) => i % 2).join(''), /href="#/, 'no pill in What: the components are pills only under Affects');
+  assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'Figma2026-10-27', 'Figma and its day, nothing else');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
   assert.equal((many.match(/ hidden>/g) ?? []).length, 2, 'the first twelve shown');
   assert.match(many, /<button data-pills-more>2 more<\/button>$/, 'the rest one click away, with the system\'s button');

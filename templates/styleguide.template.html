@@ -3049,13 +3049,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       order.forEach(function (g) { g.commits.sort(newestFirst); });
     }
     order.sort(releaseOrder);
-    // Each decision in the release that shipped after it was made; one made since the last release, with the work not
-    // released yet.
+    // The decisions of each day, a card of their own: a decision has no code version, so it is dated, never released.
+    var byDay = {};
     DECISIONS.forEach(function (d) {
-      var at = String(d.at || '').slice(0, 10), home = null;
-      for (var i = order.length - 1; i >= 0; i--) if (order[i].k && order[i].on && String(order[i].on).slice(0, 10) >= at) { home = order[i]; break; }
-      if (!home) { home = order.filter(function (g) { return !g.k; })[0]; if (!home) { home = { k: '', on: '', at: at, commits: [] }; order.unshift(home); } }
-      (home.decisions = home.decisions || []).push(d);
+      var at = String(d.at || '').slice(0, 10), home = byDay[at];
+      if (!home) { home = byDay[at] = { k: '', on: '', at: at, commits: [], day: at, decisions: [] }; order.push(home); }
+      home.decisions.push(d);
     });
     // Each read of Figma that changed what it says of a component: one row a read (the commit that saved it), the
     // components it changed and what changed in each, in the release that holds it. Its commit is not a code row too.
@@ -3087,17 +3086,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var isFirst = function (c) { return c.changed.length === 1 && /first time/.test(c.changed[0]); };
     var figmaRows = function (x) {
       var first = x.comps.filter(isFirst), changed = x.comps.filter(function (c) { return !isFirst(c); });
-      return changed.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; }).map(function (c) {
-        return '<tr data-chip="figma"><td><p class="sg-il-line">' + esc(c.changed.map(figmaChange).join('; ')) + '</p></td><td>' + pillsHTML([c.name], 'history') + '</td></tr>';
-      }).join('') + (first.length ? '<tr data-chip="figma"><td><p class="sg-il-line">Read for the first time</p><p class="sg-il-line"><span class="pg-log-date">' + first.length + (first.length === 1 ? ' component' : ' components') + '</span></p></td><td>' +
-        pillsHTML(first.map(function (c) { return c.name; }).sort(), 'history') + '</td></tr>' : '');
-    };
-    var figmaHead = function (g) {
-      var x = g.read, first = x.comps.filter(isFirst).length, changed = x.comps.length - first;
+      // What changed, then the components read for the first time, named; the commit that saved the read under the last.
+      var rows = changed.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; }).map(function (c) { return ['<p class="sg-il-line">' + esc(c.changed.map(figmaChange).join('; ')) + '</p>', pillsHTML([c.name], 'history')]; });
+      var names = first.map(function (c) { return c.name; }).sort();
+      if (names.length) rows.push(['<p class="sg-il-line">Read for the first time</p><p class="sg-il-line"><span class="pg-par-val">' + esc(names.join(', ')) + '</span></p>', pillsHTML(names, 'history')]);
       var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short || '') + '</code>';
-      return '<span class="sg-log-tag">Figma</span>Read on ' + esc(String(x.r.date).slice(0, 10)) + '  ·  saved in ' + sha + '  ·  ' + (g.firstRead && !changed ? 'the first read  ·  ' : '') +
-        [changed ? changed + ' changed' : '', first ? first + ' new' : ''].filter(Boolean).join(', ');
+      if (rows.length) rows[rows.length - 1][0] += '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + '</span></p>';
+      return rows.map(function (r) { return '<tr data-chip="figma"><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
     };
+    // A read of Figma is dated, never released: Figma, and the day it was read.
+    var figmaHead = function (g) { return '<span class="sg-log-tag">Figma</span>' + esc(String(g.read.r.date).slice(0, 10)); };
     var decisionRow = function (d) {
       var about = d.component && COMPONENTS.some(function (c) { return c.name === d.component; }) ? '<a class="sg-uses-link" href="#' + esc(cid(d.component)) + '/history">' + esc(d.component) + '</a>'
         : d.url ? '<a class="sg-uses-link" href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.page || d.about) + '</a>' : esc(d.page || d.component || 'The system');
@@ -3120,22 +3118,19 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return '<tr data-chip="code"><td>' + cell + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
     };
     var when = function (x) { var t = Date.parse(x); return isNaN(t) ? 0 : t; };
-    // A card's head: its release, or the code merged since the last one; a card with no code (a decision, a read of
-    // Figma: neither has a code version) says it came after the last release and the days it covers.
-    var lastRelease = order.filter(function (g) { return g.k; })[0];
-    var cardHead = function (g, days) {
+    // A card's head: the code's release (or the code merged since the last one), a read of Figma's day, or the day of
+    // the decisions it holds.
+    var cardHead = function (g) {
       if (g.read) return figmaHead(g);
-      if (g.k || g.commits.length) { var n = byTicket(g.commits, function (x) { return x.r; }).length; return '<span class="sg-log-tag">Code</span>' + releaseHead(g) + '  ·  ' + n + (n === 1 ? ' issue' : ' issues'); }
-      var span = days.length ? (days[days.length - 1] === days[0] ? days[0] : days[days.length - 1] + ' – ' + days[0]) : '';
-      return (lastRelease ? 'After ' + esc(lastRelease.k) + (span ? '  ·  ' : '') : '') + esc(span);
+      if (g.day) return esc(g.day);
+      var n = byTicket(g.commits, function (x) { return x.r; }).length; return '<span class="sg-log-tag">Code</span>' + releaseHead(g) + '  ·  ' + n + (n === 1 ? ' issue' : ' issues');
     };
     box.innerHTML = order.map(function (g) {
       // Its decisions, reads of Figma and issues together, newest first, each with its own date.
       var rows = (g.decisions || []).map(function (d) { return { at: String(d.at || ''), html: decisionRow(d) }; })
         .concat(byTicket(g.commits, function (x) { return x.r; }).map(function (t) { return { at: String(t.items[0].r.date || ''), html: codeRow(t) }; }));
       rows.sort(function (a, b) { return when(b.at) - when(a.at); });
-      var days = rows.map(function (r) { return r.at.slice(0, 10); }).filter(Boolean);
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + cardHead(g, days) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + (g.read ? figmaRows(g.read) : rows.map(function (r) { return r.html; }).join('')) + '</tbody></table></div>';
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + cardHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + (g.read ? figmaRows(g.read) : rows.map(function (r) { return r.html; }).join('')) + '</tbody></table></div>';
     }).join('');
     // The code, Figma, the decisions or all: a chip for each kind the page has, when it has two, and a release with
     // nothing of the kind chosen out of the way (read from the page itself: box is a var another page reuses).
