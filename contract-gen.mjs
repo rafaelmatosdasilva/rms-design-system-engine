@@ -963,7 +963,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   let authoredDoc = readJSON(authoredPath);
   if (!authoredDoc) {
     authoredDoc = {
-      _note: 'Hand-authored contract layer (rms-design-system-engine) — COMMIT this file. It holds decisions only (Figma->code bindings, semantics, notes), never captured DS values, so it is safe to share and applies in CI. The generated contracts/ + tokens.json are local, gitignored views built from this + the Figma snapshots. Resolve a prop rename or slot by adding, under a component: "bindings": { "<figmaProp>": { "attribute": "codeName" } }  or  { "slot": "slotName" }. Optional agent guidance per component: "whenNotToUse" (string), "useInstead" (string or list), "neverCombineWith" (list of component names). Optional decision status: "status" (current | deprecated | experimental), "supersededBy" (the component that won), "since", "rationale" (the why).',
+      _note: 'Hand-authored contract layer (rms-design-system-engine) — COMMIT this file. It holds decisions only (Figma->code bindings, semantics, notes), never captured DS values, so it is safe to share and applies in CI. The generated contracts/ + tokens.json are local, gitignored views built from this + the Figma snapshots. Resolve a prop rename or slot by adding, under a component: "bindings": { "<figmaProp>": { "attribute": "codeName" } }  or  { "slot": "slotName" }. Optional agent guidance per component: "whenNotToUse" (string), "useInstead" (string or list), "neverCombineWith" (list of component names). Optional decision status: "status" (current | deprecated | experimental), "supersededBy" (the component that won), "since", "rationale" (the why). Optional, at the top: "construction": { "<rule id>": true | false }, the answer of the team to a question of the construction grammar (contracts/construction.json).',
       components: Object.fromEntries(allNames.map((n) => [n, { bindings: {} }])),
     };
     if (!publishTo) try { writeFileSync(authoredPath, JSON.stringify(authoredDoc, null, 2) + '\n'); } catch { /* best-effort */ }
@@ -1148,6 +1148,19 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     dsdsOut = dir;
   } catch { /* best-effort */ }
 
+  // How the system builds a component in Figma (construction-grammar.mjs): each rule most of its components follow,
+  // with who does not, and the questions the team answers in the authored contract (construction). Rewritten each build.
+  let constructionOut = null;
+  try {
+    const { grammarOf } = await import('./construction-grammar.mjs');
+    const values = readJSON(join(ROOT, 'component-values.snapshot.json')) || {};
+    const g = grammarOf({ props, structure, values }, { answers: authoredDoc.construction ?? {} });
+    if (g.figma.rules.length || g.figma.unsettled.length) {
+      constructionOut = join(outDir, 'construction.json');
+      writeFileSync(constructionOut, JSON.stringify({ _built: stamp, _note: 'How this system builds a component in Figma, mined from its own components (rms-design-system-engine). A rule is what most of them do; a question is answered in the authored contract under "construction": { "<rule id>": true | false }.', ...g }, null, 2) + '\n');
+    }
+  } catch { /* best-effort */ }
+
   // Figma prop types: the component properties as TypeScript, for a compile-time prop check.
   let propTypesOut = null;
   try {
@@ -1169,5 +1182,5 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const statusCounts = built.reduce((acc, b) => { const st = b.contract.status?.state; if (st) acc[st] = (acc[st] || 0) + 1; return acc; }, {});
 
   try { ensureDir(outDir); writeFileSync(builtFile, JSON.stringify({ _built: stamp }, null, 2) + '\n'); } catch { /* best-effort */ }
-  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, dsdsOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
+  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, dsdsOut, constructionOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
 }

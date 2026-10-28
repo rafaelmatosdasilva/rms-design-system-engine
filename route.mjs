@@ -201,7 +201,11 @@ const EXTRACT_ASKED = /\bextract\w*|\bwith a model\b|\bmodel test\b|\bteste?\b[\
 // The team's intent layer: a GitLab project of DSDS pages, named with "intent layer" and its link (any host).
 const INTENT_LAYER = /\bintent[- ]layer\b|\bcamada de inten[çc][ãa]o\b/i;
 const ANY_LINK = /https?:\/\/[^\s)>\]]+/i;
+// How the system builds a component in Figma (its construction grammar): before building from Figma, which a request
+// naming components and Figma would otherwise reach.
+const CONSTRUCTION = /\bconstruction (rules?|grammar)\b|\bgrammar\b|\bregras de constru[çc][ãa]o\b|\bgram[aá]tica\b|\bhow (do|does) (we|our [\w ]+?|the system|this system|it) (build|construct|name|structure)\b[\s\S]{0,40}\b(components?|layers?|propert\w+|variants?)\b|\bcomo (é que )?(constru[íi]mos|o sistema constr[oó]i|nomeamos)\b[\s\S]{0,40}\bcomponentes?\b/i;
 const RULES = [
+  ['ask-the-system', (t) => CONSTRUCTION.test(t), 'construction'],
   ['guidelines-links', (t) => INTENT_LAYER.test(t) && ANY_LINK.test(t), 'intent-layer'],
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
@@ -435,6 +439,10 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
     }
     if (recipe === 'burndown') return { recipe, question, run: [cmd], notes };
     if (recipe === 'ask-the-system') {
+      if (kind === 'construction') {
+        notes.push('Answer from what the query prints: each rule with how many of the system\'s components follow it, the variant axes it already uses, and the questions only the team can answer. Building or changing a component in Figma follows these rules; where the system has no rule, follow the component it is like.');
+        return { recipe, question: false, run: [`${cmd} --query construction`], notes };
+      }
       const terms = [...named, ...(t.match(/(?:--[a-z][\w-]*|\b[a-z][\w-]*(?:\/[\w-]+)+)/gi) ?? [])];
       // A word several components share ("which props does the button take?"): the query prints each of them.
       if (!terms.length && components.length) terms.push(...looseComponents(t, components, { anywhere: true }).names);

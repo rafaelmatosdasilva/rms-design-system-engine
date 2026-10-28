@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The construction grammar: how a system builds a component in Figma, mined from its own components (continuous evaluation)
+
+What changed since the entry below (engine 043c69f): Parts: components placed only inside a root, documented in its page; a question card when unsure (#106); Tests leave no temporary folders behind; a killed browser leaves neither its profile nor its socket folder (#107); README badges, and a release every Monday sized by the pull request labels (#108); A browser left by a run killed outright is ended and its folders swept by the next one (#109); Docs: lead with the problem, and say what each claim covers (#110); Plainer review card: a heading that counts the changes, no file paths (#111); The construction grammar: how a system builds a component in Figma, mined from its own components. The guide changed in `cookbook/ask-the-system.md`, `reference/usage.md`.
+
+Guide set measured: `d7138bff6a99` · Project measured: `13d811a9d668`
+
+| Haiku, engine 1663f29 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.063 | $0.057 |
+| Input a run | 123k | 100k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 100k a run against 123k. no task changed state, and no run moved: the same result. Records: `records/2026-10-28-the-construction-grammar-how-a`.
+
 ## 2026-10: A component Figma has and the code does not: --query says its class styles nothing, so an agent uses a built one (continuous evaluation)
 
 What changed since the entry below (engine 42058be): The engine never changes code people wrote; each open issue says which fix it needs (#100); A table filtered by a chip closes on the card's own edge (#102); A Figma slot is paired with the code's slot of the same word, and the on/off that shows it with the slot filled (#98); Coverage asks the edges a screen meets first: content that does not fit, and one action where there are two (#99); What Figma says a switch or a slot does, and how the rules write a date, against the code (#101); History: a read of Figma is a release of the design, a card of its own, shaped as the code's (#103); History: each card dated as what it holds is; a read of Figma names its new components in plain words (#104); The panel colours a team sets by hand win over the template's faint layer, each brand's own (#105); Parts: components placed only inside another, shown and documented in it; Parts: asked in words, recorded with --part; documented; Parts: a pair that holds each other is asked about the piece; the spec a person edits; Parts: a question says what it was read from; A component Figma has and the code does not: --query says its class styles nothing, so an agent uses a built one. The guide changed in `reference/usage.md`.

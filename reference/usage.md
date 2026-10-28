@@ -1251,6 +1251,21 @@ check every edit gets on what changed since the last commit, never failing the f
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
+#### The construction grammar (`--query construction`)
+
+How the system builds a component in Figma, mined on every run from its own components and written to
+`contracts/construction.json`: how a component, each kind of property (boolean, text, instance swap, slot, variant) and
+each variant option is named, the word a kind of property begins or ends with (`show…`, `…Content`), whether layers carry
+names of their own (never Figma's `Frame 235`) and in which case, whether every component and variant lays out with auto
+layout, whether a component binds its own variables (`<prefix>/<component>/…`) or the shared ones, colour and spacing
+apart, and whether it carries a description. Each rule says how many components follow it and which do not. Nothing
+is imposed: a rule is what three quarters or more of the system's components already do (three at least); between half
+and three quarters it is a question for the team, and below half the system has no rule there, which is said too (follow
+the component the new one is like). The variant axes the system already uses, with their options, are kept as a
+vocabulary to reuse. The team answers a question once, in the authored contract: `"construction": { "<rule id>": true }`
+makes it a rule, `false` drops it. `--query construction` prints it all; building or changing a component in Figma
+follows it.
+
 #### A scheduled pipeline (`--ci-changed`)
 
 `rms-design-system-engine --ci-changed` says whether anything a build is made from moved since the last build, for a
