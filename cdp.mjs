@@ -109,8 +109,17 @@ export function sweepDeadProfiles(base = tmpdir()) {
 
 // Launch headless Chrome and resolve once its DevTools socket is listening.
 // Returns { chrome, userDataDir, wsUrl, kill }. Rejects if Chrome exits first.
-// Gives up after timeoutMs (default 30 s) so a Chrome that never starts cannot hang a run.
-export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engine-chrome-', timeoutMs = 30000 } = {}) {
+// Gives up after timeoutMs (default 30 s) so a Chrome that never starts cannot hang a run. A busy machine can take
+// longer than that once: a start that timed out is tried once more after a pause, as the engine waits for Figma; one
+// that failed outright (no Chrome there, or it exited) is not.
+export async function launchChrome(chromePath, opts = {}) {
+  try { return await launchOnce(chromePath, opts); } catch (e) {
+    if (!/did not start within/.test(String(e?.message))) throw e;
+    await new Promise((r) => setTimeout(r, opts.retryAfterMs ?? 2000));
+    return launchOnce(chromePath, opts);
+  }
+}
+async function launchOnce(chromePath, { tmpPrefix = 'design-system-engine-chrome-', timeoutMs = 30000 } = {}) {
   try { sweepDeadProfiles(); } catch { /* never in the way of a launch */ }
   const userDataDir = mkdtempSync(join(tmpdir(), `${PROFILE_PREFIX}${process.pid}-${tmpPrefix}`));
   // --use-mock-keychain (macOS) and --password-store=basic (Linux): a throwaway profile never touches the person's

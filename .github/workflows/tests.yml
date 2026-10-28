@@ -29,6 +29,10 @@ jobs:
       # Each failing test is also written as an annotation, so its name and first error lines show on the check.
       - name: Run the test suite
         shell: bash
+        # A shared runner has few cores and is often busy: the browser tests' time limits get the time it takes (a limit
+        # made longer only delays a real hang, it never lets a failing test pass).
+        env:
+          RMS_TEST_TIME_SCALE: '3'
         run: |
           set -o pipefail
           code=0

@@ -951,6 +951,10 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   if (targets === 'all' || (Array.isArray(targets) && targets.includes('*'))) targets = allNames;
   if (typeof targets === 'string') targets = [targets];
   targets = targets.filter((n) => structure[n] || CONTRACT[n] || props[n] || codeNames.includes(n));
+  // A component Figma gives no name (only spaces) has none to write a contract by: it is listed apart, by its node, for
+  // the design team to name, and never written as " .contract.json".
+  const unnamed = targets.filter((n) => !String(n).trim()).map((n) => ({ name: '', why: `no name in Figma: name it there (node ${props[n]?.nodeId ?? structure[n]?.nodeId ?? 'unknown'})` }));
+  targets = targets.filter((n) => String(n).trim());
 
   // What this run is built from: an older run never replaces contracts built from newer inputs.
   const builtFile = join(outDir, 'built.json');
@@ -1047,7 +1051,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const sharing = new Map();
   for (const n of targets) { const f = placeOf.get(n); if (f) sharing.set(f, [...(sharing.get(f) ?? []), n]); }
   const lead = new Map([...sharing].map(([f, ns]) => [f, ns.find((n) => Object.keys(props[n]?.properties ?? {}).length) ?? ns[0]]));
-  const skipped = [];
+  const skipped = [...unnamed];
   // Every decision the team made, wherever it was made (decisions.mjs): what each component was decided against.
   let decided = null, ruledOutLines = () => [];
   // The parts the last style guide build found (component-parts.mjs), when it ran.
@@ -1112,6 +1116,9 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     writeFileSync(join(outDir, 'README.md'), publishedReadme(built, skipped, { schema: relative(outDir, schemaOut), figmaFile: cfg.figmaFileKey || null, undefinedRefs }));
     return { outDir, schemaOut, components: emitted, skipped, removed: removed.map((f) => relative(outDir, f)), invalid, breaking, undefinedRefs, typeMismatches, authoredIssues, droppedTokens, tokenCount: 0 };
   }
+
+  // A contract an older run wrote for a component with no name (" .contract.json") is taken out: it names nothing.
+  for (const f of contractFilesIn(outDir)) if (!f.slice(f.lastIndexOf(sep) + 1).replace(/\.contract\.json$/, '').trim()) { try { unlinkSync(f); } catch { /* already gone */ } }
 
   // 4) AI index (llms.txt) — a machine-readable summary for agents, local beside the contracts.
   // The component catalog for UI generators (ui-catalog.mjs): from the contracts, plus the code

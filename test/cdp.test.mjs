@@ -131,3 +131,18 @@ test('a run killed before it cleaned up has its browser ended and its folders sw
   for (let i = 0; i < 50 && !gone; i++) { try { process.kill(Number(chromePid), 0); await new Promise((r) => setTimeout(r, 100)); } catch { gone = true; } }
   assert.ok(gone, 'the orphaned browser was left running');
 });
+
+// A busy machine can take longer than the limit to start a browser once: a start that timed out is tried once more,
+// and one that cannot work (no browser there) fails at once.
+test('a browser start that timed out is tried once more; one that cannot start is not', { timeout: budget(30000) }, async () => {
+  const { chmodSync } = await import('node:fs');
+  const dir = tempDir('cdp-retry-');
+  const fake = join(dir, 'chrome.sh'), count = join(dir, 'count');
+  // The first start says nothing (it times out); the second announces its socket.
+  writeFileSync(fake, `#!/bin/sh\nif [ -f "${count}" ]; then echo "DevTools listening on ws://127.0.0.1:1/devtools/browser/x" >&2; sleep 5; else touch "${count}"; sleep 5; fi\n`);
+  chmodSync(fake, 0o755);
+  const b = await launchChrome(fake, { timeoutMs: 500, retryAfterMs: 10 });
+  assert.match(b.wsUrl, /^ws:\/\/127\.0\.0\.1:1\//);
+  b.kill();
+  await assert.rejects(launchChrome(join(dir, 'no-such-browser'), { timeoutMs: 500, retryAfterMs: 10 }), /could not start|exited/);
+});
