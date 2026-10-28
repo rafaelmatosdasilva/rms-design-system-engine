@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A new component built in Figma from a spec: the build-component-figma recipe (continuous evaluation)
+
+What changed since the entry below (engine d6fb706): Construction: a yes/no variant that should be a boolean, padding, layer order and page; decided rules checked on every run (#118); The accessibility check keeps each page's results again, and an engine update re-checks only what it changes (#119); Construction: the layer order names the few layers most components have, each where it sits on average (#120); A new component in Figma, built the system's way: --spec from a description, --figma-build writes the script. The guide changed in `cookbook/build-component-figma.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `8feacbfd5eaf` · Project measured: `13d811a9d668`
+
+| Haiku, engine 33f86b6 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.058 | $0.058 |
+| Input a run | 103k | 102k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 102k a run against 103k. no task changed state, and no run moved: the same result. Records: `records/component-builder`.
+
 ## 2026-10: Construction: a yes/no variant that should be a boolean, padding, layer order and page; decided rules checked on every run (continuous evaluation)
 
 What changed since the entry below (engine 0a96050): How each component is built: the skeleton from Figma, and its architecture on the Construction page (#116); Construction: a yes/no variant that should be a boolean, padding, layer order and page; decided rules checked on every run. The guide changed in `reference/usage.md`.
