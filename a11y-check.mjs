@@ -1070,7 +1070,7 @@ export function styleguideShares(sg, size = SHARE_COMPONENTS) {
 // A page checked before, with nothing it rests on changed since, gives the same results: each page's are kept under its
 // signature (a11y-kept.json, beside the run's other results), and the next run puts them back instead of opening the
 // page again. A run where nothing changed opens no browser and takes seconds. A page's signature is the check itself
-// (this file and every engine file it reaches, the style guide's template, the in-page checks), what the run was asked
+// (this file and the engine files its results rest on, the in-page checks: checkSignature), what the run was asked
 // (the configuration, the colour modes, the components and the parts left out) and what the page draws: a style guide
 // part, its components as the page's data gives them and the system's CSS; a product page or a built UI, its file;
 // the components rendered from their code, every file of the project. A live page (--url, a dev server) is never kept,
@@ -1103,9 +1103,19 @@ export function engineFiles(start, { read = (f) => readFileSync(f, 'utf8'), skip
   }
   return [...seen].sort();
 }
-export function checkSignature({ dir = ENGINE_DIR, read = (f) => readFileSync(f, 'utf8') } = {}) {
-  const files = [...engineFiles(join(dir, 'a11y-check.mjs'), { read }), join(dir, 'templates', 'styleguide.template.html'), join(dir, 'wcag-page.js')];
-  return sha(AXE_VERSION, ...files.map((f) => { try { return `${relative(dir, f)}\u0000${read(f)}`; } catch { return relative(dir, f); } }));
+// What a page's results rest on in the engine, by the kind of page. A page read from a file (the style guide, a built UI,
+// a product page) rests on the check and the in-page checks: never on the style guide's template (each style guide part
+// is signed by what its components draw, their data and the page's CSS) nor on what only reads the code to render it.
+// The components rendered from their code rest on that too. The browser's plumbing and what only writes the report are
+// left out of both: a change there measures nothing differently.
+const PLUMBING = ['figma-link.mjs', 'styleguide-gen.mjs', 'cdp.mjs', 'stdio-sync.mjs', 'stamp.mjs', 'styleguide-files.mjs'];
+const RENDERING = ['component-harness.mjs', 'vue-harness.mjs', 'code-capture.mjs', 'component-capture.mjs', 'capture-compare.mjs', 'structure-capture.mjs', 'code-connect-map.mjs',
+  'code-connect-template.mjs', 'codeconnect-check.mjs', 'project-typescript.mjs', 'jsx-markup.mjs', 'css-source.mjs', 'component-source.mjs', 'component-api.mjs', 'component-locator.mjs',
+  'component-pairing.mjs', 'code-roots.mjs', 'markup-source.mjs', 'icon-folder.mjs', 'icon-source.mjs', 'figma-examples.mjs', 'figma-props.mjs', 'in-progress.mjs', 'build-list.mjs', 'decision-status.mjs'];
+export function checkSignature({ dir = ENGINE_DIR, read = (f) => readFileSync(f, 'utf8'), kind = 'page' } = {}) {
+  const skip = [...PLUMBING, ...(kind === 'page' ? RENDERING : [])];
+  const files = [...engineFiles(join(dir, 'a11y-check.mjs'), { read, skip }), join(dir, 'wcag-page.js')];
+  return sha(AXE_VERSION, kind, ...files.map((f) => { try { return `${relative(dir, f)}\u0000${read(f)}`; } catch { return relative(dir, f); } }));
 }
 // What the run was asked: the configuration (less where it was read from and when), the flags that change what is
 // checked, the colour modes and the components looked for.
@@ -2183,6 +2193,7 @@ async function main() {
   const keptBefore = REUSE ? readKept(keptPath) : {};
   const keptNow = {};
   const runSig = REUSE ? runSignature({ check: checkSignature(), cfg, argv, roots, modes: [...modes, ...pairModes] }) : null;
+  const runSigRendered = REUSE ? runSignature({ check: checkSignature({ kind: 'rendered' }), cfg, argv, roots, modes: [...modes, ...pairModes] }) : null;
   if (REUSE) {
     const sgSigs = new Map();
     for (const t of targets) {
@@ -2247,7 +2258,7 @@ async function main() {
         const names = components.length ? components : [...figmaNames, ...own.map((k) => k.name)];
         // Rendered from every file of the project: unchanged since they were last checked, their results are put back
         // and nothing is built.
-        const vueSig = REUSE ? sha(runSig, 'vue', names, projectSignature(ROOT, cfg)) : null;
+        const vueSig = REUSE ? sha(runSigRendered, 'vue', names, projectSignature(ROOT, cfg)) : null;
         const vueKept = vueSig ? keptBefore[vueSig] : null;
         const v = vueKept ? { kept: true } : await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n) });
         if (v.kept) targets.push({ label: vueKept.label, url: null, harness: true, sig: vueSig, kept: vueKept });
@@ -2336,9 +2347,12 @@ async function main() {
   const opened = [], notOpened = [];   // a component opened by a press before it was checked, or one no press showed
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
+  // A selector the browser cannot parse is the run's, not a page's: said once at the end, so a page it was dropped from
+  // is still read whole and kept (a set, so a page put back brings it too).
+  const invalidRoots = new Set();
   // What each page adds to the lists above, kept under its signature once it was read and finished (settle), or put
   // back from an earlier run instead of opening it.
-  const acc = { findings, axeViolations, unrendered, unread, unfinished, notJudged, accounted, heard, changes, instances, opened, notOpened, ranChecks, behavioursNotChecked };
+  const acc = { findings, axeViolations, unrendered, unread, unfinished, notJudged, accounted, heard, changes, instances, opened, notOpened, ranChecks, behavioursNotChecked, invalidRoots };
   const reusedPages = [], cutTargets = new Set();
   let pending = null;
   const settle = () => {
@@ -2391,7 +2405,7 @@ async function main() {
     if (roots) {
       const ok = (await send('Runtime.evaluate', { expression: `${JSON.stringify(roots)}.filter((s) => { try { document.querySelector(s); return true; } catch { return false; } })`, returnByValue: true }, sessionId)).result?.value;
       if (Array.isArray(ok) && ok.length < roots.length) {
-        for (const bad of roots.filter((x) => !ok.includes(x))) unread.push(`${String(bad).replace(/^\./, '')} (its selector ${bad} is not valid CSS, so it was not checked)`);
+        for (const bad of roots.filter((x) => !ok.includes(x))) invalidRoots.add(bad);
         roots = ok;
       }
     }
@@ -3172,6 +3186,7 @@ async function main() {
   }
   endCut();
   settle();
+  for (const bad of invalidRoots) unread.push(`${String(bad).replace(/^\./, '')} (its selector ${bad} is not valid CSS, so it was not checked)`);
   roots = dsRoots;
   if (REUSE) { try { mkdirSync(dirname(keptPath), { recursive: true }); writeFileSync(keptPath, JSON.stringify({ pages: keptToWrite(keptBefore, keptNow) }) + '\n'); } catch { /* keeping is a convenience */ } }
   if (reusedPages.length && !JSON_MODE) console.log(`ℹ️  [a11y] ${reusedPages.length} of ${targets.length} page${targets.length === 1 ? '' : 's'} unchanged since ${reusedPages.length === 1 ? 'it was' : 'they were'} last checked: ${reusedPages.length === 1 ? 'its results are' : 'their results are'} put back, not checked again (--fresh checks every page again)`);
