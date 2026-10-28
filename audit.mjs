@@ -1894,7 +1894,7 @@ if (process.argv.includes('--construction') || process.argv.includes('--figma-fi
   const authoredPath = resolve(ROOT, ccfg.contracts?.authored ?? 'contract.authored.json');
   const authored = read(authoredPath) ?? {};
   const props = read(ccfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
-  const g = grammarOf({ props, structure: read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: read('component-values.snapshot.json') ?? {}, varNames: read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {} }, { answers: authored.construction ?? {} });
+  const g = grammarOf({ props, structure: read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: read('component-values.snapshot.json') ?? {}, varNames: read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {}, skeleton: read((await import('./figma-capture.mjs')).componentFiles(ccfg).skeleton) ?? {} }, { answers: authored.construction ?? {} });
   if (!g.figma.rules.length) { console.log('❌ No construction grammar: it is read from the Figma capture. Refresh Figma (--recipe refresh-figma), then ask again.'); process.exit(2); }
   const after = (flag) => { const i = process.argv.indexOf(flag); return process.argv.slice(i + 1).filter((a, k, all) => !a.startsWith('--') && all.slice(0, k).every((b) => !b.startsWith('--'))); };
   const ruleOf = (id) => g.figma.rules.find((r) => r.id === id);
@@ -1909,7 +1909,7 @@ if (process.argv.includes('--construction') || process.argv.includes('--figma-fi
     if (may.answer === 'no') { console.log(`ℹ️  This project does not let the engine write its own files${may.why ? ` (${may.why})` : ''}: add "construction": { "${id}": ${JSON.stringify(value)} } to ${relative(ROOT, authoredPath)} by hand.`); process.exit(1); }
     authored.construction = { ...(authored.construction ?? {}), [id]: value };
     writeFileSync(authoredPath, JSON.stringify(authored, null, 2) + '\n');
-    const now = value === false ? null : grammarOf({ props, structure: read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: read('component-values.snapshot.json') ?? {}, varNames: read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {} }, { answers: authored.construction }).figma.rules.find((x) => x.id === id);
+    const now = value === false ? null : grammarOf({ props, structure: read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: read('component-values.snapshot.json') ?? {}, varNames: read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {}, skeleton: read((await import('./figma-capture.mjs')).componentFiles(ccfg).skeleton) ?? {} }, { answers: authored.construction }).figma.rules.find((x) => x.id === id);
     console.log(now ? `✅ The rule: ${now.says}. ${now.toFix.length} to fix (${relative(ROOT, authoredPath)}).` : `✅ Not a rule: ${r.says}; dropped (${relative(ROOT, authoredPath)}).`);
     console.log(now?.toFix.length ? `NEXT: tell the person; each component to fix is on the style guide's Construction page, and rms-design-system-engine --figma-fix <component> ${id} writes its fix.` : 'NEXT: tell the person the line above.');
     process.exit(0);

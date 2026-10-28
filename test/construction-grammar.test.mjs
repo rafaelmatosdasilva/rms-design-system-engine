@@ -136,3 +136,30 @@ test('the variables bound on the layers inside a component count, named by the v
   const c = rule(g, 'colour-variables');
   assert.deepEqual(c.toFix.map((t) => [t.component, t.value]), [['Promo Banner', 'advanced/Promo Banner/background/color'], ['listRow', 'advanced/listRow/title/color']]);
 });
+
+test('architecture, from the skeleton: styles, wiring, nesting, layout, placement, and each family\'s shape', () => {
+  const row = (c, extra = {}) => ({ layout: { dir: 'HORIZONTAL', w: 'HUG', h: 'FIXED', main: 'CENTER', cross: 'CENTER', pad: [8, 16, 8, 16], gap: 8 }, c, ...extra });
+  const icon = (wired = true) => ({ t: 'INSTANCE', n: 'Icon', of: { name: 'iconBase' }, ...(wired ? { wired: { visible: 'showIcon' } } : {}) });
+  const text = (styled = true) => ({ t: 'TEXT', n: 'Label', ...(styled ? { styles: { text: 'Body/M' } } : {}), wired: { characters: 'labelContent' } });
+  const skel = (tree, extra = {}) => ({ trees: [tree], variants: [['state=default', 0], ['state=hover', 0]], page: 'Components', section: 'Buttons', ...extra });
+  const skeleton = {
+    buttonPrimary: skel(row([icon(), text()]), { reactions: { 'state=default': [{ on: 'ON_HOVER', do: ['CHANGE_TO state=hover'] }] } }),
+    buttonSecondary: skel(row([icon(), text()])),
+    buttonGhost: skel(row([icon(), text(false), { t: 'VECTOR', n: 'Arrow' }])),
+    buttonLink: skel(row([text(), { t: 'FRAME', n: 'Frame 9', hidden: true }]), { section: undefined }),
+  };
+  const props = Object.fromEntries(Object.keys(skeleton).map((n) => [n, { properties: { 'showIcon#1:0': { type: 'BOOLEAN' }, 'labelContent#1:1': { type: 'TEXT' } } }]));
+  const g = grammarOf({ props, skeleton });
+  const r = (id) => g.figma.rules.find((x) => x.id === id);
+  assert.deepEqual([r('text-styles').follows, r('text-styles').toFix.map((t) => [t.component, t.value])], [3, [['buttonGhost', 'Label']]]);
+  assert.deepEqual(r('icons-are-instances').toFix.map((t) => t.value), ['Arrow']);
+  assert.deepEqual(r('hidden-layers-wired').toFix.map((t) => [t.component, t.value]), [['buttonLink', 'Frame 9']]);
+  assert.deepEqual(r('properties-wired').toFix.map((t) => [t.component, t.value]), [['buttonLink', 'showIcon']]);
+  assert.deepEqual(r('states-interactive').toFix.map((t) => t.component), ['buttonGhost', 'buttonLink', 'buttonSecondary']);
+  assert.equal(r('in-a-section').toFix[0].component, 'buttonLink');
+  const fam = r('family-button');
+  assert.equal(fam.says, 'A button is built as horizontal auto layout: a component? → text');
+  assert.deepEqual([fam.follows, fam.of, fam.toFix.map((t) => t.component)], [2, 4, ['buttonGhost', 'buttonLink']]);
+  assert.deepEqual(g.figma.families.map(({ shapes, ...f }) => f), [{ family: 'button', components: 4, shape: 'horizontal auto layout: a component? → text', follow: 2, depths: [1, 1, 1, 1] }]);
+  assert.match(fixOf(fam, fam.toFix[0]).say, /^Rebuild it as the family is built \(horizontal auto layout: a component\? → text\); now /);
+});

@@ -547,6 +547,8 @@ that differ) is never taken for a number.
 function prop(node, key) { try { return node != null && typeof node === 'object' && key in node ? node[key] : undefined; } catch (e) { return undefined; } }
 ```
 
+**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes and shadows; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
+
 **Deeper facts (always).** Also record these on each component's entry, every refresh, from the same
 `State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
 each one when present:
@@ -1081,6 +1083,111 @@ function propsFacts(root) {
   const description = String(prop(root, 'description') ?? '').trim();
   if (!Object.keys(properties).length && !annotations.length && !layerAnnotations.length && !description) return null;
   return { nodeId: root.id, properties, annotations, ...(layerAnnotations.length ? { layerAnnotations } : {}), ...(description ? { description } : {}) };
+}
+
+// skeletonOf(root): how the component is built, for building one the system's way (figma-skeleton.snapshot.json).
+// Every variant's layer tree, a tree all its variants share kept once: each layer's type and name, whether it is hidden,
+// its auto layout (direction, sizing on each axis, alignment, padding, gap, wrap) or its sizing, whether it is placed
+// absolutely, grows, stretches or clips, its size limits, the property it is wired to (visible, text, swap), its text,
+// effect, fill and stroke styles by name, the variable modes set on it, its prototype reactions, and for an instance its
+// component (from another library or not) and the properties set on it: an instance's own layers are its component's.
+// Also where the component lives (page, section), each swap and slot property's default and preferred components, the
+// variables it binds from another library, and its dev resources (links to its code). Plain objects only: it reads.
+async function skeletonOf(root) {
+  const styles = {}, collections = {}, vars = {};
+  const clean = (k) => String(k).replace(/#[^#]*$/, '');
+  const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : undefined);
+  const styleName = async (id) => {
+    if (typeof id !== 'string' || !id) return undefined;
+    if (!(id in styles)) { let s = null; try { s = await figma.getStyleByIdAsync(id); } catch (e) { /* gone */ } styles[id] = s ? s.name : null; }
+    return styles[id] || undefined;
+  };
+  const collection = async (id) => {
+    if (!(id in collections)) { let c = null; try { c = await figma.variables.getVariableCollectionByIdAsync(id); } catch (e) { /* gone */ } collections[id] = c ? { name: c.name, modes: (c.modes || []).map((m) => [m.modeId, m.name]), remote: !!c.remote } : null; }
+    return collections[id];
+  };
+  const modesOf = async (m) => {
+    const out = {};
+    for (const [cid, mid] of Object.entries(m || {})) { const c = await collection(cid); const mode = c && c.modes.find((x) => x[0] === mid); out[c ? c.name : cid] = mode ? mode[1] : mid; }
+    return out;
+  };
+  const variantIds = {};
+  const variantsOf = root.type === 'COMPONENT_SET' ? (prop(root, 'children') || []) : [root];
+  for (const v of variantsOf) variantIds[v.id] = v.name;
+  const reactionsOf = (n) => (prop(n, 'reactions') || []).map((r) => ({ on: r.trigger && r.trigger.type, ...(r.trigger && r.trigger.delay ? { after: r.trigger.delay } : {}),
+    do: (r.actions || [r.action]).filter(Boolean).map((a) => (a.type === 'NODE' ? (a.navigation || 'NAVIGATE') + (a.destinationId ? ' ' + (variantIds[a.destinationId] || a.destinationId) : '') : a.type)) })).filter((r) => r.on);
+  const compOf = async (inst) => {
+    let m = null; try { m = await inst.getMainComponentAsync(); } catch (e) { /* none */ }
+    if (!m) return undefined;
+    const set = m.parent && m.parent.type === 'COMPONENT_SET' ? m.parent : null;
+    return { name: set ? set.name : m.name, ...(set ? { variant: m.name } : {}), ...(m.remote ? { library: true } : {}) };
+  };
+  const bound = (n) => { const out = []; const walk = (x) => { if (x && typeof x === 'object') { if (x.type === 'VARIABLE_ALIAS' && x.id) out.push(x.id); else for (const v of Object.values(x)) walk(v); } }; walk(prop(n, 'boundVariables')); for (const k of ['fills', 'strokes', 'effects']) { const ps = prop(n, k); if (Array.isArray(ps)) for (const p of ps) walk(p && p.boundVariables); } return out; };
+  const layer = async (n, depth) => {
+    const t = n.type, lm = prop(n, 'layoutMode');
+    const limits = {}; for (const k of ['minWidth', 'maxWidth', 'minHeight', 'maxHeight']) { const v = num(prop(n, k)); if (v) limits[k] = v; }
+    const refs = prop(n, 'componentPropertyReferences') || {};
+    const st = {}; for (const [k, key] of [['text', 'textStyleId'], ['effect', 'effectStyleId'], ['fill', 'fillStyleId'], ['stroke', 'strokeStyleId']]) { const s = await styleName(prop(n, key)); if (s) st[k] = s; }
+    const em = prop(n, 'explicitVariableModes');
+    const rx = depth > 0 ? reactionsOf(n) : [];
+    const fx = (prop(n, 'effects') || []).filter((e) => e && e.visible !== false).length;
+    for (const id of bound(n)) vars[id] = true;
+    const o = {
+      t, n: n.name,
+      ...(prop(n, 'visible') === false ? { hidden: true } : {}),
+      ...(lm && lm !== 'NONE' ? { layout: { dir: lm, w: prop(n, 'layoutSizingHorizontal'), h: prop(n, 'layoutSizingVertical'), main: prop(n, 'primaryAxisAlignItems'), cross: prop(n, 'counterAxisAlignItems'),
+        pad: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map((k) => num(prop(n, k)) || 0), gap: num(prop(n, 'itemSpacing')) || 0, ...(prop(n, 'layoutWrap') === 'WRAP' ? { wrap: true } : {}) } }
+        : prop(n, 'layoutSizingHorizontal') ? { size: { w: prop(n, 'layoutSizingHorizontal'), h: prop(n, 'layoutSizingVertical') } } : {}),
+      ...(depth > 0 && prop(n, 'layoutPositioning') === 'ABSOLUTE' ? { absolute: true } : {}),
+      ...(depth > 0 && prop(n, 'layoutGrow') ? { grow: prop(n, 'layoutGrow') } : {}),
+      ...(depth > 0 && prop(n, 'layoutAlign') === 'STRETCH' ? { stretch: true } : {}),
+      ...(prop(n, 'clipsContent') === true ? { clip: true } : {}),
+      ...(Object.keys(limits).length ? { limits } : {}),
+      ...(Object.keys(refs).length ? { wired: Object.fromEntries(Object.entries(refs).map(([k, v]) => [k, clean(v)])) } : {}),
+      ...(Object.keys(st).length ? { styles: st } : {}),
+      ...(em && Object.keys(em).length ? { modes: await modesOf(em) } : {}),
+      ...(rx.length ? { reactions: rx } : {}),
+      ...(fx ? { effects: fx } : {}),
+    };
+    if (t === 'INSTANCE') {
+      const c = await compOf(n), cp = prop(n, 'componentProperties') || {}, given = {};
+      for (const [k, v] of Object.entries(cp)) if (v && v.type !== 'INSTANCE_SWAP') given[clean(k)] = v.value;
+      return { ...o, ...(c ? { of: c } : {}), ...(Object.keys(given).length ? { with: given } : {}) };
+    }
+    const kids = prop(n, 'children');
+    if (!Array.isArray(kids) || !kids.length) return o;
+    const c = []; for (const k of kids) c.push(await layer(k, depth + 1));
+    return { ...o, c };
+  };
+  // Every variant's tree, in the set's order; one its siblings share is kept once (trees[i]).
+  const trees = [], index = {}, variants = [], reactions = {};
+  for (const v of variantsOf) {
+    const tree = await layer(v, 0), { n: vn, ...shape } = tree, key = JSON.stringify(shape);
+    if (!(key in index)) { index[key] = trees.length; trees.push(shape); }
+    variants.push([vn, index[key]]);
+    const rx = reactionsOf(v); if (rx.length) reactions[vn] = rx;
+  }
+  // Where it lives: its page and the section (or frame) it sits in.
+  let page = null, section = null;
+  for (let p = root.parent; p; p = p.parent) { if (p.type === 'PAGE') { page = p.name; break; } if (!section && (p.type === 'SECTION' || p.type === 'FRAME')) section = p.name; }
+  // Each swap and slot property's default and preferred components, by name.
+  const swaps = {}; let defs = {}; try { defs = root.componentPropertyDefinitions || {}; } catch (e) { /* a variant */ }
+  const byKey = (deepFacts.byKey && typeof deepFacts.byKey.get === 'function') ? deepFacts.byKey : null;
+  for (const [k, d] of Object.entries(defs)) {
+    if (!d || (d.type !== 'INSTANCE_SWAP' && d.type !== 'SLOT')) continue;
+    let def = null; if (typeof d.defaultValue === 'string' && d.type === 'INSTANCE_SWAP') { try { const x = await figma.getNodeByIdAsync(d.defaultValue); def = x ? (x.parent && x.parent.type === 'COMPONENT_SET' ? x.parent.name : x.name) : null; } catch (e) { /* gone */ } }
+    const preferred = (d.preferredValues || []).map((p) => (byKey && byKey.get(p.key)) || p.key);
+    swaps[clean(k)] = { type: d.type, ...(def ? { default: def } : {}), ...(preferred.length ? { preferred } : {}) };
+  }
+  // The variables it binds from another library: their names and collections.
+  const library = [];
+  for (const id of Object.keys(vars)) {
+    let v = null; try { v = await figma.variables.getVariableByIdAsync(id); } catch (e) { /* gone */ }
+    if (v && v.remote) { const c = await collection(v.variableCollectionId); library.push({ name: v.name, ...(c ? { collection: c.name } : {}) }); }
+  }
+  let dev = []; try { dev = typeof root.getDevResourcesAsync === 'function' ? (await root.getDevResourcesAsync()).map((d) => ({ name: d.name, url: d.url })) : []; } catch (e) { /* none */ }
+  return { trees, variants, ...(page ? { page } : {}), ...(section ? { section } : {}), ...(Object.keys(reactions).length ? { reactions } : {}),
+    ...(Object.keys(swaps).length ? { swaps } : {}), ...(library.length ? { library } : {}), ...(dev.length ? { dev } : {}) };
 }
 ```
 

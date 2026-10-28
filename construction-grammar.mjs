@@ -14,6 +14,8 @@
 //     structure: figma-structure.snapshot.json → components (layout, the variables bound, child frames, toggles)
 //     values:    component-values.snapshot.json        (hygiene: the layers each variable is bound on, variants with no
 //                                                       auto layout); optional
+//     skeleton:  figma-skeleton.snapshot.json (skeletonOf: every variant's layer tree, wiring, styles, modes, nesting,
+//                swaps, placement, reactions, dev links), for how each component is built inside; optional
 //     varNames:  figma-vars.snapshot.json → variableScopes (each variable id with its name), for the variables bound on
 //                the layers inside a component; optional
 //     answers:   { <rule id>: true | false }: the team's decision, kept in the authored contract (construction); true
@@ -153,7 +155,7 @@ function layerNames(name, s = {}, v = {}, components = new Set()) {
   return [...out].filter((l) => l && l !== name && !components.has(l));
 }
 
-export function grammarOf({ props = {}, structure = {}, values = {}, varNames = {} } = {}, { answers = {} } = {}) {
+export function grammarOf({ props = {}, structure = {}, values = {}, varNames = {}, skeleton = {} } = {}, { answers = {} } = {}) {
   const names = [...new Set([...Object.keys(props), ...Object.keys(structure)])]
     .filter((n) => !n.startsWith('_') && (props[n]?.properties || structure[n]) && n.trim() && !/\s{2,}|^\s|\s$/.test(n) && !/usage context/i.test(n))
     .sort();
@@ -255,8 +257,11 @@ export function grammarOf({ props = {}, structure = {}, values = {}, varNames = 
     .sort((a, b) => b.components.length - a.components.length || a.name.localeCompare(b.name))
     .map((a) => ({ name: a.name, components: a.components.length, options: Object.entries(a.options).sort((x, y) => y[1] - x[1]).map(([o]) => o) }));
 
+  // How each component is built inside: its layers, wiring, nesting, styles, placement, and each family's shape.
+  const arch = architecture(skeleton, props, add, opts);
+
   const questions = rules.filter((r) => r.status === 'decide').map((r) => ({ id: r.id, ask: `${r.says}? ${r.follows} of ${r.of} do. Is it the rule? If it is, ${r.toFix.length} ${r.toFix.length === 1 ? 'is' : 'are'} to fix.` }));
-  return { figma: { components: names.length, rules, vocabulary: { variantAxes } }, questions };
+  return { figma: { components: names.length, rules, vocabulary: { variantAxes }, families: arch.families }, questions };
 }
 
 // The grammar in a few lines: each rule with how many follow it, then the axes most used.
@@ -294,5 +299,107 @@ export function fixOf(rule, e) {
   if (id === 'auto-layout') return { what: null, say: `Lay out ${v} with auto layout` };
   if (/-variables$/.test(id)) return { what: null, say: rule.way === 'own' ? `It binds ${v} directly: bind a variable made for it (${rule.template ?? '<component>/…'}) that points at it instead` : `It binds ${v}, a variable made for it: bind the shared variable it points at instead` };
   if (id === 'description') return { what: null, say: 'Write its description in Figma' };
+  const ARCH = {
+    'text-styles': `Give ${v} a text style`,
+    'effect-styles': `Give the shadow on ${v} an effect style`,
+    'hidden-layers-wired': `Wire ${v} to a boolean property that shows it, or delete it`,
+    'properties-wired': `Wire the property ${v} to the layer it should drive, or delete it`,
+    'icons-are-instances': `Replace ${v} with an instance of the icon component`,
+    'no-absolute-layers': `Put ${v} back in the auto layout flow`,
+    'nested-from-this-file': `Swap ${v} for this file's own component`,
+    'variables-from-this-file': `Bind this file's variables instead of ${v}`,
+    'no-pinned-modes': `Remove the pinned mode (${v})`,
+    'variants-one-structure': `Give every variant the same layers (${v} now); show or hide what differs with a property`,
+    'states-interactive': 'Add the prototype reactions: on hover change to the hover variant, on press to the pressed one',
+    'swaps-preferred': `List the components ${v} takes (its preferred values)`,
+    'in-a-section': 'Move it into a section of its page',
+    'links-to-code': 'Add a dev resource that links to its code',
+  };
+  if (ARCH[id]) return { what: null, say: ARCH[id] };
+  if (id.startsWith('family-')) return { what: null, say: `Rebuild it as the family is built (${says.replace(/^A \w+ is built as /, '')}); now ${v}` };
   return { what: null, say: v };
+}
+
+// ── Architecture: how each component is built inside, from the skeleton (figma-skeleton.snapshot.json, skeletonOf) ──
+// Every layer of every variant tree, walked; an instance's own layers are its component's, never walked.
+function layersOf(tree, out = [], path = '') {
+  for (const c of tree?.c ?? []) { const at = path ? `${path}/${c.n}` : c.n; out.push({ ...c, at }); if (c.t !== 'INSTANCE') layersOf(c, out, at); }
+  return out;
+}
+// A component's family: the first word of its name (button for buttonPrimary, card for card/Row).
+export const familyOf = (name) => wordsOf(String(name).split('/')[0])[0] ?? String(name);
+// A tree's shape in a few words: its root's layout and what it holds, in order (an instance by its component).
+// generic: each nested component as "a component" (so a family compares how it is built, not which pieces it holds), and
+// no sizing (a full-width variant is the same construction).
+export function shapeOf(tree, { generic = false } = {}) {
+  const l = tree?.layout;
+  const dir = l ? `${l.dir === 'VERTICAL' ? 'vertical' : l.dir === 'HORIZONTAL' ? 'horizontal' : String(l.dir).toLowerCase()} auto layout` : 'no auto layout';
+  const root = l && !generic ? `${dir}, ${String(l.w ?? 'fixed').toLowerCase()} × ${String(l.h ?? 'fixed').toLowerCase()}` : dir;
+  const kids = (tree?.c ?? []).filter((c) => !c.hidden || c.wired?.visible).map((c) => (c.t === 'INSTANCE' ? (generic ? 'a component' : c.of?.name ? `${c.of.name}` : 'instance') : c.t === 'TEXT' ? 'text' : c.t === 'SLOT' ? 'slot' : /^(RECTANGLE|ELLIPSE|VECTOR|LINE|POLYGON|STAR|BOOLEAN_OPERATION)$/.test(c.t) && generic ? 'shape' : c.t.toLowerCase()) + (c.wired?.visible ? '?' : '') + (c.absolute ? ' (absolute)' : ''));
+  return `${root}: ${kids.length ? kids.join(' → ') : 'nothing inside'}`;
+}
+
+function architecture(skeleton, props, add, opts) {
+  const names = Object.keys(skeleton).filter((n) => !n.startsWith('_') && skeleton[n]?.trees?.length).sort();
+  if (!names.length) return { families: [] };
+  // A component's resting variant: the one its axes name default or rest (state=default), else its first.
+  const REST = /=(default|rest|enabled|idle|off|false)\b/i;
+  const sk = (n) => skeleton[n];
+  const resting = (n) => { const v = sk(n).variants ?? []; const at = v.find(([vn]) => String(vn).split(/,\s*/).every((p) => !p.includes('=') || REST.test(p) || !/state/i.test(p)) && REST.test(vn)) ?? v[0]; return sk(n).trees[at?.[1] ?? 0]; };
+  // A tree's structure alone: each layer's type and name, and what it holds; no value, size or visibility.
+  const structure = (t) => JSON.stringify([t.t, t.n, (t.c ?? []).map(structure)]);
+  const all = (n) => sk(n).trees.flatMap((t) => layersOf(t));
+  const item = (component, off) => ({ component, value: [...new Set(off)].join(', '), fits: !off.length });
+  const judgeAll = (id, area, says, items) => add(judge(id, area, says, items, opts));
+
+  // Text: every text layer uses a text style.
+  judgeAll('text-styles', 'styles', 'Every text layer uses a text style', names.filter((n) => all(n).some((l) => l.t === 'TEXT')).map((n) => item(n, all(n).filter((l) => l.t === 'TEXT' && !l.styles?.text).map((l) => l.at))));
+  // Shadows: every layer with a shadow or blur uses an effect style.
+  judgeAll('effect-styles', 'styles', 'Every shadow or blur uses an effect style', names.filter((n) => all(n).some((l) => l.effects) || sk(n).trees.some((t) => t.effects)).map((n) => item(n, all(n).filter((l) => l.effects && !l.styles?.effect).map((l) => l.at))));
+  // Hidden layers: one hidden is shown by a property, never left hidden for nothing.
+  judgeAll('hidden-layers-wired', 'wiring', 'A hidden layer is shown by a property, never left hidden for nothing', names.map((n) => item(n, all(n).filter((l) => l.hidden && !l.wired?.visible).map((l) => l.at))));
+  // Properties: each boolean, text and swap property drives a layer.
+  const WIRE = { BOOLEAN: 'visible', TEXT: 'characters', INSTANCE_SWAP: 'mainComponent' };
+  judgeAll('properties-wired', 'wiring', 'Every boolean, text and swap property drives a layer', names.filter((n) => props[n]?.properties).map((n) => {
+    const used = new Set(all(n).flatMap((l) => Object.entries(l.wired ?? {}).map(([k, v]) => `${k}:${v}`)));
+    const off = Object.entries(props[n].properties).filter(([, d]) => WIRE[d.type]).map(([k, d]) => [k.replace(/#[^#]*$/, ''), WIRE[d.type]]).filter(([k, w]) => !used.has(`${w}:${k}`)).map(([k]) => k);
+    return item(n, off);
+  }));
+  // Icons: instances of the system's icon components, never vectors drawn inside a component.
+  judgeAll('icons-are-instances', 'nesting', 'An icon inside a component is an instance of an icon component, never a vector drawn in it', names.filter((n) => !/^icon/i.test(n)).map((n) => item(n, all(n).filter((l) => /^(VECTOR|BOOLEAN_OPERATION|STAR|POLYGON)$/.test(l.t)).map((l) => l.at))));
+  // Absolute layers: the flow of auto layout, or not.
+  judgeAll('no-absolute-layers', 'layout', 'Layers stay in the auto layout flow, never placed absolutely', names.map((n) => item(n, all(n).filter((l) => l.absolute).map((l) => l.at))));
+  // Libraries: nested components and variables from this file, or from another library.
+  judgeAll('nested-from-this-file', 'nesting', 'The components nested inside come from this file, never another library', names.filter((n) => all(n).some((l) => l.t === 'INSTANCE')).map((n) => item(n, all(n).filter((l) => l.of?.library).map((l) => l.of.name))));
+  judgeAll('variables-from-this-file', 'variables', 'The variables a component binds come from this file, never another library', names.map((n) => item(n, (sk(n).library ?? []).map((v) => v.name))));
+  // Modes: a component follows the mode it is placed in, never pins one.
+  judgeAll('no-pinned-modes', 'variables', 'A component follows the variable mode it is placed in, never pins one of its own', names.map((n) => item(n, all(n).concat(sk(n).trees).filter((l) => l.modes).flatMap((l) => Object.entries(l.modes).map(([c, m]) => `${c}: ${m}`)))));
+  // Variants: one structure, only values change.
+  judgeAll('variants-one-structure', 'layers', 'A component\'s variants share one layer structure; only values and visibility change between them', names.filter((n) => (sk(n).variants ?? []).length > 1).map((n) => {
+    const kinds = new Set(sk(n).variants.map(([, i]) => structure({ ...sk(n).trees[i], n: '' })));
+    return item(n, kinds.size > 1 ? [`${kinds.size} structures across ${sk(n).variants.length} variants`] : []);
+  }));
+  // Interactions: a hover or pressed state is reached on hover or press.
+  const STATE = /\b(hover|pressed|press)\b/i;
+  judgeAll('states-interactive', 'interactions', 'A component with a hover or pressed state changes to it on hover or press (an interactive component)', names.filter((n) => (sk(n).variants ?? []).some(([vn]) => STATE.test(vn))).map((n) => item(n, Object.keys(sk(n).reactions ?? {}).length ? [] : ['no reaction'])));
+  // Swaps: each swap property says which components it takes.
+  judgeAll('swaps-preferred', 'nesting', 'Every swap property lists the components it takes (preferred values)', names.filter((n) => Object.values(sk(n).swaps ?? {}).some((s) => s.type === 'INSTANCE_SWAP')).map((n) => item(n, Object.entries(sk(n).swaps).filter(([, s]) => s.type === 'INSTANCE_SWAP' && !(s.preferred ?? []).length).map(([k]) => k))));
+  // Placement: in a section of its page.
+  judgeAll('in-a-section', 'placement', 'A component sits in a section of its page', names.map((n) => item(n, sk(n).section ? [] : [sk(n).page ? `on ${sk(n).page}` : 'no section'])));
+  // Code: a link to its code (a dev resource).
+  judgeAll('links-to-code', 'code', 'A component links to its code (a dev resource)', names.map((n) => item(n, (sk(n).dev ?? []).length ? [] : ['no link'])));
+
+  // Each family of three or more: the shape most of its components are built in.
+  const fam = {};
+  for (const n of names) (fam[familyOf(n)] ??= []).push(n);
+  const families = [];
+  for (const [f, list] of Object.entries(fam).filter(([, l]) => l.length >= MIN_SEEN).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))) {
+    const shapes = list.map((n) => [n, shapeOf(resting(n), { generic: true })]);
+    const [shape, count] = top(shapes.map((s) => s[1]));
+    const depth = (t, d = 0) => Math.max(d, ...(t?.c ?? []).filter((c) => c.t !== 'INSTANCE').map((c) => depth(c, d + 1)));
+    const a = /^[aeiou]/i.test(f) ? 'An' : 'A';
+    families.push({ family: f, components: list.length, shape, follow: count, depths: list.map((n) => depth(resting(n))), shapes: Object.entries(shapes.reduce((m, [, s]) => ({ ...m, [s]: (m[s] ?? 0) + 1 }), {})).sort((x, y) => y[1] - x[1]).slice(0, 4) });
+    judgeAll(`family-${f}`, 'architecture', `${a} ${f} is built as ${shape}`, shapes.map(([n, s]) => ({ component: n, value: s, fits: s === shape })));
+  }
+  return { families };
 }
