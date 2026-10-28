@@ -74,6 +74,7 @@ rms-design-system-engine --contract-completeness         # list components whose
 rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules for an agent with no hooks (Cursor, Copilot): shown, and asked about; --write puts them in AGENTS.md, CLAUDE.md, .cursorrules, .github/copilot-instructions.md or .cursor/rules (those the project has, else AGENTS.md), between markers, once the person says yes (the hook holds it until then)
 rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
+rms-design-system-engine --spec "a tag like the chip"     # the spec of a new component built in Figma like one the system has: only its variables, components and names; what it cannot ground is a question (--ops adds the steps; --figma-build <name> writes the Figma script)
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
@@ -1311,6 +1312,44 @@ A rule the team decided is checked on every run, beside the gates (a gate compar
 beside its own rules): the run's summary has a **Construction** line with each decided rule a component breaks, and
 `--construction-check` says the same and exits 1, for a pipeline that fails on it. Nothing is said until the team decided
 a rule.
+
+#### A component built in Figma (`--spec`, `--figma-build`)
+
+**--spec.** `--spec "<description>" [--like <component>] [--name <name>] [--ops <file.json>]` writes the spec of a new
+component to `.design-system-engine-out/specs/<name>.spec.json`, in DSDS's shape (its traits and what it nests), with the
+engine's own part: what was asked, the component it is like, the operations that make it, its questions, what it adds to
+the system and the names it wrote the system's way. It starts as a copy of the component it is most like (named with
+`like`, else the one whose name shares its words, else it asks), and takes only the operations that make it what was
+asked. Each is checked against the system: a variable, a component, a text style or a layer it names must be the
+system's, else it is a question with the nearest the system has; a value (`#ff0000`, `16px`) is always a question, never
+written. A new name (the component, an axis, an option, a property, a layer) is written as the system's construction
+grammar writes that kind of name. The variables the component it is like was given as its own, and its description,
+are asked. Run again with `--spec --name <name> --ops <file>`: the spec keeps what was asked, and the file holds every
+operation so far. The operations, each an object with `op`:
+
+- `rename { what: component | axis | option | property | layer, from, to, axis? }`
+- `addOption { axis, option, like }` (its variants copied from the option it is like), `removeOption { axis, option }`,
+  `addAxis { axis, options, default? }`
+- `addProperty { name, kind: boolean | text | swap, default, layer }` (the layer it drives), `removeProperty { name }`,
+  `setDefault { property, value }`
+- `addLayer { parent, index?, layer: { type: instance | text | frame, name, of?, variant?, style?, text?, layout? } }`
+  (an instance of one of the system's components, a text with one of its text styles, or a frame), `removeLayer { layer }`
+- `bind { layer, field, variable, where? }` (`''` is the component's own frame; field: fill, stroke, gap, padding,
+  paddingX, paddingY, paddingTop…, radius, fontSize, strokeWeight, width, height; where: `{ size: "l" }` for some
+  variants), `rebind { from, to }` (every binding of one variable moved to another)
+- `describe { text }`, `place { page?, section? }`; and to start one, `clone { from, name }` (what `--like` writes) or
+  `create { name, axes?, layout? }` when no component is like it
+
+A layer is named by its path inside the component (`Content/Label`).
+
+**--figma-build.** `--figma-build <name> [--signed-off "<who>"]` checks the spec again against the capture as it is now,
+and builds nothing while a question is left. A new component, and a new option, axis or property on one, adds to the
+system and waits for a named person to sign it off; `--signed-off` records who and when in the spec. It then writes the
+steps to `.design-system-engine-out/handback/figma-build.json` and the Figma script to `handback/figma-apply.js` (the one
+script the project's hooks let `use_figma` run, once the person says yes; a project whose `writes.figma` is `no` gets the
+steps alone). The script copies the component it is like beside it, makes only the listed steps in every variant, and
+returns what it changed, skipped and could not find. Then the Figma snapshots are refreshed and `--construction-check`
+and `--hygiene` say what they find on it.
 
 #### A scheduled pipeline (`--ci-changed`)
 

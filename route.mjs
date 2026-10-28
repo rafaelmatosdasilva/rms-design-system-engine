@@ -206,9 +206,14 @@ const ANY_LINK = /https?:\/\/[^\s)>\]]+/i;
 const CONSTRUCTION = /\bconstruction (rules?|grammar)\b|\bgrammar\b|\bregras de constru[çc][ãa]o\b|\bgram[aá]tica\b|\bhow (do|does) (we|our [\w ]+?|the system|this system|it) (build|construct|name|structure)\b[\s\S]{0,40}\b(components?|layers?|propert\w+|variants?)\b|\bcomo (é que )?(constru[íi]mos|o sistema constr[oó]i|nomeamos)\b[\s\S]{0,40}\bcomponentes?\b/i;
 // A component made to follow how the system builds (its construction): Figma renamed, through the engine's script.
 const CONSTRUCTION_FIX = /\b(fix|correct|corrig\w*|consert\w*|repair)\b[\s\S]{0,60}\b(construction|constru[çc][ãa]o)\b|\bfigma-fix\b/i;
+// A new component made in Figma, like one the system has ("make a tag like the chip in Figma"): its spec from the system's
+// own variables, components and names, then the script the person says yes to.
+const IN_FIGMA = /\b(in|no|na|into|em)\s+figma(?![-\w/.])/i;
+const FIGMA_BUILD = /\b(build|create|make|design|draw|add|cria\w*|constr[oó]i\w*|desenha\w*|fa[zç]a?|adiciona\w*)\b[\s\S]{0,80}(\b(new|novo|nova)\b[\s\S]{0,30}\b(components?|componentes?)\b|\b(like|como|igual a|based on|baseado n[oa])\s+(the |an? |o |a )?[\w-]+)/i;
 const RULES = [
   ['figma-edits', (t) => CONSTRUCTION_FIX.test(t), 'construction-fix'],
   ['ask-the-system', (t) => CONSTRUCTION.test(t), 'construction'],
+  ['build-component-figma', (t) => FIGMA_BUILD.test(t) && IN_FIGMA.test(t) && !/\b(roles?|annotations?|accessibility|a11y|acessibilidade|prototype|prot[oó]tipo|screen|ecr[ãa])\b/i.test(t), 'figma-build'],
   ['guidelines-links', (t) => INTENT_LAYER.test(t) && ANY_LINK.test(t), 'intent-layer'],
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
@@ -405,6 +410,10 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
   }
   for (const [recipe, test, kind] of RULES) {
     if (!test(t, { build, named })) continue;
+    if (recipe === 'build-component-figma') {
+      notes.push('A new component in Figma: the engine writes its spec as a copy of the component it is like, with only the system\'s variables, components and names, and asks what it cannot ground. Ask the person each question; never answer with a value of your own. Nothing is written in Figma before someone signs off what it adds and the person says yes to the script.');
+      return { recipe, question: false, run: [`${cmd} --spec ${JSON.stringify(t.trim())}`], notes };
+    }
     if (recipe === 'build-from-figma') {
       notes.push('Build from Figma: the engine says what to build, in order (tokens first, then each component after the ones it nests), and checks each piece. Write the code only with the names, classes and values the engine prints (--query for a component); write no value Figma does not have: use the closest one the system has and say so, or ask. After each piece, run the scoped check until it passes. Commit nothing unless asked.');
       return { recipe, question, run: question ? [] : named.length ? [`${cmd} --query ${named.join(' ')}`] : [cmd], notes };

@@ -88,8 +88,9 @@ reference it points to say, never from memory or from this table alone.
 | components compared with their Figma images (`codeReading.visual`; each image from `.design-system-engine-refs/components/` or the Figma API with `FIGMA_TOKEN`) | `visual-diff` |
 | to know what to fix first, or to work a library down | `burndown` |
 | something in Figma built in code: the tokens, a component, the whole design system, or a screen from them | `build-from-figma` |
+| a new component made in Figma like one the system has | `build-component-figma` |
 | a prototype, mock-up or wireframe made with the design system | `prototype` |
-| Figma brought in line with what the code already states (a component's role and accessibility spec), the screens' accessibility findings pinned in Figma, or the prototypes' gaps sent to Figma as a to do list, applied once the person says yes | `figma-edits` |
+| Figma brought in line with the code (a component's role, its accessibility spec), accessibility findings pinned on the screens, or the prototypes' gaps sent to Figma as a to do list, once the person says yes | `figma-edits` |
 | a component's props and values, where a component is used, or a token's variable and value, asked or needed to write UI | `ask-the-system` |
 | CI, webhooks, git hooks or the project's Claude hooks | `ci-and-hooks` |
 | the style guide published for the team, one link rebuilt on every push (GitHub Pages or GitLab Pages) | `publish-styleguide` |
@@ -263,7 +264,7 @@ the snapshot's age.
 
 Full parity workflow in one command: Phase 1 (live Figma refresh) runs before Phase 2 (code audit) **when it can**, so you don't accidentally audit a stale snapshot.
 
-> **When Phase 1 can run, prefer a fresh query** - a same-day snapshot from a *prior session or context window* may miss renames or additions. If you are resuming after a context summary, compaction, or a new conversation and a live refresh is available, re-query. If it is not available, proceed with the committed snapshot and say so - do not block or improvise.
+> **When Phase 1 can run, prefer a fresh query** - a same-day snapshot from a *prior session* may miss renames or additions. Resuming after a summary, compaction or a new conversation, re-query when a live refresh is available; else proceed with the committed snapshot and say so - do not block or improvise.
 
 A Figma value is read in **every mode** of its collection, never from the one a frame shows (`--recipe refresh-figma`, *Read every mode*).
 
