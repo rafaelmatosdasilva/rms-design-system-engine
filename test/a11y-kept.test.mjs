@@ -24,7 +24,7 @@ test('stableJson signs the same object the same, whatever the order of its keys'
   assert.notEqual(stableJson({ a: 1 }), stableJson({ a: 2 }));
 });
 
-test('the check is signed by the engine files it reaches, less what only shapes the report or writes the page', () => {
+test('the check is signed by the engine files its results rest on: never the template, the browser\'s plumbing or the report', () => {
   const files = engineFiles(join(ENGINE, 'a11y-check.mjs')).map((f) => f.slice(ENGINE.length + 1));
   for (const f of ['a11y-check.mjs', 'cdp.mjs', 'mode-resolver.mjs', 'vue-harness.mjs']) assert.ok(files.includes(f), f);
   for (const f of ['figma-link.mjs', 'styleguide-gen.mjs', 'readmes.mjs']) assert.ok(!files.includes(f), f);
@@ -35,8 +35,18 @@ test('the check is signed by the engine files it reaches, less what only shapes 
   assert.notEqual(checkSignature({ dir: '/e', read }), before, 'a module the check imports changed');
   fake['/e/x.mjs'] = '1';
   assert.equal(checkSignature({ dir: '/e', read }), before);
+  // The template is not part of it: each style guide part is signed by what its components draw (styleguideSignatures).
   fake['/e/templates/styleguide.template.html'] = 't2';
-  assert.notEqual(checkSignature({ dir: '/e', read }), before, 'the style guide template changed');
+  assert.equal(checkSignature({ dir: '/e', read }), before, 'a new page in the style guide measures nothing differently');
+  // The browser's plumbing neither; what renders the components from their code only for the pages rendered so.
+  fake['/e/a11y-check.mjs'] = "import './x.mjs'; import './cdp.mjs'; import './vue-harness.mjs';";
+  fake['/e/cdp.mjs'] = 'c'; fake['/e/vue-harness.mjs'] = 'v';
+  const page = checkSignature({ dir: '/e', read }), rendered = checkSignature({ dir: '/e', read, kind: 'rendered' });
+  fake['/e/cdp.mjs'] = 'c2';
+  assert.equal(checkSignature({ dir: '/e', read }), page, 'the browser plumbing changed: nothing is measured differently');
+  fake['/e/vue-harness.mjs'] = 'v2';
+  assert.equal(checkSignature({ dir: '/e', read }), page, 'a page read from a file does not rest on the harness');
+  assert.notEqual(checkSignature({ dir: '/e', read, kind: 'rendered' }), rendered, 'the components rendered from their code do');
 });
 
 test('a run is signed by what it was asked, never by where its report goes or when the profile was read', () => {
@@ -162,4 +172,15 @@ test('a page unchanged since it was last checked is put back without a browser; 
   const changed = run(dir);
   assert.doesNotMatch(changed.out, /put back/);
   assert.ok(!changed.json.issues.some((i) => i.issue === 'name'), changed.out);
+});
+
+test('a component whose selector is not valid CSS leaves the page kept: said not checked once, on the first run and when put back', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
+  const dir = makeFixture({ 'page.html': PAGE.replace('BODY', '<span class="chip">Chip</span>'), 'ds-config.json': { componentSelectors: { Chip: '.chip', 'table/row': '.table/row' } } });
+  const args = ['--component', 'Chip', '--component', 'table/row'];
+  const said = ['table/row (its selector .table/row is not valid CSS, so it was not checked)'];
+  const first = run(dir, args);
+  assert.deepEqual(first.json.notRead, said, first.out);
+  const second = run(dir, args, { CHROME_PATH: '/nonexistent/chrome' });
+  assert.match(second.out, /1 of 1 page unchanged since it was last checked: its results are put back/, second.out);
+  assert.deepEqual(second.json.notRead, said);
 });

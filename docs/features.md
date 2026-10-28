@@ -229,6 +229,7 @@ How sure each finding is.
 - **Each page's results are kept.** They are saved under what the page rests on: its components and your CSS, your settings, and the check itself.
 - **An unchanged page is not opened again.** The next run puts its results back, and the report says how many pages it reused. When nothing changed, no browser opens and the check takes seconds.
 - **A change is tried at once.** A style guide is checked a few components a page, so a change to one component tries only its page again.
+- **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the style guide, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
 - `--fresh` (or `a11y.reuse: false`) tries every page again.
 
