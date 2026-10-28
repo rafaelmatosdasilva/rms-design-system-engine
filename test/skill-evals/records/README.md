@@ -170,5 +170,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-28-the-system-page-is-found` | The 21 guide tasks on Haiku (engine efbf5c9) | "The System page is found by the layer's index when the snapshot names no file" |
 | `2026-10-28-how-each-component-is-built` | The 21 guide tasks on Haiku (engine 1c50e50) | "How each component is built: the skeleton, read from Figma, and its architecture on the Construction page" |
 | `2026-10-28-a-ui-check-that-passes` | The 21 guide tasks on Haiku (engine 06254d7) | "A UI check that passes ends the task: reply in the chat, run nothing more" |
+| `2026-10-28-merge-remote-tracking-branch-origin` | The 21 guide tasks on Haiku (engine 0a96050) | "Merge remote-tracking branch 'origin/main' into architecture" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
