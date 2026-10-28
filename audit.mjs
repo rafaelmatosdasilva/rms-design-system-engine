@@ -1944,6 +1944,86 @@ if (process.argv.includes('--construction-check')) {
   console.log(broken.length ? 'NEXT: tell the person which components break which rule, and the fix the Construction page names; change nothing in Figma unless they ask.' : 'NEXT: none');
   process.exit(broken.length ? 1 : 0);
 }
+// ── A component built in Figma the system's way (component-spec.mjs, figma-ops.mjs) ──
+// --spec "<description>" [--like <component>] [--name <name>] [--ops <file.json>]: the spec of a new component, made only
+// of the system's variables and components, from the component it is like (.design-system-engine-out/specs/<name>.spec.json);
+// what cannot be grounded is a question. --ops adds the operations that make it what was asked (figma-ops.mjs); run again
+// with --name and --ops alone, the spec keeps what was asked.
+// --figma-build <name> [--signed-off "<who>"]: the Figma script that builds it, once nothing is left to answer and someone
+// signed off what it adds to the system (.design-system-engine-out/handback/figma-apply.js, the one the guard lets run).
+if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
+  let scfg = {};
+  try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { grammarOf } = await import('./construction-grammar.mjs');
+  const { specOf, specLines, likeOf, nameOf, EXT } = await import('./component-spec.mjs');
+  const { opsScript, opWords } = await import('./figma-ops.mjs');
+  const { mayWrite } = await import('./writes.mjs');
+  const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
+  const authored = read(scfg.contracts?.authored ?? 'contract.authored.json') ?? {};
+  const props = read(scfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
+  const structure = read(scfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
+  const values = read('component-values.snapshot.json') ?? {}, varNames = read(scfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {};
+  const skeleton = read((await import('./figma-capture.mjs')).componentFiles(scfg).skeleton) ?? {};
+  const captures = { props, skeleton, values, varNames };
+  if (!Object.keys(props).filter((n) => !n.startsWith('_')).length) { console.log('❌ No Figma capture to build from: refresh Figma (--recipe refresh-figma), then ask again.'); process.exit(2); }
+  const grammar = grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} });
+  const specDir = join(ROOT, OUT_DIR, 'specs'), specFile = (n) => join(specDir, `${n}.spec.json`);
+  const cmd = 'rms-design-system-engine';
+  if (process.argv.includes('--spec')) {
+    const given = _argValue('--name'), prev = given ? read(specFile(given)) : null;
+    const description = (process.argv[process.argv.indexOf('--spec') + 1] ?? '').startsWith('--') ? prev?.[EXT]?.asked ?? '' : _argValue('--spec') ?? prev?.[EXT]?.asked ?? '';
+    let ops = prev?.[EXT]?.ops?.filter((o) => o.op !== 'clone') ?? [];
+    const opsFile = _argValue('--ops');
+    if (opsFile) { try { const j = JSON.parse(readFileSync(resolve(ROOT, opsFile), 'utf8')); ops = Array.isArray(j) ? j : j.ops ?? []; } catch (e) { console.log(`❌ --ops: ${e.message}`); process.exit(2); } }
+    const scratch = ops.some((o) => o.op === 'create');
+    const l = scratch ? { like: null, candidates: [] } : likeOf(description, Object.keys(props), { like: _argValue('--like') ?? prev?.[EXT]?.like ?? null });
+    const name = nameOf(description, { name: given });
+    if (!l.like && !scratch) {
+      console.log(`Which of the system's components is it like? A new component starts as a copy of the one it is most like, and changes only what was asked.${l.candidates.length ? ` The nearest by name: ${l.candidates.join(', ')}.` : ''}`);
+      console.log(`NEXT: ask the person which component it is like, then run ${cmd} --spec "<description>" --like <component>${name ? '' : ' --name <name>'}. When none is like it, say so: it is built from nothing but auto layout (a create operation, cookbook/build-component-figma.md).`);
+      process.exit(0);
+    }
+    if (!name && !scratch) { console.log(`What is the new component called? It is built like ${l.like}.`); console.log(`NEXT: ask the person, then run ${cmd} --spec "<description>" --like ${l.like} --name <name>.`); process.exit(0); }
+    const { spec } = specOf({ description, like: l.like, name, ops, captures, grammar, at: new Date().toISOString() });
+    if (!spec.name) { console.log('❌ The spec has no component to build: give --like, or a create operation.'); process.exit(2); }
+    mkdirSync(specDir, { recursive: true });
+    writeFileSync(specFile(spec.name), JSON.stringify(spec, null, 2) + '\n');
+    for (const line of specLines(spec, { file: relative(ROOT, specFile(spec.name)) })) console.log(line);
+    const q = spec[EXT].questions.length;
+    console.log(q ? `NEXT: ask the person ${q === 1 ? 'the question' : `the ${q} questions`} above, with the system's own names (never a value of your own). Write the answers as operations (cookbook/build-component-figma.md) in a file, every one so far, and run ${cmd} --spec --name ${spec.name} --ops <file>.`
+      : `NEXT: show the person the spec above${spec[EXT].held.length ? ' and who must sign off what it adds' : ''}; once they agree, run ${cmd} --figma-build ${spec.name}${spec[EXT].held.length ? ' --signed-off "<who>"' : ''}.`);
+    process.exit(0);
+  }
+  const name = (() => { const i = process.argv.indexOf('--figma-build'), v = process.argv[i + 1]; return v && !v.startsWith('--') ? v : null; })();
+  const saved = name && read(specFile(name));
+  if (!saved) { console.log(`❌ --figma-build takes the name of a spec: ${cmd} --figma-build <name>${name ? ` (no spec for ${name}: write it with --spec)` : ''}.`); process.exit(2); }
+  // Checked again against the capture as it is now: the system may have changed since the spec was written.
+  const x = saved[EXT];
+  const { spec } = specOf({ description: x.asked, like: x.like, name: saved.name, ops: x.ops.filter((o) => o.op !== 'clone'), captures, grammar, at: x.at });
+  const sx = spec[EXT];
+  if (sx.questions.length) { console.log(`${spec.name} is not built while something is unanswered (${sx.questions.length}):`); for (const q of sx.questions) console.log(`   • ${q.ask}`); console.log(`NEXT: ask the person, then run ${cmd} --spec --name ${spec.name} --ops <file> with the answers as operations.`); process.exit(1); }
+  const who = _argValue('--signed-off') ?? x.signedOff?.by ?? null;
+  if (sx.held.length && !who) {
+    console.log(`${spec.name} adds to the system, so it waits for someone to sign it off: ${sx.held.map((h) => h.what).join('; ')}.`);
+    console.log(`NEXT: ask the person who signs it off (a name: the system's owner, or themselves if they are), then run ${cmd} --figma-build ${spec.name} --signed-off "<who>".`);
+    process.exit(0);
+  }
+  if (who) sx.signedOff = { by: who, at: x.signedOff?.at ?? new Date().toISOString(), what: sx.held.map((h) => h.what) };
+  writeFileSync(specFile(spec.name), JSON.stringify(spec, null, 2) + '\n');
+  const nodes = {};
+  for (const o of sx.ops) for (const n of [o.from, o.layer?.of, o.op === 'addProperty' && o.kind === 'swap' ? o.default : null]) if (n && props[n]?.nodeId) nodes[n] = props[n].nodeId;
+  const fig = mayWrite(scfg, 'figma');
+  console.log(`Building ${spec.name} in Figma (${sx.ops.length} step${sx.ops.length === 1 ? '' : 's'})${who ? `, signed off by ${who}` : ''}:`);
+  for (const o of sx.ops) console.log(`   • ${opWords(o)}`);
+  if (fig.answer === 'no') { console.log(`NEXT: this project does not let the engine write the design file${fig.why ? ` (${fig.why})` : ''}, so no script was written. The steps above are for whoever owns Figma.`); process.exit(0); }
+  const dir = join(ROOT, OUT_DIR, 'handback');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'figma-build.json'), JSON.stringify({ component: spec.name, spec: relative(ROOT, specFile(spec.name)), ops: sx.ops, nodes, signedOff: sx.signedOff ?? null }, null, 2) + '\n');
+  writeFileSync(join(dir, 'figma-apply.js'), opsScript(sx.ops, { nodes, what: 'figma-build' }));
+  console.log(`   (${relative(ROOT, join(dir, 'figma-build.json'))} · ${relative(ROOT, join(dir, 'figma-apply.js'))})`);
+  console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the steps above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${scfg.figmaFileKey ? ` (fileKey ${scfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --construction-check and ${cmd} --hygiene: say what they find on ${spec.name}.`);
+  process.exit(0);
+}
 // ── The construction grammar's decisions and fixes (construction-grammar.mjs) ──
 // --construction <rule id> yes|no: the team's decision on one still to decide, in the authored contract (construction):
 // yes makes it the rule (its components to fix), no drops it.
