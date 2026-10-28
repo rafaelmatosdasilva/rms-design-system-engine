@@ -1944,6 +1944,97 @@ if (process.argv.includes('--construction-check')) {
   console.log(broken.length ? 'NEXT: tell the person which components break which rule, and the fix the Construction page names; change nothing in Figma unless they ask.' : 'NEXT: none');
   process.exit(broken.length ? 1 : 0);
 }
+// ── A change to a component the system has, in Figma, with its change report (component-change.mjs) ──
+// --figma-change <component> "<change>" [--ops <file.json>] [--task <issue link>] [--signed-off "<who>"]: the change spec
+// (only what changes), checked against the system, the report of what it changes (the component now beside it once the
+// change is made), where it is used, what breaks and the faults it already had; then the Figma script, once nothing is
+// left to answer and someone signed off what it adds or breaks. --task reads the change from the team's tracker (a
+// GitLab issue). --change-report <component>, once Figma is read again: the read before beside the read after, and
+// where it is not what the change said.
+if (process.argv.includes('--figma-change') || process.argv.includes('--change-report')) {
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { grammarOf } = await import('./construction-grammar.mjs');
+  const { modelOf, opsScript } = await import('./figma-ops.mjs');
+  const { parseChange, changeOf, changeLines, realOf, realLines } = await import('./component-change.mjs');
+  const { mayWrite } = await import('./writes.mjs');
+  const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
+  const authored = read(ccfg.contracts?.authored ?? 'contract.authored.json') ?? {};
+  const propsFile = ccfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json';
+  const props = read(propsFile) ?? {};
+  const structure = read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
+  const values = read('component-values.snapshot.json') ?? {}, varNames = read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {};
+  const skeleton = read((await import('./figma-capture.mjs')).componentFiles(ccfg).skeleton) ?? {};
+  const captures = { props, skeleton, values, varNames };
+  const cmd = 'rms-design-system-engine';
+  const flag = process.argv.includes('--figma-change') ? '--figma-change' : '--change-report';
+  const pos = process.argv.slice(process.argv.indexOf(flag) + 1).filter((a, k, all) => !a.startsWith('--') && all.slice(0, k).every((b) => !b.startsWith('--')));
+  const component = pos[0];
+  if (!component || !props[component]) { console.log(`❌ ${flag} takes a component Figma has: ${cmd} ${flag} <component>${flag === '--figma-change' ? ' "<the change>"' : ''}${component ? ` (no ${component} in the Figma capture)` : ''}.`); process.exit(2); }
+  const changesDir = join(ROOT, OUT_DIR, 'changes'), changeFile = join(changesDir, `${component}.change.json`);
+  if (flag === '--change-report') {
+    const ch = read(changeFile);
+    if (!ch) { console.log(`❌ No change to report for ${component}: ${cmd} --figma-change ${component} "<the change>" writes one.`); process.exit(2); }
+    const readAt = props._updated ?? skeleton._updated ?? null;
+    if (readAt && ch.at && new Date(readAt) < new Date(ch.at)) console.log(`⚠️  Figma was last read ${readAt}, before the change (${ch.at}): refresh the Figma snapshots (${cmd} --refresh-figma) and ask again.`);
+    const result = realOf(ch, modelOf(component, captures));
+    for (const l of realLines(result, component)) console.log(l);
+    ch.done = [...(ch.done ?? []), { at: new Date().toISOString(), readAt, real: result.real, mismatch: result.mismatch }];
+    writeFileSync(changeFile, JSON.stringify(ch, null, 2) + '\n');
+    console.log(result.mismatch.length ? `NEXT: tell the person what is not what the change said; change nothing in Figma unless they ask (${relative(ROOT, changeFile)}).` : `NEXT: tell the person; then run ${cmd} --construction-check and ${cmd} --hygiene, and say what they find on ${component}.`);
+    process.exit(0);
+  }
+  let asked = pos[1] ?? '';
+  const task = _argValue('--task');
+  if (task) {
+    const m = String(task).match(/^(https?:\/\/.+?)\/-\/(?:issues|work_items)\/(\d+)/);
+    if (!m) { console.log(`❌ --task takes the link of a GitLab issue (…/-/issues/<number>): ${task}`); process.exit(2); }
+    const { issuesProject } = await import('./issues-gitlab.mjs');
+    const { plainGet } = await import('./gitlab-source.mjs');
+    const where = await issuesProject(m[1], { ROOT });
+    if (where.why) { console.log(`❌ The task could not be read: ${where.why}.`); process.exit(2); }
+    const r = await plainGet(`${where.base}/issues/${m[2]}`, { headers: where.headers });
+    const issue = r?.ok ? await r.json() : null;
+    if (!issue) { console.log(`❌ The task could not be read (GitLab answered ${r?.status ?? 0}).`); process.exit(2); }
+    asked = [issue.title, String(issue.description ?? '').trim()].filter(Boolean).join('\n').slice(0, 1200);
+    console.log(`The task (${where.where}#${m[2]}): ${issue.title}`);
+  }
+  let ops = [], unread = [];
+  const opsFile = _argValue('--ops');
+  if (opsFile) { try { const j = JSON.parse(readFileSync(resolve(ROOT, opsFile), 'utf8')); ops = Array.isArray(j) ? j : j.ops ?? []; } catch (e) { console.log(`❌ --ops: ${e.message}`); process.exit(2); } }
+  else ({ ops, unread } = parseChange(asked, modelOf(component, captures)));
+  if (!ops.length) {
+    console.log(`${component}: the change${asked ? ` ("${asked.split('\n')[0]}")` : ''} is not one the engine reads in words${unread.length ? ` (${unread.length} part${unread.length === 1 ? '' : 's'} not read)` : ''}.`);
+    console.log(`NEXT: write it as operations (cookbook/change-component-figma.md), only what changes, with the component's own layers, axes and properties and the system's variables and components (${cmd} --query ${component} lists them), and run ${cmd} --figma-change ${component} --ops <file>.`);
+    process.exit(0);
+  }
+  const contract = read(join(ccfg.contracts?.out ?? 'contracts', `${component}.contract.json`));
+  const prev = read(changeFile);
+  const ch = changeOf({ component, asked: asked || prev?.asked || '', ops, captures, grammar: grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} }), livesIn: contract?.livesIn ?? null, at: new Date().toISOString() });
+  const who = _argValue('--signed-off');
+  if (who) ch.signedOff = { by: who, at: ch.at, what: [...ch.held, ...ch.breaking].map((h) => h.what) };
+  mkdirSync(changesDir, { recursive: true });
+  writeFileSync(changeFile, JSON.stringify(ch, null, 2) + '\n');
+  for (const l of changeLines(ch)) console.log(l);
+  if (unread.length) console.log(`Not read (${unread.length}), left out: ${unread.join('; ')}. Write ${unread.length === 1 ? 'it' : 'them'} as operations (--ops) to add ${unread.length === 1 ? 'it' : 'them'}.`);
+  console.log(`   (${relative(ROOT, changeFile)})`);
+  if (ch.questions.length) { console.log(`NEXT: ask the person, with the system's own names (never a value of your own); write every step as operations in a file and run ${cmd} --figma-change ${component} --ops <file>.`); process.exit(0); }
+  if ((ch.held.length || ch.breaking.length) && !who) {
+    console.log(`NEXT: show the person the change above${ch.breaking.length ? ', and what it breaks' : ''}; it waits for someone to sign it off. Ask who (the system's owner, or themselves if they are), then run ${cmd} --figma-change ${component}${opsFile ? ` --ops ${opsFile}` : ` ${JSON.stringify(asked)}`} --signed-off "<who>".`);
+    process.exit(0);
+  }
+  const nodes = {};
+  for (const o of ch.ops) for (const n of [o.layer?.of, o.op === 'addProperty' && o.kind === 'swap' ? o.default : null]) if (n && props[n]?.nodeId) nodes[n] = props[n].nodeId;
+  const fig = mayWrite(ccfg, 'figma');
+  if (fig.answer === 'no') { console.log(`NEXT: this project does not let the engine write the design file${fig.why ? ` (${fig.why})` : ''}, so no script was written. The steps above are for whoever owns Figma.`); process.exit(0); }
+  const dir = join(ROOT, OUT_DIR, 'handback');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'figma-change.json'), JSON.stringify({ component, change: relative(ROOT, changeFile), ops: ch.ops, signedOff: ch.signedOff ?? null }, null, 2) + '\n');
+  writeFileSync(join(dir, 'figma-apply.js'), opsScript(ch.ops, { target: ch.nodeId, nodes, what: 'figma-change' }));
+  console.log(`   (${relative(ROOT, join(dir, 'figma-change.json'))} · ${relative(ROOT, join(dir, 'figma-apply.js'))})`);
+  console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the change above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${ccfg.figmaFileKey ? ` (fileKey ${ccfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --change-report ${component}.`);
+  process.exit(0);
+}
 // ── A component built in Figma the system's way (component-spec.mjs, figma-ops.mjs) ──
 // --spec "<description>" [--like <component>] [--name <name>] [--ops <file.json>]: the spec of a new component, made only
 // of the system's variables and components, from the component it is like (.design-system-engine-out/specs/<name>.spec.json);

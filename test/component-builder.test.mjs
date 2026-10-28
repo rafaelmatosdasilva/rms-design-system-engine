@@ -89,6 +89,7 @@ test('a spec from a description: the component it is like, its name, and what it
   assert.deepEqual(likeOf('a smaller chip for filters', Object.keys(props)).candidates.slice(0, 1), ['chipFilter']);
   assert.equal(nameOf('a tag like the chip, called tag'), 'tag');
   assert.equal(nameOf('make a pill like the chip in Figma'), 'pill');
+  assert.equal(nameOf('make a pill in Figma, like the chip'), 'pill');
   assert.equal(nameOf('create a new component like the chip'), null);
   const { spec } = specOf({ description: 'a tag like chipFilter', like: 'chipFilter', name: 'Tag', captures, grammar });
   const x = spec[EXT];

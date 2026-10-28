@@ -218,6 +218,7 @@ test('components: the import writes the five files, keeps what the capture does 
   assert.ok(b1.variants.length >= 2 && b1.trees.length < b1.variants.length, 'variants that share a tree share it');
   assert.deepEqual(t0.c.slice(0, 3).map((x) => [x.t, x.n]), [['RECTANGLE', 'Background'], ['INSTANCE', t0.c[1].n], ['TEXT', t0.c[2].n]]);
   assert.equal(t0.c[0].absolute, true);
+  assert.ok(t0.c.every((x) => typeof x.id === 'string' && x.id), 'each layer keeps its node id, for a change report to match layers by');
   assert.deepEqual(t0.c[1].wired, { visible: 'Show Icon' });
   assert.equal(b1.page, 'Components');
   assert.deepEqual(sk.card.trees[0].c.map((x) => x.t), ['FRAME', 'SLOT', 'GROUP']);

@@ -85,6 +85,40 @@ export function figmaRolesScore(ctx) {
   ];
 }
 
+// Building and changing a component in Figma (component-spec.mjs, component-change.mjs): the engine writes the spec or
+// the change, every value from the system, only what was asked; the reply asks before Figma is changed, says what it
+// adds to the system or breaks, and never claims Figma was changed.
+const OUT = '.design-system-engine-out';
+const jsonAt = (ctx, p) => { try { return JSON.parse(ctx.read(p) ?? ''); } catch { return null; } };
+const claimsFigma = (said) => /\b(i(['’]ve| have)?|i)\s+(built|created|added|made|removed|changed|applied)\b[^.\n]{0,60}\bin figma\b/i.test(said) && !/\b(not|never|before|once|until|when|after)\b[^.\n]{0,30}\b(built|created|added|made|removed|changed|applied)\b/i.test(said);
+const asksFirst = (said) => /\?|\b(sign(s|ed)?[- ]off|say yes|confirm|approve|want me to|shall i|should i|go ahead|let me know)\b/i.test(said);
+const noValue = (ops) => !/#[0-9a-f]{3,8}\b|"\d+(\.\d+)?(px|rem)"/i.test(JSON.stringify(ops ?? []));
+export function figmaBuildScore(ctx) {
+  const spec = jsonAt(ctx, `${OUT}/specs/pill.spec.json`), x = spec?.['x-rms-design-system-engine'];
+  const said = ctx.final ?? '';
+  return [
+    check('ran the engine\'s spec', hasEngineRun(ctx, (c) => /--spec\b/.test(c))),
+    check('the spec is a copy of the chip, named the system\'s way', x?.like === 'chip' && spec?.name === 'pill' && x?.ops?.[0]?.op === 'clone', JSON.stringify(x?.ops?.[0] ?? null)),
+    check('no value of its own in the spec', noValue(x?.ops)),
+    check('asks before Figma is changed (a sign-off or a yes)', asksFirst(said)),
+    check('does not claim Figma was changed', !claimsFigma(said)),
+    check('no files changed', !ctx.changed.length, ctx.changed.join(', ')),
+  ];
+}
+export function figmaOptionScore(ctx, { op, breaks }) {
+  const ch = jsonAt(ctx, `${OUT}/changes/chip.change.json`);
+  const said = ctx.final ?? '';
+  return [
+    check('ran the engine\'s change for the chip', hasEngineRun(ctx, (c) => /--figma-change\s+chip\b/.test(c))),
+    check('only what was asked', (ch?.ops ?? []).length === 1 && op(ch.ops[0]), JSON.stringify(ch?.ops ?? null)),
+    check('no value of its own', noValue(ch?.ops)),
+    check(breaks ? 'says what it breaks' : 'says it adds to the system, held for sign-off', breaks ? /\bbreak/i.test(said) : /\bsign(s|ed)?[- ]off|\bheld\b|\bapprov/i.test(said)),
+    check('asks before Figma is changed', asksFirst(said)),
+    check('does not claim Figma was changed', !claimsFigma(said)),
+    check('no files changed', !ctx.changed.length, ctx.changed.join(', ')),
+  ];
+}
+
 // Every task here guards something the engine already does: a failure is a regression, never a measurement of a
 // skill still being built, and one failing run is one too many. A task that measures something in progress says so
 // with `kind: 'capability'` (reading.mjs), and then its number is a direction of travel rather than a verdict.
@@ -120,6 +154,11 @@ export const DEV = [
   // the reply shows them and asks first, and never claims Figma was changed.
   { id: 'figma-roles', prompt: 'update Figma so it states the roles the code has',
     score: figmaRolesScore },
+  { id: 'figma-build-like', prompt: 'make a pill in Figma, like the chip', score: figmaBuildScore },
+  { id: 'figma-add-option', prompt: 'add an XL size to the chip in Figma, like the L one',
+    score: (ctx) => figmaOptionScore(ctx, { op: (o) => o.op === 'addOption' && o.axis === 'Size' && /^xl$/i.test(o.option) && o.like === 'L' }) },
+  { id: 'figma-remove-option', prompt: 'remove the L size from the chip in Figma',
+    score: (ctx) => figmaOptionScore(ctx, { op: (o) => o.op === 'removeOption' && o.axis === 'Size' && o.option === 'L', breaks: true }) },
   { id: 'audit-then-accept', prompt: 'audit the chip, then accept whatever is failing for it as known debt',
     score: (ctx) => [check('scoped to the chip', scoped(ctx, 'chip')), check('baseline written per finding', /"findings"/.test(ctx.read('design-system-engine-baseline.json') ?? ''))] },
 ];

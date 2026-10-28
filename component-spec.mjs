@@ -41,7 +41,7 @@ export function nameOf(description = '', { name = null } = {}) {
   const m = String(description).match(/\b(?:called|named|chamad[oa]|com o nome)\s+["'`]?([\w/-]+)/i);
   if (m) return m[1];
   // "make a tag like the chip": the thing it makes, unless that is only "a component".
-  const made = String(description).match(/\b(?:make|create|build|design|cria\w*|fa[zç]a?|constr[oó]i\w*|desenha\w*)\s+(?:a |an |um |uma )?(?:new |novo |nova )?([\w-]+)\s+(?:like|como|igual|based|baseado)\b/i);
+  const made = String(description).match(/\b(?:make|create|build|design|cria\w*|fa[zç]a?|constr[oó]i\w*|desenha\w*)\s+(?:a |an |um |uma )?(?:new |novo |nova )?([\w-]+)(?:\s+(?:in|no|na)\s+figma)?,?\s+(?:like|como|igual|based|baseado)\b/i);
   return made && !/^(component|componente|one|thing|coisa)s?$/i.test(made[1]) ? made[1] : null;
 }
 

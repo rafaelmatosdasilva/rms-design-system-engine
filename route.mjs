@@ -210,10 +210,14 @@ const CONSTRUCTION_FIX = /\b(fix|correct|corrig\w*|consert\w*|repair)\b[\s\S]{0,
 // own variables, components and names, then the script the person says yes to.
 const IN_FIGMA = /\b(in|no|na|into|em)\s+figma(?![-\w/.])/i;
 const FIGMA_BUILD = /\b(build|create|make|design|draw|add|cria\w*|constr[oó]i\w*|desenha\w*|fa[zç]a?|adiciona\w*)\b[\s\S]{0,80}(\b(new|novo|nova)\b[\s\S]{0,30}\b(components?|componentes?)\b|\b(like|como|igual a|based on|baseado n[oa])\s+(the |an? |o |a )?[\w-]+)/i;
+const FIGMA_CHANGE = /\b(add|rename|remove|delete|drop|bind|rebind|acrescent\w*|adicion\w*|renome\w*|remov\w*|apag\w*|tira\w*)\b/i;
+const ISSUE_LINK = /https?:\/\/\S+\/-\/(issues|work_items)\/\d+/i;
 const RULES = [
   ['figma-edits', (t) => CONSTRUCTION_FIX.test(t), 'construction-fix'],
   ['ask-the-system', (t) => CONSTRUCTION.test(t), 'construction'],
   ['build-component-figma', (t) => FIGMA_BUILD.test(t) && IN_FIGMA.test(t) && !/\b(roles?|annotations?|accessibility|a11y|acessibilidade|prototype|prot[oó]tipo|screen|ecr[ãa])\b/i.test(t), 'figma-build'],
+  // A change to one component Figma has ("add a size xl to the chip in Figma"), or a tracker's task asking one.
+  ['change-component-figma', (t, s) => s.named.length === 1 && (FIGMA_CHANGE.test(t) && IN_FIGMA.test(t) || ISSUE_LINK.test(t) && /\bfigma\b/i.test(t)) && !FIGMA_BUILD.test(t) && !/\b(roles?|annotations?|accessibility|a11y|acessibilidade|construction|constru[çc][ãa]o)\b/i.test(t) && !/\b\d+(\.\d+)?\s*(px|rem|%|pt)\b|#[0-9a-f]{3,8}\b/i.test(t), 'figma-change'],
   ['guidelines-links', (t) => INTENT_LAYER.test(t) && ANY_LINK.test(t), 'intent-layer'],
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
@@ -410,6 +414,11 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
   }
   for (const [recipe, test, kind] of RULES) {
     if (!test(t, { build, named })) continue;
+    if (recipe === 'change-component-figma') {
+      notes.push('A change to a component in Figma: the engine writes only what changes, checked against the system, and the report of what it changes, where it is used and what breaks. What it cannot read in words, write as operations. Nothing is written in Figma before someone signs off what it adds or breaks and the person says yes to the script; then Figma is read again and --change-report says what really changed.');
+      const link = t.match(ISSUE_LINK)?.[0];
+      return { recipe, question: false, run: [link ? `${cmd} --figma-change ${named[0]} --task ${link}` : `${cmd} --figma-change ${named[0]} ${JSON.stringify(t.trim())}`], notes };
+    }
     if (recipe === 'build-component-figma') {
       notes.push('A new component in Figma: the engine writes its spec as a copy of the component it is like, with only the system\'s variables, components and names, and asks what it cannot ground. Ask the person each question; never answer with a value of your own. Nothing is written in Figma before someone signs off what it adds and the person says yes to the script.');
       return { recipe, question: false, run: [`${cmd} --spec ${JSON.stringify(t.trim())}`], notes };

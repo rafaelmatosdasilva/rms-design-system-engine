@@ -155,9 +155,10 @@ export const STRICT = new Set(['fills', 'strokes', 'strokeWeight', 'cornerRadius
   'fillStyleId', 'strokeStyleId', 'fontSize']);
 // A layer with what the recipes' functions read, its children's parent set and their place on the canvas. A group has
 // no fills or strokes; a text no layout.
+let layerIds = 0;
 export function node(props, children = []) {
   const shape = props.type === 'GROUP' || props.type === 'TEXT' ? {} : { fills: [], strokes: [] };
-  const raw = { visible: true, opacity: 1, ...shape, boundVariables: {}, x: 0, y: 0, width: 80, height: 32, componentPropertyReferences: null, ...props, children };
+  const raw = { id: `L:${++layerIds}`, visible: true, opacity: 1, ...shape, boundVariables: {}, x: 0, y: 0, width: 80, height: 32, componentPropertyReferences: null, ...props, children };
   const n = new Proxy(raw, { get(t, k) { if (typeof k === 'string' && STRICT.has(k) && !(k in t)) throw new Error(`no such property '${k}' on ${t.type} node`); return t[k]; } });
   for (const c of children) c.parent = n;
   Object.defineProperty(raw, 'absoluteBoundingBox', { get() { const p = raw.parent?.absoluteBoundingBox ?? { x: 0, y: 0 }; return { x: p.x + raw.x, y: p.y + raw.y, width: raw.width, height: raw.height }; } });

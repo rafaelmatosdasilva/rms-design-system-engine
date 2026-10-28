@@ -547,7 +547,7 @@ that differ) is never taken for a number.
 function prop(node, key) { try { return node != null && typeof node === 'object' && key in node ? node[key] : undefined; } catch (e) { return undefined; } }
 ```
 
-**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes and shadows; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
+**How each component is built (always).** `skeletonOf` (below, after `propsFacts`) reads every variant's layer tree once, with the same read: each layer's type, name, node id, visibility, auto layout or sizing, position, clipping and limits, the property it is wired to, its styles by name, pinned variable modes and shadows; each instance's component and whether it comes from another library; where the component lives, its swap and slot rules, the library variables it binds, its prototype reactions and its dev resources. The capture writes it to `figma-skeleton.snapshot.json`; the construction grammar mines it (`--query construction`).
 
 **Deeper facts (always).** Also record these on each component's entry, every refresh, from the same
 `State=Default` node. The measured comparison (Gate [13] (Structure) `MEASURED`, `--capture-code --compare`) uses
@@ -1133,7 +1133,7 @@ async function skeletonOf(root) {
     const fx = (prop(n, 'effects') || []).filter((e) => e && e.visible !== false).length;
     for (const id of bound(n)) vars[id] = true;
     const o = {
-      t, n: n.name,
+      t, n: n.name, ...(depth > 0 ? { id: n.id } : {}),
       ...(prop(n, 'visible') === false ? { hidden: true } : {}),
       ...(lm && lm !== 'NONE' ? { layout: { dir: lm, w: prop(n, 'layoutSizingHorizontal'), h: prop(n, 'layoutSizingVertical'), main: prop(n, 'primaryAxisAlignItems'), cross: prop(n, 'counterAxisAlignItems'),
         pad: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map((k) => num(prop(n, k)) || 0), gap: num(prop(n, 'itemSpacing')) || 0, ...(prop(n, 'layoutWrap') === 'WRAP' ? { wrap: true } : {}) } }
@@ -1162,7 +1162,9 @@ async function skeletonOf(root) {
   // Every variant's tree, in the set's order; one its siblings share is kept once (trees[i]).
   const trees = [], index = {}, variants = [], reactions = {};
   for (const v of variantsOf) {
-    const tree = await layer(v, 0), { n: vn, ...shape } = tree, key = JSON.stringify(shape);
+    // Variants that share a tree are kept once, by its shape without the layers' ids (each variant's are its own): the
+    // tree holds the first one's, which a change report matches layers by.
+    const tree = await layer(v, 0), { n: vn, ...shape } = tree, key = JSON.stringify(shape, (k, x) => (k === 'id' ? undefined : x));
     if (!(key in index)) { index[key] = trees.length; trees.push(shape); }
     variants.push([vn, index[key]]);
     const rx = reactionsOf(v); if (rx.length) reactions[vn] = rx;
