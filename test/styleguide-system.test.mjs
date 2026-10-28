@@ -271,3 +271,17 @@ test('the system\'s own tip trigger, for what the page explains on demand: a com
   assert.equal(tipUi([comps[0]], css), null, 'no data-tip: no tip trigger');
   assert.equal(tipUi([{ name: 'x', markup: '<span class="unstyled" data-tip="a">i</span>' }], css), null, 'a class the system does not style is no trigger');
 });
+
+test('a panel colour set by hand (styleguide.chrome bg-2, surface) wins over the template\'s faint layer, in every brand', async () => {
+  const set = chromeRoles({ tokens, override: { 'bg-2': '--primitives-neutral050', surface: '--card-bg' } });
+  assert.equal(set.roles['bg-2-own'], 'var(--primitives-neutral050)');
+  assert.equal(set.roles['surface-own'], 'var(--card-bg)');
+  assert.match(set.css, /--sg-bg-2-own: var\(--primitives-neutral050\);/, 'written apart, so the template\'s rule reads it');
+  const none = chromeRoles({ tokens }).roles;
+  assert.equal(none['bg-2-own'], undefined, 'not set by hand: the template\'s own faint layer');
+  const { readFileSync } = await import('node:fs');
+  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  assert.match(tpl, /--sg-bg-2: var\(--sg-bg-2-own, color-mix\(in srgb, var\(--sg-text\) 3%, var\(--sg-bg\)\)\); --sg-surface: var\(--sg-surface-own, /, 'the page\'s rule takes the colour set by hand first');
+  assert.match(tpl, /decl\[k\] = 'var\(' \+ k \+ '-own, color-mix/, 'and a brand\'s, resolved with the brand\'s own tokens');
+  assert.match(tpl, /var LOOK = \/\^--sg-\(bg\|bg-2\|surface\|bg-2-own\|surface-own\|/, 'declared again under each brand');
+});

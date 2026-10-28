@@ -106,8 +106,9 @@
 /*{{CHROME}}*/
 /* The page's panels (the menu, a table's head, a card's name, a list over the page) are its background with a faint
    layer of its text's colour, as every fill on the page is: one family of greys in any brand, never a surface colour
-   of the brand's beside a see-through fill. */
-:root, :root[data-sg-scheme] { --sg-bg-2: color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg)); --sg-surface: color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg)); }
+   of the brand's beside a see-through fill. A colour the team names for them by hand (ds-config.json →
+   styleguide.chrome, written as --sg-bg-2-own and --sg-surface-own) wins, each brand's own value in each brand. */
+:root, :root[data-sg-scheme] { --sg-bg-2: var(--sg-bg-2-own, color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg))); --sg-surface: var(--sg-surface-own, color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg))); }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
 /* The page's own boxes only: inside a preview or a Showroom screen the system's own reset decides (it leaves icons,
@@ -9869,7 +9870,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Only what is read from a variable (a fixed colour is the same in any brand); the dark scheme's own as well. Every
       // see-through fill (a1 to a5, a hover, a choice, the menu's) is made again from the brand's own text colour, so each
       // one blends with the brand, never a grey worked out before it.
-      var LOOK = /^--sg-(bg|bg-2|surface|stage|text|text-2|muted|border|accent|warning|positive|negative|radius(-\w+)?)$/, MADE = /var\(--sg-/, decl = {}, dark = {};
+      var LOOK = /^--sg-(bg|bg-2|surface|bg-2-own|surface-own|stage|text|text-2|muted|border|accent|warning|positive|negative|radius(-\w+)?)$/, MADE = /var\(--sg-/, decl = {}, dark = {};
       // Whatever the page makes from those roles that comes out a colour (a fill, a line, a tint), by what it is, never by
       // its name: so any role added later, and any brand's colours, blend the same way. A size made from them stays put.
       var rootCS = getComputedStyle(document.documentElement);
@@ -9883,7 +9884,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         });
       });
       // The panels made from the brand's background and text, in both schemes, as the page's own are.
-      ['--sg-bg-2', '--sg-surface'].forEach(function (k) { decl[k] = 'color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg))'; delete dark[k]; });
+      ['--sg-bg-2', '--sg-surface'].forEach(function (k) { decl[k] = 'var(' + k + '-own, color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg)))'; delete dark[k]; });
       var fam = TOKENS.typeFamily && TOKENS.typeFamily.var ? 'font-family: var(' + TOKENS.typeFamily.var + ');' : '';
       var body = Object.keys(decl).map(function (k) { return k + ': ' + decl[k] + ';'; }).join(' ');
       var cst = document.createElement('style'); cst.id = 'sg-brand-chrome';
