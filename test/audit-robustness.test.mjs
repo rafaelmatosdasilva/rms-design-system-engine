@@ -42,8 +42,9 @@ test('browser: a Chrome that never becomes ready gives up with a clear reason', 
   writeFileSync(fake, '#!/bin/sh\nsleep 30\n');
   chmodSync(fake, 0o755);
   const t0 = Date.now();
-  await assert.rejects(launchChrome(fake, { timeoutMs: 400 }), /did not start within 0.4s/);
-  assert.ok(Date.now() - t0 < 5000);
+  // Tried twice (a busy machine gets one more go), then given up.
+  await assert.rejects(launchChrome(fake, { timeoutMs: 400, retryAfterMs: 10 }), /did not start within 0.4s/);
+  assert.ok(Date.now() - t0 < 15000, `${Date.now() - t0}ms`);
 });
 
 test('audit: runs its gates with its own Node, so a PATH without node does not crash it', () => {
