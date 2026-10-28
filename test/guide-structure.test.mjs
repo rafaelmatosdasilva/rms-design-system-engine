@@ -7,13 +7,12 @@
 //   • every recipe's recipe-check commands run on the demo design system
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, existsSync, cpSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, cpSync, writeFileSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { units } from './skill-evals/check-split.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const MAIN = 'rms-design-system-engine.md';
@@ -100,7 +99,7 @@ test('every step and gate reference resolves', () => {
 });
 
 test('every recipe-check command runs on the demo design system', { timeout: budget(600000) }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'recipe-check-'));
+  const dir = tempDir('recipe-check-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true, filter: (p) => !/expected-report/.test(p) });
   const today = new Date().toISOString();
   for (const f of readdirSync(join(dir, 'src')).filter((x) => x.endsWith('.json'))) writeFileSync(join(dir, 'src', f), readFileSync(join(dir, 'src', f), 'utf8').replace(/"_updated": "[^"]*"/, `"_updated": "${today}"`));

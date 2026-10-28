@@ -14,13 +14,12 @@
 // check), expected-report-static.txt without it. UPDATE_GOLDEN=1 rewrites the one that ran.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
-import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf, budget } from './helpers.mjs';
+import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIXTURE = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -46,8 +45,7 @@ test('demo design system, with Chrome: every deliberate difference is found, and
   assert.match(r.out, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
   assert.match(r.out, /button hover while disabled \(Disabled=True\): Figma no change, rendered changes background/);
   assert.match(r.out, /chip height \(Size=L, Icon=True\): Figma 32, rendered 36px/);
-  const saved = join(tmpdir(), `demo-run-${process.pid}.txt`); writeFileSync(saved, r.out);
-  assert.match(r.out, /chip \(toggle button\)|component does not expose what its role requires/, `full output in ${saved}`);
+  assert.match(r.out, /chip \(toggle button\)|component does not expose what its role requires/, r.out.slice(-3000));
   assert.doesNotMatch(r.out, /chip height \(Icon=True\)/);   // a single axis is never compared with a combination
   assert.match(r.out, /🖼  ⚠️  button: <N>% of pixels differ outside text/);   // a border only the Figma image has
   assert.match(r.out, /🖼  ✓  chip: <N>% of pixels differ outside text/);   // under the limit: the share moves with the machine's fonts
@@ -121,7 +119,7 @@ test('Figma prop types: one interface per component, states left out, names as t
 const TSC = spawnSync('which', ['tsc'], { encoding: 'utf8' }).stdout.trim();
 test('Figma prop types: tsc accepts matching props and rejects drifted ones', { skip: TSC ? false : 'no tsc' }, async () => {
   const { propTypesDts } = await import('../figma-props.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'figma-props-'));
+  const dir = tempDir('figma-props-');
   writeFileSync(join(dir, 'figma-props.d.ts'), propTypesDts(JSON.parse(readFileSync(join(FIXTURE, 'src', 'figma-component-props.snapshot.json'), 'utf8')), { cfg: JSON.parse(readFileSync(join(FIXTURE, 'ds-config.json'), 'utf8')) }));
   const file = (name, sizes) => { writeFileSync(join(dir, name), `import type { ChipFigmaProps } from './figma-props';\ntype ChipProps = { label?: string; size?: ${sizes}; icon?: boolean };\nconst p: ChipProps = {};\nexport const check: ChipFigmaProps = p;\n`); return name; };
   const tsc = (f) => spawnSync(TSC, ['--noEmit', '--strict', f, 'figma-props.d.ts'], { cwd: dir, encoding: 'utf8' });

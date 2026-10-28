@@ -3,16 +3,15 @@
 // font the design is set in, the icon swapped into an instance and the state a designed screen shows it in.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { scriptMarkups, instanceMarkups, fullestMarkup, agreedView } from '../styleguide-data.mjs';
 import { modifierFor, systemFamily, checkPrototype } from '../prototype-pieces.mjs';
 import { prototypePage, fontLoader, codeColours } from '../prototype.mjs';
 import { screenToPrototype } from '../screen-layout.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 
@@ -104,7 +103,7 @@ test('page: each instance draws the markup with room for its words, its icon fro
     themeCSS: ':root{--panel:#123456} .node{margin-bottom:8px;display:flex} .node.node-selected{outline:2px solid white} .node.node-disabled{border-style:dashed}', componentCSS: '',
     iconSheet: '<svg id="ds-icon-sheet" width="0" height="0" style="position:absolute"><symbol id="icon-var-color" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/></symbol><symbol id="icon-component" viewBox="0 0 16 16"><rect width="12" height="12"/></symbol></svg>' };
   const html = prototypePage({ name: 'atlas', tree, parts, scales, gaps: [], catalog, fonts: false });
-  const dir = mkdtempSync(join(tmpdir(), 'from-code-'));
+  const dir = tempDir('from-code-');
   writeFileSync(join(dir, 'p.html'), html);
   const chrome = await launchChrome(CHROME);
   try {

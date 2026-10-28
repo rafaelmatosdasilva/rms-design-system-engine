@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { makeFixture, runGate, budget } from './helpers.mjs';
+import { makeFixture, runGate, budget, tempDir } from './helpers.mjs';
 import { createPairing, pairingTasks, stateBase, stateSiblings, folderForms, words } from '../component-pairing.mjs';
 import { resolveComponentFile, componentSourceFiles, textReader } from '../component-source.mjs';
 import { loadLocator } from '../component-locator.mjs';
@@ -250,11 +250,10 @@ test('the props gate names the proposal for a component it finds no file for, an
 });
 
 test('the audit and the style guide list a proposal to confirm or pin, and never show its file as the code\'s alone', { timeout: budget(300000) }, async () => {
-  const { cpSync, mkdtempSync, writeFileSync, readFileSync, mkdirSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { cpSync, writeFileSync, readFileSync, mkdirSync } = await import('node:fs');
   const { spawnSync } = await import('node:child_process');
   const ENGINE = join(import.meta.dirname, '..');
-  const dir = mkdtempSync(join(tmpdir(), 'pairing-'));
+  const dir = tempDir('pairing-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'harbor-ds'), dir, { recursive: true });
   const structure = JSON.parse(readFileSync(join(dir, 'figma', 'structure.snapshot.json'), 'utf8'));
   structure.components.tag = { h: 20, defaultVariant: '', variants: {} };

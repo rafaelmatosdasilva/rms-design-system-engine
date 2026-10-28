@@ -3,16 +3,16 @@
 import { test } from 'node:test';
 import { docCoverage } from '../doc-coverage.mjs';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { docFields, readLiteral, literalBindings, shapeFindings, requiredKeys, UNKNOWN } from '../prop-shapes.mjs';
 import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../page-check.mjs';
+import { tempDir } from './helpers.mjs';
 
 const put = (root, rel, text) => { const p = join(root, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
 
 function acme() {
-  const root = mkdtempSync(join(tmpdir(), 'acme-page-'));
+  const root = tempDir('acme-page-');
   put(root, 'ds-config.json', '{}');
   put(root, 'src/components/library/tabs/TabStrip.vue', `<template><div class="tab-strip"><button v-for="t in tabs" :key="t.id" @click="emit('picked', t.id)">{{ t.label }}</button></div></template>
 <script setup>

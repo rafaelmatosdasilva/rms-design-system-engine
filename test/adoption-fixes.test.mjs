@@ -12,7 +12,7 @@ import { buildSummary } from '../next-step.mjs';
 import { route, pagesNamed, rawColoursOf } from '../route.mjs';
 import { roleWord, roleMarkupFindings } from '../role-markup.mjs';
 import { sayKind } from '../guard.mjs';
-import { fixtureProject, budget } from './helpers.mjs';
+import { fixtureProject, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -56,9 +56,7 @@ test('building a component Figma paints with a colour that has no variable: the 
 
 test('a reply that asks the person for a secret goes back once, whatever the route; a design token is not a secret', async () => {
   const { stopCheck, asksForSecret, rememberSay } = await import('../guard.mjs');
-  const { mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const root = mkdtempSync(join(tmpdir(), 'secret-'));
+  const root = tempDir('secret-');
   assert.equal(asksForSecret('Once you provide the token, I can complete setting up the guidelines from that URL.'), true);
   assert.equal(asksForSecret('Give me a hex/token to use, or confirm a green is fine.'), false);
   // A colour asked for and a design token to add, seen in a real run: not a secret, never sent back.
@@ -93,9 +91,7 @@ test('before the agent finishes, a value the system does not have that an edit l
 
 test('an owed line gets a second hand-back when the first went to something else, and no more', async () => {
   const { stopCheck, rememberSay } = await import('../guard.mjs');
-  const { mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const root = mkdtempSync(join(tmpdir(), 'twice-'));
+  const root = tempDir('twice-');
   const line = 'Figma paints tag (Tone=Positive #d6f5e3) with colours that have no variable: the code writes them as Figma has them, and the design system has no token for them yet.';
   rememberSay(root, { session_id: 's', prompt_id: 'p' }, [line]);
   const ev = (active) => ({ session_id: 's', prompt_id: 'p', stop_hook_active: active, last_assistant_message: 'Built the tag.' });

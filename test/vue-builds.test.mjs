@@ -7,13 +7,12 @@
 //   npm install --prefix test/.nuxt-tools nuxt@4 vue@3
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, existsSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, symlinkSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectBuild, renderedVue } from '../vue-harness.mjs';
 import { findChrome } from '../cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CLI_TOOLS = join(ENGINE, 'test', '.vue-cli-tools', 'node_modules');
@@ -23,7 +22,7 @@ const ready = (tools, install) => (CHROME && typeof WebSocket !== 'undefined' &&
 
 // A project of files, its packages linked from a tools folder when given.
 const project = (prefix, files, tools = null) => {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
+  const dir = tempDir(prefix);
   for (const [f, text] of Object.entries(files)) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), text); }
   if (tools) symlinkSync(tools, join(dir, 'node_modules'), 'dir');
   return dir;

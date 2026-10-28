@@ -7,11 +7,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { forbiddenHits, privateFindings, messageFindings, repoFindings, PUBLIC_EXAMPLE, ROOT } from '../.githooks/private-check.mjs';
 import { projectTerms } from '../.githooks/private-terms.mjs';
+import { tempDir } from './helpers.mjs';
 
 export { forbiddenHits };
 
@@ -55,7 +55,7 @@ test('placeholders, no-reply addresses, colour spaces and products are not priva
 });
 
 test('a word of the web a project happens to use is no project\'s: the name it really chose still is', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'web-words-'));
+  const dir = tempDir('web-words-');
   try {
     writeFileSync(join(dir, 'figma-component-props.snapshot.json'), JSON.stringify({
       components: { CardTile: { properties: { textContent: { type: 'TEXT' }, required: { type: 'BOOLEAN' }, download: { type: 'BOOLEAN' }, classList: { type: 'TEXT' }, quokkaLabel: { type: 'TEXT' } } } },
@@ -70,7 +70,7 @@ test('a word of the web a project happens to use is no project\'s: the name it r
 });
 
 test('the commit hooks refuse a private change and let a clean one through', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'private-check-'));
+  const dir = tempDir('private-check-');
   try {
     const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' });
     git('init', '-q'); git('config', 'user.email', 'demo@example.com'); git('config', 'user.name', 'Demo');
@@ -137,7 +137,7 @@ test('a font, an image outside the fixtures and a copied Figma file are refused;
 
 test('a project the engine worked on gives its own names, and only those a person chose', async () => {
   const { projectTerms } = await import('../.githooks/private-terms.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'terms-'));
+  const dir = tempDir('terms-');
   try {
     const name = j('Zor', 'ble');
     writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ name: `${name} DS`, figmaUrl: `https://www.figma.com/design/${j('Pq9', 'Or8', 'Ns7', 'Mt6', 'Lu5', 'Kv4')}/x` }));
@@ -154,8 +154,8 @@ test('a project the engine worked on gives its own names, and only those a perso
 });
 
 test('the names of the projects on this computer are refused in a commit, and an allowed one is not', () => {
-  const home = mkdtempSync(join(tmpdir(), 'terms-home-'));
-  const proj = mkdtempSync(join(tmpdir(), 'terms-proj-'));
+  const home = tempDir('terms-home-');
+  const proj = tempDir('terms-proj-');
   try {
     const comp = j('header', 'Quokka');
     writeFileSync(join(proj, 'ds-config.json'), '{}');
@@ -182,12 +182,12 @@ test('the names of the projects on this computer are refused in a commit, and an
 
 test('a project is never remembered from a temporary folder or while tests run', async () => {
   const { rememberProject } = await import('../.githooks/private-terms.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'remember-'));
+  const dir = tempDir('remember-');
   try { writeFileSync(join(dir, 'ds-config.json'), '{}'); assert.equal(rememberProject(dir), false); } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('a push is refused for any commit it sends: its lines, its files, its author', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'private-push-'));
+  const dir = tempDir('private-push-');
   try {
     const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' });
     git('init', '-q', '-b', 'main'); git('config', 'user.email', 'demo@example.com'); git('config', 'user.name', 'Demo');

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { embedRemoteFonts, keepSubsets } from '../font-embed.mjs';
+import { tempDir } from './helpers.mjs';
 
 const CSS = `/* cyrillic */
 @font-face { font-family: 'Inter'; src: url(https://fonts.gstatic.com/s/inter/cyr.woff2) format('woff2'); unicode-range: U+0400; }
@@ -20,7 +20,7 @@ test('only the latin subsets are kept', () => {
 });
 
 test('a font service\'s stylesheet is written into the page, its files as data, and read once', async () => {
-  const cacheDir = mkdtempSync(join(tmpdir(), 'fonts-'));
+  const cacheDir = tempDir('fonts-');
   let reads = 0;
   const opts = { cacheDir, fetchText: async () => { reads++; return CSS; }, fetchBytes: async (u) => { reads++; return Buffer.from('font:' + u); } };
   const href = 'https://fonts.googleapis.com/css2?family=Inter&amp;display=swap';
@@ -69,7 +69,7 @@ test('missingFamilies: a family named through a custom property, in a rule or an
 test('a family\'s own files are found in any folder of the system, by file or folder name', async () => {
   const { localFonts } = await import('../font-embed.mjs');
   const { mkdirSync, writeFileSync } = await import('node:fs');
-  const root = mkdtempSync(join(tmpdir(), 'own-fonts-'));
+  const root = tempDir('own-fonts-');
   mkdirSync(join(root, 'assets/fonts/Acme'), { recursive: true });
   writeFileSync(join(root, 'assets/fonts/Acme/Acme-Bold.woff2'), 'b');
   writeFileSync(join(root, 'assets/fonts/Acme/Acme-Regular.woff2'), 'r');

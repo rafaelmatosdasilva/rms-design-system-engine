@@ -16,13 +16,12 @@
 // token and a browser; their offline refusal is covered by their own tests).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, cpSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { availableParallelism } from 'node:os';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -50,7 +49,7 @@ const COMMANDS = [
 
 // Each in a project of its own, so one that writes something cannot make the next one read it.
 const runOne = (command) => new Promise((done) => {
-  const dir = mkdtempSync(join(tmpdir(), 'cmd-run-'));
+  const dir = tempDir('cmd-run-');
   cpSync(DEMO, dir, { recursive: true });
   execFile(process.execPath, [join(ENGINE, 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26 },
     (err, stdout, stderr) => done({ command, out: `${stdout ?? ''}${stderr ?? ''}`, timedOut: err?.killed === true }));

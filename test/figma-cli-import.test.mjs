@@ -1,14 +1,13 @@
 // figma-cli as the Figma reader: its design.json becomes the engine's snapshots, and what it does not hold is kept.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, cpSync } from 'node:fs';
+import { readFileSync, writeFileSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { snapshotsFromDesign, varsFromDesign, importFigmaCli, tokensFromDesign } from '../figma-cli-import.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const TP = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -55,7 +54,7 @@ test('another format version is refused with what to do', () => {
 });
 
 test('the command writes the snapshots ds-config names, and the audit reads them', { timeout: budget(300000) }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'figma-cli-'));
+  const dir = tempDir('figma-cli-');
   cpSync(TP, dir, { recursive: true });
   writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign()));
   const r = importFigmaCli(dir, tpCfg, 'design.json');

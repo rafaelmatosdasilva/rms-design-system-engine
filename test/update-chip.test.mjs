@@ -3,20 +3,19 @@
 // untouched project fails both; one that moves another token fails on that.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
 import { BUILD, TIDEPOOL } from './skill-evals/build-tasks.mjs';
 import { hasTypescript } from './skill-evals/build-score.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const task = BUILD.find((t) => t.id === 'update-chip');
 
 function project(edit = (css) => css) {
-  const dir = mkdtempSync(join(tmpdir(), 'update-chip-'));
+  const dir = tempDir('update-chip-');
   cpSync(TIDEPOOL, dir, { recursive: true });
   task.setup(dir);
   const f = join(dir, 'src/styles/tokens.css');

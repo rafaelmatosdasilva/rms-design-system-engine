@@ -2,12 +2,12 @@
 // one thing it otherwise never gets: what the person who asked for it said when they saw it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { addComment, closeComment, readComments, openComments, commentLines, answered, commentsPath } from '../comments.mjs';
+import { tempDir } from './helpers.mjs';
 
-const dir = () => mkdtempSync(join(tmpdir(), 'comments-'));
+const dir = () => tempDir('comments-');
 
 test('a comment is kept with its prototype, pinned to a thing when it is about one', () => {
   const d = dir();

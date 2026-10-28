@@ -1,13 +1,13 @@
 // What a person checked by hand: recorded with the component as it was, current until the component changes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { componentSignature, recordCheck, removeCheck, readChecked, checksFor } from '../checked.mjs';
+import { tempDir } from './helpers.mjs';
 
 test('a check stays current until the component changes, and only that component', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'checked-'));
+  const dir = tempDir('checked-');
   mkdirSync(join(dir, 'src'));
   const css = '.badge { color: red; }\n.chip { padding: 4px; }\n';
   writeFileSync(join(dir, 'src', 'theme.css'), css);

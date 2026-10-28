@@ -2,17 +2,17 @@
 // says yes, and an edit check it can run before committing. Each gap says what was tried.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, cpSync, appendFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, cpSync, appendFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { rulesSection, ruleTargets, writeRules, otherAgents, START, END } from '../agent-rules.mjs';
 import { judge } from '../guard.mjs';
 import { checkPrototype, mergeGaps, gapLine, pageGaps } from '../prototype-pieces.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
-const dir = () => mkdtempSync(join(tmpdir(), 'agent-rules-'));
+const dir = () => tempDir('agent-rules-');
 
 test('the rules say to ask for the contract, use only the system, run the edit check, and what never to do alone', () => {
   const s = rulesSection();

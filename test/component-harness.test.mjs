@@ -2,14 +2,13 @@
 // tries them in the browser without a dev server (build mode, or no page to open).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, cpSync, writeFileSync } from 'node:fs';
+import { cpSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { harnessCases, propsOf, pageColours, loadTypeScript } from '../component-harness.mjs';
 import { findChrome } from '../cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TIDEPOOL = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -31,7 +30,7 @@ test('the page sits on the system\'s own surface and text colour when its CSS na
 });
 
 const tidepool = (stepper = null) => {
-  const dir = mkdtempSync(join(tmpdir(), 'harness-'));
+  const dir = tempDir('harness-');
   cpSync(TIDEPOOL, dir, { recursive: true });
   cpSync(join(REF, 'src'), join(dir, 'src'), { recursive: true });
   if (stepper) writeFileSync(join(dir, 'src/components/Stepper.jsx'), stepper);

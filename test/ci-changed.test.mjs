@@ -1,13 +1,13 @@
 // A scheduled pipeline no webhook starts builds only when something it is made from moved.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { sourcesOf, sourcesNow, changes } from '../ci-changed.mjs';
+import { tempDir } from './helpers.mjs';
 
 test('the sources of a build: the code, each store read from GitLab, the intent layer, the profile and the Figma file; never what it only writes', () => {
-  const root = mkdtempSync(join(tmpdir(), 'acme-ci-'));
+  const root = tempDir('acme-ci-');
   writeFileSync(join(root, '.gitlab-source.json'), JSON.stringify({ source: 'https://gitlab.acme.test/web/ui-kit', ref: 'main' }));
   const s = sourcesOf(root, {
     figmaFileKey: 'AcmeFileKey',

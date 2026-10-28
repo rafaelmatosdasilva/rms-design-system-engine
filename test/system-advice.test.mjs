@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { modeAttributes, modesBelowRoot, productsWithTwoThemes, undescribedTokens, catalogueOnlyPatches, nearDuplicateComponents, namedByLook } from '../system-advice.mjs';
+import { tempDir } from './helpers.mjs';
 
 test('a mode set on an element below the page root, in markup or a script', () => {
   const theme = ':root { --bg: #fff; }\n[data-theme="dark"] { --bg: #000; }\n:root[data-size=phone] { --pad: 4px; }\n.card[data-open] { display: block; }';
@@ -113,10 +114,9 @@ test('aliases to a removed token: a Figma variable the capture found pointing no
 test('a token named after a product or a brand, the components\' own tokens aside', async () => {
   const { brandNamedTokens, tokenTodos } = await import('../system-advice.mjs');
   const { brandNames } = await import('../code-roots.mjs');
-  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { tmpdir } = await import('node:os');
-  const dir = mkdtempSync(join(tmpdir(), 'brands-'));
+  const dir = tempDir('brands-');
   writeFileSync(join(dir, 'products.json'), JSON.stringify({ products: [{ name: 'Harbor Notes', repo: 'acme/harbor-notes' }] }));
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/ds' }));
   const brands = brandNames(dir, { pluginDirs: { 'tide-chart': '../tide' }, brands: ['Lab'] });

@@ -3,20 +3,19 @@
 // side's value changes it is open again.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { keptKey, recordKept, readKept, dropKept, pick, keepInGates, matchKept, keptState, keptReport, reviewDate, keptPath } from '../kept.mjs';
 import { collectFindings, differencesMarkdown } from '../run-diff.mjs';
 import { route } from '../route.mjs';
 import { judge } from '../guard.mjs';
-import { fixtureProject, bareEnv, budget } from './helpers.mjs';
+import { fixtureProject, bareEnv, budget, tempDir } from './helpers.mjs';
 import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
-const dir = () => mkdtempSync(join(tmpdir(), 'kept-'));
+const dir = () => tempDir('kept-');
 const gate = (label, lines, pass = false) => ({ label, lines, pass, n: 1 });
 
 test('a decision names the difference by its check and its words, whatever its icon or the line number in a file', () => {

@@ -3,10 +3,10 @@
 // company (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { exportProfile, applyProfile, readProfile, refreshProfile, writeCommand, commandName, validate, PROFILE_FILE } from '../profile.mjs';
+import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';
 const mine = {
@@ -44,7 +44,7 @@ test('a profile written in: its shared keys and stores win, what the person set 
 });
 
 test('read from a file or a GitLab link (with the person\'s own token); a file that is not a profile is said', async () => {
-  const d = mkdtempSync(join(tmpdir(), 'profile-'));
+  const d = tempDir('profile-');
   writeFileSync(join(d, PROFILE_FILE), JSON.stringify({ profile: 1, name: 'Acme', config: {} }));
   writeFileSync(join(d, 'other.json'), '{"name":"x"}');
   assert.equal((await readProfile(PROFILE_FILE, { from: d })).profile.name, 'Acme');
@@ -58,7 +58,7 @@ test('read from a file or a GitLab link (with the person\'s own token); a file t
 });
 
 test('remembered in ds-config.json: read again each run, written in only when its maintainers changed it', async () => {
-  const d = mkdtempSync(join(tmpdir(), 'profile-'));
+  const d = tempDir('profile-');
   const write = (name) => writeFileSync(join(d, 'p.json'), JSON.stringify({ profile: 1, name, config: { figmaFileKey: name } }));
   write('Acme');
   writeFileSync(join(d, 'ds-config.json'), JSON.stringify({ codeRoots: ['/mine'] }, null, 2));
@@ -77,7 +77,7 @@ test('remembered in ds-config.json: read again each run, written in only when it
 });
 
 test('the command a team installs is named after the engine', () => {
-  const home = mkdtempSync(join(tmpdir(), 'home-'));
+  const home = tempDir('home-');
   assert.equal(commandName('Acme'), 'rms-design-system-engine-acme');
   assert.equal(commandName('rms-design-system-engine-Acme Corp'), 'rms-design-system-engine-acme-corp');
   const f = writeCommand('Acme', `https://${HOST}/design/intent/-/blob/main/profile.json`, { home, name: 'Acme' });
@@ -91,7 +91,7 @@ test('the command a team installs is named after the engine', () => {
 });
 
 test('a part this engine does not know yet is left unused and named, never a refusal of the whole profile', async () => {
-  const d = mkdtempSync(join(tmpdir(), 'profile-'));
+  const d = tempDir('profile-');
   writeFileSync(join(d, 'p.json'), JSON.stringify({ profile: 1, name: 'Acme', stores: { snapshots: { read: 'x' }, futurePart: { read: 'y' } }, config: {} }));
   const r = await refreshProfile(d, { given: 'p.json' });
   assert.equal(r.applied, true);

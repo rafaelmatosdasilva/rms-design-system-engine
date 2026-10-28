@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { checkPrototype, pieceCatalog, systemScales, systemFamily, mergeGaps, gapLine } from '../prototype-pieces.mjs';
 import { screenToPrototype, layoutHabits, screenCaptureScript } from '../screen-layout.mjs';
 import { styleBlocks } from '../styleguide-gen.mjs';
-import { fixtureProject, budget } from './helpers.mjs';
+import { fixtureProject, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const TIDEPOOL = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -246,9 +246,7 @@ test('while prototyping, an edit outside prototypes/ asks first; the composition
 
 test('the reply owes the gaps of the prototype just drawn, once', async () => {
   const { prototypeGapsOwed } = await import('../guard.mjs');
-  const { mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const root = mkdtempSync(join(tmpdir(), 'proto-owed-'));
+  const root = tempDir('proto-owed-');
   mkdirSync(join(root, '.design-system-engine-out', 'prototypes'), { recursive: true });
   const write = () => writeFileSync(join(root, '.design-system-engine-out', 'prototypes', 'last.json'), JSON.stringify({ at: new Date().toISOString(), pending: true, gaps: [{ need: 'a toggle switch for each channel', kind: 'component', line: 'component: a toggle switch for each channel' }, { need: 'a Row layout component', kind: 'layout', line: 'layout: a Row layout component' }] }));
   write();
@@ -261,9 +259,7 @@ test('the reply owes the gaps of the prototype just drawn, once', async () => {
 
 test('a page that differs from the product\'s other pages owes that too, named as a difference', async () => {
   const { stopCheck } = await import('../guard.mjs');
-  const { mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const root = mkdtempSync(join(tmpdir(), 'proto-differs-'));
+  const root = tempDir('proto-differs-');
   mkdirSync(join(root, '.design-system-engine-out', 'prototypes'), { recursive: true });
   writeFileSync(join(root, '.design-system-engine-out', 'prototypes', 'last.json'), JSON.stringify({ at: new Date().toISOString(), pending: true, gaps: [{ need: 'page padding padding/m', kind: 'consistency', line: "page padding: padding/s here, padding/m on the product's other pages (settings)" }] }));
   const reason = stopCheck({ last_assistant_message: 'The prototype is drawn.' }, { root, cfg: {} });

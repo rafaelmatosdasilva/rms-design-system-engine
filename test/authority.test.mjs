@@ -2,11 +2,11 @@
 // sources named, and the level each finding's rule stands on.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { AUTHORITY, authorityLines, authorityOf } from '../authority.mjs';
 import { buildLlms } from '../contract-gen.mjs';
+import { tempDir } from './helpers.mjs';
 
 test('the order: the users\' goal, research, documented standards, past decisions, heuristics', () => {
   assert.deepEqual(AUTHORITY.map((a) => a.key), ['goal', 'research', 'standard', 'decision', 'heuristic']);
@@ -18,7 +18,7 @@ test('the order: the users\' goal, research, documented standards, past decision
 });
 
 test('llms.txt names this system\'s own source at each level, and says what to do with the order', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'authority-'));
+  const dir = tempDir('authority-');
   writeFileSync(join(dir, 'design-system-engine-baseline.json'), '{}');
   const lines = authorityLines({ figmaFileKey: 'abc', research: ['docs/research/onboarding.md'], guidelines: { sources: ['guidelines.md'] } }, dir);
   const text = lines.join('\n');
@@ -30,7 +30,7 @@ test('llms.txt names this system\'s own source at each level, and says what to d
   assert.match(text, /4\. \*\*Accepted past decisions\*\*: the accepted differences in design-system-engine-baseline\.json\./);
   assert.match(text, /5\. \*\*General heuristics\*\*/);
   // Nothing recorded: said so, never left blank.
-  assert.match(authorityLines({}, mkdtempSync(join(tmpdir(), 'authority-'))).join('\n'), /Verified research\*\*: none recorded for this system[\s\S]*Accepted past decisions\*\*: none recorded yet\./);
+  assert.match(authorityLines({}, tempDir('authority-')).join('\n'), /Verified research\*\*: none recorded for this system[\s\S]*Accepted past decisions\*\*: none recorded yet\./);
   // In llms.txt, right after the mandate to use the components.
   const llms = buildLlms([], {}, 0, null, { authority: lines });
   assert.ok(llms.indexOf('**Use these components.**') < llms.indexOf('## When sources disagree') && llms.indexOf('## When sources disagree') < llms.indexOf('## Components'));

@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { noteCardsRead, cardsRead, CARDS_FILE, WINDOW_MS } from '../cards-read.mjs';
+import { tempDir } from './helpers.mjs';
 
 test('cards read: noted with when, read back within the window, forgotten after it', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cards-'));
+  const dir = tempDir('cards-');
   assert.deepEqual([...cardsRead(dir)], [], 'nothing noted yet');
 
   const now = Date.UTC(2026, 9, 26, 9, 0, 0);

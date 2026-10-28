@@ -2,12 +2,12 @@
 // read less, so the record exists to get the check fixed; it never hides the line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { recordWrong, readWrong, dropWrong, byCheck, wrongLines, wrongPath } from '../wrong.mjs';
+import { tempDir } from './helpers.mjs';
 
-const dir = () => mkdtempSync(join(tmpdir(), 'wrong-'));
+const dir = () => tempDir('wrong-');
 const f = (check, what, component = null) => ({ check, what, component });
 
 test('a finding marked wrong is recorded with why, and a check is counted by how often it was', () => {

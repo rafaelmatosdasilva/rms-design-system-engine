@@ -2,13 +2,12 @@
 // only, each nested one followed in turn, beside the whole system's page (never in its place), and says so.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { scopeView, nestedComponents } from '../styleguide-data.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -34,7 +33,7 @@ test('a nested component is found by the tag its own file gives it (HbBadge for 
 });
 
 test('--component X --styleguide builds X and what it nests, beside the whole system\'s page', { timeout: budget(300000) }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'sg-scope-'));
+  const dir = tempDir('sg-scope-');
   cpSync(HARBOR, dir, { recursive: true });
   // The button nests the badge (its tag, as its own file names it).
   writeFileSync(join(dir, 'components', 'HbButton.vue'), `<script setup lang="ts">

@@ -1,18 +1,17 @@
 // Where the project is: the folder the engine runs in, or one it is told (a folder or a git link), remembered there.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { hasCode, projectFor, POINTER } from '../project-dir.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('a folder holds code when it has a manifest or a stylesheet, page or script of its own', () => {
-  const d = mkdtempSync(join(tmpdir(), 'pd-'));
+  const d = tempDir('pd-');
   assert.equal(hasCode(d), false);
   mkdirSync(join(d, 'node_modules', 'x'), { recursive: true }); writeFileSync(join(d, 'node_modules', 'x', 'a.css'), '');
   writeFileSync(join(d, 'notes.md'), '# notes');
@@ -22,7 +21,7 @@ test('a folder holds code when it has a manifest or a stylesheet, page or script
 });
 
 test('a git link is cloned beside where the engine runs, once; owner/repo is GitHub; a folder is itself', () => {
-  const from = mkdtempSync(join(tmpdir(), 'pd-from-'));
+  const from = tempDir('pd-from-');
   const calls = [];
   const git = (args) => { calls.push(args); mkdirSync(join(args[2], '.git'), { recursive: true }); return { status: 0 }; };
   assert.deepEqual(projectFor('acme/ui-kit', from, { git }), { dir: join(from, 'ui-kit'), url: 'https://github.com/acme/ui-kit.git', cloned: true });
@@ -34,8 +33,8 @@ test('a git link is cloned beside where the engine runs, once; owner/repo is Git
 });
 
 test('told where the project is, the engine works there and remembers it for the next run from the same folder', { timeout: budget(120000) }, () => {
-  const from = mkdtempSync(join(tmpdir(), 'pd-run-'));
-  const project = mkdtempSync(join(tmpdir(), 'pd-proj-'));
+  const from = tempDir('pd-run-');
+  const project = tempDir('pd-proj-');
   execFileSync('git', ['init', '-q'], { cwd: project });
   mkdirSync(join(project, 'src'), { recursive: true }); writeFileSync(join(project, 'src', 'theme.css'), ':root { --a: #fff; }');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--no-hooks', `--project=${project}`], { cwd: from, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });

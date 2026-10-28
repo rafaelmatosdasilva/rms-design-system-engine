@@ -5,15 +5,14 @@
 // as compared with nothing in Figma, and drawn from its own source (a Vue template, as a React return is).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { vueMarkup } from '../vue-markup.mjs';
 import { codeComponents, rootClassOf } from '../component-source.mjs';
 import { agreedView } from '../styleguide-data.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 import { readPage } from '../styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -71,7 +70,7 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
   const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake', ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   // With Figma's data and styleguide.showCodeOnly: false: its three components; a chip only the code has is a task,
   // with its file.
-  const withFigma = mkdtempSync(join(tmpdir(), 'sg-code-only-'));
+  const withFigma = tempDir('sg-code-only-');
   cpSync(HARBOR, withFigma, { recursive: true });
   writeFileSync(join(withFigma, 'components', 'HbChip.vue'), chipVue);
   const off = JSON.parse(readFileSync(join(withFigma, 'ds-config.json'), 'utf8')); off.styleguide = { showCodeOnly: false };
@@ -89,7 +88,7 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
   assert.match(one.stdout, /HbChip: in the code and not in Figma, so not on the page; a task on the whole system's Status page\./, one.stdout + one.stderr);
   assert.doesNotMatch(one.stdout, /HbChip: not a component of this system/);
   // By default it has its page, marked Only in the code.
-  const shown = mkdtempSync(join(tmpdir(), 'sg-show-code-only-'));
+  const shown = tempDir('sg-show-code-only-');
   cpSync(HARBOR, shown, { recursive: true });
   writeFileSync(join(shown, 'components', 'HbChip.vue'), chipVue);
   const s = run(shown);
@@ -99,7 +98,7 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
   assert.match(shownPage, /"name":"HbChip","cls":"hb-chip"[^}]*"markup":"\\u003cbutton class=\\"hb-chip\\" type=\\"button\\">Filter\\u003c\/button>","markupFrom":"vue"/);
   assert.match(shownPage, /"codeOnly":\{"file":"components\/HbChip.vue","props":\[\{"name":"tone","default":"quiet","options":\["quiet","loud"\]\},\{"name":"label","default":"Filter"\}\],"figma":true\}/);
   // Before Figma's data: the code's three components, said so.
-  const noFigma = mkdtempSync(join(tmpdir(), 'sg-no-figma-'));
+  const noFigma = tempDir('sg-no-figma-');
   cpSync(HARBOR, noFigma, { recursive: true });
   rmSync(join(noFigma, 'figma'), { recursive: true });
   const cfg = JSON.parse(readFileSync(join(noFigma, 'ds-config.json'), 'utf8')); delete cfg.componentFiles;
@@ -113,7 +112,7 @@ test('in the browser: with Figma\'s data a component only the code has has its p
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
-  const dir = mkdtempSync(join(tmpdir(), 'sg-code-only-tasks-'));
+  const dir = tempDir('sg-code-only-tasks-');
   cpSync(HARBOR, dir, { recursive: true });
   writeFileSync(join(dir, 'components', 'HbChip.vue'), chipVue);
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });

@@ -1,15 +1,14 @@
 // What the team wrote about its system, and its product's page decisions, put in front of a prototype.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf, neverOf, ruledOut } from '../prototype-context.mjs';
 import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from '../product-conventions.mjs';
 import { checkPrototype } from '../prototype-pieces.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -169,7 +168,7 @@ test('the request against everything known: the guidelines\' opening and the sec
 
 test('a prototype request made with the command is kept for the catalog', async () => {
   const { routePrompt } = await import('../guard.mjs');
-  const root = mkdtempSync(join(tmpdir(), 'proto-request-'));
+  const root = tempDir('proto-request-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), root, { recursive: true });
   routePrompt({ prompt: '/rms-design-system-engine prototype a settings page with our components' }, { root, cfg: {} });
   const r = JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'prototypes', 'request.json'), 'utf8'));
@@ -206,7 +205,7 @@ test('a stand-in made of the engine\'s own Text is still a gap', () => {
 
 // ── End to end on a built Tidepool with written guidelines ────────────────────────────────────────────────────────
 test('the catalog shows what each component is for and the product\'s pages; a drawn prototype is held to both', { timeout: budget(600000) }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'tp-context-'));
+  const dir = tempDir('tp-context-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
@@ -247,7 +246,7 @@ test('the catalog shows what each component is for and the product\'s pages; a d
 });
 
 test('without importing anything, the designed screens set the product\'s pages and the request picks the closest one', { timeout: budget(600000) }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'tp-focus-'));
+  const dir = tempDir('tp-focus-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
@@ -307,7 +306,7 @@ test('the request: a component it names that the prototype leaves out is owed; o
 
 test('build mode: a text colour set on the component\'s text part counts; none at all fails the structure gate', { timeout: budget(600000) }, () => {
   const make = (fieldCss) => {
-    const dir = mkdtempSync(join(tmpdir(), 'tp-textpart-'));
+    const dir = tempDir('tp-textpart-');
     cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), dir, { recursive: true });
     const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
     cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
@@ -356,7 +355,7 @@ test('a component\'s usage (when to use, common mistakes, limitations) and its D
 
 test('the prototype context reads the Do and Don\'t pictures\' captions from the references and contract.authored.json', async () => {
   const { loadContext } = await import('../prototype-context.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'proto-usage-'));
+  const dir = tempDir('proto-usage-');
   mkdirSync(join(dir, 'refs', 'components', 'chip', 'dont'), { recursive: true });
   writeFileSync(join(dir, 'refs', 'components', 'chip', 'dont', '01 Chips as tabs between sections.png'), '');
   writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({ components: { chip: { examples: [{ kind: 'do', caption: 'One row of chips above the list', nodeId: '1:2' }], guidance: { whenToUse: 'filtering a list' } } } }));

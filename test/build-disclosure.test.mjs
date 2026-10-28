@@ -2,14 +2,13 @@
 // heard, does not. Each is rendered in Chrome with the scorer's React stand-in, which keeps state between renders.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, cpSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, cpSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
 import { BUILD } from './skill-evals/build-tasks.mjs';
 import { hasTypescript } from './skill-evals/build-score.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REF = join(HERE, 'skill-evals', 'build-reference');
@@ -19,7 +18,7 @@ const NO_TS = 'TypeScript is not installed globally (npm install -g typescript):
 const task = BUILD.find((t) => t.id === 'build-disclosure');
 
 function project(jsx, css = readFileSync(join(REF, 'src/components/disclosure.css'), 'utf8')) {
-  const dir = mkdtempSync(join(tmpdir(), 'disclosure-'));
+  const dir = tempDir('disclosure-');
   cpSync(join(REF, 'src/styles'), join(dir, 'src/styles'), { recursive: true });
   mkdirSync(join(dir, 'src/components'), { recursive: true });
   writeFileSync(join(dir, 'src/components/Disclosure.jsx'), jsx);

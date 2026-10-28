@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findSteeringFiles, steeringTruth, steeringFindings, steeringLine } from '../steering-check.mjs';
-import { makeFixture, budget } from './helpers.mjs';
+import { makeFixture, budget, tempDir } from './helpers.mjs';
 
 const truth = steeringTruth({
   catalog: { components: {
@@ -68,14 +68,13 @@ test('instruction files are found on their own; the parity\'s generated files ne
 });
 
 test('in a real run on the demo design system: wrong names are listed, a correct file is said to be correct', async () => {
-  const { cpSync, mkdtempSync, writeFileSync, mkdirSync } = await import('node:fs');
+  const { cpSync, writeFileSync, mkdirSync } = await import('node:fs');
   const { join, dirname } = await import('node:path');
-  const { tmpdir } = await import('node:os');
   const { spawnSync, execFileSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
   const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
   const run = (files) => {
-    const dir = mkdtempSync(join(tmpdir(), 'steer-'));
+    const dir = tempDir('steer-');
     cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true, filter: (p) => !/expected-report/.test(p) });
     for (const [f, text] of Object.entries(files)) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), text); }
     const env = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@e', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@e' };
@@ -84,8 +83,7 @@ test('in a real run on the demo design system: wrong names are listed, a correct
     return r.stdout + r.stderr;
   };
   const bad = run({ 'AGENTS.md': 'Use <Chip size="XL"> next to <Button />.\nRound it with var(--radii-chipp).\nThe radius token is radii/chipz.\nRun rms-design-system-engine --component chip.\n' });
-  const saved = join(tmpdir(), `steer-run-${process.pid}.txt`); writeFileSync(saved, bad);
-  assert.match(bad, /🧭 Agent instruction files: 3 design-system names that do not exist \(AGENTS\.md\)/, `full output in ${saved}`);
+  assert.match(bad, /🧭 Agent instruction files: 3 design-system names that do not exist \(AGENTS\.md\)/, bad);
   assert.match(bad, /AGENTS\.md:1  size="XL" is not a value this prop takes; the system has M, L/);
   assert.match(bad, /AGENTS\.md:2  --radii-chipp is not a declared CSS variable; the system has --radii-chip/);
   assert.match(bad, /AGENTS\.md:3  radii\/chipz is not a token; the system has radii\/chip/);

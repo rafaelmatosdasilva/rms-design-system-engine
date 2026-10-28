@@ -9,8 +9,8 @@
 // (timeouts, what "loaded" means, skip vs fail when Chrome is missing); this module only
 // provides the mechanics, so adopting it changes no check's behaviour.
 
-import { existsSync, mkdtempSync, rmSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdtempSync, rmSync, readdirSync, readlinkSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 
@@ -52,6 +52,36 @@ function whichBin(name) {
   return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : null;
 }
 
+// A process and every process under it, read once from ps (Chrome's helpers: renderers, the network service, the crash
+// reporter), and any process whose command names `marker` (on Linux the crash reporter leaves the tree). Without ps,
+// the process alone.
+function processTree(pid, marker = null) {
+  const r = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,args='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (r.error || r.status !== 0) return [pid];
+  const kids = new Map(), named = [];
+  for (const line of r.stdout.split('\n')) {
+    const m = /^\s*(\d+)\s+(\d+)\s(.*)$/.exec(line);
+    if (!m) continue;
+    kids.set(Number(m[2]), [...(kids.get(Number(m[2])) || []), Number(m[1])]);
+    if (marker && m[3].includes(marker)) named.push(Number(m[1]));
+  }
+  const tree = [pid];
+  for (let i = 0; i < tree.length; i++) tree.push(...(kids.get(tree[i]) || []));
+  return [...new Set([...tree, ...named])].filter((p) => p !== process.pid);
+}
+
+// Wait, synchronously (an exit handler may not wait any other way), until every process given has ended. Each is asked
+// of ps rather than signalled, since a child Node has not reaped yet still answers a signal. Without ps, it does not wait.
+function waitGone(pids, ms = 3000) {
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  for (const end = Date.now() + ms; Date.now() < end; Atomics.wait(pause, 0, 0, 10)) {
+    const r = spawnSync('ps', ['-p', pids.join(','), '-o', 'stat='], { encoding: 'utf8' });
+    if (r.error) return false;
+    if (r.stdout.split('\n').every((l) => !l.trim() || l.trim().startsWith('Z'))) return true;
+  }
+  return false;
+}
+
 // Launch headless Chrome and resolve once its DevTools socket is listening.
 // Returns { chrome, userDataDir, wsUrl, kill }. Rejects if Chrome exits first.
 // Gives up after timeoutMs (default 30 s) so a Chrome that never starts cannot hang a run.
@@ -61,7 +91,8 @@ export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engi
   // keychain, so no "Keychain Not Found" or keyring prompt appears while the engine or its tests read pages.
   const chrome = spawn(chromePath, [
     '--headless=new', '--remote-debugging-port=0', '--no-first-run', '--no-sandbox',
-    '--disable-gpu', '--disable-extensions', '--use-mock-keychain', '--password-store=basic', `--user-data-dir=${userDataDir}`,
+    // No component updates: a throwaway profile never needs them, and each download left a folder in the temp folder.
+    '--disable-gpu', '--disable-extensions', '--disable-component-update', '--use-mock-keychain', '--password-store=basic', `--user-data-dir=${userDataDir}`,
     // Every page the engine opens is one it is working in, though only one is in front: a page in a background tab keeps
     // its timers and its rendering at full speed (Chrome otherwise wakes it once a second, then once a minute).
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
@@ -73,10 +104,21 @@ export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engi
   // because of it — which is exactly how a machine comes to look like a failing engine.
   // The handler is removed as soon as kill runs, so a long session that opens many browsers does not pile listeners
   // up, and everything it does is synchronous, which is all an exit handler may be.
+  // Chrome writes its profile until it has shut down (a tenth of a second), so a profile deleted at once was written
+  // again and left behind, a folder per browser: the profile goes only once Chrome is gone, with the folder Chrome
+  // keeps its socket in, which it never deletes itself.
   const kill = () => {
     process.off('exit', kill);
+    let socketDir = null;
+    try { socketDir = dirname(readlinkSync(join(userDataDir, 'SingletonSocket'))); } catch { /* not started */ }
+    // The helpers write to the profile too, and outlive the browser by a moment: all of them are waited for.
+    const tree = chrome.pid && chrome.exitCode === null && chrome.signalCode === null ? processTree(chrome.pid, userDataDir) : [];
     try { chrome.kill(); } catch { /* already dead */ }
-    try { rmSync(userDataDir, { recursive: true, force: true }); } catch { /* best effort */ }
+    if (tree.length && !waitGone(tree)) {
+      for (const pid of tree) try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+      waitGone(tree, 1000);
+    }
+    for (const d of [userDataDir, socketDir]) if (d) try { rmSync(d, { recursive: true, force: true, maxRetries: 3 }); } catch { /* best effort */ }
   };
   process.on('exit', kill);
   try {

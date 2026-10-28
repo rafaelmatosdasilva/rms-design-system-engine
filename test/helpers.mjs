@@ -4,7 +4,7 @@
 // working directory. runGate() builds a throwaway project from a { path: content } map and
 // runs the gate against it (cwd = fixture), returning { code, out, dir }. `content` is written
 // verbatim when it is a string, otherwise as pretty JSON.
-import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readdirSync, readFileSync, statSync, symlinkSync, existsSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir, availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -21,8 +21,39 @@ const SCRIPTS_DIR = fileURLToPath(new URL('..', import.meta.url));
 export const TIME_SCALE = Math.max(1, Number(process.env.RMS_TEST_TIME_SCALE) || Math.min(4, Math.round(availableParallelism() / 3)));
 export const budget = (ms) => Math.round(ms * TIME_SCALE);
 
+// Every folder a test makes goes through tempDir(), under one root for its process that is deleted when the process
+// ends, so a full run leaves nothing behind (left alone, the suite filled a disk with gigabytes of fixtures). A run
+// stopped before its exit handler ran leaves its root; the next process to make a folder sweeps every root whose
+// process is gone. The root carries the pid, so two suites running at once never sweep each other's.
+const TEMP_ROOT_PREFIX = 'rms-test-';
+let tempRoot = null;
+
+const alive = (pid) => {
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+};
+
+export function sweepTempRoots(base = tmpdir()) {
+  let swept = 0;
+  for (const n of readdirSync(base)) {
+    const m = n.startsWith(TEMP_ROOT_PREFIX) && /^rms-test-(\d+)-/.exec(n);
+    if (!m || Number(m[1]) === process.pid || alive(Number(m[1]))) continue;
+    try { rmSync(join(base, n), { recursive: true, force: true }); swept++; } catch { /* another process got there first */ }
+  }
+  return swept;
+}
+
+export function tempDir(prefix = 'tmp-') {
+  if (!tempRoot) {
+    const base = tmpdir();
+    sweepTempRoots(base);
+    tempRoot = mkdtempSync(join(base, `${TEMP_ROOT_PREFIX}${process.pid}-`));
+    process.on('exit', () => { try { rmSync(tempRoot, { recursive: true, force: true, maxRetries: 3 }); } catch { /* the next run sweeps it */ } });
+  }
+  return mkdtempSync(join(tempRoot, prefix));
+}
+
 export function makeFixture(files = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'gate-'));
+  const dir = tempDir('gate-');
   for (const [rel, content] of Object.entries(files)) {
     const abs = join(dir, rel);
     mkdirSync(dirname(abs), { recursive: true });
@@ -57,7 +88,7 @@ export function crashed(out) {
 // `overlay`: a folder laid over the copy (test/fixtures/demo-primitives), its ds-config.patch.json merged into
 // ds-config.json, so a test can add to a fixture the skill evaluation runs on without changing it.
 export function fixtureProject(fixture, prefix = 'ds-', { overlay = null } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
+  const dir = tempDir(prefix);
   cpSync(fixture, dir, { recursive: true, filter: (p) => !/expected-report/.test(p) });
   if (overlay) {
     cpSync(overlay, dir, { recursive: true, filter: (p) => !p.endsWith('ds-config.patch.json') });
@@ -86,7 +117,7 @@ export function fixtureProject(fixture, prefix = 'ds-', { overlay = null } = {})
 // DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project), so a machine that has one installed for every project runs the same as one
 // that has none.
 export function bareEnv() {
-  const bin = mkdtempSync(join(tmpdir(), 'demo-bin-'));
+  const bin = tempDir('demo-bin-');
   for (const name of ['git', 'which']) {
     const p = spawnSync('which', [name], { encoding: 'utf8' }).stdout.trim();
     if (p) symlinkSync(p, join(bin, name));
@@ -127,7 +158,7 @@ export function golden(fixture, name, out) {
   if (process.env.UPDATE_GOLDEN === '1' || !existsSync(p)) { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, out); return; }
   const want = readFileSync(p, 'utf8');
   if (out === want) return;
-  const actual = join(mkdtempSync(join(tmpdir(), 'ds-actual-')), name);
+  const actual = join(tempDir('ds-actual-'), name);
   writeFileSync(actual, out);
   assert.fail(`the report differs from ${name} (this run: ${actual}); if the change is intended, rerun with UPDATE_GOLDEN=1 and review the diff`);
 }

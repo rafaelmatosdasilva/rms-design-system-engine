@@ -3,12 +3,12 @@
 // branch that moves.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf, gitStorePush } from '../stores.mjs';
 import { execFileSync } from 'node:child_process';
 import { mayWrite } from '../intent-changes.mjs';
+import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';
 const env = { GITLAB_TOKEN: 'read-token', GITLAB_WRITE_TOKEN: 'write-token', GITLAB_HOST: HOST };
@@ -60,7 +60,7 @@ function fakeGitlab({ roles = { 'read-token': 20, 'write-token': 30 }, readOnly 
   g.probes = () => g.calls.filter((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && !c[3]?.branch);
   return g;
 }
-const project = () => { const d = mkdtempSync(join(tmpdir(), 'stores-')); return d; };
+const project = () => { const d = tempDir('stores-'); return d; };
 const cfgWith = (stores) => ({ stores });
 beforeEach(() => forgetAccess());
 
@@ -193,10 +193,9 @@ test('the differences kept on purpose are a part of their own, kept with the dec
 
 test('publishing the style guide sends the page and what it links to, never the rest of its folder', async () => {
   const { pageFiles } = await import('../stores.mjs');
-  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const d = mkdtempSync(join(tmpdir(), 'sg-pub-'));
+  const d = tempDir('sg-pub-');
   mkdirSync(join(d, 'img'));
   writeFileSync(join(d, 'index.html'), '<a href="chip.html#top">Chip</a><img src="img/logo.svg"><a href="https://acme.example/x.html">x</a><a href="#status">s</a>');
   writeFileSync(join(d, 'chip.html'), '<img src="img/logo.svg"><a href="index.html">back</a>');
@@ -240,8 +239,8 @@ test('a style guide build shares the themes the store lacks, or holds older; a c
 // A real repository, read the real way: git init, fetch, ls-tree and cat-file, with only the address swapped for a
 // local one. What is proved is the reading and the parsing, which is where this can go wrong.
 test('no token: a store is read with the person\'s own git access, under its path, and git is never asked for a password', () => {
-  const home = mkdtempSync(join(tmpdir(), 'git-store-home-'));
-  const src = mkdtempSync(join(tmpdir(), 'git-store-src-'));
+  const home = tempDir('git-store-home-');
+  const src = tempDir('git-store-src-');
   const run = (args, o = {}) => execFileSync('git', args, { cwd: src, stdio: ['pipe', 'pipe', 'ignore'], ...o });
   run(['init', '-q', '-b', 'main']);
   run(['config', 'user.email', 'demo@example.com']); run(['config', 'user.name', 'Demo']);
@@ -380,9 +379,9 @@ test('a commit the gateway timed out on but GitLab made is sent, said once and n
 
 // ── Writing a store with the person's own git access ────────────────────────────────────────────────────────────
 test('no token: a store is written by git push, built without checking anything out, and a refusal is passed on', () => {
-  const home = mkdtempSync(join(tmpdir(), 'git-push-home-'));
-  const remote = mkdtempSync(join(tmpdir(), 'git-push-remote-'));
-  const seed = mkdtempSync(join(tmpdir(), 'git-push-seed-'));
+  const home = tempDir('git-push-home-');
+  const remote = tempDir('git-push-remote-');
+  const seed = tempDir('git-push-seed-');
   const run = (args, cwd) => execFileSync('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
 
   // A repository to push into, with something already in it.
@@ -433,9 +432,9 @@ test('no token: a store is written by git push, built without checking anything 
 });
 
 test('no token, a protected branch on GitLab: the push goes to a branch of its own with a merge request asked for through push options', () => {
-  const home = mkdtempSync(join(tmpdir(), 'git-mr-home-'));
-  const remote = mkdtempSync(join(tmpdir(), 'git-mr-remote-'));
-  const seed = mkdtempSync(join(tmpdir(), 'git-mr-seed-'));
+  const home = tempDir('git-mr-home-');
+  const remote = tempDir('git-mr-remote-');
+  const seed = tempDir('git-mr-seed-');
   const run = (args, cwd) => execFileSync('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
   run(['init', '--bare', '-q', '-b', 'main', remote]);
   run(['config', 'receive.advertisePushOptions', 'true'], remote);   // GitLab takes push options; a bare repository must be told to

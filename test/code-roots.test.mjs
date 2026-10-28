@@ -2,19 +2,19 @@
 // source scan reads them as the project's own code; the engine's own output is never read as usage.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
+import { mkdirSync, writeFileSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { codeRoots } from '../code-roots.mjs';
 import { projectStyleText } from '../a11y-static.mjs';
 import { uiFiles } from '../route.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function workspace() {
-  const ws = mkdtempSync(join(tmpdir(), 'code-roots-'));
+  const ws = tempDir('code-roots-');
   const ds = join(ws, 'ds'), app = join(ws, 'app');
   mkdirSync(join(ds, 'src'), { recursive: true });
   mkdirSync(app, { recursive: true });

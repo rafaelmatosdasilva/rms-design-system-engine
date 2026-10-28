@@ -4,13 +4,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir, homedir } from 'node:os';
+import { homedir } from 'node:os';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, plainGet, isMirrorOf, STATE_FILE } from '../gitlab-source.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -76,7 +76,7 @@ test('the archive: the top folder dropped, long names kept, links and paths leav
 });
 
 test('first run: the default branch\'s latest commit is fetched into a mirror beside where the engine runs', async () => {
-  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  const from = tempDir('gl-from-');
   const p = parseGitlabProject('https://gitlab.com/acme/ui-kit', {});
   const gl = fakeGitlab({ commits: { main: { id: 'a'.repeat(40), title: 'Release 2', committed_date: '2026-01-02T10:00:00Z' } }, archives: { ['a'.repeat(40)]: tarOf([['package.json', '{"name":"ui-kit"}'], ['src/theme.css', ':root { --a: #fff; }'], [STATE_FILE, '{"origin":"https://evil.example","host":"evil.example","path":"x/y"}']]) } });
   const r = await syncGitlab(p, { from, env: { GITLAB_TOKEN: 'glpat-test' }, fetchImpl: gl.fetchImpl });
@@ -92,7 +92,7 @@ test('first run: the default branch\'s latest commit is fetched into a mirror be
 });
 
 test('every later run asks for the latest commit: unchanged, nothing is downloaded; moved, the mirror follows it', async () => {
-  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  const from = tempDir('gl-from-');
   const p = parseGitlabProject('https://gitlab.com/acme/ui-kit', {});
   const A = 'a'.repeat(40), B = 'b'.repeat(40);
   const commits = { main: { id: A, title: 'one' } };
@@ -113,7 +113,7 @@ test('every later run asks for the latest commit: unchanged, nothing is download
 });
 
 test('a branch in the link is followed instead of the default one', async () => {
-  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  const from = tempDir('gl-from-');
   const p = parseGitlabProject('https://gitlab.com/acme/ui-kit/-/tree/release/v2', {});
   const C = 'c'.repeat(40);
   const gl = fakeGitlab({ commits: { 'release/v2': { id: C } }, archives: { [C]: tarOf([['package.json', '{}']]) } });
@@ -124,7 +124,7 @@ test('a branch in the link is followed instead of the default one', async () => 
 });
 
 test('the token goes only to gitlab.com or a host named in GITLAB_HOST, and is never in a message', async () => {
-  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  const from = tempDir('gl-from-');
   const p = parseGitlabProject('https://gitlab.acme.example/web/ui-kit', {});
   const gl = fakeGitlab({ commits: {}, archives: {}, status: { '/projects/': 404 } });
   const r = await syncGitlab(p, { from, env: { GITLAB_TOKEN: 'glpat-secret' }, fetchImpl: gl.fetchImpl });
@@ -138,7 +138,7 @@ test('the token goes only to gitlab.com or a host named in GITLAB_HOST, and is n
 });
 
 test('GITLAB_TOKEN and GITLAB_HOST are read from a .env beside the mirror or where the engine runs', async () => {
-  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  const from = tempDir('gl-from-');
   writeFileSync(join(from, '.env'), 'GITLAB_TOKEN="glpat-env" # read only\nGITLAB_HOST=code.acme.example\n');
   const p = parseGitlabProject('https://code.acme.example/web/ui-kit/-/tree/main', {});
   const D = 'd'.repeat(40);
@@ -149,7 +149,7 @@ test('GITLAB_TOKEN and GITLAB_HOST are read from a .env beside the mirror or whe
 });
 
 test('a run inside the mirror reads GITLAB_TOKEN and GITLAB_HOST from the .env of the folder that holds it', async () => {
-  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  const from = tempDir('gl-from-');
   writeFileSync(join(from, '.env'), 'GITLAB_TOKEN=glpat-parent\nGITLAB_HOST=code.acme.example\n');
   const p = parseGitlabProject('https://code.acme.example/web/ui-kit', { GITLAB_HOST: 'code.acme.example' });
   const A = 'a'.repeat(40), B = 'b'.repeat(40);
@@ -172,7 +172,7 @@ test('a run inside the mirror reads GITLAB_TOKEN and GITLAB_HOST from the .env o
 });
 
 test('GitLab out of reach: the mirror already there is checked, and the run says which commit it is', async () => {
-  const from = mkdtempSync(join(tmpdir(), 'gl-from-'));
+  const from = tempDir('gl-from-');
   const p = parseGitlabProject('https://gitlab.com/acme/ui-kit', {});
   const E = 'e'.repeat(40);
   const gl = fakeGitlab({ commits: { main: { id: E, committed_date: '2026-03-04T00:00:00Z' } }, archives: { [E]: tarOf([['package.json', '{}']]) } });
@@ -180,7 +180,7 @@ test('GitLab out of reach: the mirror already there is checked, and the run says
   const down = await syncGitlab(p, { from, env: {}, fetchImpl: async () => { throw new Error('getaddrinfo ENOTFOUND'); } });
   assert.equal(down.stale, true); assert.equal(down.sha, E);
   assert.match(describe(down), /could not reach gitlab\.com - checking the copy of acme\/ui-kit @ main eeeeeeee/);
-  const none = await syncGitlab(p, { from: mkdtempSync(join(tmpdir(), 'gl-none-')), env: {}, fetchImpl: async () => { throw new Error('offline'); } });
+  const none = await syncGitlab(p, { from: tempDir('gl-none-'), env: {}, fetchImpl: async () => { throw new Error('offline'); } });
   assert.equal(none.dir, null); assert.match(none.error, /could not reach/);
 });
 
@@ -201,7 +201,7 @@ test('the engine run end to end: --project=<GitLab link> sets up the mirror, rem
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
   const host = `127.0.0.1:${server.address().port}`;
-  const from = mkdtempSync(join(tmpdir(), 'gl-run-'));
+  const from = tempDir('gl-run-');
   writeFileSync(join(from, '.env'), `GITLAB_TOKEN=glpat-run\nGITLAB_HOST=${host}\n`);
   const run = (args) => new Promise((ok) => { const p = spawn(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: from, env: { ...process.env, NO_COLOR: '1', GITLAB_TOKEN: '', GITLAB_HOST: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } }); let out = ''; p.stdout.on('data', (d) => { out += d; }); p.stderr.on('data', (d) => { out += d; }); p.on('close', (code) => ok({ code, out })); });
   try {
@@ -245,11 +245,11 @@ test('the mirror downloads with a plain GET: no browser headers, redirects follo
 });
 
 test('a folder that is already the copy of the project is used where it is, never copied again inside itself', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'mirror-'));
+  const dir = tempDir('mirror-');
   writeFileSync(join(dir, STATE_FILE), JSON.stringify({ origin: 'https://gitlab.acme.test', host: 'gitlab.acme.test', path: 'web/Library', branch: null }));
   assert.equal(isMirrorOf(dir, parseGitlabProject('https://gitlab.acme.test/web/library')), true);
   assert.equal(isMirrorOf(dir, parseGitlabProject('https://gitlab.acme.test/web/other')), false);
-  assert.equal(isMirrorOf(mkdtempSync(join(tmpdir(), 'plain-')), parseGitlabProject('https://gitlab.acme.test/web/library')), false);
+  assert.equal(isMirrorOf(tempDir('plain-'), parseGitlabProject('https://gitlab.acme.test/web/library')), false);
 });
 
 test('a project link that moved, or names the project, is found: every call then goes to the project by its id', async () => {

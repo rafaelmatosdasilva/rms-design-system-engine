@@ -2,13 +2,12 @@
 // renamed in the system and its products with the old name kept in the theme, one patch per root, applied as is.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { renamedTokens, sweepFiles, linesDiff } from '../rename-sweep.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -25,7 +24,7 @@ test('the renames between two reads: same values in every mode, the closest name
 });
 
 test('--rename-sweep writes one patch for the system and one per product, and each applies as is', { timeout: budget(120000) }, () => {
-  const top = mkdtempSync(join(tmpdir(), 'sweep-')), ds = join(top, 'ds'), shop = join(top, 'shop');
+  const top = tempDir('sweep-'), ds = join(top, 'ds'), shop = join(top, 'shop');
   const put = (root, p, t) => { mkdirSync(dirname(join(root, p)), { recursive: true }); writeFileSync(join(root, p), t); };
   const git = (cwd, ...a) => spawnSync('git', a, { cwd, encoding: 'utf8' });
   put(ds, 'ds-config.json', JSON.stringify({ paths: { snapshotVars: 'figma/vars.json', themeCSS: 'src/theme.css' }, pluginDirs: { shop: '../shop' } }));

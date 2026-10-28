@@ -1,19 +1,19 @@
 // The system's icons kept as one SVG file each, read as one <symbol> sheet (icon-folder.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findIconFolder, folderSymbols, svgToSymbol, symbolId, iconFolder, codeConnectIcons } from '../icon-folder.mjs';
 import { captureIcons, structureInputFiles } from '../structure-capture.mjs';
+import { tempDir } from './helpers.mjs';
 
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
 
 const svg = (inner, attrs = 'width="24" height="24" viewBox="0 0 24 24"') => `<?xml version="1.0"?>\n<svg ${attrs} xmlns="http://www.w3.org/2000/svg">${inner}</svg>\n`;
 const project = (files) => {
-  const root = mkdtempSync(join(tmpdir(), 'icon-folder-'));
+  const root = tempDir('icon-folder-');
   for (const [p, text] of Object.entries(files)) { mkdirSync(join(root, p, '..'), { recursive: true }); writeFileSync(join(root, p), text); }
   return root;
 };

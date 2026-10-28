@@ -1,10 +1,10 @@
 // baseline.mjs - gate-level adoption baseline + ratchet (feature #2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { loadBaselineLabels, currentFailingLabels, classifyBaseline, writeBaseline } from '../baseline.mjs';
+import { tempDir } from './helpers.mjs';
 
 const G = (label, pass, planLimited = false) => ({ label, pass, planLimited });
 
@@ -41,7 +41,7 @@ test('classifyBaseline with no baseline treats every failure as a regression', (
 });
 
 test('loadBaselineLabels degrades to null on missing/malformed files', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'baseline-'));
+  const dir = tempDir('baseline-');
   assert.equal(loadBaselineLabels(join(dir, 'nope.json')), null);
   const bad = join(dir, 'bad.json');
   writeFileSync(bad, '{ not json');
@@ -52,7 +52,7 @@ test('loadBaselineLabels degrades to null on missing/malformed files', () => {
 });
 
 test('writeBaseline round-trips the current failing gates', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'baseline-'));
+  const dir = tempDir('baseline-');
   const path = join(dir, 'design-system-engine-baseline.json');
   const gates = [G('A', true), G('B', false), G('C', false, true), G('D', false)];
   const written = writeBaseline(path, gates);
@@ -80,7 +80,7 @@ test('findings: a gate is debt only when every ❌ line is accepted; fixed lines
   const moved = classifyBaseline([gate('Structure  (12 components)', ['❌ chip: padding 8px, code 4px'])], [], accepted);
   assert.deepEqual(moved.regressions, ['Structure  (12 components)']);
   // Written and read back; a failing gate with no ❌ line to accept stays a gate.
-  const dir = mkdtempSync(join(tmpdir(), 'baseline-'));
+  const dir = tempDir('baseline-');
   const path = join(dir, 'design-system-engine-baseline.json');
   writeBaseline(path, [A, B, gate('Coverage', ['2 components not reached'])], { findings: true });
   assert.deepEqual(loadBaselineLabels(path), ['Coverage']);
@@ -96,10 +96,9 @@ test('findings: a gate is debt only when every ❌ line is accepted; fixed lines
 });
 
 test('--match: only the findings that name the difference, with their gate\'s count line; nothing accepted before is dropped', async () => {
-  const { mkdtempSync, readFileSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
+  const { readFileSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const dir = mkdtempSync(join(tmpdir(), 'bl-'));
+  const dir = tempDir('bl-');
   const path = join(dir, 'design-system-engine-baseline.json');
   writeFileSync(path, JSON.stringify({ gates: [], findings: ['Icons :: ❌ an older one'] }));
   const gates = [
@@ -117,7 +116,7 @@ test('--match: only the findings that name the difference, with their gate\'s co
 });
 
 test('each line accepted as debt keeps who accepted it and when; one accepted before keeps its own', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'baseline-'));
+  const dir = tempDir('baseline-');
   const path = join(dir, 'design-system-engine-baseline.json');
   writeBaseline(path, [G('B', false)], { by: 'Acme Designer', now: '2026-01-01T00:00:00Z' });
   writeBaseline(path, [G('B', false), G('D', false)], { merge: true, by: 'Acme Developer', now: '2026-02-01T00:00:00Z' });

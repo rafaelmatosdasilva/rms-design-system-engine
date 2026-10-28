@@ -3,14 +3,13 @@
 // gap's parts on the page. A stand-in for a component the system has is said: the system's own is used.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { prototypePage } from '../prototype.mjs';
 import { checkPrototype, pageGaps } from '../prototype-pieces.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
-import { budget } from './helpers.mjs';
+import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const CSS = '.btn { padding: 4px 8px; } .btn:focus-visible { outline: 2px solid blue; } .card { display: flex; flex-direction: column; padding: 8px; }';
@@ -38,7 +37,7 @@ test('a stand-in for a component the system has is said; the page lists each gap
 });
 
 test('stand-ins are marked on the page, counted, turned off and on, and reached from the gaps list', { skip: CHROME ? false : 'no Chrome available', timeout: budget(90000) }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'proto-standins-'));
+  const dir = tempDir('proto-standins-');
   const file = join(dir, 'page.html');
   const gaps = pageGaps(checkPrototype(tree, { catalog, view: parts.view, scales: { spacing: [], text: [] } }).gaps);
   writeFileSync(file, prototypePage({ name: 'p', tree, parts, scales: { spacing: [], text: [] }, gaps, catalog, fonts: false }));

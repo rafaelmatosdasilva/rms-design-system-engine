@@ -2,16 +2,16 @@
 // 40% longer. A React page here (the engine's stand-in draws it); a Vue page goes through the project's own build.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { findChrome } from '../cdp.mjs';
 import { loadTypeScript } from '../component-harness.mjs';
 import { stressPage } from '../page-render.mjs';
+import { tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const project = (jsx, css = '') => {
-  const dir = mkdtempSync(join(tmpdir(), 'page-render-'));
+  const dir = tempDir('page-render-');
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   writeFileSync(join(dir, 'prototypes', 'Orders.jsx'), jsx);
   writeFileSync(join(dir, 'prototypes', 'orders.css'), css);

@@ -2,12 +2,12 @@
 // file named by what it holds; read back as one text; copied for publishing without the rest of its folder.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { runInNewContext } from 'node:vm';
 import { splitPage, writeStyleguide, readPage, pageData, copyPage, dataScript, dataOfScript } from '../styleguide-files.mjs';
 import { pageFiles } from '../stores.mjs';
+import { tempDir } from './helpers.mjs';
 
 // Text a data file must carry exactly: a backtick, ${, a < the inline tag escaped, a backslash before each, a line separator.
 const DATA = { title: 'Acme', components: [{ name: 'cardTile', markup: '<div class="cardTile">`${x}` \\` \\u003c </div> ', source: { text: 'a\\\\b' } }] };
@@ -56,7 +56,7 @@ test('the data file sets the same JSON the page tag held, every character kept',
 });
 
 test('written: the page and its files; read back as one page, the same data; an older build\'s files removed, nothing else', () => {
-  const d = mkdtempSync(join(tmpdir(), 'sg-files-'));
+  const d = tempDir('sg-files-');
   writeFileSync(join(d, 'my.theme.json'), '{}');
   writeFileSync(join(d, 'app.0123456789.js'), 'mine');
   const first = writeStyleguide(join(d, 'index.html'), page(json.replace('Acme', 'Northwind')));
@@ -82,7 +82,7 @@ test('written: the page and its files; read back as one page, the same data; an 
 });
 
 test('published: the page and what it links, never the rest of its folder', () => {
-  const d = mkdtempSync(join(tmpdir(), 'sg-files-'));
+  const d = tempDir('sg-files-');
   const { files } = writeStyleguide(join(d, 'guide.html'), page());
   writeFileSync(join(d, 'notes.txt'), 'mine');
   // The style guide store follows its links.

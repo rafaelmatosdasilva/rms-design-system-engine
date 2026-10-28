@@ -2,13 +2,12 @@
 // the checks and the To do list (a requirement, or design intent).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { noteKey, captureScript, mergeCaptures, noteKind, isRequirement, requirementEntry, noteIsTodo, loadCategories, categoriesPath } from '../annotation-categories.mjs';
-import { makeFixture, budget } from './helpers.mjs';
+import { makeFixture, budget, tempDir } from './helpers.mjs';
 import { OUT_DIR } from '../names.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -58,7 +57,7 @@ test('only accessibility and uncategorised notes are requirements; a note no che
 });
 
 test('the categories snapshot sits beside the component-props one, and a missing or broken one reads as none', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cats-'));
+  const dir = tempDir('cats-');
   const cfg = { paths: { compPropsSnapshot: 'src/figma-component-props.snapshot.json' } };
   assert.equal(categoriesPath(dir, cfg), join(dir, 'src', 'figma-annotation-categories.snapshot.json'));
   assert.equal(categoriesPath(dir, { paths: { annotationCategoriesSnapshot: 'x.json' } }), join(dir, 'x.json'));

@@ -1,13 +1,12 @@
 // recipes and reference printed by the engine, the install doctor, and the classic guide for rollback.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, symlinkSync, readFileSync, existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, mkdirSync, symlinkSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { listDocs, readDoc, printDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, GUIDE, logUsage } from '../skill-files.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const engine = () => makeFixture({
@@ -87,7 +86,7 @@ test('the usage log: off unless DESIGN_SYSTEM_ENGINE_USAGE_LOG=1, local, keeps t
 });
 
 test('the doctor says whether axe-core is kept beside the engine, with the update that fetches it', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'doc-axe-'));
+  const dir = tempDir('doc-axe-');
   writeFileSync(join(dir, 'rms-design-system-engine.md'), '# guide');
   const row = (at) => doctor({ engineDir: dir, home: dir, nodeVersion: '22.1.0', findChrome: () => 'x', axeReady: () => at }).find((r) => /axe-core/.test(r.what));
   assert.deepEqual([row('/c/axe.min.js').ok, row('/c/axe.min.js').what], [true, 'axe-core: /c/axe.min.js']);
