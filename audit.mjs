@@ -171,6 +171,7 @@ if (ONLY && process.argv.includes('--baseline')) {
 // need Figma wait until it is added. Any of these flags (or a project remembered from
 // before), or a stdin that is not a terminal, makes setup non-interactive.
 function _argValue(flag) { const v = _argValues(flag); return v.length ? v[v.length - 1] : null; }
+const flatWords = (s) => String(s ?? '').toLowerCase().replace(/[\u201c\u201d"'`.]/g, '').replace(/\s+/g, ' ').trim();
 const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key');
 const INIT_THEME_CSS      = _argValue('--theme-css');
 const INIT_SOURCE_URL     = _argValue('--figma-source-url');
@@ -555,13 +556,15 @@ if (process.argv.includes('--intent-decide')) {
     console.log('\nNEXT: ask the person which answer for each (or for all), saying what each does; record it with --intent-decide "<key>[,<key>…]" <answer>; never answer for them.');
     process.exit(0);
   }
-  const keys = keysArg === 'all' ? open.map(([k]) => k) : keysArg.split(',').map((k) => k.trim()).filter(Boolean);
+  // A proposal is named by its key, or by its own words (as a decision copied from the style guide names it).
+  const byWords = (k) => (d.proposals.has(k) ? k : [...d.proposals].find(([, v]) => flatWords(v.proposal) === flatWords(k))?.[0] ?? k);
+  const keys = keysArg === 'all' ? open.map(([k]) => k) : (d.proposals.has(keysArg) || [...d.proposals].some(([, v]) => flatWords(v.proposal) === flatWords(keysArg)) ? [keysArg] : keysArg.split(',')).map((k) => byWords(k.trim())).filter(Boolean);
   const unknown = keys.filter((k) => !d.proposals.has(k));
   if (unknown.length) { console.log(`❌ No proposal is called ${unknown.join(', ')} (--intent-decide lists them).`); process.exit(2); }
   // Each proposal's own answers (yes and no, or the options it lists).
   const offMenu = keys.filter((k) => !pr.optionsOf(d.proposals.get(k)).some((o) => o.answer === ans));
   if (!ans || offMenu.length) { console.log(`Answer with one of its options: ${[...new Set((offMenu.length ? offMenu : keys).flatMap((k) => pr.optionsOf(d.proposals.get(k)).map((o) => o.answer)))].join(', ')} (rms-design-system-engine --intent-decide "<key>" <answer>)`); process.exit(2); }
-  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals), { by: (await import('./decided-by.mjs')).decidedBy(ROOT) });
+  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals), { by: (await import('./decided-by.mjs')).decidedBy(ROOT), said: _argValue('--said') });
   console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans} (${projectPath(ROOT, 'intentDecisions')}): ${keys.map((k) => pr.optionsOf(d.proposals.get(k)).find((o) => o.answer === ans)?.does).filter(Boolean).join(' ') || 'the Documentation page no longer asks it of the team.'}`);
   await sendDecisions();
   // What the answer changes in the layer, made now: on the pages it was about (a page to start is found by its answer).
@@ -710,19 +713,22 @@ if (process.argv.includes('--review-drafts')) {
   if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
   const snap = il.readIntentLayer(ROOT, pcfg);
   if (!snap?._source?.sha) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run again.'); process.exit(2); }
-  const withDrafts = snap.entities.filter((e) => (e.drafts ?? []).length);
+  const withDrafts = [ch.systemPage(snap), ...snap.entities.filter((e) => (e.drafts ?? []).length)].filter(Boolean);
   const at = process.argv.indexOf('--review-drafts'), given = process.argv[at + 1] && !process.argv[at + 1].startsWith('--') ? resolve(process.argv[at + 1]) : null;
   // One decision on the command line, as each page's drafts in the style guide give it: --approve|--drop <page> [<line>]
   // (every draft on the page without one), --change <page> <line> <new text>.
   const one = ['approve', 'change', 'drop'].map((d) => [d, process.argv.indexOf(`--${d}`)]).find(([, i]) => i > 0);
-  const inline = one ? [{ do: one[0], page: process.argv[one[1] + 1], line: process.argv[one[1] + 2], ...(one[0] === 'change' ? { to: process.argv[one[1] + 3] } : {}) }] : null;
+  // --task "<its title>" keeps it to the drafts that task wrote, and --expect <n> to the number the person saw (as a
+  // decision copied from the style guide gives them both).
+  const positional = (i) => (process.argv[i] && !process.argv[i].startsWith('--') ? process.argv[i] : undefined);
+  const inline = one ? [{ do: one[0], page: positional(one[1] + 1), line: positional(one[1] + 2), ...(one[0] === 'change' ? { to: positional(one[1] + 3) } : {}), ...(_argValue('--task') ? { task: _argValue('--task') } : {}), ...(_argValue('--expect') ? { expect: Number(_argValue('--expect')) } : {}) }] : null;
   // Without a line, an approval or a drop is for every draft on the page; a change always names its line.
   if (inline && (!inline[0].page || (one[0] === 'change' && (!inline[0].line || !inline[0].to)))) { console.log(`❌ --${one[0]} takes the page${one[0] === 'change' ? ', the draft\'s words and the new words' : ', and the draft\'s words for one draft only'} (rms-design-system-engine --review-drafts lists them).`); process.exit(2); }
   if (inline && !inline[0].line) delete inline[0].line;
   if (!given && !inline) {
     if (!withDrafts.length) { console.log('✅ No drafts to review in the intent layer.'); console.log('NEXT: none'); process.exit(0); }
     console.log(`📝 ${withDrafts.reduce((t, e) => t + e.drafts.length, 0)} drafts to review on ${withDrafts.length} page${withDrafts.length === 1 ? '' : 's'}:`);
-    for (const e of withDrafts) { console.log(`\n${e.name} (${e.file})`); for (const d of e.drafts) console.log(`  · ${d.where}: "${d.text}"`); }
+    for (const e of withDrafts) { console.log(`\n${e.name} (${e.file})`); for (const d of e.drafts) console.log(`  · ${d.where}: "${d.text}"${d.task ? ` (from the task "${d.task}"${d.at ? `, ${d.at}` : ''})` : ''}`); }
     console.log('\nNEXT: ask the person what to do with each (approve, change or drop); write their decisions as [{ "page", "line", "do", "to" }] in a file and run --review-drafts <file>; never decide for them.');
     process.exit(0);
   }
@@ -740,7 +746,9 @@ if (process.argv.includes('--review-drafts')) {
   const dir = ch.writeLocal(ROOT, result.files, summary);
   console.log(`📝 ${summary.split('\n')[0]}\n   ${result.files.size} file${result.files.size === 1 ? '' : 's'} → ${relative(ROOT, dir)} (CHANGES.md says each one)${result.problems.length ? `\n   Not done: ${result.problems.join('; ')}` : ''}`);
   if (!result.files.size) { console.log('NEXT: none'); process.exit(result.problems.length ? 1 : 0); }
-  const message = 'Intent layer: drafts reviewed (' + summary.split('\n')[0].replace(/^Drafts reviewed on /, '').replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
+  // The decision as the person gave it (--said, the words copied from the style guide), kept in the commit with who gave it.
+  const said = _argValue('--said'), by = (await import('./decided-by.mjs')).decidedBy(ROOT);
+  const message = 'Intent layer: drafts reviewed (' + summary.split('\n')[0].replace(/^Drafts reviewed on /, '').replace(/\.$/, '') + ')' + (said ? `\n\nDecided${by ? ` by ${by}` : ''}: ${said}` : '') + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
   if (process.argv.includes('--commit')) {
     { const may = await ch.mayWrite(ROOT, pcfg, 'commit'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
     const done = await ch.commitToBranch(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, message });
@@ -805,6 +813,45 @@ if (process.argv.includes('--part')) {
   console.log('NEXT: read the change; to send it: the same command with --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
   process.exit(0);
 }
+// ── --draft <page> "<section>" "<line>" ["<line>"…] --task "<title>": lines drafted on a page for the team to review ──
+// Each under the section it answers, marked **Draft (<task>, <day>):** so no agent gets it until a person approves it,
+// and the style guide's decision for it names the task. The page: a component's, a pattern's, a template's, a
+// foundation's, or the System page. Written locally to read first; --commit or --merge-request sends it, only when asked.
+if (process.argv.includes('--draft')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const il = await import('./intent-layer.mjs'), ch = await import('./intent-changes.mjs');
+  if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+  const snap = il.readIntentLayer(ROOT, pcfg);
+  if (!snap?._source?.sha) { console.log('❌ No intent layer read yet. Drafts are written in it: ds-config.json → intentLayer, then run again.'); process.exit(2); }
+  const at = process.argv.indexOf('--draft'), words = [];
+  for (let i = at + 1; i < process.argv.length && !process.argv[i].startsWith('--'); i++) words.push(process.argv[i]);
+  const [subject, section, ...lines] = words, task = _argValue('--task');
+  if (!subject || !section || !lines.length) { console.log('❌ --draft takes the page, the section and each line: rms-design-system-engine --draft "<page>" "<section>" "<line>" ["<line>"…] --task "<the request\'s title>"'); process.exit(2); }
+  const access = ch.layerAccess(ROOT, pcfg);
+  if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
+  let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+  const plan = ch.draftLinesPlan(snap, subject, section, lines, files, { task, codes: Object.values(il.codeFilesOf(ROOT, pcfg)) });
+  if (plan.error) { console.log(`❌ ${plan.error}.`); process.exit(2); }
+  const summary = `${plan.lines.length} draft${plan.lines.length === 1 ? '' : 's'} on ${plan.page}, under ${section}, in ${plan.file}.\n\n${plan.lines.map((l) => `- ${l}`).join('\n')}\n`;
+  const dir = ch.writeLocal(ROOT, plan.files, summary);
+  console.log(`📝 ${summary.split('\n')[0]}\n   → ${relative(ROOT, dir)} (CHANGES.md says it)\n   No agent gets them until the team approves them.`);
+  const message = `Intent layer: ${plan.lines.length} draft${plan.lines.length === 1 ? '' : 's'} on ${plan.page}${task ? ` (${task})` : ''}\n\n${plan.lines.map((l) => `- ${l}`).join('\n')}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
+  for (const how of ['commit', 'merge-request']) {
+    if (!process.argv.includes('--' + how)) continue;
+    const may = await ch.mayWrite(ROOT, pcfg, how);
+    if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the change is in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person where the change is.'); process.exit(0); }
+    const done = how === 'commit'
+      ? await ch.commitToBranch(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, message })
+      : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: drafts on ${plan.page}`, description: summary, message });
+    if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
+    console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
+    console.log('NEXT: rebuild the style guide (--styleguide): the page\'s Documentation shows the drafts with one decision for them, to copy into Claude Code.');
+    process.exit(0);
+  }
+  console.log('NEXT: show the person the drafts; to send them: the same command with --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
+  process.exit(0);
+}
 if (process.argv.includes('--decision') || process.argv.includes('--decisions')) {
   let pcfg = {};
   try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
@@ -823,7 +870,7 @@ if (process.argv.includes('--decision') || process.argv.includes('--decisions'))
   const vals = (flag) => process.argv.flatMap((x, i) => (x === flag && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? [process.argv[i + 1]] : []));
   if (!subject || subject.startsWith('--') || !decided || decided.startsWith('--')) { console.log('❌ --decision takes what it is about and what was decided: rms-design-system-engine --decision <what it is about> "<what was decided>" --ruled-out "<option>" --why "<reason>"'); process.exit(2); }
   const { decidedBy } = await import('./decided-by.mjs');
-  const line = dl.decisionLine({ what: decided, ruledOut: vals('--ruled-out'), why: vals('--why')[0] ?? null, by: decidedBy(ROOT), at: new Date().toISOString().slice(0, 10) });
+  const line = dl.decisionLine({ what: decided, ruledOut: vals('--ruled-out'), why: vals('--why')[0] ?? null, by: decidedBy(ROOT), at: new Date().toISOString().slice(0, 10), said: _argValue('--said') });
   const access = ch.layerAccess(ROOT, pcfg);
   if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
   let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
@@ -1328,7 +1375,7 @@ if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
     process.exit(1);
   }
   const by = (await import('./decided-by.mjs')).decidedBy(ROOT);
-  const added = km.recordKept(ROOT, chosen, { reason, by, truth, review });
+  const added = km.recordKept(ROOT, chosen, { reason, by, truth, review, said: _argValue('--said') });
   console.log(`✓ Kept on purpose: ${added.length} difference${added.length === 1 ? '' : 's'}, in ${file}.`);
   for (const d of added) console.log(`   • ${km.keptLine(d)}`);
   console.log('   While the values stay as they are, they never fail a run and the differences list and the style guide show them as kept, with the reason. When a value changes, the difference is open again.');

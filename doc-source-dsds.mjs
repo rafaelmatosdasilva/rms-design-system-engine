@@ -276,21 +276,29 @@ export function entityView(entity, file, group = '', shared = null) {
   // is a question for a person, never guidance.
   for (const [k, where] of [['purpose', 'Purpose'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules']]) {
     const keep = [];
-    for (const it of view[k]) { const t = String(it?.text ?? it); if (DRAFT.test(t)) (view.drafts ??= []).push({ where: it?.draftOf ?? where, text: t.replace(DRAFT, '').trim() }); else if (isOpen(t)) (view.open ??= []).push({ where: it?.draftOf ?? where, text: openText(t) }); else keep.push(it); }
+    for (const it of view[k]) { const t = String(it?.text ?? it); if (DRAFT.test(t)) (view.drafts ??= []).push({ where: it?.draftOf ?? where, text: t.replace(DRAFT, '').trim(), ...draftTask(t) }); else if (isOpen(t)) (view.open ??= []).push({ where: it?.draftOf ?? where, text: openText(t) }); else keep.push(it); }
     view[k] = keep;
   }
   // In a section's text too: a line that starts with the marker, as a list item or on its own.
   for (const x of view.sections) {
     const lines = x.text.split('\n'), keep = [];
     let fenced = false;
-    for (const l of lines) { if (/^\s*```/.test(l)) fenced = !fenced; const t = l.replace(/^\s*[-*]\s+/, ''); if (fenced || /^\s*```/.test(l)) { keep.push(l); continue; } if (DRAFT.test(t)) (view.drafts ??= []).push({ where: x.title, text: t.replace(DRAFT, '').trim() }); else if (isOpen(t)) (view.open ??= []).push({ where: x.title, text: openText(t) }); else keep.push(l); }
+    for (const l of lines) { if (/^\s*```/.test(l)) fenced = !fenced; const t = l.replace(/^\s*[-*]\s+/, ''); if (fenced || /^\s*```/.test(l)) { keep.push(l); continue; } if (DRAFT.test(t)) (view.drafts ??= []).push({ where: x.title, text: t.replace(DRAFT, '').trim(), ...draftTask(t) }); else if (isOpen(t)) (view.open ??= []).push({ where: x.title, text: openText(t) }); else keep.push(l); }
     x.text = keep.join('\n').trim();
   }
   view.sections = view.sections.filter((x) => x.text);
   return view;
 }
-// The marker of a drafted line, at its start: **Draft:**, __Draft:__ or Draft:.
-export const DRAFT = /^\s*(?:\*\*|__)?draft(?::(?:\*\*|__)|(?:\*\*|__):|:)\s*/i;
+// The marker of a drafted line, at its start: **Draft:**, __Draft:__ or Draft:, with the task that wrote it when it
+// says one: **Draft (What to do when no component fits, 2026-10-28):**.
+export const DRAFT = /^\s*(?:\*\*|__)?draft(?:\s*\(([^)]*)\))?(?::(?:\*\*|__)|(?:\*\*|__):|:)\s*/i;
+// The task a drafted line names, and its day. → { task, at } | {}
+export function draftTask(line) {
+  const m = DRAFT.exec(String(line ?? ''))?.[1]?.trim();
+  if (!m) return {};
+  const d = /^(.*?),\s*(\d{4}-\d{2}-\d{2})$/.exec(m);
+  return d ? { task: d[1].trim(), at: d[2] } : { task: m };
+}
 // A question the team has not settled, written into a page: [open], [TBD], "Open question: …", TBD, "to be decided",
 // "??". It is not a rule yet: set apart like a draft, it reaches no agent, and a person settles it.
 // (Not a bare "Open:", which names a state, and not "??" inside a line, which is code.)
@@ -298,7 +306,18 @@ export const OPEN = /\[(?:open|tbd|tbc|todo|\?)\]|^\s*(?:\*\*|__)?(?:open questi
 export const isOpen = (t) => OPEN.test(String(t ?? ''));
 const openText = (t) => String(t).replace(/^\s*(?:\*\*|__)?(?:open question|tbd|tbc|todo)(?:\*\*|__)?\s*:\s*/i, '').replace(/\s*\[(?:open|tbd|tbc|todo|\?)\]\s*/gi, ' ').trim();
 
-// The index and its entity files → { system: { name, version, sections }, entities: [view] }.
+// The system's own page holds drafts as any page does: set apart, never one of its rules, until a person approves them.
+// → true when the line was a draft (and is now in drafts)
+function heldDraft(line, where, drafts) {
+  const t = String(line ?? '').replace(/^\s*[-*]\s+/, '');
+  if (!DRAFT.test(t)) return false;
+  drafts.push({ where, text: t.replace(DRAFT, '').trim(), ...draftTask(t) });
+  return true;
+}
+// A section's text without its drafted lines (each one held). → the text left
+const heldLines = (body, where, drafts) => body.split('\n').filter((l) => !heldDraft(l, where, drafts)).join('\n').trim();
+
+// The index and its entity files → { system: { name, version, sections, drafts? }, entities: [view] }.
 // files: Map(path → parsed JSON). entry: the index's path, or null to take every file with an entity.
 export function readDsds(files, entry = null) {
   const entities = [];
@@ -317,12 +336,12 @@ export function readDsds(files, entry = null) {
   if (index && (index.entries || index.refs)) {
     const shared = index.shared ?? [];
     const sys = (index.entries ?? []).find((e) => e?.kind === 'system') ?? {};
-    const sections = [];
+    const sections = [], drafts = [];
     for (const x of sys.sections ?? []) {
-      if (x?.kind === 'guidelines') for (const it of x.items ?? []) { const t = it?.statement ?? sharedStatement(it?.refs, shared).text; if (t) sections.push({ title: x.title ?? 'Guidelines', text: `- ${t}${it?.level ? ` (${it.level})` : ''}` }); }
-      if (x?.kind === 'section') for (const f of x.freeform ?? []) if (f?.title && f?.body) sections.push({ title: String(f.title), text: String(f.body).trim() });
+      if (x?.kind === 'guidelines') for (const it of x.items ?? []) { const t = it?.statement ?? sharedStatement(it?.refs, shared).text; if (t && !heldDraft(t, x.title ?? 'Guidelines', drafts)) sections.push({ title: x.title ?? 'Guidelines', text: `- ${t}${it?.level ? ` (${it.level})` : ''}` }); }
+      if (x?.kind === 'section') for (const f of x.freeform ?? []) if (f?.title && f?.body) { const text = heldLines(String(f.body), String(f.title), drafts); if (text) sections.push({ title: String(f.title), text }); }
     }
-    system = { name: sys.name ?? index.name ?? null, version: sys.metadata?.version ?? null, dsds: index.schemaVersion ?? null, sections };
+    system = { name: sys.name ?? index.name ?? null, ...(sys.id ? { id: sys.id } : {}), version: sys.metadata?.version ?? null, dsds: index.schemaVersion ?? null, sections, file: entry, ...(drafts.length ? { drafts } : {}) };
     const base = posix.dirname(entry);
     const one = (e, file, group) => { if (e && typeof e === 'object' && e.kind && e.kind !== 'system') { const key = `${file}#${e.id ?? e.name}`; if (!seen.has(key)) { seen.add(key); entities.push(entityView(e, file, group, shared)); } } };
     for (const r of index.refs ?? []) {
@@ -338,12 +357,12 @@ export function readDsds(files, entry = null) {
   }
   if (index) {
     const info = index.systemInfo ?? {};
-    const sections = [];
+    const sections = [], drafts = [];
     for (const b of index.documentBlocks ?? []) {
-      if (b?.kind === 'sections') for (const s of b.items ?? []) if (s?.title && s?.body) sections.push({ title: String(s.title), text: String(s.body).trim() });
-      if (b?.kind === 'checklist') for (const it of b.items ?? []) if (it?.label) sections.push({ title: b.title ?? 'Checklist', text: `- ${it.label}${it.level ? ` (${it.level})` : ''}` });
+      if (b?.kind === 'sections') for (const s of b.items ?? []) if (s?.title && s?.body) { const text = heldLines(String(s.body), String(s.title), drafts); if (text) sections.push({ title: String(s.title), text }); }
+      if (b?.kind === 'checklist') for (const it of b.items ?? []) if (it?.label && !heldDraft(it.label, b.title ?? 'Checklist', drafts)) sections.push({ title: b.title ?? 'Checklist', text: `- ${it.label}${it.level ? ` (${it.level})` : ''}` });
     }
-    system = { name: info.name ?? null, version: info.version ?? null, dsds: index.dsdsVersion ?? null, sections };
+    system = { name: info.name ?? null, version: info.version ?? null, dsds: index.dsdsVersion ?? null, sections, file: entry, ...(drafts.length ? { drafts } : {}) };
     const base = posix.dirname(entry);
     for (const g of index.entityGroups ?? []) {
       for (const e of g?.entities ?? []) {

@@ -306,6 +306,55 @@ export function route(text, { hasConfig = true, components = [], cmd = 'rms-desi
 // A check that would run on the whole library while the request named a word several components share ("check the
 // accessibility of the button"): the person is asked which one first, and the command waits for the answer.
 const WHOLE_LIBRARY_CHECK = new Set(['full-audit', 'audit-component', 'fix-a-difference', 'states-and-variants', 'a11y-notes', 'visual-diff', 'accept-debt']);
+// A decision copied from the style guide, after the company's command: "on <the page>, <what was decided>", the page
+// named by its kind and name as the style guide shows it (Component Button, Template Checkout, Legend, part of Component
+// Pie chart, the System page), each step after "; then". → { page, said: [step] } | null
+const ON_PAGE = /^\s*on\s+(the System page|(?:Component|Template|Pattern|Foundation|Flow|Page)\s+[^,]+|[^,]+,\s*part of Component\s+[^,]+),\s+([\s\S]+?)\s*$/i;
+export function copiedDecision(text) {
+  const m = ON_PAGE.exec(String(text ?? ''));
+  if (!m) return null;
+  const on = m[1].trim();
+  const page = /^the System page$/i.test(on) ? 'the System page' : on.replace(/,\s*part of Component\s+.+$/i, '').replace(/^(?:Component|Template|Pattern|Foundation|Flow|Page)\s+/i, '').trim();
+  return { page, on, steps: m[2].replace(/\.\s*$/, '').split(/;\s*then\s+/i).map((x) => x.trim()).filter(Boolean) };
+}
+const TASK = /\s+from the task\s+"([^"]+)"(?:\s*\(([^)]*)\))?/i;
+const quote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+// Each step of a copied decision as the command that makes it, or what the agent does. → { run: [cmd], notes: [string] }
+export function decisionSteps(d, text, cmd) {
+  const run = [], notes = [], said = ` --said ${quote(String(text).trim())}`;
+  for (const step of d.steps) {
+    const task = TASK.exec(step)?.[1] ?? null, of = task ? ` --task ${quote(task)}` : '';
+    let x;
+    if ((x = /^(approve|drop)\s+(?:all\s+(\d+)\s+drafts|its draft)\b/i.exec(step))) {
+      run.push(`${cmd} --review-drafts --${x[1].toLowerCase()} ${quote(d.page)}${of}${x[2] ? ` --expect ${x[2]}` : ' --expect 1'}${said}`);
+      continue;
+    }
+    if ((x = /^change\s+(?:one of the\s+(\d+)\s+drafts|its draft(?:\s+"([^"]+)")?)/i.exec(step))) {
+      notes.push(`Ask the person ${x[2] ? 'for their words for that draft' : 'which draft and their words for it'}, then run ${cmd} --review-drafts --change ${quote(d.page)} ${x[2] ? quote(x[2]) : "'<that draft>'"} '<their words>'${of}${said}. Never write the words for them.`);
+      continue;
+    }
+    if ((x = /^(yes|no|"([^"]+)")\s+to\s+"([\s\S]+)"$/i.exec(step))) {
+      run.push(`${cmd} --intent-decide ${quote(x[3])} ${(x[2] ?? x[1]).toLowerCase()}${said}`);
+      continue;
+    }
+    if ((x = /^it is (?:a part of Component\s+(.+)|its own component)$/i.exec(step))) {
+      run.push(`${cmd} --part ${quote(d.page)} ${quote(x[1]?.trim() ?? 'none')}${said}`);
+      continue;
+    }
+    if (/^ask me which component it is a part of$/i.test(step)) {
+      notes.push(`Ask the person which component ${d.page} is a part of, as Figma names it, then run ${cmd} --part ${quote(d.page)} '<that component>'${said}.`);
+      continue;
+    }
+    if ((x = /^write\s+"([^"]+)"(?:\s+(?:in|under)\s+([^,]+?))?,?\s+as drafts I review$/i.exec(step))) {
+      const section = (x[2] ?? '').replace(/^##\s*/, '').trim() || x[1];
+      notes.push(`Draft "${x[1]}" for ${d.on}: write the lines yourself, from what the system has (its components, their options and its rules), never a name it does not have; then run ${cmd} --draft ${quote(d.page)} ${quote(section)} '<line>' ['<line>'…] --task ${quote(x[1])}. Each line is marked as a draft from that task, and no agent gets it until the team approves it. Show the person the lines; send them (--commit or --merge-request) only when they ask.`);
+      continue;
+    }
+    notes.push(`Then, for ${d.on}: ${step}.`);
+  }
+  return { run, notes };
+}
+
 function routeOnly(text, opts) {
   const r = routeRequest(text, opts);
   const { cmd, components = [] } = opts;
@@ -320,6 +369,12 @@ function routeOnly(text, opts) {
 
 function routeRequest(text, { hasConfig, components, cmd, build = false, pages = [], cloud = false, writes = null }) {
   const t = String(text ?? '');
+  // A decision copied from the style guide: each step made as it says, for the page it names, and kept in its words.
+  const copied = hasConfig ? copiedDecision(t) : null;
+  if (copied) {
+    const { run, notes } = decisionSteps(copied, t, cmd);
+    if (run.length || notes.length) return { recipe: 'guidelines-links', question: false, run, kind: 'copied-decision', notes: ['A decision the person copied from the style guide: make it as it says, for the page it names. When a command says the page changed since it was read, ask the person again; never guess.', ...notes] };
+  }
   const question = QUESTION.test(t);
   const named = namedComponents(t, components);
   // Before any component is known (no snapshot, no component file), a name written as one (buttonPrimary, the card
