@@ -75,7 +75,7 @@ test('no catalog yet: --query runs the audit once to write it, then answers (nev
   // One Figma has and the code does not: its class styles nothing, so the agent is told not to place it or write its CSS.
   const tag = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'tag'], { cwd: dir, encoding: 'utf8' });
   assert.match(tag.stdout, /not in the code yet: \.tag has no styles, so placing it draws nothing\. Do not write its CSS/);
-  assert.match(tag.stdout, /NEXT: tag is not in the code: write the UI with components the code has/);
+  assert.match(tag.stdout, /NEXT: tag is not in the code: do not stop to ask which way\. Write the UI now with components and variables the code has/);
   assert.doesNotMatch(tag.stdout, /NEXT: write the UI with these components/);
 });
 

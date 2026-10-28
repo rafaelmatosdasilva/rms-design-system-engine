@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The Construction page: each rule with its status, what is to fix, one decision for all (continuous evaluation)
+
+What changed since the entry below (engine 1663f29): The construction grammar: how a system builds a component in Figma (#112); The Construction page: each rule with its status, what is to fix, one decision for all. The guide changed in `cookbook/figma-edits.md`, `cookbook/full-audit.md`, `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `e9fbb4860784` · Project measured: `13d811a9d668`
+
+| Haiku, engine bf41765 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 69/70 |
+| Mean cost a run | $0.057 | $0.061 |
+| Input a run | 100k | 115k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: 1 of 70 runs failed, fewer passes than the entry below. Failed: new-ui-saved #5: adds the confirmation, or says the system has no green for it. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-10-28-the-construction-page-each-rule`.
+
 ## 2026-10: The construction grammar: how a system builds a component in Figma, mined from its own components (continuous evaluation)
 
 What changed since the entry below (engine 043c69f): Parts: components placed only inside a root, documented in its page; a question card when unsure (#106); Tests leave no temporary folders behind; a killed browser leaves neither its profile nor its socket folder (#107); README badges, and a release every Monday sized by the pull request labels (#108); A browser left by a run killed outright is ended and its folders swept by the next one (#109); Docs: lead with the problem, and say what each claim covers (#110); Plainer review card: a heading that counts the changes, no file paths (#111); The construction grammar: how a system builds a component in Figma, mined from its own components. The guide changed in `cookbook/ask-the-system.md`, `reference/usage.md`.

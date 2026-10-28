@@ -87,7 +87,7 @@ export function answerLines(a) {
   // Where it lives: the products that use it, what it sits inside and holds, the Figma screens that draw it.
   if (e.livesIn) lines.push(...usageLines(e.livesIn));
   // Figma has it, the code does not: its class styles nothing, so an agent that places it ends up writing its CSS.
-  if (a.notBuilt) lines.push(`  not in the code yet: ${e.selector ?? name} has no styles, so placing it draws nothing. Do not write its CSS in a screen: use a component the code has, or say ${name} is not built`);
+  if (a.notBuilt) lines.push(`  not in the code yet: ${e.selector ?? name} has no styles, so placing it draws nothing. Do not write its CSS in a screen: build with a component the code has, and say ${name} is not built`);
   return lines;
 }
 
@@ -168,7 +168,7 @@ async function main() {
     const built = answers.filter((a) => a.kind === 'component' && !unbuilt.has(a.name));
     if (first) console.log(`NEXT: build ${first} as written above, then run rms-design-system-engine --component ${first} until it passes\n`);
     else if (built.length) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>\n');
-    else if (answers.some((a) => a.kind === 'component')) console.log(`NEXT: ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not in the code: write the UI with components the code has (rms-design-system-engine --query <name>), or say what is missing\n`);
+    else if (answers.some((a) => a.kind === 'component')) console.log(`NEXT: ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not in the code: do not stop to ask which way. Write the UI now with components and variables the code has (rms-design-system-engine --query <name>), and say in the reply that ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not built and what the system lacks for the request (a colour it has none of: "the system has no green")\n`);
   }
   process.exit(answers.every((a) => a.kind !== 'none') ? 0 : 1);
 }
