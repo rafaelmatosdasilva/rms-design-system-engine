@@ -31,7 +31,7 @@ const carries = (n, root) => n.length > root.length && low(n).startsWith(low(roo
 const stem = (n) => { const w = words(n); return w.length >= 3 ? low(w.slice(0, -1).join('')) : null; };
 // The words a piece of something is named with: a component named so that nothing holds is asked about (its root may
 // be missing from the system), never taken for a part.
-const PIECE = /^(row|item|cell|header|footer|legend|option|segment)$/i;
+const PIECE = /^(row|item|cell|legend|option|segment)$/i;   // a header or a footer is as often a component of its own
 
 // The team's word, when it said: { part: root | null } (null: a component of its own).
 function answered(said = {}, name) { return Object.prototype.hasOwnProperty.call(said, name) ? said[name] : undefined; }
@@ -59,9 +59,12 @@ export function partsOf({ names = [], uses = {}, said = {} } = {}) {
     const last = words(n).pop();
     if (!named.length && PIECE.test(last) && words(n).length > 1 && !all.some((p) => holds(p, n))) questions.push({ part: n, roots: [], why: `${n} is named as a piece of something (${last}), but nothing holds it and no component carries its name` });
   }
-  // A question both ways about one pair is asked once, about the one whose name carries the other's (or the first).
+  // A question both ways about one pair is asked once, about the one named as a piece (tileCardRow, not tileCardBank),
+  // else the first.
+  const piece = (q) => PIECE.test(words(q.part).pop());
   const seen = new Set();
-  const asked = questions.filter((q) => { const k = [q.part, ...q.roots].sort().join('|'); if (seen.has(k)) return false; seen.add(k); return true; });
+  const asked = [...questions].sort((a, b) => piece(b) - piece(a)).filter((q) => { const k = [q.part, ...q.roots].sort().join('|'); if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => all.indexOf(a.part) - all.indexOf(b.part));
   // A root that is itself a part (grid/Cell/text under grid/Cell under grid): its parts go to the top one.
   const top = (r) => { const s = new Set(); while (partOf[r] && !s.has(r)) { s.add(r); r = partOf[r].root; } return r; };
   for (const p of Object.keys(partOf)) partOf[p] = { ...partOf[p], root: top(partOf[p].root) };

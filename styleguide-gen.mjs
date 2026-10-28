@@ -1288,7 +1288,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const c of view.components) {
         if (partOf[c.name]) {
           const root = partOf[c.name].root, page = pageOf.get(root);
-          c.partOf = { root, by: partOf[c.name].by, docs: page?.parts?.[c.name] ?? [], page: page ? { file: page.file, url: page.url ?? null } : null };
+          c.partOf = { root, by: partOf[c.name].by, docs: page?.parts?.[c.name] ?? [], page: page ? { file: page.spec ?? page.file, url: page.specUrl ?? page.url ?? null } : null };   // the spec a person edits, when it has one
         }
         if (partsByRoot[c.name]) c.parts = partsByRoot[c.name];
       }
