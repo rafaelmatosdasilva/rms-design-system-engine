@@ -240,3 +240,12 @@ test('setup takes the documentation link from the request, and never asks for it
   assert.equal(full.ask, null);
   assert.doesNotMatch(full.run[0], /--documentation/);
 });
+
+test('how the system builds a component in Figma asks for its construction grammar, never a build', () => {
+  for (const q of ['how does our system build a component in Figma?', 'quais são as regras de construção dos componentes?', 'show me the construction grammar']) {
+    const g = r(q);
+    assert.equal(g.recipe, 'ask-the-system', q);
+    assert.deepEqual(g.run, ['rms-design-system-engine --query construction'], q);
+  }
+  assert.equal(r('build the chip from Figma', { components: ['chip'] }).recipe, 'build-from-figma');
+});

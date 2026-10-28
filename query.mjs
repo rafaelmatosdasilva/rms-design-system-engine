@@ -119,7 +119,24 @@ async function main() {
   try { tokens = flattenTokens(JSON.parse(readFileSync(join(dir, 'tokens.json'), 'utf8'))); } catch { /* components only */ }
   const spec = resolveNamingSpec(cfg);
   const varOf = (p) => { try { return tokenToVar(p, spec); } catch { return null; } };
-  const answers = terms.map((t) => answer(t, { catalog, tokens, varOf }));
+  // "construction": how the system builds a component in Figma (contracts/construction.json), unless a component has
+  // that name.
+  const grammarTerm = (t) => /^(construction|grammar)$/i.test(t) && !catalog.components?.[t];
+  if (terms.some(grammarTerm)) {
+    let g = null;
+    try { g = JSON.parse(readFileSync(join(dir, 'construction.json'), 'utf8')); } catch { /* none yet */ }
+    const { grammarLines } = await import('./construction-grammar.mjs');
+    const lines = grammarLines(g);
+    if (json) console.log(JSON.stringify(g, null, 2));
+    else {
+      console.log('');
+      for (const l of lines.length ? lines : ['No construction grammar yet: it is mined from the Figma capture, so refresh Figma (--recipe refresh-figma) and run rms-design-system-engine.']) console.log(l);
+      for (const q of g?.questions ?? []) console.log(`? ${q.ask} (answer in the authored contract: "construction": { "${q.id}": true | false })`);
+      console.log('');
+    }
+    if (terms.every(grammarTerm)) process.exit(lines.length ? 0 : 1);
+  }
+  const answers = terms.filter((t) => !grammarTerm(t)).map((t) => answer(t, { catalog, tokens, varOf }));
   // The components Figma has and the code does not (experimental, not built yet, or still to build).
   let unbuilt = new Set();
   if (answers.some((a) => a.kind === 'component')) {
