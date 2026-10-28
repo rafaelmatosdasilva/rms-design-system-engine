@@ -8,7 +8,9 @@
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/commits/main"><img src="https://img.shields.io/github/last-commit/rafaelmatosdasilva/rms-design-system-engine/main?label=last%20commit" alt="Last commit"></a>
 </p>
 
-Unlike standalone skills and fragmented workflows, RMS Design System Engine generates and connects design intent, implementation insights, documentation, contracts, verification and prototypes through shared knowledge. Every capability builds on the same context, allowing insights from one task to inform others without duplicating analysis or starting from scratch. This helps teams maintain reliable design systems as products evolve and AI agents build with them.
+AI agents can build interfaces in minutes. The hard part is making sure what they build follows your design system, and keeps following it as tokens, components and requirements change.
+
+RMS Design System Engine reads what you have (a Figma file, a codebase, or both) and turns it into documentation and component contracts that people and agents can use. It then checks every implementation against explicit rules, many of them measured in a real browser, instead of trusting the agent to get it right. Every check builds on the same shared knowledge, so what one task learns, the next one uses.
 
 ## Who it's for
 

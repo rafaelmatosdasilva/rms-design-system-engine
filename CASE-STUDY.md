@@ -2,7 +2,7 @@
 
 **The question.** A team already has Claude, its repository and the Figma MCP. What does adding the skill change in what gets built?
 
-**The answer, measured.** Work made with the skill matches the design system far more often, on every model. Nothing is invented. Every colour mode is right, and the team gets a list of what its system is missing. A small, cheap model with the skill beats the most capable model without it.
+**The answer, measured.** Work made with the skill matches the design system far more often, on every model. Claude keeps to the system's components. Every colour mode is right, and the team gets a list of what its system is missing. A small, cheap model with the skill beats the most capable model without it.
 
 ## How it was measured
 
@@ -23,6 +23,8 @@ Six tasks. Build the tokens, the button, the chip, the field, the tag, then the 
 | Sonnet | 16 of 30 | 30 of 30 |
 | Haiku | 4 of 18 | 18 of 18 |
 
+These are results on the tasks above, on one small fictional system, not a benchmark of every design system. "With the skill" is the guide, the engine and the hooks together, so the numbers measure them as one.
+
 - **Dark mode.** No run without the skill got the dark colours right, on any model (0 of 11). The MCP returns one mode, so every dark value was guessed. The skill reads every mode.
 - **What Figma knows and the code missed.** The chip's toggle role and the field's real text input come from Figma annotations. Variables replace literal colours, and the tag keeps its exact height. Without the skill these were missed or guessed.
 - **Every miss with the skill becomes a check.** Opus with the skill first passed 16 of 18. Both misses overwrote an accessible name passed in by the caller. The engine now catches that pattern in every edit, and the next run passed 18 of 18. Haiku then missed two builds, a field with no text colour and a second way of losing the accessible name. Both became checks, and Haiku passed 18 of 18.
@@ -41,7 +43,7 @@ The designer asks for a screen. The rule is to use only the system's components,
 
 - **Without the skill, most failures were inventions.** Opus built its own Switch component, drew its own illustration, and wrote colours and sizes the system does not have (13 of its 36 runs, Haiku 32). On the twelfth task, a chip that shows only its icon, both models alone named it for a screen reader every time and still gave the page a look of its own every time. Two Sonnet runs changed the system's own tokens file. Neither model alone showed a list when it is empty or a form sent with a mistake.
 - **A page has every state and holds to the others.** Five of the twelve tasks ask for what a finished design owes: a list's empty state, a form's error state, the team's four-step sign-up flow with its pages deciding alike, a page at phone width, and a button that opens a confirmation. The skill draws each state, tries every screen width and each click in the browser, and holds the pages of a flow to one wording and one layout.
-- **With the skill nothing is invented.** A need the system cannot meet becomes a labelled box on the page and a line on the gap list for the design team, for example "on/off switch, closest in the system is the chip".
+- **With the skill, a gap is shown instead of filled in.** A need the system cannot meet becomes a labelled box on the page and a line on the gap list for the design team, for example "on/off switch, closest in the system is the chip".
 - **Documentation and consistency.** Two of the twelve tasks follow the team's written guidelines (one button per screen, a tag is never a confirmation, including guidelines fetched from GitLab and Notion). One keeps a new page consistent with the designed Settings screen. Opus alone passed these when the documentation sat in plain view in the repository. The skill also makes them checks. A prototype that breaks a written limit is not drawn, and a component the documentation rules out cannot stand in.
 
 ### 3. The skill's own efficiency
@@ -59,7 +61,7 @@ A rule violation is changing code nobody asked for, committing unasked, writing 
 ## What this means for a team
 
 1. **What gets built matches the design system.** Every component is measured against Figma in the browser and fixed until it matches. In light and dark, in every state.
-2. **Nothing is invented, and gaps become visible.** Claude uses only what exists. Everything it needed and could not find goes on one list, counted across screens, so the design team sees the most needed missing pieces first.
+2. **Gaps are shown, not filled with inventions.** Claude is held to what exists, and the page check flags anything that is not from the system. Everything it needed and could not find goes on one list, counted across screens, so the design team sees the most needed missing pieces first.
 3. **The team's knowledge is used every time.** Figma descriptions and annotations, code notes, recorded decisions, and guidelines from Notion, GitLab or the repository are put in front of Claude for each request. The rules that can be checked are checked.
 4. **Pages of one product stay consistent.** A new page is compared with the designed screens and the pages already made.
 5. **A cheaper model does the job.** Haiku with the skill beat Opus alone at building from Figma (18 of 18 against 8 of 18, for $1.93 against $2.49) and at prototyping (35 of 36 against 17 of 36).
