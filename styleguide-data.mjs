@@ -1144,6 +1144,9 @@ export function chromeRoles({ tokens = null, themeCss = '', componentNames = [],
   const named = new Set();
   for (const [role, v] of Object.entries(override ?? {})) if (typeof v === 'string' && v) { roles[role] = /^--/.test(v) ? `var(${v})` : v; from[role] = 'styleguide.chrome'; named.add(role); }
   follow(named);
+  // The page's panels are a faint layer of its text over its background (the template's own rule), unless the team names
+  // their colour by hand: then its own token, written apart (--sg-bg-2-own), wins in every brand and mode.
+  for (const role of ['bg-2', 'surface']) if (named.has(role)) roles[`${role}-own`] = roles[role];
   const NEEDED = ['bg', 'surface', 'text', 'muted', 'border', 'accent', 'space-s', 'space-l'];   // text sizes and corners are the template's own
   const missing = NEEDED.filter((r) => !roles[r]);
   // Declared again on every element that carries its own mode, so a preview in Light on a Dark page resolves the
