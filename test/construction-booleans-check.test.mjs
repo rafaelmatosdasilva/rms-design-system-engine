@@ -75,3 +75,11 @@ test('a run fails on the rules the team decided, beside the gates, and says noth
   const kept = constructionLines(grammarOf({ props, structure, skeleton }, { answers: { 'family-page': true } }));
   assert.equal(kept[0], '**Construction.** 1 of the 1 rules the team decided is broken, by 1 component:');
 });
+
+test('the layer order names only the few layers most components have, and holds together', () => {
+  const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const sk = Object.fromEntries(['cardOne', 'cardTwo', 'cardThree', 'cardFour'].map((n, k) => [n, { trees: [{ c: (k === 3 ? [...names].reverse() : names).map((l) => ({ t: 'FRAME', n: l })) }], variants: [['state=default', 0]] }]));
+  const r = rule(grammarOf({ props: {}, skeleton: sk }), 'layer-order');
+  assert.equal(r.says, 'A component\'s layers come in one order: A, B, C, D, E, F', 'six at most, each where it sits on average');
+  assert.deepEqual(r.toFix.map((x) => x.component), ['cardFour']);
+});
