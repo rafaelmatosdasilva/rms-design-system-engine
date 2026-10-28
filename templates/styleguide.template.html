@@ -3040,10 +3040,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var G = DATA.construction, RULES = G.rules || [];
     hr(); if (G.listed) navLink('construction', 'construction');
     var sec = section('construction', 'System', 'Construction', '');
-    var AREA = { components: 'Components', properties: 'Properties', variants: 'Variants', layers: 'Layers', layout: 'Layout', variables: 'Variables', documentation: 'Documentation' };
+    // The kind of rule each is (construction-grammar.mjs → judge): every rule on names together, whatever is named.
+    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation' };
     var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
     var ORDER = { fix: 0, decide: 1, rule: 2 };
-    var AREA_WORD = { 'colour-variables': 'the variables a component\'s colours use', 'spacing-variables': 'the variables a component\'s spacing, gaps and radii use' };
     var rows = RULES.slice().sort(function (a, b) { return ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
@@ -3053,7 +3053,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var todoOf = function (r) {
       var n = comps(r).length;
       if (r.status === 'rule') return '<span class="pg-missing">Nothing</span>';
-      if (r.status === 'decide') return r.ways ? 'Decide which way the system goes: ' + r.ways.map(function (w) { return w.follows + ' ' + (w.way === 'own' ? 'use variables made for them' : 'use shared variables'); }).join(', ') : 'Decide whether it is the rule; then ' + n + ' ' + plural2(n) + ' to fix';
+      // Said as the rule the way most go, never as a question: the team confirms it, or takes the other way.
+      if (r.status === 'decide') return r.ways ? 'Confirm it, or take the other way: ' + r.ways.map(function (w) { return w.follows + ' ' + (w.way === 'own' ? 'use variables made for them' : 'use shared variables'); }).join(', ') : 'Decide whether it is the rule; then ' + n + ' ' + plural2(n) + ' to fix';
       return 'Fix ' + n + ' ' + plural2(n);
     };
     var cmd = 'rms-design-system-engine';
@@ -3069,7 +3070,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var copyBtn = function (k, head, text) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc(text) + '"') + '<span class="sg-decide-said" role="status"></span></div>'; };
     var rowHTML = function (r, i) {
       var n = comps(r).length;
-      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '"><td><strong>' + esc(r.ways && r.status === 'decide' ? capital(AREA_WORD[r.id] || 'variables') + ': shared, or made for each component?' : r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + r.follows + ' of ' + r.of + '<span class="pg-par-val">' + Math.round(r.follows / r.of * 100) + '%</span></td><td>' + todoOf(r) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '"><td><strong>' + esc(r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + r.follows + ' of ' + r.of + '<span class="pg-par-val">' + Math.round(r.follows / r.of * 100) + '%</span></td><td>' + todoOf(r) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     var cxKey = function (r) { return 'cx:' + r.id; };
     var panel = function (i, from) {
@@ -3101,7 +3102,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         + cs.map(function (c) { return '<tr><td>' + compHTML(c) + '</td><td>' + byC[c].map(function (t) { return '<p class="sg-il-line"><span>' + esc((t.fix && t.fix.say) || t.value) + '</span></p>'; }).join('') + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
       var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Suggestion', suggest) + card('Decision', decide) + list;
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', ST[r.status][1]], title: r.ways && r.status === 'decide' ? capital(AREA_WORD[r.id] || 'variables') + ': shared, or made for each component?' : r.says, body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);
     };
     sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr><th>Rule</th><th>Area</th><th>Follow it</th><th>To do</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
