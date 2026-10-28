@@ -30,10 +30,11 @@ const base = (f) => noExt(f).split('/').pop();
 
 export const DECISIONS = (ROOT) => resolve(ROOT, projectPath(ROOT, 'intentDecisions'));
 export function readDecisions(ROOT) { try { return JSON.parse(readFileSync(DECISIONS(ROOT), 'utf8')); } catch { return {}; } }
-// keys: [key]; answer: 'yes' | 'no'. proposals: { key: proposal } to keep each one's words with its answer.
-export function decide(ROOT, keys, answer, proposals = {}, { now = new Date().toISOString(), by = null } = {}) {
+// keys: [key]; answer: 'yes' | 'no'. proposals: { key: proposal } to keep each one's words with its answer. said: the
+// decision as the person gave it (the words copied from the style guide), kept beside it as they wrote it.
+export function decide(ROOT, keys, answer, proposals = {}, { now = new Date().toISOString(), by = null, said = null } = {}) {
   const d = readDecisions(ROOT);
-  for (const k of keys) d[k] = { answer, proposal: proposals[k]?.proposal ?? d[k]?.proposal ?? null, by: by || null, at: now };
+  for (const k of keys) d[k] = { answer, proposal: proposals[k]?.proposal ?? d[k]?.proposal ?? null, by: by || null, at: now, ...(said ? { said } : {}) };
   writeFileSync(DECISIONS(ROOT), JSON.stringify(d, null, 2) + '\n');
   return d;
 }

@@ -561,8 +561,13 @@ export function jsonReview(entry, text, to) {
   if (draftOf(String(entry.description ?? ''), text)) { n++; if (to === null) delete entry.description; else entry.description = next(entry.description); }
   return n;
 }
-// decisions: [{ page (its name or file), line (a draft's text; left out: every draft of the page), do: 'approve' |
-// 'change' | 'drop', to (change's new text) }]. check(entity, text) → why the new text is wrong, or null.
+// The system's own page, as a page with drafts: its entry in the layer's index (doc-source-dsds.mjs → readDsds).
+export const SYSTEM_PAGE = 'the System page';
+export const systemPage = (snap) => (snap?.system?.drafts?.length ? { name: SYSTEM_PAGE, id: snap.system.id ?? snap.system.name, file: snap.system.file, drafts: snap.system.drafts } : null);
+const isSystemPage = (page) => ['thesystempage', 'systempage', 'thesystem'].includes(norm(page));
+// decisions: [{ page (its name or file, or the System page), line (a draft's text; left out: every draft of the page),
+// do: 'approve' | 'change' | 'drop', to (change's new text), task (only the drafts that task wrote), expect (how many
+// drafts the person saw: any other number is not done) }]. check(entity, text) → why the new text is wrong, or null.
 // → { files: Map(path → new text), pages: [{ name, file, spec, approved, changed, dropped }], problems: [why not] }
 export function reviewPlan(snap, decisions, files, { check = () => null } = {}) {
   const idx = specIndex(files);
@@ -570,11 +575,14 @@ export function reviewPlan(snap, decisions, files, { check = () => null } = {}) 
   const text = (f) => next.get(f) ?? files.get(f);
   const byPage = new Map(), problems = [];
   for (const d of decisions) {
-    const say = (why) => problems.push(`${d.page}${d.line ? `, "${d.line}"` : ''}: ${why}`);
+    const say = (why) => problems.push(`${d.page}${d.line ? `, "${d.line}"` : ''}${d.task ? ` (the task "${d.task}")` : ''}: ${why}`);
     if (!['approve', 'change', 'drop'].includes(d.do)) { say('say approve, change or drop'); continue; }
-    const e = snap.entities.find((x) => (norm(x.name) === norm(d.page) || (d.page && String(x.file).endsWith(d.page))) && (x.drafts ?? []).length);
+    const e = isSystemPage(d.page) ? systemPage(snap) : snap.entities.find((x) => (norm(x.name) === norm(d.page) || (d.page && String(x.file).endsWith(d.page))) && (x.drafts ?? []).length);
     if (!e) { say('no page of that name has drafts'); continue; }
-    const lines = d.line ? e.drafts.filter((x) => flat(x.text) === flat(d.line)) : e.drafts;
+    const ofTask = d.task ? e.drafts.filter((x) => flat(x.task).toLowerCase() === flat(d.task).toLowerCase()) : e.drafts;
+    if (d.task && !ofTask.length) { say(`no draft on it is from that task${[...new Set(e.drafts.map((x) => x.task).filter(Boolean))].length ? ` (its drafts are from ${[...new Set(e.drafts.map((x) => x.task).filter(Boolean))].map((t) => `"${t}"`).join(', ')})` : ''}`); continue; }
+    if (d.expect != null && !d.line && ofTask.length !== Number(d.expect)) { say(`it has ${ofTask.length} draft${ofTask.length === 1 ? '' : 's'}${d.task ? ' from that task' : ''}, not ${d.expect}: the page changed since it was read, so ask the person again`); continue; }
+    const lines = d.line ? ofTask.filter((x) => flat(x.text) === flat(d.line)) : ofTask;
     if (!lines.length) { say('the page has no draft with that text (--review-drafts lists them)'); continue; }
     if (d.do === 'change' && (!d.line || !flat(d.to))) { say('a change takes the line and its new text (to)'); continue; }
     if (d.do === 'change') { const why = check(e, flat(d.to)); if (why) { say(`the new text is not kept: ${why}`); continue; } }
@@ -617,6 +625,44 @@ export function decisionPlan(snap, subject, line, files, { codes = [] } = {}) {
   b.body = (String(b.body ?? '').replace(/\s*$/, '') + `\n- ${line}`).replace(/^\n/, '');
   next.set(e.file, jsonText(doc, before));
   return { files: next, page: e.name, file: e.file };
+}
+
+// Lines drafted on a page for a person to review (--draft): under the section they answer, each marked as a draft with
+// the task that wrote it (**Draft (<task>, <day>):** …), so no agent gets them until a person approves them and the
+// decision copied from the style guide names that task. On a component, pattern, template or foundation's page, or on
+// the System page (the system's own entry in the layer's index). Never changes a line already there.
+// → { files: Map(path → text), page, file, lines: [marked] } | { error }
+export function draftLinesPlan(snap, subject, section, lines, files, { task = null, at = new Date().toISOString().slice(0, 10), codes = [] } = {}) {
+  const title = String(section ?? '').replace(/^#+\s*/, '').trim();
+  if (!title) return { error: 'name the section the drafts go under' };
+  const said = (lines ?? []).map((l) => flat(String(l).replace(DRAFT, ''))).filter(Boolean);
+  if (!said.length) return { error: 'give the lines to draft' };
+  const mark = `**Draft${task ? ` (${flat(task).replace(/[()]/g, '')}, ${at})` : ''}:** `;
+  const marked = said.map((l) => mark + l);
+  const system = isSystemPage(subject) && snap?.system?.file;
+  const want = norm(subject);
+  const e = system ? { name: SYSTEM_PAGE, id: snap.system.id ?? snap.system.name, file: snap.system.file }
+    : (snap?.entities ?? []).find((x) => x.kind !== 'token' && (norm(x.name) === want || norm(String(x.file).replace(/^.*\//, '').replace(/\.dsds\.json$/, '')) === want));
+  if (!e) return { error: `no page in the intent layer is about "${subject}": name a component, a pattern, a template, a foundation as its page is titled, or the System page` };
+  const idx = specIndex(files, { codes }), src = system ? null : specOf(e, idx), next = new Map();
+  if (src && files.has(src.spec) && !src.shared) {
+    let t = files.get(src.spec);
+    for (const l of marked) t = mdAdd(t, title, l, { sure: true });
+    next.set(src.spec, t);
+    return { files: next, page: e.name, file: src.spec, lines: marked };
+  }
+  const before = files.get(e.file); let doc = null; try { doc = JSON.parse(before); } catch { /* not JSON */ }
+  const entry = doc && (system ? (doc.entries ?? []).find((x) => x?.kind === 'system') : (entriesOf(doc).find((x) => (x.id ?? x.name) === (e.id ?? e.name)) ?? entriesOf(doc)[0]));
+  if (!entry) return { error: `the page for "${subject}" (${e.file}) could not be read to write it` };
+  entry.sections ??= [];
+  let sec = entry.sections.find((x) => x?.kind === 'section' && flat(x.title).toLowerCase() === title.toLowerCase());
+  if (!sec) { sec = { kind: 'section', for: 'all', title, freeform: [{ title, body: '' }] }; entry.sections.push(sec); }
+  sec.freeform ??= [{ title, body: '' }];
+  const b = sec.freeform[0];
+  b.title ??= title;
+  b.body = (String(b.body ?? '').replace(/\s*$/, '') + marked.map((l) => `\n- ${l}`).join('')).replace(/^\n/, '');
+  next.set(e.file, jsonText(doc, before));
+  return { files: next, page: e.name, file: e.file, lines: marked };
 }
 
 // A part's place under its root's Parts, in a Markdown spec: its own ### heading under ## Parts (made before Decisions

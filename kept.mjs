@@ -57,14 +57,14 @@ export function reviewDate(value, today = new Date()) {
 
 // Keep these findings ([{ check, what, component }], as the last audit recorded them). A decision made again for the
 // same difference replaces the old one. → the decisions written.
-export function recordKept(ROOT, findings, { reason, by = null, at = new Date().toISOString(), truth = null, review = null } = {}) {
+export function recordKept(ROOT, findings, { reason, by = null, at = new Date().toISOString(), truth = null, review = null, said = null } = {}) {
   if (!String(reason ?? '').trim()) throw new Error('a kept difference needs its reason');
   const byKey = new Map(readKept(ROOT).map((d) => [d.key, d]));
   const added = [];
   for (const f of findings) {
     const key = keptKey(`${f.check} :: ${f.what}`);
     const e = { key, ...split(key), component: f.component ?? null, reason: String(reason).trim(), by: by || null, at,
-      ...(truth ? { truth } : {}), ...(review ? { review } : {}) };
+      ...(truth ? { truth } : {}), ...(review ? { review } : {}), ...(said ? { said } : {}) };
     byKey.set(key, e);
     added.push(e);
   }

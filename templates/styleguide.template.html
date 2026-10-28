@@ -3267,6 +3267,26 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var decideMark = function (k) { return DECIDE_MARK[k] ? '<svg class="sg-decide-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + DECIDE_MARK[k] + '</svg>' : ''; };
   // A word quoted for the shell, as a command to paste takes it.
   var shq = function (s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; };
+  // What every decision copied from the guide starts with: the system's own command (styleguide-gen.mjs → engineCommand),
+  // so whoever pastes it runs it for this system and no other.
+  var ENGINE = DATA.engineCommand || 'rms-design-system-engine';
+  // The page a decision is about, by its kind and name as the guide shows them: "Component Button", "Template Checkout",
+  // "Legend, part of Component Pie chart", "the System page". Never its file: the person reads what they decide on.
+  var ilOn = function (p) {
+    if (!p || p.absent || p.system) return 'the System page';
+    if (p.about && p.about.partOf) return p.name + ', part of Component ' + p.about.partOf;
+    if (p.missingFor) return 'Component ' + p.missingFor;
+    var kind = ({ templates: 'Template', foundations: 'Foundation', patterns: 'Pattern', flows: 'Flow', pages: 'Page' })[p.layer];
+    return kind ? kind + ' ' + p.name : 'Component ' + ((p.about && p.about.is) || p.component || p.name);
+  };
+  // The task that wrote a page's drafts, as the decision names it: ' from the task "<title>" (28 Oct)', or '' when the
+  // drafts name none or several.
+  var ilTaskOf = function (drafts) {
+    var t = (drafts || []).map(function (d) { return d.task || ''; }), one = t[0];
+    if (!one || t.some(function (x) { return x.toLowerCase() !== one.toLowerCase(); })) return '';
+    var at = (drafts[0] || {}).at, d = at ? new Date(at + 'T12:00:00') : null;
+    return ' from the task "' + one + '"' + (d && !isNaN(d) ? ' (' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ')' : '');
+  };
   var IL = DATA.intentLayer, fillDocs = null;
   // A system with no intent layer has the page too: one row a component, its documentation read from Figma and the code.
   var NO_LAYER = !(IL && (IL.pages || []).length);
@@ -3310,7 +3330,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var todo = html ? html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
       // Its own options when it lists them (three or more), else yes and no.
       return open.map(function (x) {
-        var cmd = function (a) { return 'rms-design-system-engine --intent-decide "' + x.key + '" ' + a; };
+        // The answer in the person's words, for the page by its kind and name: the system's command, then "Yes to "…"".
+        var cmd = function (a) { return ENGINE + ' on ' + ilOn(p) + ', ' + (a === 'yes' ? 'Yes' : a === 'no' ? 'No' : '"' + a + '"') + ' to "' + x.proposal + '"'; };
         var opts = (x.options && x.options.length) ? x.options.map(function (o) { return { answer: String(o.answer).toLowerCase(), label: o.label || 'If ' + o.answer, does: o.does || '' }; }) : [{ answer: 'yes', label: 'If yes', does: x.yes || '' }, { answer: 'no', label: 'If no', does: x.no || todo }];
         return opts.map(function (o) { return ilAnswer(o.label, esc(o.does), cmd(o.answer)); }).join('');
       }).join('');
@@ -3385,21 +3406,22 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         + parts.map(function (x) { return section(x.what, x.html); }).join('')
         + off.map(function (x) { return section('Remove · ' + capital(x.from || 'a note'), noteBody(x, x.why || x.remove.replace(/^yes[:,]?\s*/i, '') || 'Nothing in it reaches an agent.')); }).join('')
         + fix.map(function (x) { return section('Change · ' + capital(x.from || 'a note'), noteBody(x, [x.why, x.fix].filter(Boolean).join(' '))); }).join('');
-      var cmd = function (a, rest) { return 'rms-design-system-engine --review-drafts --' + a + ' ' + shq(page) + (rest || ''); };
-      var one = n === 1, who = p.name || p.missingFor || page, only = nd === n, line = nd ? groups[0].lines[0] : '';
-      var on = 'On ' + who + '\'s intent layer page (' + page + '): ', list = function (xs) { return xs.map(function (x) { return '"' + x + '"'; }).join(', '); };
-      var drafts = nd === 1 ? 'its draft' : 'its ' + nd + ' drafts';
-      // Approve: each change made as proposed. Drafts alone: the command itself.
-      var approve = only ? cmd('approve') : on + [nd ? 'approve ' + drafts + ' (run ' + cmd('approve') + ')' : '',
-        toWrite.length ? 'write ' + toWrite.map(function (x) { return '"' + x.what + '"' + (x.where ? ' in ' + x.where : ''); }).join(', ') + ', as drafts I review' : '',
+      // Each decision in the person's words: the system's command, the page by its kind and name, what is decided, how
+      // many drafts and the task that wrote them. Never a file or a flag: Claude Code finds the page and runs the rest.
+      var one = n === 1, only = nd === n, line = nd ? groups[0].lines[0] : '';
+      var on = ENGINE + ' on ' + ilOn(p) + ', ', from = ilTaskOf(p.missingFor ? [] : p.drafts), list = function (xs) { return xs.map(function (x) { return '"' + x + '"'; }).join(', '); };
+      var drafts = function (verb) { return verb + ' ' + (nd === 1 ? 'its draft' : 'all ' + nd + ' drafts') + from; };
+      var noFile = function (w) { return String(w || '').replace(/^[^,]*\.(?:md|json)\b,?\s*/i, ''); };
+      // Approve: each change made as proposed.
+      var approve = on + capital([nd ? drafts('Approve') : '',
+        toWrite.length ? 'write ' + toWrite.map(function (x) { return '"' + x.what + '"' + (noFile(x.where) ? ' ' + noFile(x.where) : ''); }).join(', ') + ' as drafts I review' : '',
         off.length ? 'remove ' + list(off.map(noteOf)) + ' where each lives' : '',
         fix.length ? fix.map(function (x) { return 'for ' + list([noteOf(x)]) + ', ' + (x.fix ? x.fix.charAt(0).toLowerCase() + x.fix.slice(1).replace(/\.$/, '') : 'say what an agent should take from it'); }).join('; ') : '',
-        parts.map(function (x) { return 'copy what this page says into ' + (x.part.file || x.part.root + '\'s page') + ', under Parts, as ### ' + x.part.name + ', then delete this page'; }).join('; ')].filter(Boolean).join('; then ') + '.';
-      var change = only ? (one ? 'Change the draft on ' + who + '\'s intent layer page ("' + line + '"): ask me for my words, then run ' + cmd('change', ' ' + shq(line) + ' ' + shq('<my words>'))
-          : 'Change one of the ' + n + ' drafts on ' + who + '\'s intent layer page (' + page + '): ask me which one and my words, then run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>')))
-        : on + (one ? 'ask me for my words for this change, then make it with them' : 'ask me which of its ' + n + ' changes and my words, then make that one with them') + (nd ? ' (a draft: run ' + cmd('change', ' ' + shq('<that draft>') + ' ' + shq('<my words>')) + ')' : '') + '.';
+        parts.map(function (x) { return 'copy what this page says into Component ' + x.part.root + '\'s page, under Parts, as ### ' + x.part.name + ', then delete this page'; }).join('; ')].filter(Boolean).join('; then ')) + '.';
+      var change = on + (only ? (one ? 'Change its draft "' + line + '"' + from + ': ask me for my words.' : 'Change one of the ' + n + ' drafts' + from + ': ask me which one and my words.')
+        : (one ? 'Change this: ask me for my words, then make it with them.' : 'Change one of its ' + n + ' changes: ask me which one and my words, then make that one with them.'));
       // Drop: nothing is made. Its drafts are deleted; what is to write stays to write; the notes stay as they are.
-      var drop = only ? cmd('drop') : on + [nd ? 'drop ' + drafts + ' (run ' + cmd('drop') + ')' : '', write.length || notes.length ? 'write nothing new and leave ' + (notes.length ? 'its notes' : 'the page') + ' as ' + (notes.length ? 'they are' : 'it is') : ''].filter(Boolean).join('; ') + '.';
+      var drop = on + capital([nd ? drafts('Drop') : '', write.length || notes.length ? 'write nothing new and leave ' + (notes.length ? 'its notes' : 'the page') + ' as ' + (notes.length ? 'they are' : 'it is') : ''].filter(Boolean).join('; ')) + '.';
       // Three decisions side by side, each its own card on one line: its mark, its name, and the button that copies it for
       // Claude Code. What it does is the button's tip, for whoever wants it.
       var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div>'; };
@@ -3459,8 +3481,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var notesOff = function (p) { var c = !p.tokens && docComp(p); return (c && c.notesLeft) || []; };
     var needsRemove = function (p) { return notesOff(p).length > 0; };
     var removeTopic = function (p) { var n = notesOff(p).length; return n + (n === 1 ? ' note no agent reads' : ' notes no agent reads'); };
-    var needsReview = function (p) { return !p.tokens && !p.absent && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
-    var needsWrite = function (p) { if (p.absent) return true; return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
+    var needsReview = function (p) { if (p.absent) return !!(p.drafts || []).length; return !p.tokens && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
+    var needsWrite = function (p) { if (p.absent) return !(p.drafts || []).length; return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p) && !needsRemove(p); };
     var reviewTopic = function (p) { return p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
@@ -3477,7 +3499,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       rows.unshift({ action: 'keep', tokens: { missing: Object.keys(missing).sort(), total: Math.max(total, Object.keys(missing).length) } });
     })();
     // The system's row, first, while the layer does not say what to do when no component fits (layer-questions.mjs).
-    if (IL.absent && !IL.absent.rule && IL.absent.asked) rows.unshift({ action: 'write', absent: IL.absent });
+    // With drafts on the System page (the system's own entry), the row is theirs to review, and nothing is still to write.
+    if ((IL.systemDrafts || []).length) rows.unshift({ action: 'review', absent: IL.absent || { kinds: [], asked: 0, answered: 0 }, system: true, drafts: IL.systemDrafts });
+    else if (IL.absent && !IL.absent.rule && IL.absent.asked) rows.unshift({ action: 'write', absent: IL.absent });
     // Every row but Keep waits on a person: its status is Review, and what kind of review is said under it (a draft's
     // review is "Drafts", the others their decision: Move, Fix, Add…).
     // Under Review, the topic of the review, never an answer to it (the Proposal card answers): a page of a part of a
@@ -3509,9 +3533,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           todo: tm.length ? '<p class="sg-il-line"><strong>Say what ' + tm.length + ' of the ' + tn + ' tokens the components use are for. An agent asking which token to use for something finds nothing on them yet.</strong></p>' : '',
           why: '<p class="sg-il-line">' + esc((tn - tm.length) + ' of ' + tn + ' tokens the components use say what they are for, in Figma or in the intent layer.') + '</p>', gets: '' }; }
       if (p.absent) { var ab = p.absent, asked = ab.kinds.filter(function (k) { return !k.said; }).map(function (k) { return k.kind; });
-        return { decision: decisionCell('write', p), file: ab.entry ? (ab.entryUrl ? '<a class="sg-uses-link" href="' + esc(ab.entryUrl) + '" target="_blank" rel="noopener">' + esc(ab.entry) + '</a>' : esc(ab.entry)) : '<span class="pg-missing">—</span>', forWhat: 'The system', updated: docAt(p), reads: '', remove: '',
-          write: [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span><span class="sg-il-codes">' + asked.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join('') + '</span>' : '') }],
-          todo: '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits. Today an agent asked for a component the system does not have builds one of its own.</strong></p>',
+        var held = (p.drafts || []).length;
+        return { decision: decisionCell(held ? 'review' : 'write', p), file: ab.entry ? (ab.entryUrl ? '<a class="sg-uses-link" href="' + esc(ab.entryUrl) + '" target="_blank" rel="noopener">' + esc(ab.entry) + '</a>' : esc(ab.entry)) : '<span class="pg-missing">—</span>', forWhat: 'The system', updated: docAt(p), reads: '', remove: '',
+          write: held ? [] : [{ what: 'What to do when no component fits', html: '<span class="sg-il-label">What to write</span><span class="sg-il-text">One rule for every case, like "Use only the components in this system. If none fits, say so and ask before building one."</span><span class="sg-il-label">Where</span><span class="sg-il-text">On the system\'s page in the intent layer' + (ab.entry ? ', ' + esc(ab.entry) : '') + '.</span>' + (asked.length ? '<span class="sg-il-label">What agents ask for that the system does not have</span><span class="sg-il-codes">' + asked.map(function (k) { return '<code>' + esc(k) + '</code>'; }).join('') + '</span>' : '') }],
+          todo: held ? '<p class="sg-il-line"><strong>Review the drafts on the System page. Agents won\'t use them until you decide.</strong></p>' : '<p class="sg-il-line"><strong>Add one rule to the system\'s page that says what agents do when no component fits. Today an agent asked for a component the system does not have builds one of its own.</strong></p>',
           why: '<p class="sg-il-line">' + esc(ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: docAt(p), reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
@@ -3536,7 +3561,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo), task = own ? ilTodo(own) : c.todo;
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said')); };
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
     // A link to a page's panel (panel=doc:<file>) opens it.
@@ -3754,10 +3779,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // card to copy into Claude Code, which records it in the intent layer.
   var partQuestionRow = function (c) {
     var q = (DATA.partQuestions || []).filter(function (x) { return x.part === c.name; })[0]; if (!q) return null;
-    var run = function (to) { return 'rms-design-system-engine --part ' + shq(c.name) + ' ' + shq(to); };
+    // The answer in the person's words: the system's command, the component, then what it is.
+    var run = function (to) { return ENGINE + ' on Component ' + c.name + ', ' + (to === 'none' ? 'It is its own component' : 'It is a part of Component ' + to); };
     var card = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-part-copy="' + esc(copy) + '"') + '</div>'; };
     var cards = q.roots.map(function (r) { return card('approve', 'Part of ' + r, 'Shown and documented inside ' + r + ', never on its own.', run(r)); })
-      .concat(q.roots.length ? [] : [card('change', 'Part of another', 'Claude Code asks which component it belongs to.', 'Ask me which component ' + c.name + ' is a part of, then run ' + run('<that component>'))])
+      .concat(q.roots.length ? [] : [card('change', 'Part of another', 'Claude Code asks which component it belongs to.', ENGINE + ' on Component ' + c.name + ', Ask me which component it is a part of')])
       .concat([card('drop', 'Its own component', 'It stays a component of the system, placed on its own.', run('none'))]);
     var ask = q.roots.length ? 'Is ' + c.name + ' a part of ' + q.roots.join(' or ') + '?' : 'Is ' + c.name + ' a part of another component?';
     return { key: c.name + '\u0000doc:part?', area: 'Documentation', kind: 'Part or component', written: '<p class="sg-il-line"><strong>' + esc(ask) + '</strong></p><p class="sg-il-line">' + esc(capital(q.why)) + '.</p><div class="sg-decide-grid">' + cards.join('') + '</div>',

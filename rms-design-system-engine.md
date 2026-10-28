@@ -65,7 +65,7 @@ hook routed it), follow that block. Otherwise run the router, passing the reques
 (`NOTE:`), the sentences to say (`SAY:`), one `NEXT:` line, and the recipe itself. Do what it prints: run the `RUN:`
 command and relay its SUMMARY, or, when it says to run nothing, answer from the recipe it printed. Put each `SAY:`
 line in your final reply word for word (when it names a condition, only when that condition holds). Do not pick a
-recipe or a command yourself.
+recipe or a command yourself. A request that names no system: say which you took and why, or ask.
 
 This guide holds the rules that always apply. The steps for each task are in a **recipe**: before acting, print
 the one that fits with `rms-design-system-engine --recipe <name>` (or read
