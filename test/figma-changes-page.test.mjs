@@ -41,8 +41,8 @@ test('instances in every team file from Figma\'s library analytics, a set\'s var
 
 test('the style guide has the Changes in Figma page, and each component\'s History links each change', () => {
   const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
-  assert.match(tpl, /section\('figma-changes', 'Changes', 'Changes in Figma'/);
+  assert.match(tpl, /section\('changes-in-Figma', 'Changes', 'Changes in Figma'/);
   assert.match(tpl, /card\('What the change said it does'[\s\S]*card\('What Figma shows once it was made'/);
-  assert.match(tpl, /#figma-changes\?panel=' \+ esc\(encodeURIComponent\('doc:fc:'/);
+  assert.match(tpl, /#changes-in-Figma\?panel=' \+ esc\(encodeURIComponent\('doc:fc:'/);
   assert.match(readFileSync(new URL('../styleguide-gen.mjs', import.meta.url), 'utf8'), /view\.figmaChanges = fc/);
 });

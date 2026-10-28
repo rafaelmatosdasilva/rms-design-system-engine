@@ -1805,7 +1805,7 @@ It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its 
 as it is, keeps every annotation a person wrote, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
-Descriptions, missing components and layout are never written: they stay in `figma-changes.md`.
+Descriptions, missing components and layout are never written: they stay in `changes-in-Figma.md`.
 
 #### Adoption baseline / ratchet (opt-in, gate-level)
 

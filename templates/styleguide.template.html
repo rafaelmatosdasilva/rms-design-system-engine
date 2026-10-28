@@ -1947,7 +1947,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     showroom: '<rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M5.5 14h5M8 11.5V14"/>',
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
   };
-  NAV_MARK['figma-changes'] = NAV_MARK.history;   // the changes made in Figma: History's mark
+  NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
   // A page's name starts with a capital (Status, Identity, In use); a component's is written as the system names it.
   function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; var l = String(label); if (!/^c-/.test(id)) l = l.charAt(0).toUpperCase() + l.slice(1); a.innerHTML = navMark(id) + esc(l); (parent || nav).appendChild(a); }
@@ -3126,8 +3126,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var FCH = DATA.figmaChanges || [];
   var fcKey = function (x) { return 'doc:fc:' + x.component + ':' + x.at; };
   if (FCH.length) (function () {
-    hr(); navLink('figma-changes', 'Changes in Figma');
-    var sec = section('figma-changes', 'Changes', 'Changes in Figma', '');
+    hr(); navLink('changes-in-Figma', 'changes in Figma');
+    var sec = section('changes-in-Figma', 'Changes', 'Changes in Figma', '');
     var ST = { waiting: ['figma', 'Waiting to be made'], made: ['match', 'Made as said'], 'not as said': ['differs', 'Not as said'] };
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
@@ -7475,7 +7475,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // Figma page.
     var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said' };
     fig += (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
-      return '<tr><td><a class="sg-uses-link" href="#figma-changes?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + '</td></tr>';
+      return '<tr><td><a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + '</td></tr>';
     }).join('');
     var out = (dec ? card('Decisions', dec, 'decisions') : '') + (fig ? card('Figma', fig, 'figma') : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
     // Its code, Figma and its decisions: chips, as the History page has, for each kind it has when it has two.
