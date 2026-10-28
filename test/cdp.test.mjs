@@ -7,7 +7,7 @@ import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { budget, tempDir } from './helpers.mjs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { findChrome, playwrightChromium, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { findChrome, playwrightChromium, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED, sweepDeadProfiles } from '../cdp.mjs';
 
 const none = () => null;
 
@@ -105,4 +105,28 @@ test('a browser killed leaves neither its profile nor its socket folder behind',
   await new Promise((r) => setTimeout(r, 1000));
   assert.equal(existsSync(browser.userDataDir), false, 'the profile was left behind');
   assert.equal(existsSync(socketDir), false, 'the socket folder was left behind');
+});
+
+// A run killed outright never reaches its exit handler: its browser lives on, orphaned, on a profile nobody deletes.
+// The next browser any run starts ends it and deletes its profile and socket folder.
+test('a run killed before it cleaned up has its browser ended and its folders swept by the next', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false, timeout: budget(60000) }, async () => {
+  const { spawn } = await import('node:child_process');
+  const { readlinkSync, existsSync } = await import('node:fs');
+  const cdp = pathToFileURL(join(ENGINE, 'cdp.mjs')).href;
+  const run = spawn(process.execPath, ['--input-type=module', '-e',
+    `import { launchChrome } from ${JSON.stringify(cdp)}; const b = await launchChrome(${JSON.stringify(CHROME)}, { tmpPrefix: 'cdp-orphan-' }); console.log(b.userDataDir + '\\t' + b.chrome.pid); setInterval(() => {}, 1000);`]);
+  const [dir, chromePid] = await new Promise((resolve, reject) => {
+    let out = '';
+    run.stdout.on('data', (d) => { out += d; if (out.includes('\n')) resolve(out.trim().split('\t')); });
+    run.on('exit', () => reject(new Error('the run ended before its browser started')));
+  });
+  const socketDir = dirname(readlinkSync(join(dir, 'SingletonSocket')));
+  run.kill('SIGKILL');
+  await new Promise((r) => run.on('exit', r));
+  assert.ok(sweepDeadProfiles() >= 1);
+  assert.equal(existsSync(dir), false, 'the profile was left behind');
+  assert.equal(existsSync(socketDir), false, 'the socket folder was left behind');
+  let gone = false;
+  try { process.kill(Number(chromePid), 0); } catch { gone = true; }
+  assert.ok(gone, 'the orphaned browser was left running');
 });

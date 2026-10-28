@@ -82,11 +82,37 @@ function waitGone(pids, ms = 3000) {
   return false;
 }
 
+// Every profile carries the pid of the run that made it (rms-chrome-<pid>-<prefix>), so one left by a run that was killed
+// before it could delete it is known for garbage: the next browser any run starts deletes it, with the folder Chrome
+// keeps its socket in, after ending a browser still running on it (orphaned when its run died).
+const PROFILE_PREFIX = 'rms-chrome-';
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+
+export function sweepDeadProfiles(base = tmpdir()) {
+  let swept = 0;
+  for (const n of readdirSync(base)) {
+    const m = n.startsWith(PROFILE_PREFIX) && /^rms-chrome-(\d+)-/.exec(n);
+    if (!m || Number(m[1]) === process.pid || alive(Number(m[1]))) continue;
+    const dir = join(base, n);
+    let socketDir = null;
+    try { socketDir = dirname(readlinkSync(join(dir, 'SingletonSocket'))); } catch { /* never started */ }
+    const orphans = processTree(-1, dir).filter((p) => p !== -1);
+    if (orphans.length) {
+      for (const pid of orphans) try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+      waitGone(orphans, 1000);
+    }
+    for (const d of [dir, socketDir]) if (d) try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ }
+    swept++;
+  }
+  return swept;
+}
+
 // Launch headless Chrome and resolve once its DevTools socket is listening.
 // Returns { chrome, userDataDir, wsUrl, kill }. Rejects if Chrome exits first.
 // Gives up after timeoutMs (default 30 s) so a Chrome that never starts cannot hang a run.
 export async function launchChrome(chromePath, { tmpPrefix = 'design-system-engine-chrome-', timeoutMs = 30000 } = {}) {
-  const userDataDir = mkdtempSync(join(tmpdir(), tmpPrefix));
+  try { sweepDeadProfiles(); } catch { /* never in the way of a launch */ }
+  const userDataDir = mkdtempSync(join(tmpdir(), `${PROFILE_PREFIX}${process.pid}-${tmpPrefix}`));
   // --use-mock-keychain (macOS) and --password-store=basic (Linux): a throwaway profile never touches the person's
   // keychain, so no "Keychain Not Found" or keyring prompt appears while the engine or its tests read pages.
   const chrome = spawn(chromePath, [
