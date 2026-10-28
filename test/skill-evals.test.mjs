@@ -200,13 +200,38 @@ test('no CLI on PATH: a run by path that ends "not in parity" (exit 1) still cou
 // Continuous evaluation: the guide set the agent reads (main file, recipes, reference) is the one the
 // latest evaluation measured. A change to any of them needs a fresh run (reference/maintainers.md, Skill
 // evaluation), then the new hash in RESULTS.md.
+// The set is measured as a whole, or file by file: two branches that each changed a different guide file, each measured,
+// merge into a set every file of which an entry measured, and need no paid run for the crossing alone. A file both
+// changed is a version nobody measured, named.
+export function guideMeasured(results, now, files) {
+  const sets = [...results.matchAll(/Guide set measured: `([0-9a-f]{12})`/g)].map((m) => m[1]);
+  if (sets.includes(now)) return { ok: true, sets };
+  const seen = new Set([...results.matchAll(/^Guide files measured: (.+)$/gm)].flatMap((m) => [...m[1].matchAll(/`([^`]+) ([0-9a-f]{8})`/g)].map((x) => `${x[1]} ${x[2]}`)));
+  const unmeasured = Object.entries(files).filter(([f, h]) => !seen.has(`${f} ${h}`)).map(([f]) => f);
+  return { ok: !!seen.size && !unmeasured.length, sets, unmeasured };
+}
 test('RESULTS.md records the guide set that is in the repository', async () => {
-  const { guideSetHash } = await import('../skill-files.mjs');
+  const { guideSetHash, guideFileHashes } = await import('../skill-files.mjs');
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const results = readFileSync(join(root, 'test', 'skill-evals', 'RESULTS.md'), 'utf8');
-  const measured = [...results.matchAll(/Guide set measured: `([0-9a-f]{12})`/g)].map((m) => m[1]);
   const now = guideSetHash(root);
-  assert.ok(measured.includes(now), `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${measured.join(', ') || 'none'}, the repository has ${now}): run \`node test/skill-evals/continuous.mjs\`, which measures the committed guide and writes the entry with "Guide set measured: \`${now}\`"`);
+  const m = guideMeasured(results, now, guideFileHashes(root));
+  assert.ok(m.ok, `the guide, a recipe or a reference file changed since the last evaluation (RESULTS.md has ${m.sets.join(', ') || 'none'}, the repository has ${now}${m.unmeasured?.length ? `; measured in no entry: ${m.unmeasured.join(', ')}` : ''}): run \`node test/skill-evals/continuous.mjs\`, which measures the committed guide and writes the entry with "Guide set measured: \`${now}\`"`);
+});
+
+test('a guide set is measured whole or file by file; a file two branches both changed is not', () => {
+  const entry = (set, files) => `Guide set measured: \`${set}\` · Project measured: \`p\`\n\nGuide files measured: ${Object.entries(files).map(([f, h]) => `\`${f} ${h}\``).join(' ')}\n`;
+  // One branch changed the recipe, the other the reference, each measured on its own.
+  const results = entry('aaaaaaaaaaaa', { 'main.md': '11111111', 'cookbook/a.md': '22222222', 'reference/u.md': '33333333' })
+    + entry('bbbbbbbbbbbb', { 'main.md': '11111111', 'cookbook/a.md': '22222222', 'reference/u.md': '44444444' })
+    + entry('cccccccccccc', { 'main.md': '11111111', 'cookbook/a.md': '55555555', 'reference/u.md': '33333333' });
+  assert.equal(guideMeasured(results, 'bbbbbbbbbbbb', {}).ok, true);
+  assert.equal(guideMeasured(results, 'dddddddddddd', { 'main.md': '11111111', 'cookbook/a.md': '55555555', 'reference/u.md': '44444444' }).ok, true);
+  // Both changed the reference: its merged version is in no entry.
+  const both = guideMeasured(results, 'eeeeeeeeeeee', { 'main.md': '11111111', 'cookbook/a.md': '55555555', 'reference/u.md': '66666666' });
+  assert.deepEqual([both.ok, both.unmeasured], [false, ['reference/u.md']]);
+  // An entry from before files were recorded holds only its set.
+  assert.equal(guideMeasured('Guide set measured: `aaaaaaaaaaaa` · Project measured: `p`\n', 'zzzzzzzzzzzz', { 'main.md': '1' }).ok, false);
 });
 
 // The project every run works on is part of the measurement: a change to the demo design system changes every
