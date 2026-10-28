@@ -1947,6 +1947,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     showroom: '<rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M5.5 14h5M8 11.5V14"/>',
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
   };
+  NAV_MARK['figma-changes'] = NAV_MARK.history;   // the changes made in Figma: History's mark
   function navMark(id) { return '<svg class="sg-nav-mark" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (NAV_MARK[id] || (/^c-/.test(id) ? NAV_MARK.component : NAV_MARK.component)) + '</svg>'; }
   // A page's name starts with a capital (Status, Identity, In use); a component's is written as the system names it.
   function navLink(id, label, parent) { var a = document.createElement('a'); a.href = '#' + id; var l = String(label); if (!/^c-/.test(id)) l = l.charAt(0).toUpperCase() + l.slice(1); a.innerHTML = navMark(id) + esc(l); (parent || nav).appendChild(a); }
@@ -3116,6 +3117,60 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
     var nOf = function (st) { return rows.filter(function (r) { return r.status === st; }).length; };
     pageBar(sec, { chips: [{ key: 'fix', label: 'To fix', n: nOf('fix'), dot: 'differs' }, { key: 'decide', label: 'To decide', n: nOf('decide'), dot: 'figma' }, { key: 'rule', label: 'Rules', n: nOf('rule'), dot: 'match' }].filter(function (c) { return c.n; }) });
+  })();
+  // Changes in Figma: each change made to a component in Figma through the engine (DATA.figmaChanges, component-change.mjs).
+  // One table, a row a change: the component, what was asked, its steps and its status (waiting to be made, made as said,
+  // not as said). A row opens its before and after in the side panel: what the change said it would do (the read before
+  // beside the same once changed), what Figma shows once read again, and where it is not what was said; where the
+  // component is used, what it breaks, what it adds and who signed it off, and the faults it already had.
+  var FCH = DATA.figmaChanges || [];
+  var fcKey = function (x) { return 'doc:fc:' + x.component + ':' + x.at; };
+  if (FCH.length) (function () {
+    hr(); navLink('figma-changes', 'Changes in Figma');
+    var sec = section('figma-changes', 'Changes', 'Changes in Figma', '');
+    var ST = { waiting: ['figma', 'Waiting to be made'], made: ['match', 'Made as said'], 'not as said': ['differs', 'Not as said'] };
+    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+    var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
+    var compHTML = function (n) { return known[n] ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>' : esc(n); };
+    var SIGN = { added: '+', removed: '−', renamed: '↻', moved: '→', changed: '~' };
+    var SECT = { skeleton: 'Its layers', architecture: 'Axes, options and properties', variables: 'Variables' };
+    var diffTable = function (d) {
+      var rows = [];
+      ['skeleton', 'architecture', 'variables'].forEach(function (k) { (d && d[k] || []).forEach(function (x) { rows.push('<tr><td>' + esc(SECT[k]) + '</td><td><span aria-hidden="true">' + esc(SIGN[x.change] || '·') + '</span> ' + esc(capital(x.change)) + ' ' + esc(x.what) + '</td><td>' + (x.from != null ? '<code>' + esc(x.from) + '</code>' : '') + (x.from != null && x.to != null ? ' → ' : '') + (x.to != null ? '<code>' + esc(x.to) + '</code>' : '') + '</td></tr>'); }); });
+      return rows.length ? '<div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Part</th><th>What</th><th>Before → after</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' : '<p class="sg-il-line">Nothing changes.</p>';
+    };
+    var rowHTML = function (x, i) {
+      return '<tr class="sg-row-open" tabindex="0" data-fc-row="' + i + '" data-chip="' + esc(x.status) + '"><td>' + compHTML(x.component) + '</td><td><strong>' + esc(x.asked || x.steps[0] || '') + '</strong><span class="pg-par-val">' + esc(x.steps.length + ' step' + (x.steps.length === 1 ? '' : 's')) + '</span></td><td>' + esc(String(x.at || '').slice(0, 10)) + '</td><td>' + dot(ST[x.status][0], ST[x.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+    };
+    var panel = function (i, from) {
+      var x = FCH[i]; if (!x) return;
+      var m = panelShell('sg-fc-panel', 'Changes in Figma'); m._key = fcKey(x);
+      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var lines = function (l) { return (l || []).map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); };
+      var u = x.usedBy, lib = u && u.library;
+      var used = u ? lines([u.products.length ? 'The code of ' + u.products.join(', ') : '', u.inside.length ? 'Inside ' + u.inside.join(', ') : '', u.screens ? u.screens + ' Figma screen' + (u.screens === 1 ? '' : 's') : '',
+        lib && lib.instances != null ? lib.instances + ' instance' + (lib.instances === 1 ? '' : 's') + ' in ' + lib.files + ' team file' + (lib.files === 1 ? '' : 's') + ' (Figma\'s library analytics)' : 'Team files the engine does not read are not counted' + (lib && lib.unseen ? ': ' + lib.unseen : '') + '.'].filter(Boolean)) : '';
+      var after = x.status === 'waiting' ? '<p class="sg-il-line">Not made yet: once the script runs and Figma is read again, rms-design-system-engine --change-report ' + esc(x.component) + ' fills this in.</p>'
+        : diffTable(x.real) + (x.mismatch.length ? '<p class="sg-il-line"><strong>' + esc('Not what the change said (' + x.mismatch.length + ')') + '</strong></p>' + lines(x.mismatch.map(function (y) { return capital(y.change) + ' ' + y.what + (y.from != null || y.to != null ? ': ' + [y.from, y.to].filter(function (z) { return z != null; }).join(' → ') : ''); })) : '<p class="sg-il-line">It is what the change said.</p>');
+      var body = card('Status', '<p>' + dot(ST[x.status][0], ST[x.status][1]) + '</p>' + (x.readAt ? '<p class="sg-il-line"><span class="pg-dim">' + esc('Figma read again ' + String(x.readAt).slice(0, 10)) + '</span></p>' : ''))
+        + card('Its steps', lines(x.steps))
+        + card('What the change said it does', diffTable(x.report))
+        + card('What Figma shows once it was made', after)
+        + card('Where it is used', used)
+        + card('What it breaks', lines(x.breaking.map(function (b) { return b.what; })))
+        + card('What it adds to the system', lines(x.held.map(function (h) { return h.what; })))
+        + card('Signed off', x.signedOff ? lines([x.signedOff.by + ', ' + String(x.signedOff.at || '').slice(0, 10)]) : '')
+        + card('Faults it already had, not fixed by this change', lines(x.faults.map(function (f) { return f.says + (f.value ? ': ' + f.value : ''); })));
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Changes in Figma', x.component], title: x.asked || x.steps[0] || x.component, body: body });
+      panelShow(m, from);
+    };
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-fc-table"><thead><tr><th>Component</th><th>The change</th><th>Asked</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + FCH.map(rowHTML).join('') + '</tbody></table></div></div>');
+    var open = function (tr) { if (tr) panel(+tr.getAttribute('data-fc-row'), tr); };
+    sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-fc-row]')); });
+    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-fc-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
+    sec._openKey = function (key) { var i = FCH.findIndex(function (x) { return fcKey(x) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
+    var nOf = function (st) { return FCH.filter(function (x) { return x.status === st; }).length; };
+    pageBar(sec, { chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }].filter(function (c) { return c.n; }) });
   })();
   // History: every change gathered by the release it shipped in, newest first, each a table of what was done and what
   // it affects: the code's commits, each read of Figma that changed what Figma says of a component, and what the team
@@ -7415,6 +7470,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var dec = (c.decisions || []).map(function (d) {
       return '<tr><td>' + esc(d.what) + (d.ruledOut && d.ruledOut.length ? '<br><span class="pg-dim">ruled out: ' + esc(d.ruledOut.join(', ')) + '</span>' : '') + '</td><td>' +
         (d.why ? esc(d.why) + ' ' : '') + '<span class="pg-dim">' + esc(d.said + (d.by ? ', ' + d.by : '')) + '</span>' + (d.at ? ' ' + day(d.at) : '') + '</td></tr>';
+    }).join('');
+    // Each change made to it in Figma through the engine, with its status, opening its before and after on the Changes in
+    // Figma page.
+    var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said' };
+    fig += (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
+      return '<tr><td><a class="sg-uses-link" href="#figma-changes?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + '</td></tr>';
     }).join('');
     var out = (dec ? card('Decisions', dec, 'decisions') : '') + (fig ? card('Figma', fig, 'figma') : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
     // Its code, Figma and its decisions: chips, as the History page has, for each kind it has when it has two.

@@ -1363,15 +1363,20 @@ Content gap to spacing/s`, `move chip/label/color to text/default`, `description
 component (the capture now, and the same once the change is made), never from memory: its skeleton (each layer added,
 removed or renamed, matched by node id, so a rename is never a removal and an addition), its architecture (variant axes
 and options, properties, what each drives, the variants), its variables (each layer and field's bindings, from → to),
-and where it is used (its contract's products, the components it sits inside, the screens; team files the engine does
-not read are said, not counted). A removal or a rename breaks what leans on it; a new option, axis or property adds to
+and where it is used (its contract's products, the components it sits inside, the screens, and with `FIGMA_TOKEN` its
+instances in every team file from Figma's library analytics, on the plans that have them; otherwise those files are said
+not seen, and why). A removal or a rename breaks what leans on it; a new option, axis or property adds to
 the system: both wait for `--signed-off`. The faults the component already has by the construction grammar's rules are
 listed apart, never fixed with the change. Then the script (`handback/figma-apply.js`), run with `use_figma` once the
 person says yes.
 
 **--change-report.** `--change-report <component>`, once Figma is read again: the read before beside the read after,
 section by section, and each place where it is not what the change said (warned when Figma was last read before the
-change). Each report is kept in the change's file (`done`).
+change). Each report is kept in the change's file (`done`) and, once made, in `changes/done/`. The style guide has a
+**Changes in Figma** page: one table, a row a change (its component, what was asked, waiting, made as said or not as
+said), each opening its before and after in the side panel (what the change said it does, what Figma shows once read
+again, where it is used, what it breaks and adds, who signed it off, the faults it already had); each component's History
+lists its changes, linked to that panel.
 
 #### A scheduled pipeline (`--ci-changed`)
 

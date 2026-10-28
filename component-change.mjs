@@ -16,8 +16,10 @@
 //   changeLines(change) → what the run prints
 //   realOf(change, after) → { real, mismatch }: the real difference, and where it is not the predicted one
 //   realLines(result, component) → what the run prints after
+//   changesView(ROOT) → every change, for the style guide's Changes in Figma page and each component's History: the ones
+//     waiting to be made (changes/<component>.change.json) and the ones made and read again (changes/done/), newest first
 //
-// Pure: no file is read or written here.
+// Pure but for changesView, which reads the changes the engine kept.
 import { ground, predict, modelOf, opWords, FIELDS } from './figma-ops.mjs';
 import { diffModels, diffLines } from './component-diff.mjs';
 
@@ -108,23 +110,25 @@ export function parseChange(text = '', model = null) {
 // The faults the component already has, by the grammar's rules to fix: listed apart, never fixed with the change.
 const faultsOf = (grammar, component) => (grammar?.figma?.rules ?? []).filter((r) => r.status === 'fix').flatMap((r) => r.toFix.filter((t) => t.component === component).map((t) => ({ rule: r.id, says: r.says, value: t.value })));
 
-export function changeOf({ component, asked = '', ops = [], captures = {}, grammar = null, livesIn = null, at = null } = {}) {
+// library: what Figma's library analytics say of it in every team file ({ instances, files }), or why that was not
+// seen ({ unseen }): figma-analytics.mjs.
+export function changeOf({ component, asked = '', ops = [], captures = {}, grammar = null, livesIn = null, library = null, at = null } = {}) {
   const before = modelOf(component, captures);
   const grounded = ground(ops, { captures, grammar, target: component });
   const after = predict(before, grounded.ops, captures);
   return {
     kind: 'change', component, nodeId: before?.nodeId ?? null, asked, at,
     ops: grounded.ops, questions: grounded.questions, named: grounded.named, held: grounded.held, breaking: grounded.breaking,
-    report: diffModels(before, after), usedBy: usageOf(livesIn), faults: faultsOf(grammar, component), before, predicted: after,
+    report: diffModels(before, after), usedBy: usageOf(livesIn, library), faults: faultsOf(grammar, component), before, predicted: after,
   };
 }
 
 // Where it is used, from its contract (usage-map.mjs → livesIn): the products whose code uses it, the components it sits
 // inside, the screens that draw it. Team files the engine does not read are said, not guessed.
-function usageOf(l) {
-  if (!l) return null;
-  const products = (l.products ?? []).map((p) => `${p.name ?? 'the system\'s own pages'} (${p.files} file${p.files === 1 ? '' : 's'})`);
-  return { products, inside: (l.inside ?? []).map((x) => (typeof x === 'string' ? x : x.name)).filter(Boolean), screens: (l.screens ?? []).length };
+function usageOf(l, library = null) {
+  if (!l && !library) return null;
+  const products = (l?.products ?? []).map((p) => `${p.name ?? 'the system\'s own pages'} (${p.files} file${p.files === 1 ? '' : 's'})`);
+  return { products, inside: (l?.inside ?? []).map((x) => (typeof x === 'string' ? x : x.name)).filter(Boolean), screens: (l?.screens ?? []).length, ...(library ? { library } : {}) };
 }
 
 export function changeLines(ch) {
@@ -133,7 +137,9 @@ export function changeLines(ch) {
   if (d.length) out.push('What changes (the component now, beside it once the change is made):', ...d);
   if (ch.usedBy) {
     const u = ch.usedBy;
-    out.push(`Where it is used: ${[u.products.length ? `the code of ${u.products.join(', ')}` : null, u.inside.length ? `inside ${u.inside.join(', ')}` : null, u.screens ? `${u.screens} Figma screen${u.screens === 1 ? '' : 's'}` : null].filter(Boolean).join('; ') || 'nowhere the engine reads'}. Team files the engine does not read are not counted.`);
+    const lib = u.library;
+    const inFiles = lib?.instances != null ? `${lib.instances} instance${lib.instances === 1 ? '' : 's'} in ${lib.files} team file${lib.files === 1 ? '' : 's'} (Figma's library analytics)` : null;
+    out.push(`Where it is used: ${[u.products.length ? `the code of ${u.products.join(', ')}` : null, u.inside.length ? `inside ${u.inside.join(', ')}` : null, u.screens ? `${u.screens} Figma screen${u.screens === 1 ? '' : 's'}` : null, inFiles].filter(Boolean).join('; ') || 'nowhere the engine reads'}.${inFiles ? '' : ` Team files the engine does not read are not counted${lib?.unseen ? ` (${lib.unseen})` : ''}.`}`);
   }
   if (ch.breaking.length) out.push(`Breaking (${ch.breaking.length}), held for sign-off with what they break:`, ...ch.breaking.map((b) => `   • ${b.what}`));
   if (ch.held.length) out.push(`Held for sign-off (it adds to the system): ${ch.held.map((h) => h.what).join('; ')}.`);
@@ -165,4 +171,22 @@ export function realLines({ real, mismatch }, component) {
     mismatch.length ? `⚠️  Not what the change said (${mismatch.length}):` : '✅ It is what the change said.',
     ...mismatch.map((x) => `   • ${x.change} ${x.what}${x.from != null || x.to != null ? `: ${[x.from, x.to].filter((y) => y != null).join(' → ')}` : ''}`),
   ];
+}
+
+// Every change the engine kept: waiting to be made, or made and read again. → [{ component, at, asked, steps, status:
+// 'waiting' | 'made' | 'not as said', report, real, mismatch, usedBy, breaking, held, faults, signedOff, readAt }]
+export function changesView(ROOT, { outDir = '.design-system-engine-out', readdirSync, readFileSync, join } = {}) {
+  const dir = join(ROOT, outDir, 'changes'), out = [];
+  const read = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
+  const list = (d) => { try { return readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => join(d, f)); } catch { return []; } };
+  for (const f of [...list(dir), ...list(join(dir, 'done'))]) {
+    const ch = read(f);
+    if (!ch?.component || ch.kind !== 'change') continue;
+    const last = (ch.done ?? []).at(-1);
+    out.push({ component: ch.component, at: ch.at, asked: ch.asked ?? '', steps: (ch.ops ?? []).map(opWords), status: !last ? 'waiting' : last.mismatch?.length ? 'not as said' : 'made',
+      report: ch.report, real: last?.real ?? null, mismatch: last?.mismatch ?? [], readAt: last?.readAt ?? null, usedBy: ch.usedBy ?? null, breaking: ch.breaking ?? [], held: ch.held ?? [], faults: ch.faults ?? [], signedOff: ch.signedOff ?? null });
+  }
+  // One change made twice (its file waiting, and kept once made) is shown once, as made.
+  const seen = new Set();
+  return out.sort((a, b) => String(b.at).localeCompare(String(a.at)) || (a.status === 'waiting') - (b.status === 'waiting')).filter((x) => { const k = `${x.component}|${x.at}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }

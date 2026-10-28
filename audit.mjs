@@ -1981,6 +1981,10 @@ if (process.argv.includes('--figma-change') || process.argv.includes('--change-r
     for (const l of realLines(result, component)) console.log(l);
     ch.done = [...(ch.done ?? []), { at: new Date().toISOString(), readAt, real: result.real, mismatch: result.mismatch }];
     writeFileSync(changeFile, JSON.stringify(ch, null, 2) + '\n');
+    // Kept once made, for the style guide's Changes in Figma page and the component's History (a new change replaces the
+    // one waiting, never this).
+    mkdirSync(join(changesDir, 'done'), { recursive: true });
+    writeFileSync(join(changesDir, 'done', `${component}-${String(ch.at).replace(/[:.]/g, '-')}.json`), JSON.stringify(ch, null, 2) + '\n');
     console.log(result.mismatch.length ? `NEXT: tell the person what is not what the change said; change nothing in Figma unless they ask (${relative(ROOT, changeFile)}).` : `NEXT: tell the person; then run ${cmd} --construction-check and ${cmd} --hygiene, and say what they find on ${component}.`);
     process.exit(0);
   }
@@ -2010,7 +2014,11 @@ if (process.argv.includes('--figma-change') || process.argv.includes('--change-r
   }
   const contract = read(join(ccfg.contracts?.out ?? 'contracts', `${component}.contract.json`));
   const prev = read(changeFile);
-  const ch = changeOf({ component, asked: asked || prev?.asked || '', ops, captures, grammar: grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} }), livesIn: contract?.livesIn ?? null, at: new Date().toISOString() });
+  // Its instances in every team file, where Figma's library analytics may be read (an Enterprise plan); else why not.
+  const { libraryUsage } = await import('./figma-analytics.mjs');
+  const figmaToken = process.env.FIGMA_TOKEN ?? (() => { for (const d of [ROOT, dirname(ROOT)]) { try { const m = /^\s*FIGMA_TOKEN\s*=\s*['"]?([^'"\n#]+)/m.exec(readFileSync(join(d, '.env'), 'utf8')); if (m) return m[1].trim(); } catch { /* none here */ } } return null; })();
+  const library = await libraryUsage(component, { fileKey: ccfg.figmaFileKey ?? null, token: figmaToken });
+  const ch = changeOf({ component, asked: asked || prev?.asked || '', ops, captures, grammar: grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} }), livesIn: contract?.livesIn ?? null, library, at: new Date().toISOString() });
   const who = _argValue('--signed-off');
   if (who) ch.signedOff = { by: who, at: ch.at, what: [...ch.held, ...ch.breaking].map((h) => h.what) };
   mkdirSync(changesDir, { recursive: true });

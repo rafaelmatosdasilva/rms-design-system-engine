@@ -3,7 +3,7 @@
 // breaks, the faults it already had; and after Figma is read again, the real difference beside the predicted one.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -90,7 +90,7 @@ test('--figma-change and --change-report: the report, held for sign-off, the scr
   write('src/skeleton.json', skeleton);
   write('component-values.snapshot.json', values);
   write('contracts/chipFilter.contract.json', { name: 'chipFilter', livesIn });
-  const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
+  const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
   assert.match(cli('--figma-change', 'chipFilter', 'make it nicer'), /not one the engine reads in words[\s\S]*--figma-change chipFilter --ops <file>/);
   const first = cli('--figma-change', 'chipFilter', 'add xl to size like l, then rename Label layer to Text');
   assert.match(first, /chipFilter: the change asked .*, 2 steps:/);
@@ -110,6 +110,8 @@ test('--figma-change and --change-report: the report, held for sign-off, the scr
   assert.match(report, /↻ layer: Content\/Label → Content\/Text/);
   assert.match(report, /✅ It is what the change said\./);
   assert.equal(JSON.parse(readFileSync(join(root, '.design-system-engine-out/changes/chipFilter.change.json'), 'utf8')).done.length, 1);
+  // Kept once made, for the style guide's Changes in Figma page.
+  assert.equal(readdirSync(join(root, '.design-system-engine-out/changes/done')).length, 1);
 });
 
 test('a change to one component in Figma routes to its report; a new one, roles and values keep their own', () => {
