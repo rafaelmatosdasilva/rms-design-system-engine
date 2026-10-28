@@ -561,6 +561,9 @@ each one when present:
   compared by name with the contract's `children` that have a `name` and a `cssSelector`
 - which layers each boolean property shows or hides (`toggles`)
 - each slot's preferred components (`slots`), which the contract uses as the slot's `accepts` list
+- its layer tree (`skeleton`): the resting variant's layers to three deep, each with its depth, type and name,
+  and for an instance the component it is of; and the page it sits on (`page`). The construction grammar
+  reads its architecture from them: the order its layers come in, what it nests, where it sits
 
 Without them the measured comparison has almost nothing to compare (a few facts per component instead of a dozen), so a refresh is not finished until every component has them. An older snapshot without them still works; the comparison simply skips what Figma did not record.
 
@@ -661,6 +664,21 @@ async function deepFacts(node, set) {
     (toggles[name] ??= []).push(l.name);
   }
   if (Object.keys(toggles).length) out.toggles = toggles;
+  // Its layer tree, to three deep and at most 80 layers: depth, type, name, and for an instance the component it is of
+  // (a variant's set). And the page it is on.
+  const skeleton = [];
+  const tree = async (x, d) => {
+    for (const c of prop(x, 'children') ?? []) {
+      if (skeleton.length >= 80) return;
+      const e = { d, t: c.type, n: c.name };
+      if (c.type === 'INSTANCE') { let mc = null; try { mc = await c.getMainComponentAsync(); } catch (err) { /* a missing component */ } if (mc) e.of = mc.parent?.type === 'COMPONENT_SET' ? mc.parent.name : mc.name; }
+      skeleton.push(e);
+      if (d < 3 && c.type !== 'INSTANCE') await tree(c, d + 1);
+    }
+  };
+  await tree(node, 1);
+  if (skeleton.length) out.skeleton = skeleton;
+  for (let p = set ?? node; p; p = p.parent) if (p.type === 'PAGE') { out.page = p.name; break; }
   if (set?.type === 'COMPONENT_SET') {
     out.defaultVariant = node.name;
     out.variants = {};

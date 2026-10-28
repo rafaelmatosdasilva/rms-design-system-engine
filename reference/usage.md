@@ -1265,14 +1265,20 @@ check every edit gets on what changed since the last commit, never failing the f
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
-#### The construction grammar (`--query construction`, `--construction`, `--figma-fix`)
+#### The construction grammar (`--query construction`, `--construction`, `--figma-fix`, `--construction-check`)
 
 How the system builds a component in Figma, mined on every run from its own components and written to
 `contracts/construction.json`: how a component, each kind of property (boolean, text, instance swap, slot, variant) and
 each variant option is named, the word a kind of property begins or ends with (`show…`, `…Content`), whether layers carry
 names of their own (never Figma's `Frame 235`) and in which case, whether every component and variant lays out with auto
 layout, whether a component binds its own variables (`<prefix>/<component>/…`) or the shared ones, colour and spacing
-apart, and whether it carries a description. Nothing is imposed: each line is what the system's own components already
+apart, and whether it carries a description. Its **architecture** too: whether a component lays out, sets its width and
+sits on a page the way its family does (the components whose name begins with the same word), where its padding sits
+(its own frame or a layer inside it), the order its frame's layers come in, whether it nests only the system's own
+components, and whether a yes/no variant changes how the component looks (one whose two variants differ only in layers
+shown or hidden, with the same fill, stroke, text, padding, gap and corners, is a boolean property in all but name). The
+layer order, what it nests and its page come from the capture's layer tree (`skeleton`, `page`), so an older capture has
+none of them. Nothing is imposed: each line is what the system's own components already
 do, seen on three or more, with how many follow it and which do not. There are no exceptions: a component follows it or
 is to fix. Each line has a status:
 
@@ -1294,6 +1300,11 @@ The style guide has a **Construction** page: one table, a row per line with its 
 do, filtered by status. A row opens in the side panel: the decision to copy for a line to decide, and each component to
 fix with its fix to copy into Claude Code (Fix it, Another name, Name a layer; Fix all for a rule's renames). The page is
 in no menu and no search, opened only by its link (`#construction`), until the team lists it (`styleguide.construction`).
+
+A rule the team decided is checked on every run, beside the gates (a gate compares Figma with the code; this is Figma
+beside its own rules): the run's summary has a **Construction** line with each decided rule a component breaks, and
+`--construction-check` says the same and exits 1, for a pipeline that fails on it. Nothing is said until the team decided
+a rule.
 
 #### A scheduled pipeline (`--ci-changed`)
 

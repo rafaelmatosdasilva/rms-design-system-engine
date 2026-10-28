@@ -146,7 +146,7 @@ test('a yes/no is named by one case rule whether Figma makes it a boolean or a v
   const p = rule(g, 'boolean-property-prefix');
   assert.match(p.says, /^A boolean property begins with "show"/);
   assert.ok(!p.toFix.some((x) => /disabled|active|Wide/.test(x.value)), 'a state is never told to begin with "show"');
-  assert.ok(g.figma.rules.every((r) => ['naming', 'layout', 'variables', 'documentation'].includes(r.area)), 'each rule in a kind of rule: names together');
+  assert.ok(g.figma.rules.every((r) => ['naming', 'layout', 'architecture', 'variables', 'documentation'].includes(r.area)), 'each rule in a kind of rule: names together');
 });
 
 test('on the Construction page each row is a rule, a decision included: never a question', () => {
@@ -154,5 +154,5 @@ test('on the Construction page each row is a rule, a decision included: never a 
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('if (DATA.construction)') + 12000);
   assert.doesNotMatch(page, /shared, or made for each component\?/);
   assert.match(page, /'Confirm it, or take the other way: '/);
-  assert.match(page, /var AREA = \{ naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation' \};/);
+  assert.match(page, /var AREA = \{ naming: 'Naming convention', layout: 'Layout', architecture: 'Architecture', variables: 'Variables', documentation: 'Documentation' \};/);
 });

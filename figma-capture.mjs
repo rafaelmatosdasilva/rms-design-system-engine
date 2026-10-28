@@ -431,7 +431,7 @@ export const AUDIT_FUNCTIONS = ['stateTokensOf', 'getBindings', 'stateBindingsOf
 // The keys componentFacts writes, and propsFacts: an older snapshot's other keys are kept, these are replaced.
 export const STRUCTURE_KEYS = ['nodeId', 'h', 'paddingVar', 'gapVar', 'fontSizeVar', 'fontWeightVar', 'fillStructure', 'innerRadiusVar', 'strokeOnDefault', 'strokeOnAnyState',
   'sizingV', 'layout', 'slot', 'minH', 'iconSize', 'childFramePadding', 'childFrameGaps', 'variantStroke', 'variantHeight', 'restingState', 'restingStroke', 'variantOpacity',
-  'box', 'paddingPx', 'radiusPx', 'gapPx', 'colors', 'inFlow', 'stroke', 'opacity', 'text', 'toggles', 'defaultVariant', 'variants', 'slots', 'fillOpacity', 'variantFillOpacity', 'drawnOn', 'fills'];
+  'box', 'paddingPx', 'radiusPx', 'gapPx', 'colors', 'inFlow', 'stroke', 'opacity', 'text', 'toggles', 'defaultVariant', 'variants', 'slots', 'fillOpacity', 'variantFillOpacity', 'drawnOn', 'fills', 'skeleton', 'page'];
 export const PROPS_KEYS = ['nodeId', 'properties', 'annotations', 'layerAnnotations', 'description'];
 export const TIME = 20000;   // ms a call spends reading components in Figma before it answers, well within the Figma tool's wait
 export const ANSWER = 19000;   // bytes of one answer of the components, all of it

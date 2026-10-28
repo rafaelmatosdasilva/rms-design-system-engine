@@ -76,7 +76,8 @@ const KINDS = { BOOLEAN: 'boolean', TEXT: 'text', INSTANCE_SWAP: 'instance swap'
 
 // One rule from a list of items, each { component, value, fits }: its status, by who follows it and what the team said.
 // area: the kind of rule it is, as the Construction page groups them: naming (how components, their properties, their
-// variants' options and their layers are named), layout, variables, documentation.
+// variants' options and their layers are named), layout, architecture (how a component is built: its family's layout,
+// its layers' order, what it nests, what a yes/no does), variables, documentation.
 function judge(id, area, says, items, { answers = {}, min = MIN_SEEN } = {}) {
   const of = items.length;
   if (of < min) return null;
@@ -253,6 +254,89 @@ export function grammarOf({ props = {}, structure = {}, values = {}, varNames = 
   }
 
   // Description.
+  // Architecture: how a component is built, beside its own family's (the components whose name begins with the same
+  // word: buttonPrimary and buttonTertiary are buttons) and the system's.
+  const familyOf = (n) => wordsOf(String(n).split('/')[0])[0] ?? n;
+  const families = new Map();
+  for (const n of names) (families.get(familyOf(n)) ?? families.set(familyOf(n), []).get(familyOf(n))).push(n);
+  // A family's way, beside each of its components: one of a family of one is beside nothing, and is left out.
+  const byFamily = (valueOf, word) => names.filter((n) => valueOf(n) != null && (families.get(familyOf(n)) ?? []).filter((m) => valueOf(m) != null).length >= 2).map((n) => {
+    const way = top((families.get(familyOf(n)) ?? []).map(valueOf).filter((v) => v != null))[0];
+    return { component: n, value: `${valueOf(n)}, where its family (${familyOf(n)}…) ${word(way)}`, fits: valueOf(n) === way };
+  });
+  const DIR = { HORIZONTAL: 'horizontally', VERTICAL: 'vertically', GRID: 'in a grid' };
+  const directionOf = (n) => DIR[structure[n]?.box?.layout ?? structure[n]?.layout] ?? null;
+  add(judge('family-layout', 'architecture', 'A component lays out the way its family does (every button horizontally, every card vertically)', byFamily(directionOf, (w) => `lays out ${w}`), opts));
+  const SIZE = { HUG: 'hugs its content', FILL: 'fills its parent', FIXED: 'has a fixed width' };
+  const sizingOf = (n) => { const z = structure[n]?.box?.sizing?.h; return z ? SIZE[z] ?? z.toLowerCase() : null; };
+  add(judge('family-sizing', 'architecture', 'A component\'s width is set the way its family\'s is (it hugs its content, fills its parent or is fixed)', byFamily(sizingOf, (w) => w), opts));
+
+  // Where a component's padding sits: on its own frame, or on a layer inside it (a Content frame), as most do.
+  const padded = (p) => Array.isArray(p) && p.some((x) => x > 0);
+  const padWhere = names.map((n) => {
+    const s = structure[n] ?? {};
+    const own = !!(s.paddingVar?.tb || s.paddingVar?.lr) || padded(s.paddingPx), inside = (s.childFramePadding ?? []).length > 0;
+    return own || inside ? { component: n, where: own ? 'frame' : 'inside', inner: (s.childFramePadding ?? []).map((x) => x.name).filter(Boolean) } : null;
+  }).filter(Boolean);
+  const padWay = top(padWhere.map((x) => x.where))[0];
+  add(judge('padding-where', 'architecture', padWay === 'inside' ? 'A component\'s padding sits on a layer inside it (a Content frame), not on its own frame' : 'A component\'s padding sits on its own frame, not on a layer inside it',
+    padWhere.map((x) => ({ component: x.component, value: x.where === 'frame' ? 'its own frame' : x.inner.join(', ') || 'a layer inside it', fits: x.where === padWay })), opts));
+
+  // What it nests: only the system's own components (an instance of one of them), never a copy kept in it.
+  const nested = names.map((n) => {
+    const sk = structure[n]?.skeleton;
+    if (!Array.isArray(sk)) return null;
+    const foreign = [...new Set(sk.filter((x) => x.t === 'INSTANCE' && x.of && !components.has(x.of) && !components.has(String(x.of).split('/')[0])).map((x) => x.of))];
+    return sk.some((x) => x.t === 'INSTANCE') ? { component: n, value: foreign.join(', '), fits: !foreign.length } : null;
+  }).filter(Boolean);
+  add(judge('nests-system', 'architecture', 'A component nests only the system\'s own components, never one from elsewhere', nested, opts));
+
+  // Its layers' order: the layers a component's frame holds, in the order most components hold them (Background, then
+  // Content), for the names seen on enough components to have one.
+  const rootsOf = (n) => { const sk = structure[n]?.skeleton; return Array.isArray(sk) ? sk.filter((x) => x.d === 1 && !components.has(x.n)).map((x) => x.n) : null; };
+  const seenAt = new Map();
+  for (const n of names) for (const l of new Set(rootsOf(n) ?? [])) seenAt.set(l, (seenAt.get(l) ?? 0) + 1);
+  const roles = [...seenAt].filter(([, c]) => c >= MIN_SEEN).map(([l]) => l);
+  const before = (a, b) => names.filter((n) => { const r = rootsOf(n) ?? []; return r.includes(a) && r.includes(b) && r.indexOf(a) < r.indexOf(b); }).length;
+  const order = roles.slice().sort((a, b) => before(b, a) - before(a, b) || a.localeCompare(b));
+  if (order.length >= 2) {
+    const ordered = names.map((n) => { const r = (rootsOf(n) ?? []).filter((l) => order.includes(l)); return r.length >= 2 ? { component: n, value: r.join(', '), fits: r.every((l, i) => !i || order.indexOf(r[i - 1]) < order.indexOf(l)) } : null; }).filter(Boolean);
+    add(judge('layer-order', 'architecture', `A component's layers come in one order: ${order.join(', ')}`, ordered, opts));
+  }
+
+  // Where it sits in the file: on its family's page, as most of the family do.
+  add(judge('family-page', 'architecture', 'A component sits on the page its family is on', byFamily((n) => structure[n]?.page ?? null, (w) => `is on ${w}`).map((x) => ({ ...x, value: `on ${x.value}` })), opts));
+
+  // A yes/no variant changes how the component looks. One whose two variants differ only in layers shown or hidden
+  // (the same fill, stroke, text, padding, gap and corners, one holding the other's layers and more) is a boolean
+  // property in all but name: a boolean on that layer does it, with half the variants.
+  const yesNoProps = (byKind.VARIANT ?? []).filter((i) => yesNoVariant(i.def));
+  const axesOf = (v) => Object.fromEntries(String(v).split(',').map((x) => x.trim().split('=')).filter((x) => x.length === 2).map(([k, v2]) => [k.trim(), v2.trim()]));
+  const sameStyle = (a, b) => ['paddingPx', 'gapPx', 'radiusPx', 'fontSize', 'colors'].every((k) => JSON.stringify(a?.[k] ?? null) === JSON.stringify(b?.[k] ?? null));
+  const shows = yesNoProps.map((i) => {
+    const vs = Object.entries(structure[i.component]?.variants ?? {});
+    const pairs = [];
+    for (const [tn, t] of vs) {
+      const ta = axesOf(tn);
+      if (String(ta[i.value] ?? '').toLowerCase() !== 'true') continue;
+      const f = vs.find(([fn]) => { const fa = axesOf(fn); return String(fa[i.value] ?? '').toLowerCase() === 'false' && Object.entries(ta).every(([k, v]) => k === i.value || fa[k] === v); });
+      if (f) pairs.push([t, f[1]]);
+    }
+    if (!pairs.length) return null;
+    const layersShown = new Set();
+    const only = pairs.every(([t, f]) => {
+      const lt = new Set(t.layers ?? []), lf = new Set(f.layers ?? []);
+      const sub = (a, b) => [...a].every((x) => b.has(x));
+      const grows = (lt.size !== lf.size && (sub(lt, lf) || sub(lf, lt))) || (lt.size === lf.size && sub(lt, lf) && t.inFlow !== f.inFlow);
+      for (const x of lt) if (!lf.has(x)) layersShown.add(x);
+      for (const x of lf) if (!lt.has(x)) layersShown.add(x);
+      return grows && sameStyle(t, f);
+    });
+    const shown = [...layersShown].slice(0, 3);
+    return { component: i.component, prop: i.value, value: `${i.value}: ${only ? (shown.length ? shown.join(', ') : 'a layer') + (layersShown.size > 3 ? '…' : '') : 'restyles it'}`, fits: !only };
+  }).filter(Boolean);
+  add(judge('yes-no-variant-restyles', 'architecture', 'A yes/no variant changes how the component looks; one that only shows or hides layers is a boolean property', shows, opts));
+
   const described = names.filter((n) => props[n]).map((n) => ({ component: n, value: '', fits: !!String(props[n].description ?? '').trim() || values[n]?.hygiene?.description === true }));
   add(judge('description', 'documentation', 'Every component carries a description in Figma', described, opts));
 
@@ -270,6 +354,25 @@ export function grammarOf({ props = {}, structure = {}, values = {}, varNames = 
 
   const questions = rules.filter((r) => r.status === 'decide').map((r) => ({ id: r.id, ask: `${r.says}? ${r.follows} of ${r.of} do. Is it the rule? If it is, ${r.toFix.length} ${r.toFix.length === 1 ? 'is' : 'are'} to fix.` }));
   return { figma: { components: names.length, rules, vocabulary: { variantAxes } }, questions };
+}
+
+// The rules the team decided (answered yes, or chose the way for the variables a component binds) and what breaks each:
+// what a run fails on, beside the gates (a gate compares Figma with the code; this is Figma beside its own rules).
+// → { decided: [rule], broken: [rule] }
+export function decidedRules(g) {
+  const decided = (g?.figma?.rules ?? []).filter((r) => r.by === 'team');
+  return { decided, broken: decided.filter((r) => r.toFix.length) };
+}
+// The run's summary lines for it: none until the team decided a rule. → [line]
+export function constructionLines(g, { max = 6 } = {}) {
+  const { decided, broken } = decidedRules(g);
+  if (!decided.length) return [];
+  if (!broken.length) return [`**Construction.** The ${decided.length === 1 ? 'rule' : `${decided.length} rules`} the team decided ${decided.length === 1 ? 'is' : 'are'} followed by every component.`];
+  const n = broken.reduce((t, r) => t + r.toFix.length, 0);
+  return [`**Construction.** ${broken.length} of the ${decided.length} rules the team decided ${broken.length === 1 ? 'is' : 'are'} broken, by ${n} component${n === 1 ? '' : 's'}:`,
+    ...broken.slice(0, max).map((r) => { const c = [...new Set(r.toFix.map((x) => x.component))]; return `- ${r.says}: ${c.slice(0, 4).join(', ')}${c.length > 4 ? ` and ${c.length - 4} more` : ''}`; }),
+    ...(broken.length > max ? [`- and ${broken.length - max} more`] : []),
+    'Each one\'s fix is on the style guide\'s Construction page (rms-design-system-engine --figma-fix <component> writes the renames).'];
 }
 
 // The grammar in a few lines: each rule with how many follow it, then the axes most used.
@@ -307,5 +410,12 @@ export function fixOf(rule, e) {
   if (id === 'auto-layout') return { what: null, say: `Lay out ${v} with auto layout` };
   if (/-variables$/.test(id)) return { what: null, say: rule.way === 'own' ? `It binds ${v} directly: bind a variable made for it (${rule.template ?? '<component>/…'}) that points at it instead` : `It binds ${v}, a variable made for it: bind the shared variable it points at instead` };
   if (id === 'description') return { what: null, say: 'Write its description in Figma' };
+  if (id === 'family-layout') return { what: null, say: `It lays out ${v}: lay it out as its family does` };
+  if (id === 'family-sizing') return { what: null, say: `Its width: it ${v}. Set it as its family's is` };
+  if (id === 'padding-where') return { what: null, say: `Its padding is on ${v}: ${/inside it \(/.test(says) ? 'move it to a layer inside it' : 'move it to its own frame'}` };
+  if (id === 'nests-system') return { what: null, say: `It nests ${v}: use the system's own component instead` };
+  if (id === 'layer-order') return { what: null, say: `Its layers are in this order: ${v}. Put them in the system's order` };
+  if (id === 'family-page') return { what: null, say: `It is ${v}: move it to its family's page` };
+  if (id === 'yes-no-variant-restyles') { const at = v.indexOf(': '), prop = e?.prop ?? v.slice(0, at), shown = v.slice(at + 2); return { what: null, say: `${prop} only shows or hides ${shown}: make that a boolean property on the layer, and remove the ${prop} variant` }; }
   return { what: null, say: v };
 }

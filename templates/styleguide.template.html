@@ -3041,7 +3041,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     hr(); if (G.listed) navLink('construction', 'construction');
     var sec = section('construction', 'System', 'Construction', '');
     // The kind of rule each is (construction-grammar.mjs → judge): every rule on names together, whatever is named.
-    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation' };
+    var AREA = { naming: 'Naming convention', layout: 'Layout', architecture: 'Architecture', variables: 'Variables', documentation: 'Documentation' };
     var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
     var ORDER = { fix: 0, decide: 1, rule: 2 };
     var rows = RULES.slice().sort(function (a, b) { return ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
