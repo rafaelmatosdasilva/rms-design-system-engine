@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: The System page is found by the layer's index when the snapshot names no file (continuous evaluation)
+
+What changed since the entry below (engine 2f5a617): The Construction page: each rule's status, what is to fix, one decision for all (#113); A decision copied from the style guide names the system, the page and the task in words; The System page is found by the layer's index when the snapshot names no file. The guide changed in `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `c10d05c3da36` · Project measured: `13d811a9d668`
+
+| Haiku, engine efbf5c9 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.062 | $0.061 |
+| Input a run | 125k | 118k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 118k a run against 125k. no task changed state, and no run moved: the same result. Records: `records/2026-10-28-the-system-page-is-found`.
+
 ## 2026-10: An unbuilt component in a query: build with what the code has and say so, never stop to ask (continuous evaluation)
 
 What changed since the entry below (engine bf41765): An unbuilt component in a query: build with what the code has and say so, never stop to ask.
