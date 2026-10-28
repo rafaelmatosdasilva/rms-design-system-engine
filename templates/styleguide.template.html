@@ -3319,7 +3319,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var decide = function (k, head, says, copy) { return '<div class="sg-decide sg-decide--' + k + '" title="' + esc(says) + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy decision', ' data-il-copy="' + esc(copy) + '" data-il-said="Paste it in Claude Code"') + '<span class="sg-decide-said" role="status"></span></div>'; };
       var them = only ? (one ? 'the draft' : 'the ' + n + ' drafts') : (one ? 'the change' : 'the ' + n + ' changes');
       var lead = '<p class="sg-il-line"><strong>' + esc(n + ' proposed ' + (only ? 'draft' : 'change') + (one ? '' : 's')) + '</strong></p>' + (task && !/pg-missing/.test(task) ? task : '')
-        + '<p class="sg-il-line">' + esc((one ? 'Approve it, change it or drop it' : 'Approve all ' + n + ', change one or drop them all') + ', then copy your choice into Claude Code.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you decide.' : '')) + '</p>';
+        + '<p class="sg-il-line">' + esc((one ? 'Approve it, change it or drop it' : 'Approve all ' + n + ', change one or drop them all') + ', then copy your decision into Claude Code.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you decide.' : '')) + '</p>';
       return lead + '<div class="sg-il-draft"><div class="sg-il-draft-text">' + html + '</div><div class="sg-decide-grid">' +
         decide('approve', one ? 'Approve' : 'Approve all', only ? (one ? 'Agents use the draft as written from the next run.' : 'Agents use the ' + n + ' drafts as written from the next run.') : 'Each change is made as it is proposed here.', approve) +
         decide('change', one ? 'Change' : 'Change one', only ? (one ? 'Claude Code asks for your words to replace the draft.' : 'Your words replace one draft; Claude Code asks which.') : 'Your words replace one; Claude Code asks which.', change) +
@@ -3675,7 +3675,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       .concat([card('drop', 'Its own component', 'It stays a component of the system, placed on its own.', run('none'))]);
     var ask = q.roots.length ? 'Is ' + c.name + ' a part of ' + q.roots.join(' or ') + '?' : 'Is ' + c.name + ' a part of another component?';
     return { key: c.name + '\u0000doc:part?', area: 'Documentation', kind: 'Part or component', written: '<p class="sg-il-line"><strong>' + esc(ask) + '</strong></p><p class="sg-il-line">' + esc(capital(q.why)) + '.</p><div class="sg-decide-grid">' + cards.join('') + '</div>',
-      todo: esc('Say whether it is a part, then copy your choice and paste it into Claude Code.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: ['Figma\'s names', 'The code (what each component holds)'] };
+      todo: esc('Say whether it is a part, then copy your decision and paste it into Claude Code.'), who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null, src: ['Figma\'s names', 'The code (what each component holds)'] };
   };
   document.addEventListener('click', function (e) { var cp = e.target.closest && e.target.closest('[data-part-copy]'); if (cp) copyText(cp.getAttribute('data-part-copy'), cp); });
   // A part's documentation: what its root's page says of it under Parts (### its name), or where to write it.

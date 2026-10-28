@@ -319,7 +319,7 @@ function decide(page, e, { comp, has }) {
   // Questions the team left open on it ([open], TBD): a person settles each, writing the answer in its place. Until
   // then no agent reads the line, and a prototype that needs it asks.
   const open = (page.open ?? []).map((q) => `Answer the open question${q.where ? ` under ${q.where}` : ''} "${q.text}". Write the answer in its place and remove the [open] or TBD marker. Agents skip it until then.`);
-  if (drafts.length || open.length) return { action: 'review', decision: label('review'), todo: [...open, ...(drafts.length ? [drafts.length === 1 ? 'Review its draft below. Approve it, change it or drop it, then copy your choice and paste it into Claude Code. Agents won\'t use it until you decide.' : `Review these ${drafts.length} drafts. Approve them all, change one or drop them all, then copy your choice and paste it into Claude Code. Agents won't use them until you decide.`] : []), ...todo] };
+  if (drafts.length || open.length) return { action: 'review', decision: label('review'), todo: [...open, ...(drafts.length ? [drafts.length === 1 ? 'Review its draft below. Approve it, change it or drop it, then copy your decision and paste it into Claude Code. Agents won\'t use it until you decide.' : `Review these ${drafts.length} drafts. Approve them all, change one or drop them all, then copy your decision and paste it into Claude Code. Agents won't use them until you decide.`] : []), ...todo] };
   // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
   // retitle or remove); keep it only when there is nothing to change.
   const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';

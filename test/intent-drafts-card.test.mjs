@@ -31,7 +31,7 @@ test('the drafts are in the What to do card, grouped by section, each once, then
   assert.equal((html.match(/<strong>Limitations</g) ?? []).length, 1, 'a section\'s drafts together');
   assert.match(html, /<strong>Do and don't</);
   assert.doesNotMatch(html, /Proposed draft/, 'the heading says they are proposed, never each section');
-  assert.match(html, /^<p class="sg-il-line"><strong>3 proposed drafts<\/strong><\/p><p class="sg-il-line">Approve all 3, change one or drop them all, then copy your choice into Claude Code\. Agents won't use the drafts until you decide\.<\/p>/);
+  assert.match(html, /^<p class="sg-il-line"><strong>3 proposed drafts<\/strong><\/p><p class="sg-il-line">Approve all 3, change one or drop them all, then copy your decision into Claude Code\. Agents won't use the drafts until you decide\.<\/p>/);
   assert.equal((html.match(/Does not show loading/g) ?? []).length, 1, 'the same draft once');
   const c = cards(html);
   assert.deepEqual(c.map((x) => [x.k, x.head]), [['approve', 'Approve all'], ['change', 'Change one'], ['drop', 'Drop all']], 'three cards side by side, each with its own mark');
@@ -84,7 +84,7 @@ test('every change a page asks for is in What to do, under one decision: its dra
 
 test('the engine\'s own line for the drafts is not said twice: the card says it for every change', () => {
   const re = new RegExp(/var REVIEW_LINE = \/(.+)\/;/.exec(tpl)[1]);
-  assert.ok(re.test('Review these 5 drafts. Approve them all, change one or drop them all, then copy your choice and paste it into Claude Code.'));
+  assert.ok(re.test('Review these 5 drafts. Approve them all, change one or drop them all, then copy your decision and paste it into Claude Code.'));
   assert.ok(re.test('Review its draft below. Approve it, change it or drop it.'));
   assert.ok(!re.test('Check the page against the component as it is today.'));
 });
