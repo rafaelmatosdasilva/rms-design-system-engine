@@ -1,5 +1,13 @@
 # The maintenance engine for AI-ready design systems
 
+<p align="center">
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/actions/workflows/tests.yml"><img src="https://github.com/rafaelmatosdasilva/rms-design-system-engine/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20·%20Figma-a259ff?logo=figma&logoColor=white" alt="Works with Claude Code and Figma">
+  <img src="https://img.shields.io/badge/node-%E2%89%A5%2022-339933?logo=nodedotjs&logoColor=white" alt="Node 22 or newer">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/commits/main"><img src="https://img.shields.io/github/last-commit/rafaelmatosdasilva/rms-design-system-engine/main?label=last%20commit" alt="Last commit"></a>
+</p>
+
 Unlike standalone skills and fragmented workflows, RMS Design System Engine generates and connects design intent, implementation insights, documentation, contracts, verification and prototypes through shared knowledge. Every capability builds on the same context, allowing insights from one task to inform others without duplicating analysis or starting from scratch. This helps teams maintain reliable design systems as products evolve and AI agents build with them.
 
 ## Who it's for

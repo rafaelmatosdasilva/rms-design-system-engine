@@ -78,6 +78,7 @@ The skill updates itself. Once a day, before an audit, it pulls the latest versi
 - It only does this when the install is on `main` with no local changes, and never on CI.
 - `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off.
 - `rms-design-system-engine --update` updates it by hand, and `--version` tells you if you are behind.
+- Every Monday a new version is published on GitHub when something changed: a release with the list of what was merged since the last one. Watch the repository (**Watch → Custom → Releases**) to hear about each one.
 - `rms-design-system-engine --doctor` checks the install, axe-core included. The install fetches axe-core, so the first accessibility check needs no network.
 
 Keep a single copy. Link anything that needs the skill's files to `~/.claude/skills/rms-design-system-engine`, the folder that updates itself, instead of keeping a clone of your own.

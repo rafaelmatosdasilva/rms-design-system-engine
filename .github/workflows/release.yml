@@ -1,0 +1,57 @@
+# Publishes a release automatically: every Monday, when main has commits since the last version tag, it tags the
+# next version and creates a GitHub Release whose notes list the pull requests merged since the previous one.
+# How big the step is (patch, minor or major) comes from the release labels on those pull requests
+# (release-version.mjs). Nobody runs this by hand. Only tags are written: main itself is never pushed to.
+name: release
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Tag and publish the next version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          range=${last:+$last..}HEAD
+          if [ -n "$last" ] && [ "$(git rev-list --count "$range")" = 0 ]; then
+            echo "No commits since $last: nothing to release."
+            exit 0
+          fi
+          # The labels of each pull request merged in the range, as [[...], [...]].
+          labels='['
+          for n in $(git log "$range" --format=%s | sed -nE 's/.*\(#([0-9]+)\)$/\1/p'); do
+            l=$(gh pr view "$n" --json labels --jq '[.labels[].name]' 2>/dev/null || echo '[]')
+            labels="$labels$l,"
+          done
+          labels="${labels%,}]"
+          next=$(node release-version.mjs "$last" "$(node -p "require('./package.json').version")" "$labels")
+          echo "Releasing $next (previous: ${last:-none})"
+          git tag "$next"
+          git push origin "$next"
+          if [ -n "$last" ]; then
+            gh release create "$next" --title "$next" --generate-notes --notes-start-tag "$last"
+          else
+            gh release create "$next" --title "$next" --generate-notes
+          fi
