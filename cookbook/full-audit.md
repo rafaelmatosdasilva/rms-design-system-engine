@@ -425,6 +425,28 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
     for (const [list, scope] of [['fills', fillScope], ['strokes', 'STROKE_COLOR']]) {
       for (const p of paintsOf(n, list)) if (p && p.boundVariables) bind(p.boundVariables.color, scope, at);
     }
+    // Shadows and blurs: each effect's colour, blur, spread and offsets, bound to a variable, or set by an effect style.
+    const effects = get(n, 'effects');
+    for (const e of Array.isArray(effects) ? effects : []) {
+      if (!e || e.visible === false) continue;
+      const ev = e.boundVariables || {};
+      bind(ev.color, 'EFFECT_COLOR', at);
+      for (const k of ['radius', 'spread', 'offsetX', 'offsetY']) bind(ev[k], 'EFFECT_FLOAT', at);
+      out.values++;
+      if (styled(n, 'effect')) continue;
+      const off = e.offset || {};
+      const loose = [e.color && !ev.color ? 'colour' : null, num(e.radius) && !ev.radius ? 'blur ' + e.radius : null, num(e.spread) && !ev.spread ? 'spread ' + e.spread : null,
+        (off.x || off.y) && !(ev.offsetX || ev.offsetY) ? 'x ' + (off.x || 0) + ' y ' + (off.y || 0) : null].filter(Boolean);
+      if (loose.length) raw(at, String(e.type || 'effect').toLowerCase().replace(/_/g, ' '), loose.join(', '));
+    }
+    // A border's thickness and a layer's opacity, each a value a variable can hold.
+    const weight = get(n, 'strokeWeight');
+    if (paintsOf(n, 'strokes').some((p) => p && p.visible !== false) && num(weight)) {
+      out.values++;
+      if (!bound(n, 'strokeWeight') && !['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'].some((k) => bound(n, k))) raw(at, 'border', weight);
+    }
+    const opacity = get(n, 'opacity');
+    if (typeof opacity === 'number' && opacity < 1) { out.values++; if (!bound(n, 'opacity')) raw(at, 'opacity', Math.round(opacity * 100) / 100); }
     if (!artwork.test(n.type)) {
       for (const [list, kind] of [['fills', 'fill'], ['strokes', 'stroke']]) {
         paintsOf(n, list).forEach((p, i) => {
@@ -453,6 +475,10 @@ function hygieneOf(root, description, budget = { n: Infinity }, names = {}) {
       const fontSize = get(n, 'fontSize'), style = get(n, 'style');
       const size = typeof fontSize === 'number' ? fontSize : style && style.fontSize;
       raw(at, 'text style', size ? `${size}px` : 'mixed');
+    } else if (n.type === 'TEXT' && !styled(n, 'text')) {
+      // Its size bound, and no text style: each of its other text values needs its own variable.
+      const loose = [['lineHeight', 'line height'], ['letterSpacing', 'letter spacing'], ['fontFamily', 'font family'], ['fontWeight', 'font weight']].filter(([k]) => !bound(n, k)).map(([, w]) => w);
+      if (loose.length) raw(at, 'text', loose.join(', '));
     }
     for (const c of kids(n)) walk(c, `${at}/${c.name}`);
   };

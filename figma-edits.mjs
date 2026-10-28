@@ -288,7 +288,8 @@ export function specEdits(propsSnap = {}, components = [], { heard = {} } = {}) 
 }
 
 // The Figma plugin script for the edits a person approved (decisions are never in it). Idempotent: a node that
-// already states a role is left as it is. Returns { changed, skipped, missing } for the agent to report.
+// already states a role, or a name already renamed, is left as it is. A rename is of an option, a property, the
+// component itself or a layer in every variant (the construction fixes: --figma-fix). Returns { changed, skipped, missing } for the agent to report.
 export function applyScript(edits = []) {
   const todo = edits.filter((e) => e.kind === 'role' && e.nodeId && e.label).map((e) => ({ id: e.nodeId, component: e.component, label: e.label }));
   const list = edits.find((e) => e.kind === 'todo');
@@ -357,6 +358,23 @@ for (const r of renames.filter((x) => x.what === 'property')) {
   try { set.editComponentProperty(key, { name: r.to }); changed.push(r.component + ': ' + r.from + ' → ' + r.to); }
   catch (e) { missing.push(r.component + ' ' + r.from + ' (' + String(e && e.message || e) + ')'); }
 }
+for (const r of renames.filter((x) => x.what === 'component')) {
+  const set = await figma.getNodeByIdAsync(r.id);
+  if (!set) { missing.push(r.component); continue; }
+  if (set.name === r.to) { skipped.push(r.component); continue; }
+  if (set.name !== r.from) { missing.push(r.component + ' (named ' + set.name + ' now)'); continue; }
+  set.name = r.to; changed.push(r.from + ' → ' + r.to);
+}
+// A layer renamed in every variant; never inside an instance, whose layers are its own component's.
+for (const r of renames.filter((x) => x.what === 'layer')) {
+  const set = await figma.getNodeByIdAsync(r.id);
+  if (!set) { missing.push(r.component + ' › ' + r.from); continue; }
+  const inInstance = (n) => { for (let p = n.parent; p && p !== set; p = p.parent) if (p.type === 'INSTANCE') return true; return false; };
+  const found = set.findAll ? set.findAll((n) => n.name === r.from && !inInstance(n)) : [];
+  if (!found.length) { (set.findAll && set.findAll((n) => n.name === r.to).length ? skipped : missing).push(r.component + ' › ' + r.from); continue; }
+  for (const n of found) n.name = r.to;
+  changed.push(r.component + ' › ' + r.from + ' → ' + r.to + (found.length > 1 ? ' (' + found.length + ' layers)' : ''));
+}
 ` : ''}
 for (const e of edits) {
   const node = await figma.getNodeByIdAsync(e.id);
@@ -417,7 +435,7 @@ export function editLines(edits, { fileKey = null, may = 'ask', why = null } = {
     ...(roles.length ? [`Figma changes the engine can make (${roles.length}), each read from the code:`, ...roles.map((e) => `   • ${e.component}: add the annotation "${e.label}" (${e.why})`)] : specs.some((e) => e.role) ? [] : ['✅ Figma states every role the code has.']),
     ...(specs.length ? [`Accessibility specs from the code (${specs.length}), one annotation per component in the category "${SPEC_CATEGORY}", replacing the one the last run wrote:`, ...specs.map((e) => `   • ${e.component}: ${e.why}`)] : []),
     ...(review ? [`Accessibility findings pinned on the screens in Figma (${review.why}), in the category "${review.category}", replacing the last run's:`, ...review.screens.map((x) => `   • ${x.name}: ${!x.count ? 'nothing to fix' : x.pins.length ? `${x.count} to fix, pinned on ${x.pins.length} layer${x.pins.length === 1 ? '' : 's'}` : `${x.count} to fix, said in the screen's summary (read the screens again with --figma-a11y to pin each on its layer)`}`)] : []),
-    ...(renames.length ? [`Names written as the rest of the system writes them (${renames.length}):`, ...renames.map((e) => `   • ${e.component}: ${e.what === 'option' ? `${e.prop}=${e.from} → ${e.to}` : `"${e.from}" → "${e.to}"`}`), '   Each component\'s code contract follows the new names once Figma is read again.'] : []),
+    ...(renames.length ? [`Names written as the rest of the system writes them (${renames.length}):`, ...renames.map((e) => `   • ${e.component}: ${e.what === 'option' ? `${e.prop}=${e.from} → ${e.to}` : `${e.what === 'layer' ? 'the layer ' : e.what === 'component' ? 'the component ' : ''}"${e.from}" → "${e.to}"`}`), '   Each component\'s code contract follows the new names once Figma is read again.'] : []),
     ...(todo ? [`The design team's to do list in Figma, page "${todo.page}", frame "${todo.frame}" (${todo.why}), written afresh:`, ...todo.items.map((g) => `   • ${g.need}: ${todoText(g)}`)] : []),
     ...(notes ? [`Annotations no check reads, listed in Figma on the page "${notes.page}", frame "${notes.frame}" (${notes.why}); the annotations themselves are not changed:`, ...notes.items.map((n) => `   • ${n.component}${n.layer ? ` › ${n.layer}` : ''}: "${n.text}"${n.wording ? ` → write it as "${n.wording}"` : ' (an accessibility note: write it as Role:, Alt:, Heading level or a key, so a check reads it)'}`)] : []),
     ...(decide.length ? [`For a person to decide (${decide.length}), never applied:`, ...decide.map((e) => `   • ${e.component}: ${e.why}`)] : []),

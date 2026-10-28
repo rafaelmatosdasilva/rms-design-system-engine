@@ -131,7 +131,7 @@ async function main() {
     else {
       console.log('');
       for (const l of lines.length ? lines : ['No construction grammar yet: it is mined from the Figma capture, so refresh Figma (--recipe refresh-figma) and run rms-design-system-engine.']) console.log(l);
-      for (const q of g?.questions ?? []) console.log(`? ${q.ask} (answer in the authored contract: "construction": { "${q.id}": true | false })`);
+      for (const q of g?.questions ?? []) console.log(`? ${q.ask} (the team answers: rms-design-system-engine --construction ${q.id} yes|no)`);
       console.log('');
     }
     if (terms.every(grammarTerm)) process.exit(lines.length ? 0 : 1);

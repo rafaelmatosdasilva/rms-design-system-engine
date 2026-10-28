@@ -6,26 +6,36 @@
 // its layers carry names, whether every component lays out with auto layout, which variables a component binds (its own
 // or the shared ones), whether it carries a description. No system says this in one place, and every system says it
 // differently, so nothing here is imposed: each rule is what most of the system's own components already do, with how
-// many follow it and which do not.
+// many follow it and which do not. It is a rule only once every component follows it: there are no exceptions, a
+// component follows it or is to fix.
 //
 //   grammarOf({ props, structure, values }, { answers }) → { figma: { components, rules, vocabulary }, questions }
 //     props:     figma-component-props.snapshot.json   (properties, their kinds, options and the description)
 //     structure: figma-structure.snapshot.json → components (layout, the variables bound, child frames, toggles)
 //     values:    component-values.snapshot.json        (hygiene: the layers each variable is bound on, variants with no
 //                                                       auto layout); optional
-//     answers:   { <rule id>: true | false }: the team's word on a question, kept in the authored contract
-//                (construction); true makes it a rule, false drops it
+//     varNames:  figma-vars.snapshot.json → variableScopes (each variable id with its name), for the variables bound on
+//                the layers inside a component; optional
+//     answers:   { <rule id>: true | false }: the team's decision, kept in the authored contract (construction); true
+//                makes it one to fix, false drops it; for the variables a component binds, 'own' or 'shared' says
+//                which way the system goes (each such rule carries both ways: ways, way)
 //   grammarLines(grammar) → the grammar in a few lines, for llms.txt and --query
+//   fixOf(rule, toFix) → what to do in Figma for one component that breaks a rule: a rename the engine can write
+//     ({ what: 'component' | 'property' | 'option' | 'layer', from, to, prop?, say }), or what only a person can do
+//     ({ what: null, say }: a layer's new name needs its content read, layout and bindings a design decision)
 //
-// A rule needs at least MIN_SEEN components and RULE_SHARE of them following it. Between QUESTION_SHARE and RULE_SHARE
-// it is a question for the team (is this the rule, and the rest exceptions?), asked once and kept. Below that, the system
-// has no rule there, and none is written: an agent then follows the component it was asked to build like.
+// Each one, seen on at least MIN_SEEN components, has a status:
+//   rule    every component follows it: nothing to do;
+//   fix     FIX_SHARE of them or more follow it, or the team decided it is the rule: the others are to fix;
+//   decide  fewer follow it and the team has not decided: whether it is the rule, then the others are to fix.
+// The team's no drops it.
 //
 // Pure: no file is read or written here (contract-gen.mjs writes contracts/construction.json).
 
-export const RULE_SHARE = 0.75;
-export const QUESTION_SHARE = 0.5;
+export const FIX_SHARE = 0.8;
 export const MIN_SEEN = 3;
+// A word a kind of property begins or ends with is a candidate when half its names have it.
+const AFFIX_SHARE = 0.5;
 
 // Figma's own names for a layer nobody named: "Frame 235", "Rectangle 12".
 const AUTO_NAMED = /^(Frame|Group|Rectangle|Ellipse|Vector|Line|Polygon|Star|Union|Subtract|Intersect|Exclude|Image|Text|Component|Instance|Section|Slice)( \d+)+$/;
@@ -64,20 +74,19 @@ const propName = (key) => String(key).replace(/#[^#]*$/, '');
 
 const KINDS = { BOOLEAN: 'boolean', TEXT: 'text', INSTANCE_SWAP: 'instance swap', SLOT: 'slot', VARIANT: 'variant' };
 
-// One rule from a list of items, each { component, value, fits }: a rule, a question or nothing, by the share that fits.
-function judge(id, area, says, items, { answers = {}, min = MIN_SEEN, unsettled = [] } = {}) {
+// One rule from a list of items, each { component, value, fits }: its status, by who follows it and what the team said.
+function judge(id, area, says, items, { answers = {}, min = MIN_SEEN } = {}) {
   const of = items.length;
   if (of < min) return null;
   const follows = items.filter((i) => i.fits).length;
   const share = follows / of;
-  const exceptions = items.filter((i) => !i.fits).map(({ component, value }) => ({ component, value }));
-  const base = { id, area, says, follows, of, share: Math.round(share * 100) / 100, exceptions };
-  if (answers[id] === true) return { ...base, status: 'rule', by: 'team' };
+  const toFix = items.filter((i) => !i.fits).map(({ component, value, prop }) => ({ component, value, ...(prop ? { prop } : {}) }));
+  const base = { id, area, says, follows, of, share: Math.round(share * 100) / 100, toFix };
   if (answers[id] === false) return null;
-  if (share >= RULE_SHARE) return { ...base, status: 'rule', by: 'majority' };
-  if (share >= QUESTION_SHARE) return { ...base, status: 'question', by: 'majority' };
-  unsettled.push({ id, area, says, follows, of });
-  return null;
+  const by = answers[id] === true ? 'team' : 'majority';
+  if (!toFix.length) return { ...base, status: 'rule', by };
+  if (by === 'team' || share >= FIX_SHARE) return { ...base, status: 'fix', by };
+  return { ...base, status: 'decide', by };
 }
 
 // The most common of a list of values, with its count.
@@ -101,14 +110,27 @@ function affix(names, where) {
   const words = names.map((n) => wordsOf(n)).filter((w) => w.length > 1).map((w) => (where === 'start' ? w[0] : w[w.length - 1]));
   if (!words.length) return null;
   const [word, count] = top(words);
-  return count / names.length >= QUESTION_SHARE ? word : null;
+  return count / names.length >= AFFIX_SHARE ? word : null;
 }
 
-// The variables a component's own frame binds, from the structure capture: { colour: [...], spacing: [...] }.
-function boundTokens(s = {}) {
-  const colour = ['fill', 'text', 'stroke'].map((k) => s.colors?.[k]?.token).filter(Boolean);
-  const spacing = [s.paddingVar?.tb, s.paddingVar?.lr, s.gapVar, s.innerRadiusVar, ...(s.childFrameGaps ?? []).map((g) => g.gapVar)].filter(Boolean);
-  return { colour, spacing };
+// The variables a component binds, on its frame and on every layer inside it (an instance's are its own component's):
+// its frame's from the structure capture, every layer's from the values capture (hygiene.binds: each variable id with
+// the properties and layers it is bound on), named by the vars snapshot (variableScopes). A variable from another
+// library, which the snapshot does not name, is left out. → { colour: [...], spacing: [...] }
+const COLOUR_FIELDS = new Set(['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR', 'FILL', 'STROKE', 'COLOR']);
+const SPACING_FIELDS = new Set(['GAP', 'CORNER_RADIUS', 'PADDING', 'PADDING_LEFT', 'PADDING_RIGHT', 'PADDING_TOP', 'PADDING_BOTTOM', 'ITEM_SPACING', 'COUNTER_AXIS_SPACING', 'TOP_LEFT_RADIUS', 'TOP_RIGHT_RADIUS', 'BOTTOM_LEFT_RADIUS', 'BOTTOM_RIGHT_RADIUS']);
+function boundTokens(s = {}, v = {}, varNames = {}) {
+  const colour = new Set(['fill', 'text', 'stroke'].map((k) => s.colors?.[k]?.token).filter(Boolean));
+  const spacing = new Set([s.paddingVar?.tb, s.paddingVar?.lr, s.gapVar, s.innerRadiusVar, ...(s.childFrameGaps ?? []).map((g) => g.gapVar)].filter(Boolean));
+  for (const [id, where] of Object.entries(v.hygiene?.binds ?? {})) {
+    const name = varNames[id]?.name ?? (typeof varNames[id] === 'string' ? varNames[id] : null);
+    if (!name) continue;
+    for (const field of Object.keys(where ?? {})) {
+      if (COLOUR_FIELDS.has(field) || /_FILL$|_COLOR$/.test(field)) colour.add(name);
+      else if (SPACING_FIELDS.has(field) || /PADDING|SPACING|RADIUS/.test(field)) spacing.add(name);
+    }
+  }
+  return { colour: [...colour], spacing: [...spacing] };
 }
 
 // Whether a variable is the component's own (its name is one of the path's segments: advanced/buttonPrimary/text/color),
@@ -131,14 +153,14 @@ function layerNames(name, s = {}, v = {}, components = new Set()) {
   return [...out].filter((l) => l && l !== name && !components.has(l));
 }
 
-export function grammarOf({ props = {}, structure = {}, values = {} } = {}, { answers = {} } = {}) {
+export function grammarOf({ props = {}, structure = {}, values = {}, varNames = {} } = {}, { answers = {} } = {}) {
   const names = [...new Set([...Object.keys(props), ...Object.keys(structure)])]
     .filter((n) => !n.startsWith('_') && (props[n]?.properties || structure[n]) && n.trim() && !/\s{2,}|^\s|\s$/.test(n) && !/usage context/i.test(n))
     .sort();
   const components = new Set(names);
-  const rules = [], unsettled = [];
+  const rules = [];
   const add = (r) => { if (r) rules.push(r); };
-  const opts = { answers, unsettled };
+  const opts = { answers };
 
   // Component names.
   // A part's name is its root's and its own (table/Row): each is written in the system's case.
@@ -164,7 +186,7 @@ export function grammarOf({ props = {}, structure = {}, values = {} } = {}, { an
 
   // Variant options: how each is written, and a yes/no axis's two options.
   // A number (style=1) or a placeholder ((Select a preset)) is not written in any case, and is left out.
-  const options = (byKind.VARIANT ?? []).flatMap((i) => (i.def.variantOptions ?? []).filter((o) => /[A-Za-z]/.test(o) && !/^\(.*\)$/.test(o)).map((o) => ({ component: i.component, value: `${i.value}=${o}`, option: o })));
+  const options = (byKind.VARIANT ?? []).flatMap((i) => (i.def.variantOptions ?? []).filter((o) => /[A-Za-z]/.test(o) && !/^\(.*\)$/.test(o)).map((o) => ({ component: i.component, value: `${i.value}=${o}`, option: o, prop: i.value })));
   const optCase = dominantCase(options.map((o) => o.option).filter((o) => !/^(true|false)$/i.test(o)));
   add(judge('variant-option-case', 'variants', `A variant option is written in ${optCase} (${optCase === 'camelCase' ? 'default, inProgress' : 'as most are'})`, options.filter((o) => !/^(true|false)$/i.test(o.option)).map((o) => ({ ...o, fits: caseFits(o.option, optCase) })), opts));
   const yesNo = options.filter((o) => /^(true|false)$/i.test(o.option));
@@ -191,17 +213,30 @@ export function grammarOf({ props = {}, structure = {}, values = {} } = {}, { an
 
   // Variables: whether a component binds its own (advanced/<component>/…) or the shared ones, colour and spacing apart.
   for (const [kind, label] of [['colour', 'colours'], ['spacing', 'spacing, gaps and radii']]) {
-    const seen = names.map((n) => ({ n, t: boundTokens(structure[n])[kind] })).filter((x) => x.t.length);
+    const seen = names.map((n) => ({ n, t: boundTokens(structure[n], values[n], varNames)[kind] })).filter((x) => x.t.length);
     if (!seen.length) continue;
+    // Two ways a system goes: its components bind the shared variables directly, or variables made for each of them
+    // (<prefix>/<component>/…). Which one is the team's to say (answers: 'own' or 'shared'); until then, the way more
+    // components go is put to them, with the other beside it.
+    const id = `${kind}-variables`;
     const prefixes = seen.flatMap(({ n, t }) => t.map((tok) => ownToken(tok, n)).filter((p) => p !== null));
-    const own = prefixes.length >= seen.flatMap((x) => x.t).length / 2;
-    const prefix = own ? top(prefixes)[0] : null;
-    const template = own ? `${prefix ? prefix + '/' : ''}<component>/…` : null;
-    add(judge(`${kind}-variables`, 'variables', own ? `A component's ${label} bind its own variables (${template})` : `A component's ${label} bind the system's shared variables, not variables of its own`,
-      seen.map(({ n, t }) => {
-        const off = t.filter((tok) => (own ? ownToken(tok, n) === null : ownToken(tok, n) !== null));
-        return { component: n, value: off.join(', '), fits: !off.length };
-      }), opts));
+    const prefix = top(prefixes)[0];
+    const template = `${prefix ? prefix + '/' : ''}<component>/…`;
+    const shared = seen.flatMap(({ n, t }) => t.filter((tok) => ownToken(tok, n) === null));
+    const example = top(shared)[0];
+    const isOwn = (n, tok) => ownToken(tok, n) !== null;
+    const byWay = (way) => seen.map(({ n, t }) => { const off = t.filter((tok) => (way === 'own' ? !isOwn(n, tok) : isOwn(n, tok))); return { component: n, value: off.join(', '), fits: !off.length }; });
+    const SAYS = {
+      own: `A component's ${label} use variables made for it (${template}), never the shared ones directly`,
+      shared: `A component's ${label} use the system's shared variables directly${example ? ` (${example})` : ''}, never variables made for it`,
+    };
+    const said = answers[id] === 'own' || answers[id] === 'shared' ? answers[id] : null;
+    const way = said ?? (byWay('own').filter((x) => x.fits).length > byWay('shared').filter((x) => x.fits).length ? 'own' : 'shared');
+    const other = way === 'own' ? 'shared' : 'own';
+    const r = judge(id, 'variables', SAYS[way], byWay(way), { ...opts, answers: { ...answers, [id]: said ? true : answers[id] } });
+    // Which way is the system's architecture, never the engine's guess: until the team says, it is to decide.
+    if (r && !said && r.status === 'fix') r.status = 'decide';
+    if (r) { r.way = way; r.template = template; r.ways = [way, other].map((w) => ({ way: w, says: SAYS[w], follows: byWay(w).filter((x) => x.fits).length })); add(r); }
   }
 
   // Description.
@@ -220,18 +255,44 @@ export function grammarOf({ props = {}, structure = {}, values = {} } = {}, { an
     .sort((a, b) => b.components.length - a.components.length || a.name.localeCompare(b.name))
     .map((a) => ({ name: a.name, components: a.components.length, options: Object.entries(a.options).sort((x, y) => y[1] - x[1]).map(([o]) => o) }));
 
-  const questions = rules.filter((r) => r.status === 'question').map((r) => ({ id: r.id, ask: `${r.says}? ${r.follows} of ${r.of} do; ${r.of - r.follows} do not (${r.exceptions.slice(0, 3).map((e) => e.component).join(', ')}${r.exceptions.length > 3 ? '…' : ''}). Is it the rule, and the others to change?` }));
-  return { figma: { components: names.length, rules, unsettled, vocabulary: { variantAxes } }, questions };
+  const questions = rules.filter((r) => r.status === 'decide').map((r) => ({ id: r.id, ask: `${r.says}? ${r.follows} of ${r.of} do. Is it the rule? If it is, ${r.toFix.length} ${r.toFix.length === 1 ? 'is' : 'are'} to fix.` }));
+  return { figma: { components: names.length, rules, vocabulary: { variantAxes } }, questions };
 }
 
 // The grammar in a few lines: each rule with how many follow it, then the axes most used.
 export function grammarLines(g, { axes = 8, options = 6 } = {}) {
   const f = g?.figma;
   if (!f?.rules?.length) return [];
-  const lines = [`How this system builds a component in Figma (from its ${f.components} components):`];
-  for (const r of f.rules) lines.push(`- ${r.says}${r.status === 'question' ? ' (a question for the team)' : ''}: ${r.follows} of ${r.of}${r.by === 'team' ? ', the team\'s rule' : ''}.`);
-  for (const u of f.unsettled ?? []) lines.push(`- No rule: ${u.says.replace(/^\w/, (c) => c.toLowerCase())} in ${u.follows} of ${u.of}; follow the component it is like.`);
+  const lines = [`How this system builds a component in Figma (from its ${f.components} components). A new or changed component follows each line; one still to decide, as the component it is like does:`];
+  const fix = (r) => `${r.toFix.length} to fix`;
+  for (const r of f.rules) lines.push(`- ${r.says}: ${r.status === 'rule' ? `the rule, every component follows it` : r.status === 'fix' ? `${r.follows} of ${r.of} follow it, ${fix(r)}${r.by === 'team' ? ' (the team\'s rule)' : ''}` : `${r.follows} of ${r.of} follow it; the team decides whether it is the rule (then ${fix(r)})`}.`);
   const va = f.vocabulary?.variantAxes ?? [];
   if (va.length) lines.push(`- Variant axes it already uses: ${va.slice(0, axes).map((a) => `${a.name} (${a.options.slice(0, options).join(' | ')}${a.options.length > options ? ' …' : ''})`).join('; ')}.`);
   return lines;
+}
+
+// camelCase of a name: Show Hint Text, ShowHintText, ↳ expanded → showHintText, expanded.
+export const camelOf = (s) => String(s ?? '').replace(/^\u21b3\s*/, '').split(/[\s_-]+/).filter(Boolean).map((w, i) => (i ? w[0].toUpperCase() : w[0].toLowerCase()) + w.slice(1)).join('');
+const casedAs = (s, rule) => (/camel/i.test(rule) ? camelOf(s) : /pascal/i.test(rule) ? camelOf(s).replace(/^\w/, (c) => c.toUpperCase()) : /kebab/i.test(rule) ? wordsOf(s).join('-') : /snake/i.test(rule) ? wordsOf(s).join('_') : /title/i.test(rule) ? wordsOf(s).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') : s);
+const caseIn = (says) => (says.match(/in (camelCase|PascalCase|kebab-case|snake_case|Title Case)/) ?? [])[1] ?? 'camelCase';
+
+export function fixOf(rule, e) {
+  const v = String(e?.value ?? ''), id = rule?.id ?? '', says = rule?.says ?? '';
+  const word = (says.match(/"(\w+)"/) ?? [])[1] ?? '';
+  const cap = (w) => w.replace(/^\w/, (c) => c.toUpperCase());
+  if (id === 'component-name-case') { const to = v.split('/').map((x) => casedAs(x, caseIn(says))).join('/'); return { what: 'component', from: v, to, say: `Rename the component to ${to}` }; }
+  if (/-property-case$/.test(id)) { const to = casedAs(v, caseIn(says)); return { what: 'property', from: v, to, say: `Rename the property ${v} to ${to}` }; }
+  if (/-property-prefix$/.test(id)) { const to = word + cap(camelOf(v)); return { what: 'property', from: v, to, say: `Rename the property ${v} to ${to}, if it shows or hides a layer; otherwise make it a variant` }; }
+  if (/-property-suffix$/.test(id)) { const to = camelOf(v).replace(new RegExp(`${word}$`, 'i'), '') + cap(word); return { what: 'property', from: v, to, say: `Rename the property ${v} to ${to}` }; }
+  if (id === 'variant-option-case' || id === 'variant-boolean-options') {
+    const [prop, opt] = [v.slice(0, v.indexOf('=')), v.slice(v.indexOf('=') + 1)];
+    const to = id === 'variant-option-case' ? casedAs(opt, caseIn(says)) : /true and false/.test(says) ? opt.toLowerCase() : cap(opt.toLowerCase());
+    return { what: 'option', prop, from: opt, to, say: `Rename the option ${opt} of ${prop} to ${to}` };
+  }
+  if (id === 'layer-name-case') { const to = casedAs(v, caseIn(says)); return { what: 'layer', from: v, to, say: `Rename the layer ${v} to ${to}` }; }
+  if (id === 'layers-named') return { what: null, say: `Name ${v} after what ${v.includes(',') ? 'each holds' : 'it holds'}`, layers: v.split(', ') };
+  if (id === 'auto-layout') return { what: null, say: `Lay out ${v} with auto layout` };
+  if (/-variables$/.test(id)) return { what: null, say: rule.way === 'own' ? `It binds ${v} directly: bind a variable made for it (${rule.template ?? '<component>/…'}) that points at it instead` : `It binds ${v}, a variable made for it: bind the shared variable it points at instead` };
+  if (id === 'description') return { what: null, say: 'Write its description in Figma' };
+  return { what: null, say: v };
 }

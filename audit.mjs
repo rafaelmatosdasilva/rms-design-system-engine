@@ -1878,6 +1878,96 @@ if (process.argv.includes('--census')) {
 }
 
 // ── --figma-edits: the Figma side of the hand-back, written by the engine, applied only when a person says yes ──
+// ── The construction grammar's decisions and fixes (construction-grammar.mjs) ──
+// --construction <rule id> yes|no: the team's decision on one still to decide, in the authored contract (construction):
+// yes makes it the rule (its components to fix), no drops it.
+// --figma-fix <component> [<rule id>] [<value>] [--to <name>] (or --figma-fix --rule <rule id> [--names <file.json>], every
+// component the rule has to fix, the unnamed layers with the names the person approved): what the component must change in Figma to follow the system's rules, as the script --figma-edits writes (.design-system-engine-out/handback/figma-apply.js), run once the
+// person says yes. Renames only (the component, a property, an option, a layer); --to names it otherwise than proposed,
+// and names a layer Figma left unnamed. Layout and variable bindings are a person's, said and never written.
+if (process.argv.includes('--construction') || process.argv.includes('--figma-fix')) {
+  let ccfg = {};
+  try { ccfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const { grammarOf, fixOf } = await import('./construction-grammar.mjs');
+  const { mayWrite } = await import('./writes.mjs');
+  const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
+  const authoredPath = resolve(ROOT, ccfg.contracts?.authored ?? 'contract.authored.json');
+  const authored = read(authoredPath) ?? {};
+  const props = read(ccfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
+  const g = grammarOf({ props, structure: read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: read('component-values.snapshot.json') ?? {}, varNames: read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {} }, { answers: authored.construction ?? {} });
+  if (!g.figma.rules.length) { console.log('❌ No construction grammar: it is read from the Figma capture. Refresh Figma (--recipe refresh-figma), then ask again.'); process.exit(2); }
+  const after = (flag) => { const i = process.argv.indexOf(flag); return process.argv.slice(i + 1).filter((a, k, all) => !a.startsWith('--') && all.slice(0, k).every((b) => !b.startsWith('--'))); };
+  const ruleOf = (id) => g.figma.rules.find((r) => r.id === id);
+  if (process.argv.includes('--construction')) {
+    const [id, word] = after('--construction');
+    const r = ruleOf(id), w = String(word ?? '').toLowerCase();
+    // yes or no; for the variables a component binds, the way the system goes: own (made for each component) or shared.
+    const ok = r && (['yes', 'no'].includes(w) || (r.ways && ['own', 'shared'].includes(w)));
+    if (!ok) { console.log(`❌ --construction takes a rule and the decision: rms-design-system-engine --construction <rule id> yes|no (own|shared for the variables a component binds). To decide: ${g.figma.rules.filter((x) => x.status === 'decide').map((x) => x.id).join(', ') || 'none'}.`); process.exit(2); }
+    const value = w === 'yes' ? true : w === 'no' ? false : w;
+    const may = mayWrite(ccfg, 'engine');
+    if (may.answer === 'no') { console.log(`ℹ️  This project does not let the engine write its own files${may.why ? ` (${may.why})` : ''}: add "construction": { "${id}": ${JSON.stringify(value)} } to ${relative(ROOT, authoredPath)} by hand.`); process.exit(1); }
+    authored.construction = { ...(authored.construction ?? {}), [id]: value };
+    writeFileSync(authoredPath, JSON.stringify(authored, null, 2) + '\n');
+    const now = value === false ? null : grammarOf({ props, structure: read(ccfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: read('component-values.snapshot.json') ?? {}, varNames: read(ccfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {} }, { answers: authored.construction }).figma.rules.find((x) => x.id === id);
+    console.log(now ? `✅ The rule: ${now.says}. ${now.toFix.length} to fix (${relative(ROOT, authoredPath)}).` : `✅ Not a rule: ${r.says}; dropped (${relative(ROOT, authoredPath)}).`);
+    console.log(now?.toFix.length ? `NEXT: tell the person; each component to fix is on the style guide's Construction page, and rms-design-system-engine --figma-fix <component> ${id} writes its fix.` : 'NEXT: tell the person the line above.');
+    process.exit(0);
+  }
+  // --figma-fix --rule <rule id>: every component the rule has to fix, in one script.
+  const every = _argValue('--rule');
+  if (every) {
+    const r = ruleOf(every);
+    if (!r) { console.log(`❌ No rule ${every}. The rules: ${g.figma.rules.map((x) => x.id).join(', ')}.`); process.exit(2); }
+    // --names <file.json>: the names a person approved for the layers Figma left unnamed, { "<component> › <layer>": "<name>" }.
+    const namesFile = _argValue('--names');
+    let given = {};
+    if (namesFile) { try { given = JSON.parse(readFileSync(resolve(ROOT, namesFile), 'utf8')); } catch (e) { console.log(`❌ --names: ${e.message}`); process.exit(2); } }
+    const edits = r.toFix.map((t) => ({ t, f: fixOf(r, t) })).filter((x) => props[x.t.component]?.nodeId).flatMap(({ t, f }) => {
+      const base = { kind: 'rename', nodeId: props[t.component].nodeId, component: t.component, why: r.says };
+      if (f.what) return [{ ...base, what: f.what, ...(f.prop ? { prop: f.prop } : {}), from: f.from, to: f.to }];
+      return (f.layers ?? []).filter((l) => given[`${t.component} › ${l}`]).map((l) => ({ ...base, what: 'layer', from: l, to: given[`${t.component} › ${l}`] }));
+    });
+    const left = r.toFix.length - edits.length;
+    if (!edits.length) {
+      const layers = r.toFix.flatMap((t) => (fixOf(r, t).layers ?? []).map((l) => `${t.component} › ${l}`));
+      console.log(layers.length ? `${r.says}: ${layers.length} layers to name. Read what each holds in Figma, propose a name for every one as a list, and once the person approves it write it as { "<component> › <layer>": "<name>" } to a file and run rms-design-system-engine --figma-fix --rule ${every} --names <that file>:\n${layers.map((l) => `   • ${l}`).join('\n')}`
+        : `${r.says}: ${r.toFix.length} to fix, each a person's in Figma (the engine renames only): say what to change, step by step, component by component.`);
+      process.exit(0);
+    }
+    const { editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const fig = mayWrite(ccfg, 'figma');
+    const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits, { may: fig.answer });
+    for (const l of editLines(edits, { fileKey: ccfg.figmaFileKey ?? null, may: fig.answer, why: fig.why })) console.log(l);
+    console.log(`   (${relative(ROOT, files.json)}${files.script ? ` · ${relative(ROOT, files.script)}` : ''})${left ? `\n   ${left} more to fix need a person (a name to give, layout, bindings): rms-design-system-engine --figma-fix <component> ${every} says which.` : ''}`);
+    process.exit(0);
+  }
+  const [component, id, value] = after('--figma-fix'), to = _argValue('--to');
+  const node = props[component]?.nodeId;
+  if (!component || !node) { console.log(`❌ --figma-fix takes a component Figma has: rms-design-system-engine --figma-fix <component> [<rule id>] [<value>] [--to <name>]${component ? ` (no ${component} in the Figma capture)` : ''}.`); process.exit(2); }
+  const found = g.figma.rules.filter((r) => (id ? r.id === id : r.status === 'fix')).flatMap((r) => r.toFix.filter((t) => t.component === component && (value == null || t.value === value || (r.id === 'layers-named' && t.value.split(', ').includes(value)))).map((t) => ({ r, t, f: fixOf(r, t) })));
+  if (!found.length) { console.log(`✅ ${component} follows ${id ? `the rule ${id}` : 'every rule to fix'}${value ? ` for ${value}` : ''}: nothing to change.`); process.exit(0); }
+  if (to && found.length > 1) { console.log(`❌ --to names one fix: give the rule and the value too (${found.map((x) => `${x.r.id} ${x.t.value}`).join('; ')}).`); process.exit(2); }
+  const edits = [], person = [];
+  for (const { r, t, f } of found) {
+    // A layer Figma left unnamed is named after what it holds: the person's name (--to), else it is theirs to give.
+    const layer = f.layers && (value && f.layers.includes(value) ? value : f.layers.length === 1 ? f.layers[0] : null);
+    if (!f.what && layer && to) edits.push({ kind: 'rename', nodeId: node, component, what: 'layer', from: layer, to, why: r.says });
+    else if (f.what) edits.push({ kind: 'rename', nodeId: node, component, what: f.what, ...(f.prop ? { prop: f.prop } : {}), from: f.from, to: to ?? f.to, why: r.says });
+    else person.push(`   • ${f.say}${f.layers ? ` (give its name: --figma-fix ${component} ${r.id} ${JSON.stringify(f.layers.length === 1 ? f.layers[0] : '<layer>')} --to <name>)` : ''}: ${r.says}.`);
+  }
+  const { editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+  const fig = mayWrite(ccfg, 'figma');
+  if (edits.length) {
+    const files = writeFigmaEdits(join(ROOT, OUT_DIR, 'handback'), edits, { may: fig.answer });
+    for (const l of editLines(edits, { fileKey: ccfg.figmaFileKey ?? null, may: fig.answer, why: fig.why })) console.log(l);
+    console.log(`   (${relative(ROOT, files.json)}${files.script ? ` · ${relative(ROOT, files.script)}` : ''})`);
+  }
+  if (person.length) { console.log(`${component}: what only a person changes in Figma (${person.length}), never written by the engine:`); for (const l of person) console.log(l); }
+  if (!edits.length) console.log('NEXT: tell the person what to change in Figma (the lines above), or ask them for the name to give.');
+  process.exit(0);
+}
+
 if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
   try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }

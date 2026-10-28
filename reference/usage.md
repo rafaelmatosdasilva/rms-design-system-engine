@@ -1251,20 +1251,35 @@ check every edit gets on what changed since the last commit, never failing the f
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
-#### The construction grammar (`--query construction`)
+#### The construction grammar (`--query construction`, `--construction`, `--figma-fix`)
 
 How the system builds a component in Figma, mined on every run from its own components and written to
 `contracts/construction.json`: how a component, each kind of property (boolean, text, instance swap, slot, variant) and
 each variant option is named, the word a kind of property begins or ends with (`show…`, `…Content`), whether layers carry
 names of their own (never Figma's `Frame 235`) and in which case, whether every component and variant lays out with auto
 layout, whether a component binds its own variables (`<prefix>/<component>/…`) or the shared ones, colour and spacing
-apart, and whether it carries a description. Each rule says how many components follow it and which do not. Nothing
-is imposed: a rule is what three quarters or more of the system's components already do (three at least); between half
-and three quarters it is a question for the team, and below half the system has no rule there, which is said too (follow
-the component the new one is like). The variant axes the system already uses, with their options, are kept as a
-vocabulary to reuse. The team answers a question once, in the authored contract: `"construction": { "<rule id>": true }`
-makes it a rule, `false` drops it. `--query construction` prints it all; building or changing a component in Figma
-follows it.
+apart, and whether it carries a description. Nothing is imposed: each line is what the system's own components already
+do, seen on three or more, with how many follow it and which do not. There are no exceptions: a component follows it or
+is to fix. Each line has a status:
+
+- **Rule**: every component follows it. Nothing to do.
+- **To fix**: four in five or more follow it, or the team made it the rule. The others are to fix; it is a rule once every
+  one does.
+- **To decide**: fewer follow it and the team has not decided. `--construction <rule id> yes` makes it the rule (its
+  components to fix), `no` drops it; the answer is kept in the authored contract (`construction`).
+
+`--figma-fix <component> [<rule id>] [<value>] [--to <name>]` writes what one component must change to follow the rules
+as the script `--figma-edits` writes (`.design-system-engine-out/handback/figma-apply.js`), run with the Figma tool once
+the person says yes; `--figma-fix --rule <rule id>` does every component of one rule. The engine renames only: the
+component, a property, an option, a layer in every variant (never inside an instance). `--to` gives another name, and
+names a layer Figma left unnamed (Claude reads what it holds and proposes one). Layout and variable bindings are a
+person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
+to reuse. `--query construction` prints it all; building or changing a component in Figma follows it.
+
+The style guide has a **Construction** page: one table, a row per line with its status, how many follow it and what is to
+do, filtered by status. A row opens in the side panel: the decision to copy for a line to decide, and each component to
+fix with its fix to copy into Claude Code (Fix it, Another name, Name a layer; Fix all for a rule's renames). The page is
+in no menu and no search, opened only by its link (`#construction`), until the team lists it (`styleguide.construction`).
 
 #### A scheduled pipeline (`--ci-changed`)
 
