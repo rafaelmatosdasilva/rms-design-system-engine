@@ -174,5 +174,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-28-construction-a-yes-no-variant` | The 21 guide tasks on Haiku (engine d6fb706) | "Construction: a yes/no variant that should be a boolean, padding, layer order and page; decided rules checked on every run" |
 | `component-builder` | The 21 guide tasks on Haiku (engine 33f86b6) | "A new component built in Figma from a spec: the build-component-figma recipe" |
 | `component-change` | The 24 guide tasks on Haiku (engine 02226fe) | "A component changed in Figma with its report: the change-component-figma recipe, and evals for building" |
+| `system-sign-off` | The 24 guide tasks on Haiku (engine b121b51) | "A change to the system itself is signed off, and the changes made in Figma have a page" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
