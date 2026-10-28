@@ -102,7 +102,8 @@ test('a browser killed leaves neither its profile nor its socket folder behind',
   const browser = await launchChrome(CHROME, { tmpPrefix: 'cdp-kill-' });
   const socketDir = dirname(readlinkSync(join(browser.userDataDir, 'SingletonSocket')));
   browser.kill();
-  await new Promise((r) => setTimeout(r, 1000));
+  // Gone once Chrome and its helpers have exited: a busy machine takes longer than an idle one.
+  for (let i = 0; i < 50 && (existsSync(browser.userDataDir) || existsSync(socketDir)); i++) await new Promise((r) => setTimeout(r, 100));
   assert.equal(existsSync(browser.userDataDir), false, 'the profile was left behind');
   assert.equal(existsSync(socketDir), false, 'the socket folder was left behind');
 });
