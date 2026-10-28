@@ -210,10 +210,19 @@ test('components: the import writes the five files, keeps what the capture does 
   r = await importComponents(root, cfg, { dir });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(r.removed, ['removedOne']);
-  const files = ['src/figma-structure.snapshot.json', 'src/figma-component-props.snapshot.json', 'component-values.snapshot.json', 'component-state-tokens.json', 'component-state-bindings.json'];
+  const files = ['src/figma-structure.snapshot.json', 'src/figma-component-props.snapshot.json', 'component-values.snapshot.json', 'component-state-tokens.json', 'component-state-bindings.json', 'src/figma-skeleton.snapshot.json'];
   assert.deepEqual(r.written, files);
+  // The skeleton: every variant's layer tree, one its variants share kept once; what each layer is wired to; where it lives.
+  const sk = json(root, 'src/figma-skeleton.snapshot.json');
+  const b1 = sk.button1, t0 = b1.trees[b1.variants[0][1]];
+  assert.ok(b1.variants.length >= 2 && b1.trees.length < b1.variants.length, 'variants that share a tree share it');
+  assert.deepEqual(t0.c.slice(0, 3).map((x) => [x.t, x.n]), [['RECTANGLE', 'Background'], ['INSTANCE', t0.c[1].n], ['TEXT', t0.c[2].n]]);
+  assert.equal(t0.c[0].absolute, true);
+  assert.deepEqual(t0.c[1].wired, { visible: 'Show Icon' });
+  assert.equal(b1.page, 'Components');
+  assert.deepEqual(sk.card.trees[0].c.map((x) => x.t), ['FRAME', 'SLOT', 'GROUP']);
   const said = importLines(r, 'cap').join('\n');
-  assert.match(said, /^✓ Figma's components read in \d+ checked chunks?: 32 components with 89 variants, the props of 32, the raw values of 32 and the states of 32 → src\/figma-structure\.snapshot\.json, src\/figma-component-props\.snapshot\.json, component-values\.snapshot\.json, component-state-tokens\.json, component-state-bindings\.json\nTaken out, no longer in Figma: removedOne\.\n⚠️ {2}Not read in Figma, kept as it was: button3 \(structure: the layer tree could not be read\)\.$/);
+  assert.match(said, /^✓ Figma's components read in \d+ checked chunks?: 32 components with 89 variants, the props of 32, the raw values of 32, the states of 32 and how 32 are built → src\/figma-structure\.snapshot\.json, src\/figma-component-props\.snapshot\.json, component-values\.snapshot\.json, component-state-tokens\.json, component-state-bindings\.json, src\/figma-skeleton\.snapshot\.json\nTaken out, no longer in Figma: removedOne\.\n⚠️ {2}Not read in Figma, kept as it was: button3 \(structure: the layer tree could not be read\)\.$/);
   for (const p of files) { const s = json(root, p); assert.ok(s._built?.at && s._updated, `${p} stamped`); }
   const s = json(root, 'src/figma-structure.snapshot.json');
   const b = s.components.button1;

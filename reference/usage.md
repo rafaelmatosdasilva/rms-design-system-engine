@@ -1290,6 +1290,14 @@ names a layer Figma left unnamed (Claude reads what it holds and proposes one). 
 person's: said, never written. The variant axes the system already uses, with their options, are kept as a vocabulary
 to reuse. `--query construction` prints it all; building or changing a component in Figma follows it.
 
+How each component is built inside comes from the skeleton the Figma capture reads (`figma-skeleton.snapshot.json`):
+every text layer with a text style, every shadow with an effect style, no layer hidden without a property to show it,
+every boolean, text and swap property driving a layer, icons as instances never drawn vectors, layers in the auto layout
+flow, nested components and variables from this file, no pinned variable mode, one layer structure across a component's
+variants, hover and pressed states reached by prototype reactions, swap properties listing what they take, each
+component in a section, a link to its code; and for each family of three or more (the buttons, the cards), the shape
+most are built in (its root's auto layout and what it holds, in order). Each is a line with the same statuses.
+
 The style guide has a **Construction** page: one table, a row per line with its status, how many follow it and what is to
 do, filtered by status. A row opens in the side panel: the decision to copy for a line to decide, and each component to
 fix with its fix to copy into Claude Code (Fix it, Another name, Name a layer; Fix all for a rule's renames). The page is

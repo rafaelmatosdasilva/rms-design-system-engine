@@ -1412,11 +1412,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const constructionShow = cfg.styleguide?.construction ?? 'unlisted';
     if (constructionShow !== 'off') try {
       const { grammarOf, fixOf } = await import('./construction-grammar.mjs');
-      const g = grammarOf({ props: readJson(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {}, structure: readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: readJson('component-values.snapshot.json') ?? {}, varNames: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {} },
+      const g = grammarOf({ props: readJson(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {}, structure: readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: readJson('component-values.snapshot.json') ?? {}, varNames: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {}, skeleton: readJson((await import('./figma-capture.mjs')).componentFiles(cfg).skeleton) ?? {} },
         { answers: readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.construction ?? {} });
       // Each component to fix with its fix (fixOf), so the page says it as the engine's --figma-fix makes it.
       for (const r of g.figma.rules) r.toFix = r.toFix.map((t) => ({ ...t, fix: fixOf(r, t) }));
-      if (g.figma.rules.length) view.construction = { rules: g.figma.rules, components: g.figma.components, listed: constructionShow === 'listed' };
+      if (g.figma.rules.length) view.construction = { rules: g.figma.rules, components: g.figma.components, families: g.figma.families ?? [], listed: constructionShow === 'listed' };
     } catch { /* no Construction page */ }
     // How much each area weighs in the Health page's one number (styleguide.health.weights); the page's own otherwise.
     if (cfg.styleguide?.health?.weights && typeof cfg.styleguide.health.weights === 'object') view.healthWeights = cfg.styleguide.health.weights;

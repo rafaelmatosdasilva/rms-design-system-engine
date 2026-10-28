@@ -426,7 +426,7 @@ export async function importCapture(ROOT, cfg = {}, { dir = captureDir(ROOT), so
 //   variant names. A component larger than one answer comes in slices of that text.
 // - the import matches each component's items to its checksum, in whichever answer they were saved.
 // No script switches Figma's page (that is saved with the file and changes its version): each page is loaded where it is.
-export const COMPONENT_FUNCTIONS = ['prop', 'parseAxes', 'restingVariant', 'restingOf', 'deepHasStroke', 'getBoundPaddingVar', 'childFrames', 'deepFacts', 'paintFacts', 'componentFacts', 'propsFacts'];
+export const COMPONENT_FUNCTIONS = ['prop', 'parseAxes', 'restingVariant', 'restingOf', 'deepHasStroke', 'getBoundPaddingVar', 'childFrames', 'deepFacts', 'paintFacts', 'componentFacts', 'propsFacts', 'skeletonOf'];
 export const AUDIT_FUNCTIONS = ['stateTokensOf', 'getBindings', 'stateBindingsOf', 'collectRaw', 'hygieneOf'];
 // The keys componentFacts writes, and propsFacts: an older snapshot's other keys are kept, these are replaced.
 export const STRUCTURE_KEYS = ['nodeId', 'h', 'paddingVar', 'gapVar', 'fontSizeVar', 'fontWeightVar', 'fillStructure', 'innerRadiusVar', 'strokeOnDefault', 'strokeOnAnyState',
@@ -437,9 +437,14 @@ export const TIME = 20000;   // ms a call spends reading components in Figma bef
 export const ANSWER = 19000;   // bytes of one answer of the components, all of it
 export const SCRIPT_MAX = 50000;   // characters the Figma tool takes in one script
 const READ_IDS = 400;   // the components a read is offered, at most (each answer holds far fewer)
-// The five files the components capture writes (the structure and props snapshots where ds-config.json puts them).
-export const componentFiles = (cfg = {}) => ({ structure: cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json', props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json',
-  values: 'component-values.snapshot.json', states: 'component-state-tokens.json', bindings: 'component-state-bindings.json' });
+// The six files the components capture writes (the structure and props snapshots where ds-config.json puts them, the
+// skeleton beside the structure unless paths.snapshotSkeleton says otherwise).
+export const componentFiles = (cfg = {}) => {
+  const structure = cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json';
+  return { structure, props: cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json',
+    values: 'component-values.snapshot.json', states: 'component-state-tokens.json', bindings: 'component-state-bindings.json',
+    skeleton: cfg.paths?.snapshotSkeleton ?? structure.replace(/[^/\\]+$/, 'figma-skeleton.snapshot.json') };
+};
 
 // The source of each named function in the recipes' code blocks (cookbook/refresh-figma.md, cookbook/full-audit.md).
 export function recipeFunctions(engineDir = ENGINE, names = [...COMPONENT_FUNCTIONS, ...AUDIT_FUNCTIONS]) {
@@ -514,6 +519,7 @@ const values=await read('values',id+'#values',()=>{const nums=new Set(),colors=n
 if(values)out.push({k:'values',id:id+'#values',v:values});
 const states=await read('states',id+'#states',()=>stateTokensOf(r,NAMES));if(states)out.push({k:'states',id:id+'#states',v:states});
 if(r.type==='COMPONENT_SET'){const b=await read('bindings',id+'#bindings',()=>stateBindingsOf(r,LOCAL));if(b)out.push({k:'bindings',id:id+'#bindings',v:{variants:b}});}
+const sk=await read('skeleton',id+'#skeleton',()=>skeletonOf(r));if(sk)out.push({k:'skeleton',id:id+'#skeleton',v:sk});
 // What JSON keeps (no symbol such as figma.mixed, no undefined), so the checksum is over what the answer carries.
 return JSON.parse(JSON.stringify(out));
 }
@@ -703,11 +709,11 @@ export function partsBack(items) {
 // after any status mark in front of it (🟡 .tableRow). A building block of others, never a component of the system.
 export const unpublished = (name) => /^[._]/.test(String(name ?? '').replace(/^[^\p{L}\p{N}._]+/u, ''));
 
-// What the items hold, by component name. → { names, structure, props, values, states, bindings, errors, variants, dupes,
-// unpublished }
+// What the items hold, by component name. → { names, structure, props, values, states, bindings, skeleton, errors,
+// variants, dupes, unpublished }
 export function componentsFromItems(items) {
   const all = partsBack(items);
-  const byId = new Map(), names = [], structure = {}, props = {}, values = {}, states = {}, bindings = {}, errors = [], dupes = [], hidden = [];
+  const byId = new Map(), names = [], structure = {}, props = {}, values = {}, states = {}, bindings = {}, skeleton = {}, errors = [], dupes = [], hidden = [];
   let variants = 0;
   for (const it of all) {
     if (it.k !== 'component' || byId.has(it.id)) continue;
@@ -726,8 +732,9 @@ export function componentsFromItems(items) {
     else if (it.k === 'values') values[name] = it.v;
     else if (it.k === 'states') states[name] = it.v;
     else if (it.k === 'bindings') bindings[name] = it.v.variants ?? {};
+    else if (it.k === 'skeleton') skeleton[name] = it.v;
   }
-  return { names, structure, props, values, states, bindings, errors, variants, dupes: [...new Set(dupes)], unpublished: hidden };
+  return { names, structure, props, values, states, bindings, skeleton, errors, variants, dupes: [...new Set(dupes)], unpublished: hidden };
 }
 
 // component-state-tokens.json from each component's own tokens: the counts summed, a token hidden-only when no
@@ -742,7 +749,7 @@ export function stateTokensFile(per) {
   return { _hiddenOnly: hiddenOnly, _hiddenToggleable: hiddenOnly.filter((t) => toggle.has(t)), ...counts };
 }
 
-// --capture-import for the components: when every chunk is there, write the five files. A part a chunk did not read
+// --capture-import for the components: when every chunk is there, write the six files. A part a chunk did not read
 // (an older capture's answers, or one the Figma tool could not read) keeps what the file held; a component no longer in
 // Figma is taken out of each.
 export async function importComponents(ROOT, cfg = {}, { dir = captureDir(ROOT), source = 'the Figma tool', now = new Date().toISOString(), engineDir = ENGINE, figmaVersion = null } = {}) {
@@ -820,6 +827,13 @@ function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0
     for (const [k] of own(prevB)) if (!inFigma.has(k)) removed.add(k);
     snaps.bindings = { ...bindings, _built: stamp };
   }
+  // The skeleton: how each component is built, every variant's layer tree (skeletonOf); a component not read kept.
+  if (Object.keys(got.skeleton).length) {
+    const skel = { ...meta(prev.skeleton), _updated: now, _note: prev.skeleton?._note ?? 'How each component is built in Figma: every variant\'s layer tree, its auto layout, what each layer is wired to, styles, modes, nesting, slots and swaps, reactions and dev links, read with the capture recipe\'s skeletonOf (cookbook/refresh-figma.md). Do not edit by hand.', _source: how };
+    for (const name of got.names) { const v = got.skeleton[name] ?? prev.skeleton?.[name]; if (v) skel[name] = v; else (notRead.skeleton ??= []).push(name); }
+    for (const [k] of own(prev.skeleton)) if (!inFigma.has(k)) removed.add(k);
+    snaps.skeleton = { ...skel, _built: stamp };
+  }
   const kept = [], written = [];
   for (const [k, snap] of Object.entries(snaps)) {
     const may = mayWrite(join(ROOT, paths[k]), stamp, { ROOT, engineDir, label: paths[k] });
@@ -831,7 +845,7 @@ function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0
   if (!written.length) return { ok: false, ...base, kept: kept.join('\n') };
   for (const f of new Set(stale)) { try { unlinkSync(join(dir, f)); } catch { /* left */ } }
   return { ok: true, ...base, paths, written, removed: [...removed].filter((n) => !unpublished(n)), unpublished: got.unpublished, dupes: got.dupes, errors: got.errors, notRead, statesKept, added, ...(kept.length ? { kept: kept.join('\n') } : {}),
-    counts: { chunks, components: Object.keys(components).length, variants: got.variants, props: Object.keys(got.props).length, values: Object.keys(got.values).length, states: Object.keys(got.states).length } };
+    counts: { chunks, components: Object.keys(components).length, variants: got.variants, props: Object.keys(got.props).length, values: Object.keys(got.values).length, states: Object.keys(got.states).length, skeleton: Object.keys(got.skeleton).length } };
 }
 
 // figma-cli reads the same chunks itself: the checksums first, then each chunk not saved yet.
@@ -929,7 +943,7 @@ export function importLines(r, rel) {
   }
   const n = r.counts;
   if (kind === 'vars') { lines.push(`✓ Figma's variables read in ${n.chunks} checked chunk${n.chunks === 1 ? '' : 's'}: ${n.colours} colours in ${n.modes} mode${n.modes === 1 ? '' : 's'}, ${n.sizing} sizes, ${n.textStyles} text styles, the scopes of ${n.scopes} variables → ${r.path}`); return lines; }
-  const also = n.values || n.states ? `, the raw values of ${n.values} and the states of ${n.states}` : '';
+  const also = n.values || n.states ? `, the raw values of ${n.values}${n.skeleton ? `, the states of ${n.states} and how ${n.skeleton} are built` : ` and the states of ${n.states}`}` : '';
   lines.push(`✓ Figma's components read in ${n.chunks} checked chunk${n.chunks === 1 ? '' : 's'}: ${n.components} component${n.components === 1 ? '' : 's'} with ${n.variants} variants, the props of ${n.props}${also} → ${r.written.join(', ')}`);
   if (r.removed?.length) lines.push(`Taken out, no longer in Figma: ${r.removed.join(', ')}.`);
   if (r.errors?.length) lines.push(`⚠️  Not read in Figma, kept as it was: ${r.errors.map((e) => `${e.name} (${e.kind}: ${e.error})`).join('; ')}.`);

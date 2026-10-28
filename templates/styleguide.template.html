@@ -3040,8 +3040,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var G = DATA.construction, RULES = G.rules || [];
     hr(); if (G.listed) navLink('construction', 'construction');
     var sec = section('construction', 'System', 'Construction', '');
-    // The kind of rule each is (construction-grammar.mjs → judge): every rule on names together, whatever is named.
-    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation' };
+    // The kind of rule each is (construction-grammar.mjs → judge): every rule on names together, whatever is named; how
+    // each component is built inside (the skeleton) in its own kinds.
+    var AREA = { naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation', layers: 'Layers', styles: 'Styles', wiring: 'Wiring', nesting: 'Nesting', interactions: 'Interactions', placement: 'Placement', code: 'Code', architecture: 'Architecture' };
     var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
     var ORDER = { fix: 0, decide: 1, rule: 2 };
     var rows = RULES.slice().sort(function (a, b) { return ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
@@ -3100,7 +3101,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       }
       var list = n ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc('Components it changes (' + n + ')') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>What changes</th></tr></thead><tbody>'
         + cs.map(function (c) { return '<tr><td>' + compHTML(c) + '</td><td>' + byC[c].map(function (t) { return '<p class="sg-il-line"><span>' + esc((t.fix && t.fix.say) || t.value) + '</span></p>'; }).join('') + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
-      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Suggestion', suggest) + card('Decision', decide) + list;
+      // A family's rule: every way its components are built, how many each, so the choice is seen whole.
+      var fam = /^family-/.test(r.id) ? (G.families || []).filter(function (x) { return 'family-' + x.family === r.id; })[0] : null;
+      var ways = fam ? '<table class="pg-par-table"><thead><tr><th>Built as</th><th>Components</th></tr></thead><tbody>' + fam.shapes.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</tbody></table>' : '';
+      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Suggestion', suggest) + card('Decision', decide) + (ways ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc('How the ' + fam.components + ' in the family are built') + '</div><div class="pg-par-scroll">' + ways + '</div></div>' : '') + list;
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', ST[r.status][1]], title: r.says, body: body });
       panelShow(m, from);

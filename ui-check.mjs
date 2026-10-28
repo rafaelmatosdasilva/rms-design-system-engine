@@ -40,7 +40,9 @@ if (/\.(html?|jsx|tsx|vue|svelte|css|scss|less)$/i.test(input)) {
   // A page in prototypes/ is held to the system as a prototype is: its components, what each is given, where each goes.
   const page = (await import('./page-check.mjs')).pageHookCheck(event, { root: ROOT, cfg: { ...cfg, hooks: true, editCheck: true }, outDir: OUT_DIR });
   const out = [editCheck(event, { root: ROOT, cfg: { ...cfg, hooks: true, editCheck: true } }), page].filter(Boolean).join('\n\n') || null;
-  if (!out) { console.log(`\n✅ ${input}: what changed since the last commit uses only the system (the check every edit gets). --check-ui is for a generated UI in JSON.\n`); process.exit(0); }
+  // Passing is the end of the task: the reply says what changed, and nothing more is run to confirm it (a server, a
+  // screenshot, a browser install): the check above is the confirmation.
+  if (!out) { console.log(`\n✅ ${input}: what changed since the last commit uses only the system (the check every edit gets). --check-ui is for a generated UI in JSON.\nNEXT: the change is checked. Reply now, in the chat: what you added and where, and anything the system did not have for it. Run nothing more to confirm it.\n`); process.exit(0); }
   console.log(`\n${out}\n`);
   process.exit(1);
 }
