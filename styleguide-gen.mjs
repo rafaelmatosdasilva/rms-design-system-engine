@@ -1403,6 +1403,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       }
       if (cfg.styleguide?.groups) view.groups = cfg.styleguide.groups;
     } catch { /* no status, no coverage */ }
+    // How the system builds a component in Figma (construction-grammar.mjs), for the Construction page: each rule, what
+    // is to fix to follow it and what the team has to decide. The page
+    // is in no menu and no search, opened only by its link (#construction), unless styleguide.construction is "listed";
+    // "off" leaves it out of the guide and its data.
+    const constructionShow = cfg.styleguide?.construction ?? 'unlisted';
+    if (constructionShow !== 'off') try {
+      const { grammarOf, fixOf } = await import('./construction-grammar.mjs');
+      const g = grammarOf({ props: readJson(cfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {}, structure: readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {}, values: readJson('component-values.snapshot.json') ?? {}, varNames: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {} },
+        { answers: readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.construction ?? {} });
+      // Each component to fix with its fix (fixOf), so the page says it as the engine's --figma-fix makes it.
+      for (const r of g.figma.rules) r.toFix = r.toFix.map((t) => ({ ...t, fix: fixOf(r, t) }));
+      if (g.figma.rules.length) view.construction = { rules: g.figma.rules, components: g.figma.components, listed: constructionShow === 'listed' };
+    } catch { /* no Construction page */ }
     // How much each area weighs in the Health page's one number (styleguide.health.weights); the page's own otherwise.
     if (cfg.styleguide?.health?.weights && typeof cfg.styleguide.health.weights === 'object') view.healthWeights = cfg.styleguide.health.weights;
     // What the system retired that is still in use: each deprecated component on its own page and in its To do

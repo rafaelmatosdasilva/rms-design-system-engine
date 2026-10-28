@@ -950,6 +950,10 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
 .sg-issues tr.sg-row-open:hover td.sg-row-go { color: var(--sg-text); }
+/* The Construction table: the rule widest, the rest even, its status last. */
+.sg-cx-table { table-layout: fixed; width: 100%; min-width: 56rem; }   /* narrower, it scrolls: no word broken in two */
+.sg-cx-table td { overflow-wrap: normal; word-break: normal; hyphens: none; }
+.sg-cx-table col.sg-cx-rule { width: 34%; } .sg-cx-table col.sg-cx-col { width: 15%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
 .sg-issues th, .sg-issues td { padding-left: var(--sg-space-s); padding-right: var(--sg-space-s); }
@@ -3026,6 +3030,88 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     pageBar(td, { links: [{ label: 'Built ' + when + (eng ? ' · engine ' + eng : ''), url: eng && DATA.engineRepo ? DATA.engineRepo + '/commit/' + b.engine : '#status' }] });
   })();
   var hl = td, hlBox = document.createElement('div'); hlBox.className = 'sg-health-box'; td.appendChild(hlBox);
+  // Construction: how the system builds a component in Figma (DATA.construction, construction-grammar.mjs). One table, a
+  // row a rule: its status (a rule only once every component follows it; to fix when most do or the team decided it; to
+  // decide otherwise), how many follow it and what is to do. A row opens in the side panel: the decision to copy for a
+  // rule to decide, and each component to fix with its fix to copy into Claude Code (renames are made by the engine's
+  // script, --figma-fix; a name to give, layout and bindings are a person's). No exceptions: a component follows it or is
+  // to fix. In no menu and no search unless the team lists it (styleguide.construction): opened by its link.
+  if (DATA.construction) (function () {
+    var G = DATA.construction, RULES = G.rules || [];
+    hr(); if (G.listed) navLink('construction', 'construction');
+    var sec = section('construction', 'System', 'Construction', '');
+    var AREA = { components: 'Components', properties: 'Properties', variants: 'Variants', layers: 'Layers', layout: 'Layout', variables: 'Variables', documentation: 'Documentation' };
+    var ST = { fix: ['differs', 'To fix'], decide: ['figma', 'To decide'], rule: ['match', 'Rule'] };
+    var ORDER = { fix: 0, decide: 1, rule: 2 };
+    var AREA_WORD = { 'colour-variables': 'the variables a component\'s colours use', 'spacing-variables': 'the variables a component\'s spacing, gaps and radii use' };
+    var rows = RULES.slice().sort(function (a, b) { return ORDER[a.status] - ORDER[b.status] || b.toFix.length - a.toFix.length; });
+    var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
+    var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
+    var compHTML = function (n) { return known[n] ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '">' + esc(n) + '</a>' : esc(n); };
+    var comps = function (r) { var seen = {}, out = []; r.toFix.forEach(function (t) { if (!seen[t.component]) { seen[t.component] = 1; out.push(t.component); } }); return out; };
+    var plural2 = function (n) { return n === 1 ? 'component' : 'components'; };
+    var todoOf = function (r) {
+      var n = comps(r).length;
+      if (r.status === 'rule') return '<span class="pg-missing">Nothing</span>';
+      if (r.status === 'decide') return r.ways ? 'Decide which way the system goes: ' + r.ways.map(function (w) { return w.follows + ' ' + (w.way === 'own' ? 'use variables made for them' : 'use shared variables'); }).join(', ') : 'Decide whether it is the rule; then ' + n + ' ' + plural2(n) + ' to fix';
+      return 'Fix ' + n + ' ' + plural2(n);
+    };
+    var cmd = 'rms-design-system-engine';
+    // The one change for every component a rule has to fix, as it is copied into Claude Code: renames the engine writes,
+    // names for unnamed layers Claude proposes as one list, layout and bindings Claude walks through.
+    var applyAll = function (r) {
+      var cs = comps(r), n = cs.length, f = (r.toFix[0] || {}).fix || {};
+      var lead = 'Make every component follow the system\'s construction rule "' + r.says + '" (' + n + ' ' + plural2(n) + ' to change: ' + cs.join(', ') + '). ';
+      if (f.what) return lead + 'Run ' + cmd + ' --figma-fix --rule ' + r.id + ', then apply the script it writes.';
+      if (f.layers) return lead + 'Run ' + cmd + ' --figma-fix --rule ' + r.id + ': read in Figma what each unnamed layer holds, propose one list of names, and once I approve it run it again with --names and apply the script it writes.';
+      return lead + 'The engine does not change layout or variable bindings: give me one list of what to change in Figma, component by component, in the order to do it.';
+    };
+    var copyBtn = function (k, head, text) { return '<div class="sg-decide sg-decide--' + k + '"><strong class="sg-decide-head">' + decideMark(k) + esc(head) + '</strong>' + sysButton('button', 'Copy', ' data-cx-copy="' + esc(text) + '"') + '<span class="sg-decide-said" role="status"></span></div>'; };
+    var rowHTML = function (r, i) {
+      var n = comps(r).length;
+      return '<tr class="sg-row-open" tabindex="0" data-cx-row="' + i + '" data-chip="' + r.status + '"><td><strong>' + esc(r.ways && r.status === 'decide' ? capital(AREA_WORD[r.id] || 'variables') + ': shared, or made for each component?' : r.says) + '</strong></td><td>' + esc(AREA[r.area] || capital(r.area)) + '</td><td>' + r.follows + ' of ' + r.of + '<span class="pg-par-val">' + Math.round(r.follows / r.of * 100) + '%</span></td><td>' + todoOf(r) + '</td><td>' + dot(ST[r.status][0], ST[r.status][1]) + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+    };
+    var cxKey = function (r) { return 'cx:' + r.id; };
+    var panel = function (i, from) {
+      var r = rows[i]; if (!r) return;
+      var m = panelShell('sg-cx-panel', 'Construction'); m._key = cxKey(r);
+      var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
+      var cs = comps(r), byC = {}, n = cs.length;
+      r.toFix.forEach(function (t) { (byC[t.component] = byC[t.component] || []).push(t); });
+      var WAY_HEAD = { own: 'Variables made for each component', shared: 'Shared variables' };
+      var lower = function (x) { return String(x).replace(/^\w/, function (c) { return c.toLowerCase(); }); };
+      var pct = Math.round(r.follows / r.of * 100);
+      // What the engine suggests, from what most of the system already does; one decision for every component.
+      var suggest, decide;
+      if (r.status === 'rule') { suggest = 'Every component follows it. Nothing to change.'; decide = ''; }
+      else if (r.ways) {
+        var best = r.ways[0], other = r.ways[1];
+        suggest = '<p class="sg-il-line"><strong>' + esc(WAY_HEAD[best.way]) + '</strong>: ' + esc(best.follows + ' of ' + r.of + ' components already do this (' + lower(best.says) + ').') + '</p><p class="sg-il-line"><span class="pg-par-val">' + esc(other.follows + ' go the other way (' + lower(other.says) + '). Choose one; the others are then changed to match.') + '</span></p>';
+        decide = '<div class="sg-decide-grid">' + r.ways.map(function (w, k) { return copyBtn(k ? 'change' : 'approve', (k ? '' : 'Suggested: ') + WAY_HEAD[w.way], 'The system\'s construction rule: "' + w.says + '". Run ' + cmd + ' --construction ' + r.id + ' ' + w.way + '.'); }).join('') + '</div>';
+      }
+      else if (r.status === 'decide') {
+        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' components (' + pct + '%) already do this.') + '</p><p class="sg-il-line">' + (pct >= 50 ? '<strong>' + esc('Suggested: make it the rule, and change the ' + n + ' that don\'t.') + '</strong>' : esc('Fewer than half do: make it the rule only if it is how the system should be built; then ' + n + ' are to change.')) + '</p>';
+        decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Make it the rule', 'Make it a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' yes.') + copyBtn('drop', 'Not a rule', 'It is not a construction rule of the system: "' + r.says + '". Run ' + cmd + ' --construction ' + r.id + ' no.') + '</div>';
+      }
+      else {
+        suggest = '<p class="sg-il-line">' + esc(r.follows + ' of ' + r.of + ' components (' + pct + '%) already do this.') + '</p><p class="sg-il-line"><strong>' + esc('Suggested: change the ' + n + ' ' + plural2(n) + ' that don\'t, so every one does.') + '</strong></p>';
+        decide = '<div class="sg-decide-grid">' + copyBtn('approve', 'Apply to all ' + n, applyAll(r)) + '</div>';
+      }
+      var list = n ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc('Components it changes (' + n + ')') + '</div><div class="pg-par-scroll"><table class="pg-par-table"><thead><tr><th>Component</th><th>What changes</th></tr></thead><tbody>'
+        + cs.map(function (c) { return '<tr><td>' + compHTML(c) + '</td><td>' + byC[c].map(function (t) { return '<p class="sg-il-line"><span>' + esc((t.fix && t.fix.say) || t.value) + '</span></p>'; }).join('') + '</td></tr>'; }).join('') + '</tbody></table></div></div>' : '';
+      var body = card('Status', '<p>' + dot(ST[r.status][0], ST[r.status][1]) + '</p>') + card('Suggestion', suggest) + card('Decision', decide) + list;
+      m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-cx-copy]'); if (cp) copyText(cp.getAttribute('data-cx-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Construction', ST[r.status][1]], title: r.ways && r.status === 'decide' ? capital(AREA_WORD[r.id] || 'variables') + ': shared, or made for each component?' : r.says, body: body });
+      panelShow(m, from);
+    };
+    sec.insertAdjacentHTML('beforeend', '<div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-cx-table"><colgroup><col class="sg-cx-rule"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col class="sg-cx-col"><col></colgroup><thead><tr><th>Rule</th><th>Area</th><th>Follow it</th><th>To do</th><th>Status</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>');
+    var open = function (tr) { if (tr) panel(+tr.getAttribute('data-cx-row'), tr); };
+    sec.addEventListener('click', function (e) { if (e.target.closest('a, button')) return; open(e.target.closest('tr[data-cx-row]')); });
+    sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-cx-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
+    sec._openKey = function (key) { var i = rows.findIndex(function (r) { return cxKey(r) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
+    var nOf = function (st) { return rows.filter(function (r) { return r.status === st; }).length; };
+    pageBar(sec, { chips: [{ key: 'fix', label: 'To fix', n: nOf('fix'), dot: 'differs' }, { key: 'decide', label: 'To decide', n: nOf('decide'), dot: 'figma' }, { key: 'rule', label: 'Rules', n: nOf('rule'), dot: 'match' }].filter(function (c) { return c.n; }) });
+  })();
   // History: every change gathered by the release it shipped in, newest first, each a table of what was done and what
   // it affects: the code's commits, each read of Figma that changed what Figma says of a component, and what the team
   // decided in that time (a component, a pattern, a template, a foundation, the system), what it ruled out and why.

@@ -204,7 +204,10 @@ const ANY_LINK = /https?:\/\/[^\s)>\]]+/i;
 // How the system builds a component in Figma (its construction grammar): before building from Figma, which a request
 // naming components and Figma would otherwise reach.
 const CONSTRUCTION = /\bconstruction (rules?|grammar)\b|\bgrammar\b|\bregras de constru[çc][ãa]o\b|\bgram[aá]tica\b|\bhow (do|does) (we|our [\w ]+?|the system|this system|it) (build|construct|name|structure)\b[\s\S]{0,40}\b(components?|layers?|propert\w+|variants?)\b|\bcomo (é que )?(constru[íi]mos|o sistema constr[oó]i|nomeamos)\b[\s\S]{0,40}\bcomponentes?\b/i;
+// A component made to follow how the system builds (its construction): Figma renamed, through the engine's script.
+const CONSTRUCTION_FIX = /\b(fix|correct|corrig\w*|consert\w*|repair)\b[\s\S]{0,60}\b(construction|constru[çc][ãa]o)\b|\bfigma-fix\b/i;
 const RULES = [
+  ['figma-edits', (t) => CONSTRUCTION_FIX.test(t), 'construction-fix'],
   ['ask-the-system', (t) => CONSTRUCTION.test(t), 'construction'],
   ['guidelines-links', (t) => INTENT_LAYER.test(t) && ANY_LINK.test(t), 'intent-layer'],
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
@@ -353,6 +356,10 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
     }
     if (recipe === 'figma-edits') {
       const may = writes?.figma ?? 'ask';
+      if (kind === 'construction-fix') {
+        notes.push('The engine writes the renames that make the component follow how the system builds (--figma-fix) as the Figma script. ' + (may === 'no' ? 'This project never lets it write the design file: show the person the list and say that.' : 'Show the person the list and, once they say yes (a fix they copied and pasted says it), run .design-system-engine-out/handback/figma-apply.js with the Figma tool as written. A layer Figma left unnamed: read what it holds, propose a name, then run it again with --to <name>. Layout and variable bindings are the person\'s: say what to change, step by step.'));
+        return { recipe, question: false, run: named.length ? named.map((n) => `${cmd} --figma-fix ${n}`) : [`${cmd} --query construction`], notes };
+      }
       notes.push(may === 'no'
         ? 'The engine lists every Figma edit, and this project never lets it write the design file: no script is written, and the changes go on the Tasks page for whoever owns Figma. Show the person the list and say that. Never write a Figma script of your own.'
         : `The engine lists every Figma edit and writes the script for it; ${may === 'yes' ? 'this project lets the engine change the design file, so run' : 'show the person the list and ask. Only when they say yes, run'} .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.`);

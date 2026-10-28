@@ -222,3 +222,25 @@ test('--figma-edits lists each edit on the demo design system, and the engine ne
   assert.match(out, /^NEXT: show the person the/m, 'with no answer recorded, the project is asked before Figma is changed');
   assert.equal(existsSync(join(dir, '.design-system-engine-out', 'handback', 'figma-apply.js')), true);
 });
+
+test('a construction fix renames the component itself, or a layer in every variant but never inside an instance', async () => {
+  const layer = (name, children = [], type = 'FRAME') => ({ name, type, children, parent: null });
+  const link = (n) => { for (const c of n.children ?? []) { c.parent = n; link(c); } return n; };
+  const findAll = (root) => (pred) => { const out = []; const walk = (n) => { for (const c of n.children ?? []) { if (pred(c)) out.push(c); walk(c); } }; walk(root); return out; };
+  const inner = layer('Frame 12');
+  const set = link({ name: 'Promo Banner', type: 'COMPONENT_SET', children: [layer('Wide=True', [layer('Frame 12'), layer('icon', [inner], 'INSTANCE')], 'COMPONENT'), layer('Wide=False', [layer('Frame 12')], 'COMPONENT')] });
+  set.findAll = findAll(set);
+  globalThis.figma = { getNodeByIdAsync: async (id) => (id === '1:2' ? set : null) };
+  const script = applyScript([
+    { kind: 'rename', nodeId: '1:2', component: 'Promo Banner', what: 'layer', from: 'Frame 12', to: 'Content' },
+    { kind: 'rename', nodeId: '1:2', component: 'Promo Banner', what: 'component', from: 'Promo Banner', to: 'promoBanner' },
+  ]);
+  const run = new (Object.getPrototypeOf(async () => {}).constructor)(script);
+  const out = await run();
+  delete globalThis.figma;
+  assert.equal(set.name, 'promoBanner');
+  assert.deepEqual(set.children.map((v) => v.children[0].name), ['Content', 'Content']);
+  assert.equal(inner.name, 'Frame 12', 'a layer inside an instance is its own component\'s');
+  assert.deepEqual(out.changed, ['Promo Banner → promoBanner', 'Promo Banner › Frame 12 → Content (2 layers)']);
+  assert.match(editLines([{ kind: 'rename', component: 'Promo Banner', what: 'layer', from: 'Frame 12', to: 'Content' }]).join('\n'), /Promo Banner: the layer "Frame 12" → "Content"/);
+});

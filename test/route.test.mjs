@@ -249,3 +249,10 @@ test('how the system builds a component in Figma asks for its construction gramm
   }
   assert.equal(r('build the chip from Figma', { components: ['chip'] }).recipe, 'build-from-figma');
 });
+
+test('fixing a component\'s construction in Figma writes its renames, through the engine', () => {
+  const f = r('fix the construction of the chip in Figma', { components: ['chip'] });
+  assert.equal(f.recipe, 'figma-edits');
+  assert.deepEqual(f.run, ['rms-design-system-engine --figma-fix chip']);
+  assert.equal(r('how does our system build a component in Figma?').recipe, 'ask-the-system');
+});

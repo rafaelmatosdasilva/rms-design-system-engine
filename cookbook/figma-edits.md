@@ -1,6 +1,6 @@
 # Bring Figma in line with the code
 
-**Use when.** the person wants Figma updated to state what the code already has ("update Figma to match the code", "add the roles in Figma"), the accessibility findings pinned on the designed screens or each component's accessibility spec written in Figma ("pin the accessibility findings in Figma"), or the prototypes' gaps sent to Figma as the design team's to do list ("send the gaps to Figma"), or a run's `NEXT:` line lists Figma edits the engine can make.
+**Use when.** the person wants Figma updated to state what the code already has ("update Figma to match the code", "add the roles in Figma"), the accessibility findings pinned on the designed screens or each component's accessibility spec written in Figma ("pin the accessibility findings in Figma"), or the prototypes' gaps sent to Figma as the design team's to do list ("send the gaps to Figma"), a component made to follow how the system builds components ("fix the construction of the chip in Figma", a fix copied from the style guide's Construction page), or a run's `NEXT:` line lists Figma edits the engine can make.
 
 ## Steps
 
@@ -8,6 +8,8 @@
 2. Show the person that list, as printed, and ask whether to apply it. Change nothing in Figma before they say yes.
 3. When they say yes, run `.design-system-engine-out/handback/figma-apply.js` with the Figma MCP's `use_figma` on the project's Figma file, exactly as the engine wrote it (the project's hooks refuse any other Figma write). It changes only what was listed (renaming options in each variant's name, then properties), leaves a component that already states a role or a name already renamed as it is, writes the to do list afresh on its own page, replaces the accessibility specs and the screens' review the last run wrote (in the categories Accessibility and Accessibility Review), keeps every annotation a person wrote, and returns what it changed, skipped and could not find, and the to do list it wrote: tell the person.
 4. Then refresh the Figma snapshots (`--recipe refresh-figma`), so the next audit reads the new annotations and names; a renamed property is then the new name in each component's code contract, which the audit says.
+
+A component made to follow how the system builds components (its construction grammar, `--query construction`): run `rms-design-system-engine --figma-fix <component>` (or what the copied fix says), show the person the renames it lists, and run the same script once they say yes. A layer Figma left unnamed: read what it holds, propose a name, and once they agree run it again with `--to <name>`. Layout and variable bindings it only says: tell the person what to change, step by step.
 
 What needs a person's words or a design decision is never written in Figma: a description, a component the code lacks, a screen's layout. Those stay in `.design-system-engine-out/handback/figma-changes.md` for the design team.
 

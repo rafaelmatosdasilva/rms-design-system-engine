@@ -1154,10 +1154,11 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   try {
     const { grammarOf } = await import('./construction-grammar.mjs');
     const values = readJSON(join(ROOT, 'component-values.snapshot.json')) || {};
-    const g = grammarOf({ props, structure, values }, { answers: authoredDoc.construction ?? {} });
+    const varNames = readJSON(resolve(ROOT, paths.snapshotVars || 'figma-vars.snapshot.json'))?.variableScopes ?? {};
+    const g = grammarOf({ props, structure, values, varNames }, { answers: authoredDoc.construction ?? {} });
     if (g.figma.rules.length || g.figma.unsettled.length) {
       constructionOut = join(outDir, 'construction.json');
-      writeFileSync(constructionOut, JSON.stringify({ _built: stamp, _note: 'How this system builds a component in Figma, mined from its own components (rms-design-system-engine). A rule is what most of them do; a question is answered in the authored contract under "construction": { "<rule id>": true | false }.', ...g }, null, 2) + '\n');
+      writeFileSync(constructionOut, JSON.stringify({ _built: stamp, _note: 'How this system builds a component in Figma, mined from its own components (rms-design-system-engine). Each line is a rule (every component follows it), to fix (most do, or the team decided it) or to decide (rms-design-system-engine --construction <rule id> yes|no).', ...g }, null, 2) + '\n');
     }
   } catch { /* best-effort */ }
 
