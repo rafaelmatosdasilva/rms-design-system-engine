@@ -117,6 +117,8 @@ test('a change to one component in Figma routes to its report; a new one, roles 
   assert.deepEqual(route('add a size xl to the chip in Figma', c).run, ['rms-design-system-engine --figma-change chip "add a size xl to the chip in Figma"']);
   assert.deepEqual(route('do this on the chip in Figma https://gitlab.com/a/b/-/issues/12', c).run, ['rms-design-system-engine --figma-change chip --task https://gitlab.com/a/b/-/issues/12']);
   assert.equal(route('make a pill like the chip in Figma', c).recipe, 'build-component-figma');
+  // "like the L one" is an option of the chip, not a component to build like.
+  assert.equal(route('add an XL size to the chip in Figma, like the L one', c).recipe, 'change-component-figma');
   assert.equal(route('add the roles in Figma', c).recipe, 'figma-edits');
   assert.equal(route('change the chip radius in figma to 8', c).recipe, 'fix-a-difference');
 });
