@@ -168,5 +168,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-28-the-construction-page-each-rule` | The 21 guide tasks on Haiku (engine bf41765) | "The Construction page: each rule with its status, what is to fix, one decision for all" |
 | `2026-10-28-an-unbuilt-component-in-a` | The 21 guide tasks on Haiku (engine 2f5a617) | "An unbuilt component in a query: build with what the code has and say so, never stop to ask" |
 | `2026-10-28-the-system-page-is-found` | The 21 guide tasks on Haiku (engine efbf5c9) | "The System page is found by the layer's index when the snapshot names no file" |
+| `2026-10-28-construction-each-component-s-architecture` | The 21 guide tasks on Haiku (engine 88fbfd0) | "Construction: each component's architecture, a yes/no variant that should be a boolean, decided rules checked on every run" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: Construction: each component's architecture, a yes/no variant that should be a boolean, decided rules checked on every run (continuous evaluation)
+
+What changed since the entry below (engine efbf5c9): A decision copied from the style guide names the system, the page and the task in words (#114); The Construction page: every rule on names under Naming convention, each row a rule (#115); Construction: each component's architecture, a yes/no variant that should be a boolean, decided rules checked on every run. The guide changed in `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `a2c9280cb51b` · Project measured: `13d811a9d668`
+
+| Haiku, engine 88fbfd0 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.061 |
+| Input a run | 118k | 117k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 117k a run against 118k. no task changed state, and no run moved: the same result. Records: `records/2026-10-28-construction-each-component-s-architecture`.
+
 ## 2026-10: The System page is found by the layer's index when the snapshot names no file (continuous evaluation)
 
 What changed since the entry below (engine 2f5a617): The Construction page: each rule's status, what is to fix, one decision for all (#113); A decision copied from the style guide names the system, the page and the task in words; The System page is found by the layer's index when the snapshot names no file. The guide changed in `reference/usage.md`, `rms-design-system-engine.md`.
