@@ -168,5 +168,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-28-the-construction-page-each-rule` | The 21 guide tasks on Haiku (engine bf41765) | "The Construction page: each rule with its status, what is to fix, one decision for all" |
 | `2026-10-28-an-unbuilt-component-in-a` | The 21 guide tasks on Haiku (engine 2f5a617) | "An unbuilt component in a query: build with what the code has and say so, never stop to ask" |
 | `2026-10-28-how-each-component-is-built` | The 21 guide tasks on Haiku (engine 1c50e50) | "How each component is built: the skeleton, read from Figma, and its architecture on the Construction page" |
+| `2026-10-28-a-ui-check-that-passes` | The 21 guide tasks on Haiku (engine 06254d7) | "A UI check that passes ends the task: reply in the chat, run nothing more" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

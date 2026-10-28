@@ -1,5 +1,21 @@
 # Skill evaluation results
 
+## 2026-10: A UI check that passes ends the task: reply in the chat, run nothing more (continuous evaluation)
+
+What changed since the entry below (engine 1c50e50): A UI check that passes ends the task: reply in the chat, run nothing more.
+
+Guide set measured: `b5463a75ae62` · Project measured: `13d811a9d668`
+
+| Haiku, engine 06254d7 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.066 | $0.058 |
+| Input a run | 154k | 105k |
+| Rule violations | 1 | 0 |
+| Runs stopped at a limit | 1 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 105k a run against 154k. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-10-28-a-ui-check-that-passes`.
+
 ## 2026-10: How each component is built: the skeleton, read from Figma, and its architecture on the Construction page (continuous evaluation)
 
 What changed since the entry below (engine 2f5a617): The Construction page: each rule's status, what is to fix, one decision for all (#113); How each component is built: the skeleton, read from Figma, and its architecture on the Construction page. The guide changed in `cookbook/refresh-figma.md`, `reference/config.md`, `reference/usage.md`.
