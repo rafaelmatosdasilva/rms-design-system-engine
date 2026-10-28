@@ -163,5 +163,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-27-history-a-chip-each-for` | The 21 guide tasks on Haiku (engine c5af798) | "History: a chip each for the code, Figma and the decisions" |
 | `2026-10-27-a-finding-said-under-the` | The 21 guide tasks on Haiku (engine 73933d0) | "A finding said under the code's name for a component (picker/Row) reaches its page" |
 | `2026-10-27-an-on-off-that-hides` | The 21 guide tasks on Haiku (engine 42058be) | "An on/off that hides more than Figma's, a slot that shrinks what Figma stretches, and dates against the writing rules" |
+| `2026-10-28-a-component-figma-has-and` | The 21 guide tasks on Haiku (engine 043c69f) | "A component Figma has and the code does not: --query says its class styles nothing, so an agent uses a built one" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
