@@ -2115,6 +2115,23 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the steps above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${scfg.figmaFileKey ? ` (fileKey ${scfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --construction-check and ${cmd} --hygiene: say what they find on ${spec.name}.`);
   process.exit(0);
 }
+// ── A change to the system itself, signed off (sign-off.mjs) ──
+// --sign-off "<what>" --by "<who>": a named person agreed to add it to the system (a token, a component's option), so the
+// guard lets the edit that adds it through. --sign-off alone lists what was signed off.
+if (process.argv.includes('--sign-off')) {
+  const { recordSignOff, readSignOffs, SIGN_OFFS } = await import('./sign-off.mjs');
+  const i = process.argv.indexOf('--sign-off'), what = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null, by = _argValue('--by');
+  if (!what) {
+    const all = readSignOffs(ROOT);
+    console.log(all.length ? `Signed off to add to the system (${all.length}, ${SIGN_OFFS}):\n${all.map((x) => `   • ${x.what}: ${x.by}, ${String(x.at).slice(0, 10)}`).join('\n')}` : 'Nothing signed off yet: an edit that adds to the system (a token, a component\'s option) waits for one.');
+    process.exit(0);
+  }
+  if (!by || !by.trim()) { console.log(`❌ A sign-off names who gave it: rms-design-system-engine --sign-off ${JSON.stringify(what)} --by "<who>" (the name the person gives, never one you choose).`); process.exit(2); }
+  recordSignOff(ROOT, { what, by: by.trim() });
+  console.log(`✅ Signed off by ${by.trim()}: ${what} (${SIGN_OFFS}).`);
+  console.log('NEXT: make the edit that adds it; the guard lets it through now. Say who signed it off in your answer.');
+  process.exit(0);
+}
 // ── The construction grammar's decisions and fixes (construction-grammar.mjs) ──
 // --construction <rule id> yes|no: the team's decision on one still to decide, in the authored contract (construction):
 // yes makes it the rule (its components to fix), no drops it.
