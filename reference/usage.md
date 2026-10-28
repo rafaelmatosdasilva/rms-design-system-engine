@@ -104,7 +104,8 @@ rms-design-system-engine --intent-decide                 # the engine's proposed
 rms-design-system-engine --intent-decide "<key>[,<key>]" yes|no  # the team's answer ("all" for every open one), kept in design-system-engine-intent-decisions.json; what the answer changes in the intent layer is made and committed at once (a no to a Move merges the part into its parent's page, a no to a Fix writes the sentence again as a draft, a page to write is started from its code), and a Fix not answered yet is left as it is
 rms-design-system-engine --review-drafts                 # every draft in the intent layer to review: its page, its section, its text
 rms-design-system-engine --review-drafts <file>          # a person's review of them, [{ page, line, do: approve | change | drop, to }], made in the layer's files (a change checked against the system first); --commit or --merge-request sends it, only when asked
-rms-design-system-engine --review-drafts --approve <page>  # one decision, as each page's drafts give it: --approve or --drop every draft on the page (or one: <page> '<line>'), --change <page> '<line>' '<new words>'
+rms-design-system-engine --review-drafts --approve <page>  # one decision, as each page's drafts give it: --approve or --drop every draft on the page (or one: <page> '<line>'), --change <page> '<line>' '<new words>' ; --task '<title>' keeps it to that task's drafts, --expect <n> to the number the person saw, --said '<their words>' keeps them with it; <page> may be 'the System page'
+rms-design-system-engine --draft '<page>' '<section>' '<line>' ['<line>'…] --task '<title>'  # lines drafted for the team to review, under that section, marked **Draft (<title>, <day>):**; --commit or --merge-request sends them, only when asked
 rms-design-system-engine --intent-changes --commit      # the same, as one commit straight on the layer's branch, only while it is where it was read (drafts keep their marker); only when the person asks
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
 rms-design-system-engine --decision <what it is about> "<what was decided>" [--ruled-out "<option>"]... [--why "<reason>"]  # one line under the Decisions heading of that page in the intent layer (a component, pattern, template, flow, foundation or the system), with who and when; written locally to read first, --commit or --merge-request sends it, only when the person asks
@@ -420,6 +421,19 @@ off) or dropped (the line deleted), in the page's spec and its DSDS page alike. 
 draft; with a file of the person's decisions it makes them, writes `CHANGES.md`, and `--commit` or `--merge-request`
 sends them. An agent writes that file only from what the person said for each line, never deciding for them; the
 same can be done in the layer by hand (remove the marker to approve, delete the line to drop).
+
+**Drafting on request: `--draft`.** "Write … as drafts I review": the agent writes the lines from what the system has,
+then `--draft "<page>" "<section>" "<line>" ["<line>"…] --task "<the request's title>"` puts them under that section,
+each marked `**Draft (<task>, <day>):**`, so no agent gets them and the decision for them names the task. The page is a
+component's, a pattern's, a template's, a foundation's, or **the System page** (the system's own entry in the layer's
+index, whose drafts are held as any page's). Written locally to read first; `--commit` or `--merge-request` sends them.
+
+**Decisions copied from the style guide.** Each Copy decision is the system's own command, the page by its kind and
+name, and the decision in words, never a file or a flag: `/rms-design-system-engine-<client> on Component Button,
+Approve all 3 drafts from the task "What to do when no component fits" (28 Oct)`. The router turns it into the command
+(`--review-drafts --approve 'Button' --task '…' --expect 3 --said '…'`, `--intent-decide '<the proposal>' yes`,
+`--part`, `--draft`); a page that now holds another number of drafts from that task is not touched, and the person is
+asked again. The words are kept with the decision (`said`) beside who made it and when.
 
 **Making the changes: `--intent-changes`** (`intent-changes.mjs`). The review's changes made in the layer's own files:
 the repeated lines taken out; each sentence the content check finds wrong written again with only what the system has;

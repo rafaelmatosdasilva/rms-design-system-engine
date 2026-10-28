@@ -77,6 +77,8 @@ const propName = (key) => String(key).replace(/#[^#]*$/, '');
 const KINDS = { BOOLEAN: 'boolean', TEXT: 'text', INSTANCE_SWAP: 'instance swap', SLOT: 'slot', VARIANT: 'variant' };
 
 // One rule from a list of items, each { component, value, fits }: its status, by who follows it and what the team said.
+// area: the kind of rule it is, as the Construction page groups them: naming (how components, their properties, their
+// variants' options and their layers are named), layout, variables, documentation.
 function judge(id, area, says, items, { answers = {}, min = MIN_SEEN } = {}) {
   const of = items.length;
   if (of < min) return null;
@@ -168,41 +170,52 @@ export function grammarOf({ props = {}, structure = {}, values = {}, varNames = 
   // A part's name is its root's and its own (table/Row): each is written in the system's case.
   const segs = (n) => String(n).split('/').map((x) => x.trim()).filter(Boolean);
   const nameCase = dominantCase(names.flatMap(segs));
-  add(judge('component-name-case', 'components', `A component is named in ${nameCase}`, names.map((n) => ({ component: n, value: n, fits: segs(n).every((x) => caseFits(x, nameCase)) })), opts));
+  add(judge('component-name-case', 'naming', `A component is named in ${nameCase}`, names.map((n) => ({ component: n, value: n, fits: segs(n).every((x) => caseFits(x, nameCase)) })), opts));
 
   // Each kind of property: how it is written, and the word it begins or ends with.
-  const byKind = {};
-  for (const n of names) for (const [key, d] of Object.entries(props[n]?.properties ?? {})) (byKind[d.type] ??= []).push({ component: n, value: propName(key), def: d });
-  for (const [type, list] of Object.entries(byKind)) {
-    const kind = KINDS[type] ?? type.toLowerCase();
+  // A yes/no is named as one whether Figma makes it a boolean property or a variant of true and false: in code both are
+  // the same boolean prop, so they are held to the same rules (byName). The variant's options are still a variant's.
+  const byKind = {}, byName = {};
+  const yesNoVariant = (d) => d.type === 'VARIANT' && (d.variantOptions ?? []).length === 2 && (d.variantOptions ?? []).every((o) => /^(true|false)$/i.test(o));
+  for (const n of names) for (const [key, d] of Object.entries(props[n]?.properties ?? {})) {
+    const item = { component: n, value: propName(key), def: d };
+    (byKind[d.type] ??= []).push(item);
+    (byName[yesNoVariant(d) ? 'BOOLEAN' : d.type] ??= []).push(item);
+  }
+  for (const [type, list] of Object.entries(byName)) {
+    const both = type === 'BOOLEAN' && list.some((i) => i.def.type === 'VARIANT');
+    const kind = both ? 'yes/no' : KINDS[type] ?? type.toLowerCase();
     const a = /^[aeiou]/.test(kind) ? 'An' : 'A';
-    const id = kind.replace(/ /g, '-');
-    const values_ = list.map((i) => i.value);
-    const c = dominantCase(values_);
-    add(judge(`${id}-property-case`, 'properties', `${a} ${kind} property is named in ${c}`, list.map((i) => ({ ...i, fits: caseFits(i.value, c) })), opts));
-    const pre = affix(values_, 'start'), post = affix(values_, 'end');
+    const id = (KINDS[type] ?? type.toLowerCase()).replace(/ /g, '-');   // the same id whatever it is called, so an answer stays
+    const c = dominantCase(list.map((i) => i.value));
+    // The word a name begins or ends with is a boolean property's own (showIcon shows a layer): a variant of true and
+    // false names a state (disabled, active), and is never told to begin with "show".
+    const own = both ? list.filter((i) => i.def.type === 'BOOLEAN') : list, values_ = own.map((i) => i.value), whatOwn = both ? 'A boolean property' : null;
+    const what = both ? `${a} ${kind} property (a boolean, or a variant of true and false)` : `${a} ${kind} property`;
+    add(judge(`${id}-property-case`, 'naming', `${what} is named in ${c}`, list.map((i) => ({ ...i, fits: caseFits(i.value, c) })), opts));
+    const pre = own.length ? affix(values_, 'start') : null, post = own.length ? affix(values_, 'end') : null;
     const cap = (w) => w.replace(/^\w/, (x) => x.toUpperCase());
-    if (pre) add(judge(`${id}-property-prefix`, 'properties', `${a} ${kind} property begins with "${pre}" (${pre}${cap('thing')})`, list.map((i) => ({ ...i, fits: wordsOf(i.value)[0] === pre && wordsOf(i.value).length > 1 })), opts));
-    if (post) add(judge(`${id}-property-suffix`, 'properties', `${a} ${kind} property ends with "${cap(post)}" (thing${cap(post)})`, list.map((i) => ({ ...i, fits: wordsOf(i.value).at(-1) === post && wordsOf(i.value).length > 1 })), opts));
+    if (pre) add(judge(`${id}-property-prefix`, 'naming', `${whatOwn ?? what} begins with "${pre}" (${pre}${cap('thing')})`, own.map((i) => ({ ...i, fits: wordsOf(i.value)[0] === pre && wordsOf(i.value).length > 1 })), opts));
+    if (post) add(judge(`${id}-property-suffix`, 'naming', `${whatOwn ?? what} ends with "${cap(post)}" (thing${cap(post)})`, own.map((i) => ({ ...i, fits: wordsOf(i.value).at(-1) === post && wordsOf(i.value).length > 1 })), opts));
   }
 
   // Variant options: how each is written, and a yes/no axis's two options.
   // A number (style=1) or a placeholder ((Select a preset)) is not written in any case, and is left out.
   const options = (byKind.VARIANT ?? []).flatMap((i) => (i.def.variantOptions ?? []).filter((o) => /[A-Za-z]/.test(o) && !/^\(.*\)$/.test(o)).map((o) => ({ component: i.component, value: `${i.value}=${o}`, option: o, prop: i.value })));
   const optCase = dominantCase(options.map((o) => o.option).filter((o) => !/^(true|false)$/i.test(o)));
-  add(judge('variant-option-case', 'variants', `A variant option is written in ${optCase} (${optCase === 'camelCase' ? 'default, inProgress' : 'as most are'})`, options.filter((o) => !/^(true|false)$/i.test(o.option)).map((o) => ({ ...o, fits: caseFits(o.option, optCase) })), opts));
+  add(judge('variant-option-case', 'naming', `A variant option is written in ${optCase} (${optCase === 'camelCase' ? 'default, inProgress' : 'as most are'})`, options.filter((o) => !/^(true|false)$/i.test(o.option)).map((o) => ({ ...o, fits: caseFits(o.option, optCase) })), opts));
   const yesNo = options.filter((o) => /^(true|false)$/i.test(o.option));
   if (yesNo.length) {
     const lower = yesNo.filter((o) => /^(true|false)$/.test(o.option)).length >= yesNo.length / 2;
-    add(judge('variant-boolean-options', 'variants', `A yes/no variant's options are ${lower ? 'true and false' : 'True and False'}`, yesNo.map((o) => ({ ...o, fits: lower ? /^(true|false)$/.test(o.option) : /^(True|False)$/.test(o.option) })), opts));
+    add(judge('variant-boolean-options', 'naming', `A yes/no variant's options are ${lower ? 'true and false' : 'True and False'}`, yesNo.map((o) => ({ ...o, fits: lower ? /^(true|false)$/.test(o.option) : /^(True|False)$/.test(o.option) })), opts));
   }
 
   // Layers: named by the team, not left with Figma's own names; and written in one case.
   const layers = names.map((n) => ({ n, l: layerNames(n, structure[n], values[n], components) })).filter((x) => x.l.length);
-  add(judge('layers-named', 'layers', 'Every layer has a name of its own (never Figma\'s "Frame 235")', layers.map(({ n, l }) => ({ component: n, value: l.filter(isAutoNamed).join(', '), fits: !l.some(isAutoNamed) })), opts));
+  add(judge('layers-named', 'naming', 'Every layer has a name of its own (never Figma\'s "Frame 235")', layers.map(({ n, l }) => ({ component: n, value: l.filter(isAutoNamed).join(', '), fits: !l.some(isAutoNamed) })), opts));
   const named = layers.flatMap(({ n, l }) => l.filter((x) => !isAutoNamed(x)).map((x) => ({ component: n, value: x })));
   const layerCase = dominantCase(named.map((x) => x.value));
-  add(judge('layer-name-case', 'layers', `A layer is named in ${layerCase}`, named.map((x) => ({ ...x, fits: caseFits(x.value, layerCase) })), opts));
+  add(judge('layer-name-case', 'naming', `A layer is named in ${layerCase}`, named.map((x) => ({ ...x, fits: caseFits(x.value, layerCase) })), opts));
 
   // Auto layout: on the component's frame, and on every variant of two layers or more.
   const laid = names.filter((n) => structure[n]).map((n) => {

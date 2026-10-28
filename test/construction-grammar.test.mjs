@@ -1,6 +1,7 @@
 // How a system builds a component in Figma, mined from its own components (construction-grammar.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { grammarOf, grammarLines, fixOf, caseOf, caseFits, isAutoNamed, wordsOf } from '../construction-grammar.mjs';
 
 // Four components that agree, and one (Promo Banner) that breaks most of it.
@@ -162,4 +163,23 @@ test('architecture, from the skeleton: styles, wiring, nesting, layout, placemen
   assert.deepEqual([fam.follows, fam.of, fam.toFix.map((t) => t.component)], [2, 4, ['buttonGhost', 'buttonLink']]);
   assert.deepEqual(g.figma.families.map(({ shapes, ...f }) => f), [{ family: 'button', components: 4, shape: 'horizontal auto layout: a component? → text', follow: 2, depths: [1, 1, 1, 1] }]);
   assert.match(fixOf(fam, fam.toFix[0]).say, /^Rebuild it as the family is built \(horizontal auto layout: a component\? → text\); now /);
+});
+
+test('a yes/no is named by one case rule whether Figma makes it a boolean or a variant of true and false; "show" stays a boolean\'s', () => {
+  const g = grammarOf({ props, structure, values });
+  const c = rule(g, 'boolean-property-case');
+  assert.equal(c.says, 'A yes/no property (a boolean, or a variant of true and false) is named in camelCase');
+  assert.equal(c.area, 'naming');
+  const p = rule(g, 'boolean-property-prefix');
+  assert.match(p.says, /^A boolean property begins with "show"/);
+  assert.ok(!p.toFix.some((x) => /disabled|active|Wide/.test(x.value)), 'a state is never told to begin with "show"');
+  assert.ok(g.figma.rules.every((r) => ['naming', 'layout', 'variables', 'documentation'].includes(r.area)), 'each rule in a kind of rule: names together');
+});
+
+test('on the Construction page each row is a rule, a decision included: never a question', () => {
+  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('if (DATA.construction)') + 12000);
+  assert.doesNotMatch(page, /shared, or made for each component\?/);
+  assert.match(page, /'Confirm it, or take the other way: '/);
+  assert.match(page, /var AREA = \{ naming: 'Naming convention', layout: 'Layout', variables: 'Variables', documentation: 'Documentation',/);
 });

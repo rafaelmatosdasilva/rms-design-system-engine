@@ -84,7 +84,7 @@ test('the command a team installs is named after the engine', () => {
   assert.equal(f, join(home, '.claude', 'skills', 'rms-design-system-engine-acme', 'SKILL.md'));
   const text = readFileSync(f, 'utf8');
   assert.match(text, /^---\nname: rms-design-system-engine-acme\n/);
-  assert.match(text, /rms-design-system-engine --profile 'https:\/\/gitlab\.acme\.test\/design\/intent\/-\/blob\/main\/profile\.json' \$ARGUMENTS/);
+  assert.match(text, /rms-design-system-engine --profile 'https:\/\/gitlab\.acme\.test\/design\/intent\/-\/blob\/main\/profile\.json' --route "\$ARGUMENTS"/, 'the request is routed first');
   assert.ok(!/token\s*[:=]/i.test(text));
   assert.throws(() => writeCommand('', 'p.json', { home }), /client's name/);
   assert.ok(!existsSync(join(home, '.claude', 'skills', 'rms-design-system-engine-')));

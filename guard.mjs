@@ -291,8 +291,9 @@ export function figmaWriteVerdict(code, { root, userText = null } = {}) {
   return null;
 }
 
-// The route for a request made with the skill's command, as context for the agent; null for any other prompt.
-const COMMAND = /^\s*\/rms-design-system-engine\b[ \t]*([\s\S]*)$/;
+// The route for a request made with the skill's command, or a company's (/rms-design-system-engine-<client>), as
+// context for the agent; null for any other prompt.
+const COMMAND = /^\s*\/rms-design-system-engine(?:-[a-z0-9][a-z0-9-]*)?(?=\s|$)[ \t]*([\s\S]*)$/;
 export const MAX_RECIPE = 6000;
 export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = process.env } = {}) {
   if (cfg.hooks === false) return null;
