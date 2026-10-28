@@ -24,6 +24,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { OUT_DIR } from './names.mjs';
+import { partLines } from './component-parts.mjs';
 import { intentLayerConfig, DRAFT } from './doc-source-dsds.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, plainSend, untar, projectApi } from './gitlab-source.mjs';
 export { writeTokenFrom };
@@ -102,7 +103,7 @@ export function specOf(e, idx) {
 // ── Editing a Markdown spec ─────────────────────────────────────────────────────────────────────────────────────────
 // The written sections first, in the order a spec keeps them (Purpose to Limitations), then the reference ones (its role,
 // do and don't, an example): a spec checked for its section order takes a new one in its place.
-const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example', 'properties', 'data', 'events', 'slots', 'decisions'];   // Decisions last: the team's record, apart from what it documents
+const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example', 'properties', 'data', 'events', 'slots', 'parts', 'decisions'];   // Decisions last: the team's record, apart from what it documents
 // The role of the element a component's code renders, as a screen reader names it (none for an element with no role).
 // An example of a component in use: its tag, and each prop that takes named values with the first of them (up to three),
 // so every name and value in it is one the code takes.
@@ -616,6 +617,49 @@ export function decisionPlan(snap, subject, line, files, { codes = [] } = {}) {
   b.body = (String(b.body ?? '').replace(/\s*$/, '') + `\n- ${line}`).replace(/^\n/, '');
   next.set(e.file, jsonText(doc, before));
   return { files: next, page: e.name, file: e.file };
+}
+
+// A part's place under its root's Parts, in a Markdown spec: its own ### heading under ## Parts (made before Decisions
+// when the page has none yet), with the line that says it is a part.
+export function mdAddPart(text, part, said) {
+  const lines = text.split('\n');
+  const at = lines.findIndex((l) => /^##\s/.test(l) && !/^###/.test(l) && headKey(l) === 'parts');
+  const block = [`### ${part}`, '', said, ''];
+  if (at >= 0) {
+    if (lines.some((l, i) => i > at && /^###\s/.test(l) && l.replace(/^###\s+/, '').replace(/`/g, '').trim() === part)) return text;
+    let end = at + 1; while (end < lines.length && !/^#{1,2}\s/.test(lines[end])) end++;
+    let last = end - 1; while (last > at && !lines[last].trim()) last--;
+    lines.splice(last + 1, 0, '', ...block.slice(0, -1));
+    return lines.join('\n');
+  }
+  const later = lines.findIndex((l, i) => i > 0 && /^##\s/.test(l) && headKey(l) === 'decisions');
+  const head = ['## Parts', '', ...block];
+  if (later < 0) return text.replace(/\s*$/, '\n\n') + head.join('\n');
+  lines.splice(later, 0, ...head);
+  return lines.join('\n');
+}
+
+// The team's answer to "is <part> a part of <root>?" (component-parts.mjs): yes, written on the root's page (the part
+// under Parts, and the decision); no, a decision on its own page, else on the page of the root it was asked about.
+export function partPlan(snap, part, root, files, { codes = [], askedRoot = null } = {}) {
+  const said = partLines(part, root);
+  if (!root) {
+    for (const on of [part, askedRoot].filter(Boolean)) { const p = decisionPlan(snap, on, said.decision, files, { codes }); if (!p.error) return p; }
+    return { error: `no page in the intent layer is about ${part}${askedRoot ? ` or ${askedRoot}` : ''}: write "A component of its own." in its Figma description instead` };
+  }
+  const plan = decisionPlan(snap, root, said.decision, files, { codes });
+  if (plan.error) return plan;
+  const now = plan.files.get(plan.file);
+  if (/\.md$/i.test(plan.file)) { plan.files.set(plan.file, mdAddPart(now, part, said.said)); return plan; }
+  let doc = null; try { doc = JSON.parse(now); } catch { return plan; }
+  const entry = entriesOf(doc)[0];
+  entry.sections ??= [];
+  let sec = entry.sections.find((x) => /^parts?$/i.test(String(x.title ?? '').trim()));
+  if (!sec) { sec = { kind: 'section', for: 'all', title: 'Parts', freeform: [] }; const di = entry.sections.findIndex((x) => /^(decisions?|decided)$/i.test(String(x.title ?? '').trim())); if (di < 0) entry.sections.push(sec); else entry.sections.splice(di, 0, sec); }
+  sec.freeform ??= [];
+  if (!sec.freeform.some((f) => f.title === part)) sec.freeform.push({ title: part, body: said.said });
+  plan.files.set(plan.file, jsonText(doc, files.get(plan.file)));
+  return plan;
 }
 
 export function describeReview({ pages, problems }) {

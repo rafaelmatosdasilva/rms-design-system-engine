@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: A component Figma has and the code does not: --query says its class styles nothing, so an agent uses a built one (continuous evaluation)
+
+What changed since the entry below (engine 42058be): The engine never changes code people wrote; each open issue says which fix it needs (#100); A table filtered by a chip closes on the card's own edge (#102); A Figma slot is paired with the code's slot of the same word, and the on/off that shows it with the slot filled (#98); Coverage asks the edges a screen meets first: content that does not fit, and one action where there are two (#99); What Figma says a switch or a slot does, and how the rules write a date, against the code (#101); History: a read of Figma is a release of the design, a card of its own, shaped as the code's (#103); History: each card dated as what it holds is; a read of Figma names its new components in plain words (#104); The panel colours a team sets by hand win over the template's faint layer, each brand's own (#105); Parts: components placed only inside another, shown and documented in it; Parts: asked in words, recorded with --part; documented; Parts: a pair that holds each other is asked about the piece; the spec a person edits; Parts: a question says what it was read from; A component Figma has and the code does not: --query says its class styles nothing, so an agent uses a built one. The guide changed in `reference/usage.md`.
+
+Guide set measured: `1dad53c290b2` · Project measured: `13d811a9d668`
+
+| Haiku, engine 043c69f | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 70/70 | 70/70 |
+| Mean cost a run | $0.063 | $0.063 |
+| Input a run | 128k | 123k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 123k a run against 128k. no task changed state, and no run moved: the same result. Records: `records/2026-10-28-a-component-figma-has-and`.
+
 ## 2026-10: An on/off that hides more than Figma's, a slot that shrinks what Figma stretches, and dates against the writing rules (continuous evaluation)
 
 What changed since the entry below (engine 73933d0): A number that means what it says: a fallen engine, a regression, and a count that moved by one (#95); The --figma-edits test runs the command as a person does, so main passes on CI (#93); What to do holds every change a page asks for, under one decision (#90); A browser accessibility check that measured nothing keeps the last good result (#92); Each component's Figma history from the snapshots store's commits, when the project has no git history of them (#91); A difference becomes an issue, once, and the run that stops finding it closes it (#96); What a screen runs into in a component's own code, named with its line (#94); History: a card with no code says it came after the last release; rows newest first; each component named (#97); An on/off that hides more than Figma's, a slot that shrinks what Figma stretches, and dates against the writing rules. The guide changed in `reference/usage.md`.

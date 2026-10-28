@@ -765,6 +765,46 @@ if (process.argv.includes('--review-drafts')) {
 // Written on the page it is about (a component's, a pattern's, a template's, a foundation's) under its Decisions
 // heading, as one line a person reads (decisions.mjs). Written to .design-system-engine-out/intent-changes/ to read
 // first; --commit or --merge-request sends it, only when the person asks. --decisions lists every decision recorded.
+// A part's answer (component-parts.mjs): --part <part> <root> says it is placed only inside that root, written on the
+// root's page (### the part under Parts, and the decision); --part <part> none keeps it a component of its own, a
+// decision on its page. Written to .design-system-engine-out/intent-changes/ to read first; --commit or
+// --merge-request sends it, only when the person asks.
+if (process.argv.includes('--part')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const at = process.argv.indexOf('--part'), part = process.argv[at + 1], to = process.argv[at + 2];
+  if (!part || part.startsWith('--') || !to || to.startsWith('--')) { console.log('❌ --part takes the part and its root (or none): rms-design-system-engine --part <part> <root|none>'); process.exit(2); }
+  const il = await import('./intent-layer.mjs'), ch = await import('./intent-changes.mjs');
+  if (!process.argv.includes('--offline')) { try { for (const r of await il.syncSources(ROOT, pcfg)) if (r.line) console.log('   ' + r.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+  const snap = il.readIntentLayer(ROOT, pcfg);
+  if (!snap?._source?.sha) { console.log('❌ No intent layer read yet. A part is written in it: ds-config.json → intentLayer, then run again.'); process.exit(2); }
+  const { readParts } = await import('./component-parts.mjs'), { OUT_DIR } = await import('./names.mjs');
+  const asked = (readParts(ROOT, OUT_DIR, { readFileSync, join })?.questions ?? []).find((q) => q.part === part);
+  const root = /^(none|no|own)$/i.test(to) ? null : to;
+  const access = ch.layerAccess(ROOT, pcfg);
+  if (access.error) { console.log(`❌ ${access.error}`); process.exit(2); }
+  let files; try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`❌ ${e.message}`); process.exit(2); }
+  const plan = ch.partPlan(snap, part, root, files, { codes: Object.values(il.codeFilesOf(ROOT, pcfg)), askedRoot: asked?.roots?.[0] ?? null });
+  if (plan.error) { console.log(`❌ ${plan.error}.`); process.exit(2); }
+  const said = root ? `${part} is a part of ${root}` : `${part} is a component of its own`;
+  const dir = ch.writeLocal(ROOT, plan.files, `${said}, on ${plan.page}, in ${plan.file}.\n`);
+  console.log(`🧩 ${said}: on ${plan.page} (${plan.file}) → ${relative(ROOT, dir)} (CHANGES.md says it)`);
+  const message = `Intent layer: ${said}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
+  for (const how of ['commit', 'merge-request']) {
+    if (!process.argv.includes('--' + how)) continue;
+    const may = await ch.mayWrite(ROOT, pcfg, how);
+    if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the change is in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person who may send it'); process.exit(0); }
+    const done = how === 'commit'
+      ? await ch.commitToBranch(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, message })
+      : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/part-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: ${said}`, description: `${said}, on ${plan.page}, in ${plan.file}.`, message });
+    if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
+    console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
+    console.log('NEXT: the next style guide build shows it, and agents get it on the run after.');
+    process.exit(0);
+  }
+  console.log('NEXT: read the change; to send it: the same command with --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
+  process.exit(0);
+}
 if (process.argv.includes('--decision') || process.argv.includes('--decisions')) {
   let pcfg = {};
   try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }

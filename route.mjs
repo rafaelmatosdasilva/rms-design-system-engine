@@ -188,6 +188,9 @@ const KEEP_WHY = /\b(because|since|porque|pois|j[aá] que)\b\s+([^.!?\n]{4,200})
 // A decision the team made, with what it ruled out ("record that the tile has no large size, we ruled out a size per
 // page because no screen needs it", "descartamos o tamanho grande"): written on its page in the intent layer.
 const DECISION_SAYS = /\bruled? out\b|\b(record|log|write down|note down)\b[^.\n]{0,40}\b(decision|decided)\b|\bwe decided\b|\bdecis[ãa]o\b|\bdecidimos\b|\bdescart(amos|ado|ada)\b/i;
+// A part named by the team ("the row is a part of the tile list, it is never used on its own", "X is its own
+// component"): recorded with --part on its root's page.
+const PART_SAYS = /\b(is|are)\s+(a\s+)?parts?\s+of\b|\bnever (used|placed) on its own\b|\bits own component\b|\b(é|faz)\s+parte\s+d[eoa]\b/i;
 const RULED_OUT = /\b(?:ruled? out|descartamos)\s+(.+?)(?=\s+(?:because|since|porque|pois)\b|[.;!?\n]|$)/i;
 // A Figma link given to use from now on (a branch of the file, or another file): only the file key changes.
 const USE_FIGMA_FILE = /\b(use|using|switch\w*|point\w*|scan\w*|read\w*|change\w*|move\w*|instead|branch\w*|usa\w*|muda\w*|troca\w*|l[eê]r?)\b/i;
@@ -203,6 +206,7 @@ const RULES = [
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
+  ['guidelines-links', (t) => PART_SAYS.test(t) && !LINK.test(t), 'part'],
   ['guidelines-links', (t) => DECISION_SAYS.test(t) && !LINK.test(t), 'decision'],
   ['guidelines-links', (t) => LINK.test(t)],
   // A token renamed in Figma: one change renames it everywhere, the old name kept pointing at the new one.
@@ -372,6 +376,18 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
     if (kind === 'guidance-rating') {
       notes.push('Rates the guidance for what an agent can take from it: a class for the whole and for each component (ready, partial, thin) and what to add. --extract also asks a model questions answered from the guidance alone, which spends the person\'s model tokens: only when they ask for it. Each component\'s rating is also in its Documentation area of the style guide.');
       return { recipe, question: false, run: [`${cmd} --guidance-rating${EXTRACT_ASKED.test(t) ? ' --extract' : ''}`], notes, kind };
+    }
+    if (kind === 'part') {
+      // Placed only inside its root: written on the root's page in the intent layer, the part under Parts; or a
+      // component of its own. Written locally to read first, sent only when the person asks.
+      const own = /\bits own component\b|\bnot a part\b/i.test(t);
+      notes.push('The team says whether a component is a part of another: record it with --part, the part first and its root (or none), as the components are named in Figma. It is written locally to read first; --commit or --merge-request sends it to the intent layer only when the person asks. The next style guide build shows the part inside its root, and agents get it on the run after.');
+      // The part is the one named before "part of", the root the one after.
+      const at = (n) => { const m = new RegExp(`(^|[^\\w/])${n.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}(?![\\w/])`, 'i').exec(t); return m ? m.index : Infinity; };
+      const order = [...named].sort((a, b) => at(a) - at(b)), pivot = t.search(/\bparts?\s+of\b|\bparte\s+d/i);
+      const part = own || pivot < 0 ? order[0] : order.find((n) => at(n) < pivot), root = own ? null : order.find((n) => at(n) > pivot && n !== part);
+      const run = `${cmd} --part ${part ?? '<part>'} ${own ? 'none' : root ?? '<root>'}`;
+      return { recipe, question: false, run: [run], notes, kind, ...(part && (own || root) ? {} : { ask: own ? 'which component it is, as Figma names it' : 'which component is the part and which its root, as Figma names them', askHow: 'the part, then its root' }) };
     }
     if (kind === 'decision') {
       // On the page it is about (a component, a pattern, a template, a flow, a foundation, the system), one line with

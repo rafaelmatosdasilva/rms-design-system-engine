@@ -86,6 +86,8 @@ export function answerLines(a) {
   if (e.useInstead?.length) lines.push(`  use instead: ${e.useInstead.join(', ')}`);
   // Where it lives: the products that use it, what it sits inside and holds, the Figma screens that draw it.
   if (e.livesIn) lines.push(...usageLines(e.livesIn));
+  // Figma has it, the code does not: its class styles nothing, so an agent that places it ends up writing its CSS.
+  if (a.notBuilt) lines.push(`  not in the code yet: ${e.selector ?? name} has no styles, so placing it draws nothing. Do not write its CSS in a screen: use a component the code has, or say ${name} is not built`);
   return lines;
 }
 
@@ -118,6 +120,11 @@ async function main() {
   const spec = resolveNamingSpec(cfg);
   const varOf = (p) => { try { return tokenToVar(p, spec); } catch { return null; } };
   const answers = terms.map((t) => answer(t, { catalog, tokens, varOf }));
+  // The components Figma has and the code does not (experimental, not built yet, or still to build).
+  let unbuilt = new Set();
+  if (answers.some((a) => a.kind === 'component')) {
+    try { const { inProgressList } = await import('./in-progress.mjs'); unbuilt = new Set((await inProgressList(ROOT, cfg)).filter((x) => x.figma && !x.code).map((x) => x.name)); } catch { /* every one is taken as built */ }
+  }
   // Build mode: a component still to build gets its build sheet, the exact lines the engine then checks.
   const sheets = {};
   if (cfg.build === true && answers.some((a) => a.kind === 'component')) {
@@ -136,13 +143,15 @@ async function main() {
     const typography = read(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json').typography ?? {};
     for (const a of answers) if (a.kind === 'component' && toBuild.has(a.name)) sheets[a.name] = buildSheetLines(a.name, d, { struct, props, nesting, typography, file: cfg.componentFiles?.[a.name] ?? null });
   }
-  if (json) console.log(JSON.stringify(answers.map((a) => (sheets[a.name] ? { ...a, buildSheet: sheets[a.name] } : a)), null, 2));
+  if (json) console.log(JSON.stringify(answers.map((a) => (sheets[a.name] ? { ...a, buildSheet: sheets[a.name] } : unbuilt.has(a.name) ? { ...a, notBuilt: true } : a)), null, 2));
   else {
     console.log('');
-    for (const a of answers) { for (const l of [...answerLines(a), ...(sheets[a.name] ?? [])]) console.log(l); console.log(''); }
+    for (const a of answers) { for (const l of [...answerLines(sheets[a.name] ? a : { ...a, notBuilt: unbuilt.has(a.name) }), ...(sheets[a.name] ?? [])]) console.log(l); console.log(''); }
     const first = Object.keys(sheets)[0];
+    const built = answers.filter((a) => a.kind === 'component' && !unbuilt.has(a.name));
     if (first) console.log(`NEXT: build ${first} as written above, then run rms-design-system-engine --component ${first} until it passes\n`);
-    else if (answers.some((a) => a.kind === 'component')) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>\n');
+    else if (built.length) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>\n');
+    else if (answers.some((a) => a.kind === 'component')) console.log(`NEXT: ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not in the code: write the UI with components the code has (rms-design-system-engine --query <name>), or say what is missing\n`);
   }
   process.exit(answers.every((a) => a.kind !== 'none') ? 0 : 1);
 }

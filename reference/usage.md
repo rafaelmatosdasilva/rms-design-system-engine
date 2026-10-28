@@ -109,6 +109,7 @@ rms-design-system-engine --intent-changes --commit      # the same, as one commi
 rms-design-system-engine --intent-changes --drafts-from <file>  # the drafts from answers already written (when the claude command cannot draft, the requests are in .design-system-engine-out/intent-draft-request.md); --no-drafts: only the mechanical changes
 rms-design-system-engine --decision <what it is about> "<what was decided>" [--ruled-out "<option>"]... [--why "<reason>"]  # one line under the Decisions heading of that page in the intent layer (a component, pattern, template, flow, foundation or the system), with who and when; written locally to read first, --commit or --merge-request sends it, only when the person asks
 rms-design-system-engine --decisions                     # every decision recorded, newest first, wherever it was made
+rms-design-system-engine --part <part> <root|none>         # the team's answer to a part question: placed only inside <root> (written on the root's page in the intent layer, under Parts as ### <part>, and as a decision), or none, a component of its own; written locally to read first, --commit or --merge-request sends it, only when the person asks
 rms-design-system-engine --store                         # where each part lives (snapshots, intent layer, contracts, style guide, decisions, themes) and what this person may do there, as GitLab answers
 rms-design-system-engine --store <part>=<link|folder|nowhere> [--store <part>.path=<folder in it>] [--store <part>.branch=<branch>]   # name where a part lives (ds-config.json → stores); who may change it is GitLab's answer, never asked
 rms-design-system-engine --profile <link|file>           # set up from the company's profile (or take its new version): the shared setup and the stores, nothing asked; kept in ds-config.json and read again each run
@@ -728,6 +729,15 @@ What the engine's template shows (`styleguide-data.mjs` decides it):
 - **History**, an area of its own (`#c-chip/history`; an old `/changelog` link opens it): what the team decided about it first, then when Figma was last read for it, then each commit that changed it (its own file,
   or a line of the shared stylesheet holding its class; the project's own files only), grouped by the release tag
   (`v*`) that holds it, each linked to its commit and its pull request.
+- **Parts** (`#c-<root>/parts`): the components placed only inside it (`component-parts.mjs`), each a card to its own
+  page, then what the root's page says of each under its Parts section (`### <part>`), or where to write it. A part is
+  found when its Figma path sits under the component's (`grid/Row`), or when its name carries the root's (or both share
+  a stem of two words or more) and the root holds it while it does not hold the root. One of the two alone is a
+  question on the component's Documentation, with an answer to copy each (`--part`); `Part of: <root>` in Figma's
+  description answers it too. A part is not listed as a component (the menu, the overview, Status fold it into its
+  root), its page says whose part it is, its Documentation is its root's Parts section, and the Documentation page asks
+  no page of its own for it (a page it has is to move into the root's Parts). Contracts and `llms.txt` list it under
+  its root, from `.design-system-engine-out/parts.json`, which the style guide's build writes.
 - **Used in**: a card per product that uses it: the product's own picture (`styleguide.plugins[].image`, else
   `docs/preview.png`, `docs/screenshot.png`, `preview.png` … beside its page), else its page pictured in Chrome as it
   opens with the component's places marked (`product-shots.mjs`, window size from its `showUI` call), and how many

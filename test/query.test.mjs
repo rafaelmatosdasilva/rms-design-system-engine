@@ -71,6 +71,12 @@ test('no catalog yet: --query runs the audit once to write it, then answers (nev
   // Only once: the next question answers from the catalog.
   const again = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8' });
   assert.doesNotMatch(again.stdout, /No catalog yet/);
+  assert.doesNotMatch(again.stdout, /not in the code yet/, 'a component the code has');
+  // One Figma has and the code does not: its class styles nothing, so the agent is told not to place it or write its CSS.
+  const tag = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'tag'], { cwd: dir, encoding: 'utf8' });
+  assert.match(tag.stdout, /not in the code yet: \.tag has no styles, so placing it draws nothing\. Do not write its CSS/);
+  assert.match(tag.stdout, /NEXT: tag is not in the code: write the UI with components the code has/);
+  assert.doesNotMatch(tag.stdout, /NEXT: write the UI with these components/);
 });
 
 test('--check-ui on a page checks it as an edit (what changed since the last commit), never fails it as JSON', async () => {
