@@ -76,12 +76,15 @@ export function runStats(rows = []) {
 }
 
 // The RESULTS.md entry for one recorded evaluation. `now` and `before` are { model: runStats } (before may be empty).
-export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', guideSet, now, before = {}, name, cli = '', date = new Date().toISOString().slice(0, 7) }) {
+export function resultsEntry({ title, what, guideFiles = [], prevEngine = '', guideSet, fileHashes = null, now, before = {}, name, cli = '', date = new Date().toISOString().slice(0, 7) }) {
   const k = (x) => `${Math.round(x / 1000)}k`, usd = (x) => `$${x.toFixed(3)}`;
   const out = [`## ${date}: ${title} (continuous evaluation)`, ''];
   out.push(`What changed since the entry below${prevEngine ? ` (engine ${prevEngine})` : ''}: ${what}${/[.!?]$/.test(what) ? '' : '.'}${guideFiles.length ? ` The guide changed in ${guideFiles.map((f) => `\`${f}\``).join(', ')}.` : ''}`, '');
   const project = Object.values(now)[0]?.project ?? '';
   out.push(`Guide set measured: \`${guideSet}\` · Project measured: \`${project}\``, '');
+  // Each file's own hash too: a later set whose every file one entry or another measured is measured (two branches
+  // that changed different guide files, merged, need no evaluation of their crossing).
+  if (fileHashes) out.push(`Guide files measured: ${Object.entries(fileHashes).map(([f, h]) => `\`${f} ${h}\``).join(' ')}`, '');
   if (cli) out.push(`**The agent's command line changed.** ${cli.charAt(0).toUpperCase()}${cli.slice(1)}`, '');
   const reading = [];
   for (const [model, s] of Object.entries(now)) {
@@ -130,7 +133,7 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
   if (ENTRY) {
     const ENGINE = dirname(dirname(HERE));
     const { readFolder } = await import('./summarize.mjs');
-    const { guideSetHash } = await import('../../skill-files.mjs');
+    const { guideSetHash, guideFileHashes } = await import('../../skill-files.mjs');
     const sidesOf = (dir) => Object.fromEntries(readFolder(dir).filter((x) => x.set === 'guide').map((x) => [x.model, runStats(x.rows)]));
     const now = sidesOf(join(HERE, 'records', name));
     const engines = [...new Set(Object.values(now).flatMap((x) => x.engine.split(', ')))];
@@ -154,7 +157,7 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
     const { cliChange, cliLine } = await import('./lib.mjs');
     const rowsOf = (dir) => (dir && existsSync(dir) ? readFolder(dir).filter((x) => x.set === 'guide').flatMap((x) => x.rows) : []);
     const cli = cliLine(cliChange(rowsOf(join(HERE, 'records', name)), rowsOf(prevName && join(HERE, 'records', prevName))));
-    const entry = resultsEntry({ title, what, guideFiles, prevEngine, guideSet: guideSetHash(ENGINE), now, before, name, cli });
+    const entry = resultsEntry({ title, what, guideFiles, prevEngine, guideSet: guideSetHash(ENGINE), fileHashes: guideFileHashes(ENGINE), now, before, name, cli });
     const at = results.indexOf('\n## ');
     writeFileSync(join(HERE, 'RESULTS.md'), at < 0 ? `${results.trimEnd()}\n\n${entry}` : `${results.slice(0, at + 1)}${entry}\n${results.slice(at + 1)}`);
     const readmePath = join(HERE, 'records', 'README.md');

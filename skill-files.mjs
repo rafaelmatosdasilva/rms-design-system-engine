@@ -8,7 +8,7 @@
 //   rms-design-system-engine --doctor             checks the install, with the one fix for each problem
 //   rms-design-system-engine --guide classic      links the command to the guide as it was before the split
 import { readFileSync, existsSync, readdirSync, lstatSync, readlinkSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { OUT_DIR, SKILL, envVar } from './names.mjs';
@@ -143,9 +143,14 @@ export function logUsage(projectDir, entry, { env = process.env, now = () => new
 
 // The guide set an evaluation measures: the main file, every recipe and every reference file. A change
 // to any of them needs a fresh evaluation; test/skill-evals.test.mjs holds RESULTS.md to this hash.
+const guideFilesOf = (engineDir) => [GUIDE, ...['recipe', 'reference'].flatMap((k) => listDocs(engineDir, k).map((d) => join(KINDS[k], `${d.name}.md`)))].sort();
 export function guideSetHash(engineDir) {
-  const files = [GUIDE, ...['recipe', 'reference'].flatMap((k) => listDocs(engineDir, k).map((d) => join(KINDS[k], `${d.name}.md`)))];
   const h = createHash('sha256');
-  for (const f of files.sort()) h.update(`${f}\n`).update(readFileSync(join(engineDir, f), 'utf8'));
+  for (const f of guideFilesOf(engineDir)) h.update(`${f}\n`).update(readFileSync(join(engineDir, f), 'utf8'));
   return h.digest('hex').slice(0, 12);
+}
+// Each guide file's own hash, so a set made of files each measured (two branches that changed different files, merged)
+// is known to be measured file by file. → { 'cookbook/audit-component.md': '1a2b3c4d', … }
+export function guideFileHashes(engineDir) {
+  return Object.fromEntries(guideFilesOf(engineDir).map((f) => [f.split(sep).join('/'), createHash('sha256').update(readFileSync(join(engineDir, f), 'utf8')).digest('hex').slice(0, 8)]));
 }
