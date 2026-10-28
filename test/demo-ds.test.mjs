@@ -16,7 +16,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../cdp.mjs';
@@ -46,8 +45,7 @@ test('demo design system, with Chrome: every deliberate difference is found, and
   assert.match(r.out, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
   assert.match(r.out, /button hover while disabled \(Disabled=True\): Figma no change, rendered changes background/);
   assert.match(r.out, /chip height \(Size=L, Icon=True\): Figma 32, rendered 36px/);
-  const saved = join(tmpdir(), `demo-run-${process.pid}.txt`); writeFileSync(saved, r.out);
-  assert.match(r.out, /chip \(toggle button\)|component does not expose what its role requires/, `full output in ${saved}`);
+  assert.match(r.out, /chip \(toggle button\)|component does not expose what its role requires/, r.out.slice(-3000));
   assert.doesNotMatch(r.out, /chip height \(Icon=True\)/);   // a single axis is never compared with a combination
   assert.match(r.out, /🖼  ⚠️  button: <N>% of pixels differ outside text/);   // a border only the Figma image has
   assert.match(r.out, /🖼  ✓  chip: <N>% of pixels differ outside text/);   // under the limit: the share moves with the machine's fonts

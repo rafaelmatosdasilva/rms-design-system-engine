@@ -70,7 +70,6 @@ test('instruction files are found on their own; the parity\'s generated files ne
 test('in a real run on the demo design system: wrong names are listed, a correct file is said to be correct', async () => {
   const { cpSync, writeFileSync, mkdirSync } = await import('node:fs');
   const { join, dirname } = await import('node:path');
-  const { tmpdir } = await import('node:os');
   const { spawnSync, execFileSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
   const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -84,8 +83,7 @@ test('in a real run on the demo design system: wrong names are listed, a correct
     return r.stdout + r.stderr;
   };
   const bad = run({ 'AGENTS.md': 'Use <Chip size="XL"> next to <Button />.\nRound it with var(--radii-chipp).\nThe radius token is radii/chipz.\nRun rms-design-system-engine --component chip.\n' });
-  const saved = join(tmpdir(), `steer-run-${process.pid}.txt`); writeFileSync(saved, bad);
-  assert.match(bad, /🧭 Agent instruction files: 3 design-system names that do not exist \(AGENTS\.md\)/, `full output in ${saved}`);
+  assert.match(bad, /🧭 Agent instruction files: 3 design-system names that do not exist \(AGENTS\.md\)/, bad);
   assert.match(bad, /AGENTS\.md:1  size="XL" is not a value this prop takes; the system has M, L/);
   assert.match(bad, /AGENTS\.md:2  --radii-chipp is not a declared CSS variable; the system has --radii-chip/);
   assert.match(bad, /AGENTS\.md:3  radii\/chipz is not a token; the system has radii\/chip/);

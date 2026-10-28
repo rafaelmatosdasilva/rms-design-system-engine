@@ -37,8 +37,8 @@ test('a root left by a process that is gone is swept; a live one and folders of 
   assert.deepEqual(readdirSync(base).sort(), ['gate-ghi789', `rms-test-${process.pid}-def456`, 'rms-test-notapid']);
 });
 
-test('no test makes a folder in the system temp folder itself, only through tempDir', () => {
-  const offenders = readdirSync(TEST_DIR).filter((f) => f.endsWith('.test.mjs'))
-    .filter((f) => /mkdtemp(Sync)?\([^;]*tmpdir\(\)/.test(readFileSync(join(TEST_DIR, f), 'utf8')));
-  assert.deepEqual(offenders, [], 'use tempDir() from helpers.mjs, so the folder is deleted when the test ends');
+test('no test writes in the system temp folder itself, only through tempDir', () => {
+  const offenders = readdirSync(TEST_DIR).filter((f) => f.endsWith('.test.mjs') && f !== 'temp-dirs.test.mjs')
+    .filter((f) => /\btmpdir\(\)/.test(readFileSync(join(TEST_DIR, f), 'utf8')));
+  assert.deepEqual(offenders, [], 'use tempDir() from helpers.mjs, so what a test writes is deleted when it ends');
 });
