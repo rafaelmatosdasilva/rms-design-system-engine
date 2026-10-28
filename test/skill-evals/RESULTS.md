@@ -1,5 +1,20 @@
 # Skill evaluation results
 
+## 2026-10: An unbuilt component in a query: build with what the code has and say so, never stop to ask (continuous evaluation)
+
+What changed since the entry below (engine bf41765): An unbuilt component in a query: build with what the code has and say so, never stop to ask.
+
+Guide set measured: `e9fbb4860784` · Project measured: `13d811a9d668`
+
+| Haiku, engine 2f5a617 | Entry below | This version |
+|---|---|---|
+| The 21 guide tasks (`new-ui-saved` at 10 runs) | 69/70 | 70/70 |
+| Mean cost a run | $0.061 | $0.062 |
+| Input a run | 115k | 125k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 125k a run against 115k. no task changed state; 1 run moved inside tasks that pass sometimes, which is noise, not a difference. Records: `records/2026-10-28-an-unbuilt-component-in-a`.
+
 ## 2026-10: The Construction page: each rule with its status, what is to fix, one decision for all (continuous evaluation)
 
 What changed since the entry below (engine 1663f29): The construction grammar: how a system builds a component in Figma (#112); The Construction page: each rule with its status, what is to fix, one decision for all. The guide changed in `cookbook/figma-edits.md`, `cookbook/full-audit.md`, `reference/config.md`, `reference/usage.md`.
