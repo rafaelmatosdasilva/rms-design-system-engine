@@ -467,16 +467,16 @@ function architecture(skeleton, props, add, opts) {
   judgeAll('links-to-code', 'code', 'A component links to its code (a dev resource)', names.map((n) => item(n, (sk(n).dev ?? []).length ? [] : ['no link'])));
 
   // Its layers' order: the layers its resting variant's frame holds, in the order most components hold them
-  // (Background, then Content), for the names seen on enough components to have one; a nested component's own name is
-  // its component's, and is left out.
+  // (Background, then Content). Only the few names most components have (six at most, each on three or more), each put
+  // where it sits on average (0 first, 1 last), so the order holds together; a nested component's own name is its
+  // component's, and is left out.
   const own = new Set(Object.keys(props));
   const rootsOf = (n) => (resting(n)?.c ?? []).filter((c) => c.t !== 'INSTANCE' && !own.has(c.n)).map((c) => c.n);
   const seenAt = new Map();
-  for (const n of names) for (const l of new Set(rootsOf(n))) seenAt.set(l, (seenAt.get(l) ?? 0) + 1);
-  const roles = [...seenAt].filter(([, c]) => c >= MIN_SEEN).map(([l]) => l);
-  const before = (a, b) => names.filter((n) => { const r = rootsOf(n); return r.includes(a) && r.includes(b) && r.indexOf(a) < r.indexOf(b); }).length;
-  const order = roles.slice().sort((a, b) => before(b, a) - before(a, b) || a.localeCompare(b));
-  if (order.length >= 2) judgeAll('layer-order', 'layers', `A component's layers come in one order: ${order.join(', ')}`, names.map((n) => { const r = rootsOf(n).filter((l) => order.includes(l)); return r.length >= 2 ? { component: n, value: r.join(', '), fits: r.every((l, i) => !i || order.indexOf(r[i - 1]) < order.indexOf(l)) } : null; }).filter(Boolean));
+  for (const n of names) { const r = [...new Set(rootsOf(n))]; r.forEach((l, k) => { const e = seenAt.get(l) ?? { n: 0, at: 0 }; e.n++; e.at += r.length > 1 ? k / (r.length - 1) : 0.5; seenAt.set(l, e); }); }
+  const order = [...seenAt].filter(([, e]) => e.n >= MIN_SEEN).sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0])).slice(0, 6)
+    .sort((a, b) => a[1].at / a[1].n - b[1].at / b[1].n || a[0].localeCompare(b[0])).map(([l]) => l);
+  if (order.length >= 2) judgeAll('layer-order', 'layers', `A component's layers come in one order: ${order.join(', ')}`, names.map((n) => { const r = rootsOf(n).filter((l) => order.includes(l)); return r.length >= 2 ? { component: n, value: r.join(', '), fits: r.every((l, k) => !k || order.indexOf(r[k - 1]) < order.indexOf(l)) } : null; }).filter(Boolean));
   // Its page: the one its family is on, as most of the family are (a family of one is beside nothing).
   const famOf = {};
   for (const n of names) if (sk(n).page) (famOf[familyOf(n)] ??= []).push(n);
