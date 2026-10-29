@@ -87,7 +87,7 @@ import { roleWord as roleWordOf } from './role-markup.mjs';
 import { parseColor as parseCssColor } from './css-values.mjs';
 import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
 import { loadCategories, requirementEntry, noteKind, isRequirement } from './annotation-categories.mjs';
-import { partRoleOf, annotatedBehaviours, partRolesOf, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
+import { partRoleOf, annotatedBehaviours, partRolesOf, partsFromNames, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
 
 // ── Pure, unit-testable core (exported; importing this module runs NOTHING) ─────
 // Parse a computed-style color. Returns {r,g,b,a} or null when it is not an rgb()/rgba()
@@ -3088,9 +3088,12 @@ async function main() {
         const sel = selOf(comp);
         if (!sel) continue;
         const entry = requirementEntry(snap[comp] ?? {}, cats, cfg);
-        for (const { layer, part } of partRolesOf(entry)) {
+        // The parts Figma's annotations name, else the ones a control's layers say by their names (Label, Error message).
+        const annotated = partRolesOf(entry);
+        const parts = annotated.length ? annotated : partsFromNames((contract[comp]?.children ?? []).map((c) => c.name), roles[comp] ?? null);
+        for (const { layer, part, fromName } of parts) {
           const partSel = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase())?.cssSelector ?? null;
-          for (const problem of (await evalv(partRoleExpression(sel, partSel, layer, part))) ?? []) findings.push({ kind: 'partrole', plugin: label, desc: `${comp}: ${problem}` });
+          for (const problem of (await evalv(partRoleExpression(sel, partSel, layer, part))) ?? []) findings.push({ kind: 'partrole', plugin: label, desc: `${comp}: ${problem}${fromName ? ' (the part read from its layer\'s name: annotate it in Figma to confirm)' : ''}` });
         }
         const plan = behavioursFor(roles[comp] ?? '', entry.annotations ?? [], authored[comp]?.behaviourExceptions ?? {});
         for (const w of plan.weak) findings.push({ kind: 'behaviour', plugin: label, desc: `${comp}: the exception for "${w.id}" gives no link to the decision (an ADR or a pull request), so it is still checked` });

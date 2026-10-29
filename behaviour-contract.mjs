@@ -28,7 +28,7 @@ export const PART_ROLES = {
   panel: 'is named by the control\'s aria-controls, so the control says what it opens',
 };
 const PART_ALIASES = { error: 'errormessage', errortext: 'errormessage', helper: 'description', helpertext: 'description', hint: 'description', caption: 'description',
-  supportingtext: 'description', icon: 'indicator', decoration: 'indicator', checkmark: 'indicator', chevron: 'indicator', stepup: 'increment', plus: 'increment',
+  supportingtext: 'description', icon: 'indicator', decoration: 'indicator', checkmark: 'indicator', check: 'indicator', thumb: 'indicator', heart: 'indicator', chevron: 'indicator', stepup: 'increment', plus: 'increment',
   stepdown: 'decrement', minus: 'decrement', content: 'panel', region: 'panel' };
 const norm = (w) => String(w ?? '').toLowerCase().replace(/[\s_-]+/g, '');
 export const partRoleOf = (word) => { const w = norm(word); const r = PART_ALIASES[w] ?? w; return PART_ROLES[r] ? r : null; };
@@ -45,6 +45,42 @@ export function partRolesOf(entry = {}) {
     }
   }
   return out;
+}
+
+// The part roles a control's layers say by their names when no annotation does ("Label", "Error message", "Helper
+// text", "Chevron", "Plus"): the same parts, marked read from the name, so a component nobody annotated still has its
+// label tied to its field and its indicator silent. Only for a control (a role is given); a layer named for a part
+// twice is taken once. → [{ layer, part, fromName: true }]
+const FIELD_ROLES = /^(textbox|textfield|searchbox|combobox|listbox|checkbox|radio|switch|spinbutton|slider)$/i;
+export function partsFromNames(layers = [], role = null) {
+  if (!role) return [];
+  const out = [], seen = new Set();
+  for (const layer of layers) {
+    const words = String(layer ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+    const part = partRoleOf(words.join('')) ?? partRoleOf(words.slice(0, 2).join('')) ?? partRoleOf(words[0] ?? '');
+    if (!part || part === 'panel' || part === 'value' || seen.has(part)) continue;
+    // A "Label" layer of a button, a tab or a link is its own words, which name it: only a field's label is a part.
+    if (part === 'label' && !FIELD_ROLES.test(String(role))) continue;
+    seen.add(part); out.push({ layer, part, fromName: true });
+  }
+  return out;
+}
+
+// The parts a component's markup shows, by element and class: a <label>, an error, a hint or description, an indicator
+// (a check, a chevron), the + and - of a stepper. → [{ part, element }] for the spec Figma is offered.
+export function partsInMarkup(markup = '') {
+  const out = new Map();
+  for (const m of String(markup).matchAll(/<([a-zA-Z][\w-]*)\b([^>]*)>/g)) {
+    const [, tag, attrs] = m, cls = (/\bclass(?:Name)?\s*=\s*["']([^"']+)["']/.exec(attrs)?.[1] ?? '').toLowerCase();
+    let part = /^label$/i.test(tag) ? 'label' : null;
+    for (const c of cls.split(/\s+/)) {
+      if (part) break;
+      const bits = c.split(/[-_]+/).filter(Boolean);
+      for (let k = bits.length; k > 0 && !part; k--) { const r = partRoleOf(bits.slice(-k).join('')); if (r && r !== 'panel' && r !== 'value') part = r; }
+    }
+    if (part && !out.has(part)) out.set(part, `<${tag}${cls ? ` class="${cls.split(/\s+/)[0]}"` : ''}>`);
+  }
+  return [...out].map(([part, element]) => ({ part, element }));
 }
 
 // role → the behaviours it owes. act: what the check does (click, keys, type); expect: what must change.

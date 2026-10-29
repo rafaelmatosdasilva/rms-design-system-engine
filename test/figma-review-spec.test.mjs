@@ -80,7 +80,7 @@ test('specs: role, name, states, keys and what a screen reader says; an open rol
   assert.match(toggle.label, /The role is a decision still open: Figma says switch, the code renders a togglebutton\./);
   assert.match(toggle.label, /States: pressed \(aria-pressed\)/);
   assert.match(toggle.label, /Behaviour: a click and Space flip aria-pressed/);
-  assert.match(field.label, /Keys: Tab reaches it; typing writes into it$/);
+  assert.match(field.label, /Keys: Tab reaches it; typing writes into it\nParts: label <label> names the control: a <label for> it, the control inside it, or aria-labelledby on the control$/, 'its parts, read from the markup, with what each owes');
   assert.doesNotMatch(field.label, /Behaviour:/, 'what the keys line says is not said twice');
   assert.equal(field.role, 'textbox', 'the spec the last run wrote is not read as the person\'s role');
   assert.match(field.label, /Name: its label\nStates: invalid \(aria-invalid\), required/);
