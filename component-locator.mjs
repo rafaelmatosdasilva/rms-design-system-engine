@@ -9,7 +9,7 @@
 //   1. ds-config.json → componentSelectors[name]                 (explicit project config)
 //   2. structure-contract.mjs → COMPONENT_CSS_SELECTORS[name].main (the contract's selector map)
 //   3. a name that already is a selector (".x", "#x", "[x]")      (used as-is)
-//   4. the class the code's own component file gives its first element: one that is the name in another spelling
+//   4. the class the code's own component file gives its first element (past a wrapper with no class): one that is the name in another spelling
 //      (ButtonPrimary → .button-primary), else the class of the file the shared pairing gives the component
 //      (component-pairing.mjs: its folder and name, buttonSecondary → buttons/Secondary.vue →
 //      .button-secondary-container; a generic file name, switches/General.vue for switch; componentFiles…). With no
@@ -34,6 +34,7 @@ export function leadingToken(selector) {
 }
 
 const squash = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const WRAPPER = /^(transition|transition-group|teleport|keep-alive|suspense|template|component)$/i;
 
 // The classes the code's component files give their first element (a Vue or Svelte file's first element in its
 // template; a React file's first className), found two ways → { byName, byFile }, each Map(squashed name → Map(".class"
@@ -49,8 +50,16 @@ export function codeRootClasses(files = [], read = textReader()) {
     let classes = null;
     if (ext === '.vue' || ext === '.svelte') {
       const tpl = ext === '.vue' ? (/<template[^>]*>([\s\S]*)<\/template>/.exec(text)?.[1] ?? '') : text.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '');
-      const first = /<[A-Za-z][\w-]*\b([^>]*)>/.exec(tpl);
-      classes = first ? /(?:^|\s)class\s*=\s*["']([^"']+)["']/.exec(first[1])?.[1] : null;
+      // Its first element, past a wrapper with no class of its own (a transition, a teleport, a tooltip or another
+      // component around it, whose first child is what draws).
+      let rest = tpl;
+      for (let i = 0; i < 4; i++) {
+        const el = /<([A-Za-z][\w-]*)\b([^>]*)>/.exec(rest);
+        if (!el) break;
+        classes = /(?:^|\s)class\s*=\s*["']([^"']+)["']/.exec(el[2])?.[1] ?? null;
+        if (classes || !(WRAPPER.test(el[1]) || el[1].includes('-') || /^[A-Z]/.test(el[1])) || /\/\s*$/.test(el[2])) break;
+        rest = rest.slice(el.index + el[0].length);
+      }
     } else if (ext === '.jsx' || ext === '.tsx') {
       classes = /\bclassName\s*=\s*(?:["']([^"']+)["']|\{\s*["'`]([^"'`$]+)["'`]\s*\})/.exec(text)?.slice(1).find(Boolean) ?? null;
     }
@@ -84,7 +93,12 @@ export function createLocator(cfg = {}, { contractSelectors = {}, codeClasses = 
     if (spelled?.has(convention)) return null;
     if (spelled?.size) return most(spelled);
     const pr = pairingOf();
-    return pr ? pr.classOf(name) : most(code.byFile.get(squash(name)));
+    const paired = (pr ? pr.classOf(name) : null) ?? most(code.byFile.get(squash(name)));
+    if (paired) return paired;
+    // A name nested deeper than the code's folders (table/Cell/button for tables/body/cells/Button.vue): its last two
+    // parts, as the file's folder and name spell them.
+    const parts = String(name).split('/').filter(Boolean);
+    return parts.length > 2 ? most(code.byFile.get(squash(parts.slice(-2).join('')))) : null;
   };
 
   function resolveOne(name) {

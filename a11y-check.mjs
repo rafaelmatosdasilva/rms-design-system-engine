@@ -2101,8 +2101,14 @@ async function main() {
   const modeDefs = cfg.figma?.modes?.length ? loadModes(cfg) : [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }];
   let modes = modeDefs.map((m) => ({ name: m.name || m.snapshotKey || 'light', sw: modeSwitch(m) })).filter((m) => !m.sw.unsupported);
   const locator = await loadLocator(ROOT, cfg);   // the one shared component finder
-  const selOf = (name) => locator.selectorFor(name);
-  let roots = components.length ? components.map(selOf) : null;
+  // A name the convention cannot make a class of (table/Cell/button gives .table/Cell/button, which no browser parses)
+  // and that no code file gives a class: found by the box the page that renders the components from their code puts it
+  // in, so it is checked there, never dropped.
+  const selOf = (name) => {
+    const sel = locator.selectorFor(name);
+    return locator.sourceOf(name) === 'convention' && !/^\.-?[_a-zA-Z][\w-]*$/.test(sel) ? `[data-dse-component=${JSON.stringify(String(name))}] > .dse-case > *` : sel;
+  };
+  let roots = components.length ? components.filter((n) => String(n).trim()).map(selOf) : null;   // a name of spaces names nothing
 
   const builtUiPath = (plugin) => {
     const i = plugins.indexOf(plugin);
