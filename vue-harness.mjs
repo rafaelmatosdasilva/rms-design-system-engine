@@ -247,7 +247,7 @@ export function listSamples(text, propNames = [], samples = {}, example = null, 
 }
 
 // How often the project's code writes each name for a key (kind: 'Solid', tileKind: 'Outline'), in its scripts and
-// data under src. → { key: { name: count } }
+// data under src, and for an attribute its templates write as text (tile-kind="Outline"). → { key: { name: count } }
 export function keyedNames(ROOT) {
   const count = {};
   const walk = (d) => {
@@ -258,7 +258,10 @@ export function keyedNames(ROOT) {
       if (e.isDirectory()) { walk(p); continue; }
       if (!/\.(vue|m?js|ts)$/.test(e.name)) continue;
       let src; try { src = readFileSync(p, 'utf8'); } catch { continue; }
-      for (const m of src.matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*['"]([A-Za-z][\w-]{0,40})['"]/g)) ((count[m[1]] ??= {})[m[2]] = (count[m[1]][m[2]] ?? 0) + 1);
+      const add = (k, v) => ((count[k] ??= {})[v] = (count[k][v] ?? 0) + 1);
+      for (const m of src.matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*['"]([A-Za-z][\w-]{0,40})['"]/g)) add(m[1], m[2]);
+      const tpl = /<template\b[\s\S]*<\/template>/.exec(src)?.[0] ?? '';
+      for (const m of tpl.matchAll(/\s([a-z][\w-]*)="([A-Z][\w-]{0,40})"/g)) add(m[1].replace(/-(\w)/g, (_, c) => c.toUpperCase()), m[2]);
     }
   };
   walk(join(ROOT, 'src'));
@@ -267,28 +270,44 @@ export function keyedNames(ROOT) {
 
 // The parts a component loads by a name it is given (defineAsyncComponent(() => import(`../tiles/${kind}.vue`))), and
 // where that name comes from: a field of the items of a list it loops over (partFor(tile.kind) in a v-for over
-// tiles), or a field of an object prop (props.item.tileKind). A name that is no file of that folder
-// loads nothing, and the component fails before it draws. → [{ prop, field, list, names }], names the folder's files,
-// the ones the project's code writes most for that field first (keyedNames).
-export function asyncChoices(ROOT, file, text, keyed = {}) {
+// tiles), a field of an object prop (props.item.tileKind), or a prop of its own (props.tileKind, field null). A name
+// passed through a table first (`${fileFor(kind)}` with fileFor's { Solid: 'Solid', … }) is one of the table's names
+// whose file is there. A name that is no file of that folder loads nothing, and the component fails before it draws.
+// propNames: the props its API declares. → [{ prop, field, list, names }], the ones the project's code writes most for
+// it first (keyedNames).
+export function asyncChoices(ROOT, file, text, keyed = {}, propNames = []) {
   const src = String(text);
   const tpl = /<template\b[\s\S]*<\/template>/.exec(src)?.[0] ?? '';
   const script = src.replace(tpl, '');
   const out = [];
-  const pathOf = (e) => { const p = e.replace(/^props\./, '').split('.'); return p.length === 2 ? { prop: p[0], field: p[1], list: false } : null; };
-  for (const m of script.matchAll(/\bimport\s*\(\s*`([^`$]*)\$\{\s*([A-Za-z_$][\w$.]*)\s*\}([^`$]*)`\s*\)/g)) {
-    const [, prefix, expr, suffix] = m;
+  const declared = (p) => propNames.includes(p);   // the props its API declares (textComponentApi)
+  const pathOf = (e) => {
+    const own = e.startsWith('props.'), p = e.replace(/^props\./, '').split('.');
+    if (p.length === 2) return { prop: p[0], field: p[1], list: false };
+    return p.length === 1 && (own || declared(p[0])) ? { prop: p[0], field: null, list: false } : null;
+  };
+  for (const m of script.matchAll(/\bimport\s*\(\s*`([^`$]*)\$\{\s*(?:([A-Za-z_$][\w$]*)\s*\(\s*)?([A-Za-z_$][\w$.]*)\s*\)?\s*\}([^`$]*)`\s*\)/g)) {
+    const [, prefix, table, expr, suffix] = m;
     const at = prefix.startsWith('@/') ? join(ROOT, 'src', prefix.slice(2)) : prefix.startsWith('.') ? resolve(dirname(file), prefix) : null;
     if (!at) continue;
     const dir = prefix.endsWith('/') ? at : dirname(at), start = prefix.endsWith('/') ? '' : basename(at);
     let names = []; try { names = readdirSync(dir).filter((f) => f.startsWith(start) && f.endsWith(suffix) && f.length > start.length + suffix.length).map((f) => f.slice(start.length, f.length - suffix.length)).sort(); } catch { continue; }
     if (!names.length) continue;
+    // A table between the name and the file (fileFor(kind)): the table's names whose file is in the folder.
+    if (table) {
+      const at = new RegExp(`\\b(?:const|let|var|function)\\s+${table}\\b`).exec(script);
+      const body = at ? script.slice(at.index, at.index + 3000).split(/\n\}/)[0] : '';
+      const entries = [...body.matchAll(/['"]?([A-Za-z_$][\w$-]*)['"]?\s*:\s*['"]([\w-]+)['"]/g)].filter((e) => names.includes(e[2])).map((e) => e[1]);
+      if (!entries.length) continue;
+      names = [...new Set(entries)].sort();
+    }
     const targets = [];
     if (expr.includes('.')) { const t = pathOf(expr); if (t) targets.push(t); }
     else {
       // A const set from a prop's field (const tileKind = props.item.tileKind).
-      const set = new RegExp(`\\b(?:const|let|var)\\s+${expr}\\s*=\\s*((?:props\\.)?[A-Za-z_$][\\w$]*\\.[A-Za-z_$][\\w$]*)\\s*(?:;|\\n)`).exec(script);
+      const set = new RegExp(`\\b(?:const|let|var)\\s+${expr}\\s*=\\s*((?:props\\.)?[A-Za-z_$][\\w$]*\\.[A-Za-z_$][\\w$]*|props\\.[A-Za-z_$][\\w$]*)\\s*(?:;|\\n)`).exec(script);
       if (set) { const t = pathOf(set[1]); if (t) targets.push(t); }
+      else if (declared(expr)) targets.push({ prop: expr, field: null, list: false });   // the prop itself (<script setup> reads it bare in a template literal)
       // The parameter of the function around the import, called in the template with a field of a v-for's item.
       const fns = [...script.slice(0, m.index).matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>|\bfunction\s+([A-Za-z_$][\w$]*)\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/g)];
       const fn = fns.reverse().find((f) => (f[2] ?? f[4]) === expr);
@@ -299,7 +318,7 @@ export function asyncChoices(ROOT, file, text, keyed = {}) {
       }
     }
     for (const t of targets) {
-      const used = keyed[t.field] ?? {};
+      const used = keyed[t.field ?? t.prop] ?? {};
       out.push({ ...t, names: [...names].sort((a, b) => (used[b] ?? 0) - (used[a] ?? 0)) });
     }
   }
@@ -312,6 +331,7 @@ export function withChoices(fill, choices) {
   const out = { ...fill };
   const pick = (names, v, i) => names.find((n) => n.toLowerCase() === String(v ?? '').toLowerCase()) ?? names[i % names.length];
   for (const { prop, field, list, names } of choices) {
+    if (field == null) continue;                                  // a prop of its own: its cases say it (withCaseChoices)
     if (list) {
       const items = Array.isArray(out[prop]) && out[prop].length ? out[prop] : [{}, {}, {}];
       out[prop] = items.map((it, i) => (it && typeof it === 'object' ? { ...it, [field]: pick(names, it[field], i) } : it));
@@ -319,6 +339,28 @@ export function withChoices(fill, choices) {
       const was = out[prop] && typeof out[prop] === 'object' && !Array.isArray(out[prop]) ? out[prop] : {};
       out[prop] = { ...was, [field]: pick(names, was[field], 0) };
     }
+  }
+  return out;
+}
+
+// The cases a component is drawn in, each prop that names the part it loads (asyncChoices, field null) given a name the
+// folder has: the case's own value when there is one (in any case), else the most used; a case made only to show that
+// prop (tileKind="tileKind") is named for the value it now draws, and dropped when that is the default's.
+export function withCaseChoices(cases, choices) {
+  const own = choices.filter((c) => c.field == null);
+  if (!own.length) return cases;
+  const pick = (names, v) => names.find((n) => n.toLowerCase() === String(v ?? '').toLowerCase()) ?? names[0];
+  const out = [];
+  for (const c of cases) {
+    const props = { ...c.props };
+    let label = c.label;
+    for (const { prop, names } of own) {
+      const v = pick(names, props[prop]);
+      if (label.startsWith(`${prop}=`) && String(props[prop]).toLowerCase() !== v.toLowerCase()) label = `${prop}=${v}`;
+      props[prop] = v;
+    }
+    if (out.length && label !== c.label && JSON.stringify(props) === JSON.stringify(out[0].props)) continue;
+    out.push({ ...c, label, props });
   }
   return out;
 }
@@ -601,9 +643,10 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const example = bestExample(examples, name, propsSnap[name]);
     const figmaCases = fromFigma ? harnessCases(propsSnap[name], max, example) : null;
     const connect = codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [];
-    const cases = (figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
+    const choices = asyncChoices(ROOT, resolve(ROOT, file), text, keyed ??= keyedNames(ROOT), Object.keys(api.props ?? {}));
+    const cases = withCaseChoices((figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c)), choices);
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    const fill = withChoices({ ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), ...(pageData[resolve(ROOT, file)] ?? {}) }, asyncChoices(ROOT, resolve(ROOT, file), text, keyed ??= keyedNames(ROOT)));
+    const fill = withChoices({ ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
     groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };

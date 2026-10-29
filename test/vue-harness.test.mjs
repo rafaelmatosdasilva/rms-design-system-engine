@@ -222,7 +222,7 @@ test('a text with no default takes the value the project\'s own pages pass it mo
 });
 
 test('a part loaded by a name it is given gets the name of a file it can load, the one the code uses most first', async () => {
-  const { asyncChoices, keyedNames, withChoices } = await import('../vue-harness.mjs');
+  const { asyncChoices, keyedNames, withChoices, withCaseChoices } = await import('../vue-harness.mjs');
   const dir = tempDir('vue-parts-'); mkdirSync(join(dir, 'src', 'tiles'), { recursive: true }); mkdirSync(join(dir, 'src', 'panel'));
   for (const n of ['Banner', 'Outline', 'Solid']) writeFileSync(join(dir, 'src', 'tiles', `${n}.vue`), '<template><button/></template>');
   writeFileSync(join(dir, 'src', 'Page.vue'), "<script setup>const a = [{ kind: 'Solid' }, { kind: 'Solid' }, { kind: 'Outline' }]\nconst b = { tileKind: 'Outline' }</script>");
@@ -237,6 +237,14 @@ test('a part loaded by a name it is given gets the name of a file it can load, t
   assert.deepEqual(cell.map(({ prop, field, list: l, names }) => [prop, field, l, names[0]]), [['item', 'tileKind', false, 'Outline']]);
   assert.deepEqual(withChoices({}, cell), { item: { tileKind: 'Outline' } }, 'an object prop given none gets one with the name');
   assert.deepEqual(asyncChoices(dir, panel, '<script setup>const x = import(`../missing/${n}.vue`)</script>', keyed), [], 'a folder that is not there gives nothing');
+  // A prop of its own, through a table of names first; its cases drawn with names the table has.
+  writeFileSync(join(dir, 'src', 'Menu.vue'), '<template><x-menu tile-kind="Outline"/><x-menu tile-kind="Outline"/></template>');
+  const ownText = "<script setup>\nconst props = defineProps({ tileKind: String, size: { type: String } })\nconst fileFor = kind => {\n  const files = { Solid: 'Solid', Outline: 'Outline', Ghost: 'Ghost' }\n  return files[kind]\n}\nconst part = computed(() => {\n  const tileKind = props.tileKind\n  return defineAsyncComponent(() => import(`./tiles/${fileFor(tileKind)}.vue`))\n})\n</script>";
+  const own = asyncChoices(dir, join(dir, 'src', 'Picker.vue'), ownText, keyedNames(dir), ['tileKind', 'size']);
+  assert.deepEqual(own, [{ prop: 'tileKind', field: null, list: false, names: ['Outline', 'Solid'] }], 'the table\'s names whose file is there (no Ghost), the most written first; a type: option is never taken for a prop');
+  assert.deepEqual(withCaseChoices([{ label: 'default', props: {} }, { label: 'tileKind="tileKind"', props: { tileKind: 'TileKind' } }, { label: 'tileKind=solid', props: { tileKind: 'solid' } }], own),
+    [{ label: 'default', props: { tileKind: 'Outline' } }, { label: 'tileKind=solid', props: { tileKind: 'Solid' } }], 'a made-up name drawn as the most used, the case made only for it dropped when it is the default; a real one kept');
+  assert.deepEqual(asyncChoices(dir, join(dir, 'src', 'Picker.vue'), '<script setup>\nconst part = defineAsyncComponent(() => import(`./tiles/${tileKind}.vue`))\n</script>', keyedNames(dir), ['size']), [], 'a bare name no declared prop gives is not taken for one');
 });
 
 test('a state Figma\'s default variant has on (Disabled) starts off; its on is a case of its own', () => {
