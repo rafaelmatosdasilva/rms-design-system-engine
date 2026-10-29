@@ -16,6 +16,27 @@ import { findChrome } from '../../cdp.mjs';
 export const ENGINE = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 export const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
 export const TOOLS = 'Bash,Read,Edit,Write,Glob,Grep,Skill';
+// How the agent reaches the engine (the route benchmark, route-tasks.mjs). Every route has the same guide; only what the
+// agent can call differs: a shell (the command line), the engine's MCP server (mcp.mjs, for an agent with no shell),
+// both, or neither (an agent with no shell and no server: what the server adds).
+export const MCP_SERVER = 'design-system';
+export const ROUTES = {
+  shell: { tools: TOOLS, mcp: false },
+  both: { tools: TOOLS, mcp: true },
+  mcp: { tools: 'Read,Edit,Write,Glob,Grep,Skill', mcp: true },
+  none: { tools: 'Read,Edit,Write,Glob,Grep,Skill', mcp: false },
+};
+// The command line of one headless turn: its tools, and the engine's MCP server pointed at the project when the route
+// has it (no other server, ever).
+export function claudeArgs({ prompt, model, maxTurns = 40, budget = 3, resume = null, route = 'shell', cwd = '.' }) {
+  const r = ROUTES[route];
+  if (!r) throw new Error(`unknown route ${route}: ${Object.keys(ROUTES).join(', ')}`);
+  const servers = r.mcp ? { [MCP_SERVER]: { command: process.execPath, args: [join(ENGINE, 'mcp.mjs'), `--project=${cwd}`] } } : {};
+  const allowed = [...r.tools.split(','), ...(r.mcp ? [`mcp__${MCP_SERVER}`] : [])];
+  return ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--model', model, '--max-turns', String(maxTurns),
+    '--max-budget-usd', String(budget), '--tools', r.tools, '--allowedTools', allowed.join(' '),
+    '--strict-mcp-config', '--mcp-config', JSON.stringify({ mcpServers: servers }), ...(resume ? ['--resume', resume] : [])];
+}
 // The CLI that runs each task, found once on this machine's PATH: a run's own PATH leaves out ~/.local/bin (where
 // install.sh puts the engine's command), and the Claude Code installer puts `claude` there too.
 const CLAUDE = (() => { try { return execFileSync('which', ['claude'], { encoding: 'utf8' }).trim() || 'claude'; } catch { return 'claude'; } })();
@@ -164,10 +185,8 @@ export function limitReached(events) {
 }
 
 // One headless turn. Resolves { events, sessionId, cost, error, infra, limit }.
-export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTurns = 40, budget = 3, timeoutMs = 15 * 60 * 1000 }) {
-  const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--model', model, '--max-turns', String(maxTurns),
-    '--max-budget-usd', String(budget), '--tools', TOOLS, '--allowedTools', TOOLS.split(',').join(' '),
-    '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', ...(resume ? ['--resume', resume] : [])];
+export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTurns = 40, budget = 3, timeoutMs = 15 * 60 * 1000, route = 'shell' }) {
+  const args = claudeArgs({ prompt, model, maxTurns, budget, resume, route, cwd });
   return new Promise((resolve) => {
     // Real users have Chrome: the audit's browser reading and accessibility check run in every variant.
     // A run that installs its own Playwright must not clean up the machine's shared browsers (its garbage collection
@@ -208,6 +227,8 @@ export function context(events, dir, saved = null) {
   const final = results.map((r) => String(r.result ?? '')).join('\n\n');
   const bash = calls.filter((c) => c.name === 'Bash').map((c) => ({ command: String(c.input.command ?? ''), result: c.result, isError: c.isError }));
   const engine = bash.filter((b) => ENGINE_CALL.test(b.command));
+  // The engine's answers through its MCP server: each call's tool (query, catalog, check_ui, summary) and arguments.
+  const mcp = calls.filter((c) => c.name.startsWith(`mcp__${MCP_SERVER}__`)).map((c) => ({ tool: c.name.slice(`mcp__${MCP_SERVER}__`.length), input: c.input, result: c.result, isError: c.isError }));
   const git = (...a) => { if (saved) return ''; try { return execFileSync('git', a, { cwd: dir, encoding: 'utf8' }); } catch { return ''; } };
   // Files the engine writes on every run: never the agent's change. Applied to
   // a saved row too, so a run scored with an older list is scored with this one.
@@ -228,9 +249,9 @@ export function context(events, dir, saved = null) {
   // A saved run (rescoring) keeps the files it wrote; a file it left as it was is read from the rebuilt project.
   const read = (p) => { if (saved && savedFiles[p] != null) return savedFiles[p]; try { return readFileSync(join(dir, p), 'utf8'); } catch { return null; } };
   return {
-    calls, bash, engine, texts, final, all: [...texts, final].join('\n'), changed, commits: saved ? saved.commits ?? 1 : Number(git('rev-list', '--count', 'HEAD').trim() || 0),
+    calls, bash, engine, mcp, texts, final, all: [...texts, final].join('\n'), changed, commits: saved ? saved.commits ?? 1 : Number(git('rev-list', '--count', 'HEAD').trim() || 0),
     diff: git('diff', 'HEAD'), read, nextLines, dir,
-    usage: results.reduce((u, r) => ({ input: u.input + (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_input_tokens ?? 0) + (r.usage?.cache_creation_input_tokens ?? 0), output: u.output + (r.usage?.output_tokens ?? 0), turns: u.turns + (r.num_turns ?? 0), cost: u.cost + (r.total_cost_usd ?? 0) }), { input: 0, output: 0, turns: 0, cost: 0 }),
+    usage: results.reduce((u, r) => ({ input: u.input + (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_input_tokens ?? 0) + (r.usage?.cache_creation_input_tokens ?? 0), output: u.output + (r.usage?.output_tokens ?? 0), turns: u.turns + (r.num_turns ?? 0), cost: u.cost + (r.total_cost_usd ?? 0), ms: u.ms + (r.duration_ms ?? 0) }), { input: 0, output: 0, turns: 0, cost: 0, ms: 0 }),
   };
 }
 

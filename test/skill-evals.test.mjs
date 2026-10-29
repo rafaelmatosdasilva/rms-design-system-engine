@@ -140,13 +140,13 @@ test('context: tool calls, results, engine runs and changed files from a real st
     { type: 'assistant', message: { content: [{ type: 'text', text: 'Running it.' }, { type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'rms-design-system-engine --component chip' } }] } },
     { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: [{ type: 'text', text: 'report\nNEXT: rms-design-system-engine --component chip' }] }] } },
     { type: 'assistant', message: { content: [{ type: 'tool_use', id: 't2', name: 'Bash', input: { command: 'rms-design-system-engine --component chip' } }] } },
-    { type: 'result', result: 'The chip differs.', usage: { input_tokens: 10, cache_read_input_tokens: 90, output_tokens: 5 }, num_turns: 3, total_cost_usd: 0.1 },
+    { type: 'result', result: 'The chip differs.', usage: { input_tokens: 10, cache_read_input_tokens: 90, output_tokens: 5 }, num_turns: 3, total_cost_usd: 0.1, duration_ms: 4200 },
   ];
   const ctx = context(events, dir);
   assert.equal(ctx.engine.length, 2);
   assert.deepEqual(ctx.changed, ['src/theme.css']);          // engine outputs are not counted as changes
   assert.equal(ctx.final, 'The chip differs.');
-  assert.deepEqual(ctx.usage, { input: 100, output: 5, turns: 3, cost: 0.1 });
+  assert.deepEqual(ctx.usage, { input: 100, output: 5, turns: 3, cost: 0.1, ms: 4200 });
   assert.deepEqual(ctx.nextLines, ['rms-design-system-engine --component chip']);
   assert.equal(decisionPoints(ctx), 1);                         // the second run followed a NEXT line
 });
@@ -284,4 +284,57 @@ test('the chip\'s 36 against 32 counts on one line, or on two lines in a row whe
   assert.ok(!COMBO.test('The button is 32px tall.\n\nThe card is 36px wide.'));
   assert.ok(!COMBO.test('320 and 360'));
   assert.ok(!COMBO.test('36 components were checked.\nAll 32 passing gates look fine for now.'));
+});
+
+// The route benchmark: the same tasks through the command line and through the engine's MCP server.
+test('route benchmark: each route gives the agent its tools, and the engine\'s MCP server only where the route has it', async () => {
+  const { claudeArgs, ROUTES } = await import('./skill-evals/lib.mjs');
+  const opt = (args, k) => args[args.indexOf(k) + 1];
+  const shell = claudeArgs({ prompt: 'p', model: 'm', route: 'shell', cwd: '/tmp/acme' });
+  assert.match(opt(shell, '--tools'), /\bBash\b/);
+  assert.deepEqual(JSON.parse(opt(shell, '--mcp-config')), { mcpServers: {} });
+  const mcp = claudeArgs({ prompt: 'p', model: 'm', route: 'mcp', cwd: '/tmp/acme' });
+  assert.doesNotMatch(opt(mcp, '--tools'), /\bBash\b/, 'no shell on the MCP route');
+  const server = JSON.parse(opt(mcp, '--mcp-config')).mcpServers['design-system'];
+  assert.match(server.args[0], /mcp\.mjs$/);
+  assert.equal(server.args[1], '--project=/tmp/acme');
+  assert.match(opt(mcp, '--allowedTools'), /mcp__design-system/);
+  assert.match(opt(claudeArgs({ prompt: 'p', model: 'm', route: 'both' }), '--tools'), /\bBash\b/);
+  assert.deepEqual(JSON.parse(opt(claudeArgs({ prompt: 'p', model: 'm', route: 'none' }), '--mcp-config')), { mcpServers: {} });
+  assert.deepEqual(Object.keys(ROUTES), ['shell', 'both', 'mcp', 'none']);
+  assert.throws(() => claudeArgs({ prompt: 'p', model: 'm', route: 'fax' }), /unknown route/);
+});
+
+test('route benchmark: a task counts the engine asked by its command or by its MCP tool, never by neither', async () => {
+  const { askedBy, ROUTE_TASKS } = await import('./skill-evals/route-tasks.mjs');
+  const events = [
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'm1', name: 'mcp__design-system__query', input: { terms: ['chip'] } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'm1', content: [{ type: 'text', text: '[{"name":"chip"}]' }] }] } },
+    { type: 'result', result: 'size takes M or L.' },
+  ];
+  const ctx = context(events, '/nonexistent');
+  assert.deepEqual(ctx.mcp.map((m) => [m.tool, m.input.terms[0]]), [['query', 'chip']]);
+  const q = { cli: (c) => /--query/.test(c), mcp: (t) => t === 'query' };
+  assert.equal(askedBy(ctx, q), 'mcp');
+  assert.equal(askedBy(fakeCtx({ calls: [run('rms-design-system-engine --query chip')] }), q), 'shell');
+  assert.equal(askedBy(fakeCtx({ calls: [{ name: 'Read', input: { file_path: 'src/theme.css' } }] }), q), '');
+  const props = ROUTE_TASKS.find((t) => t.id === 'route-props');
+  const ok = { ...fakeCtx({ final: 'The chip\'s size takes M or L.' }), mcp: ctx.mcp };
+  assert.ok(props.score(ok).every((c) => c.ok));
+  assert.ok(!props.score({ ...fakeCtx({ final: 'The chip\'s size takes M or L.' }), mcp: [] }).every((c) => c.ok), 'guessed, not asked');
+  const token = ROUTE_TASKS.find((t) => t.id === 'route-token');
+  assert.ok(!token.score({ ...fakeCtx({ final: 'Use --radii-chip; it is 12px.' }), mcp: ctx.mcp }).every((c) => c.ok), 'the code\'s value, not Figma\'s');
+  assert.ok(token.score({ ...fakeCtx({ final: 'Use --radii-chip; Figma gives 16px.' }), mcp: ctx.mcp }).every((c) => c.ok));
+});
+
+test('route benchmark: the table says, per route, the passes, time, tokens, tool calls and how each run reached the engine', async () => {
+  const { routeStats, routeTable, reached } = await import('./skill-evals/route-report.mjs');
+  const row = (route, pass, engineRuns, mcpCalls) => ({ route, task: 'route-props', pass, engineRuns, mcpCalls, calls: 4, usage: { input: 50000, output: 300, cost: 0.05, ms: 12000 } });
+  assert.equal(reached(row('both', true, 1, ['query'])), 'both');
+  assert.equal(reached(row('mcp', true, 0, [])), 'neither');
+  const s = routeStats([row('mcp', true, 0, ['query']), row('mcp', false, 0, [])]);
+  assert.deepEqual([s.pass, s.runs, s.seconds, s.calls, s.reached], [1, 2, 12, 4, { MCP: 1, neither: 1 }]);
+  const table = routeTable({ shell: [row('shell', true, 1, [])], mcp: [row('mcp', true, 0, ['query'])] });
+  assert.match(table, /\| shell only \(the command line\) \| 1\/1 \| 12 s \| 50k \| 300 \| 4\.0 \| \$0\.050 \| command 1 \|/);
+  assert.match(table, /\| `route-props` \| 1\/1 \| 1\/1 \|/);
 });
