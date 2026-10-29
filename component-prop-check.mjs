@@ -25,7 +25,7 @@
 
 import { counterpart } from './prop-vocabulary.mjs';
 import { roleWord, roleMarkupFindings } from './role-markup.mjs';   // a Figma role, read in the component's markup
-import { partWiringFindings } from './behaviour-contract.mjs';   // a field's label, error, hint and indicator, read in its source
+import { partWiringFindings, partWiringNotYet } from './behaviour-contract.mjs';   // a field's label, error, hint and indicator, read in its source
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import { loadLocator } from './component-locator.mjs';
@@ -169,7 +169,7 @@ const resolveFile = (figmaName) => API.fileFor(figmaName);
 // too. A boolean prop (isDisabled) stays a code prop. Shared with the Figma prop types (figma-props.mjs).
 const isStateAxis = stateAxisTest(cfg);
 
-const MISSING = [], NOFILE = [], EXTRA = [], SUGGEST = [], OK = [], VALUE_FAIL = [], VALUE_INFO = [], SLOT_FAIL = [], NAME_FAIL = [], ROLE_FAIL = [];
+const MISSING = [], NOFILE = [], EXTRA = [], SUGGEST = [], OK = [], VALUE_FAIL = [], VALUE_INFO = [], SLOT_FAIL = [], NAME_FAIL = [], ROLE_FAIL = [], ROLE_NOTYET = [];
 const rows = [];   // structured parity rows: { component, figmaProp, figmaValue, codeProp, codeValue, status }
 
 // How a Figma property definition reads in the report: 's · m · l', 'boolean', 'text', 'icon (instance)'.
@@ -260,6 +260,8 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
     let src = ''; try { src = readFileSync(file, 'utf8'); } catch { /* unreadable: nothing to say */ }
     const miss = [...roleMarkupFindings(src, role), ...partWiringFindings(src, role)];   // its parts too, for a field
     if (miss.length) ROLE_FAIL.push(`${figmaName}: Figma's annotation says role ${role}; the code needs ${miss.join(' and ')}  (${relative(ROOT, file)})`);
+    // A label outside the shadow root its field sits in: no browser ties them yet, so it is said apart, not failed.
+    for (const l of partWiringNotYet(src, role)) ROLE_NOTYET.push(`${figmaName}: ${l}  (${relative(ROOT, file)})`);
   }
   if (!figNames.length) continue;
   if (!file) {
@@ -430,6 +432,7 @@ if (ROLE_FAIL.length)  console.log(`❌ ROLE      ${ROLE_FAIL.length}   (the mar
 if (EXTRA.length)      console.log(`ℹ️ EXTRA     ${EXTRA.length}   (code prop with no Figma property - advisory)`);
 if (SUGGEST.length)    console.log(`ℹ️ RENAME?   ${SUGGEST.length}   (possible renames - advisory)`);
 if (VALUE_INFO.length) console.log(`ℹ️ VALUE?    ${VALUE_INFO.length}   (could not read a code value to verify - advisory)`);
+if (ROLE_NOTYET.length) console.log(`ℹ️ NOT YET   ${ROLE_NOTYET.length}   (a part's wiring no browser makes yet - advisory)`);
 
 const fail = MISSING.length + NAME_FAIL.length + NOFILE.length + VALUE_FAIL.length + SLOT_FAIL.length + ROLE_FAIL.length;
 
@@ -447,6 +450,7 @@ if (VALUE_FAIL.length) { console.log('\n─── Wrong value (default or varian
 if (SLOT_FAIL.length)  { console.log('\n─── Missing slot (Figma instance swap with no code slot) ──'); for (const l of SLOT_FAIL) console.log(`  ❌ ${l}`); }
 if (NOFILE.length)     { console.log('\n─── No code component found ──'); for (const l of NOFILE) console.log(`  ❌ ${l}`); }
 if (ROLE_FAIL.length)  { console.log('\n─── Role (Figma\'s annotation says what the element is; the markup must be that) ──'); for (const l of ROLE_FAIL) console.log(`  ❌ ${l}`); }
+if (ROLE_NOTYET.length) { console.log('\n─── Wiring no browser makes yet (advisory) ──'); for (const l of ROLE_NOTYET) console.log(`  ℹ️ ${l}`); }
 if (SUGGEST.length)    { console.log('\n─── Possible renames (advisory) ──'); for (const l of SUGGEST) console.log(`  ℹ️ ${l}`); }
 if (VALUE_INFO.length) { console.log('\n─── Values not verified (advisory) ──'); for (const l of VALUE_INFO.slice(0, 20)) console.log(`  ℹ️ ${l}`); }
 if (EXTRA.length)      { console.log('\n─── Extra code props (advisory) ──'); for (const l of EXTRA.slice(0, 20)) console.log(`  ℹ️ ${l}`); }

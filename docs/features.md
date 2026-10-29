@@ -72,6 +72,7 @@ Each goal says why we need it, then what it does not do well today. A line with 
 - Measures touch targets, on the page and again on a small 320 pixel screen.
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory.
+- Checks that each control's parts (its label, error, hint, indicator and step buttons) are wired to it.
 - Lists what the Figma file is missing, such as a focus state or an error message.
 - Checks your designed screens in Figma for contrast and target size. *(Beta)*
 - Tries again only what changed, so a second run takes seconds.

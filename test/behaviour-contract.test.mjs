@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
 import { findChrome } from '../cdp.mjs';
-import { partRoleOf, partRolesOf, partsFromNames, partsInMarkup, behavioursFor, annotatedBehaviours, behaviourSheetLines, partSheetLines } from '../behaviour-contract.mjs';
+import { partRoleOf, partRolesOf, partsFromNames, partsInMarkup, behavioursFor, annotatedBehaviours, behaviourSheetLines, partSheetLines, buildSheetParts, partBuildLines, partWiringNotYet } from '../behaviour-contract.mjs';
 import { annotationFacts } from '../a11y-check.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -42,7 +42,9 @@ test('page: each part does what its role says, and each component does what its 
     <span role="button" tabindex="0" class="dead" aria-pressed="false">Italic</span>
     <button class="more" aria-expanded="false" aria-controls="more-panel">More</button><div id="more-panel" hidden>Details</div>
     <button class="stuck" aria-expanded="false" aria-controls="stuck-panel">Stuck</button><div id="stuck-panel" hidden>Never</div>
+    <div class="acme-search"><label class="acme-search__label" for="q">Query</label><acme-input id="q"></acme-input></div>
   </main><script>
+    customElements.define('acme-input', class extends HTMLElement { constructor() { super(); this.attachShadow({ mode: 'open' }).innerHTML = '<input>'; } });
     const flip = (el, a) => el.setAttribute(a, el.getAttribute(a) === 'true' ? 'false' : 'true');
     document.querySelector('.toggle').addEventListener('click', (e) => flip(e.currentTarget, 'aria-pressed'));
     document.querySelector('.dead').addEventListener('click', (e) => flip(e.currentTarget, 'aria-pressed'));   // a click flips it, Space does nothing
@@ -59,9 +61,10 @@ test('page: each part does what its role says, and each component does what its 
       dead: { annotations: [{ label: 'role: togglebutton' }] },
       more: { annotations: [{ label: 'role: disclosure' }] },
       stuck: { annotations: [{ label: 'role: disclosure' }] },
+      search: { layerAnnotations: layers([['Label', 'label']]) },
     },
     'contract.authored.json': { components: { stuck: { behaviourExceptions: { 'click-expand': 'Opened by the page, see https://github.com/acme/ds/pull/7' } } } },
-    'ds-config.json': { componentSelectors: { field: '.field', loose: '.loose', stepper: '.stepper', toggle: '.toggle', dead: '.dead', more: '.more', stuck: '.stuck' } },
+    'ds-config.json': { componentSelectors: { field: '.field', loose: '.loose', stepper: '.stepper', toggle: '.toggle', dead: '.dead', more: '.more', stuck: '.stuck', search: '.acme-search' } },
   });
   let out = '';
   try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
@@ -75,6 +78,9 @@ test('page: each part does what its role says, and each component does what its 
     'stepper: its "Decrement" part (decrement) has no spoken name: add aria-label',
     'stepper: its "Value" part (value) is not exposed by its spinbutton (aria-valuenow or aria-valuetext)',
   ], out);
+  // A label outside the shadow root its field sits in: a finding of its own, not a plain failure.
+  assert.deepEqual(of('partnotyet'), ['search: its "Label" part (label) is outside <acme-input>, whose control sits inside its shadow root, where an id cannot reach: wiring no browser makes yet'], out);
+  assert.equal(d.issues.find((i) => i.issue === 'partnotyet')?.severity, 'advisory', out);
   assert.deepEqual(of('behaviour'), ['dead: Space flips aria-pressed (role togglebutton), but aria-pressed stayed false'], out);
   assert.ok(!of('behaviour').some((x) => /^(toggle|more|stuck):/.test(x)), out);
 });
@@ -145,4 +151,24 @@ test('a field\'s parts wired in its own source: its label tied, its error and hi
   assert.deepEqual(partWiringFindings('<template><input v-bind="$attrs"><span class="hint">h</span></template>', 'textbox'), [], 'attributes passed through: whoever uses it joins the hint');
   assert.deepEqual(partWiringFindings(loose, 'button'), [], 'only a field');
   assert.deepEqual(partWiringFindings('<template><tile-input /></template>', 'textbox'), [], 'no field of its own in the source: left to the browser');
+});
+
+test('the build sheet lists each part with its role, its wiring and where that wiring is checked', () => {
+  const lines = partBuildLines(buildSheetParts({}, ['Label', 'cardTile', 'Error message', 'Chevron'], 'textbox'), 'textbox');
+  assert.deepEqual(lines.map((l) => /^the "([^"]+)" part \(role (\w+)\)/.exec(l).slice(1).join(' ')), ['Label label', 'Error message errormessage', 'Chevron indicator']);
+  assert.ok(lines.every((l) => /Checked: read in its source, then tried in the browser \(read from the layer's name: annotate it in Figma to confirm\)$/.test(l)), lines.join('\n'));
+  assert.match(lines[1], /is linked to the control while it shows \(aria-describedby or aria-errormessage\), with aria-invalid="true"/);
+  // Annotated parts come first and say no name; a step button is tried in the browser only.
+  const stepper = partBuildLines(buildSheetParts({ layerAnnotations: [{ layer: 'Plus', annotations: [{ label: 'role: increment' }] }] }, ['Label'], 'spinbutton'), 'spinbutton');
+  assert.deepEqual(stepper, ['the "Plus" part (role increment) is a button with a spoken name ("Increase", "Add one"). Checked: tried in the browser']);
+  assert.deepEqual(buildSheetParts({}, ['Label'], null), [], 'not a control: no parts');
+});
+
+test('a field\'s label outside the shadow root its field sits in: wiring no browser makes yet, said apart', () => {
+  const vue = '<template><div class="acme-search"><label for="q">Query</label><acme-input id="q" /></div></template>';
+  assert.deepEqual(partWiringNotYet(vue, 'textbox'), ['its <label> is outside <acme-input>, whose field sits inside its shadow root, where an id cannot reach: wiring no browser makes yet']);
+  assert.equal(partWiringNotYet('export const S = ({ id }) => <><label htmlFor={id}>Query</label><acme-input id={id} /></>;', 'textbox').length, 1, 'JSX, the id bound');
+  assert.deepEqual(partWiringNotYet('<template><label for="q">Q</label><input id="q"></template>', 'textbox'), [], 'its own field: the plain check reads it');
+  assert.deepEqual(partWiringNotYet('<template><label for="q">Q</label><acme-input id="other" /></template>', 'textbox'), [], 'tied to nothing in it');
+  assert.deepEqual(partWiringNotYet(vue, 'button'), [], 'only a field');
 });

@@ -167,6 +167,13 @@ test('the build sheet says what markup a role asks for', async () => {
   assert.match(r.stdout, /role: togglebutton, so write it as a <button type="button"> with aria-pressed/);
 });
 
+test('the build sheet lists a control\'s parts: each with its role, its wiring and where it is checked', () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-parts-');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'stepper'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.match(r.stdout, /its parts, each wired to the control:\n\s+the "Decrement" part \(role decrement\) is a button with a spoken name \("Decrease", "Remove one"\)\. Checked: tried in the browser/);
+  assert.match(r.stdout, /the "Increment" part \(role increment\) is a button with a spoken name/);
+});
+
 test('a component built into its own stylesheet is found, recorded as a theme file and checked', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-own-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');

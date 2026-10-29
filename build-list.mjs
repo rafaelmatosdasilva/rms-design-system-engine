@@ -265,7 +265,7 @@ export function projectDerivedContract(ROOT, cfg, classFor, varOf = () => null) 
 // The markup a role annotation asks for, and its other obligations: one table (role-markup.mjs).
 export { roleMarkup } from './role-markup.mjs';
 import { roleMarkup, roleSheetLines } from './role-markup.mjs';
-import { behaviourSheetLines, partSheetLines, partRolesOf } from './behaviour-contract.mjs';
+import { behaviourSheetLines, buildSheetParts, partBuildLines } from './behaviour-contract.mjs';
 import { designA11yFindings, designA11ySheetLines } from './design-a11y.mjs';
 
 // ── The build sheet: what --query prints for a component still to build ────────────────────────────────────────
@@ -315,7 +315,12 @@ export function buildSheetLines(name, d, { struct = {}, props = {}, nesting = {}
   const role = (props[name]?.annotations ?? []).map((a) => /^role:\s*(.+)$/i.exec(a.label ?? '')?.[1]).find(Boolean);
   if (role) lines.push(`    role: ${role}, so write it as ${roleMarkup(role)}`);
   if (role) for (const o of [...roleSheetLines(role), ...behaviourSheetLines(role)]) lines.push(`      and ${o}`);
-  for (const l of partSheetLines(partRolesOf(props[name] ?? {}))) lines.push(`    ${l}`);
+  // Its parts (a label, an error, an indicator, the + and - of a stepper): Figma's annotated ones, else the ones a
+  // control's layers say by their names, each with its role, its wiring and where that wiring is checked.
+  const layers = [...new Set([...(s.layers ?? []), ...Object.values(s.variants ?? {}).flatMap((v) => v?.layers ?? [])])];
+  const parts = buildSheetParts(props[name] ?? {}, layers, role ?? null);
+  if (parts.length) lines.push('    its parts, each wired to the control:');
+  for (const l of partBuildLines(parts, role)) lines.push(`      ${l}`);
   // What the design does not give it yet (no focus state, an error shown by colour alone): written meanwhile, or left
   // to the person (design-a11y.mjs).
   for (const l of designA11ySheetLines(designA11yFindings({ [name]: props[name] }, { [name]: { ...s, h: s.h ?? c.h } }), name)) lines.push(`    ${l}`);
