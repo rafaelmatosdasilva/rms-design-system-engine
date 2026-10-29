@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-10: The intent layer read from GitHub and a project folder, and from Markdown and MDX pages (continuous evaluation)
+
+What changed since the entry below (engine 1bc455e): Motion and effects read from Figma in answers that each fit (#133); llms.txt says what each token is for, in the team's words (#134); A border token's job, read from the controls that use it (#135); A component's text colour is paired with its own surface, never another's (#136); A finding marked wrong is a case its check must pass, and --wrong is a command (#138); The names agents invented here, in each contract and in llms.txt (#137); An object a part reads: its dates left out, a list read through a name of its own (#141); A token in the first layer where its value can change (#139); A control's parts are checked even where nobody annotated them (#142); Two runs writing one store are merged by their stamps (#143); The Tasks list names the team that owns each task (#140); Dev Mode links and code syntax written into Figma, after a yes (#144); The design file's own guidance, in llms.txt (#145); A field's parts wired in its own source, before any browser (#146); Which system version each product uses, and what a newer one changes for it (#147); Features page: one line per capability, with how far along each part is (#148); Commands: build a new component in Figma, and change one, the system's way (#152); Route benchmark: the same tasks through the command line and the MCP server (#153); Motion and effects read again only where a checksum changed (#151); A control's parts on the build sheet, and a label across a shadow root said apart (#150); A new component in Figma like one of a family reaches its spec (#155); Features page: each part named by what it does, with what you get and why it matters (#156); The intent layer read from GitHub and a project folder, and from Markdown and MDX pages. The guide changed in `cookbook/guidelines-links.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `536944629555` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md afcb4830` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 80c49112` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6c5a3936` `cookbook/guidelines-links.md 0d17d437` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 50abedb9` `cookbook/refresh-figma.md cbd2b4d4` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 53e38764` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md 285672f0` `rms-design-system-engine.md f85fd227`
+
+| Haiku, engine 78b2e7f | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.057 | $0.059 |
+| Input a run | 106k | 108k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 108k a run against 106k. no task changed state, and no run moved: the same result. Records: `records/intent-layer-sources`.
+
 ## 2026-10: Two runs writing one store merged by their stamps (continuous evaluation)
 
 What changed since the entry below (engine b121b51): reference/usage.md: a store write whose branch moved is merged file by file by stamps, and a store read decides a file changed on both sides by its stamps. The guide changed in `reference/usage.md`.
