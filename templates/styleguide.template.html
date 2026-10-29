@@ -2449,6 +2449,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // Who acts on an item: you in the Figma file, the code, you deciding which side is
   // right when Figma and the code each have a case, or you checking by hand what only a person can judge.
   var WHO = { figma: 'You in Figma', code: 'A developer in the code', figmaCode: 'In Figma and in the code', both: 'You decide', person: 'You check by hand' };
+  // The team that owns what a task is about (ds-config.json owners: a component, a layer or a token prefix to a team),
+  // said after who acts: the longest key that is the component's name, or a token prefix the task names ("primitives/");
+  // "*" for everything else. None set: nothing said.
+  var OWNERS = (typeof DATA !== 'undefined' && DATA.owners) || {};
+  function teamNote(about) {
+    var a = String(about || ''), keys = Object.keys(OWNERS).sort(function (x, y) { return y.length - x.length; });
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i], kl = k.toLowerCase(), al = a.toLowerCase();
+      if (k !== '*' && (al === kl || (k.indexOf('/') >= 0 && al.indexOf(kl) >= 0))) return ' · ' + OWNERS[k];
+    }
+    return OWNERS['*'] ? ' · ' + OWNERS['*'] : '';
+  }
   // Whether the system has a Figma file at all: with none, every fix is the code's.
   var HAS_FIGMA = typeof COMPONENTS === 'undefined' || COMPONENTS.some(function (c) { return !c.codeOnly; });
   // A colour's contrast lives in the system's colours: fixed in Figma and in the code alike when it has both.
@@ -7279,7 +7291,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var whereOf = function (x) { var m = /\(([^()]*:\d+[^()]*)\)/.exec(String(x.what || '')); return m ? m[1] : ''; };
     // A mismatch is a difference, flagged as one (Differs), whoever decides which side is right: knowing it differs is
     // never unsure. Unsure is kept for what is not known yet (a pairing to confirm, a kept difference to look at again).
-    var diffRow = function (x) { return { st: 'todo', who: WHO[x.who] || WHO.both, todo: esc(doWhat(x.todo)), fresh: !!x.new }; };
+    var diffRow = function (x) { return { st: 'todo', who: (WHO[x.who] || WHO.both) + teamNote(c.name), todo: esc(doWhat(x.todo)), fresh: !!x.new }; };
     // A difference the team decided to keep: its reason, who decided and when; once its review date has come it is to check.
     var kept = c.kept || [], keptUsed = {};
     var keptRow = function (k) {
@@ -7696,7 +7708,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var add = function (label, st, html, from, todo, who, fresh) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from, todo: todo || '', who: who || '', fresh: !!fresh }); };
     (c.a11yFindings || []).forEach(function (x) {
       var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? WHO[x.who] || WHO.both : '', x.new);
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[x.who] || WHO.both) + teamNote(c.name) : '', x.new);
     });
     if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '.') + placesTag(i.items || i.details.map(placeOf)), auditOn(ch.at), esc(capital(i.fix))); });
     var stat = {};
@@ -7767,8 +7779,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var sys = TODO.filter(function (t) { return !t.comp; }).map(function (t, i) {
       var comp = /^Figma has the (.+) component; the code does not have it yet\.$/.exec(t.say || '');
       // A component only the code has: its file on the code's side, nothing on Figma's.
-      if (t.codeFile) return { from: t, key: '\u0000system:' + i + ':' + t.say, area: 'Parity', kind: 'Component', figma: '<span class="pg-par-none">Not there</span>', code: '<code>' + esc(t.codeFile) + '</code>', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: WHO[t.who] || WHO.both, st: 'todo', rel: PAR_REL.code, at: DATA.builtAt || null };
-      return { key: '\u0000system:' + i + ':' + t.say, area: t.area || (comp ? 'Parity' : 'Style guide'), kind: t.type || (comp ? 'Component' : 'Stand-in'), figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: WHO[t.who] || WHO.both, st: t.who !== 'both' ? 'todo' : 'check', rel: comp ? PAR_REL.figma : '', from: t, at: DATA.builtAt || null };
+      if (t.codeFile) return { from: t, key: '\u0000system:' + i + ':' + t.say, area: 'Parity', kind: 'Component', figma: '<span class="pg-par-none">Not there</span>', code: '<code>' + esc(t.codeFile) + '</code>', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say), st: 'todo', rel: PAR_REL.code, at: DATA.builtAt || null };
+      return { key: '\u0000system:' + i + ':' + t.say, area: t.area || (comp ? 'Parity' : 'Style guide'), kind: t.type || (comp ? 'Component' : 'Stand-in'), figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say), st: t.who !== 'both' ? 'todo' : 'check', rel: comp ? PAR_REL.figma : '', from: t, at: DATA.builtAt || null };
     });
     if (sys.length) order.push({ name: null, rows: sys });
     COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
