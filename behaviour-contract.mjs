@@ -326,3 +326,26 @@ export function stateFindings(components = []) {
   }
   return out;
 }
+
+// A field's parts wired in its own source, read without a browser (the source check, Gate [15]): its label tied to it
+// (for= its id, or wrapping it), an error or a hint shown beside it joined by aria-describedby (an error with
+// aria-invalid too), an indicator inside it (a chevron, a check) silent. Only what the source shows for certain: a part
+// bound through a prop ({...attrs}, :aria-describedby) counts as joined. → [sentence], what the field still needs.
+export function partWiringFindings(source = '', role = null) {
+  if (!FIELD_ROLES.test(String(role ?? ''))) return [];
+  const tpl = /<template\b[\s\S]*<\/template>/.exec(String(source))?.[0] ?? String(source);
+  const control = /<(input|textarea|select)\b([^>]*)>/i.exec(tpl);
+  if (!control) return [];
+  const attrs = control[2], out = [];
+  const bound = (name) => new RegExp(`(?:^|\\s)(?::|v-bind:)?${name}\\s*=`, 'i').test(attrs) || /v-bind\s*=\s*["']\$?attrs|\{\s*\.\.\./.test(attrs);
+  const label = /<label\b([^>]*)>([\s\S]*?)<\/label>/i.exec(tpl);
+  if (label && !/(?:^|\s)(?::|v-bind:)?for\s*=/.test(label[1]) && !/<(input|textarea|select)\b/i.test(label[2])) out.push('its <label> tied to it (for= the field\'s id, or wrapping the field)');
+  const classes = [...tpl.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)].flatMap((m) => m[1].toLowerCase().split(/\s+/));
+  const has = (re) => classes.some((c) => re.test(c));
+  if (has(/error/) && !(bound('aria-describedby') || bound('aria-errormessage'))) out.push('its error message joined with aria-describedby (or aria-errormessage) while it shows');
+  if (has(/error/) && !bound('aria-invalid')) out.push('aria-invalid="true" while its error shows');
+  if (has(/helper|hint|description/) && !bound('aria-describedby')) out.push('its hint joined with aria-describedby');
+  const indicator = [...tpl.matchAll(/<([a-z][\w-]*)\b([^>]*\bclass\s*=\s*["'][^"']*(?:chevron|checkmark|arrow)[^"']*["'][^>]*)>/gi)];
+  if (indicator.some((m) => !/aria-hidden/.test(m[2]))) out.push('its indicator (a chevron, a check) silent for screen readers (aria-hidden="true")');
+  return out;
+}

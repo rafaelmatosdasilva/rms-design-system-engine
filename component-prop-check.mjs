@@ -25,6 +25,7 @@
 
 import { counterpart } from './prop-vocabulary.mjs';
 import { roleWord, roleMarkupFindings } from './role-markup.mjs';   // a Figma role, read in the component's markup
+import { partWiringFindings } from './behaviour-contract.mjs';   // a field's label, error, hint and indicator, read in its source
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import { loadLocator } from './component-locator.mjs';
@@ -257,7 +258,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
   // every prop is a state (a field with only State=Default/Error still has to be a real input).
   if (file && role) {
     let src = ''; try { src = readFileSync(file, 'utf8'); } catch { /* unreadable: nothing to say */ }
-    const miss = roleMarkupFindings(src, role);
+    const miss = [...roleMarkupFindings(src, role), ...partWiringFindings(src, role)];   // its parts too, for a field
     if (miss.length) ROLE_FAIL.push(`${figmaName}: Figma's annotation says role ${role}; the code needs ${miss.join(' and ')}  (${relative(ROOT, file)})`);
   }
   if (!figNames.length) continue;
