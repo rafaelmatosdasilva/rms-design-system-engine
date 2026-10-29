@@ -29,7 +29,7 @@ import { buildStamp, mayWrite } from './stamp.mjs';
 import { shortStyleNames, componentStyleKey } from './text-styles.mjs';
 import { resolveStatus, parseStatusTags, lintStatusFields, statusFindings, statusLine } from './decision-status.mjs';
 import { buildCatalog, catalogTable } from './ui-catalog.mjs';
-import { readInvented } from './invented.mjs';
+import { readInvented, inventedFor } from './invented.mjs';
 import { loadLocator } from './component-locator.mjs';
 import { codeComponents } from './component-source.mjs';
 import { readableOn, pairsOf, pairLines } from './token-pairs.mjs';
@@ -556,6 +556,7 @@ const CONTRACT_SCHEMA = {
     partOf: { type: 'string', description: 'The component this one is a part of: placed only inside it, never on its own.' },
     parts: { type: 'array', description: 'Its parts: components placed only inside it, each with what its documentation says.', items: { type: 'object', properties: { name: { type: 'string' }, docs: { type: 'array', items: { type: 'string' } } } } },
     decidedAgainst: { type: 'array', description: 'What the team looked at for it and turned down, and why: never propose it again.', items: { type: 'string' } },
+    invented: { type: 'array', description: 'Names agents in this project wrote for it that it does not have, each with the right one: never write the wrong one.', items: { type: 'object', required: ['kind', 'wrong', 'right'], properties: { kind: { enum: ['prop', 'value', 'event'] }, wrong: { type: 'string' }, right: { type: 'string' }, times: { type: 'integer' } } } },
     kept: { type: 'array', description: 'Differences between Figma and the code the team kept on purpose: follow the side it says is right.', items: { type: 'object', required: ['what', 'reason'], properties: { check: str, what: str, truth: { enum: ['figma', 'code'] }, reason: str, at: str } } },
     relationships: { type: 'object', properties: { composesWith: strs, neverCombineWith: strs } },
     usage: { type: 'object', properties: { element: str, props: { type: 'object' } } },
@@ -783,6 +784,8 @@ export function buildLlms(built, tokens, tokenCount, catalog = null, { maxBytes 
     if (contract.whenNotToUse) lines.push(`    - avoid: ${String(contract.whenNotToUse).replace(/\s+/g, ' ').trim()}`);
     else if (it?.whenNotToUse?.length) lines.push(`    - avoid: ${short(it.whenNotToUse[0])}`);
     if (Array.isArray(contract.useInstead) && contract.useInstead.length) lines.push(`    - use instead: ${contract.useInstead.join(', ')}`);
+    // What agents here wrote instead of its names: the next one reads the right name before it guesses.
+    if (contract.invented?.length) lines.push(`    - agents here wrote (never write it): ${contract.invented.slice(0, 6).map((x) => `${x.kind} ${x.wrong} → ${x.right}`).join(', ')}`);
     if (Array.isArray(rel.composesWith) && rel.composesWith.length) lines.push(`    - composes: ${rel.composesWith.join(', ')}`);
     const parts = Object.keys(partOf).filter((p) => partOf[p].root === name).sort();
     if (parts.length) lines.push(`    - parts (placed only inside it, never on their own): ${parts.join(', ')}`, ...parts.flatMap((p) => (partOf[p].docs ?? []).slice(0, 2).map((d) => `        - ${p}: ${short(d)}`)));
@@ -1088,6 +1091,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   try { const dm = await import('./decisions.mjs'); decided = dm.gatherDecisions(ROOT); ruledOutLines = dm.ruledOutLines; } catch { /* none */ }
   // Published, each contract names the last commit that changed its file: a mirror's history is fetched once for all.
   if (publish && mirrorState(ROOT)) { try { ensureHistory(ROOT, { paths: [...new Set(targets.map((n) => apiEntryOf(n)?.file).filter(Boolean))].map((path) => ({ path })) }); } catch { /* the commits stay unknown */ } }
+  let invented = null;   // readInvented, once, with the first component
   for (const name of targets) {
     const api = apiEntryOf(name);
     const relFile = placeOf.get(name);
@@ -1099,6 +1103,9 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     let text = ''; try { if (api?.file) text = readFileSync(resolve(ROOT, api.file), 'utf8'); } catch { /* unreadable */ }
     const codePart = apiReader ? { api, text, aliases: cfg.componentPropAliases?.[name] ?? null, stateBindings: stateBindings[name] ?? null, componentTokens: stateTokensFile[name]?.tokens ?? null, publish, idPrefix: cc.idPrefix, schemaRef: relative(dirname(file), schemaOut).split(/[\\/]+/).join('/').replace(/^(?!\.)/, './'), figmaFile: cfg.figmaFileKey || undefined, commit: publish ? lastCommitOf(ROOT, api?.file) : null } : null;
     const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source, wrongOf(intentPages.get(name))) : null, code: codePart });
+    // What agents here wrote for it instead of its own names, each with the right one (invented.mjs).
+    const wrote = inventedFor(invented ??= readInvented(ROOT), name);
+    if (wrote.length) contract.invented = wrote;
     const keptHere = keptAll.filter((d) => d.component === name);
     if (keptHere.length) contract.kept = keptHere.map((d) => ({ check: d.check, what: d.what, ...(d.truth ? { truth: d.truth } : {}), reason: d.reason, ...(d.at ? { at: String(d.at).slice(0, 10) } : {}) }));
     // From the code alone, no description is a placeholder saying it came from Figma.

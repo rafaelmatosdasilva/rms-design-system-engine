@@ -276,6 +276,8 @@ It does not catch what *your* agents guessed. `--check-ui` already knows them â€
 
 Only inventions the check could correct go into the catalog: an entry that cannot say what to write instead would send an agent nowhere. The rest are still counted, because knowing a name gets invented is worth something on its own.
 
+The same names are written into each component's contract (`invented`, with the right name and how often) and beside the component in `llms.txt` ("agents here wrote: prop showFooters â†’ showFooter"), so an agent reads them whichever file it opens. They come from both checks, `--check-ui` and the check of pages written as code, props, values and events alike.
+
 ### When a check is wrong
 
 Not every finding is right. A check that raises things it should not is the quietest failure the engine can have: people stop reading its lines, and then miss the true one.
