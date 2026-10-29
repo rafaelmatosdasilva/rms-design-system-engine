@@ -1462,7 +1462,9 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     // Accessibility waits until every component is tried in this browser; then each card is a count over a total.
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
-    assert.deepEqual(tiles.map((x) => x[0]), ['Parity', 'Code', 'Accessibility', 'Documentation'], errors.join('\n'));
+    // The four, then AI readiness when the guidance was rated (a card the width of the four, under them).
+    assert.deepEqual(tiles.map((x) => x[0]).slice(0, 4), ['Parity', 'Code', 'Accessibility', 'Documentation'], errors.join('\n'));
+    assert.deepEqual(tiles.map((x) => x[0]).slice(4), tiles.length > 4 ? ['AI readiness'] : []);
     // The big number is the share of checks done, no line under it; the legend counts the components, the done state
     // in the big number's word.
     assert.match(tiles[0][1], /^\d+%matched\|$/, 'parity: the share matched, nothing under it');

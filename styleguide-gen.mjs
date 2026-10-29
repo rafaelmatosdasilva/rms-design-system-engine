@@ -187,6 +187,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // A page for some components only (opts.only) goes beside the whole system's, named after them, so neither replaces the other.
   const outPath = opts.out ? resolve(ROOT, opts.out) : opts.only?.length ? join(dirname(projectOut), `${opts.only.map((n) => String(n).replace(/[^\w-]+/g, '-')).join('+')}.html`) : projectOut;
   if (!existsSync(templatePath)) throw new Error('styleguide template not found: ' + templatePath);
+  // The Status page's numbers at each past release (health-history.mjs), for its trend: set while the page's data is
+  // read, put in the page as it is written, and handed back so the build keeps today's once it has measured them.
+  let healthTrend = null;
   let html = readFileSync(templatePath, 'utf8');
   if (opts.out && outPath !== projectOut) {
     const base = `<base href="${pathToFileURL(dirname(projectOut)).href}/">`;
@@ -1446,6 +1449,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     } catch { /* no changes */ }
     // How much each area weighs in the Health page's one number (styleguide.health.weights); the page's own otherwise.
     if (cfg.styleguide?.health?.weights && typeof cfg.styleguide.health.weights === 'object') view.healthWeights = cfg.styleguide.health.weights;
+    // Each card's number at every past release, for its trend: the record kept with the snapshots, filled from what
+    // history still holds (the page built before, and the pages the project committed at each release tag). Not for a
+    // page of some components only, nor the code capture's own copy, nor the parts another page is drawn with.
+    if (!opts.only?.length && !opts.out && !opts.partsOnly) try {
+      const hh = await import('./health-history.mjs');
+      const file = join(ROOT, hh.HEALTH_FILE), kept = hh.readHealth(file);
+      const tags = (view.releaseLog ?? []).map((g) => g.release).filter(Boolean);
+      const pages = [...(existsSync(outPath) ? [readFileSync(outPath, 'utf8')] : []), ...hh.pagesAtReleases(ROOT, relative(ROOT, outPath), tags, kept)];
+      const record = hh.backfillHealth(kept, pages, { ROOT });
+      if (hh.healthText(record) !== hh.healthText(kept)) writeFileSync(file, hh.healthText(record));
+      const release = hh.releaseFinder(ROOT, view.releaseLog)(view.built?.code);
+      healthTrend = { payload: hh.trendOf(record, release), release, code: view.built?.code ?? null, built: view.built ?? null };
+    } catch { /* the cards show today's numbers alone */ }
     // What the system retired that is still in use: each deprecated component on its own page and in its To do
     // rows, product by product; each retired token in the system's To do, a swap or a decision.
     if (!opts.only?.length) try {
@@ -1718,8 +1734,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   const may = opts.out ? { ok: true } : mayWrite(outPath, built, { ROOT, label: relative(ROOT, outPath) });
   if (!may.ok) return { out: outPath, kept: may.line, filled, bytes: 0, components: 0 };
   html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, (m) => `${stampMeta(built)}\n${m}`) : html.replace(/<head>/i, (m) => `${m}\n${stampMeta(built)}`);
+  if (healthTrend) html = (await import('./health-history.mjs')).withHealth(html, healthTrend.payload);
   // The page and the files it links beside it (its styles, code, fonts and data: styleguide-files.mjs). The code
   // capture's own copy (opts.out), read through a <base> pointing elsewhere, stays one file.
   const written = writeStyleguide(outPath, html, { split: !opts.out });
-  return { out: outPath, files: written.files, fontsEmbedded: fontsEmbedded ? { embedded: fontsEmbedded.embedded.length, kept: fontsEmbedded.kept, missing: fontsEmbedded.missing } : null, filled, bytes: written.bytes, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, notInFigma: agreedSummary?.notInFigma ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null };
+  return { out: outPath, files: written.files, fontsEmbedded: fontsEmbedded ? { embedded: fontsEmbedded.embedded.length, kept: fontsEmbedded.kept, missing: fontsEmbedded.missing } : null, filled, bytes: written.bytes, components: agreedSummary?.components ?? Object.keys(intent.components || {}).length, codeOnly: agreedSummary?.codeOnly ?? 0, notInFigma: agreedSummary?.notInFigma ?? 0, scope: agreedSummary?.scope ?? null, template: engineTemplate ? 'engine' : 'project', notAgreed: agreedSummary?.line ?? null, vue: vueRender, chrome: chrome ? { missing: chrome.missing, from: chrome.from } : null, health: healthTrend ? { release: healthTrend.release, code: healthTrend.code, built: healthTrend.built, past: healthTrend.payload.past.length } : null };
 }

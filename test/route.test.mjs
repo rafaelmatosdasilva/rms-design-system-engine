@@ -262,3 +262,40 @@ test('fixing a component\'s construction in Figma writes its renames, through th
   assert.deepEqual(f.run, ['rms-design-system-engine --figma-fix chip']);
   assert.equal(r('how does our system build a component in Figma?').recipe, 'ask-the-system');
 });
+
+test('a UI generated outside the code is checked with --check-ui, never as an audit of the components it names', () => {
+  const P2 = { hasConfig: true, components: ['button', 'chip', 'cardTile'] };
+  for (const [q, file] of [
+    ['write the generated UI to ui.json and check it against the design system', 'ui.json'],
+    ['write the generated UI (a cardTile with a chip and a button) to acme-ui.json and check it against the design system', 'acme-ui.json'],
+    ['check the generated screen in out/acme-screen.json against our components', 'out/acme-screen.json'],
+    ['write the generated UI and check it against the design system', '<file>'],
+    ['validate this AI-generated page against the system', '<file>'],
+    ['check the screen the agent generated against the design system', '<file>'],
+    ['verifica a UI gerada contra o design system', '<file>'],
+  ]) {
+    const g = r(q, P2);
+    assert.deepEqual([g.recipe, g.run], ['ask-the-system', [`rms-design-system-engine --check-ui ${file}`]], q);
+  }
+  // A prototype keeps its own route; a file that is no UI is not checked as one.
+  assert.equal(r('check the generated prototype against the system').recipe, 'prototype');
+  assert.deepEqual(r('check ds-config.json').run, ['rms-design-system-engine']);
+  assert.deepEqual(r('build the chip from Figma').run, ['rms-design-system-engine --query chip']);
+});
+
+test('what a run already found is printed again with --summary, never a new run in its place', () => {
+  for (const q of ['what did the last audit find', 'what did the last audit find?', 'what did the audit find?', 'show me the last audit\'s summary', 'summarise the last run', 'what failed in the previous check?', 'show me the summary again', 'o que encontrou a última auditoria?', 'mostra o resumo da última auditoria']) {
+    const s = r(q);
+    assert.deepEqual([s.recipe, s.run, s.question], ['full-audit', ['rms-design-system-engine --summary'], false], q);
+  }
+  // One component named: still the last run's summary, under that component's recipe.
+  assert.deepEqual([r('what did the last run say about the chip?').recipe, r('what did the last run say about the chip?').run], ['audit-component', ['rms-design-system-engine --summary']]);
+  // A word several components share does not turn it into a question about which one.
+  const loose = r('what did the last audit find for the button?', { hasConfig: true, components: ['buttonPrimary', 'iconButton'] });
+  assert.deepEqual([loose.run, loose.which], [['rms-design-system-engine --summary'], undefined]);
+  // A run asked for again, a fix from it, or what changed since it still runs.
+  assert.deepEqual(r('run the last audit again').run, ['rms-design-system-engine']);
+  assert.equal(r('fix what the last audit found').recipe, 'fix-a-difference');
+  assert.deepEqual(r('what changed since the last audit?').run, ['rms-design-system-engine']);
+  assert.deepEqual(r('build the chip like last time').run, ['rms-design-system-engine --component chip']);
+});

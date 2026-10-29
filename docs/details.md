@@ -160,6 +160,7 @@ rms-design-system-engine --keep --component chip --match height --reason "the pr
 rms-design-system-engine --only accessibility   # only the accessibility check
 rms-design-system-engine --only parity          # every check against Figma, without accessibility
 rms-design-system-engine --only 3               # one gate by number, or by name: --only "token values", --only states,props
+rms-design-system-engine --a11y-no-worse        # after the audit on a merge request: fails on an accessibility blocker the base branch did not have
 ```
 
 - `--only` runs that part and nothing else, and the summary says so, so a part never reads as the whole system passing. A word it does not know prints the list of gates.
@@ -487,7 +488,10 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **What your app gives them.** A Vue component that reads a Pinia store or links with Vue Router gets your project's own, when your `package.json` lists it and it is installed.
 - **What your entry installs.** Whatever your `main.js` puts on the app goes on each component too, however it does it: `app.use`, a property set on every component (a translation function), `app.provide`, a mixin, or a setup function handed the app.
 - **The data a page would pass.** A component drawn alone gets what a page would give it. A value it hands on to a child takes the child's type: a number for an amount the child does sums on, an icon for the child's icon. One the child has its own fallback for is left unset.
-- **One that cannot draw says why.** Its reason is given once, with how many of its cases it hits, such as a method called on an element it does not draw in that case. It is reported as not checked, and the rest of the page is still kept for the next run.
+- **Lists inside its data.** The items of a list inside an object get the fields the code reads of them, and those a child it hands each item to reads. A list inside an item is given empty.
+- **The route it reads.** A component that reads the current route is drawn at a path its code expects, such as a name of the table it looks the path up in. When none can be read, its reason says so.
+- **An icon of its own folder.** An icon that loads from a folder its code lists gets the name of a file in that folder.
+- **One that cannot draw says why.** Its reason is given once, with how many of its cases it hits, such as a method called on an element it does not draw in that case, or the input that was missing when it read a field of nothing. It is reported as not checked, and the rest of the page is still kept for the next run.
 - **Your designed screens in Figma.** When Claude [refreshes the Figma data](commands.md#set-up), it also reads the screens `ds-config.json` names for text and icon contrast and target size, without changing Figma. [Updating Figma](commands.md#update-figma) pins each problem on its layer once you say yes.
 
 ### What it tries
@@ -581,6 +585,107 @@ The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory ·
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
 - `--fresh` (or `a11y.reuse: false`) tries every page again.
 
+### Accessibility never gets worse
+
+A conformance claim holds only if the next release keeps it. So a merge request (GitLab) or pull request (GitHub) can fail when it adds an accessibility problem the last build did not have.
+
+- **What it compares.** This run's accessibility result with the one the last build on the base branch kept.
+- **Only blockers count.** A warning or an advisory never fails it.
+- **Only components and products' pages.** A finding on the page around them is left out, and so are prototypes.
+- **Old problems are not new.** A blocker the base branch already had is ignored, even when its measured value moves.
+- **Each blocker is keyed the same way every time.** By its component or product page, the element and its variant, the state, the colour mode, the WCAG criterion and the kind of problem.
+
+What you get:
+
+| Situation | Exit | What it says |
+|---|---|---|
+| A new blocker | 1 | Each one, such as `new: cardTile, disabled (Light), 1.4.3 contrast 3.1:1` |
+| No new blocker | 0 | That, and each blocker fixed since, as good news |
+| No build kept a result yet | 0 | That there is nothing to compare, so it passes |
+| This run has no result of its own | 2 | That the check did not measure anything, so nothing can be compared |
+
+- **A component this run could not read** is listed as not checked, never as fixed.
+- **It only reports.** It never changes your code. Your pipeline decides what a failing exit stops.
+
+#### Set it up in CI
+
+Two steps, both after the audit:
+
+1. **On the base branch**, keep each build's result: `rms-design-system-engine --a11y-no-worse --record`. It writes `.design-system-engine-out/a11y-last-build.json`.
+2. **On each merge request or pull request**, compare: `rms-design-system-engine --a11y-no-worse`.
+
+The pipeline carries the file from the base branch to each merge request: as the last job's artifact on GitLab, in the cache on GitHub.
+
+GitLab (`.gitlab-ci.yml`):
+
+```yaml
+.a11y:
+  image: node:24-bookworm
+  variables:
+    CHROME_PATH: /usr/bin/chromium
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq chromium > /dev/null
+    - git clone --depth 1 https://github.com/rafaelmatosdasilva/rms-design-system-engine.git ../engine
+
+a11y-keep:
+  extends: .a11y
+  script:
+    - node ../engine/audit.mjs --only accessibility || true
+    - node ../engine/audit.mjs --a11y-no-worse --record
+  artifacts:
+    paths: [.design-system-engine-out/a11y-last-build.json]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+a11y-no-worse:
+  extends: .a11y
+  script:
+    - mkdir -p .design-system-engine-out
+    - 'curl -fsSL -H "JOB-TOKEN: $CI_JOB_TOKEN" -o .design-system-engine-out/a11y-last-build.json "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/artifacts/$CI_DEFAULT_BRANCH/raw/.design-system-engine-out/a11y-last-build.json?job=a11y-keep" || true'
+    - node ../engine/audit.mjs --only accessibility || true
+    - node ../engine/audit.mjs --a11y-no-worse
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+```
+
+GitLab keeps the artifact of the latest successful job on each branch, so the merge request reads the base branch's last one. Before the first, nothing is fetched and the check passes, saying so.
+
+GitHub (`.github/workflows/a11y-no-worse.yml`):
+
+```yaml
+name: accessibility never gets worse
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: git clone --depth 1 https://github.com/rafaelmatosdasilva/rms-design-system-engine.git ../engine
+      - uses: actions/cache/restore@v4
+        with:
+          path: .design-system-engine-out
+          key: a11y-main-${{ github.sha }}
+          restore-keys: a11y-main-
+      - run: node ../engine/audit.mjs --only accessibility || true
+      - if: github.event_name == 'pull_request'
+        run: node ../engine/audit.mjs --a11y-no-worse
+      - if: github.event_name == 'push'
+        run: node ../engine/audit.mjs --a11y-no-worse --record
+      - if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: .design-system-engine-out
+          key: a11y-main-${{ github.sha }}
+```
+
+GitHub's runners already have Chrome. A pull request can read the caches its base branch saved, and the cache also lets the check reuse the pages that did not change. Name your base branch where it says `main`.
+
 ### What the Figma file is missing
 
 Some problems belong to the Figma file. They are listed for whoever keeps it.
@@ -615,7 +720,7 @@ An automated check finds many failures, but it cannot show that a product meets 
 | Page | What you find there |
 |---|---|
 | Overview | A card for each foundation and component, with a thumbnail drawn from your own code, and a search across everything |
-| Health | How far the system has come, in one number and by area |
+| Health | How far the system has come, by area, each number beside its value at past releases |
 | Tasks | Everything still open, with who acts and what to do |
 | Foundations | Colours, typography, spacing, radii, motion and icons |
 | Components | One page for each component, in areas you switch between |
@@ -639,6 +744,18 @@ Every row says what to do and who acts.
 Each row also shows its status (To fix, To check, New in the last audit), when it was last updated and where it was read. The system's own items come first. Under The system you find what the tokens owe, such as descriptions to write in Figma, a token named after a product, an alias that points nowhere, and a retired token still in use.
 
 Accessibility is tried while the page is built and kept in it, so the page opens with the final results and nothing runs while you read. A component the build could not try is tried in your browser instead. A page whose own script fails is never published, so the last good page stays.
+
+### Health over time
+
+Each card on the Status page shows today's number and how it has moved, release by release.
+
+- **What is kept.** Each card's percentage (matched, built, passed, written) and AI readiness, the share of components an agent can pick and use from your guidance alone (a fifth card, under the four).
+- **Per release.** A release is one of your project's version tags, as History groups the commits. Each keeps the last numbers measured on code it holds. Work after the last tag counts for the next release until its tag exists.
+- **On each card.** The change since the last release in words (Up 4 points since v1.2.0), a small line, and every value written out with its release, oldest first, today's last. The line is never the only way to read it.
+- **No history yet.** The card shows today's number alone and says the trend starts now.
+- **When it is kept.** A build that tries the page in a browser (`--styleguide` without `--no-a11y-bake`) keeps today's numbers. Accessibility is kept only once every component is tried, and in the default theme. In another theme, the Accessibility card lists the default theme's past values without comparing.
+- **Where it is kept.** `health-history.snapshot.json`, with the snapshots, so a snapshots store shares it with the team. Two copies are merged release by release: each keeps the numbers measured from the newer inputs (the code, Figma and the engine each run was built from). A run from an older checkout never replaces them.
+- **Filled from history.** When nothing was kept for a release, the engine reads the page built before and, if your project commits its style guide, the page at each release tag. Each page carries the record as it was when it was built.
 
 ### Each component's page
 
@@ -678,7 +795,7 @@ Also on each component.
 
 ### The intent layer
 
-Your intent layer (why each piece exists and how to use it) is read on every run: DSDS or Markdown (MDX) pages, in a GitLab project, a GitHub repository or a folder of your project. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown. A note in the code that only says how the component is built, or repeats another, is left alone: it is there for developers.
+Your intent layer (why each piece exists and how to use it) is read on every run: DSDS or Markdown (MDX) pages, in a GitLab project, a GitHub repository or a folder of your project. On a Markdown page, written for people, only a line that tells what to do is one of its rules; a line that only describes (what the variants are, how it is laid out) stays on its documentation for people, so agents are not handed every paragraph. Links between its pages lead to those pages where the layer lives, and images, lines of links and HTML entities are left out. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown. A note in the code that only says how the component is built, or repeats another, is left alone: it is there for developers.
 
 With no intent layer, every row can still be finished.
 
@@ -701,7 +818,7 @@ Agents read your guidelines and Figma's descriptions to pick and use each compon
 - **Names that mislead.** A token, property or component named in the text that the system does not have is listed first, to rename or take out. A name with a `*` (`--card-*`) is a family, there when one of the system's names starts with it.
 - **Where you see it.** In each component's Documentation area, one row per piece (Example; Properties, done, naming the contract file that holds them; Names that do not exist; beside What it is and When to use), and on the Status page's tasks under Documentation while something is missing.
 - **A test with a model, when you ask.** A model answers questions from your guidance alone, such as the options of each property, and the engine scores the answers against the real ones. It uses your model tokens.
-- **The whole document** gets a class too, from how many of its components are ready.
+- **The whole document** gets a class too, from how many of its components are ready. The Status page shows it as AI readiness, with its trend.
 - **What a screen meets first.** Each component's Documentation area also asks what its page leaves open at the edges: what it does when its content does not fit (it scrolls, wraps, is cut or grows), and, for a component with two actions, what it shows with one. Asked only where it applies, and no more once the page says it.
 
 ### Foundations
@@ -956,7 +1073,7 @@ Then it says which source decides when two disagree. The goal of the people who 
 - **Stale names.** A name in backticks that is no token, property or component of the system is listed to rename or take out.
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
-- **In the style guide.** Each component's rating sits in its Documentation area, and the whole document's on the Health page beside AI readiness.
+- **In the style guide.** Each component's rating sits in its Documentation area, and the whole document's on the Status page as AI readiness, with its value at past releases.
 
 ### Figma quota
 

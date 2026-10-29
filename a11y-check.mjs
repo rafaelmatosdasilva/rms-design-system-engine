@@ -1157,7 +1157,7 @@ const PROJECT_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'cov
 export function projectSignature(ROOT, cfg = {}, { list = null, read = (f) => readFileSync(f) } = {}) {
   const outDir = OUT_DIR.split('/')[0];
   const sgOut = cfg?.styleguide?.out ? relative(ROOT, resolve(ROOT, dirname(cfg.styleguide.out))) : null;
-  const skipFile = (rel) => rel === 'ds-config.json' || /(^|\/)(a11y-results|open-since)\.snapshot\.json$/.test(rel) || /-result\.json$/.test(rel);
+  const skipFile = (rel) => rel === 'ds-config.json' || /(^|\/)(a11y-results|open-since|health-history)\.snapshot\.json$/.test(rel) || /-result\.json$/.test(rel);
   const files = list ?? (() => {
     const out = [];
     const walk = (dir) => {
@@ -2274,7 +2274,7 @@ async function main() {
         // and nothing is built.
         const vueSig = REUSE ? sha(runSigRendered, 'vue', names, projectSignature(ROOT, cfg)) : null;
         const vueKept = vueSig ? keptBefore[vueSig] : null;
-        const v = vueKept ? { kept: true } : await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n) });
+        const v = vueKept ? { kept: true } : await startVueHarness(ROOT, cfg, names, { propsSnap, read, locate: (n) => ownFile.get(n) ?? locate(n), alone: true });
         if (v.kept) targets.push({ label: vueKept.label, url: null, harness: true, sig: vueSig, kept: vueKept });
         else if (v.url) {
           const before = stopServer; stopServer = () => { before?.(); v.close(); };

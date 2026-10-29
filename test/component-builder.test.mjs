@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './helpers.mjs';
 import { modelOf, predict, ground, opsScript } from '../figma-ops.mjs';
-import { specOf, specLines, likeOf, nameOf, EXT } from '../component-spec.mjs';
+import { specOf, specLines, likeOf, nameOf, askedOf, sharedOf, primitiveTest, EXT } from '../component-spec.mjs';
 import { diffModels, diffLines } from '../component-diff.mjs';
 import { grammarOf } from '../construction-grammar.mjs';
 import { route } from '../route.mjs';
@@ -61,7 +61,7 @@ test('every operation is checked against the system: a value, an unknown variabl
 test('new names are written the way the system writes them; what adds to the system is held, what removes is breaking', () => {
   const g = ground([
     { op: 'addOption', axis: 'size', option: 'XL', like: 'l' },
-    { op: 'addProperty', name: 'show badge', kind: 'boolean', default: false, layer: 'Content/icon' },
+    { op: 'addProperty', name: 'show badge', kind: 'boolean', default: false, layer: 'Content' },
     { op: 'removeProperty', name: 'labelContent' },
     { op: 'rename', what: 'layer', from: 'Content/Label', to: 'Text' },
   ], { captures, grammar, target: 'chipFilter' });
@@ -107,6 +107,65 @@ test('a spec from a description: the component it is like, its name, and what it
   assert.ok(specLines(answered).some((l) => /How it differs from chipFilter/.test(l)));
 });
 
+test('an option or axis named loosely is the one the component has: "L", "large" and "Size" are l and size', () => {
+  const g = ground([
+    { op: 'addOption', axis: 'Size', option: 'XL', like: 'L' },
+    { op: 'removeOption', axis: 'size', option: 'small' },
+    { op: 'bind', layer: 'Content', field: 'gap', variable: 'spacing/s', where: { Size: 'large' } },
+  ], { captures, grammar, target: 'chipFilter' });
+  assert.deepEqual(g.questions, []);
+  assert.deepEqual(g.ops.map((o) => [o.axis ?? null, o.like ?? o.option ?? o.where?.size]), [['size', 'l'], ['size', 's'], [null, 'l']]);
+  // An option it has already is not added again.
+  assert.match(ground([{ op: 'addOption', axis: 'size', option: 'large', like: 's' }], { captures, grammar, target: 'chipFilter' }).questions[0].ask, /already has l/);
+});
+
+test('a property is never put on a layer another property already drives, and one left driving nothing goes with its layer', () => {
+  const g = ground([{ op: 'addProperty', name: 'showBadge', kind: 'boolean', layer: 'Content/icon' }], { captures, grammar, target: 'chipFilter' });
+  assert.match(g.questions[0].ask, /Content\/icon is already shown or hidden by showIcon/);
+  const r = ground([{ op: 'removeLayer', layer: 'Content/icon' }], { captures, grammar, target: 'chipFilter' });
+  assert.deepEqual(r.ops.map((o) => o.op + ' ' + (o.layer ?? o.name)), ['removeLayer Content/icon', 'removeProperty showIcon']);
+  assert.equal(r.breaking.length, 2);
+});
+
+test('what the description asks beyond the copy is read as a change, and what is not read is asked, never dropped', () => {
+  const m = modelOf('chipFilter', captures);
+  assert.deepEqual(askedOf('a tag like chipFilter, called tag', m), { ops: [], unread: [] });
+  assert.deepEqual(askedOf('a tag like chipFilter with a size XL like L, called tag', m).ops, [{ op: 'addOption', axis: 'size', option: 'XL', like: 'L' }]);
+  assert.deepEqual(askedOf('a tag like chipFilter without the icon', m).ops, [{ op: 'removeLayer', layer: 'Content/icon' }]);
+  assert.deepEqual(askedOf('a tag like chipFilter with the description "A tag."', m).ops, [{ op: 'describe', text: 'A tag.' }]);
+  assert.deepEqual(askedOf('a tag like chipFilter with sparkles', m).unread, ['add sparkles']);
+  const { spec } = specOf({ description: 'a tag like chipFilter with sparkles', like: 'chipFilter', name: 'tag', unread: ['add sparkles'], captures, grammar });
+  assert.ok(spec[EXT].questions.some((q) => /not read: "add sparkles"/.test(q.ask)));
+});
+
+test('the like\'s own variables: the shared one each points at is proposed, from the alias chain', () => {
+  const withAliases = { ...captures, aliases: { 'chipFilter/label/color': ['text/default', 'neutral/900'] } };
+  const { spec } = specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures: withAliases, grammar });
+  assert.deepEqual(spec[EXT].shared, [{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }]);
+  assert.ok(spec[EXT].questions.some((q) => /chipFilter\/label\/color → text\/default \(--shared binds it\)/.test(q.ask)));
+  // None to point at: a rebind for each, as before.
+  assert.ok(specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures, grammar }).spec[EXT].questions.some((q) => /None points at no shared variable/.test(q.ask)));
+});
+
+test('the shared variable is never a primitive, nor another component\'s own: the same value is not the same purpose', () => {
+  const vn = (names) => Object.fromEntries(names.map((n, i) => [`V:${i}`, { name: n, scopes: ['TEXT_FILL'] }]));
+  const names = ['ds/chipFilter/label/color', 'ds/chipFilter/badge/color', 'ds/chipFilter/dot/color', 'ds/button/label/color', 'text/label/color', 'overlay/scrim/color', 'border/strong/color', 'border/subtle/color', 'primitives/grey900', 'primitives/grey100'];
+  const aliasesByMode = {
+    light: { 'ds/chipFilter/label/color': ['primitives/grey900'], 'ds/chipFilter/badge/color': ['ds/button/label/color', 'primitives/grey900'], 'ds/chipFilter/dot/color': ['primitives/grey100'], 'ds/button/label/color': ['primitives/grey900'], 'text/label/color': ['primitives/grey900'], 'overlay/scrim/color': ['primitives/grey900'], 'border/strong/color': ['primitives/grey100'], 'border/subtle/color': ['primitives/grey100'] },
+  };
+  const cap = { props: { chipFilter: {}, button: {} }, varNames: vn(names), aliases: aliasesByMode.light, aliasesByMode, isPrimitive: primitiveTest() };
+  // Only a primitive in the chain: the shared one for the same thing, by its name, resolving to the same in every mode.
+  assert.deepEqual(sharedOf('ds/chipFilter/label/color', { like: 'chipFilter', captures: cap }), { to: 'text/label/color', via: 'primitives/grey900' });
+  // Another component's own variable in the chain is skipped, as it would be in the same layer.
+  assert.deepEqual(sharedOf('ds/chipFilter/badge/color', { like: 'chipFilter', captures: cap }), { primitive: 'primitives/grey900', options: ['text/label/color', 'overlay/scrim/color'] });
+  // Several for the same value and none plainly for the same thing: asked, never proposed.
+  assert.deepEqual(sharedOf('ds/chipFilter/dot/color', { like: 'chipFilter', captures: cap }), { primitive: 'primitives/grey100', options: ['border/strong/color', 'border/subtle/color'] });
+  // A project's declared tiers say what a primitive is.
+  const tiers = [{ name: 'core', match: '^core/', layer: 1 }, { name: 'rest', match: '.' }];
+  assert.equal(primitiveTest({ tiers })('core/blue'), true);
+  assert.equal(primitiveTest({ tiers })('primitives/blue'), false);
+});
+
 // ── The script, run on a stand-in for Figma ──
 function fakeFigma() {
   const reg = new Map(); let seq = 0;
@@ -115,7 +174,8 @@ function fakeFigma() {
     appendChild(c) { if (c.parent) c.parent.children.splice(c.parent.children.indexOf(c), 1); c.parent = this; this.children.push(c); }
     insertChild(i, c) { if (c.parent) c.parent.children.splice(c.parent.children.indexOf(c), 1); c.parent = this; this.children.splice(i, 0, c); }
     remove() { this.parent.children.splice(this.parent.children.indexOf(this), 1); reg.delete(this.id); }
-    clone() { const c = new N(this.type, this.name, { componentPropertyDefinitions: this.componentPropertyDefinitions ? JSON.parse(JSON.stringify(this.componentPropertyDefinitions)) : undefined, componentPropertyReferences: this.componentPropertyReferences ? { ...this.componentPropertyReferences } : undefined, fills: JSON.parse(JSON.stringify(this.fills)), boundVariables: { ...this.boundVariables }, description: this.description, mainComponent: this.mainComponent }); for (const k of this.children) c.appendChild(k.clone()); return c; }
+    clone() { const c = this.cloneAll(); if (this.type === 'COMPONENT' && this.parent?.type === 'COMPONENT_SET') { const drop = (n) => { n.componentPropertyReferences = null; n.children.forEach(drop); }; c.children.forEach(drop); } return c; }
+    cloneAll() { const c = new N(this.type, this.name, { componentPropertyDefinitions: this.componentPropertyDefinitions ? JSON.parse(JSON.stringify(this.componentPropertyDefinitions)) : undefined, componentPropertyReferences: this.componentPropertyReferences ? { ...this.componentPropertyReferences } : undefined, fills: JSON.parse(JSON.stringify(this.fills)), boundVariables: { ...this.boundVariables }, description: this.description, mainComponent: this.mainComponent }); for (const k of this.children) c.appendChild(k.cloneAll()); return c; }
     findAll(f) { const out = []; const walk = (n) => { for (const k of n.children) { if (f(k)) out.push(k); walk(k); } }; walk(this); return out; }
     findOne(f) { return this.findAll(f)[0] ?? null; }
     setBoundVariable(f, v) { this.boundVariables[f] = { type: 'VARIABLE_ALIAS', id: v.id }; }
@@ -123,6 +183,7 @@ function fakeFigma() {
     editComponentProperty(k, { name, defaultValue }) { const d = this.componentPropertyDefinitions[k]; delete this.componentPropertyDefinitions[k]; if (defaultValue !== undefined) d.defaultValue = defaultValue; this.componentPropertyDefinitions[name ? `${name}#${k.split('#')[1] ?? ''}` : k] = d; }
     deleteComponentProperty(k) { delete this.componentPropertyDefinitions[k]; }
     resizeWithoutConstraints(w, h) { this.width = w; this.height = h; }
+    resize(w, h) { this.width = w; this.height = h; this.primaryAxisSizingMode = 'FIXED'; this.counterAxisSizingMode = 'FIXED'; }
     get defaultVariant() { return this.children[0]; }
     createInstance() { return new N('INSTANCE', this.name, { mainComponent: this }); }
     async loadAsync() {}
@@ -130,7 +191,7 @@ function fakeFigma() {
   const page = new N('PAGE', 'Chips'), section = new N('SECTION', 'Chips');
   page.appendChild(section);
   const vars = [{ id: 'V:1', name: 'chipFilter/label/color' }, { id: 'V:2', name: 'text/default' }];
-  const variant = (vn) => { const v = new N('COMPONENT', vn); const content = new N('FRAME', 'Content'); const label = new N('TEXT', 'Label', { fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V:1' } } }], fontName: { family: 'Inter', style: 'Regular' }, characters: 'Label' }); content.appendChild(new N('INSTANCE', 'icon')); content.appendChild(label); v.appendChild(content); return v; };
+  const variant = (vn) => { const v = new N('COMPONENT', vn); const content = new N('FRAME', 'Content'); const label = new N('TEXT', 'Label', { fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'V:1' } } }], fontName: { family: 'Inter', style: 'Regular' }, characters: 'Label' }); content.appendChild(new N('INSTANCE', 'icon', { componentPropertyReferences: { visible: 'showIcon#1:2' } })); content.appendChild(label); v.appendChild(content); return v; };
   const set = new N('COMPONENT_SET', 'chipFilter', { componentPropertyDefinitions: { size: { type: 'VARIANT' }, 'showIcon#1:2': { type: 'BOOLEAN', defaultValue: true } } });
   set.appendChild(variant('size=s')); set.appendChild(variant('size=l'));
   section.appendChild(set);
@@ -149,7 +210,7 @@ test('the build script copies the component, adds an option, a property, moves a
   const ops = [
     { op: 'clone', from: 'chipFilter', name: 'tag' },
     { op: 'addOption', axis: 'size', option: 'xl', like: 'l' },
-    { op: 'addProperty', name: 'showBadge', kind: 'boolean', default: false, layer: 'Content/icon' },
+    { op: 'addProperty', name: 'showBadge', kind: 'boolean', default: false, layer: 'Content' },
     { op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' },
     { op: 'describe', text: 'A tag.' },
   ];
@@ -161,12 +222,30 @@ test('the build script copies the component, adds an option, a property, moves a
   assert.equal(tag.description, 'A tag.');
   const key = Object.keys(tag.componentPropertyDefinitions).find((k) => k.startsWith('showBadge#'));
   assert.ok(key);
-  for (const v of tag.children) assert.equal(v.children[0].children[0].componentPropertyReferences.visible, key);
+  for (const v of tag.children) assert.equal(v.children[0].componentPropertyReferences.visible, key);
+  // The variant copied for xl keeps what its layers were wired to, which Figma drops when a variant is cloned.
+  assert.deepEqual(tag.children[2].children[0].children[0].componentPropertyReferences, { visible: 'showIcon#1:2' });
   for (const v of tag.children) assert.equal(v.children[0].children[1].fills[0].boundVariables.color.id, 'V:2');
   // The component it is a copy of is not touched.
   assert.equal(set.children.length, 2);
   assert.equal(set.children[0].children[0].children[1].fills[0].boundVariables.color.id, 'V:1');
   assert.equal(out.node, tag.id);
+});
+
+test('a set with auto layout and a fixed height grows to hold its variants, and keeps how each axis is sized', async () => {
+  const { figma, set } = fakeFigma();
+  Object.assign(set, { layoutMode: 'HORIZONTAL', primaryAxisSizingMode: 'AUTO', counterAxisSizingMode: 'FIXED', paddingRight: 20, paddingBottom: 20, width: 260, height: 40 });
+  set.children.forEach((v, i) => Object.assign(v, { x: 20 + i * 120, y: 20 }));
+  const out = await run(opsScript([{ op: 'describe', text: 'A chip.' }, { op: 'bind', layer: '', field: 'fill', variable: 'text/default' }], { target: set.id, what: 'figma-change' }), figma);
+  assert.deepEqual(out.missing, []);
+  assert.deepEqual([set.width, set.height, set.primaryAxisSizingMode, set.counterAxisSizingMode], [260, 80, 'AUTO', 'FIXED']);
+});
+
+test('a property whose layer is not there is not made', async () => {
+  const { figma, set } = fakeFigma();
+  const out = await run(opsScript([{ op: 'addProperty', name: 'showBadge', kind: 'boolean', layer: 'Content/Badge' }], { target: set.id, what: 'figma-change' }), figma);
+  assert.deepEqual(out.missing, ['property showBadge (no layer Content/Badge)']);
+  assert.deepEqual(Object.keys(set.componentPropertyDefinitions), ['size', 'showIcon#1:2']);
 });
 
 test('a change script names what it could not find, and changes nothing else', async () => {
@@ -182,7 +261,7 @@ test('--spec and --figma-build: asked, held for sign-off, then the script the gu
   writeFileSync(join(root, 'ds-config.json'), JSON.stringify({ figmaFileKey: 'KEY', writes: { figma: 'ask' }, paths: { compPropsSnapshot: 'src/props.json', snapshotStructure: 'src/structure.json', snapshotVars: 'src/vars.json', snapshotSkeleton: 'src/skeleton.json' } }));
   writeFileSync(join(root, 'src/props.json'), JSON.stringify(props));
   writeFileSync(join(root, 'src/structure.json'), JSON.stringify({ components: structure }));
-  writeFileSync(join(root, 'src/vars.json'), JSON.stringify({ variableScopes: varNames }));
+  writeFileSync(join(root, 'src/vars.json'), JSON.stringify({ variableScopes: varNames, aliases: { light: { 'chipFilter/label/color': ['text/default'] } } }));
   writeFileSync(join(root, 'src/skeleton.json'), JSON.stringify(skeleton));
   writeFileSync(join(root, 'component-values.snapshot.json'), JSON.stringify(values));
   const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
@@ -191,6 +270,8 @@ test('--spec and --figma-build: asked, held for sign-off, then the script the gu
   assert.match(first, /tag: a spec built like chipFilter, 2 variants/);
   assert.match(first, /To answer before it is built \(2\)/);
   assert.match(cli('--figma-build', 'tag'), /not built while something is unanswered/);
+  assert.match(cli('--spec', 'a tag like chipFilter with sparkles, called sparkle'), /What was asked and not read: "add sparkles"/);
+  assert.match(cli('--spec', 'a tag like chipFilter, called shared', '--shared'), /every binding of chipFilter\/label\/color moved to text\/default/);
   const opsFile = join(root, 'ops.json');
   writeFileSync(opsFile, JSON.stringify([{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }, { op: 'describe', text: 'A tag.' }]));
   assert.match(cli('--spec', '--name', 'tag', '--ops', opsFile), /--figma-build tag --signed-off/);

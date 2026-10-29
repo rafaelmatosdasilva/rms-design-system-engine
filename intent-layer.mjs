@@ -255,7 +255,8 @@ export function useReport(snap, matched = new Map(), { names = [], codeExists = 
     // tokens the contracts carry): they stay on the page as they are, never retitled.
     // A section titled with a component's name is an example of it in use: for people too.
     const isName = (t) => names.some((n) => norm(n) === norm(t));
-    const forAgents = (e.sections ?? []).filter((x) => { const t = String(x.title).replace(/^\d+(\.\d+)*[.)]?\s+/, '').trim(); return !FOR_PEOPLE.test(t) && !isExample(x.text) && !isName(t) && !isName(t.split(/\s+/)[0]); });
+    // A component's lines that only describe (doc-source-dsds.mjs → PRESCRIBES) are for people as well.
+    const forAgents = (e.sections ?? []).filter((x) => { const t = String(x.title).replace(/^\d+(\.\d+)*[.)]?\s+/, '').trim(); return !x.described && !FOR_PEOPLE.test(t) && !isExample(x.text) && !isName(t) && !isName(t.split(/\s+/)[0]); });
     if (e.sections?.length && reach.sections && !(comp && !component)) gets.push({ what: `${KIND_WORDS.sections} (${e.sections.map((x) => x.title).slice(0, 4).join(', ')}${e.sections.length > 4 ? ', …' : ''})`, lines: e.sections.length, to: reach.sections });
     else if (forAgents.length) notUsed.push(notUsedItem(`${forAgents.length} section${forAgents.length === 1 ? '' : 's'} (${forAgents.map((x) => x.title).slice(0, 4).join(', ')}${forAgents.length > 4 ? ', …' : ''})`, 'unknownTitle'));
     if (e.facts?.length) notUsed.push(notUsedItem(e.facts.join(', '), 'facts'));

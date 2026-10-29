@@ -73,7 +73,7 @@ const WIDTH      = 60;
 // The profile given now (--profile, read where the run started: project-dir.mjs) or remembered in ds-config.json is
 // written in when its maintainers changed it, and this person is told what GitLab lets them write; then the snapshots
 // and the team's decisions are read from their stores. Commands that only print, or make a profile, skip both.
-const STORE_QUIET = ['--version', '--route', '--recipe', '--reference', '--summary', '--help', '--profile-export', '--profile-new', '--make-command', '--products'].some((f) => process.argv.slice(2).some((a) => a === f || a.startsWith(f + '=')));
+const STORE_QUIET = ['--version', '--route', '--recipe', '--reference', '--summary', '--help', '--profile-export', '--profile-new', '--make-command', '--products', '--a11y-no-worse'].some((f) => process.argv.slice(2).some((a) => a === f || a.startsWith(f + '=')));
 const STORE_OFFLINE = process.argv.includes('--offline');
 if (!STORE_QUIET) {
   const pf = await import('./profile.mjs');
@@ -603,6 +603,29 @@ if (process.argv.includes('--ci-changed')) {
   if (moved.length) { console.log(`▶️  Changed since the last build (${last.at}): ${moved.map((m) => `${m.what} ${short(m.from)} → ${short(m.to)}`).join(' · ')}. Build.`); process.exit(0); }
   console.log(`⏸  Nothing changed since the last build (${last.at}): ${Object.keys(now).join(', ')} as they were.`);
   process.exit(3);
+}
+
+// ── --a11y-no-worse [--record]: accessibility never gets worse (a11y-no-worse.mjs) ──
+// For a merge request's pipeline: after the audit, exit 1 when this run's accessibility result has a blocker the last
+// build on the base branch did not have (each one listed), 0 when it has none (what was fixed is said) or when no build
+// kept a result yet, 2 when this run has no result of its own. --record, in the base branch's pipeline after its audit,
+// keeps that build's blockers in OUT_DIR/a11y-last-build.json (the pipeline keeps that folder in its cache).
+if (process.argv.includes('--a11y-no-worse')) {
+  const nw = await import('./a11y-no-worse.mjs');
+  const result = nw.readJson(join(ROOT, OUT_DIR, nw.RESULT_FILE));
+  const file = join(ROOT, OUT_DIR, nw.RECORD_FILE);
+  if (process.argv.includes('--record')) {
+    if (!result?.checkedAt) { console.log(`❌ No accessibility result to keep (${OUT_DIR}/${nw.RESULT_FILE}): run the audit first.`); process.exit(2); }
+    let commit = null; try { const { execFileSync } = await import('node:child_process'); commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { /* not a git checkout */ }
+    const rec = nw.recordOf(result, { commit, branch: process.env.CI_COMMIT_BRANCH || process.env.GITHUB_REF_NAME || null });
+    mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+    writeFileSync(file, JSON.stringify(rec, null, 1) + '\n');
+    console.log(`✅ Kept this build's accessibility result (checked ${rec.checkedAt}): ${rec.blockers.length} blocker${rec.blockers.length === 1 ? '' : 's'} on components and products' pages, in ${OUT_DIR}/${nw.RECORD_FILE}.`);
+    process.exit(0);
+  }
+  const v = nw.noWorse(nw.readJson(file), result);
+  console.log(v.lines.join('\n'));
+  process.exit(v.code);
 }
 
 // ── --writes [<place> <yes|ask|no>]: what this project lets the engine change, and where it must never ──
@@ -1923,6 +1946,25 @@ if (process.argv.includes('--styleguide')) {
           if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[OPEN_FILE, Buffer.from(next)]]), 'When each open task was first found, saved with rms-design-system-engine', { offline: STORE_OFFLINE })).line);
         }
       }
+      // The Status page's numbers today (what its cards say, and its AI readiness), kept for the release this code
+      // belongs to, with the snapshots as the open tasks are: each card shows them as its trend (health-history.mjs).
+      if (!b.skipped && b.health && r.health) {
+        const hh = await import('./health-history.mjs');
+        const { releaseLog } = await import('./component-changelog.mjs');
+        const file = join(ROOT, hh.HEALTH_FILE), prev = hh.readHealth(file);
+        const { record, key, kept } = hh.recordHealth(prev, { values: b.health, code: r.health.code, built: r.health.built, at: new Date().toISOString() }, { ROOT, releaseOf: hh.releaseFinder(ROOT, releaseLog(ROOT)) });
+        const next = hh.healthText(record), rel = key === hh.UNRELEASED ? 'the next release' : key;
+        if (kept) console.log(`   📈 The Status page's numbers for ${rel} kept as they were: they were measured from newer inputs than this run.`);
+        else if (next !== hh.healthText(prev)) {
+          writeFileSync(file, next);
+          const page = resolve(ROOT, r.out), html = readFileSync(page, 'utf8'), withIt = hh.withHealth(html, hh.trendOf(record, r.health.release));
+          if (withIt !== html) writeFileSync(page, withIt);
+          const said = hh.AREAS.filter((a) => b.health[a] != null).map((a) => `${a} ${b.health[a]}%`).join(', ');
+          console.log(`   📈 The Status page's numbers kept for ${rel} (${said}) in ${hh.HEALTH_FILE}: ${r.health.past ? `each card shows them beside ${r.health.past} earlier release${r.health.past === 1 ? '' : 's'}` : 'each card\'s trend starts from them'}.`);
+          const st = await import('./stores.mjs');
+          if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[hh.HEALTH_FILE, Buffer.from(next)]]), `The Status page's numbers for ${rel}, saved with rms-design-system-engine`, { offline: STORE_OFFLINE })).line);
+        }
+      }
     } else {
       // Built without trying them (--no-a11y-bake, a CI's first build): the results saved with the snapshots go in the
       // page all the same, so it shows them at once and the viewer's browser tries only the components that changed
@@ -2179,16 +2221,19 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   let scfg = {};
   try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   const { grammarOf } = await import('./construction-grammar.mjs');
-  const { specOf, specLines, likeOf, nameOf, EXT } = await import('./component-spec.mjs');
-  const { opsScript, opWords } = await import('./figma-ops.mjs');
+  const { specOf, specLines, likeOf, nameOf, askedOf, primitiveTest, tierTest, EXT } = await import('./component-spec.mjs');
+  const { opsScript, opWords, modelOf } = await import('./figma-ops.mjs');
   const { mayWrite } = await import('./writes.mjs');
   const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
   const authored = read(scfg.contracts?.authored ?? 'contract.authored.json') ?? {};
   const props = read(scfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
   const structure = read(scfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
-  const values = read('component-values.snapshot.json') ?? {}, varNames = read(scfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {};
+  const vars = read(scfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
+  const values = read('component-values.snapshot.json') ?? {}, varNames = vars.variableScopes ?? {};
   const skeleton = read((await import('./figma-capture.mjs')).componentFiles(scfg).skeleton) ?? {};
-  const captures = { props, skeleton, values, varNames };
+  // What each variable points at, nearest first: the first mode's colours, then every other kind.
+  const aliases = { ...(vars.otherAliases ?? {}), ...(Object.values(vars.aliases ?? {})[0] ?? {}) };
+  const captures = { props, skeleton, values, varNames, aliases, aliasesByMode: vars.aliases ?? {}, isPrimitive: primitiveTest({ tiers: scfg.tiers, prefix: scfg.figma?.primitivePrefix }), tierOf: tierTest({ tiers: scfg.tiers }) };
   if (!Object.keys(props).filter((n) => !n.startsWith('_')).length) { console.log('❌ No Figma capture to build from: refresh Figma (--recipe refresh-figma), then ask again.'); process.exit(2); }
   const grammar = grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} });
   const specDir = join(ROOT, OUT_DIR, 'specs'), specFile = (n) => join(specDir, `${n}.spec.json`);
@@ -2208,7 +2253,15 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
       process.exit(0);
     }
     if (!name && !scratch) { console.log(`What is the new component called? It is built like ${l.like}.`); console.log(`NEXT: ask the person, then run ${cmd} --spec "<description>" --like ${l.like} --name <name>.`); process.exit(0); }
-    const { spec } = specOf({ description, like: l.like, name, ops, captures, grammar, at: new Date().toISOString() });
+    // What the description asks beyond the copy, read as a change to the one it is like; once the person's operations
+    // are given, what was not read is theirs to have written.
+    const asked = scratch ? { ops: [], unread: [] } : askedOf(description, modelOf(l.like, captures));
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    ops = [...asked.ops.filter((a) => !ops.some((o) => same(o, a))), ...ops];
+    const unread = opsFile ? [] : asked.unread;
+    // --shared: the like's own variables bound to the shared one each points at, as the spec proposed.
+    if (process.argv.includes('--shared')) for (const o of specOf({ description, like: l.like, name, ops, captures, grammar }).spec[EXT].shared ?? []) if (!ops.some((x) => same(x, o))) ops.push(o);
+    const { spec } = specOf({ description, like: l.like, name, ops, unread, captures, grammar, at: new Date().toISOString() });
     if (!spec.name) { console.log('❌ The spec has no component to build: give --like, or a create operation.'); process.exit(2); }
     mkdirSync(specDir, { recursive: true });
     writeFileSync(specFile(spec.name), JSON.stringify(spec, null, 2) + '\n');
