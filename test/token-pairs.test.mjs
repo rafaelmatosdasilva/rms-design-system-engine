@@ -47,6 +47,24 @@ test('pairsOf: the names say which surface a colour was made for, the values say
   assert.equal(pairsOf({}).length, 0);
 });
 
+test('pairsOf: a component\'s colour goes on that component\'s own surface, never on another\'s that shares a word', () => {
+  const mode = {
+    'kit/tileLink/text/hover/color': '#1a1a1a', 'kit/tileLink/background/hover/color': '#f0f0f0', 'kit/tileLink/background/default/color': '#ffffff',
+    'kit/tileLink/text/color': '#333333',
+    'kit/chipFilter/background/hover/color': '#000000',
+    'kit/listBadge/color/badgeText': '#ffffff', 'kit/listBadge/background/color': '#0044cc',
+    'kit/noteText/background/color': '#fafafa',
+    'kit/statusCard/icon/alert/color': '#b00020', 'kit/statusCard/title/alert/color': '#b00020', 'kit/statusCard/background/alert/color': '#fff4f4',
+  };
+  const by = Object.fromEntries(pairsOf({ light: mode }).map((p) => [p.text, p.surface]));
+  assert.equal(by['kit/tileLink/text/hover/color'], 'kit/tileLink/background/hover/color', 'its hover on its own hover, not another component\'s');
+  assert.equal(by['kit/tileLink/text/color'], 'kit/tileLink/background/default/color', 'with no word of its own: its surface at rest');
+  assert.equal(by['kit/listBadge/color/badgeText'], 'kit/listBadge/background/color', 'a last part ending in Text is a text colour');
+  assert.ok(!Object.values(by).includes('kit/listBadge/color/badgeText'), 'and never a surface');
+  assert.equal(by['kit/statusCard/icon/alert/color'], 'kit/statusCard/background/alert/color', 'a title is a text colour, not a surface');
+  assert.ok(!('kit/noteText/background/color' in by), 'a component named …Text is not a text colour');
+});
+
 test('wrongPairs: a colour put on a surface it was not made for, whether or not it still reads', () => {
   const pairs = pairsOf(SYSTEM);
   const found = wrongPairs([
