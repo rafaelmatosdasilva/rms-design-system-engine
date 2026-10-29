@@ -287,7 +287,7 @@ test('a Vue component drawn as the product draws it: Figma\'s names in the code\
   const r = await renderedVue(dir, {}, ['button'], { propsSnap, locate: () => join(dir, 'src', 'components', 'Button.vue'), chromePath: CHROME, max: 4 });
   assert.deepEqual(r.failed, [], JSON.stringify(r));
   const at = (label) => r.cases.button.find((c) => c.label === label)?.markup ?? '';
-  assert.match(at('default'), /class="btn s" data-ready="1" data-hint=""><span class="label">LABEL<\/span><i class="icon" data-icon="m\/home-m">/, 'labelContent as label through the app\'s plugin, size as buttonSize, the icon its pages use, an object it reads given, not disabled');
+  assert.match(at('default'), /class="btn s" data-ready="1" data-hint="Hint 1"><span class="label">LABEL<\/span><i class="icon" data-icon="m\/home-m">/, 'labelContent as label through the app\'s plugin, size as buttonSize, the icon its pages use, an object it reads given with the field it reads, not disabled');
   assert.doesNotMatch(at('showLabel=false'), /class="label"/, 'its label off: none given');
   assert.match(at('disabled=true'), /disabled=""/);
 });

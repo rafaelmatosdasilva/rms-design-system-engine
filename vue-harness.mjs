@@ -209,6 +209,35 @@ export function propSamples(ROOT) {
 // on/off one off but the first item's selected or active. So a list draws as a list. → { propName: [items] }
 // With an example from Figma whose instances are the list's items (a bar's tabs): one item a tab, each field from the
 // tab's own property (label from LabelContent, icon from mainIcon, its icon as the code names its file), else its words.
+// A field no page writes as text: what the components that take a prop of that name declare it as (kinds), an on/off
+// off (the first of a list selected), one with options its default or first option, a number (or a field named as an
+// amount is) counted, before its own name and number. i: the item's place in its list.
+export function sampleValue(f, i, samples = {}, kinds = {}) {
+  const k = kinds[f];
+  if (/^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) || k?.type === 'boolean') return i === 0 && /selected|active|current/i.test(f);
+  if (typeof samples[f] === 'string') return /icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) || k?.options?.length ? samples[f] : `${samples[f]} ${i + 1}`;
+  if (k?.options?.length) return k.options.includes(k.default) ? k.default : k.options[0];
+  // A number, declared as one or named as an amount is (initialValue, total, rate), is counted.
+  if (k?.type === 'number' || (!k && /(amount|total|price|balance|rate|quantity|count)$|^(min|max|step|initial(value)?)$/i.test(f))) return i + 1;
+  return `${f.charAt(0).toUpperCase() + f.slice(1)} ${i + 1}`;
+}
+
+// For each object prop the code reads fields of (cell.type, props.baseAmount.label) with none given by default, an
+// object with those fields, each as sampleValue gives it; a field it loops over or measures (months.map, rows.length)
+// a list of three. So a part drawn alone, outside the parent that always passes it one, draws. → { propName: object }
+export function objectSamples(text, objectProps = [], samples = {}, kinds = {}) {
+  const src = String(text), out = {};
+  for (const p of objectProps) {
+    const fields = {};
+    for (const m of src.matchAll(new RegExp(`(?:\\bprops\\.|[^.\\w$])${p}\\??\\.([A-Za-z_$][\\w$]*)(\\??\\.(?:map|forEach|filter|find|some|every|reduce|slice|length|indexOf|includes|join)\\b|\\[)?`, 'g'))) {
+      const [, f, list] = m;
+      if (fields[f] === undefined || (list && !Array.isArray(fields[f]))) fields[f] = list ? [0, 1, 2].map((i) => sampleValue(f.replace(/s$/, ''), i, samples, kinds)) : sampleValue(f, 0, samples, kinds);
+    }
+    if (Object.keys(fields).length) out[p] = fields;
+  }
+  return out;
+}
+
 export function listSamples(text, propNames = [], samples = {}, example = null, icons = {}, kinds = {}) {
   const tpl = /<template\b[\s\S]*<\/template>/.exec(String(text))?.[0] ?? '';
   const out = {};
@@ -238,16 +267,7 @@ export function listSamples(text, propNames = [], samples = {}, example = null, 
       out[list] = figmaItems.map((it, i) => Object.fromEntries(fields.map((f) => [f, fromFigma(it, f, i)]).filter(([, v]) => v !== undefined)));
       continue;
     }
-    // A field no page writes as text: what the components that take a prop of that name declare it as (kinds), an
-    // on/off off, one with options its default or first option, a number counted, before its own name and number.
-    const value = (f, i) => {
-      const k = kinds[f];
-      if (/^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) || k?.type === 'boolean') return i === 0 && /selected|active|current/i.test(f);
-      if (typeof samples[f] === 'string') return /icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) || k?.options?.length ? samples[f] : `${samples[f]} ${i + 1}`;
-      if (k?.options?.length) return k.options.includes(k.default) ? k.default : k.options[0];
-      if (k?.type === 'number') return i + 1;
-      return `${f.charAt(0).toUpperCase() + f.slice(1)} ${i + 1}`;
-    };
+    const value = (f, i) => sampleValue(f, i, samples, kinds);
     out[list] = [0, 1, 2].map((i) => (fields.length ? Object.fromEntries(fields.map((f) => [f, value(f, i)])) : `Item ${i + 1}`));
   }
   return out;
@@ -393,6 +413,13 @@ export function withCaseChoices(cases, choices) {
   return out;
 }
 
+// The props a component's code falls back from when it is not given one (props.language || its own, x ?? y): left
+// unset by the harness, as a page that does not pass it, so the code's own fallback draws rather than an empty one.
+export function fallbackProps(text, propNames = []) {
+  const src = String(text);
+  return propNames.filter((p) => new RegExp(`(?:\\bprops\\.|[^.\\w$])${p}\\??\\s*(?:\\|\\||\\?\\?)`).test(src));
+}
+
 // Every icon of the project's icon folder by its file's name (home-m), as the code names it (m/home-m).
 export function iconPaths(ROOT) {
   const folder = findIconFolder(ROOT);
@@ -471,7 +498,7 @@ export function appSetup(ROOT) {
 export function harnessModule(groups, styles = [], plugins = {}) {
   return `${styles.map((s) => `import ${JSON.stringify(s)};`).join('\n')}
 import { createApp, h, reactive } from 'vue';
-${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill, connect, frame }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {}, connect: connect ?? [], frame: frame ?? null }))).replace(/</g, '\\u003c')};
+${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill, connect, frame, fallback }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {}, connect: connect ?? [], frame: frame ?? null, fallback: fallback ?? [] }))).replace(/</g, '\\u003c')};
 const LOAD = {
 ${groups.map((g) => `  ${JSON.stringify(g.name)}: () => import(${JSON.stringify(g.file)}),`).join('\n')}
 };
@@ -495,7 +522,7 @@ const BY_ROLE = { togglebutton: ['pressed'], toggle: ['pressed'], checkbox: ['ch
 // The props the component declares, each given the variant's value (Figma's names matched to the code's, a value
 // written as the code's own option writes it, Success as success; True and False as booleans for a Boolean prop); an
 // aria- attribute the page adds falls through to its root.
-function fit(C, props, role, options, fill = {}, connect = []) {
+function fit(C, props, role, options, fill = {}, connect = [], fallback = []) {
   const decl = Array.isArray(C.props) ? Object.fromEntries(C.props.map((k) => [k, {}])) : (C.props || {});
   const out = {};
   for (const [d, spec] of Object.entries(decl)) {
@@ -512,6 +539,8 @@ function fit(C, props, role, options, fill = {}, connect = []) {
       if (cc && cc.values && cc.values[v] != null) v = cc.values[v];
       if (typeof v === 'string' && ICONS[v] && /icon/i.test(hit + d)) v = ICONS[v];
       if (types.includes(Boolean) && typeof v === 'string') v = /^(true|yes|on)$/i.test(v);
+      // A number it does arithmetic on (initialValue.toFixed()), given words: the number they say, else 0.
+      if (types.length === 1 && types[0] === Number && typeof v === 'string') v = v.trim() !== '' && !isNaN(Number(v)) ? Number(v) : 0;
       const own = (options[d] || []).find((o) => squash(o) === squash(v));
       out[d] = own !== undefined ? own : v;
     }
@@ -524,10 +553,15 @@ function fit(C, props, role, options, fill = {}, connect = []) {
     // icon the pages use most, so the part it draws is there to see, show and hide.
     else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && /icon$/i.test(d) && SAMPLES.icon != null) out[d] = SAMPLES.icon;
     else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && TEXTY.test(d)) out[d] = HUMAN(d);
+    // A function it calls as it draws (allowedToShowView, a formatter) and none given: one that allows, so it draws.
+    else if (types.length === 1 && types[0] === Function && !(spec && typeof spec === 'object' && 'default' in spec)) out[d] = () => true;
+    // A date it reads (pageDate.getFullYear()) and none given: today.
+    else if (types.includes(Date) && !(spec && typeof spec === 'object' && 'default' in spec)) out[d] = new Date();
     // An object or a list it reads into with no default: an empty one, as a page always passes one, so it draws.
     // (params: Object, or { type: Object } with no default)
     // A list it loops over: the items its template reads (listSamples), else an empty one.
-    else if (!(spec && typeof spec === 'object' && 'default' in spec) && types.length === 1 && (types[0] === Object || types[0] === Array)) out[d] = fill[d] ? JSON.parse(JSON.stringify(fill[d])) : types[0] === Array ? [] : {};
+    // One the code falls back from when it is not given (props.language || its own): not given, so the fallback draws.
+    else if (!(spec && typeof spec === 'object' && 'default' in spec) && types.length === 1 && (types[0] === Object || types[0] === Array) && (fill[d] || !fallback.includes(d))) out[d] = fill[d] ? JSON.parse(JSON.stringify(fill[d])) : types[0] === Array ? [] : {};
   }
   for (const [k, v] of Object.entries(props)) if (/^aria-/.test(k)) out[k] = v;
   // Code Connect's own switches for a part (showIcon gives icon): off, the part is not given.
@@ -599,7 +633,7 @@ for (const g of GROUPS) {
   for (const c of g.cases) {
     const box = document.createElement('div'); box.className = 'dse-case'; box.setAttribute('data-dse-case', c.label); sec.append(box);
     if (g.frame) { box.style.width = g.frame[0] + 'px'; box.style.height = g.frame[1] + 'px'; }
-    const state = reactive(fit(C, c.props, g.role, g.options, g.fill, g.connect));
+    const state = reactive(fit(C, c.props, g.role, g.options, g.fill, g.connect, g.fallback));
     const app = createApp({ render: () => h(C, { ...state, ...listeners(C, state) }) });
     app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] });
     app.config.warnHandler = () => {};
@@ -676,8 +710,9 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const choices = asyncChoices(ROOT, resolve(ROOT, file), text, keyed ??= keyedNames(ROOT), Object.keys(api.props ?? {}));
     const cases = withCaseChoices((figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max, kindsOf())).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c)), choices);
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    const fill = withChoices({ ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons, kindsOf()), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, from: fromFigma ? 'figma' : 'code' });
+    const objects = Object.entries(api.props ?? {}).filter(([, d]) => /^object$/i.test(d.type ?? '') && d.default == null).map(([k]) => k);
+    const fill = withChoices({ ...objectSamples(text, objects, samples, kindsOf()), ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons, kindsOf()), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, fallback: fallbackProps(text, Object.keys(api.props ?? {})), from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);
