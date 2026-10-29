@@ -221,6 +221,24 @@ test('a text with no default takes the value the project\'s own pages pass it mo
   assert.equal(s.class, undefined); assert.equal(s.title, undefined, 'a bound value is never taken');
 });
 
+test('a part loaded by a name it is given gets the name of a file it can load, the one the code uses most first', async () => {
+  const { asyncChoices, keyedNames, withChoices } = await import('../vue-harness.mjs');
+  const dir = tempDir('vue-parts-'); mkdirSync(join(dir, 'src', 'tiles'), { recursive: true }); mkdirSync(join(dir, 'src', 'panel'));
+  for (const n of ['Banner', 'Outline', 'Solid']) writeFileSync(join(dir, 'src', 'tiles', `${n}.vue`), '<template><button/></template>');
+  writeFileSync(join(dir, 'src', 'Page.vue'), "<script setup>const a = [{ kind: 'Solid' }, { kind: 'Solid' }, { kind: 'Outline' }]\nconst b = { tileKind: 'Outline' }</script>");
+  const keyed = keyedNames(dir);
+  const panel = join(dir, 'src', 'panel', 'Panel.vue');
+  const listText = '<template><component v-for="(tile, i) in tiles" :is="part(tile.kind)" :label="tile.label"/></template>\n<script setup>\nimport { defineAsyncComponent } from \'vue\'\nconst part = (kind) => defineAsyncComponent(() => import(`../tiles/${kind}.vue`))\n</script>';
+  const list = asyncChoices(dir, panel, listText, keyed);
+  assert.deepEqual(list, [{ prop: 'tiles', field: 'kind', list: true, names: ['Solid', 'Outline', 'Banner'] }]);
+  assert.deepEqual(withChoices({ tiles: [{ kind: 'Kind 1', label: 'Label 1' }, { kind: 'outline', label: 'Label 2' }] }, list).tiles, [{ kind: 'Solid', label: 'Label 1' }, { kind: 'Outline', label: 'Label 2' }], 'a made-up name replaced, a real one kept in the file\'s own case');
+  const cellText = '<template><part v-bind="item"/></template>\n<script setup>\nconst part = computed(() => {\n  const tileKind = props.item.tileKind\n  return defineAsyncComponent(() => import(`@/tiles/${tileKind}.vue`))\n})\n</script>';
+  const cell = asyncChoices(dir, join(dir, 'src', 'Slot.vue'), cellText, keyed);
+  assert.deepEqual(cell.map(({ prop, field, list: l, names }) => [prop, field, l, names[0]]), [['item', 'tileKind', false, 'Outline']]);
+  assert.deepEqual(withChoices({}, cell), { item: { tileKind: 'Outline' } }, 'an object prop given none gets one with the name');
+  assert.deepEqual(asyncChoices(dir, panel, '<script setup>const x = import(`../missing/${n}.vue`)</script>', keyed), [], 'a folder that is not there gives nothing');
+});
+
 test('a state Figma\'s default variant has on (Disabled) starts off; its on is a case of its own', () => {
   const cases = harnessCases({ properties: { disabled: { type: 'VARIANT', defaultValue: 'true', variantOptions: ['false', 'true'] }, size: { type: 'VARIANT', defaultValue: 's', variantOptions: ['s', 'm'] } } });
   assert.equal(cases[0].props.disabled, 'false');
