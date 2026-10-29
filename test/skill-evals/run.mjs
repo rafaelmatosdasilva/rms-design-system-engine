@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // test/skill-evals/run.mjs - run the skill evaluation. Spends model tokens; not in `node --test`.
 //
-//   node test/skill-evals/run.mjs --variant baseline|cookbook|skill|bare|mcp --model <id> --runs 5 --set dev|heldout|all|build|prototype
-//        [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
+//   node test/skill-evals/run.mjs --variant baseline|cookbook|skill|bare|mcp --model <id> --runs 5 --set dev|heldout|all|build|prototype|route
+//        [--route shell|both|mcp|none] [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
+//
+// --route says how the agent reaches the engine (lib.mjs ROUTES): a shell (the default), the engine's MCP server with
+// no shell (mcp), both, or neither. The route benchmark (--set route) runs the same tasks on each.
 //
 // A run the API refused (a usage limit, a 429) is not a result: nothing is written for it, the pool stops, and
 // the same command with --resume carries on, skipping each (task, run) already in the results file. Without
@@ -16,7 +19,8 @@ import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, ENGINE, DEMO, cliOf, cliChange, cliLine } from './lib.mjs';
+import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, ENGINE, DEMO, cliOf, cliChange, cliLine, ROUTES } from './lib.mjs';
+import { ROUTE_TASKS } from './route-tasks.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { engineFell, kindOf } from './reading.mjs';
@@ -29,6 +33,8 @@ import { envVar } from '../../names.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i === -1 ? d : process.argv[i + 1]; };
 const V = arg('variant', 'baseline'), MODEL = arg('model', 'claude-sonnet-5'), RUNS = Number(arg('runs', 1)), SET = arg('set', 'dev');
+const ROUTE = arg('route', 'shell');
+if (!ROUTES[ROUTE]) { console.log(`✗ no route ${ROUTE}: ${Object.keys(ROUTES).join(', ')}`); process.exit(2); }
 const ONLY = arg('only', null), JOBS = Number(arg('jobs', 2)), BUDGET = Number(arg('budget', 3)), DRY = process.argv.includes('--dry'), RESUME = process.argv.includes('--resume');
 
 let privateTasks = [];
@@ -36,18 +42,20 @@ const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');
 if (PRIVATE_TASKS && (SET === 'heldout' || SET === 'all' || SET === 'private')) {
   privateTasks = (await import(PRIVATE_TASKS)).PRIVATE.map((t) => ({ ...t, private: true }));
 }
-const sets = { dev: DEV, heldout: [...HELDOUT, ...privateTasks], private: privateTasks, all: [...DEV, ...HELDOUT, ...privateTasks], build: BUILD, prototype: PROTO };
-const tasks = (sets[SET] ?? []).filter((t) => !ONLY || t.id === ONLY).map((t) => ({ ...t, set: BUILD.includes(t) ? 'build' : PROTO.includes(t) ? 'prototype' : DEV.includes(t) ? 'dev' : 'heldout', source: BUILD.includes(t) || PROTO.includes(t) ? TIDEPOOL : t.source }));
+const sets = { dev: DEV, heldout: [...HELDOUT, ...privateTasks], private: privateTasks, all: [...DEV, ...HELDOUT, ...privateTasks], build: BUILD, prototype: PROTO, route: ROUTE_TASKS };
+const tasks = (sets[SET] ?? []).filter((t) => !ONLY || t.id === ONLY).map((t) => ({ ...t, set: BUILD.includes(t) ? 'build' : PROTO.includes(t) ? 'prototype' : ROUTE_TASKS.includes(t) ? 'route' : DEV.includes(t) ? 'dev' : 'heldout', source: BUILD.includes(t) || PROTO.includes(t) ? TIDEPOOL : t.source }));
 const vr = variant(V, { ref: arg('ref', undefined) });
 const sha = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 const engineHash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ENGINE, encoding: 'utf8' }).trim() + (execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ENGINE, encoding: 'utf8' }).trim() ? '+dirty' : '');
 const cliVersion = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
-const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, cliVersion };
-console.log(`${V} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
+const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, cliVersion, ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
+console.log(`${V}${ROUTE !== 'shell' ? ` by ${ROUTE}` : ''} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
-const outFor = (t) => (t.private ? envVar(process.env, 'EVAL_PRIVATE_OUT') : t.set === 'build' ? join(HERE, 'results', 'build') : t.set === 'prototype' ? join(HERE, 'results', 'prototype') : join(HERE, 'results'));
-const resultsFile = (t) => join(outFor(t), `${V}.${MODEL}.jsonl`);
+const outFor = (t) => (t.private ? envVar(process.env, 'EVAL_PRIVATE_OUT') : t.set === 'build' ? join(HERE, 'results', 'build') : t.set === 'prototype' ? join(HERE, 'results', 'prototype') : t.set === 'route' ? join(HERE, 'results', 'route') : join(HERE, 'results'));
+// A route other than the shell is a side of its own: its runs never mix with the shell's.
+const SIDE = ROUTE !== 'shell' || SET === 'route' ? `${V}-${ROUTE}` : V;
+const resultsFile = (t) => join(outFor(t), `${SIDE}.${MODEL}.jsonl`);
 
 // What is already measured, per results file. Rows from another guide or engine never mix with this one.
 const done = new Set();
@@ -74,11 +82,11 @@ async function one({ t, run }) {
   const events = [];
   let sessionId = null, error = null, limit = null;
   for (const prompt of t.prompts ?? [t.prompt]) {
-    const r = await runClaude({ cwd: dir, home, path, prompt: `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`, model: MODEL, resume: sessionId, budget: BUDGET });
+    const r = await runClaude({ cwd: dir, home, path, prompt: `${vr.prefix ?? '/rms-design-system-engine '}${prompt}`, model: MODEL, resume: sessionId, budget: BUDGET, route: ROUTE });
     events.push(...r.events);
     sessionId = r.sessionId ?? sessionId;
     if (r.infra) {
-      writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.refused.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
+      writeFileSync(join(out, 'transcripts', `${SIDE}.${MODEL}.${t.id}.${run}.refused.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
       cleanup(dir, home);
       throw new Refused(r.infra);
     }
@@ -94,8 +102,8 @@ async function one({ t, run }) {
   // A run that reached an engine which fell over is not the agent's failure: it is kept on the row and counted
   // apart, the same as a run the harness stopped at its own ceiling.
   const fell = engineFell(ctx);
-  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, kind: kindOf(t), run, ...(fell ? { fell } : {}), pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, limit, at: new Date().toISOString() };
-  writeFileSync(join(out, 'transcripts', `${V}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
+  const row = { ...meta, cli: cliOf(events), task: t.id, set: t.set, kind: kindOf(t), run, ...(fell ? { fell } : {}), pass: [...taskChecks, ...rules].every((c) => c.ok), checks: taskChecks, rules, usage: ctx.usage, calls: ctx.calls.length, mcpCalls: ctx.mcp.map((m) => m.tool), decisionPoints: decisionPoints(ctx), engineRuns: ctx.engine.length, enginePaths: [...new Set(ctx.engine.map((b) => b.command.match(/node\s+(\S*audit\.mjs)/)?.[1] ?? 'rms-design-system-engine'))], changed: ctx.changed, commits: ctx.commits, files: keepFiles(ctx, t.keep ?? []), error, limit, at: new Date().toISOString() };
+  writeFileSync(join(out, 'transcripts', `${SIDE}.${MODEL}.${t.id}.${run}.jsonl`), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
   appendFileSync(resultsFile(t), JSON.stringify(row) + '\n');
   cleanup(dir, home);
   console.log(`  ${fell ? '⚠' : row.pass ? '✓' : '✗'} ${t.id} #${run}  $${ctx.usage.cost.toFixed(2)}  ${ctx.usage.turns} turns${fell ? `  (the engine fell over: ${fell.said} — not the agent's failure)` : row.pass ? '' : `  (${[...taskChecks, ...rules].filter((c) => !c.ok).map((c) => c.name).join('; ')})`}`);

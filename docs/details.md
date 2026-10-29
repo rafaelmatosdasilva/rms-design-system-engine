@@ -176,6 +176,11 @@ claude mcp add design-system -- node ~/.claude/skills/rms-design-system-engine/m
 
 It offers four tools: `query` (a component or token, as `--query`), `catalog` (everything a screen may use), `check_ui` (as `--check-ui`) and `summary` (the last audit's). Each runs the same command, so the answers are the same as in a terminal. A folder that remembers its project (`.design-system-engine-project`) answers for that project.
 
+Both routes are measured on the same tasks:
+
+- `node test/skill-evals/run.mjs --set route --route shell` gives the agent a shell; `mcp` gives it the MCP server and no shell; `both` gives it the two; `none` gives it neither.
+- `node test/skill-evals/route-report.mjs` prints, per route, the runs that pass, the time, tokens and tool calls a run, and how each run reached the engine.
+
 ## What it checks
 
 Every run compares your code with Figma and reports in plain words. The 25 gates are listed in [Features and capabilities](features.md#the-checks). Here is what a developer needs to know about each.
