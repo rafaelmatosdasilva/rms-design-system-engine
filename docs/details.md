@@ -160,6 +160,7 @@ rms-design-system-engine --keep --component chip --match height --reason "the pr
 rms-design-system-engine --only accessibility   # only the accessibility check
 rms-design-system-engine --only parity          # every check against Figma, without accessibility
 rms-design-system-engine --only 3               # one gate by number, or by name: --only "token values", --only states,props
+rms-design-system-engine --a11y-no-worse        # after the audit on a merge request: fails on an accessibility blocker the base branch did not have
 ```
 
 - `--only` runs that part and nothing else, and the summary says so, so a part never reads as the whole system passing. A word it does not know prints the list of gates.
@@ -560,6 +561,107 @@ The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory ·
 - **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the style guide, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
 - `--fresh` (or `a11y.reuse: false`) tries every page again.
+
+### Accessibility never gets worse
+
+A conformance claim holds only if the next release keeps it. So a merge request (GitLab) or pull request (GitHub) can fail when it adds an accessibility problem the last build did not have.
+
+- **What it compares.** This run's accessibility result with the one the last build on the base branch kept.
+- **Only blockers count.** A warning or an advisory never fails it.
+- **Only components and products' pages.** A finding on the page around them is left out, and so are prototypes.
+- **Old problems are not new.** A blocker the base branch already had is ignored, even when its measured value moves.
+- **Each blocker is keyed the same way every time.** By its component or product page, the element and its variant, the state, the colour mode, the WCAG criterion and the kind of problem.
+
+What you get:
+
+| Situation | Exit | What it says |
+|---|---|---|
+| A new blocker | 1 | Each one, such as `new: cardTile, disabled (Light), 1.4.3 contrast 3.1:1` |
+| No new blocker | 0 | That, and each blocker fixed since, as good news |
+| No build kept a result yet | 0 | That there is nothing to compare, so it passes |
+| This run has no result of its own | 2 | That the check did not measure anything, so nothing can be compared |
+
+- **A component this run could not read** is listed as not checked, never as fixed.
+- **It only reports.** It never changes your code. Your pipeline decides what a failing exit stops.
+
+#### Set it up in CI
+
+Two steps, both after the audit:
+
+1. **On the base branch**, keep each build's result: `rms-design-system-engine --a11y-no-worse --record`. It writes `.design-system-engine-out/a11y-last-build.json`.
+2. **On each merge request or pull request**, compare: `rms-design-system-engine --a11y-no-worse`.
+
+The pipeline carries the file from the base branch to each merge request: as the last job's artifact on GitLab, in the cache on GitHub.
+
+GitLab (`.gitlab-ci.yml`):
+
+```yaml
+.a11y:
+  image: node:24-bookworm
+  variables:
+    CHROME_PATH: /usr/bin/chromium
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq chromium > /dev/null
+    - git clone --depth 1 https://github.com/rafaelmatosdasilva/rms-design-system-engine.git ../engine
+
+a11y-keep:
+  extends: .a11y
+  script:
+    - node ../engine/audit.mjs --only accessibility || true
+    - node ../engine/audit.mjs --a11y-no-worse --record
+  artifacts:
+    paths: [.design-system-engine-out/a11y-last-build.json]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+a11y-no-worse:
+  extends: .a11y
+  script:
+    - mkdir -p .design-system-engine-out
+    - 'curl -fsSL -H "JOB-TOKEN: $CI_JOB_TOKEN" -o .design-system-engine-out/a11y-last-build.json "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/artifacts/$CI_DEFAULT_BRANCH/raw/.design-system-engine-out/a11y-last-build.json?job=a11y-keep" || true'
+    - node ../engine/audit.mjs --only accessibility || true
+    - node ../engine/audit.mjs --a11y-no-worse
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+```
+
+GitLab keeps the artifact of the latest successful job on each branch, so the merge request reads the base branch's last one. Before the first, nothing is fetched and the check passes, saying so.
+
+GitHub (`.github/workflows/a11y-no-worse.yml`):
+
+```yaml
+name: accessibility never gets worse
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: git clone --depth 1 https://github.com/rafaelmatosdasilva/rms-design-system-engine.git ../engine
+      - uses: actions/cache/restore@v4
+        with:
+          path: .design-system-engine-out
+          key: a11y-main-${{ github.sha }}
+          restore-keys: a11y-main-
+      - run: node ../engine/audit.mjs --only accessibility || true
+      - if: github.event_name == 'pull_request'
+        run: node ../engine/audit.mjs --a11y-no-worse
+      - if: github.event_name == 'push'
+        run: node ../engine/audit.mjs --a11y-no-worse --record
+      - if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: .design-system-engine-out
+          key: a11y-main-${{ github.sha }}
+```
+
+GitHub's runners already have Chrome. A pull request can read the caches its base branch saved, and the cache also lets the check reuse the pages that did not change. Name your base branch where it says `main`.
 
 ### What the Figma file is missing
 
