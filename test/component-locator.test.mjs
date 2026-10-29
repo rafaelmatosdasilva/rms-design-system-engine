@@ -61,3 +61,19 @@ test('with no Figma data and no contract, the class comes from the component\'s 
   assert.equal((await loadLocator(dir, { componentSelectors: { ButtonPrimary: '.bp' } })).selectorFor('ButtonPrimary'), '.bp');
   assert.equal(codeRootClasses([]).byName.size, 0);
 });
+
+test('a root past a wrapper with no class, and a name nested deeper than the code\'s folders, still find the code\'s class', async () => {
+  const dir = makeFixture({
+    'ds-config.json': {},
+    // A transition, or another component around it (a hint), with no class of its own: its first child draws.
+    'src/components/library/panels/Bar.vue': '<template>\n  <transition name="slide" appear>\n    <div v-if="on" class="panel-bar-wrapper"></div>\n  </transition>\n</template>\n',
+    'src/components/library/navigation/TileWide.vue': '<template>\n  <!-- hint -->\n  <hint-box :label="hint">\n    <button class="tile-wide-container"></button>\n  </hint-box>\n</template>\n',
+    // Figma nests it deeper than the folders do: grid/Slot/toggle is grids/body/slots/Toggle.vue.
+    'src/components/library/grids/body/slots/Toggle.vue': '<template><label class="slot-toggle"></label></template>',
+  });
+  const L = await loadLocator(dir, {});
+  assert.deepEqual([L.selectorFor('panelBar'), L.sourceOf('panelBar')], ['.panel-bar-wrapper', 'code']);
+  assert.equal(L.selectorFor('navigation/TileWide'), '.tile-wide-container', 'a name with a slash, by its folder and file');
+  assert.equal(L.selectorFor('grid/Slot/toggle'), '.slot-toggle', 'its last two parts, as the folder and file spell them');
+  assert.deepEqual([L.selectorFor('grid/Slot/missing'), L.sourceOf('grid/Slot/missing')], ['.grid/Slot/missing', 'convention'], 'no file: the convention, for the check to find another way');
+});
