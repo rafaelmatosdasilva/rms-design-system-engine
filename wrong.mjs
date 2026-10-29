@@ -78,3 +78,22 @@ export function wrongLines(ROOT, { least = 2 } = {}) {
     ...loud.map((c) => `  ${c.check}: ${c.times} times${c.components.length ? ` (${c.components.slice(0, 4).join(', ')}${c.components.length > 4 ? ` +${c.components.length - 4}` : ''})` : ''}`),
   ];
 }
+
+// Each finding marked wrong is a case its check must pass: once a run of that check no longer raises it, the check is
+// fixed and the mark can be taken back; while it still does, the check is still wrong. Only the checks the run ran
+// count: a mark on a check this run did not run is neither. raised: this run's findings [{ check, what }]; ran: the
+// checks it ran. → { still: [mark], fixed: [mark] }
+export function wrongCases(ROOT, raised = [], ran = []) {
+  const now = new Set(raised.map((f) => keptKey(`${f.check} :: ${f.what}`)));
+  const checks = new Set(ran.map((c) => keptKey(`${c} :: x`).split(' :: ')[0]));
+  const marks = readWrong(ROOT).filter((m) => checks.has(m.check));
+  return { still: marks.filter((m) => now.has(m.key)), fixed: marks.filter((m) => !now.has(m.key)) };
+}
+
+// What a run says of them: each still raised, with why it is wrong, then each fixed, with how to take its mark back.
+export function caseLines({ still = [], fixed = [] } = {}) {
+  const lines = [];
+  if (still.length) lines.push(`Marked wrong and still raised: ${still.length} (a case its check has not passed yet; the check is to be fixed):`, ...still.slice(0, 10).map((m) => `  ${m.check}: ${m.what} (wrong because: ${m.why})`));
+  if (fixed.length) lines.push(`Marked wrong and no longer raised: ${fixed.length} (its check passes that case now):`, ...fixed.slice(0, 10).map((m) => `  ${m.check}: ${m.what}`), '  Take a mark back once the fix is kept: rms-design-system-engine --unwrong --match <words>.');
+  return lines;
+}

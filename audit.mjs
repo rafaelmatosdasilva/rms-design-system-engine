@@ -1408,6 +1408,56 @@ if (process.argv.includes('--keep') || process.argv.includes('--unkeep')) {
   process.exit(0);
 }
 
+// ── --wrong / --unwrong: a finding that should never have been raised (wrong.mjs) ──
+// --wrong --match <words> [--component <name>] --why "<what the check misread>" [--by "<name>"] marks the findings of
+// the last full audit that match as wrong, each with why, who and when. They are not hidden: each is a case its check
+// must pass, and every run says which it still raises. --wrong alone lists them; --unwrong --match <words> takes some
+// back. Only the person says a finding is wrong: the project's hooks ask otherwise.
+if (process.argv.includes('--wrong') || process.argv.includes('--unwrong')) {
+  const undo = process.argv.includes('--unwrong');
+  const argOf = (flag) => { const i = process.argv.indexOf(flag); return i > -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null; };
+  const mi = process.argv.indexOf('--match');
+  const words = mi > -1 ? process.argv.slice(mi + 1).filter((x, i, all) => !x.startsWith('--') && all.slice(0, i).every((y) => !y.startsWith('--'))).flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean) : [];
+  const components = (argOf('--component') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const component = components.length ? components : null;
+  const km = await import('./kept.mjs'), wr = await import('./wrong.mjs');
+  const line = (m) => `${m.check}: ${m.what}${m.component ? ` (${m.component})` : ''} - ${m.why}${m.by ? `, ${m.by}` : ''}${m.at ? `, ${String(m.at).slice(0, 10)}` : ''}`;
+  if (undo) {
+    if (!words.length && !component) { console.log('Usage: rms-design-system-engine --unwrong --match <words> [--component <name>]: takes back the marks that match.'); process.exit(2); }
+    const gone = wr.dropWrong(ROOT, (m) => km.pick([m], { component, words }).length > 0);
+    if (!gone.length) { console.log(`No finding marked wrong matches${component ? ` in ${component.join(', ')}` : ''}${words.length ? ` "${words.join(', ')}"` : ''}.`); process.exit(1); }
+    console.log(`✓ ${gone.length} mark${gone.length === 1 ? '' : 's'} taken back.`);
+    for (const m of gone) console.log(`   • ${line(m)}`);
+    console.log(`NEXT: commit ${wr.WRONG_FILE} when the person asks`);
+    process.exit(0);
+  }
+  if (!words.length && !component) {
+    const all = wr.readWrong(ROOT);
+    if (!all.length) console.log('No finding is marked wrong. Mark one: rms-design-system-engine --wrong --match <words> [--component <name>] --why "<what the check misread>".');
+    else { console.log(`Marked wrong (${wr.WRONG_FILE}): ${all.length}`); for (const m of all) console.log(`   • ${line(m)}`); }
+    process.exit(0);
+  }
+  const why = argOf('--why');
+  if (!why) { console.log('❌ A finding marked wrong needs why: add --why "<what the check misread>". Ask the person for it; never write one for them.'); process.exit(2); }
+  let records = null;
+  try { records = JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'findings.json'), 'utf8')).findings ?? null; } catch { /* no full audit yet */ }
+  if (!records) { console.log('❌ No full audit yet: run rms-design-system-engine first, then mark the findings it lists.'); process.exit(2); }
+  const found = records.map((r) => ({ check: r.check, what: r.evidence, component: r.component ?? null }));
+  const chosen = km.pick(found, { component, words });
+  if (!chosen.length) {
+    console.log(`❌ No finding${component ? ` in ${component.join(', ')}` : ''} matches${words.length ? ` "${words.join(', ')}"` : ''} in the last full audit.`);
+    for (const x of km.pick(found, { component }).slice(0, 10)) console.log(`   • ${x.check}: ${x.what}`);
+    process.exit(1);
+  }
+  const by = (await import('./decided-by.mjs')).decidedBy(ROOT);
+  const added = wr.recordWrong(ROOT, chosen, { why, by });
+  console.log(`✓ Marked wrong: ${added.length} finding${added.length === 1 ? '' : 's'}, in ${wr.WRONG_FILE}.`);
+  for (const m of added) console.log(`   • ${line(m)}`);
+  console.log('   Not hidden: each is a case its check must pass, and every run says whether it still raises it.');
+  console.log(`NEXT: commit ${wr.WRONG_FILE} when the person asks`);
+  process.exit(0);
+}
+
 // ── --checked <component> <criterion>: a person checked a WCAG criterion by hand ──
 // Recorded with the component as it is now (checked.mjs): the style guide shows it Done, by whom and when, until the
 // component changes. --unchecked takes one back. Only the person marks a check; the project's hooks ask otherwise.
@@ -6875,6 +6925,10 @@ function reportFull(label, items, shown) {
         const rules = Object.fromEntries(gr.filter((g) => g.rule).map((g) => [g.check, g.rule]));
         const records = findingRecords(now, names, { prev: prev?.findings ?? null, rules, failing: gr.filter((g) => g.verdict === 'fails').map((g) => g.check) });
         writeFileSync(join(ROOT, OUT_DIR, 'findings.json'), JSON.stringify({ at: new Date().toISOString(), gates: gr, findings: records }, null, 1) + '\n');
+        // Each finding a person marked wrong, tried as a case: still raised by its check, or passed now.
+        const wr = await import('./wrong.mjs');
+        const cases = wr.caseLines(wr.wrongCases(ROOT, records.map((r) => ({ check: r.check, what: r.evidence })), gr.map((g) => g.check)));
+        if (cases.length) { console.log(C.yellow(`\n🔁 ${cases[0]}`)); for (const l of cases.slice(1)) console.log(C.yellow(`   ${l}`)); }
       } catch { /* a convenience */ }
       // Where each component lives, from the catalog this run wrote: its heading in the list says so.
       let livesIn = {};
