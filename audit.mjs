@@ -2397,7 +2397,7 @@ if (process.argv.includes('--annotation-categories')) {
     const path = ac.categoriesPath(ROOT, acConfig);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(r.snapshot, null, 2) + '\n');
-    console.log(`✅ Annotation categories kept: ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}, ${r.notes} categorised note${r.notes === 1 ? '' : 's'} on ${r.nodes} node${r.nodes === 1 ? '' : 's'} → ${relative(ROOT, path)}`);
+    console.log(`✅ Annotation categories kept: ${r.categories} categor${r.categories === 1 ? 'y' : 'ies'}, ${r.notes} categorised note${r.notes === 1 ? '' : 's'} on ${r.nodes} node${r.nodes === 1 ? '' : 's'}${r.guidance ? `, and the words of ${r.guidance} note${r.guidance === 1 ? '' : 's'} outside the components (llms.txt says them${r.guidanceCut ? `; ${r.guidanceCut} did not fit in the answer: read the page alone with PAGE_IDS` : ''})` : ''} → ${relative(ROOT, path)}`);
     // What that means for the notes the checks read: the component-props snapshot's notes, by kind.
     let props = {};
     try { props = JSON.parse(readFileSync(resolve(ROOT, acConfig.paths?.compPropsSnapshot ?? 'figma-component-props.snapshot.json'), 'utf8')); } catch { /* no component snapshot yet */ }
