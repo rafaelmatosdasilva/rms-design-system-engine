@@ -78,6 +78,7 @@ import { join, resolve, dirname, relative } from 'path';
 import { spawn } from 'child_process';
 import { pathToFileURL, fileURLToPath } from 'url';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from './cdp.mjs';
+import { harnessNotDrawn } from './vue-harness.mjs';
 import { inlinePage } from './styleguide-files.mjs';
 import { loadLocator } from './component-locator.mjs';
 import { loadModes, loadCollections, combinedModes, mergeSwitches, modeSwitchFor } from './mode-resolver.mjs';
@@ -2356,6 +2357,7 @@ async function main() {
     if (!axeSource) unfinished.push(`axe-core's rules (it could not be downloaded, offline or blocked, and no copy is cached: run once online, or point ds-config.json → a11y.axePath at a local axe.min.js ${AXE_VERSION})`);
   }
   const opened = [], notOpened = [];   // a component opened by a press before it was checked, or one no press showed
+  const notDrawn = [];   // a component its own code stopped from drawing on the page of components, with why (harnessNotDrawn)
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
   // A selector the browser cannot parse is the run's, not a page's: said once at the end, so a page it was dropped from
@@ -2363,7 +2365,7 @@ async function main() {
   const invalidRoots = new Set();
   // What each page adds to the lists above, kept under its signature once it was read and finished (settle), or put
   // back from an earlier run instead of opening it.
-  const acc = { findings, axeViolations, unrendered, unread, unfinished, notJudged, accounted, heard, changes, instances, opened, notOpened, ranChecks, behavioursNotChecked, invalidRoots };
+  const acc = { findings, axeViolations, unrendered, unread, unfinished, notJudged, accounted, heard, changes, instances, opened, notOpened, notDrawn, ranChecks, behavioursNotChecked, invalidRoots };
   const reusedPages = [], cutTargets = new Set();
   let pending = null;
   const settle = () => {
@@ -2402,7 +2404,7 @@ async function main() {
     const where = target.only ? `${label} (${target.only.join(', ')})` : label;   // a part of the style guide, by its components
     pending = { target, mark: keptMark(acc), swept: sweptPlugins };
     const { targetId, sessionId } = await openPage(send, target.url);
-    stopPage = () => { cut = { target, marks: [unfinished, unread, unrendered, notOpened].map((l) => [l, l.length]) }; send('Target.closeTarget', { targetId }).catch(() => {}); };
+    stopPage = () => { cut = { target, marks: [unfinished, unread, unrendered, notOpened, notDrawn].map((l) => [l, l.length]) }; send('Target.closeTarget', { targetId }).catch(() => {}); };
     if (outOfTime) stopPage();
     try {   // the page closed by the time limit fails what was running on it: that is the stop, handled by endCut
     // up to ~10s — a dev server / SPA can be slower than a file://
@@ -2476,8 +2478,11 @@ async function main() {
     try {
       for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }, sessionId);
     } catch { /* no keyboard: the sweep still runs */ }
-    // A component the harness could not load or render is said, never counted as clean.
-    if (target.harness) for (const f of ((await send('Runtime.evaluate', { expression: 'window.__dseHarnessFailed || []', returnByValue: true }, sessionId)).result?.value ?? [])) unrendered.push(`${f.name} (${f.why})`);
+    // A component the harness could not load or render is said, never counted as clean: per component, with why.
+    if (target.harness) {
+      const said = harnessNotDrawn((await send('Runtime.evaluate', { expression: 'window.__dseHarnessFailed || []', returnByValue: true }, sessionId)).result?.value ?? []);
+      notDrawn.push(...said.notDrawn); unrendered.push(...said.unrendered);
+    }
 
     // 2. Name/role — accessibility tree (theme-independent), run once per target.
     try {
@@ -3216,6 +3221,7 @@ async function main() {
   if (!sweptPlugins) skip(unrendered.length ? `nothing rendered to check — ${unrendered.join(', ')} showed none of the design system's components within 10s.${notOpenedLine}` : 'nothing rendered to check — a --url/dev-server page did not load, or the plugin UIs are not built');
   for (const o of opened) console.log(`ℹ️  [a11y] ${o}, then checked open`);
   for (const o of notOpened) console.log(`⚠️  [a11y] not opened: ${o}; not checked open, so not clean`);
+  for (const o of notDrawn) console.log(`⚠️  [a11y] not drawn from its code: ${o}; not checked, so not clean`);
   if (unrendered.length) console.log(`⚠️  [a11y] not checked: ${unrendered.join(', ')} showed none of the design system's components within 10s`);
   if (unread.length) console.log(`⚠️  [a11y] partly not checked: the page could not be read in ${unread.join(', ')}; those results are missing, not clean`);
   if (unfinished.length) console.log(`⚠️  [a11y] partly not checked: ${unfinished.join('; ')}; those results are missing, not clean`);
@@ -3240,7 +3246,7 @@ async function main() {
     .map((b, i) => [b, i]).sort((x, y) => SEVERITY_ORDER[bucketSeverity(...x[0])] - SEVERITY_ORDER[bucketSeverity(...y[0])] || x[1] - y[1]).map(([b]) => b);
   const total = buckets.reduce((n, [, l]) => n + l.length, 0);
   const inThemes = themes.length > 1 ? ` (checked in ${themes.length} themes)` : '';
-  const partial = !!(unread.length || unrendered.length || unfinished.length || notOpened.length || leftOut.length);
+  const partial = !!(unread.length || unrendered.length || unfinished.length || notOpened.length || notDrawn.length || leftOut.length);
   const verdict = a11yVerdict(buckets, { cannot: cannot.length, partial });
   // Must-pass stops on a blocker or a warning; an advisory never stops a run.
   const stops = verdict.blockers + verdict.warnings;
@@ -3298,7 +3304,7 @@ async function main() {
     ran: [...ranChecks],
     issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const n = ownerName(f.desc); if (n) r.component = n; const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
     // What could not be read, rendered or finished: never a clean result, so an agent or CI can tell.
-    ...(unread.length || unrendered.length || unfinished.length || notOpened.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...notOpened.map((u) => `${u} (not opened)`), ...unfinished] } : {}),
+    ...(unread.length || unrendered.length || unfinished.length || notOpened.length || notDrawn.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...notOpened.map((u) => `${u} (not opened)`), ...notDrawn.map((u) => `${u} (not drawn from its code)`), ...unfinished] } : {}),
     // A component opened by a press before it was checked (a modal behind its "Show" button), and by which.
     ...(opened.length ? { opened } : {}),
     // What a check left alone on purpose, with why (a dialog drawn as a picture): neither a finding nor clean.
@@ -3322,7 +3328,7 @@ async function main() {
 
   // ── Human lane (default): plain language, no jargon ──
   console.log(`\n─── Accessibility check ${STRICT ? '(must pass)' : components.length ? `(${components.join(', ')}: each line is part of building it, unless it says to send it back to Figma)` : '(advisory — never blocks the build)'} ───\n`);
-  if (!total && (unread.length || unrendered.length || unfinished.length || notOpened.length)) {
+  if (!total && (unread.length || unrendered.length || unfinished.length || notOpened.length || notDrawn.length)) {
     console.log(`Nothing found in what could be read${inThemes}, but part of it was not checked (see ⚠️ above): not a clean result.`);
   } else if (!total) {
     console.log(`Good news: nothing to fix here${inThemes}.`);

@@ -1855,7 +1855,8 @@ if (process.argv.includes('--styleguide')) {
       } catch (e) { console.log(`   📏 Showroom not measured: ${String(e.message).split('\n')[0]}`); }
     }
     // Its Vue components: drawn from what the project's own Vite renders, or from their templates, and why.
-    if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own ${r.vue.build ?? 'build'} renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? `; the rest from their templates${r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);
+    // Each one its own code kept from drawing in some or every case is said once, with why.
+    if (r.vue) console.log(r.vue.rendered ? `   ${r.vue.rendered} of ${r.vue.of} Vue component${r.vue.of === 1 ? '' : 's'} drawn as the project's own ${r.vue.build ?? 'build'} renders ${r.vue.of === 1 ? 'it' : 'them'}${r.vue.rendered < r.vue.of ? '; the rest from their templates' : ''}${r.vue.notDrawn?.length ? `. Not drawn from their code: ${r.vue.notDrawn.join('; ')}` : r.vue.rendered < r.vue.of && r.vue.failed?.length ? ` (${r.vue.failed.map((f) => `${f.name}: ${f.why}`).join('; ')})` : ''}.` : `   Vue components drawn from their templates: ${r.vue.why ?? 'none rendered'}.`);
     for (const name of r.scope?.asked ?? SCOPE_COMPONENTS) console.log(`   ${name}: ${relative(ROOT, r.out)}#c-${name}  (its Accessibility and Parity areas)`);
     // Accessibility tried now in a browser, every variant of every component, and kept in the page: whoever opens it reads
     // the final results at once, nothing running while they read (styleguide-bake.mjs). --no-a11y-bake builds the page

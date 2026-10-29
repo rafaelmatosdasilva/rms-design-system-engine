@@ -321,3 +321,155 @@ test('an object a part reads: a date it reads left out, a field it loops over th
   assert.equal(typeof got.words.longNames, 'string', 'one it only passes on is a value');
   assert.deepEqual(got.range, { label: 'Label 1' }, 'from and startDate are dates: left out, as a page that gives none');
 });
+
+test('an object a part reads: a word method makes a field a text, a field read into an object, a compared word and a table name used', async () => {
+  const { objectSamples } = await import('../vue-harness.mjs');
+  const code = `const tint = props.option.tintColor
+if (tint.startsWith('--')) x(); else if (tint.includes('-')) y()
+const name = props.button.kind.charAt(0).toUpperCase() + props.button.kind.slice(1)
+if (props.button.kind === 'solid') z()
+props.rows.lines.length; props.rows.title.length
+const parts = { Plain: A, Money: B }
+const C = parts[props.cell.partKind]
+props.amount.params.label; props.amount.params.isQuantity; props.amount.params.from; props.amount.figure; props.amount.pinIcon`;
+  const got = objectSamples(code, ['option', 'button', 'rows', 'cell', 'amount'], { icon: 'm/home-m' }, {}, { numeric: ['amount.figure'], icons: ['amount.pinIcon'] });
+  assert.equal(typeof got.option.tintColor, 'string', 'includes beside startsWith: a text, never a list');
+  assert.equal(got.button.kind, 'solid', 'the word the code compares it with');
+  assert.ok(Array.isArray(got.rows.lines) && got.rows.lines.length === 3, 'a plural it measures: a list');
+  assert.equal(typeof got.rows.title, 'string', 'a singular it measures: a text has a length too');
+  assert.equal(got.cell.partKind, 'Plain', 'the first name of the table it looks it up in');
+  const used = objectSamples(`${code}\nif (props.cell.partKind === 'Other') w()`, ['cell'], {}, {}, { keyed: { partKind: { Money: 3 } } });
+  assert.equal(used.cell.partKind, 'Money', 'the table\'s name the project writes most, before a word it is compared with');
+  assert.deepEqual(got.amount.params, { label: 'Label 1', isQuantity: false }, 'read into further: an object of those fields, a date left out');
+  assert.equal(got.amount.figure, 1, 'passed on to a child that takes a number');
+  assert.equal(got.amount.pinIcon, 'm/home-m', 'passed on as a child\'s icon');
+});
+
+test('a value passed on to a child takes what the child declares: a number, its icon, or unset where the child falls back', async () => {
+  const { childFacing } = await import('../vue-harness.mjs');
+  const { textComponentApi } = await import('../component-source.mjs');
+  const dir = tempDir('vue-child-');
+  mkdirSync(join(dir, 'src', 'parts'), { recursive: true });
+  mkdirSync(join(dir, 'node_modules', 'acme-money-field'), { recursive: true });
+  writeFileSync(join(dir, 'node_modules', 'acme-money-field', 'package.json'), JSON.stringify({ name: 'acme-money-field', main: 'index.js' }));
+  writeFileSync(join(dir, 'node_modules', 'acme-money-field', 'index.js'), 'export default { props: { value: [String, Number], label: [String, Number] } }');
+  writeFileSync(join(dir, 'src', 'parts', 'DayGrid.vue'), '<script setup>\nconst props = defineProps({ language: Object, caption: [String, Number] })\nconst words = props.language || {}\n</script><template><ol /></template>');
+  writeFileSync(join(dir, 'src', 'parts', 'AcIcon.vue'), '<script setup>defineProps({ icon: String })</script><template><i /></template>');
+  const file = join(dir, 'src', 'CardTile.vue');
+  const text = `<template><div>
+  <day-grid :language="language" :caption="title" />
+  <acme-money-field :value="amount.figure" :label="amount.label" />
+  <ac-icon :icon="pin" />
+</div></template>
+<script setup>
+import DayGrid from './parts/DayGrid'
+defineProps({ language: Object, title: String, amount: Object, pin: String })
+</script>`;
+  const got = childFacing(dir, file, text, (f, t) => textComponentApi(f, t), undefined, { AcIcon: '/src/parts/AcIcon.vue' });
+  assert.deepEqual(got.numeric, ['amount.figure'], 'the package\'s number; a text (title, label) keeps its words');
+  assert.deepEqual(got.icons, ['pin'], 'the icon of a component the entry registers');
+  assert.deepEqual(got.fallback, ['language'], 'the child falls back from it when not given');
+});
+
+test('a text the code compares with words takes those words; a part never loads its own file by name', async () => {
+  const { comparedWords, variantsFromCode } = await import('../component-harness.mjs');
+  const text = "<script setup>\nconst props = defineProps({ view: String })\nswitch (props.view) { case 'week': a(); break; case 'month': b() }\nif (props.view === 'day') c()\n</script>";
+  assert.deepEqual(comparedWords(text, 'view'), ['day', 'week', 'month']);
+  assert.deepEqual(variantsFromCode(textComponentApi('Planner.vue', text), text).map((c) => c.label), ['default', 'view=week', 'view=month'], 'never view="View", which it would refuse');
+  const { asyncChoices } = await import('../vue-harness.mjs');
+  const dir = tempDir('vue-own-');
+  mkdirSync(join(dir, 'src', 'tiles'), { recursive: true });
+  for (const n of ['Group', 'Solid', 'Ghost']) writeFileSync(join(dir, 'src', 'tiles', `${n}.vue`), '<template><i /></template>');
+  const own = join(dir, 'src', 'tiles', 'Group.vue');
+  const src = "<script setup>\nconst props = defineProps({ tileKind: { type: String, default: 'Solid' } })\nconst part = defineAsyncComponent(() => import(`../tiles/${props.tileKind}.vue`))\n</script>";
+  assert.deepEqual(asyncChoices(dir, own, src, {}, ['tileKind'])[0].names, ['Ghost', 'Solid'], 'its own file is not one of the names');
+});
+
+test('a translation function the entry installs another way is installed the same way: set on every component, provided, mixed in, or by a setup function', () => {
+  const dir = tempDir('vue-entry-');
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  writeFileSync(join(dir, 'src', 'main.js'), `import { createApp } from 'vue'
+import App from './App.vue'
+import i18n, { LOCALE_KEY } from '@/i18n'
+import words from '@/words-mixin'
+import setupFormats from '@/setup-formats'
+import mountEverything from '@/mount-everything'
+const app = createApp(App)
+app.config.globalProperties.$tr = i18n.global.tr
+app.config.globalProperties.$alert = window.alert.bind(window)
+app.provide('translate', i18n)
+app.provide(LOCALE_KEY, i18n.global)
+app.mixin(words)
+setupFormats(app)
+mountEverything(app)
+app.mount('#app')`);
+  const got = appSetup(dir).filter((x) => x.kind !== 'import');
+  assert.deepEqual(got, [
+    { kind: 'global', name: '$tr', spec: '@/i18n', path: ['global', 'tr'] },
+    { kind: 'provide', spec: '@/i18n', key: 'translate' },
+    { kind: 'provide', spec: '@/i18n', path: ['global'], keySpec: '@/i18n', keyNamed: 'LOCALE_KEY' },
+    { kind: 'mixin', spec: '@/words-mixin' },
+    { kind: 'call', spec: '@/setup-formats' },
+  ], 'a value the entry builds (window.alert.bind) and a function that mounts are left alone');
+});
+
+test('what the page of components could not draw is said once per component, with why; only what the page could not set up is tried again', async () => {
+  const { harnessNotDrawn } = await import('../vue-harness.mjs');
+  const got = harnessNotDrawn([
+    { name: 'calendar (default)', component: 'calendar', case: 'default', of: 3, why: 'no month names' },
+    { name: 'calendar (view=month)', component: 'calendar', case: 'view=month', of: 3, why: 'no month names' },
+    { name: 'search (locked=true)', component: 'search', case: 'locked=true', of: 2, why: 'it calls field.focus() as it draws' },
+    { name: 'cell', component: 'cell', why: 'it drew nothing in any of its 1 case' },
+    { name: 'pager (default)', component: 'pager', case: 'default', of: 1, why: 'x' },
+    { name: "the app's use", why: 'i18n did not load' },
+  ]);
+  assert.deepEqual(got.notDrawn, ['calendar (no month names, in 2 of its 3 cases)', 'search (it calls field.focus() as it draws, in 1 of its 2 cases)', 'cell (it drew nothing in any of its 1 case)', 'pager (x, in every case)']);
+  assert.deepEqual(got.unrendered, ["the app's use (i18n did not load)"]);
+});
+
+test('components that need data the page does not give draw from their code, and one that cannot says why', { skip: READY, timeout: budget(300000) }, async () => {
+  const dir = tempDir('vue-data-');
+  mkdirSync(join(dir, 'src', 'components', 'parts'), { recursive: true });
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'acme', private: true, dependencies: { vue: '^3.5.0' } }));
+  writeFileSync(join(dir, 'vite.config.js'), "import vue from '@vitejs/plugin-vue'\nimport { fileURLToPath } from 'node:url'\nexport default { plugins: [vue()], resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } } }");
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+  writeFileSync(join(dir, 'src', 'main.js'), `import { createApp } from 'vue'
+import App from './App.vue'
+import i18n from '@/i18n'
+import setupFormats from '@/setup-formats'
+const app = createApp(App)
+app.config.globalProperties.$tr = i18n.global.tr
+setupFormats(app)
+app.mount('#app')`);
+  writeFileSync(join(dir, 'src', 'App.vue'), '<template><div /></template>');
+  writeFileSync(join(dir, 'src', 'i18n.js'), "export default { global: { tr: (k) => 'T:' + k } }");
+  writeFileSync(join(dir, 'src', 'setup-formats.js'), 'export default function setupFormats (app) { app.config.globalProperties.$money = (n) => n.toFixed(2) }');
+  const C = join(dir, 'src', 'components');
+  writeFileSync(join(C, 'parts', 'AmountField.vue'), "<script setup>\nimport { computed } from 'vue'\nconst props = defineProps({ value: [String, Number] })\nconst shown = computed(() => (props.value ? props.value.toFixed(2) : ''))\n</script><template><input class=\"amount\" :value=\"shown\"></template>");
+  writeFileSync(join(C, 'parts', 'DayGrid.vue'), "<script setup>\nimport { computed } from 'vue'\nconst props = defineProps({ language: Object })\nconst words = computed(() => props.language || { months: ['Jan', 'Feb'] })\n</script><template><ol class=\"grid\"><li v-for=\"m in words.months.slice(0, 1)\" :key=\"m\">{{ m }}</li></ol></template>");
+  writeFileSync(join(C, 'Converter.vue'), "<script setup>\nimport AmountField from './parts/AmountField.vue'\ndefineProps({ amount: { type: Object, required: true } })\n</script><template><div class=\"converter\"><span>{{ amount.params.label }}</span><amount-field :value=\"amount.figure\" /></div></template>");
+  writeFileSync(join(C, 'Calendar.vue'), "<script setup>\nimport DayGrid from './parts/DayGrid.vue'\ndefineProps({ language: Object })\n</script><template><div class=\"calendar\"><day-grid :language=\"language\" /></div></template>");
+  writeFileSync(join(C, 'Greeting.vue'), '<template><p class="greet">{{ $tr(\'hello\') }} {{ $money(2) }}</p></template>');
+  writeFileSync(join(C, 'Search.vue'), "<script setup>\nimport { ref, onMounted } from 'vue'\nconst props = defineProps({ locked: Boolean })\nconst field = ref(null)\nonMounted(() => field.value.focus())\n</script><template><div class=\"search\"><input v-if=\"!locked\" ref=\"field\"><span v-else>Locked</span></div></template>");
+  writeFileSync(join(C, 'Cell.vue'), "<script setup>\nimport { computed } from 'vue'\nconst props = defineProps({ value: [String, Number, Object] })\nconst content = computed(() => (props.value && typeof props.value === 'object' ? props.value.value : props.value))\n</script><template><div v-if=\"content\" class=\"cell\">{{ content }}</div></template>");
+  writeFileSync(join(C, 'Picture.vue'), '<script setup>defineProps({ count: Number })</script><template><b v-if="count">{{ count }}</b></template>');
+  const names = ['converter', 'calendar', 'greeting', 'search', 'cell', 'picture'];
+  const file = (n) => join(C, `${n.charAt(0).toUpperCase() + n.slice(1)}.vue`);
+  const r = await renderedVue(dir, {}, names, { locate: file, chromePath: CHROME, max: 4 });
+  const failed = (n) => r.failed.filter((f) => f.component === n);
+  for (const n of ['converter', 'calendar', 'greeting', 'cell']) assert.deepEqual(failed(n), [], `${n}: ${JSON.stringify(r.failed)}`);
+  assert.match(r.markup.converter, /<span>Label 1<\/span><input class="amount" value="1.00">/, 'the amount its child does arithmetic on is a number; the object it reads into is one');
+  assert.match(r.markup.calendar, /<li>Jan<\/li>/, 'the language its child falls back from is left unset');
+  assert.match(r.markup.greeting, /T:hello 2\.00/, 'what the entry sets on every component, and what its setup function installs');
+  assert.match(r.markup.cell, />Value<\/div>/, 'a value it shows as it is: words');
+  assert.match(JSON.stringify(failed('search')), /it calls field\.focus\(\) as it draws, on the element ref=\\"field\\" names, which its template does not draw in this case/, JSON.stringify(r.failed));
+  assert.equal(failed('search')[0].case, 'locked=true');
+  assert.match(failed('picture')[0]?.why ?? '', /drew nothing in any of its \d+ cases?: its template shows nothing for the props it was given \(none given for count\)/, JSON.stringify(r.failed));
+});
+
+test('a Code Connect file that writes a prop only while a property has a value never gives it that value', async () => {
+  const { harnessModule } = await import('../vue-harness.mjs');
+  const mod = harnessModule([{ name: 'x', file: '/x.vue', cases: [], role: '' }]);
+  assert.match(mod, /x\.role !== 'condition' \|\| types\.includes\(Boolean\)/, 'a condition sets only an on/off');
+  assert.match(mod, /x\.unclear \|\| x\.equals != null\) continue/, 'only a plain switch removes a part');
+});

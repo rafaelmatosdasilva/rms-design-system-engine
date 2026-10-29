@@ -8,10 +8,10 @@
 // webpack.config). A project with no Vite config but Vite and @vitejs/plugin-vue installed gets that plugin, as a new
 // Vue project has it. What it lacks is said, never worked around with a build of the engine's.
 // The variants are Figma's when it has the component, else the code's own props (component-harness.mjs variantsFromCode).
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, dirname, resolve, sep, basename } from 'node:path';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { OUT_DIR } from './names.mjs';
 import { findIconFolder, svgFiles } from './icon-folder.mjs';
@@ -212,9 +212,12 @@ export function propSamples(ROOT) {
 // A field no page writes as text: what the components that take a prop of that name declare it as (kinds), an on/off
 // off (the first of a list selected), one with options its default or first option, a number (or a field named as an
 // amount is) counted, before its own name and number. i: the item's place in its list.
+// An on/off named as one (allowClear, enableSort) is off too; a field named as an id (id, slotId) takes its
+// own name and number with no space, as an id that names an element (#target-slotId-1) is written.
 export function sampleValue(f, i, samples = {}, kinds = {}) {
   const k = kinds[f];
-  if (/^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) || k?.type === 'boolean') return i === 0 && /selected|active|current/i.test(f);
+  if (/^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) || /^(apply|allow|enable|can|should|use)[A-Z]/.test(f) || k?.type === 'boolean') return i === 0 && /selected|active|current/i.test(f);
+  if (/^(id|key|identifier)$|[a-z](Id|Key|Identifier)$/.test(f) && !k?.options?.length) return typeof samples[f] === 'string' && !/\s/.test(samples[f]) ? `${samples[f]}-${i + 1}` : `${f}-${i + 1}`;
   if (typeof samples[f] === 'string') return /icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) || k?.options?.length ? samples[f] : `${samples[f]} ${i + 1}`;
   if (k?.options?.length) return k.options.includes(k.default) ? k.default : k.options[0];
   // A number, declared as one or named as an amount is (initialValue, total, rate), is counted.
@@ -223,26 +226,148 @@ export function sampleValue(f, i, samples = {}, kinds = {}) {
 }
 
 // For each object prop the code reads fields of (cell.type, props.baseAmount.label) with none given by default, an
-// object with those fields, each as sampleValue gives it; a field it loops over or measures (months.map, rows.length)
-// a list of three; a date it reads left out (a page that gives none). So a part drawn alone, outside the parent that
-// always passes it one, draws. → { propName: object }
-export function objectSamples(text, objectProps = [], samples = {}, kinds = {}) {
+// object with those fields, each as sampleValue gives it, so a part drawn alone, outside the parent that always passes
+// it one, draws. What the code does with a field says what it is:
+// - looped over (months.map), or measured or cut (rows.length, rows.slice) when its name is plural and no word method
+//   is called on it: a list of three. A text has length, slice and includes too: tintColor.includes('-') beside
+//   tintColor.startsWith('--') is a text;
+// - read into further (amount.params.label): an object with those fields;
+// - looked up in a table of the component's own (parts[cell.partKind], with const parts =
+//   { Plain: …, Money: … }): the table's name the project's code writes most for that field (onward.keyed,
+//   keyedNames), else its first, as the table decides what it draws;
+// - else compared with a word (button.kind === 'solid'): that word;
+// - passed on to a child that takes it as a number (onward.numeric: ['amount.figure'], childFacing): a number;
+//   as its icon (onward.icons: ['pin.value']): the icon the project's pages use most;
+// - a date (disabledDates.from, range.startDate): left out, as a page that gives none.
+// Each of these holds for a field first kept in a name of its own (const labels = props.translation.monthsAbbr;
+// labels.map(...)). → { propName: object }
+const LIST_ONLY = /^(map|forEach|filter|find|findIndex|flatMap|some|every|reduce|join)$/;
+const LIST_OR_TEXT = /^(slice|length|indexOf|includes|at|concat)$/;
+const TEXT_ONLY = /^(startsWith|endsWith|charAt|charCodeAt|toLowerCase|toUpperCase|toLocaleLowerCase|toLocaleUpperCase|trim|trimStart|trimEnd|split|replace|replaceAll|padStart|padEnd|substring|substr|match|localeCompare|normalize)$/;
+const DATE_FIELD = /^(from|to|start|end|min|max)$|(date|day|month|year|time)$/i;
+export function objectSamples(text, objectProps = [], samples = {}, kinds = {}, onward = {}) {
+  const numeric = onward.numeric ?? [], icons = onward.icons ?? [];
   const src = String(text), out = {};
-  for (const p of objectProps) {
-    const fields = {};
-    for (const m of src.matchAll(new RegExp(`(?:\\bprops\\.|[^.\\w$])${p}\\??\\.([A-Za-z_$][\\w$]*)(\\??\\.(?:map|forEach|filter|find|some|every|reduce|slice|length|indexOf|includes|join)\\b|\\[)?`, 'g'))) {
-      const [, f, list] = m;
-      // A date it reads (disabledDates.from, range.start): left out, as a page that gives none; words would not be one.
-      if (!list && /^(from|to|start|end|min|max)$|(date|day|month|year|time)$/i.test(f)) continue;
-      if (fields[f] === undefined || (list && !Array.isArray(fields[f]))) fields[f] = list ? [0, 1, 2].map((i) => sampleValue(f.replace(/s$/, ''), i, samples, kinds)) : sampleValue(f, 0, samples, kinds);
+  const ID = '[A-Za-z_$][\\w$]*';
+  // The names a table of the component's own lists at its top level (const parts = { Plain: …, Money: … }).
+  const tableNames = (t) => {
+    const at = new RegExp(`\\b(?:const|let|var)\\s+${t}\\s*=\\s*\\{`).exec(src);
+    if (!at) return [];
+    const names = [];
+    let depth = 1, i = at.index + at[0].length, start = i;
+    for (; i < src.length && depth; i++) {
+      const ch = src[i];
+      if (ch === '{' || ch === '(' || ch === '[') depth++;
+      else if (ch === '}' || ch === ')' || ch === ']') depth--;
+      if ((depth === 1 && ch === ',') || depth === 0) {
+        const key = /^\s*['"]?([A-Za-z_$][\w$-]*)['"]?\s*:/.exec(src.slice(start, i))?.[1];
+        if (key) names.push(key);
+        start = i + 1;
+      }
     }
-    // A field kept in a name first and looped over by that name (const labels = props.translation.monthsAbbr;
-    // labels.map(...)): a list too.
-    for (const m of src.matchAll(new RegExp(`\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:props\\.)?${p}\\??\\.([A-Za-z_$][\\w$]*)\\s*(?:;|\\n)`, 'g'))) {
-      const [, local, f] = m;
-      if (new RegExp(`\\b${local}\\??\\.(?:map|forEach|filter|find|some|every|reduce|slice|length|indexOf|includes|join)\\b|\\b${local}\\[`).test(src)) fields[f] = [0, 1, 2].map((i) => sampleValue(f.replace(/s$/, ''), i, samples, kinds));
+    return names;
+  };
+  for (const p of objectProps) {
+    const uses = {};
+    const use = (f) => (uses[f] ??= { list: false, maybe: false, text: false, sub: new Set(), word: null, table: null });
+    // What is done with a field: a method or a field after it (p.f.map(, p.f.label), or an index (p.f[0]).
+    const after = (u, next, call, index) => {
+      if (index) u.maybe = true;
+      else if (!next) return;
+      else if (LIST_ONLY.test(next)) u.list = true;
+      else if (LIST_OR_TEXT.test(next)) u.maybe = true;
+      else if (TEXT_ONLY.test(next)) u.text = true;
+      else if (!call) u.sub.add(next);
+    };
+    const field = `(?:\\bprops\\.|[^.\\w$])${p}\\??\\.(${ID})`;
+    for (const m of src.matchAll(new RegExp(`${field}(?:\\??\\.(${ID})(\\s*\\()?|(\\[))?`, 'g'))) after(use(m[1]), m[2], m[3], m[4]);
+    for (const m of src.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${ID})\\s*=\\s*(?:props\\.)?${p}\\??\\.(${ID})\\s*(?:;|\\n)`, 'g'))) {
+      const [, local, f] = m, u = use(f);
+      for (const n of src.matchAll(new RegExp(`\\b${local}(?:\\??\\.(${ID})(\\s*\\()?|(\\[))`, 'g'))) after(u, n[1], n[2], n[3]);
+    }
+    for (const m of src.matchAll(new RegExp(`${field}\\s*===?\\s*(['"])([^'"\\n]{1,40})\\2|(['"])([^'"\\n]{1,40})\\5\\s*===?\\s*(?:props\\.)?${p}\\??\\.(${ID})`, 'g'))) {
+      const u = use(m[1] ?? m[6]);
+      u.word ??= m[3] ?? m[5];
+    }
+    for (const m of src.matchAll(new RegExp(`\\b(${ID})\\[\\s*(?:props\\.)?${p}\\??\\.(${ID})\\s*\\]`, 'g'))) {
+      const u = use(m[2]);
+      if (!u.table) { const names = tableNames(m[1]); if (names.length) u.table = names; }
+    }
+    const fields = {};
+    for (const [f, u] of Object.entries(uses)) {
+      const list = u.list || (u.maybe && !u.text && /[^s]s$/.test(f));
+      if (!list && DATE_FIELD.test(f)) continue;
+      if (list) fields[f] = [0, 1, 2].map((i) => sampleValue(f.replace(/s$/, ''), i, samples, kinds));
+      else if (u.sub.size && !u.text && !u.word) fields[f] = Object.fromEntries([...u.sub].filter((g) => !DATE_FIELD.test(g)).map((g) => [g, sampleValue(g, 0, samples, kinds)]));
+      else if (u.table) { const used = onward.keyed?.[f] ?? {}; fields[f] = [...u.table].sort((a, b) => (used[b] ?? 0) - (used[a] ?? 0))[0]; }
+      else if (u.word != null) fields[f] = u.word;
+      else if (numeric.includes(`${p}.${f}`)) fields[f] = 1;
+      else if (icons.includes(`${p}.${f}`) && typeof samples.icon === 'string') fields[f] = samples.icon;
+      else fields[f] = sampleValue(f, 0, samples, kinds);
     }
     if (Object.keys(fields).length) out[p] = fields;
+  }
+  return out;
+}
+
+// The values a component passes on, as they are, to a child component it draws (<amount-field :value="figure">,
+// <date-grid :language="language">, :value="item.amount"), and what that child declares them as (its own file, found
+// through the component's imports, the components the app's entry registers (globals: { AcIcon: '@/…/AcIcon.vue' }),
+// or the package of that name for a tag it never imports): a value its child takes
+// as a number (String or Number), a number, so a child that does arithmetic on it draws; one its child takes as its icon
+// (<ac-icon :icon="value">), an icon; a prop its child falls back
+// from when it is not given (props.language || its own), left unset, so the child's own fallback draws rather than an
+// empty one. A text (label, title, content) keeps its words. apiOf(file) → textComponentApi; readText(file) → its text.
+// → { numeric: ['figure', 'item.amount'], icons: ['value'], fallback: ['language'] }
+const TEXT_PROP = /(label|title|text|description|caption|heading|subtitle|message|hint|placeholder|content|name)$/i;
+export function childFacing(ROOT, file, text, apiOf, readText = (f) => readFileSync(f, 'utf8'), globals = {}) {
+  const src = String(text);
+  const tpl = /<template\b[\s\S]*<\/template>/.exec(src)?.[0] ?? '';
+  const script = src.replace(tpl, '');
+  const out = { numeric: [], icons: [], fallback: [] };
+  if (!tpl) return out;
+  const imports = new Map();
+  for (const m of script.matchAll(/\bimport\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g)) imports.set(m[1], m[2]);
+  const pascal = (t) => t.replace(/(^|-)(\w)/g, (_, __, c) => c.toUpperCase());
+  const squash = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const withExt = (base) => ['', '.vue', '.js', '.ts', '.mjs', '/index.vue', '/index.js', '/index.ts'].map((x) => base + x).find((f) => { try { return statSync(f).isFile(); } catch { return false; } }) ?? null;
+  const fileOf = (tag) => {
+    const spec = imports.get(tag) ?? imports.get(pascal(tag)) ?? globals[tag] ?? globals[pascal(tag)];
+    if (spec) {
+      if (/^[@~]\//.test(spec)) return withExt(join(ROOT, 'src', spec.slice(2)));
+      if (spec.startsWith('.')) return withExt(resolve(dirname(file), spec));
+      if (spec.startsWith('/')) return withExt(join(ROOT, spec));
+      try { const u = projectModule(ROOT, spec); return u ? fileURLToPath(u) : null; } catch { return null; }
+    }
+    // A tag it never imports that names a package (<vue-amount-input>, installed by the app's entry).
+    if (!tag.includes('-')) return null;
+    try { const u = projectModule(ROOT, tag); return u ? fileURLToPath(u) : null; } catch { return null; }
+  };
+  const seen = new Set();
+  for (const t of tpl.matchAll(/<([A-Za-z][\w.-]*)((?:\s+[^\s=>"'/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)*)\s*\/?>/g)) {
+    const [, tag, attrs] = t;
+    if (/^(template|component|slot|transition|transition-group|keep-alive|teleport|suspense)$/i.test(tag)) continue;
+    const binds = [...attrs.matchAll(/(?:^|\s)(?::|v-bind:)([\w-]+)\s*=\s*"\s*([^"]*?)\s*"/g)].map(([, a, e]) => [a, /^(?:props\.)?([A-Za-z_$][\w$]*)(?:\??\.([A-Za-z_$][\w$]*))?$/.exec(e)]).filter(([, e]) => e);
+    if (!binds.length) continue;
+    const child = fileOf(tag);
+    // A package's bundle of megabytes (a PDF viewer with its engine inside) is not read for its props: it says too
+    // little for the time it takes.
+    if (!child || resolve(child) === resolve(file) || (() => { try { return statSync(child).size > 1e6; } catch { return true; } })()) continue;
+    let api = null, childText = '';
+    // A child that is a script (a package's build) is read as a Vue component's options (props: { value: [String, Number] }).
+    try { childText = readText(child); api = apiOf(/\.vue$/.test(child) ? child : `${child}.vue`, childText); } catch { continue; }
+    const props = api?.props ?? {};
+    for (const [attr, e] of binds) {
+      const name = Object.keys(props).find((k) => squash(k) === squash(attr));
+      if (!name) continue;
+      const path = e[2] ? `${e[1]}.${e[2]}` : e[1];
+      const key = `${path}|${child}|${name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (/\bnumber\b/.test(props[name].type ?? '') && !TEXT_PROP.test(name) && !TEXT_PROP.test(e[2] ?? e[1]) && !out.numeric.includes(path)) out.numeric.push(path);
+      if (/icon$/i.test(name) && /\bstring\b/.test(props[name].type ?? '') && !/icon$/i.test(e[2] ?? e[1]) && !out.icons.includes(path)) out.icons.push(path);
+      if (!e[2] && props[name].default == null && fallbackProps(childText, [name]).length && !out.fallback.includes(e[1])) out.fallback.push(e[1]);
+    }
   }
   return out;
 }
@@ -348,7 +473,9 @@ export function asyncChoices(ROOT, file, text, keyed = {}, propNames = []) {
     const at = prefix.startsWith('@/') ? join(ROOT, 'src', prefix.slice(2)) : prefix.startsWith('.') ? resolve(dirname(file), prefix) : null;
     if (!at) continue;
     const dir = prefix.endsWith('/') ? at : dirname(at), start = prefix.endsWith('/') ? '' : basename(at);
-    let names = []; try { names = readdirSync(dir).filter((f) => f.startsWith(start) && f.endsWith(suffix) && f.length > start.length + suffix.length).map((f) => f.slice(start.length, f.length - suffix.length)).sort(); } catch { continue; }
+    // Never the component's own file (a group that loads its items from its own folder): a build lists a folder's files
+    // to load by name without the one that asks (import.meta.glob), so its own name loads nothing.
+    let names = []; try { names = readdirSync(dir).filter((f) => f.startsWith(start) && f.endsWith(suffix) && f.length > start.length + suffix.length && resolve(dir, f) !== resolve(file)).map((f) => f.slice(start.length, f.length - suffix.length)).sort(); } catch { continue; }
     if (!names.length) continue;
     // A table between the name and the file (fileFor(kind)): the table's names whose file is in the folder.
     if (table) {
@@ -458,9 +585,18 @@ export function teleportTargets(ROOT) {
 
 // What the project's own entry installs on its app (src/main.js: app.use(i18n), app.component('BaseIcon', BaseIcon),
 // app.directive('mask', mask)), each read from the import that names it, so each instance on the page gets the same:
-// a component that calls $t, renders <BaseIcon> or uses v-mask draws as it does in the product. The store and the router
-// are left to the page's own (appPlugins), and an option passed with a plugin is not, as it may name what the entry
-// builds around it. → [{ kind: 'use' | 'component' | 'directive', name?, spec, named? }]
+// a component that calls $t, renders <BaseIcon> or uses v-mask draws as it does in the product. A translation function
+// or any other the entry installs another way is given the same way too:
+// - set on every component (app.config.globalProperties.$t = i18n.global.t): 'global', its name and where it is read
+//   (path: ['global', 't']);
+// - provided (app.provide('translate', translate), app.provide(I18N_KEY, i18n)): 'provide', its key (a word, or an
+//   import: keySpec);
+// - mixed into every component (app.mixin(translations)): 'mixin';
+// - installed by a function of the project's own that is handed the app (setupI18n(app), registerPlugins(app)): 'call'.
+// Each in the entry's order. The store and the router are left to the page's own (appPlugins), and an option passed
+// with a plugin is not, as it may name what the entry builds around it.
+// → [{ kind: 'import' | 'use' | 'component' | 'directive' | 'global' | 'provide' | 'mixin' | 'call', name?, spec, named?,
+// path?, key?, keySpec?, keyNamed? }]
 export function appSetup(ROOT) {
   for (const entry of ['src/main.ts', 'src/main.js', 'src/main.mts', 'main.ts', 'main.js']) {
     let text = ''; try { text = readFileSync(join(ROOT, entry), 'utf8'); } catch { continue; }
@@ -483,18 +619,37 @@ export function appSetup(ROOT) {
     // component, so modules that import each other start in the order the product starts them, never halfway.
     const out = own.map((spec) => ({ kind: 'import', spec }));
     const skip = (id, src) => /^(createPinia|router)$/i.test(id) || /(^|\/)router(\/|$)|^vue-router$|^pinia$/i.test(src.spec);
-    const call = new RegExp(`\\b${app}\\s*\\.\\s*(use|component|directive)\\s*\\(([^)]*)\\)`, 'g');
+    // A value read from an import, as it is or through its fields (i18n.global.t): the import and the fields.
+    const valueOf = (expr) => { const [id, ...path] = String(expr).trim().split(/\s*\??\.\s*/); const src = /^[A-Za-z_$][\w$]*$/.test(id) && path.every((k) => /^[A-Za-z_$][\w$]*$/.test(k)) ? imports.get(id) : null; return src ? { ...src, ...(path.length ? { path } : {}) } : null; };
+    const found = [];
+    const call = new RegExp(`\\b${app}\\s*\\.\\s*(use|component|directive|provide|mixin)\\s*\\(([^)]*)\\)`, 'g');
     for (const m of text.matchAll(call)) {
       const args = m[2].split(',').map((x) => x.trim());
       if (m[1] === 'use') {
         const id = /^[A-Za-z_$][\w$]*$/.test(args[0]) ? args[0] : null, src = id && imports.get(id);
-        if (src && !skip(id, src)) out.push({ kind: 'use', ...src });
+        if (src && !skip(id, src)) found.push([m.index, { kind: 'use', ...src }]);
+      } else if (m[1] === 'mixin') {
+        const src = valueOf(args[0]);
+        if (src) found.push([m.index, { kind: 'mixin', ...src }]);
+      } else if (m[1] === 'provide') {
+        const word = /^['"]([^'"]+)['"]$/.exec(args[0] ?? '')?.[1], keySrc = word ? null : valueOf(args[0] ?? ''), src = valueOf(args[1] ?? '');
+        if (src && (word || (keySrc && !keySrc.path))) found.push([m.index, { kind: 'provide', ...src, ...(word ? { key: word } : { keySpec: keySrc.spec, ...(keySrc.named ? { keyNamed: keySrc.named } : {}) }) }]);
       } else {
         const name = /^['"]([^'"]+)['"]$/.exec(args[0] ?? '')?.[1], src = imports.get(args[1] ?? '');
-        if (name && src) out.push({ kind: m[1], name, ...src });
+        if (name && src) found.push([m.index, { kind: m[1], name, ...src }]);
       }
     }
-    return out;
+    for (const m of text.matchAll(new RegExp(`\\b${app}\\s*\\.\\s*config\\s*\\.\\s*globalProperties\\s*(?:\\.\\s*([A-Za-z_$][\\w$]*)|\\[\\s*['"]([^'"]+)['"]\\s*\\])\\s*=\\s*([A-Za-z_$][\\w$.?\\s]*?)\\s*(?:;|\\n|$)`, 'gm'))) {
+      const src = valueOf(m[3]);
+      if (src) found.push([m.index, { kind: 'global', name: m[1] ?? m[2], ...src }]);
+    }
+    // A function of the project's own handed the app and nothing else, named for what it installs (setupI18n(app),
+// registerPlugins(app)), never one that mounts it: it installs what it installs.
+    for (const m of text.matchAll(new RegExp(`(?:^|[;\\n{}])\\s*(?:await\\s+)?([A-Za-z_$][\\w$]*)\\s*\\(\\s*${app}\\s*\\)`, 'gm'))) {
+      const src = imports.get(m[1]);
+      if (src && /^(\/|@\/|~\/|\.)/.test(src.spec) && /setup|install|regist|plugin|i18n|translat|locale|provide/i.test(m[1]) && !/mount/i.test(m[1]) && !skip(m[1], src)) found.push([m.index, { kind: 'call', ...src }]);
+    }
+    return [...out, ...found.sort((a, b) => a[0] - b[0]).map(([, x]) => x)];
   }
   return [];
 }
@@ -507,13 +662,13 @@ export function appSetup(ROOT) {
 export function harnessModule(groups, styles = [], plugins = {}) {
   return `${styles.map((s) => `import ${JSON.stringify(s)};`).join('\n')}
 import { createApp, h, reactive } from 'vue';
-${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill, connect, frame, fallback }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {}, connect: connect ?? [], frame: frame ?? null, fallback: fallback ?? [] }))).replace(/</g, '\\u003c')};
+${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill, connect, frame, fallback, numeric, icons, refs }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {}, connect: connect ?? [], frame: frame ?? null, fallback: fallback ?? [], numeric: numeric ?? [], icons: icons ?? [], refs: refs ?? [] }))).replace(/</g, '\\u003c')};
 const LOAD = {
 ${groups.map((g) => `  ${JSON.stringify(g.name)}: () => import(${JSON.stringify(g.file)}),`).join('\n')}
 };
 // What the project's entry installs on its app (appSetup), each loaded once; one that does not load is said, the rest kept.
 const SETUP = [
-${(plugins.setup ?? []).map((x) => `  { kind: ${JSON.stringify(x.kind)}, name: ${JSON.stringify(x.name ?? null)}, named: ${JSON.stringify(x.named ?? null)}, load: () => import(${JSON.stringify(x.spec)}) },`).join('\n')}
+${(plugins.setup ?? []).map((x) => `  { kind: ${JSON.stringify(x.kind)}, name: ${JSON.stringify(x.name ?? null)}, named: ${JSON.stringify(x.named ?? null)}, path: ${JSON.stringify(x.path ?? [])}, key: ${JSON.stringify(x.key ?? null)}, keyNamed: ${JSON.stringify(x.keyNamed ?? null)}, load: () => import(${JSON.stringify(x.spec)})${x.keySpec ? `, keyLoad: () => import(${JSON.stringify(x.keySpec)})` : ''} },`).join('\n')}
 ];
 const squash = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
 const SAMPLES = ${JSON.stringify(plugins.samples ?? {})};
@@ -531,7 +686,7 @@ const BY_ROLE = { togglebutton: ['pressed'], toggle: ['pressed'], checkbox: ['ch
 // The props the component declares, each given the variant's value (Figma's names matched to the code's, a value
 // written as the code's own option writes it, Success as success; True and False as booleans for a Boolean prop); an
 // aria- attribute the page adds falls through to its root.
-function fit(C, props, role, options, fill = {}, connect = [], fallback = []) {
+function fit(C, props, role, options, fill = {}, connect = [], fallback = [], numeric = [], icons = []) {
   const decl = Array.isArray(C.props) ? Object.fromEntries(C.props.map((k) => [k, {}])) : (C.props || {});
   const out = {};
   for (const [d, spec] of Object.entries(decl)) {
@@ -539,12 +694,15 @@ function fit(C, props, role, options, fill = {}, connect = [], fallback = []) {
     // A code name that ends with Figma's (buttonSize for size) when no other prop does.
     const tail = Object.keys(props).filter((k) => squash(k).length > 2 && squash(d).endsWith(squash(k)) && !Object.keys(decl).some((o) => squash(o) === squash(k)));
     const types = [].concat(spec && spec.type || spec || []);
-    // The project's own Code Connect says which Figma property this prop is (size for buttonSize), first.
-    const cc = types.some((t) => t === Array || t === Object) ? null : connect.find((x) => x.code === d && x.kind !== 'instance' && (x.kind !== 'boolean' || types.includes(Boolean)));
+    // The project's own Code Connect says which Figma property this prop is (size for buttonSize), first. One it writes
+    // only while a property has a value (:figure only with showAmount on) is not that property's value: an on/off
+    // takes whether it holds (invalid while status is error), any other is left to what follows.
+    const cc = types.some((t) => t === Array || t === Object) ? null : connect.find((x) => x.code === d && x.kind !== 'instance' && !x.event && !x.unclear && (x.kind !== 'boolean' || types.includes(Boolean)) && (x.role !== 'condition' || types.includes(Boolean)));
     const ccHit = cc ? Object.keys(props).find((k) => squash(k) === squash(cc.figma)) : undefined;
     const hit = ccHit ?? Object.keys(props).find((k) => squash(k) === squash(d)) ?? Object.keys(props).find((k) => squash(k).replace(/(content|text|value|swap)$/, '') === squash(d)) ?? (tail.length === 1 ? tail[0] : undefined);
     if (hit !== undefined) {
       let v = props[hit];
+      if (cc && cc.role === 'condition' && hit === ccHit) v = (cc.equals != null ? squash(v) === squash(cc.equals) : v === true || /^(true|yes|on)$/i.test(String(v))) !== !!cc.negated;
       if (cc && cc.values && cc.values[v] != null) v = cc.values[v];
       if (typeof v === 'string' && ICONS[v] && /icon/i.test(hit + d)) v = ICONS[v];
       if (types.includes(Boolean) && typeof v === 'string') v = /^(true|yes|on)$/i.test(v);
@@ -556,12 +714,17 @@ function fit(C, props, role, options, fill = {}, connect = [], fallback = []) {
     else if ((BY_ROLE[role] || []).includes(squash(d))) out[d] = false;
     // A switch that keeps it where it is drawn instead of teleporting it away (disabledTeleport): on, so it draws in place.
     else if (types.length === 1 && types[0] === Boolean && /disabl\\w*teleport|teleport\\w*(disabled|off)/i.test(d)) out[d] = true;
+    // A text it passes on to a child as that child's icon (<ac-icon :icon="value">), none given: the icon the pages use most.
+    else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && icons.includes(d) && SAMPLES.icon != null) out[d] = SAMPLES.icon;
     // A text the code takes with no default (an icon's name, a label): the one the project's own pages pass it most.
     else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && SAMPLES[d] != null) out[d] = SAMPLES[d];
     // A text or an icon with no default and none the pages pass (buttonLabel, buttonIcon): its own name as its words, the
     // icon the pages use most, so the part it draws is there to see, show and hide.
     else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && /icon$/i.test(d) && SAMPLES.icon != null) out[d] = SAMPLES.icon;
     else if (types.length === 1 && types[0] === String && !(spec && typeof spec === 'object' && 'default' in spec) && TEXTY.test(d)) out[d] = HUMAN(d);
+    // A value it shows as it is or as an object's (value: [String, Number, Object]) with no default: words, its own name
+    // (a number when it passes it on to a child that takes one, below), so a cell that shows nothing without one draws.
+    else if (types.length > 1 && types.includes(String) && !(spec && typeof spec === 'object' && 'default' in spec) && (TEXTY.test(d) || /^value$/i.test(d))) out[d] = SAMPLES[d] != null ? SAMPLES[d] : HUMAN(d);
     // A function it calls as it draws (allowedToShowView, a formatter) and none given: one that allows, so it draws.
     else if (types.length === 1 && types[0] === Function && !(spec && typeof spec === 'object' && 'default' in spec)) out[d] = () => true;
     // A date it reads (pageDate.getFullYear()) and none given: today.
@@ -572,10 +735,13 @@ function fit(C, props, role, options, fill = {}, connect = [], fallback = []) {
     // One the code falls back from when it is not given (props.language || its own): not given, so the fallback draws.
     else if (!(spec && typeof spec === 'object' && 'default' in spec) && types.length === 1 && (types[0] === Object || types[0] === Array) && (fill[d] || !fallback.includes(d))) out[d] = fill[d] ? JSON.parse(JSON.stringify(fill[d])) : types[0] === Array ? [] : {};
   }
+  // A value it passes on to a child that takes a number (childFacing), given words: a number, so the child draws.
+  for (const d of numeric) if (typeof out[d] === 'string' && out[d].trim() !== '' && isNaN(Number(out[d]))) out[d] = 1;
   for (const [k, v] of Object.entries(props)) if (/^aria-/.test(k)) out[k] = v;
-  // Code Connect's own switches for a part (showIcon gives icon): off, the part is not given.
+  // Code Connect's own switches for a part (showIcon gives icon): off, the part is not given. Only a plain one: a part
+  // its file writes under a further condition, or reads unclearly, may be one the component always reads.
   for (const x of connect) {
-    if (x.kind !== 'boolean' || !x.code || !(x.code in out)) continue;
+    if (x.kind !== 'boolean' || !x.code || !(x.code in out) || x.unclear || x.equals != null) continue;
     const at = Object.keys(props).find((k) => squash(k) === squash(x.figma));
     const t = [].concat(decl[x.code] && decl[x.code].type || decl[x.code] || []);
     if (at !== undefined && !t.includes(Boolean) && (props[at] === false || props[at] === 'false')) delete out[x.code];
@@ -619,36 +785,62 @@ const inherit = (app) => {
 };
 const main = document.getElementById('dse-harness');
 const failed = [];
+// Why a case could not draw, said in the component's own terms where its message lets it be: a method called on an
+// element its template names (ref="field") that is not there in that case, a function its template calls that nothing
+// gives it (t(), when no translation is installed by that name).
+const explain = (g, e) => {
+  const m = String(e && e.message || e).split('\\n')[0];
+  const r = /^(\\w+)\\.value\\.(\\w+) is not a function|^Cannot read properties of (?:null|undefined) \\(reading '(\\w+)'\\)/.exec(m);
+  const called = r ? (r[1] ? g.refs.filter((x) => x.name === r[1]) : g.refs.filter((x) => x.methods.includes(r[3]))) : [];
+  if (called.length === 1) return 'it calls ' + called[0].name + '.' + (r[2] || r[3]) + '() as it draws, on the element ref="' + called[0].name + '" names, which its template does not draw in this case (' + m + ')';
+  const fn = /^(?:_ctx|\\$setup|_vm)\\.(\\w+) is not a function/.exec(m);
+  if (fn) return 'its template calls ' + fn[1] + '(), which nothing gives it: neither its own script nor anything the app\\'s entry installs (' + m + ')';
+  return m;
+};
 (async () => {
 const setup = [];
 for (const x of SETUP) {
-  try { const m = await x.load(); const v = x.named ? m[x.named] : (m.default ?? m); if (v && x.kind !== 'import') setup.push({ ...x, v }); }
+  try {
+    const m = await x.load();
+    let v = x.named ? m[x.named] : (m.default ?? m);
+    for (const k of x.path || []) v = v == null ? v : v[k];
+    let key = x.key;
+    if (x.keyLoad) { const km = await x.keyLoad(); key = x.keyNamed ? km[x.keyNamed] : km.default; }
+    if (v && x.kind !== 'import') setup.push({ ...x, v, key });
+  }
   catch (e) { if (x.kind !== 'import') failed.push({ name: 'the app\\'s ' + (x.name || x.kind), why: String(e && e.message || e).split('\\n')[0] }); }
 }
+const drawn = [], given = {};
 const install = (app) => {
   for (const x of setup) {
     try {
       if (x.kind === 'use') app.use(x.v);
       else if (x.kind === 'component' && !app._context.components[x.name]) app.component(x.name, x.v);
       else if (x.kind === 'directive' && !app._context.directives[x.name]) app.directive(x.name, x.v);
+      else if (x.kind === 'global' && !(x.name in app.config.globalProperties)) app.config.globalProperties[x.name] = x.v;
+      else if (x.kind === 'provide' && x.key != null && !(x.key in app._context.provides)) app.provide(x.key, x.v);
+      else if (x.kind === 'mixin') app.mixin(x.v);
+      else if (x.kind === 'call' && typeof x.v === 'function') x.v(app);
     } catch (e) { /* one the app already has, or that cannot be installed twice: the rest still installed */ }
   }
 };
 for (const g of GROUPS) {
   const sec = document.createElement('section'); sec.setAttribute('data-dse-component', g.name); sec.setAttribute('aria-label', g.name); main.append(sec);
   let C = null;
-  try { C = (await LOAD[g.name]()).default; } catch (e) { failed.push({ name: g.name, why: String(e && e.message || e).split('\\n')[0] }); continue; }
-  if (!C) { failed.push({ name: g.name, why: 'no component exported' }); continue; }
+  try { C = (await LOAD[g.name]()).default; } catch (e) { failed.push({ name: g.name, component: g.name, why: String(e && e.message || e).split('\\n')[0] }); continue; }
+  if (!C) { failed.push({ name: g.name, component: g.name, why: 'no component exported' }); continue; }
+  drawn.push({ g, sec, C });
   for (const c of g.cases) {
     const box = document.createElement('div'); box.className = 'dse-case'; box.setAttribute('data-dse-case', c.label); sec.append(box);
     if (g.frame) { box.style.width = g.frame[0] + 'px'; box.style.height = g.frame[1] + 'px'; }
-    const state = reactive(fit(C, c.props, g.role, g.options, g.fill, g.connect, g.fallback));
+    const state = reactive(fit(C, c.props, g.role, g.options, g.fill, g.connect, g.fallback, g.numeric, g.icons));
+    if (!given[g.name]) given[g.name] = Object.keys(state);
     const app = createApp({ render: () => h(C, { ...state, ...listeners(C, state) }) });
-    app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] });
+    app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', component: g.name, case: c.label, of: g.cases.length, why: explain(g, e) });
     app.config.warnHandler = () => {};
     inherit(app);
     install(app);
-${plugins.pinia ? "    if (!app.config.globalProperties.$pinia) app.use(createPinia());\n" : ''}${plugins.router ? "    if (!app.config.globalProperties.$router) app.use(createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] }));\n" : ''}    try { app.mount(box); } catch (e) { failed.push({ name: g.name + ' (' + c.label + ')', why: String(e && e.message || e).split('\\n')[0] }); }
+${plugins.pinia ? "    if (!app.config.globalProperties.$pinia) app.use(createPinia());\n" : ''}${plugins.router ? "    if (!app.config.globalProperties.$router) app.use(createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] }));\n" : ''}    try { app.mount(box); } catch (e) { failed.push({ name: g.name + ' (' + c.label + ')', component: g.name, case: c.label, of: g.cases.length, why: explain(g, e) }); }
     gather(box);
   }
 }
@@ -661,10 +853,41 @@ await new Promise((done) => {
   mo.observe(main, { subtree: true, childList: true, attributes: true, characterData: true });
   t = setTimeout(fin, 400); setTimeout(fin, 8000);
 });
+// A component that drew nothing in any case, with nothing thrown (its template shows nothing for what it was given):
+// said, with the props it was given none for, so the page says why of every component it does not draw.
+for (const { g, sec, C } of drawn) {
+  if (g.cases.length === 0 || failed.some((f) => f.component === g.name)) continue;
+  if ([...sec.querySelectorAll('.dse-case')].some((b) => b.firstElementChild)) continue;
+  const decl = Array.isArray(C.props) ? C.props : Object.keys(C.props || {});
+  const none = decl.filter((d) => !(given[g.name] || []).includes(d));
+  failed.push({ name: g.name, component: g.name, why: 'it drew nothing in any of its ' + g.cases.length + ' case' + (g.cases.length === 1 ? '' : 's') + ': its template shows nothing for the props it was given' + (none.length ? ' (none given for ' + none.join(', ') + ')' : '') });
+}
 window.__dseHarnessFailed = failed;
 window.__dseHarnessReady = true;
 })();
 `;
+}
+
+// What the page of components drawn from their code says it could not draw (window.__dseHarnessFailed), per component:
+// each component its own code stopped from drawing (an error it threw as it drew, a file that did not load, nothing
+// drawn) once, with why and in how many of its cases. That is the component's own and the same on every run of the same
+// files, so it is said (notDrawn) and the page is still whole and kept; what the page itself could not set up (the app's
+// i18n did not load) is not drawn for every component, and is tried again (unrendered).
+// → { notDrawn: ['planner (no month names, in 12 of its 14 cases)'], unrendered: ["the app's i18n (…)"] }
+export function harnessNotDrawn(failed = []) {
+  const notDrawn = [], unrendered = [], by = new Map();
+  for (const f of failed ?? []) {
+    if (!f?.component) { unrendered.push(`${f?.name} (${f?.why})`); continue; }
+    const g = by.get(f.component) ?? { whys: [], cases: new Set(), of: f.of ?? null, whole: false };
+    if (!g.whys.includes(f.why)) g.whys.push(f.why);
+    if (f.case != null) g.cases.add(f.case); else g.whole = true;
+    by.set(f.component, g);
+  }
+  for (const [name, g] of by) {
+    const where = g.whole || !g.of ? '' : g.cases.size >= g.of ? ', in every case' : `, in ${g.cases.size} of its ${g.of} cases`;
+    notDrawn.push(`${name} (${g.whys.slice(0, 2).join('; ')}${g.whys.length > 2 ? `; and ${g.whys.length - 2} more` : ''}${where})`);
+  }
+  return { notDrawn, unrendered };
 }
 
 // The page around the module: the system's own surface and text colour (pageColours), no motion.
@@ -694,6 +917,10 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
   const { harnessCases, variantsFromCode, pageColours, codeCases, decidedCases } = await import('./component-harness.mjs');
   const { textComponentApi, componentSourceFiles } = await import('./component-source.mjs');
   const kindsOf = () => (kinds ??= propKinds(componentSourceFiles(ROOT, cfg), (f) => { try { return textComponentApi(f, read(f)); } catch { return null; } }));
+  // A child's declared props, read once per file (a package's too).
+  const childApis = new Map();
+  const globals = Object.fromEntries(appSetup(ROOT).filter((x) => x.kind === 'component' && !x.named).map((x) => [x.name, x.spec]));
+  const childApi = (f, t) => { if (!childApis.has(f)) { let a = null; try { a = textComponentApi(f, t); } catch { /* unreadable */ } childApis.set(f, a); } return childApis.get(f); };
   for (const name of names) {
     const file = locate(name);
     if (!file) { missing.push(`${name} (no component file found)`); continue; }
@@ -720,8 +947,15 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const cases = withCaseChoices((figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max, kindsOf())).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c)), choices);
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
     const objects = Object.entries(api.props ?? {}).filter(([, d]) => /^object$/i.test(d.type ?? '') && d.default == null).map(([k]) => k);
-    const fill = withChoices({ ...objectSamples(text, objects, samples, kindsOf()), ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons, kindsOf()), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, fallback: fallbackProps(text, Object.keys(api.props ?? {})), from: fromFigma ? 'figma' : 'code' });
+    // What it passes on to the children it draws, as they take it (childFacing).
+    const declared = Object.keys(api.props ?? {});
+    const onward = childFacing(ROOT, resolve(ROOT, file), text, childApi, read, globals);
+    const fill = withChoices({ ...objectSamples(text, objects, samples, kindsOf(), { ...onward, keyed }), ...listSamples(text, declared, samples, example, icons, kindsOf()), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
+    const fallback = [...new Set([...fallbackProps(text, declared), ...onward.fallback.filter((p) => declared.includes(p) && api.props[p]?.default == null)])];
+    // The elements its template names (ref="field") and the methods its code calls on them (field.value.focus()).
+    const refs = [...new Set([...String(/<template\b[\s\S]*<\/template>/.exec(text)?.[0] ?? '').matchAll(/\sref\s*=\s*["']([A-Za-z_$][\w$]*)["']/g)].map((m) => m[1]))]
+      .map((r) => ({ name: r, methods: [...new Set([...text.matchAll(new RegExp(`\\b${r}\\.value\\??\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g'))].map((m) => m[1]))] }));
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, fallback, numeric: onward.numeric.filter((p) => declared.includes(p)), icons: onward.icons.filter((p) => declared.includes(p)), refs, from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);

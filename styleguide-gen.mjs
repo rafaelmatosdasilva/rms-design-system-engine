@@ -390,7 +390,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const screenFiles = {};
       if (!opts.only?.length) { try { for (const f of readdirSync(showroomDir)) if (/\.vue$/.test(f)) screenFiles[`showroom:${f.replace(/\.vue$/, '')}`] = relative(ROOT, join(showroomDir, f)); } catch { /* no showroom */ } }
       if ((toRender.length || Object.keys(screenFiles).length) && cfg.styleguide?.renderVue !== false) {
-        const { renderedVue } = await import('./vue-harness.mjs');
+        const { renderedVue, harnessNotDrawn } = await import('./vue-harness.mjs');
         // Every variant it has (Figma's, else its own props'), so the Playground draws each as it renders.
         const r = await renderedVue(ROOT, cfg, [...toRender, ...Object.keys(screenFiles)], { propsSnap, read, locate: (n) => vueFiles[n] ?? screenFiles[n] ?? null, max: cfg.a11y?.maxVariants ?? 16 });
         for (const [key, file] of Object.entries(screenFiles)) {
@@ -423,7 +423,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
           }
         }
         vueCss = r.css;
-        vueRender = { rendered: Object.keys(r.markup).length, of: toRender.length, why: r.why ?? null, failed: r.failed, build: r.build ?? null };
+        // Each component its own code kept from drawing, once, with why and in how many of its cases (harnessNotDrawn).
+        vueRender = { rendered: Object.keys(r.markup).length, of: toRender.length, why: r.why ?? null, failed: r.failed, notDrawn: harnessNotDrawn((r.failed ?? []).filter((f) => !String(f.name).startsWith('showroom:'))).notDrawn, build: r.build ?? null };
       }
     } catch { /* no component sources */ }
     // The token check's own result: each token equal to Figma, with its CSS variable. Run it, read it, tidy up.
