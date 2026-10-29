@@ -151,6 +151,17 @@ export function startPage({ name, code }, snap, files, { api = null } = {}) {
     ?? snap.entities.find((e) => e.kind === 'component' && e.code && files.has(e.file));
   if (!sib) return null;
   const title = words(name.replace(/\//g, ' '));
+  // A layer written as Markdown: a page beside its sibling's, laid out as it is (one file, or a folder of tabs whose main
+  // tab holds what it is for), its front matter naming its title, its code and that it is a draft. It is its own spec.
+  if (/\.(md|mdx|markdown)$/i.test(sib.file)) {
+    const ext = /\.\w+$/.exec(sib.file)[0], slug = kebab(title);
+    const md = sib.files?.length > 1 ? `${sib.file.split('/').slice(0, -2).join('/')}/${slug}/${sib.file.split('/').pop()}` : sib.file.replace(/[^/]+$/, `${slug}${ext}`);
+    const mdFile = md.replace(/^\//, '');
+    if (files.has(mdFile)) return null;
+    const text = `---\ntitle: ${title}\nkind: component\ncomponent: ${code}\nstatus: draft\n---\n`;
+    const entity = { kind: 'component', layer: sib.layer, name: title, id: slug, file: mdFile, code, purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [] };
+    return { entity, spec: mdFile, file: mdFile, files: new Map([[mdFile, text]]) };
+  }
   const file = sib.file.replace(/[^/]+$/, `${kebab(code.split('/').pop().replace(/\.\w+$/, ''))}.dsds.json`);
   const idx = specIndex(files), sibSpec = specOf(sib, idx)?.spec;
   const spec = (sibSpec ? sibSpec.replace(/[^/]+$/, '') : 'specs/components/') + `${kebab(title)}.md`;

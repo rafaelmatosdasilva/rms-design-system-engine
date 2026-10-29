@@ -257,3 +257,114 @@ function folderHost(ROOT, c) {
     },
   };
 }
+
+// ── Writing to the layer where it lives (GitHub, a folder) ──────────────────────────────────────────────────────────
+// The access the layer's changes take (intent-changes.mjs): its text files at the commit read, one commit straight on
+// its branch (only while the branch is still at that commit), or a branch and a request for the team to review. A
+// GitLab layer has its own (intent-changes.mjs → layerAccess); this one is GitHub's or a folder's.
+//   files(sha)  → Map(path → text) of the layer's JSON and Markdown files
+//   commit({ files, sha, target, message, created }) → { url, sha, said } | { error }
+//   request({ files, sha, target, title, description, branch, message, created }) → { url, branch, said } | { error }
+// files: Map(path → text, or null for a file taken out). said: what was done, in words.
+// A folder is the project's own: its changes are written there, never committed, for a person to read and commit; a
+// file changed on disk since the layer was read is not overwritten. GitHub: GITHUB_TOKEN (or GH_TOKEN) that may write
+// to the repository (contents, and pull requests for a request), sent only to api.github.com.
+export function layerWriter(ROOT, c, { env = process.env, fetchImpl = plainGet, sendImpl = null } = {}) {
+  if (c.host === 'folder') return folderWriter(ROOT, c);
+  if (c.host === 'github') return githubWriter(ROOT, c, { env, fetchImpl, sendImpl });
+  return { error: 'a GitLab layer is written through intent-changes.mjs → layerAccess' };
+}
+function folderWriter(ROOT, c) {
+  const h = folderHost(ROOT, c);
+  if (h.error) return h;
+  const read = new Map();   // what each file held when read: a file changed since is not overwritten
+  const write = async ({ files, created = new Set() }) => {
+    const moved = [];
+    for (const [f] of files) {
+      const abs = resolve(ROOT, f);
+      if (!abs.startsWith(resolve(ROOT) + sep)) return { error: `${f} is outside this project` };
+      const now = existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+      if (created.has(f) ? now !== null : read.has(f) && now !== read.get(f)) moved.push(f);
+    }
+    if (moved.length) return { error: `${moved.slice(0, 3).join(', ')}${moved.length > 3 ? ` and ${moved.length - 3} more` : ''} changed in the folder since the layer was read: run again, so the changes are made on what is there now` };
+    const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
+    for (const [f, t] of files) {
+      const abs = resolve(ROOT, f);
+      if (t === null) { rmSync(abs, { force: true }); continue; }
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, t);
+    }
+    return { url: null, sha: null, said: `written in the folder ${h.folder || '.'} (${files.size} file${files.size === 1 ? '' : 's'}), not committed: read them and commit them yourself` };
+  };
+  return {
+    kind: 'folder', writesWith: 'the project\'s own folder',
+    async files() {
+      const got = await h.files();
+      const out = new Map();
+      for (const f of got.files) { const t = f.data.toString('utf8'); out.set(f.path, t); read.set(f.path, t); }
+      return out;
+    },
+    commit: write,
+    // A folder has no review of its own: the changes are written the same way, for a person to read before committing.
+    request: write,
+  };
+}
+function githubWriter(ROOT, c, { env, fetchImpl, sendImpl }) {
+  const g = parseGithub(c.url);
+  if (!g) return { error: `${c.url} is not a GitHub repository link` };
+  const h = githubHost(ROOT, c, { env, fetchImpl });
+  const token = envFrom('GITHUB_TOKEN', env, [ROOT]) || envFrom('GH_TOKEN', env, [ROOT]);
+  const api = `https://api.github.com/repos/${g.owner}/${g.repo}`;
+  const headers = { 'User-Agent': 'rms-design-system-engine', Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  const send = async (method, path, body) => {
+    const fn = sendImpl ?? (await import('./gitlab-source.mjs')).plainSend;
+    try { return await fn(api + path, { method, headers, body }); } catch (e) { return { ok: false, status: 0, json: async () => ({ message: e.message }) }; }
+  };
+  const get = async (path) => { try { return await fetchImpl(api + path, { method: 'GET', headers }); } catch { return { ok: false, status: 0 }; } };
+  const refused = (r, what) => (r.status === 401 ? `GitHub did not accept the token (401) for ${what}: check GITHUB_TOKEN in .env`
+    : r.status === 403 || r.status === 404 ? `GitHub refused ${what} (${r.status}): the token in GITHUB_TOKEN needs to write to ${g.owner}/${g.repo} (contents${what.includes('pull request') ? ' and pull requests' : ''}), or the branch is protected`
+      : r.status === 422 ? `GitHub could not do ${what} (422): the branch may already exist, or the branch moved` : r.status ? `GitHub answered ${r.status} to ${what}` : `could not reach GitHub for ${what}`);
+  // One commit with every change on top of `parent`, and the branch moved to it (only forward, from `parent`).
+  const commitOn = async (branch, parent, files, message, created) => {
+    const pc = await get(`/git/commits/${parent}`);
+    if (!pc.ok) return { error: refused(pc, 'reading the commit') };
+    const baseTree = (await pc.json())?.tree?.sha;
+    const tree = [...files].map(([path, content]) => (content === null ? { path, mode: '100644', type: 'blob', sha: null } : { path, mode: '100644', type: 'blob', content }));
+    const t = await send('POST', '/git/trees', { base_tree: baseTree, tree });
+    if (!t.ok) return { error: refused(t, 'the commit\'s files') };
+    const cm = await send('POST', '/git/commits', { message, tree: (await t.json())?.sha, parents: [parent] });
+    if (!cm.ok) return { error: refused(cm, 'the commit') };
+    const sha = (await cm.json())?.sha;
+    const ref = await send('PATCH', `/git/refs/heads/${encodeURIComponent(branch)}`, { sha, force: false });
+    if (!ref.ok) return { error: refused(ref, `moving ${branch}`) };
+    return { sha, url: `${g.url}/commit/${sha}` };
+  };
+  return {
+    kind: 'github', writesWith: token ? 'GITHUB_TOKEN' : 'no token',
+    async files(sha) {
+      const got = await h.files(c.path ?? null, sha);
+      if (got.error) throw new Error(got.error);
+      return new Map(got.files.map((f) => [f.path, f.data.toString('utf8')]));
+    },
+    async commit({ files, sha, target, message, created = new Set() }) {
+      if (!token) return { error: `no GITHUB_TOKEN in .env that may write to ${g.owner}/${g.repo}` };
+      const r = await get(`/git/ref/heads/${encodeURIComponent(target)}`);
+      if (!r.ok) return { error: refused(r, `reading ${target}`) };
+      const head = String((await r.json())?.object?.sha ?? '');
+      if (!head.startsWith(sha) && !sha.startsWith(head)) return { error: `${target} moved since the layer was read (now ${head.slice(0, 8)}): run again, so the changes are made on what is there now` };
+      const done = await commitOn(target, head, files, message, created);
+      return done.error ? done : { ...done, said: `committed on ${target}: ${done.url}` };
+    },
+    async request({ files, sha, target, title, description, branch, message, created = new Set() }) {
+      if (!token) return { error: `no GITHUB_TOKEN in .env that may write to ${g.owner}/${g.repo}` };
+      const b = await send('POST', '/git/refs', { ref: `refs/heads/${branch}`, sha });
+      if (!b.ok) return { error: refused(b, `making the branch ${branch}`) };
+      const done = await commitOn(branch, sha, files, message, created);
+      if (done.error) return { error: `${done.error} (the branch ${branch} was made; delete it before trying again)` };
+      const pr = await send('POST', '/pulls', { title, head: branch, base: target, body: description });
+      if (!pr.ok) return { error: `${refused(pr, 'the pull request')} (the branch ${branch} holds the changes)` };
+      const url = (await pr.json())?.html_url ?? null;
+      return { url, branch, said: `pull request ${url} (branch ${branch})` };
+    },
+  };
+}
