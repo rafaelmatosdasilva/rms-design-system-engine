@@ -155,6 +155,16 @@ rms-design-system-engine --only 3               # one gate by number, or by name
 - `--baseline` needs the whole run.
 - Every option is in `reference/usage.md` (`rms-design-system-engine --reference usage`).
 
+### For an agent with no terminal
+
+A prototyping tool or a chat assistant that cannot run commands gets the same answers through MCP. Add the engine as an MCP server, pointed at your project:
+
+```bash
+claude mcp add design-system -- node ~/.claude/skills/rms-design-system-engine/mcp.mjs --project=/path/to/your/project
+```
+
+It offers four tools: `query` (a component or token, as `--query`), `catalog` (everything a screen may use), `check_ui` (as `--check-ui`) and `summary` (the last audit's). Each runs the same command, so the answers are the same as in a terminal. A folder that remembers its project (`.design-system-engine-project`) answers for that project.
+
 ## What it checks
 
 Every run compares your code with Figma and reports in plain words. The 25 gates are listed in [Features and capabilities](features.md#the-checks). Here is what a developer needs to know about each.
