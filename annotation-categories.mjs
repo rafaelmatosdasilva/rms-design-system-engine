@@ -51,28 +51,47 @@ function noteKey(text) { const t = String(text == null ? '' : text).replace(/\\s
 const cats = await figma.annotations.getAnnotationCategoriesAsync();
 const notes = {};
 const pages = PAGE_IDS.length ? (await Promise.all(PAGE_IDS.map((id) => figma.getNodeByIdAsync(id)))).filter(Boolean) : figma.root.children;
+// The words of each note outside a component (a foundations, brand or pattern page's own frames): the team's guidance
+// for the whole system, kept with where it is, within what one answer holds.
+const guidance = [];
+let room = 9000, cut = 0;
+const inComponent = (n) => { for (let p = n; p; p = p.parent) if (p.type === 'COMPONENT' || p.type === 'COMPONENT_SET' || p.type === 'INSTANCE') return true; return false; };
 for (const page of pages) {
   await page.loadAsync();
   for (const n of page.findAll((x) => Array.isArray(x.annotations) && x.annotations.length > 0)) {
     for (const a of n.annotations) if (a.categoryId) (notes[n.id] = notes[n.id] || {})[noteKey(a.label || a.labelMarkdown || '')] = a.categoryId;
+    if (inComponent(n)) continue;
+    for (const a of n.annotations) {
+      const text = String(a.labelMarkdown || a.label || '').replace(/\\s+/g, ' ').trim().slice(0, 400);
+      if (!text) continue;
+      if (text.length > room) { cut++; continue; }
+      room -= text.length;
+      guidance.push({ page: page.name, node: n.name, text, categoryId: a.categoryId || null });
+    }
   }
 }
-return JSON.stringify({ _updated: new Date().toISOString(), pages: PAGE_IDS.length ? PAGE_IDS : 'all', categories: Object.fromEntries(cats.map((c) => [c.id, { label: c.label, color: c.color }])), notes: notes });
+return JSON.stringify({ _updated: new Date().toISOString(), pages: PAGE_IDS.length ? PAGE_IDS : 'all', pageNames: pages.map((p) => p.name), categories: Object.fromEntries(cats.map((c) => [c.id, { label: c.label, color: c.color }])), notes: notes, guidance, guidanceCut: cut });
 `;
 }
 
 // Captures folded into one categories snapshot. prev: the snapshot there now (or null); captures: what the script
 // returned, one or more (a later capture of a node replaces that node). → { snapshot, nodes, notes, categories }
 export function mergeCaptures(prev = null, captures = []) {
-  const out = { categories: { ...(prev?.categories ?? {}) }, notes: { ...(prev?.notes ?? {}) } };
+  const out = { categories: { ...(prev?.categories ?? {}) }, notes: { ...(prev?.notes ?? {}) }, guidance: [...(prev?.guidance ?? [])] };
   for (const c of captures) {
     if (!c || typeof c !== 'object' || typeof c.categories !== 'object' || typeof c.notes !== 'object') throw new Error('not a capture from the annotation-categories script (no categories and notes in it)');
     Object.assign(out.categories, c.categories);
     // A page read again replaces what was known of its nodes; a node it no longer holds stays as it was.
     for (const [node, keys] of Object.entries(c.notes)) out.notes[node] = { ...keys };
+    // The words outside components: a page read again replaces what was kept of it.
+    if (Array.isArray(c.guidance)) {
+      const read = new Set(c.pageNames ?? c.guidance.map((g) => g.page));
+      out.guidance = [...out.guidance.filter((g) => !read.has(g.page)), ...c.guidance];
+      if (c.guidanceCut) out.guidanceCut = (out.guidanceCut ?? 0) + c.guidanceCut;
+    }
   }
   const notes = Object.values(out.notes).reduce((n, k) => n + Object.keys(k).length, 0);
-  return { snapshot: { _updated: new Date().toISOString(), ...out }, nodes: Object.keys(out.notes).length, notes, categories: Object.keys(out.categories).length };
+  return { snapshot: { _updated: new Date().toISOString(), ...out }, nodes: Object.keys(out.notes).length, notes, categories: Object.keys(out.categories).length, guidance: out.guidance.length, guidanceCut: out.guidanceCut ?? 0 };
 }
 
 // Where the categories snapshot is: ds-config paths.annotationCategoriesSnapshot, else beside the component-props one.
@@ -113,3 +132,11 @@ export function requirementEntry(entry = {}, cats = null, cfg = {}) {
 // it); one with no category when the engine can tell an accessibility meaning in it (a wording a check reads);
 // never a note of another kind, which is design intent.
 export const noteIsTodo = (kind, wording) => kind === 'accessibility' || (kind === null && !!wording);
+
+// The team's guidance in its own design file: the words of each note outside a component, by page, the kind its
+// category says (a note for whoever draws the file, authoring, is left out: it is not guidance for what is built).
+// → [{ page, node, text, kind }]
+export function fileGuidance(cats = null, cfg = {}) {
+  return (cats?.guidance ?? []).map((g) => ({ ...g, kind: g.categoryId ? noteKind({ categoryId: g.categoryId }, null, cats, cfg) : null }))
+    .filter((g) => g.kind !== 'authoring');
+}

@@ -85,3 +85,23 @@ test('--annotation-categories: no file writes the read-only script; the files it
   writeFileSync(join(dir, 'junk.json'), '{"hello":1}');
   assert.throws(() => run('junk.json'), /not a capture/);
 });
+
+test('the words of notes outside components are kept by page, a page read again replaces its own, and llms.txt says them; authoring notes are left out', async () => {
+  const { mergeCaptures, fileGuidance, captureScript } = await import('../annotation-categories.mjs');
+  const { buildLlms } = await import('../contract-gen.mjs');
+  // The real script, on a fake file: a note on a brand page's frame is kept, one inside a component is not.
+  const comp = { type: 'COMPONENT', name: 'tile', parent: null };
+  const inside = { type: 'TEXT', name: 'label', parent: comp, annotations: [{ label: 'Keep it short', categoryId: 'c1' }] };
+  const frame = { type: 'FRAME', name: 'Brand colour', parent: null, annotations: [{ label: 'Use the accent for one action per screen', categoryId: 'c1' }, { label: 'Draw it on the 8 pt grid', categoryId: 'c2' }] };
+  const page = { name: 'Foundations', loadAsync: async () => {}, findAll: (f) => [inside, frame].filter(f) };
+  const figma = { root: { children: [page] }, annotations: { getAnnotationCategoriesAsync: async () => [{ id: 'c1', label: 'Intent', color: 'blue' }, { id: 'c2', label: 'Authoring', color: 'grey' }] } };
+  const answer = JSON.parse(await new Function('figma', `return (async () => {\n${captureScript()}\n})()`)(figma));
+  assert.deepEqual(answer.guidance.map((g) => [g.page, g.node, g.text]), [['Foundations', 'Brand colour', 'Use the accent for one action per screen'], ['Foundations', 'Brand colour', 'Draw it on the 8 pt grid']]);
+  const prev = { categories: {}, notes: {}, guidance: [{ page: 'Foundations', node: 'Old', text: 'gone' }, { page: 'Patterns', node: 'Forms', text: 'One column', categoryId: 'c1' }] };
+  const { snapshot, guidance } = mergeCaptures(prev, [answer]);
+  assert.equal(guidance, 3, 'the page read again replaced its own; the other page kept');
+  const said = fileGuidance(snapshot, {});
+  assert.deepEqual(said.map((g) => g.text), ['One column', 'Use the accent for one action per screen'], 'the note for whoever draws the file is left out');
+  const text = buildLlms([], {}, 0, null, { guidance: said });
+  assert.match(text, /## The design file's own guidance\n\nNotes the team wrote in Figma outside any component[^\n]*\n- Patterns:\n    - Forms \(intent\): One column\n- Foundations:\n    - Brand colour \(intent\): Use the accent for one action per screen/);
+});
