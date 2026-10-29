@@ -131,6 +131,11 @@ test('a role is checked when every Figma prop is a state: a field with no real i
   const r = gate();
   assert.equal(r.status, 1);
   assert.match(r.stdout, /field: Figma's annotation says role textbox; the code needs an <input> or <textarea>/);
+  // Its field inside another component's shadow root, its label outside: said apart, as wiring no browser makes yet.
+  writeFileSync(join(dir, 'src/components/Field.jsx'), readFileSync(join(dir, 'src/components/Field.jsx'), 'utf8').replace('<div className="field-value">{value}</div>', '<><label htmlFor="q">Query</label><acme-input id="q" /></>'));
+  const shadowed = gate().stdout;
+  assert.match(shadowed, /ℹ️ NOT YET +1 +\(a part's wiring no browser makes yet - advisory\)/);
+  assert.match(shadowed, /─── Wiring no browser makes yet \(advisory\) ──\n +ℹ️ field: its <label> is outside <acme-input>, whose field sits inside its shadow root, where an id cannot reach/);
 });
 
 test('a React component is drawn as the JSX it returns: its element, its children, its default text', async () => {

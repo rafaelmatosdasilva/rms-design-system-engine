@@ -568,6 +568,11 @@ export const A11Y_GUIDE = {
     why: 'Figma marks an inner layer as the label, the error message, the indicator or a step button of its component. Each owes the control something: a label names it, an error message is linked while it shows, an indicator stays silent, a step button has a name.',
     fix: 'Wire the part as the finding says (a <label for>, aria-describedby, aria-hidden="true", aria-label), or correct the annotation in Figma.',
   },
+  partnotyet: {
+    title: (n) => `${plural(n, 'label is', 'labels are')} outside the shadow root its control sits in: wiring no browser makes yet`,
+    why: 'The label is outside another component, and the control it names is inside that component\'s shadow root. An id does not reach into a shadow root, so neither a <label for> nor aria-labelledby can tie them: browsers are still adding a way (reference target). Until one ships, a screen reader may hear the control without its name.',
+    fix: 'Meanwhile, give the control its name inside the component (pass the label\'s words in, for its own <label> or aria-label), or make the component form-associated so the label names the component itself.',
+  },
   behaviour: {
     title: (n) => `${plural(n, 'component does', 'components do')} not behave as its role or its Figma note says`,
     why: 'What a person can do with a component comes with its role: Space flips a toggle, a click opens a disclosure, a tab takes the selection, a text box takes typing. Figma notes can add more (Escape closes, the arrow keys move).',
@@ -594,14 +599,14 @@ export const A11Y_GUIDE = {
 // warning.
 export const A11Y_BLOCKER = new Set(['contrast', 'hovercontrast', 'statecontrast', 'stateedge', 'iconcontrast', 'boundary', 'focuscontrast', 'name', 'focus', 'keyboard', 'tabtrap', 'target', 'zoom', 'reflow', 'spacing', 'obscured',
   'escape', 'modalescape', 'tapcontent', 'focusreturn', 'activate', 'arrows', 'textalt', 'captions', 'autoaudio', 'dupid', 'aria', 'emptylabel', 'labelname', 'context', 'hovercontent', 'onfocus', 'oninput', 'pause', 'flash', 'authpaste']);
-export const A11Y_ADVISORY = new Set(['focusthin', 'motion', 'target44', 'cvdcontrast', 'cvdvariant']);
+export const A11Y_ADVISORY = new Set(['focusthin', 'motion', 'target44', 'cvdcontrast', 'cvdvariant', 'partnotyet']);
 export const severityOf = (kind) => (A11Y_BLOCKER.has(kind) ? 'blocker' : A11Y_ADVISORY.has(kind) ? 'advisory' : 'warning');
 // A bucket's severity: an axe-core rule carries its own (from its impact), every other kind the one above.
 export const bucketSeverity = (kind, list = []) => list[0]?.severity ?? severityOf(kind);
 const SEVERITY_ORDER = { blocker: 0, warning: 1, advisory: 2 };
 // The order the report lists the kinds in, within each severity; a kind not listed comes after these.
 export const A11Y_ORDER = ['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'name', 'focus', 'focuscontrast', 'ariastate', 'keyboard', 'tooltipname', 'target', 'tabtrap', 'tabindex', 'pageorder', 'focushidden',
-  'escape', 'modalescape', 'tapcontent', 'unannounced', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole',
+  'escape', 'modalescape', 'tapcontent', 'unannounced', 'focusreturn', 'heading', 'activate', 'arrows', 'obscured', 'zoom', 'motion', 'forcedfocus', 'focusthin', 'spacing', 'reflow', 'semantics', 'rolecontract', 'annotation', 'partrole', 'partnotyet',
   'behaviour', 'statefollows', 'forcedcontrast', 'forcedstate', 'target44', 'cvdcontrast', 'cvdvariant'];
 // The kinds whose same element failing the same way in many places is one finding with a count.
 export const A11Y_GROUPED = new Set(['contrast', 'hovercontrast', 'statecontrast', 'iconcontrast', 'cvdcontrast']);
@@ -3093,7 +3098,8 @@ async function main() {
         const parts = annotated.length ? annotated : partsFromNames((contract[comp]?.children ?? []).map((c) => c.name), roles[comp] ?? null);
         for (const { layer, part, fromName } of parts) {
           const partSel = (contract[comp]?.children ?? []).find((c) => String(c.name ?? '').toLowerCase() === String(layer).toLowerCase())?.cssSelector ?? null;
-          for (const problem of (await evalv(partRoleExpression(sel, partSel, layer, part))) ?? []) findings.push({ kind: 'partrole', plugin: label, desc: `${comp}: ${problem}${fromName ? ' (the part read from its layer\'s name: annotate it in Figma to confirm)' : ''}` });
+          // A label outside the shadow root its control sits in is said apart: wiring no browser makes yet.
+          for (const problem of (await evalv(partRoleExpression(sel, partSel, layer, part))) ?? []) findings.push({ kind: problem?.notYet ? 'partnotyet' : 'partrole', plugin: label, desc: `${comp}: ${problem?.notYet ?? problem}${fromName ? ' (the part read from its layer\'s name: annotate it in Figma to confirm)' : ''}` });
         }
         const plan = behavioursFor(roles[comp] ?? '', entry.annotations ?? [], authored[comp]?.behaviourExceptions ?? {});
         for (const w of plan.weak) findings.push({ kind: 'behaviour', plugin: label, desc: `${comp}: the exception for "${w.id}" gives no link to the decision (an ADR or a pull request), so it is still checked` });

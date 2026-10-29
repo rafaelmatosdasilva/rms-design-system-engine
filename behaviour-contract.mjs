@@ -128,6 +128,23 @@ export function behavioursFor(role, annotations = [], exceptions = {}) {
 export const behaviourSheetLines = (role) => (BEHAVIOURS[roleKey(role)] ?? []).map((r) => r.sheet ?? r.says);
 export const partSheetLines = (parts) => parts.map((p) => `the "${p.layer}" part ${PART_ROLES[p.part]}`);
 
+// The parts a component is built with, for its build sheet: Figma's annotated parts, else the ones its layers' names
+// say (a control only). layers: every layer name its variants show (the structure snapshot).
+export function buildSheetParts(entry = {}, layers = [], role = null) {
+  const annotated = partRolesOf(entry);
+  return annotated.length ? annotated : partsFromNames(layers, role);
+}
+
+// A field's label, error, hint and indicator are read in its own source first (partWiringFindings); every part is
+// tried in the browser.
+const PART_IN_SOURCE = new Set(['label', 'errormessage', 'description', 'indicator']);
+export const partCheckedWhere = (part, role = null) => (PART_IN_SOURCE.has(part) && FIELD_ROLES.test(norm(role)) ? 'read in its source, then tried in the browser' : 'tried in the browser');
+
+// The build sheet's lines for the parts: each with its role, the wiring it owes the control, and where that wiring is
+// checked once the component exists; a part read from a layer's name says so.
+export const partBuildLines = (parts, role = null) => parts.map((p) =>
+  `the "${p.layer}" part (role ${p.part}) ${PART_ROLES[p.part]}. Checked: ${partCheckedWhere(p.part, role)}${p.fromName ? ' (read from the layer\'s name: annotate it in Figma to confirm)' : ''}`);
+
 // ── In the page ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 // The first usable instance of a component, marked so the steps find it again; its control (the instance, or the first
@@ -202,7 +219,8 @@ export function behaviourExpression(mark, row, phase) {
 }
 
 // What each annotated part owes, on up to 20 instances. partSelector: the contract's cssSelector for the layer, else
-// the element whose class carries the layer's name. Returns the problems as short sentences.
+// the element whose class carries the layer's name. Returns the problems as short sentences, and { notYet } for a
+// label outside the shadow root its control sits in (wiring no browser makes yet, a finding of its own).
 export function partRoleExpression(selector, partSelector, layer, part) {
   return `(() => {
     let els; try { els = [...document.querySelectorAll(${JSON.stringify(selector)})].slice(0, 20); } catch { return []; }
@@ -225,7 +243,7 @@ export function partRoleExpression(selector, partSelector, layer, part) {
       if (part === 'value') return el.querySelector('[role=spinbutton],[role=slider],input:not([type=hidden])');
       return null;
     };
-    const out = new Set();
+    const out = new Set(), notYet = new Set();
     let seen = 0;
     for (const el of els) {
       const p = find(el);
@@ -260,6 +278,15 @@ export function partRoleExpression(selector, partSelector, layer, part) {
         }
         continue;
       }
+      // A label whose control sits inside another component's shadow root: an id does not reach into it, so neither
+      // for= nor aria-labelledby can tie them, whatever the code writes. Said apart, as wiring no browser makes yet.
+      if (part === 'label' && !c) {
+        const id = p.getAttribute('for');
+        const target = id ? (el.getRootNode().getElementById ? el.getRootNode().getElementById(id) : document.getElementById(id)) : null;
+        const hosts = [...(target ? [target] : []), ...el.querySelectorAll('*')].filter((x) => x !== p && !p.contains(x));
+        const host = hosts.find((x) => x.shadowRoot && x.shadowRoot.querySelector(CONTROL)) || (target && target.localName.includes('-') && !target.shadowRoot ? target : null);
+        if (host) { notYet.add('its "' + layer + '" part (label) is outside <' + host.localName + '>, whose control sits inside its ' + (host.shadowRoot ? '' : 'closed ') + 'shadow root, where an id cannot reach: wiring no browser makes yet'); continue; }
+      }
       if (!c) { say('belongs to no control inside the component'); continue; }
       if (part === 'label') {
         const tied = (c.labels && [...c.labels].some((l) => l === p || l.contains(p) || p.contains(l))) || ids(c.getAttribute('aria-labelledby')).some((id) => id === p.id && p.id) || (p.tagName === 'LABEL' && p.contains(c));
@@ -281,7 +308,7 @@ export function partRoleExpression(selector, partSelector, layer, part) {
         if (!(p.id && ids(c.getAttribute('aria-controls')).includes(p.id))) say('is not named by its control\\'s aria-controls');
       }
     }
-    return seen ? [...out] : ['no instance shows its "' + layer + '" part: not checked'];
+    return seen ? [...out, ...[...notYet].map((s) => ({ notYet: s }))] : ['no instance shows its "' + layer + '" part: not checked'];
   })()`;
 }
 
@@ -347,5 +374,23 @@ export function partWiringFindings(source = '', role = null) {
   if (has(/helper|hint|description/) && !bound('aria-describedby')) out.push('its hint joined with aria-describedby');
   const indicator = [...tpl.matchAll(/<([a-z][\w-]*)\b([^>]*\bclass\s*=\s*["'][^"']*(?:chevron|checkmark|arrow)[^"']*["'][^>]*)>/gi)];
   if (indicator.some((m) => !/aria-hidden/.test(m[2]))) out.push('its indicator (a chevron, a check) silent for screen readers (aria-hidden="true")');
+  return out;
+}
+
+// A field's label written outside another component that holds the field in its shadow root (<label for="q"> and
+// <acme-input id="q">): an id does not reach into a shadow root, so no browser ties them yet, whatever is written. Said
+// apart from what the field needs, as wiring no browser makes yet. → [sentence]
+export function partWiringNotYet(source = '', role = null) {
+  if (!FIELD_ROLES.test(String(role ?? ''))) return [];
+  const tpl = /<template\b[\s\S]*<\/template>/.exec(String(source))?.[0] ?? String(source);
+  if (/<(input|textarea|select)\b/i.test(tpl)) return [];
+  const out = [];
+  const valueOf = (attrs, names) => new RegExp(`(?:^|\\s)(?::|v-bind:)?(?:${names})\\s*=\\s*(?:"([^"]*)"|'([^']*)'|\\{([^}]*)\\})`, 'i').exec(attrs)?.slice(1).find((x) => x != null)?.trim();
+  for (const m of tpl.matchAll(/<label\b([^>]*)>/gi)) {
+    const id = valueOf(m[1], 'for|htmlFor');
+    if (!id) continue;
+    const host = [...tpl.matchAll(/<([a-z][\w]*-[\w-]*)\b([^>]*)>/gi)].find((h) => valueOf(h[2], 'id') === id);
+    if (host) out.push(`its <label> is outside <${host[1]}>, whose field sits inside its shadow root, where an id cannot reach: wiring no browser makes yet`);
+  }
   return out;
 }
