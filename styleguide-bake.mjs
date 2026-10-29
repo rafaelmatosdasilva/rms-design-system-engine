@@ -119,14 +119,27 @@ export async function bakeA11y(file, { saved = null, chromePath = process.env.CH
       all.push(...parts);
       if (parts.some((p) => p.dead)) break;   // a page whose script stopped stops in every theme: said once
     }
-    close();
     const parts = all;
     writeFileSync(file, withBaked(readFileSync(file, 'utf8'), { at: new Date().toISOString(), themes: byTheme }));
+    // The Status page's numbers with every result now in it, read once in the default theme, for the record of their
+    // trend (health-history.mjs): { area: percent }, a number it could not measure null; null when the page says none.
+    let health = null;
+    if (!all.some((p) => p.dead)) {
+      try {
+        const { targetId, sessionId } = await openPage(send, `file://${file}?brand=default#status`);
+        await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId).catch(() => {});
+        await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { attempts: 1200, tolerateErrors: true });
+        const h = await send('Runtime.evaluate', { expression: 'JSON.stringify(window.__sgHealthNow ? window.__sgHealthNow() : null)', returnByValue: true }, sessionId).catch(() => null);
+        try { health = JSON.parse(h?.result?.value || 'null'); } catch { health = null; }
+        await send('Target.closeTarget', { targetId }).catch(() => {});
+      } catch { health = null; }
+    }
+    close();
     const reused = saved ? Object.keys(byTheme).reduce((t, th) => t + Object.keys(byTheme[th]).filter((n) => saved[th]?.[n] && saved[th][n].sig === byTheme[th][n].sig).length, 0) : 0;
     const results = byTheme[themes[0]] ?? {};
     // The open tasks, only when every page said them: a page that could not leaves the record as it was.
     const open = parts.every((p) => Array.isArray(p.open)) ? [...new Set(parts.flatMap((p) => p.open))] : null;
     const triedAll = Object.values(byTheme).reduce((t, r) => t + Object.keys(r).length, 0);
-    return { results, themes: byTheme, themeList: themes, triedAll, open, reused, tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, dead: parts.some((p) => p.dead), errors: [...errors], ms: Date.now() - t0 };
+    return { results, themes: byTheme, themeList: themes, triedAll, open, health, reused, tried: Object.keys(results).length, of: Math.max(0, ...parts.map((p) => p.of)), unfinished: parts.filter((p) => !p.done).length, dead: parts.some((p) => p.dead), errors: [...errors], ms: Date.now() - t0 };
   } finally { kill(); }
 }

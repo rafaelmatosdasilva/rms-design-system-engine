@@ -40,6 +40,7 @@ import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom,
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { runBy } from './decided-by.mjs';
 import { isOwnFile, linksOf, ASSETS } from './styleguide-files.mjs';
+import { HEALTH_FILE, mergeHealthFiles } from './health-history.mjs';
 
 export const PARTS = ['snapshots', 'intentLayer', 'contracts', 'kept', 'styleguide', 'decisions', 'themes', 'prototypes'];
 export const LABEL = { snapshots: 'Snapshots', intentLayer: 'Intent layer', contracts: 'Contracts', kept: 'Kept differences', styleguide: 'Style guide', decisions: 'Team decisions', themes: 'Themes', prototypes: 'Prototypes' };
@@ -70,6 +71,10 @@ const TAKES = {
   // themes are. A prototype is the team's work like a decision is, and until now it lived on whoever drew it.
   prototypes: (rel) => /^[^/]+\.(json|vue|jsx|tsx|svelte|html?)$/i.test(rel),
 };
+// A file whose two copies are merged rather than one chosen, because each entry in it carries its own stamp: the
+// Status page's numbers per release (health-history.mjs), each release keeping the numbers measured from the newer
+// inputs. (mine, theirs, { ROOT }) → the merged file's text.
+const MERGE = { snapshots: { [HEALTH_FILE]: mergeHealthFiles } };
 const ROLE = { 0: 'no access', 5: 'Minimal access', 10: 'Guest', 15: 'Planner', 20: 'Reporter', 30: 'Developer', 40: 'Maintainer', 50: 'Owner' };
 const roleOf = (n) => ROLE[n] ?? `access level ${n}`;
 const hash = (b) => createHash('sha1').update(b).digest('hex');
@@ -515,7 +520,7 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
       }
     }
   } catch (e) { return { line: `⚠️  ${label} not read from ${describePlace(place)}: ${e.message}`, changed: false, written: [] }; }
-  const written = [], kept = [], keptNewer = [], newer = [], files = { ...(prev.files ?? {}) };
+  const written = [], kept = [], keptNewer = [], newer = [], merged = [], files = { ...(prev.files ?? {}) };
   const { stampIn, compareStamps } = await import('./stamp.mjs');
   const base = resolve(ROOT, part === 'themes' ? THEMES_DIR : part === 'prototypes' ? PROTOTYPES_DIR : '.');
   for (const [rel, data] of remote) {
@@ -526,6 +531,8 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
     const here = existsSync(fp) ? hash(readFileSync(fp)) : null;
     if (here === there) { files[rel] = there; continue; }
     if (here && prev.files?.[rel] !== here) {                                // changed here and there since the last read
+      const merge = MERGE[part]?.[rel];
+      if (merge) { writeFileSync(fp, merge(readFileSync(fp, 'utf8'), Buffer.from(data).toString('utf8'), { ROOT })); merged.push(rel); files[rel] = there; continue; }
       const mine = stampIn(readFileSync(fp, 'utf8'), rel), theirs = stampIn(Buffer.from(data).toString('utf8'), rel);
       const c = mine && theirs ? compareStamps(theirs, mine, { ROOT }) : null;   // is this computer's older?
       if (!c?.older) { (mine && theirs && compareStamps(mine, theirs, { ROOT }).older ? keptNewer : kept).push(rel); continue; }
@@ -538,6 +545,7 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
   const at = `${describePlace(place)}${sha ? ` ${sha.slice(0, 8)}` : ''}`;
   const lines = [];
   if (written.length) lines.push(`📥 ${label}: ${written.length} file${written.length === 1 ? '' : 's'} from ${at}${newer.length ? `, ${newer.map((n) => n.rel).join(', ')} over this computer's, built from older inputs (${newer.map((n) => n.why).join('; ')})` : ''}`);
+  if (merged.length) lines.push(`🔀 ${label}: ${merged.join(', ')} changed here and in ${describePlace(place)}: merged, each entry as measured from the newer inputs`);
   if (keptNewer.length) lines.push(`ℹ️  ${label}: ${keptNewer.join(', ')} changed here and in ${describePlace(place)}: this computer's kept, built from newer inputs${part === 'snapshots' ? ' (send it with --refresh-snapshots)' : ''}`);
   if (kept.length) lines.push(`⚠️  ${label}: ${kept.join(', ')} changed here and in ${describePlace(place)}, from inputs that cannot be ordered: this computer's kept${part === 'snapshots' ? ' (send it with --refresh-snapshots, or delete it to take the store\'s)' : ''}`);
   return { line: lines.join('\n') || null, changed: written.length > 0, written, kept: [...keptNewer, ...kept] };
@@ -697,6 +705,13 @@ async function mergeMoved(ROOT, part, api, pre, head, sendable, prev, force = fa
     const take = () => { if (inside) { mkdirSync(dirname(here), { recursive: true }); writeFileSync(here, there); } };
     const local = existsSync(here) ? hash(readFileSync(here)) : null;
     if (ours === read && local === read) { take(); out.took.push(rel); continue; }   // only the store changed it: taken here
+    const merge = MERGE[part]?.[rel];
+    if (merge) {                                                              // both changed it, entry by entry: merged
+      const both = Buffer.from(merge(there.toString('utf8'), Buffer.from(data).toString('utf8'), { ROOT }));
+      if (inside) { mkdirSync(dirname(here), { recursive: true }); writeFileSync(here, both); }
+      if (hash(both) === theirs) out.took.push(rel); else out.send.push([rel, both]);
+      continue;
+    }
     const a = stampIn(there.toString('utf8'), rel), b = stampIn(Buffer.from(data).toString('utf8'), rel);
     const mineOlder = a && b ? compareStamps(a, b, { ROOT }) : null, theirsOlder = a && b ? compareStamps(b, a, { ROOT }) : null;
     if (mineOlder?.older && !force) { take(); out.kept.push({ rel, why: mineOlder.why.join('; ') }); }
