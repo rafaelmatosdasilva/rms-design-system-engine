@@ -950,6 +950,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     const allCss = [systemCss, ...(ctx?.componentSheets ?? []).map(readText)].join('\n');
     // What uses each token, for the page's "What uses it" view.
     // When the page was built: a row read then (its code, the team's notes, a stand-in) says so in its Updated column.
+    // Who owns each layer or component (ds-config.json owners), for the Tasks list to name the team after who acts.
+    if (cfg.owners && typeof cfg.owners === 'object') view.owners = cfg.owners;
     view.builtAt = new Date().toISOString();
     // What it was built from: the code commit, the Figma version and the engine, also in the page's <head>.
     view.built = buildStamp(ROOT, { vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), at: view.builtAt });
