@@ -304,6 +304,8 @@ For whoever keeps the Figma file, it lists a colour, radius, padding, gap or tex
 
 Code can only match what Figma states, so the summary says first when the file is not reliable enough to compare.
 
+**Dev Mode, from the code.** `--figma-edits` also offers to link each component set to its code file (a Dev resource) and to give each variable its CSS name as its Web code syntax (`var(--name)`), so Dev Mode and the Figma MCP hand developers and agents the names the code uses. Like every edit there, nothing is written until you say yes; a link already there is left, and a variable whose code syntax said something else is changed and listed. `devMode: false` in `ds-config.json` leaves them out.
+
 - Under 90% of its values bound to a token or style, or of its variants in auto layout, it is only partly reliable.
 - Under 60%, a match or a difference can be chance, and the least reliable components are named.
 

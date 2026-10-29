@@ -299,7 +299,7 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
 
 // What changes a Figma file in a plugin script: an assignment to a node's properties, or a call that creates, removes,
 // moves or edits. A script without one only reads.
-const FIGMA_WRITE = /\.(annotations|name|description|characters|fills|strokes|effects|visible|opacity|x|y|cornerRadius|layoutMode|itemSpacing|padding\w*)\s*=(?!=)|\bfigma\.create\w*\(|\.(remove|resize|appendChild|insertChild|setProperties|editComponentProperty|addComponentProperty|deleteComponentProperty|setValueForMode|setBoundVariable\w*|swapComponent|detachInstance|set|setPluginData|setSharedPluginData)\s*\(/;
+const FIGMA_WRITE = /\.(annotations|name|description|characters|fills|strokes|effects|visible|opacity|x|y|cornerRadius|layoutMode|itemSpacing|padding\w*)\s*=(?!=)|\bfigma\.create\w*\(|\.(remove|resize|appendChild|insertChild|setProperties|editComponentProperty|addComponentProperty|deleteComponentProperty|setValueForMode|setBoundVariable\w*|swapComponent|detachInstance|set|setPluginData|setSharedPluginData|setVariableCodeSyntax|removeVariableCodeSyntax|addDevResourceAsync|editDevResourceAsync|deleteDevResourceAsync)\s*\(/;
 // A yes to what was shown: an approval, or a request to make the change.
 const APPROVES = /^\s*(yes|yeah|yep|ok(ay)?|sure|go( ahead)?|do it|please do|apply( them| it)?|sim|pode|manda)\b/i;
 const norm = (t) => String(t ?? '').replace(/\s+/g, ' ').trim();

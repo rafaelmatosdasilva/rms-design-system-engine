@@ -244,3 +244,23 @@ test('a construction fix renames the component itself, or a layer in every varia
   assert.deepEqual(out.changed, ['Promo Banner → promoBanner', 'Promo Banner › Frame 12 → Content (2 layers)']);
   assert.match(editLines([{ kind: 'rename', component: 'Promo Banner', what: 'layer', from: 'Frame 12', to: 'Content' }]).join('\n'), /Promo Banner: the layer "Frame 12" → "Content"/);
 });
+
+test('Dev Mode: each component linked to its code once, each variable its CSS name as Web code syntax, one written otherwise said', async () => {
+  const { devModeEdits, applyScript, editLines } = await import('../figma-edits.mjs');
+  const edits = devModeEdits([{ component: 'tileCard', nodeId: '1:2', file: 'src/TileCard.vue', url: 'https://git.example.com/kit/-/blob/main/src/TileCard.vue' }, { component: 'tileRow', nodeId: '9:9', file: 'src/TileRow.vue', url: 'https://git.example.com/kit/-/blob/main/src/TileRow.vue' }],
+    [{ variable: 'kit/tile/color', css: '--kit-tile-color' }, { variable: 'kit/tile/text/color', css: '--kit-tile-text' }]);
+  assert.deepEqual(edits.find((e) => e.kind === 'codesyntax').except, { 'kit/tile/text/color': '--kit-tile-text' }, 'only the names the plain rule does not give travel in the script');
+  const links = [];
+  const node = { addDevResourceAsync: async (url, name) => links.push([url, name]), getDevResourcesAsync: async () => [] };
+  const set = {};
+  const variable = (name, web) => ({ name, codeSyntax: web ? { WEB: web } : {}, setVariableCodeSyntax: (p, v) => { set[name] = [p, v]; } });
+  const figma = { getNodeByIdAsync: async (id) => (id === '1:2' ? node : null), variables: { getLocalVariablesAsync: async () => [variable('kit/tile/color', 'var(--kit-tile-color)'), variable('kit/tile/text/color', 'var(--old-text)'), variable('kit/tile/size')] } };
+  const r = await new Function('figma', `return (async () => {\n${applyScript(edits)}\n})()`)(figma);
+  assert.deepEqual(links, [['https://git.example.com/kit/-/blob/main/src/TileCard.vue', 'src/TileCard.vue']]);
+  assert.deepEqual(r.missing, ['tileRow'], 'a node not in the file is said, never invented');
+  assert.deepEqual(set, { 'kit/tile/text/color': ['WEB', 'var(--kit-tile-text)'], 'kit/tile/size': ['WEB', 'var(--kit-tile-size)'] }, 'one already right is left');
+  assert.deepEqual(r.otherSyntax, ['kit/tile/text/color: var(--old-text) → var(--kit-tile-text)']);
+  const lines = editLines(edits).join('\n');
+  assert.match(lines, /Dev Mode links to the code \(2 components linked to their code file in Dev Mode\)/);
+  assert.match(lines, /NEXT: show the person the Dev Mode links and code syntax above/);
+});
