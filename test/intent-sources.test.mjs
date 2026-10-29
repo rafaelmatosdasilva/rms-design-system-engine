@@ -9,7 +9,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
 import { intentLayerConfig, syncIntentLayer, describeSync, readIntentLayer, matchComponents, componentIntent, itemsOf } from '../intent-layer.mjs';
-import { frontMatter, plainText, mdSections, readMarkdown, metaTitle } from '../doc-source-markdown.mjs';
+import { frontMatter, plainText, mdSections, readMarkdown, metaTitle, resolveLinks, decodeEntities } from '../doc-source-markdown.mjs';
+import { entityView } from '../doc-source-dsds.mjs';
 import { parseGithub, hostOf, fileUrl } from '../doc-host.mjs';
 import { layerAccess } from '../intent-changes.mjs';
 import { generateIntent } from '../intent-gen.mjs';
@@ -138,6 +139,39 @@ test('an .mdx beside its component\'s code is that component\'s page, with a doc
   assert.deepEqual(t.whenNotToUse, ['Not inside another tile.']);
   assert.deepEqual(t.rules.map((r) => r.text), ['Keep one main action.']);
   assert.equal(entities.find((e) => e.name === 'Setup').layer, 'system');
+});
+
+test('a page written for people: a line that tells what to do is a rule, one that only describes stays a section for people', () => {
+  const texts = new Map([['docs/components/tile.md', [
+    '# Tile', '', 'Groups one subject.', '',
+    '## Variants', '', '- The plain tile has no border.', '- Use the outlined tile on a busy background.', '',
+    '## Placement', '', '- Tiles wrap to the next row in a grid.', '- Never nest a tile in a tile.', '- Give each tile one main action.', '',
+    '## Role', '', '- Role: group', '',
+  ].join('\n')]]);
+  const t = readMarkdown(texts, { root: 'docs' }).entities[0];
+  assert.deepEqual(t.rules.map((r) => r.text), ['Variants: Use the outlined tile on a busy background.', 'Placement: Never nest a tile in a tile.', 'Placement: Give each tile one main action.', 'Role: group']);
+  assert.deepEqual(t.sections.map((x) => [x.title, x.described]), [['Variants', true], ['Placement', true]]);
+  // A DSDS page is written for agents: every line of its own prose is a rule, as before.
+  const d = entityView({ kind: 'component', name: 'Tile', sections: [{ kind: 'section', title: 'Spec', freeform: [{ title: 'Placement', body: '- Tiles wrap to the next row in a grid.' }] }] }, 'tile.dsds.json', 'components');
+  assert.deepEqual(d.rules.map((r) => r.text), ['Placement: Tiles wrap to the next row in a grid.']);
+});
+
+test('noise left out: entities decoded, images (wrapped too) and lines of links only dropped', () => {
+  assert.equal(decodeEntities('a&nbsp;|&nbsp;b &amp; c &#8217; &#x2014;'), 'a | b & c ’ —');
+  const t = plainText('[Source code](https://x.test/src) &nbsp;|&nbsp; [Usage guidelines](/components/tile/usage)\n\nGroups one subject &amp; its actions.\n\n![A tile with a long\ndescription](tile.png)\n\n- ![icon](i.svg) Keep one action.\n\n```html\n<b>&amp;</b>\n```');
+  assert.doesNotMatch(t, /Source code|!\[|tile\.png/);
+  assert.match(t, /Groups one subject & its actions\./);
+  assert.match(t, /- Keep one action\./);
+  assert.match(t, /<b>&amp;<\/b>/, 'code is kept as written');
+});
+
+test('a link to another page of the site goes to that page where the layer lives; others are left', () => {
+  const page = (name, file, extra = {}) => ({ name, file, url: `${GH}/blob/main/${file}`, purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], ...extra });
+  const tree = page('Tree view', 'site/components/tree-view/usage.mdx', { files: ['site/components/tree-view/usage.mdx', 'site/components/tree-view/style.mdx'] });
+  const acc = page('Accordion', 'site/components/accordion.md', { whenNotToUse: ['Nested content: use [tree view](/components/tree-view/usage#when) instead.', 'See [the guide](../guide.md), [MDN](https://developer.mozilla.org/x) and [gone](/nowhere).'] });
+  resolveLinks([tree, acc], { url: (f) => `${GH}/blob/main/${f}`, paths: ['site/guide.md'] });
+  assert.equal(acc.whenNotToUse[0], `Nested content: use [tree view](${GH}/blob/main/site/components/tree-view/usage.mdx#when) instead.`);
+  assert.equal(acc.whenNotToUse[1], `See [the guide](${GH}/blob/main/site/guide.md), [MDN](https://developer.mozilla.org/x) and [gone](/nowhere).`);
 });
 
 // ── A folder of the project ─────────────────────────────────────────────────────────────────────────────────────────

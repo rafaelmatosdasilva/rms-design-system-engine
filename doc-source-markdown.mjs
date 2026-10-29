@@ -99,10 +99,17 @@ function tagEnd(t, i) {
 function tableLines(rows) {
   const cells = (r) => r.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim());
   const body = rows.filter((r) => !/^\s*\|?\s*:?-{2,}/.test(r)).slice(1);
-  return body.map((r) => { const c = cells(r).filter(Boolean); return c.length > 1 ? `- ${c[0]}: ${c.slice(1).join(' · ')}` : c.length ? `- ${c[0]}` : ''; }).filter(Boolean);
+  return body.map((r) => { const c = cells(decodeEntities(r.replace(/!\[[^\]]*\]\([^)]*\)/g, ''))).filter(Boolean); return c.length > 1 ? `- ${c[0]}: ${c.slice(1).join(' · ')}` : c.length ? `- ${c[0]}` : ''; }).filter(Boolean);
 }
+// HTML entities as the characters they are (&nbsp; a space, &amp; an ampersand, &#8217; and &#x2019; by number).
+const ENTITIES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", mdash: '—', ndash: '–', hellip: '…', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', middot: '·', bull: '•', times: '×', copy: '©', reg: '®', trade: '™', larr: '←', rarr: '→' };
+export const decodeEntities = (t) => String(t ?? '').replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : ENTITIES[e.toLowerCase()] ?? m);
+// A line that is only links (a page's bar of links: "[Source code] | [Usage guidelines]"), or only an image: nothing an
+// agent can use.
+const ONLY_LINKS = /^\s*(?:[-*]\s+)?(?:(?:!?\[[^\]]*\]\([^)]*\)|[|·•/–—-]|\s)+)$/;
 // MDX (or Markdown with HTML) as Markdown text: imports, exports, comments and tags out (across lines), the text inside
-// kept; a table a line a row; a Do or Don't example led by its marker. Code fences are kept as they are.
+// kept; a table a line a row; a Do or Don't example led by its marker; entities decoded, images and lines of links only
+// left out. Code fences are kept as they are.
 export function plainText(text) {
   const src = String(text ?? '').replace(/\r\n?/g, '\n').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/<!--[\s\S]*?-->/g, '');
   // Imports and exports first, line by line: one that runs over several lines (an object, a template literal) up to
@@ -136,13 +143,22 @@ export function plainText(text) {
       if (ch === '{' && /(^|\n)\s*$/.test(t)) { let d = 0, k = i; for (; k < part.length; k++) { if (part[k] === '{') d++; else if (part[k] === '}' && --d === 0) break; } if (k < part.length && /^\s*(\n|$)/.test(part.slice(k + 1, k + 3))) { i = k + 1; continue; } }
       t += ch; i++;
     }
-    return t;
+    // Images, their words wrapped over lines too: nothing an agent reads.
+    return t.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
   }).join('');
   // Tables a line a row; a marker on its own line joined to the words after it.
   const lines = [];
   let table = [];
   const flush = () => { if (table.length) { lines.push(...(table.length > 1 ? tableLines(table) : table)); table = []; } };
-  for (const l of out.split('\n')) { if (/^\s*\|.*\|\s*$/.test(l)) { table.push(l); continue; } flush(); lines.push(l.replace(/\s+$/, '')); }
+  let inFence = false;
+  for (const raw of out.split('\n')) {
+    if (/^\s*(```|~~~)/.test(raw)) { flush(); inFence = !inFence; lines.push(raw); continue; }
+    if (inFence) { lines.push(raw); continue; }
+    if (/^\s*\|.*\|\s*$/.test(raw)) { table.push(raw); continue; }
+    flush();
+    const line = decodeEntities(raw.replace(/!\[[^\]]*\]\([^)]*\)/g, '')).replace(/[ \t\u00a0]{2,}/g, ' ').replace(/\s+$/, '');
+    lines.push(/\]\(/.test(line) && ONLY_LINKS.test(line) ? '' : line);
+  }
   flush();
   const joined = [];
   for (const l of lines) {
@@ -255,7 +271,7 @@ export function readMarkdown(texts, { paths = [], root = '' } = {}) {
       documentBlocks: [{ kind: 'sections', items }],
     };
     // The group decides the layer first: the folder (or the Meta title's first part), as an index's group does.
-    const view = entityView(entity, main.path, String(fm.kind ?? fm.type ?? fm.layer ?? metaKind ?? folder ?? ''));
+    const view = entityView(entity, main.path, String(fm.kind ?? fm.type ?? fm.layer ?? metaKind ?? folder ?? ''), null, { described: true });
     if (code && !view.code) view.code = code;
     if (files.length > 1) view.files = files.map((f) => f.path);
     entities.push(view);
@@ -275,4 +291,33 @@ export function readMarkdown(texts, { paths = [], root = '' } = {}) {
     system = { name: plainTitle(top?.fm.title ?? top?.doc.title ?? '') || null, version: top?.fm.version ?? null, format: 'markdown', sections, file: (top ?? systemFiles[0]).path, ...(drafts.length ? { drafts } : {}) };
   }
   return { system, entities };
+}
+
+// ── Links between pages ─────────────────────────────────────────────────────────────────────────────────────────────
+// A link a page makes to another page of the site (/components/tree-view/usage, ../button.md) points nowhere outside
+// it: it is made a link to that page where the layer lives, or to the layer's file it names. Links to anywhere else are
+// left as they are. url(file): the link to one file of the layer.
+const pageKey = (file) => { const p = String(file).replace(PAGE_FILE, ''), dir = posix.dirname(p), base = posix.basename(p); return dir !== '.' && (TAB.test(base) || base.toLowerCase() === posix.basename(dir).toLowerCase()) ? dir : p; };
+export function resolveLinks(entities, { url, paths = [] } = {}) {
+  const keys = entities.flatMap((e) => (e.files ?? [e.file]).map((f) => [pageKey(f).toLowerCase(), e]));
+  const files = new Set(paths);
+  const target = (href, from) => {
+    const [path, hash] = String(href).split('#');
+    if (!path || /^[a-z][\w+.-]*:|^\/\//i.test(path)) return null;
+    if (!path.startsWith('/')) { const f = posix.normalize(posix.join(posix.dirname(from), path)); if (files.has(f)) { const u = url(f); return u ? u + (hash ? `#${hash}` : '') : null; } }
+    const want = path.replace(/^\/+|\/+$/g, '').replace(PAGE_FILE, '').toLowerCase().split('/');
+    for (let cut = 0; cut <= 1 && want.length - cut > 0; cut++) {
+      const tail = want.slice(0, want.length - cut).join('/');
+      const hit = keys.filter(([k]) => k === tail || k.endsWith('/' + tail));
+      if (hit.length && new Set(hit.map(([, e]) => e)).size === 1) return hit[0][1].url ? hit[0][1].url + (hash ? `#${hash}` : '') : null;
+      if (!TAB.test(want[want.length - 1])) break;   // only a tab's name may be left off (/button/usage → the Button page)
+    }
+    return null;
+  };
+  const fix = (t, from) => String(t).replace(/\]\(([^)\s]+)\)/g, (m, href) => { const u = target(href, from); return u ? `](${u})` : m; });
+  for (const e of entities) {
+    for (const k of ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations']) e[k] = (e[k] ?? []).map((t) => fix(t, e.file));
+    e.rules = (e.rules ?? []).map((r) => ({ ...r, text: fix(r.text, e.file) }));
+    e.sections = (e.sections ?? []).map((x) => ({ ...x, text: fix(x.text, e.file) }));
+  }
 }

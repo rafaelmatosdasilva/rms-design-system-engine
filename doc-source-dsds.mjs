@@ -44,7 +44,7 @@ export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 17;   // 17: Markdown and MDX pages, and GitHub and a project's folder as hosts (doc-host.mjs); 16: a root's Parts section, each part's documentation under its name (component-parts.mjs); 15: a page's Decisions section, read as its decisions (decisions.mjs); 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
+export const READER = 18;   // 18: a Markdown page's prose is a rule only where it tells what to do, the rest a section; its entities decoded, images and link bars left out, its links to other pages made links to them; 17: Markdown and MDX pages, and GitHub and a project's folder as hosts (doc-host.mjs); 16: a root's Parts section, each part's documentation under its name (component-parts.mjs); 15: a page's Decisions section, read as its decisions (decisions.mjs); 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
@@ -120,6 +120,11 @@ const PLACEHOLDER_DEF = /^((an? )?(event|slot|prop(erty)?) (emitted|exposed|acce
 // Section titles written for people by their nature (where a fact was confirmed, examples, links to other pages, a
 // mapping to the code, notes on tokens the contracts carry): left on the page as they are, never read as rules.
 export const FOR_PEOPLE = /^(evidence|.*\bexamples?|cross[- ]references?|references?|see also|related|related pages|changelog|history|sources?|.*\bmapping|token notes|table of contents|contents|on this page)$/i;
+// A line that tells what to do (or not): a rule. One that only describes is not. A rule says so with a modal word, or
+// starts with what to do ("Give it a name…"), or is a short fact the page sets ("Role: button").
+const MODAL = /\b(must|should|shall|never|always|do not|don'?t|avoid|only|keep|make sure|ensure|required?|at (?:most|least)|no more than|prefer|instead|cannot|can'?t|may not|reserve)\b/i;
+const IMPERATIVE = /^(?:\*\*[^*]+\*\*\s*:?\s*)?(?:give|ask|add|place|put|set|show|hide|label|name|write|pair|group|align|start|end|open|close|choose|pick|select|provide|include|limit|let|allow|apply|follow|match|stack|wrap|truncate|center|display|use|combine|split|link|mark|test|check|confirm|tell|say|describe|offer|move|lead|return|focus|announce|respect|support|consider|try|remember|treat|state|lay|nest|sort|order|load|disable|enable|indicate|reduce|leave|replace|default|position|size|space|pad|make|do|be|have|get|take|go|see|refer)\b/i;
+export const PRESCRIBES = { test: (t) => { const s = String(t ?? '').trim(); return MODAL.test(s) || IMPERATIVE.test(s) || /^[\w ./-]{1,30}:\s*\S[^.!?]{0,40}$/.test(s); } };
 // A section that is mostly code (a fenced block, markup) with little prose around it: an example, for people.
 export const isExample = (text) => /```|^\s*</m.test(String(text)) && String(text).replace(/```[\s\S]*?```/g, '').replace(/^\s*<[^\n]*$/gm, '').trim().length < 200;
 // A title's own words: its last part ("Overview / When To Use"), any numbering ("2. Overview") dropped.
@@ -200,7 +205,9 @@ function sharedStatement(refs, shared) {
 }
 
 // One entity as the engine reads it. file: its path in the project.
-export function entityView(entity, file, group = '', shared = null) {
+// opts.described: a component page's prose that only describes is kept apart from its rules (a page written for people,
+// as a documentation site's Markdown is; a DSDS page is written for agents, every line of it a rule).
+export function entityView(entity, file, group = '', shared = null, { described = false } = {}) {
   const kind = String(entity?.kind ?? '').trim() || 'entity';
   const view = {
     kind, layer: layerOf(kind, group), name: String(entity?.name ?? entity?.identifier ?? entity?.id ?? '').trim(), id: entity?.identifier ?? entity?.id ?? null,
@@ -266,10 +273,19 @@ export function entityView(entity, file, group = '', shared = null) {
         // ("Legend Overflow: …"): the team's titles are theirs, the engine reads them. Examples and notes for people stay.
         // A line already led by the title ("Role: button" under Role) keeps it once; a drafted line stays a draft, set
         // apart below, never read as a rule with the title in front of its marker.
-        else if (view.layer === 'components' && !FOR_PEOPLE.test(titleWords(title)) && !isExample(body)) view.rules.push(...itemsOf(body).map((text) => {
-          const own = titleWords(title), led = text.toLowerCase().startsWith(own.toLowerCase() + ':');
-          return DRAFT.test(text) || isOpen(text) ? { text, level: null, draftOf: own } : { text: led ? text : `${own}: ${text}`, level: null };
-        }));
+        // On a page written for people (described), only a line that tells what to do is a rule; one that describes (what
+        // the variants are, how it is laid out) stays in a section of that title, for people (its documentation in the
+        // style guide), so a long page does not hand agents hundreds of rules.
+        else if (view.layer === 'components' && !FOR_PEOPLE.test(titleWords(title)) && !isExample(body)) {
+          const own = titleWords(title), said = [];
+          for (const text of itemsOf(body)) {
+            const led = text.toLowerCase().startsWith(own.toLowerCase() + ':');
+            if (DRAFT.test(text) || isOpen(text)) view.rules.push({ text, level: null, draftOf: own });
+            else if (!described || PRESCRIBES.test(text)) view.rules.push({ text: led ? text : `${own}: ${text}`, level: null });
+            else said.push(text);
+          }
+          if (said.length) view.sections.push({ title, text: said.map((t) => `- ${t}`).join('\n'), described: true });
+        }
         else view.sections.push({ title, text: body });
       }
     } else if (b.kind === 'use-cases') {
@@ -520,6 +536,8 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     }
     const boilerplate = dropBoilerplate(entities);
     for (const e of entities) e.url = fileUrl(source, e.file);
+    // A Markdown page's links to other pages of its site: to those pages where the layer lives.
+    if (format === 'markdown') (await import('./doc-source-markdown.mjs')).resolveLinks(entities, { url: (f) => fileUrl(source, f), paths: layerFiles });
     // Each page's own spec, where it has one (its code file's, else its title's); a family's spec several pages are
     // written from is named as shared.
     if (format === 'dsds') try {
