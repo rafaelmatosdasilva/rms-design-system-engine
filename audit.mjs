@@ -933,12 +933,25 @@ if (process.argv.includes('--figma-effects')) {
   if (!file) {
     mkdirSync(capDir, { recursive: true });
     writeFileSync(join(capDir, 'effects-capture.js'), ep.effectsCaptureScript(ecfg.figma?.componentsPage ?? null));
-    console.log(`Effects capture script → ${relative(ROOT, join(capDir, 'effects-capture.js'))} (read-only: it changes nothing in Figma).`);
+    (await import('./capture-chunks.mjs')).startChunks(capDir, 'effects');
+    console.log(`Effects capture script → ${relative(ROOT, join(capDir, 'effects-capture.js'))} (read-only: it changes nothing in Figma). A large file is read in several answers: each says when there is more.`);
     console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'effects.json'))}, then run rms-design-system-engine --figma-effects ${relative(ROOT, join(capDir, 'effects.json'))}`);
     process.exit(0);
   }
   let snap;
-  try { snap = ep.effectsSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  try {
+    // One answer of several (what fits in each): joined to the ones before it; the next script written when there is more.
+    const cc = await import('./capture-chunks.mjs');
+    const j = cc.joinChunk(capDir, 'effects', readFileSync(resolve(ROOT, file), 'utf8'), cc.mergeCapture);
+    if (j.error) { console.log(`❌ ${file}: ${j.error}`); process.exit(2); }
+    if (!j.done) {
+      writeFileSync(join(capDir, 'effects-capture.js'), ep.effectsCaptureScript(ecfg.figma?.componentsPage ?? null, { start: j.next }));
+      console.log(`✓ ${Object.keys(j.body.components).length} components' effects read so far; more did not fit in that answer.`);
+      console.log(`NEXT: run ${relative(ROOT, join(capDir, 'effects-capture.js'))} the same way (unchanged, with use_figma), save what it returns as ${relative(ROOT, join(capDir, 'effects.json'))}, then run rms-design-system-engine --figma-effects ${relative(ROOT, join(capDir, 'effects.json'))} again.`);
+      process.exit(0);
+    }
+    snap = ep.effectsSnapshot(j.body);
+  } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
   const target = ecfg.paths?.snapshotEffects ?? join(dirname(ecfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-effects.snapshot.json');
   mkdirSync(dirname(join(ROOT, target)), { recursive: true });
   writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');
@@ -962,12 +975,24 @@ if (process.argv.includes('--figma-motion')) {
   if (!file) {
     mkdirSync(capDir, { recursive: true });
     writeFileSync(join(capDir, 'motion-capture.js'), mp.motionCaptureScript(null));   // every page: overlays live on the screens
-    console.log(`Motion capture script → ${relative(ROOT, join(capDir, 'motion-capture.js'))} (read-only: it changes nothing in Figma).`);
+    (await import('./capture-chunks.mjs')).startChunks(capDir, 'motion');
+    console.log(`Motion capture script → ${relative(ROOT, join(capDir, 'motion-capture.js'))} (read-only: it changes nothing in Figma). A large file is read in several answers: each says when there is more.`);
     console.log(`NEXT: run it unchanged with the Figma MCP's use_figma on the project's Figma file, save what it returns as ${relative(ROOT, join(capDir, 'motion.json'))}, then run rms-design-system-engine --figma-motion ${relative(ROOT, join(capDir, 'motion.json'))}`);
     process.exit(0);
   }
   let snap;
-  try { snap = mp.motionSnapshot(readFileSync(resolve(ROOT, file), 'utf8')); } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
+  try {
+    const cc = await import('./capture-chunks.mjs');
+    const j = cc.joinChunk(capDir, 'motion', readFileSync(resolve(ROOT, file), 'utf8'), cc.mergeCapture);
+    if (j.error) { console.log(`❌ ${file}: ${j.error}`); process.exit(2); }
+    if (!j.done) {
+      writeFileSync(join(capDir, 'motion-capture.js'), mp.motionCaptureScript(null, { start: j.next }));
+      console.log(`✓ the motion of ${Object.keys({ ...j.body.components, ...(j.body.motion ?? {}) }).length} components read so far; more did not fit in that answer.`);
+      console.log(`NEXT: run ${relative(ROOT, join(capDir, 'motion-capture.js'))} the same way (unchanged, with use_figma), save what it returns as ${relative(ROOT, join(capDir, 'motion.json'))}, then run rms-design-system-engine --figma-motion ${relative(ROOT, join(capDir, 'motion.json'))} again.`);
+      process.exit(0);
+    }
+    snap = mp.motionSnapshot(j.body);
+  } catch (e) { console.log(`❌ ${file}: ${String(e.message).split('\n')[0]}`); process.exit(2); }
   const target = mcfg.paths?.snapshotMotion ?? join(dirname(mcfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-motion.snapshot.json');
   mkdirSync(dirname(join(ROOT, target)), { recursive: true });
   writeFileSync(join(ROOT, target), JSON.stringify(snap, null, 1) + '\n');

@@ -14,8 +14,12 @@ import { customProps } from './motion-components.mjs';
 // Run with use_figma or figma-cli on the file (PAGE_IDS: the pages to read, null for every page). It only reads: each
 // component's own frame (a set's default variant, its first) and its layers to two levels down: their effects (with
 // the variable or the effect style behind each), a gradient or an image fill, Clip content, blend mode and opacity.
+// An answer holds what fits in BUDGET characters (figma-cli and the Figma MCP cut an answer at about 20,000): from
+// START (a page and a component on it), it says where the next one starts (next, null when all are read) and how many
+// components it holds (count), so a cut or edited answer is caught.
 export const EFFECTS_CAPTURE_JS = `
 const PAGE_IDS = __PAGE_IDS__;
+const START = __START__, BUDGET = __BUDGET__;
 const pages = PAGE_IDS ? (await Promise.all(PAGE_IDS.map((id) => figma.getNodeByIdAsync(id)))).filter(Boolean) : figma.root.children;
 const out = {};
 const varName = async (b) => { if (!b || !b.id) return null; const v = await figma.variables.getVariableByIdAsync(b.id); return v ? v.name : null; };
@@ -53,17 +57,27 @@ const walk = async (n, depth) => {
   }
   return rec;
 };
-for (const page of pages) {
+let size = 2, next = null;
+pages: for (let p = START.page; p < pages.length; p++) {
+  const page = pages[p];
   await page.loadAsync();   // loaded where it is: switching the page would change the file
-  for (const set of page.findAllWithCriteria({ types: ['COMPONENT_SET'] })) if (set.children[0]) { const r = await walk(set.children[0], 0); out[set.name] = kept(r) ? r : {}; }
-  for (const c of page.findAllWithCriteria({ types: ['COMPONENT'] })) if (!c.parent || c.parent.type !== 'COMPONENT_SET') { const r = await walk(c, 0); if (kept(r)) out[c.name] = r; }
+  const items = [...page.findAllWithCriteria({ types: ['COMPONENT_SET'] }).filter((s) => s.children[0]), ...page.findAllWithCriteria({ types: ['COMPONENT'] }).filter((c) => !c.parent || c.parent.type !== 'COMPONENT_SET')];
+  for (let i = p === START.page ? START.item : 0; i < items.length; i++) {
+    const n = items[i], set = n.type === 'COMPONENT_SET';
+    const r = await walk(set ? n.children[0] : n, 0);
+    if (!set && !kept(r)) continue;
+    const rec = kept(r) ? r : {}, add = JSON.stringify(n.name).length + JSON.stringify(rec).length + 2;
+    if (Object.keys(out).length && size + add > BUDGET) { next = { page: p, item: i }; break pages; }
+    out[n.name] = rec; size += add;
+  }
 }
-return { _captured: new Date().toISOString(), _note: 'Read-only capture of each component\\'s effects, gradient and image fills, Clip content, blend mode and opacity (effects-parity.mjs).', components: out };
+return { _captured: new Date().toISOString(), _note: 'Read-only capture of each component\\'s effects, gradient and image fills, Clip content, blend mode and opacity (effects-parity.mjs).', components: out, count: Object.keys(out).length, start: START, next };
 `;
 
-export const effectsCaptureScript = (pageIds = null) => {
+export const CAPTURE_BUDGET = 15000;
+export const effectsCaptureScript = (pageIds = null, { start = { page: 0, item: 0 }, budget = CAPTURE_BUDGET } = {}) => {
   const ids = pageIds == null ? null : [pageIds].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
-  return EFFECTS_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(ids && ids.length ? ids : null)).trim() + '\n';
+  return EFFECTS_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(ids && ids.length ? ids : null)).replace('__START__', JSON.stringify(start)).replace('__BUDGET__', String(budget)).trim() + '\n';
 };
 
 // The effects snapshot from a capture's answer (what use_figma returned, saved as a file).
