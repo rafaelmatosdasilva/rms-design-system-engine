@@ -321,6 +321,18 @@ test('llms.txt carries the owner\'s primitives table, and nothing when there is 
   assert.doesNotMatch(buildLlms([], {}, 0, null), /Primitives/);
 });
 
+test('llms.txt says what each token is for in the team\'s words, the brand\'s first, the same words once', async () => {
+  const { buildLlms } = await import('../contract-gen.mjs');
+  const tokens = {
+    surface: { card: { color: { $value: '#fff', $description: 'Behind a card and its content' } }, sheet: { color: { $value: '#fafafa', $description: 'Behind a card and its content' } } },
+    base: { accent: { color: { $value: '#05f', $description: 'The main brand colour' } }, weight: { $value: 400, $description: 'font-weight' }, old: { $value: 1, $description: '@deprecated' } },
+  };
+  const text = buildLlms([], tokens, 5, null);
+  assert.match(text, /\*\*What the tokens are for, in the team's words \(their Figma descriptions, 3 tokens\):\*\*\n  The main brand colour: base\/accent\/color\n  Behind a card and its content: surface\/card\/color, surface\/sheet\/color\n/);
+  assert.doesNotMatch(text, /font-weight|deprecated/, 'a description that only names what it sets, or only that it is deprecated, is left out');
+  assert.doesNotMatch(buildLlms([], { a: { $value: 1 } }, 1, null), /What the tokens are for/);
+});
+
 test('a component named with a slash (table/row) gets its own folder, not a failed write', async () => {
   const dir = makeFixture({
     'theme.css': ':root{}\n',
