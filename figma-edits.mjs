@@ -303,6 +303,7 @@ export function applyScript(edits = []) {
   const renames = edits.filter((e) => e.kind === 'rename' && e.nodeId).map((e) => ({ id: e.nodeId, component: e.component, what: e.what, prop: e.prop, from: e.from, to: e.to }));
   const review = edits.find((e) => e.kind === 'review');
   const specs = edits.filter((e) => e.kind === 'spec' && e.nodeId).map((e) => ({ id: e.nodeId, component: e.component, label: e.label }));
+  const devlinks = edits.find((e) => e.kind === 'devlinks'), syntax = edits.find((e) => e.kind === 'codesyntax');
   return `// Written by rms-design-system-engine --figma-edits. Run it with the Figma MCP's use_figma only after the person said yes.
 const edits = ${JSON.stringify(todo, null, 2)};
 const changed = [], skipped = [], missing = [];
@@ -311,6 +312,29 @@ const keep = (a) => (a.labelMarkdown ? { labelMarkdown: a.labelMarkdown } : { la
 const keepAll = (a) => ({ ...keep(a), ...(a.properties ? { properties: a.properties } : {}), ...(a.categoryId ? { categoryId: a.categoryId } : {}) });
 const category = async (label, color) => { const all = await figma.annotations.getAnnotationCategoriesAsync(); return all.find((c) => String(c.label).toLowerCase() === label.toLowerCase()) || await figma.annotations.addAnnotationCategoryAsync({ label, color }); };
 const pageOf = async (n) => { let p = n; while (p && p.type !== 'PAGE') p = p.parent; if (p && p.loadAsync) await p.loadAsync(); };
+${devlinks ? `// Dev Mode: each component set linked to its code file, once.
+const devlinks = ${JSON.stringify(devlinks.items.map((l) => ({ id: l.nodeId, component: l.component, url: l.url, file: l.file })), null, 2)};
+for (const l of devlinks) {
+  const n = await figma.getNodeByIdAsync(l.id);
+  if (!n || !('addDevResourceAsync' in n)) { missing.push(l.component); continue; }
+  const have = await n.getDevResourcesAsync();
+  if (have.some((r) => r.url === l.url)) { skipped.push(l.component + ': linked to its code already'); continue; }
+  await n.addDevResourceAsync(l.url, l.file);
+  changed.push(l.component + ': linked to ' + l.file);
+}` : ''}
+${syntax ? `// Dev Mode: each variable's CSS name as its Web code syntax; one written otherwise is changed and said.
+const except = ${JSON.stringify(syntax.except)};
+const cssOf = (name) => except[name] || (${JSON.stringify(syntax.prefix)} + name.split('/').join('-'));
+const otherSyntax = [];
+let given = 0, already = 0;
+for (const v of await figma.variables.getLocalVariablesAsync()) {
+  const want = 'var(' + cssOf(v.name) + ')', now = v.codeSyntax && v.codeSyntax.WEB;
+  if (now === want) { already++; continue; }
+  if (now) otherSyntax.push(v.name + ': ' + now + ' → ' + want);
+  v.setVariableCodeSyntax('WEB', want); given++;
+}
+changed.push(given + ' variables given their CSS name as Web code syntax' + (otherSyntax.length ? ' (' + otherSyntax.length + ' had another)' : ''));
+if (already) skipped.push(already + ' variables had it already');` : ''}
 ${review ? `// the screens' accessibility findings. What the last run pinned goes first, so what is fixed clears.
 const review = ${JSON.stringify(review.screens.map((x) => ({ id: x.id, name: x.name, summary: x.summary, pins: x.pins })), null, 2)};
 const reviewCat = await category(${JSON.stringify(REVIEW_CATEGORY)}, 'red');
@@ -420,7 +444,7 @@ for (const f of frames) {
   written.push(${JSON.stringify(pageName)} + ' › ' + f.name + ': ' + f.cards.length + f.head + (f.cards.length === 1 ? '' : 's'));
 }
 const todo = written.join('; ');
-return { changed, skipped, missing, todo };` : 'return { changed, skipped, missing };'}
+return { changed, skipped, missing, todo${syntax ? ', otherSyntax' : ''} };` : `return { changed, skipped, missing${syntax ? ', otherSyntax' : ''} };`}
 `;
 }
 
@@ -432,6 +456,7 @@ export function editLines(edits, { fileKey = null, may = 'ask', why = null } = {
   const notes = edits.find((e) => e.kind === 'notes');
   const renames = edits.filter((e) => e.kind === 'rename');
   const review = edits.find((e) => e.kind === 'review'), specs = edits.filter((e) => e.kind === 'spec');
+  const devlinks = edits.find((e) => e.kind === 'devlinks'), syntax = edits.find((e) => e.kind === 'codesyntax');
   const apply = edits.filter((e) => !e.decision);
   if (!edits.length) return ['✅ Figma states every role the code has, writes its names one way, every annotation is read by a check, and no prototype needs anything the system lacks: nothing to send back.'];
   return [
@@ -439,17 +464,37 @@ export function editLines(edits, { fileKey = null, may = 'ask', why = null } = {
     ...(specs.length ? [`Accessibility specs from the code (${specs.length}), one annotation per component in the category "${SPEC_CATEGORY}", replacing the one the last run wrote:`, ...specs.map((e) => `   • ${e.component}: ${e.why}`)] : []),
     ...(review ? [`Accessibility findings pinned on the screens in Figma (${review.why}), in the category "${review.category}", replacing the last run's:`, ...review.screens.map((x) => `   • ${x.name}: ${!x.count ? 'nothing to fix' : x.pins.length ? `${x.count} to fix, pinned on ${x.pins.length} layer${x.pins.length === 1 ? '' : 's'}` : `${x.count} to fix, said in the screen's summary (read the screens again with --figma-a11y to pin each on its layer)`}`)] : []),
     ...(renames.length ? [`Names written as the rest of the system writes them (${renames.length}):`, ...renames.map((e) => `   • ${e.component}: ${e.what === 'option' ? `${e.prop}=${e.from} → ${e.to}` : `${e.what === 'layer' ? 'the layer ' : e.what === 'component' ? 'the component ' : ''}"${e.from}" → "${e.to}"`}`), '   Each component\'s code contract follows the new names once Figma is read again.'] : []),
+    ...(devlinks ? [`Dev Mode links to the code (${devlinks.why}), each added once:`, ...devlinks.items.slice(0, 12).map((l) => `   • ${l.component}: ${l.file}`), ...(devlinks.items.length > 12 ? [`   … and ${devlinks.items.length - 12} more`] : [])] : []),
+    ...(syntax ? [`Dev Mode code syntax (${syntax.why}): Web, var(--name), the name the code uses; one written otherwise is changed and listed when the script runs.`] : []),
     ...(todo ? [`The design team's to do list in Figma, page "${todo.page}", frame "${todo.frame}" (${todo.why}), written afresh:`, ...todo.items.map((g) => `   • ${g.need}: ${todoText(g)}`)] : []),
     ...(notes ? [`Annotations no check reads, listed in Figma on the page "${notes.page}", frame "${notes.frame}" (${notes.why}); the annotations themselves are not changed:`, ...notes.items.map((n) => `   • ${n.component}${n.layer ? ` › ${n.layer}` : ''}: "${n.text}"${n.wording ? ` → write it as "${n.wording}"` : ' (an accessibility note: write it as Role:, Alt:, Heading level or a key, so a check reads it)'}`)] : []),
     ...(decide.length ? [`For a person to decide (${decide.length}), never applied:`, ...decide.map((e) => `   • ${e.component}: ${e.why}`)] : []),
     ...(apply.length && may === 'no' ? [`NEXT: this project does not let the engine write the design file${why ? ` (${why})` : ''}, so nothing was written to run. The ${apply.length} change${apply.length === 1 ? '' : 's'} above ${apply.length === 1 ? 'is' : 'are'} on the Tasks page, for whoever owns Figma.`] : []),
-    ...(apply.length && may !== 'no' ? [`NEXT: ${may === 'yes' ? 'run' : 'show the person the'} ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', specs.length ? `${specs.length} accessibility spec${specs.length === 1 ? '' : 's'}` : '', review ? 'accessibility review' : '', todo ? 'to do list' : '', notes ? 'annotations no check reads' : ''].filter(Boolean).join(' and ')} above${may === 'yes' ? '' : ' and ask; only when they say yes'}, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
+    ...(apply.length && may !== 'no' ? [`NEXT: ${may === 'yes' ? 'run' : 'show the person the'} ${[roles.length ? `${roles.length} change${roles.length === 1 ? '' : 's'}` : '', renames.length ? `${renames.length} rename${renames.length === 1 ? '' : 's'}` : '', specs.length ? `${specs.length} accessibility spec${specs.length === 1 ? '' : 's'}` : '', review ? 'accessibility review' : '', devlinks ? 'Dev Mode links' : '', syntax ? 'code syntax' : '', todo ? 'to do list' : '', notes ? 'annotations no check reads' : ''].filter(Boolean).join(' and ')} above${may === 'yes' ? '' : ' and ask; only when they say yes'}, run the script in .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma${fileKey ? ` (fileKey ${fileKey})` : ''}, report what it returns, then refresh the Figma snapshots (rms-design-system-engine --refresh-figma)`] : []),
   ];
 }
 
 // The list is always written: what Figma is missing is worth reading whoever may change it. The script that makes
 // the changes is written only where the project lets the engine change the design file - a script nobody may run is
 // a loaded gun left on the table.
+// What Dev Mode hands a developer or an agent, from what the engine knows: each component set a Dev resource link to its
+// code file, and each variable its CSS name as its Web code syntax (var(--name)). Written only after the person says
+// yes, like every edit here; what is already there is left, and a code syntax other than the CSS name is changed and
+// listed. links: [{ component, nodeId, url, file }]; vars: [{ variable, css }], css the variable's custom property.
+// The script names each variable's property by the plain rule (the prefix, its path with dashes) and carries only the
+// ones the system's naming writes otherwise, so a file of two thousand variables stays a short script.
+// → [{ kind: 'devlinks', items, why }, { kind: 'codesyntax', prefix, except, count, why }]
+export function devModeEdits(links = [], vars = [], { prefix = '--' } = {}) {
+  const out = [];
+  const ls = links.filter((l) => l?.nodeId && l.url);
+  if (ls.length) out.push({ kind: 'devlinks', items: ls, why: `${ls.length} component${ls.length === 1 ? '' : 's'} linked to ${ls.length === 1 ? 'its' : 'their'} code file in Dev Mode` });
+  const plain = (n) => prefix + String(n).split('/').join('-');
+  const vs = vars.filter((v) => v?.variable && v.css);
+  if (vs.length) out.push({ kind: 'codesyntax', prefix, except: Object.fromEntries(vs.filter((v) => v.css !== plain(v.variable)).map((v) => [v.variable, v.css])), count: vs.length,
+    why: `${vs.length} variable${vs.length === 1 ? '' : 's'} given ${vs.length === 1 ? 'its' : 'their'} CSS name as Web code syntax` });
+  return out;
+}
+
 export function writeFigmaEdits(dir, edits, { may = 'ask' } = {}) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'figma-edits.json'), JSON.stringify(edits, null, 2) + '\n');

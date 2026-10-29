@@ -2309,7 +2309,7 @@ if (process.argv.includes('--figma-edits')) {
   let feConfig = {};
   try { feConfig = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   try {
-    const { figmaEdits, gapEdits, renameEdits, annotationEdits, reviewEdits, specEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
+    const { figmaEdits, gapEdits, renameEdits, annotationEdits, reviewEdits, specEdits, devModeEdits, editLines, writeFigmaEdits } = await import('./figma-edits.mjs');
     const { annotationUses } = await import('./a11y-check.mjs');
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
     // What the prototypes needed and the system lacks: the design team's to do list.
@@ -2336,8 +2336,29 @@ if (process.argv.includes('--figma-edits')) {
       const roles = Object.fromEntries(Object.entries(propsSnap ?? {}).filter(([k, v]) => !k.startsWith('_') && v && typeof v === 'object').map(([k, v]) => [k, annotatedRole(v)]).filter(([, r]) => r));
       review = reviewEdits(sa.screenA11yFindings(snap, { roles }), snap.screens ?? []);
     } catch { /* the screens not read for accessibility yet (--figma-a11y) */ }
+    // Dev Mode: each component set linked to its code file, and each variable its CSS name as Web code syntax (devModeEdits).
+    let devMode = [];
+    if (propsSnap && feConfig.devMode !== false) {
+      try {
+        const { componentSourceFiles, resolveComponentFile, textReader } = await import('./component-source.mjs');
+        const { loadLocator } = await import('./component-locator.mjs');
+        const { repoUrl, fileUrl, defaultBranch } = await import('./component-changelog.mjs');
+        const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
+        const repo = repoUrl(ROOT), branch = feConfig.styleguide?.branch ?? defaultBranch(ROOT);
+        const files = componentSourceFiles(ROOT, feConfig), read = textReader(), loc = await loadLocator(ROOT, feConfig);
+        const links = repo ? Object.entries(propsSnap).filter(([k, v]) => !k.startsWith('_') && v?.nodeId).map(([name, v]) => {
+          const f = resolveComponentFile(name, { ROOT, cfg: feConfig, files, read, classFor: (x) => loc.classFor(x) })?.file;
+          const rel = f ? relative(ROOT, resolve(ROOT, f)) : null;
+          return rel ? { component: name, nodeId: v.nodeId, file: rel, url: fileUrl(repo, branch, rel) } : null;
+        }).filter(Boolean) : [];
+        const spec = resolveNamingSpec(feConfig);
+        let vsnapD = {}; try { vsnapD = JSON.parse(readFileSync(resolve(ROOT, feConfig.paths?.snapshotVars ?? 'figma-vars.snapshot.json'), 'utf8')); } catch { /* no variables read */ }
+        const names = [...new Set([...Object.values(vsnapD.color ?? {}).flatMap((m) => Object.keys(m ?? {})), ...Object.keys(vsnapD.sizing ?? {})])];
+        devMode = devModeEdits(links, names.map((n) => ({ variable: n, css: tokenToVar(n, spec) })), { prefix: spec.prefix ?? '--' });
+      } catch { /* Dev Mode edits are a convenience */ }
+    }
     // A role the spec states is not added twice.
-    const edits = [...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []).filter((e) => !(e.kind === 'role' && specRole.has(e.component))) : []), ...specs, ...review, ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses, loadCategories(ROOT, feConfig), feConfig) : [])];
+    const edits = [...devMode, ...(propsSnap ? figmaEdits(propsSnap, parts.view?.components ?? []).filter((e) => !(e.kind === 'role' && specRole.has(e.component))) : []), ...specs, ...review, ...renames, ...gapEdits(gaps), ...(propsSnap ? annotationEdits(propsSnap, annotationUses, loadCategories(ROOT, feConfig), feConfig) : [])];
     // What this project lets the engine change in the design file decides whether the script that makes the changes
     // is written at all (writes.mjs). The list is written either way: what Figma is missing is worth reading.
     const { mayWrite } = await import('./writes.mjs');
