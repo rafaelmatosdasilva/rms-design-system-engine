@@ -143,7 +143,7 @@ The same requests as terminal commands, for scripts and CI.
 rms-design-system-engine                       # the whole design system
 rms-design-system-engine --component input     # one component (or a few: input,button)
 rms-design-system-engine --check-ui ui.json     # check a UI an AI tool generated against your components
-rms-design-system-engine --query badge          # one component or token, names written exactly; a token says what it is for (its Figma description), a text colour also lists the surfaces it can be read on
+rms-design-system-engine --query badge          # one component or token, names written exactly; a token says what it is for (its Figma description), a text colour also lists the surfaces it can be read on; a name it does not know finds the closest by spelling, by its words and by what each is for ("main action"), and says what to ask next
 rms-design-system-engine --component chip --baseline --findings --match radi   # accept one known difference (the chip's radius) as debt; everything else keeps failing
 rms-design-system-engine --keep --component chip --match height --reason "the product needs a larger tap target"   # keep a difference on purpose, with its reason
 rms-design-system-engine --only accessibility   # only the accessibility check

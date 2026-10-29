@@ -39,6 +39,27 @@ test('a token by its path or its CSS variable; anything else names the closest',
   assert.deepEqual(answerLines(answer('text/subtle', { catalog, tokens: described, varOf })).slice(1), ['  for: Secondary text: captions, hints, metadata.']);
 });
 
+test('a term that matches nothing finds by spelling, by its words and by what the names are for, and says what to ask next', async () => {
+  const { nearest, nextFor } = await import('../query.mjs');
+  const comps = Object.entries({
+    badge: { selector: '.hb-badge', description: 'A short status label beside an item.' },
+    buttonMain: { selector: '.hb-button-main', description: 'The single most important action on a screen.' },
+    loaderRing: { selector: '.hb-loader-ring', description: 'Shown while content loads.' },
+    tileGrid: { selector: '.hb-tile-grid', description: '' },
+  });
+  const toks = flattenTokens({ border: { divider: { color: { $type: 'color', $value: '#ddd', $description: 'Lines between sections' } } }, surface: { base: { color: { $type: 'color', $value: '#fff' } } } });
+  assert.equal(nearest('bdage', comps, toks)[0], 'badge', 'two letters swapped');
+  assert.equal(nearest('buton', comps, toks)[0], 'buttonMain', 'a letter missing');
+  assert.equal(nearest('most important action', comps, toks)[0], 'buttonMain', 'what it is for, from its description');
+  assert.equal(nearest('loading spinner', comps, toks)[0], 'loaderRing', 'the same stem');
+  assert.equal(nearest('divider colour', comps, toks)[0], 'border/divider/color', 'a token by the words of its path');
+  assert.deepEqual(nearest('zebra', comps, toks), []);
+  assert.equal(nextFor({ kind: 'none', near: ['badge'] }), 'rms-design-system-engine --query badge');
+  assert.equal(nextFor({ kind: 'none', near: [] }), null);
+  assert.equal(nextFor({ kind: 'component', name: 'tileGrid' }, { sheet: true }), 'rms-design-system-engine --component tileGrid');
+  assert.equal(nextFor({ kind: 'token' }), 'rms-design-system-engine --check-ui <file>');
+});
+
 test('the command: several terms in one call, exit 1 when one is not found, 2 before the first audit', () => {
   const dir = makeFixture({ 'ds-config.json': { figma: { namingConvention: { prefix: '--hb-' } } }, 'contracts/catalog.json': catalog, 'contracts/tokens.json': { radius: { control: { $type: 'dimension', $value: '6px' } } } });
   const run = (...args) => spawnSync(process.execPath, [join(process.cwd(), 'query.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
