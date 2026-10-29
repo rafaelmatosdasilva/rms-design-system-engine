@@ -73,7 +73,7 @@ const WIDTH      = 60;
 // The profile given now (--profile, read where the run started: project-dir.mjs) or remembered in ds-config.json is
 // written in when its maintainers changed it, and this person is told what GitLab lets them write; then the snapshots
 // and the team's decisions are read from their stores. Commands that only print, or make a profile, skip both.
-const STORE_QUIET = ['--version', '--route', '--recipe', '--reference', '--summary', '--help', '--profile-export', '--profile-new', '--make-command', '--products'].some((f) => process.argv.slice(2).some((a) => a === f || a.startsWith(f + '=')));
+const STORE_QUIET = ['--version', '--route', '--recipe', '--reference', '--summary', '--help', '--profile-export', '--profile-new', '--make-command', '--products', '--a11y-no-worse'].some((f) => process.argv.slice(2).some((a) => a === f || a.startsWith(f + '=')));
 const STORE_OFFLINE = process.argv.includes('--offline');
 if (!STORE_QUIET) {
   const pf = await import('./profile.mjs');
@@ -603,6 +603,29 @@ if (process.argv.includes('--ci-changed')) {
   if (moved.length) { console.log(`▶️  Changed since the last build (${last.at}): ${moved.map((m) => `${m.what} ${short(m.from)} → ${short(m.to)}`).join(' · ')}. Build.`); process.exit(0); }
   console.log(`⏸  Nothing changed since the last build (${last.at}): ${Object.keys(now).join(', ')} as they were.`);
   process.exit(3);
+}
+
+// ── --a11y-no-worse [--record]: accessibility never gets worse (a11y-no-worse.mjs) ──
+// For a merge request's pipeline: after the audit, exit 1 when this run's accessibility result has a blocker the last
+// build on the base branch did not have (each one listed), 0 when it has none (what was fixed is said) or when no build
+// kept a result yet, 2 when this run has no result of its own. --record, in the base branch's pipeline after its audit,
+// keeps that build's blockers in OUT_DIR/a11y-last-build.json (the pipeline keeps that folder in its cache).
+if (process.argv.includes('--a11y-no-worse')) {
+  const nw = await import('./a11y-no-worse.mjs');
+  const result = nw.readJson(join(ROOT, OUT_DIR, nw.RESULT_FILE));
+  const file = join(ROOT, OUT_DIR, nw.RECORD_FILE);
+  if (process.argv.includes('--record')) {
+    if (!result?.checkedAt) { console.log(`❌ No accessibility result to keep (${OUT_DIR}/${nw.RESULT_FILE}): run the audit first.`); process.exit(2); }
+    let commit = null; try { const { execFileSync } = await import('node:child_process'); commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { /* not a git checkout */ }
+    const rec = nw.recordOf(result, { commit, branch: process.env.CI_COMMIT_BRANCH || process.env.GITHUB_REF_NAME || null });
+    mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+    writeFileSync(file, JSON.stringify(rec, null, 1) + '\n');
+    console.log(`✅ Kept this build's accessibility result (checked ${rec.checkedAt}): ${rec.blockers.length} blocker${rec.blockers.length === 1 ? '' : 's'} on components and products' pages, in ${OUT_DIR}/${nw.RECORD_FILE}.`);
+    process.exit(0);
+  }
+  const v = nw.noWorse(nw.readJson(file), result);
+  console.log(v.lines.join('\n'));
+  process.exit(v.code);
 }
 
 // ── --writes [<place> <yes|ask|no>]: what this project lets the engine change, and where it must never ──

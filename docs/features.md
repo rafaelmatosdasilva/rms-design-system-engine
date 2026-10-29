@@ -65,6 +65,7 @@ Each section says why it matters, then what it does not do well today. A line wi
 - Lists what the Figma file is missing, such as a focus state or an error message.
 - Checks your designed screens in Figma for contrast and target size. *(Beta)*
 - Tries again only what changed, so a second run takes seconds.
+- Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
 
 ## Write component contracts · Stable
 
