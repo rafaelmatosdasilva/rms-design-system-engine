@@ -2221,7 +2221,7 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   let scfg = {};
   try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   const { grammarOf } = await import('./construction-grammar.mjs');
-  const { specOf, specLines, likeOf, nameOf, askedOf, EXT } = await import('./component-spec.mjs');
+  const { specOf, specLines, likeOf, nameOf, askedOf, primitiveTest, tierTest, EXT } = await import('./component-spec.mjs');
   const { opsScript, opWords, modelOf } = await import('./figma-ops.mjs');
   const { mayWrite } = await import('./writes.mjs');
   const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
@@ -2233,7 +2233,7 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   const skeleton = read((await import('./figma-capture.mjs')).componentFiles(scfg).skeleton) ?? {};
   // What each variable points at, nearest first: the first mode's colours, then every other kind.
   const aliases = { ...(vars.otherAliases ?? {}), ...(Object.values(vars.aliases ?? {})[0] ?? {}) };
-  const captures = { props, skeleton, values, varNames, aliases };
+  const captures = { props, skeleton, values, varNames, aliases, aliasesByMode: vars.aliases ?? {}, isPrimitive: primitiveTest({ tiers: scfg.tiers, prefix: scfg.figma?.primitivePrefix }), tierOf: tierTest({ tiers: scfg.tiers }) };
   if (!Object.keys(props).filter((n) => !n.startsWith('_')).length) { console.log('❌ No Figma capture to build from: refresh Figma (--recipe refresh-figma), then ask again.'); process.exit(2); }
   const grammar = grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} });
   const specDir = join(ROOT, OUT_DIR, 'specs'), specFile = (n) => join(specDir, `${n}.spec.json`);

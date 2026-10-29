@@ -1346,8 +1346,11 @@ written. A new name (the component, an axis, an option, a property, a layer) is 
 grammar writes that kind of name. What the description asks beyond the copy is read as a change to it ("with a size xl
 like l", "without the icon", "with the description …", read as `--figma-change` reads words); what it cannot read is a
 question that names the axes and properties the one it is like has, never dropped. The variables the component it is
-like was given as its own are asked, with the shared one each points at (the nearest in its alias chain not made for
-it): `--shared` binds every one to it. Its description is asked. Run again with `--spec --name <name> --ops <file>`: the
+like was given as its own are asked, with the shared one each points at: the nearest in its alias chain that is
+neither in their layer (the project's declared `tiers`, else the path before the component's name) nor a primitive
+(the base tier, else `figma.primitivePrefix`). When the chain reaches only a primitive, it is the shared variable that
+resolves to the same primitive in every mode with the same scope and a name for the same thing (text, border); when none
+or several are, the person chooses, and a primitive is never proposed. `--shared` binds every one proposed. Its description is asked. Run again with `--spec --name <name> --ops <file>`: the
 spec keeps what was asked, and the file holds every operation so far. An axis or option is matched as the component
 names it (`Size` is size, and `L`, `large` or `lg` is l). A property is never put on a layer another property already
 drives, and a removed layer takes with it the property that drove only it. The operations, each an object with `op`:
@@ -1374,7 +1377,9 @@ steps to `.design-system-engine-out/handback/figma-build.json` and the Figma scr
 script the project's hooks let `use_figma` run, once the person says yes; a project whose `writes.figma` is `no` gets the
 steps alone). The script copies the component it is like beside it, makes only the listed steps in every variant, and
 returns what it changed, skipped and could not find. A variant copied for a new option or axis keeps what its layers
-were wired to (Figma drops the property references of a variant cloned in its set, and the script puts them back); a
+were wired to (Figma drops the property references of a variant cloned in its set, and the script puts them back), and
+a set grows to hold its variants (one with auto layout and a fixed size on an axis grows on that axis, keeping how each
+axis is sized, so none is clipped); a
 property whose layer is not there is not made; a variable is the file's own, else one of the libraries the file uses,
 imported by key. Then the Figma snapshots are refreshed and `--construction-check` and `--hygiene` say what they find on
 it.

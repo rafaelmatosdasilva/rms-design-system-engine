@@ -156,7 +156,8 @@ How it checks the agent's work, in a loop, before you see it:
 - Reads the rest of the same sentence ("with a size XL like L", "without the icon"), and asks about any part it could not read instead of dropping it.
 - Changes an existing one ("add a size XL to the chip"), with where it is used and what the change breaks.
 - Uses only the system's own variables, components, text styles and names. It never makes up a value.
-- Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all.
+- Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all. It never proposes binding a component straight to a primitive.
+- Grows the component set to hold new variants, so none is clipped.
 - Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
 - Follows how your system builds components: names, properties, layers and auto layout.
 - Writes nothing until someone signs it off and you say yes, then checks the result.

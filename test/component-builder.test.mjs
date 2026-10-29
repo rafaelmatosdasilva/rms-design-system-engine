@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './helpers.mjs';
 import { modelOf, predict, ground, opsScript } from '../figma-ops.mjs';
-import { specOf, specLines, likeOf, nameOf, askedOf, EXT } from '../component-spec.mjs';
+import { specOf, specLines, likeOf, nameOf, askedOf, sharedOf, primitiveTest, EXT } from '../component-spec.mjs';
 import { diffModels, diffLines } from '../component-diff.mjs';
 import { grammarOf } from '../construction-grammar.mjs';
 import { route } from '../route.mjs';
@@ -142,9 +142,28 @@ test('the like\'s own variables: the shared one each points at is proposed, from
   const withAliases = { ...captures, aliases: { 'chipFilter/label/color': ['text/default', 'neutral/900'] } };
   const { spec } = specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures: withAliases, grammar });
   assert.deepEqual(spec[EXT].shared, [{ op: 'rebind', from: 'chipFilter/label/color', to: 'text/default' }]);
-  assert.ok(spec[EXT].questions.some((q) => /chipFilter\/label\/color → text\/default \(--shared binds them all\)/.test(q.ask)));
+  assert.ok(spec[EXT].questions.some((q) => /chipFilter\/label\/color → text\/default \(--shared binds it\)/.test(q.ask)));
   // None to point at: a rebind for each, as before.
   assert.ok(specOf({ description: 'a tag', like: 'chipFilter', name: 'tag', captures, grammar }).spec[EXT].questions.some((q) => /None points at no shared variable/.test(q.ask)));
+});
+
+test('the shared variable is never a primitive, nor another component\'s own: the same value is not the same purpose', () => {
+  const vn = (names) => Object.fromEntries(names.map((n, i) => [`V:${i}`, { name: n, scopes: ['TEXT_FILL'] }]));
+  const names = ['ds/chipFilter/label/color', 'ds/chipFilter/badge/color', 'ds/chipFilter/dot/color', 'ds/button/label/color', 'text/label/color', 'overlay/scrim/color', 'border/strong/color', 'border/subtle/color', 'primitives/grey900', 'primitives/grey100'];
+  const aliasesByMode = {
+    light: { 'ds/chipFilter/label/color': ['primitives/grey900'], 'ds/chipFilter/badge/color': ['ds/button/label/color', 'primitives/grey900'], 'ds/chipFilter/dot/color': ['primitives/grey100'], 'ds/button/label/color': ['primitives/grey900'], 'text/label/color': ['primitives/grey900'], 'overlay/scrim/color': ['primitives/grey900'], 'border/strong/color': ['primitives/grey100'], 'border/subtle/color': ['primitives/grey100'] },
+  };
+  const cap = { props: { chipFilter: {}, button: {} }, varNames: vn(names), aliases: aliasesByMode.light, aliasesByMode, isPrimitive: primitiveTest() };
+  // Only a primitive in the chain: the shared one for the same thing, by its name, resolving to the same in every mode.
+  assert.deepEqual(sharedOf('ds/chipFilter/label/color', { like: 'chipFilter', captures: cap }), { to: 'text/label/color', via: 'primitives/grey900' });
+  // Another component's own variable in the chain is skipped, as it would be in the same layer.
+  assert.deepEqual(sharedOf('ds/chipFilter/badge/color', { like: 'chipFilter', captures: cap }), { primitive: 'primitives/grey900', options: ['text/label/color', 'overlay/scrim/color'] });
+  // Several for the same value and none plainly for the same thing: asked, never proposed.
+  assert.deepEqual(sharedOf('ds/chipFilter/dot/color', { like: 'chipFilter', captures: cap }), { primitive: 'primitives/grey100', options: ['border/strong/color', 'border/subtle/color'] });
+  // A project's declared tiers say what a primitive is.
+  const tiers = [{ name: 'core', match: '^core/', layer: 1 }, { name: 'rest', match: '.' }];
+  assert.equal(primitiveTest({ tiers })('core/blue'), true);
+  assert.equal(primitiveTest({ tiers })('primitives/blue'), false);
 });
 
 // ── The script, run on a stand-in for Figma ──
@@ -164,6 +183,7 @@ function fakeFigma() {
     editComponentProperty(k, { name, defaultValue }) { const d = this.componentPropertyDefinitions[k]; delete this.componentPropertyDefinitions[k]; if (defaultValue !== undefined) d.defaultValue = defaultValue; this.componentPropertyDefinitions[name ? `${name}#${k.split('#')[1] ?? ''}` : k] = d; }
     deleteComponentProperty(k) { delete this.componentPropertyDefinitions[k]; }
     resizeWithoutConstraints(w, h) { this.width = w; this.height = h; }
+    resize(w, h) { this.width = w; this.height = h; this.primaryAxisSizingMode = 'FIXED'; this.counterAxisSizingMode = 'FIXED'; }
     get defaultVariant() { return this.children[0]; }
     createInstance() { return new N('INSTANCE', this.name, { mainComponent: this }); }
     async loadAsync() {}
@@ -210,6 +230,15 @@ test('the build script copies the component, adds an option, a property, moves a
   assert.equal(set.children.length, 2);
   assert.equal(set.children[0].children[0].children[1].fills[0].boundVariables.color.id, 'V:1');
   assert.equal(out.node, tag.id);
+});
+
+test('a set with auto layout and a fixed height grows to hold its variants, and keeps how each axis is sized', async () => {
+  const { figma, set } = fakeFigma();
+  Object.assign(set, { layoutMode: 'HORIZONTAL', primaryAxisSizingMode: 'AUTO', counterAxisSizingMode: 'FIXED', paddingRight: 20, paddingBottom: 20, width: 260, height: 40 });
+  set.children.forEach((v, i) => Object.assign(v, { x: 20 + i * 120, y: 20 }));
+  const out = await run(opsScript([{ op: 'describe', text: 'A chip.' }, { op: 'bind', layer: '', field: 'fill', variable: 'text/default' }], { target: set.id, what: 'figma-change' }), figma);
+  assert.deepEqual(out.missing, []);
+  assert.deepEqual([set.width, set.height, set.primaryAxisSizingMode, set.counterAxisSizingMode], [260, 80, 'AUTO', 'FIXED']);
 });
 
 test('a property whose layer is not there is not made', async () => {

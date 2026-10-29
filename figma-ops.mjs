@@ -333,8 +333,19 @@ const layerIn = (v, path) => { if (!path) return v; let n = v; for (const seg of
 const keyOf = (s, name) => Object.keys(s.componentPropertyDefinitions || {}).find((k) => k.replace(/#[^#]*$/, '') === name);
 const fonts = async (n) => { if (n.type !== 'TEXT') return; const f = n.fontName === figma.mixed ? n.getRangeAllFontNames(0, n.characters.length) : [n.fontName]; for (const x of f) await figma.loadFontAsync(x); };
 const inside = (s) => [s, ...(s.findAll ? s.findAll((n) => { for (let p = n.parent; p && p !== s; p = p.parent) if (p.type === 'INSTANCE') return false; return true; }) : [])];
-// New variants go in a row under the others, and the set grows to hold them.
-const fit = (s) => { if (s.type !== 'COMPONENT_SET' || (s.layoutMode && s.layoutMode !== 'NONE')) return; let w = 0, h = 0; for (const c of s.children) { w = Math.max(w, c.x + c.width); h = Math.max(h, c.y + c.height); } s.resizeWithoutConstraints(Math.max(s.width, w + 20), Math.max(s.height, h + 20)); };
+// New variants go in a row under the others, and the set grows to hold them. A set with auto layout places them
+// itself; one of a fixed size on an axis grows on that axis to its padding, keeping how each axis is sized, so no
+// variant is clipped.
+const fit = (s) => {
+  if (s.type !== 'COMPONENT_SET') return;
+  const auto = s.layoutMode && s.layoutMode !== 'NONE';
+  let w = 0, h = 0; for (const c of s.children) { w = Math.max(w, c.x + c.width); h = Math.max(h, c.y + c.height); }
+  const W = Math.max(s.width, w + (auto ? s.paddingRight : 20)), H = Math.max(s.height, h + (auto ? s.paddingBottom : 20));
+  if (W === s.width && H === s.height) return;
+  if (!auto) { s.resizeWithoutConstraints(W, H); return; }
+  const modes = [s.primaryAxisSizingMode, s.counterAxisSizingMode];
+  s.resize(W, H); s.primaryAxisSizingMode = modes[0]; s.counterAxisSizingMode = modes[1];
+};
 // A variant copied inside its set loses what its layers were wired to (Figma drops the property references on clone):
 // each layer gets its source's back, by position.
 const rewire = async (from, to) => { if (from.componentPropertyReferences && Object.keys(from.componentPropertyReferences).length && 'componentPropertyReferences' in to) { await fonts(to); try { to.componentPropertyReferences = { ...from.componentPropertyReferences }; } catch (e) { /* a reference Figma will not take here */ } } const a = from.children || [], b = to.children || []; if (from.type !== 'INSTANCE') for (let i = 0; i < Math.min(a.length, b.length); i++) await rewire(a[i], b[i]); };
@@ -445,7 +456,7 @@ ${target ? "if (!set) return { changed, skipped, missing: ['the component (node 
         if (L.fill && 'layoutSizingHorizontal' in node && p.layoutMode && p.layoutMode !== 'NONE') node.layoutSizingHorizontal = 'FILL';
         n++;
       }
-      (n ? changed : missing).push('layer ' + (o.parent ? o.parent + '/' : '') + L.name + (n ? ' in ' + n + ' variant' + (n === 1 ? '' : 's') : ''));
+      fit(set); (n ? changed : missing).push('layer ' + (o.parent ? o.parent + '/' : '') + L.name + (n ? ' in ' + n + ' variant' + (n === 1 ? '' : 's') : ''));
     } else if (o.op === 'removeLayer') {
       let n = 0; for (const v of variantsOf(set)) { const l = layerIn(v, o.layer); if (l) { l.remove(); n++; } }
       (n ? changed : skipped).push('layer ' + o.layer + (n ? ' removed' : ''));
@@ -454,7 +465,7 @@ ${target ? "if (!set) return { changed, skipped, missing: ['the component (node 
       if (!v) { missing.push('variable ' + o.variable); continue; }
       let n = 0;
       for (const x of variantsOf(set).filter((x) => !o.where || Object.entries(o.where).every(([k, y]) => axesOf(x)[k] === y))) { const l = layerIn(x, o.layer || ''); if (!l) continue; await bindOne(l, o.field, v); n++; }
-      (n ? changed : missing).push((o.layer || 'its frame') + ' ' + o.field + ' → ' + o.variable + (n ? '' : ' (no such layer)'));
+      fit(set); (n ? changed : missing).push((o.layer || 'its frame') + ' ' + o.field + ' → ' + o.variable + (n ? '' : ' (no such layer)'));
     } else if (o.op === 'rebind') {
       const a = await varOf(o.from), b = await varOf(o.to);
       if (!a || !b) { missing.push('variable ' + (a ? o.to : o.from)); continue; }
