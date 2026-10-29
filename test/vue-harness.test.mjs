@@ -313,3 +313,11 @@ const made = build([1, 2])
   assert.deepEqual(got.params, { title: 'Totals', show: true }, 'a ref() of a literal too');
   assert.equal(got.items, undefined, 'a value made by a call is never run');
 });
+
+test('an object a part reads: a date it reads left out, a field it loops over through a name of its own a list', async () => {
+  const { objectSamples } = await import('../vue-harness.mjs');
+  const got = objectSamples('const names = props.words.shortNames\nreturn names.map((n) => n)\nprops.words.longNames; props.range.from; props.range.startDate; props.range.label', ['words', 'range']);
+  assert.deepEqual(got.words.shortNames, ['ShortName 1', 'ShortName 2', 'ShortName 3']);
+  assert.equal(typeof got.words.longNames, 'string', 'one it only passes on is a value');
+  assert.deepEqual(got.range, { label: 'Label 1' }, 'from and startDate are dates: left out, as a page that gives none');
+});

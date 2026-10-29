@@ -224,14 +224,23 @@ export function sampleValue(f, i, samples = {}, kinds = {}) {
 
 // For each object prop the code reads fields of (cell.type, props.baseAmount.label) with none given by default, an
 // object with those fields, each as sampleValue gives it; a field it loops over or measures (months.map, rows.length)
-// a list of three. So a part drawn alone, outside the parent that always passes it one, draws. → { propName: object }
+// a list of three; a date it reads left out (a page that gives none). So a part drawn alone, outside the parent that
+// always passes it one, draws. → { propName: object }
 export function objectSamples(text, objectProps = [], samples = {}, kinds = {}) {
   const src = String(text), out = {};
   for (const p of objectProps) {
     const fields = {};
     for (const m of src.matchAll(new RegExp(`(?:\\bprops\\.|[^.\\w$])${p}\\??\\.([A-Za-z_$][\\w$]*)(\\??\\.(?:map|forEach|filter|find|some|every|reduce|slice|length|indexOf|includes|join)\\b|\\[)?`, 'g'))) {
       const [, f, list] = m;
+      // A date it reads (disabledDates.from, range.start): left out, as a page that gives none; words would not be one.
+      if (!list && /^(from|to|start|end|min|max)$|(date|day|month|year|time)$/i.test(f)) continue;
       if (fields[f] === undefined || (list && !Array.isArray(fields[f]))) fields[f] = list ? [0, 1, 2].map((i) => sampleValue(f.replace(/s$/, ''), i, samples, kinds)) : sampleValue(f, 0, samples, kinds);
+    }
+    // A field kept in a name first and looped over by that name (const labels = props.translation.monthsAbbr;
+    // labels.map(...)): a list too.
+    for (const m of src.matchAll(new RegExp(`\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:props\\.)?${p}\\??\\.([A-Za-z_$][\\w$]*)\\s*(?:;|\\n)`, 'g'))) {
+      const [, local, f] = m;
+      if (new RegExp(`\\b${local}\\??\\.(?:map|forEach|filter|find|some|every|reduce|slice|length|indexOf|includes|join)\\b|\\b${local}\\[`).test(src)) fields[f] = [0, 1, 2].map((i) => sampleValue(f.replace(/s$/, ''), i, samples, kinds));
     }
     if (Object.keys(fields).length) out[p] = fields;
   }
