@@ -227,7 +227,23 @@ const FIGMA_BUILD = /\b(build|create|make|design|draw|add|cria\w*|constr[oó]i\w
 const figmaBuild = (t, components = []) => { const m = t.match(FIGMA_BUILD); return !!m && (!!m[3] || components.some((c) => c.toLowerCase() === String(m[7] ?? '').toLowerCase()) || !!memberOf(m[7], t, components)); };
 const FIGMA_CHANGE = /\b(add|rename|remove|delete|drop|bind|rebind|acrescent\w*|adicion\w*|renome\w*|remov\w*|apag\w*|tira\w*)\b/i;
 const ISSUE_LINK = /https?:\/\/\S+\/-\/(issues|work_items)\/\d+/i;
+// What a run already found ("what did the last audit find", "show me the summary again", "o que encontrou a última
+// auditoria"): the last run's SUMMARY printed again (--summary), never a new run in its place. A run asked for again, a
+// change to make from it, or what changed since it is not this: those run.
+const PAST_RUN = /\b(?:last|latest|previous|most recent|prior|earlier)\s+(?:full\s+|parity\s+|accessibility\s+)?(?:audit|run|check|scan|report|results?|summary)\b|\bdid\s+(?:the|that|this|your|my|our)\s+(?:full\s+|parity\s+|accessibility\s+)?(?:audit|run|check|scan)\s+(?:find|say|show|report|flag|catch|turn up|return|give)\b|\b(?:the|that|this)\s+(?:audit|run|check|scan)\s+(?:you|we|i)\s+(?:just\s+)?(?:ran|did|made)\b|(?<![\p{L}])(?:[úu]ltima|anterior)\s+(?:auditoria|verifica[çc][ãa]o|corrida|execu[çc][ãa]o)\b|\b(?:auditoria|verifica[çc][ãa]o|corrida)\s+anterior\b/iu;
+const SUMMARY_AGAIN = /\b(?:show|print|give|repeat|read|display|paste|send|see|mostra\w*|repete|d[aá]-?me|l[eê])\b[^.\n]{0,25}\b(?:the\s+|o\s+)?(?:audit'?s?\s+|run'?s?\s+)?(?:summary|resumo)\b/i;
+const NOT_LAST_RESULT = /\b(?:fix|correct|repair|accept|keep|baseline|apply|update|refresh|re-?run|redo|compare|diff|since|changed|corrig\w*|consert\w*|aceit\w*|mant[eé]m|aplic\w*|atualiz\w*|compar\w*|desde|mudou)\b|\b(?:run|audit|check|scan|corre)\b[^.\n]{0,30}\b(?:again|de novo|outra vez)\b|\bstyle ?guide\b|\bguia de estilos?\b/i;
+const lastResult = (t) => (PAST_RUN.test(t) || SUMMARY_AGAIN.test(t)) && !NOT_LAST_RESULT.test(t);
+// A UI an AI tool (or the agent itself) generated, to check against the system's components ("write the generated UI
+// to ui.json and check it against the design system", "validate this AI-made screen"): --check-ui on that file, never
+// an audit of the components it happens to name. Prototypes keep their own route.
+const GENERATED_UI = /\bgenerated\s+(?:ui|screens?|pages?|layouts?|views?|markup|json|composition|component tree)\b|\b(?:ai|agent|model|llm|tool|generator)[- ](?:generated|written|made|built)\s+(?:ui|screens?|pages?|layouts?|views?|markup|json)\b|\b(?:ui|screens?|pages?|layouts?|views?)\b[^.\n]{0,25}\b(?:an?\s+|the\s+|my\s+|our\s+)?(?:ai|agent|model|llm|generator|ui generator|tool)\b[^.\n]{0,15}\b(?:generated|wrote|made|produced|built|returned)\b|\b(?:ui|ecr[ãa]|tela|p[aá]gina|interface)\s+gerad[ao]\b|\ba2ui\b|(?<![\w.-])[\w./-]*\b(?:ui|screen|page|layout|generated|a2ui)\b[\w.-]*\.json\b/i;
+const CHECK_IT = /\b(?:check|validate|verify|lint|test|audit|review|confirm|against|conform\w*|verifica\w*|valida\w*|confer\w*|confirma\w*|contra)\b/i;
+const generatedUi = (t) => GENERATED_UI.test(t) && CHECK_IT.test(t) && !PROTOTYPE.test(t);
+const UI_FILE_SAID = /(?<![\w.-])((?:\.{1,2}\/|~\/|\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:json|html?|jsx|tsx|vue|svelte))\b/i;
 const RULES = [
+  ['full-audit', (t) => lastResult(t), 'last-result'],
+  ['ask-the-system', (t) => generatedUi(t), 'check-ui'],
   ['figma-edits', (t) => CONSTRUCTION_FIX.test(t), 'construction-fix'],
   ['ask-the-system', (t) => CONSTRUCTION.test(t), 'construction'],
   ['build-component-figma', (t, s) => figmaBuild(t, s.components) && IN_FIGMA.test(t) && !/\b(roles?|annotations?|accessibility|a11y|acessibilidade|prototype|prot[oó]tipo|screen|ecr[ãa])\b/i.test(t), 'figma-build'],
@@ -384,7 +400,7 @@ function routeOnly(text, opts) {
   const { cmd, components = [] } = opts;
   if (!opts.hasConfig || !components.length || namedComponents(text, components).length) return r;
   const loose = looseComponents(text, components);
-  if (!loose.ask || !WHOLE_LIBRARY_CHECK.has(r.recipe) || r.run.length !== 1) return r;
+  if (!loose.ask || !WHOLE_LIBRARY_CHECK.has(r.recipe) || r.run.length !== 1 || r.kind === 'last-result') return r;
   const rest = r.run[0] === cmd ? '' : r.run[0].startsWith(`${cmd} --`) && !r.run[0].includes(' --component ') ? r.run[0].slice(cmd.length) : null;
   if (rest == null) return r;
   return { ...r, recipe: r.recipe === 'full-audit' ? 'audit-component' : r.recipe, question: false, run: [`${cmd} --component '<${orList(loose.names)}>'${rest}`], which: `which component they mean: ${orList(loose.names)}, or all of them`,
@@ -429,6 +445,15 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
   }
   for (const [recipe, test, kind] of RULES) {
     if (!test(t, { build, named, components })) continue;
+    if (kind === 'last-result') {
+      notes.push('The person asks what a run already found: print the last run\'s SUMMARY with --summary and relay it as it is. Run no new audit in its place; only when it says there is no summary yet, run the command its NEXT line names.');
+      return { recipe: named.length ? 'audit-component' : recipe, question: false, run: [`${cmd} --summary`], notes, kind };
+    }
+    if (kind === 'check-ui') {
+      const file = t.match(UI_FILE_SAID)?.[1] ?? null;
+      notes.push(`A UI generated outside the system's own code (by an AI tool, or by you when asked to write it): check that file against the component catalog with --check-ui, never an audit of the components it names. ${file ? '' : 'Write the UI to a file first when it is not in one yet (JSON: a nested { component, props, children } tree, or the flat A2UI list; or the page file itself), then run the command with that file in place of <file>. '}Report each finding as the check prints it; change the UI only when the person asks.`);
+      return { recipe, question: false, run: [`${cmd} --check-ui ${file ? shellPath(file) : '<file>'}`], notes, kind };
+    }
     if (recipe === 'change-component-figma') {
       notes.push('A change to a component in Figma: the engine writes only what changes, checked against the system, and the report of what it changes, where it is used and what breaks. What it cannot read in words, write as operations. Nothing is written in Figma before someone signs off what it adds or breaks and the person says yes to the script; then Figma is read again and --change-report says what really changed.');
       const link = t.match(ISSUE_LINK)?.[0];

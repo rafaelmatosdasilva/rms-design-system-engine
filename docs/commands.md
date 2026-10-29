@@ -24,6 +24,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine check the button against Figma, without accessibility` | Every check against Figma, without accessibility |
 | `/rms-design-system-engine run only the token values check` | One check, by number or name |
 | `/rms-design-system-engine which component should I fix first?` | The component with the most left to fix |
+| `/rms-design-system-engine what did the last audit find?` | The last run's summary again, with nothing run anew |
 
 ## Accessibility
 
@@ -59,6 +60,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine are our prototype pages consistent?` | Where the product's pages differ |
 | `/rms-design-system-engine check the prototype flow` | Missing pages and broken links in a flow |
 | `/rms-design-system-engine build the button from Figma` | The component built and checked piece by piece |
+| `/rms-design-system-engine write the generated UI to ui.json and check it against the design system` | Each component, prop or value the generated UI uses that your system does not have |
 | `/rms-design-system-engine what is left to build?` | What Figma has and the code does not, in order |
 
 ## Tokens and changes
