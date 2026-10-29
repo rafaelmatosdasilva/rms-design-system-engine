@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
 import { findChrome } from '../cdp.mjs';
-import { partRoleOf, partRolesOf, behavioursFor, annotatedBehaviours, behaviourSheetLines, partSheetLines } from '../behaviour-contract.mjs';
+import { partRoleOf, partRolesOf, partsFromNames, partsInMarkup, behavioursFor, annotatedBehaviours, behaviourSheetLines, partSheetLines } from '../behaviour-contract.mjs';
 import { annotationFacts } from '../a11y-check.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -123,4 +123,13 @@ test('states: an option heard on a part (heardOn) sets the part\'s state and cou
   // Without heardOn the class alone is still a state nobody hears.
   const bare = [{ label: 'Disabled', type: 'BOOLEAN', on: { add: ['field--disabled'], attrs: {} } }];
   assert.equal(stateFindings([{ name: 'field', role: 'textbox', controls: bare }]).length, 1);
+});
+
+test('a control nobody annotated: its parts read from its layers\' names and from its markup', () => {
+  assert.deepEqual(partsFromNames(['Label', 'Field', 'Helper text', 'Error message', 'Chevron', 'Label copy'], 'textbox').map((x) => [x.layer, x.part]),
+    [['Label', 'label'], ['Helper text', 'description'], ['Error message', 'errormessage'], ['Chevron', 'indicator']], 'a part named twice is taken once');
+  assert.deepEqual(partsFromNames(['Plus', 'Value', 'Minus'], 'spinbutton').map((x) => x.part), ['increment', 'decrement']);
+  assert.deepEqual(partsFromNames(['Label'], null), [], 'not a control: no parts owed');
+  assert.deepEqual(partsInMarkup('<div class="tile-field"><label for="a">Name</label><input id="a"><span class="tile-field__hint">x</span><em class="tile-error-text">y</em><i class="icon-check"></i></div>').map((x) => x.part),
+    ['label', 'description', 'errormessage', 'indicator']);
 });

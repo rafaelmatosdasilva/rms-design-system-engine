@@ -30,7 +30,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { roleWord } from './role-markup.mjs';
-import { behaviourSheetLines } from './behaviour-contract.mjs';
+import { behaviourSheetLines, partsInMarkup, PART_ROLES } from './behaviour-contract.mjs';
 import { noteIsTodo } from './annotation-categories.mjs';
 
 const attr = (attrs, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|\\{\\s*["']?([^}"']*)["']?\\s*\\})`, 'i').exec(attrs); return m ? (m[1] ?? m[2] ?? m[3] ?? '').trim() : null; };
@@ -271,6 +271,7 @@ export function specEdits(propsSnap = {}, components = [], { heard = {} } = {}) 
     const figmaRole = roleWord((entry.annotations ?? []).filter((a) => !String(a?.labelMarkdown ?? a?.label ?? '').startsWith(SPEC_HEAD)));
     const differs = found && figmaRole && figmaRole !== found.role && !(figmaRole === 'textfield' && found.role === 'textbox');
     const states = statesOf(markups), named = nameSource(markups), keys = found ? KEYS_OWED[found.role] ?? null : null;
+    const parts = partsInMarkup(markups[0] ?? '');
     const does = found ? behaviourSheetLines(found.role).filter((l) => !keys?.includes(l)) : [];
     const says = (heard[name] ?? []).slice(0, 4).join(' · ');
     if (!found && !states.length) continue;   // a wrapper of several controls with no state of its own: nothing to state
@@ -280,6 +281,8 @@ export function specEdits(propsSnap = {}, components = [], { heard = {} } = {}) 
       states.length ? `States: ${states.join(', ')}` : null,
       keys ? `Keys: ${keys}` : null,
       does.length ? `Behaviour: ${does.join('; ')}` : null,
+      // Its parts, read from the markup, each with what it owes the control: what Figma's layer annotations can confirm.
+      found && parts.length ? `Parts: ${parts.map((x) => `${x.part} ${x.element} ${PART_ROLES[x.part]}`).join('; ')}` : null,
       says ? `A screen reader says: ${says}` : null].filter(Boolean);
     out.push({ kind: 'spec', component: name, nodeId: entry.nodeId, role: found && !differs ? found.role : null, label: lines.join('\n'),
       why: [found ? `${/^[aeiou]/.test(found.role) ? 'an' : 'a'} ${found.role}` : 'a composite', named ? `named by ${named.split(':')[0]}` : null, states.length ? `${states.length} state${states.length === 1 ? '' : 's'}` : null].filter(Boolean).join(', ') });
