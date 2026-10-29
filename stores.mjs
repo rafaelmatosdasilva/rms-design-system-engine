@@ -554,14 +554,16 @@ async function treeFiles(api, path, sha, part) {
 
 // ── Writing the part to its store ──────────────────────────────────────────────────────────────────────────────────
 // Only where GitLab lets this person write (writeAccess); a commit on the branch, or a merge request when the branch is
-// protected or the setup asks for one; refused when the branch moved since the store was read in this run, so nothing
-// written meanwhile is overwritten. Never throws. → { ok, line, url? }
+// protected or the setup asks for one. When the branch moved since the store was read in this run (another run wrote
+// it), each file is merged rather than refused: one only this run changed is sent, one only the other changed is
+// taken here, and one both changed is decided by what each was built from (stamp.mjs): the copy built from newer
+// inputs is kept, and one whose inputs cannot be ordered is held, neither overwritten. Never throws. → { ok, line, url? }
 export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
   const label = LABEL[part];
   const a = await writeAccess(ROOT, cfg, part, opts);
   if (!a.mode) return { ok: false, line: `ℹ️  ${label} not sent: ${a.why}.${a.place ? ' Whoever may write it there sends it.' : ''}` };
   const place = a.place;
-  const sendable = [...files].filter(([rel]) => safeRel(rel) && TAKES[part]?.(rel));
+  let sendable = [...files].filter(([rel]) => safeRel(rel) && TAKES[part]?.(rel));
   if (!sendable.length) return { ok: true, line: `ℹ️  ${label}: nothing to send` };
   // Written with this person's own git access, because there is no token. Built and pushed without a checkout; a
   // host that will not take it says so and that is what the line carries.
@@ -596,8 +598,18 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     // A part the project reads from the same place (the snapshots, the decisions) is sent on the commit it was read at.
     // Not the themes: each is a file of its own, and the page published beside them moves the branch they are read at.
     const expect = opts.expectSha ?? (part !== 'themes' && TAKES_ON_RUN.includes(part) && keyOf(storesOf(cfg)[part].read) === keyOf(place) ? prev.sha : null);
-    if (expect && head && !head.startsWith(expect)) return { ok: false, line: `⚠️  ${label} not sent: ${a.branch} moved since it was read (now ${head.slice(0, 8)}): run again, so the store is read first` };
     const pre = place.path ? place.path + '/' : '';
+    let merged = null;
+    if (expect && head && !head.startsWith(expect)) {
+      merged = await mergeMoved(ROOT, part, api, pre, head, sendable, prev, opts.force ?? process.argv.includes('--force'));
+      if (merged.error) return { ok: false, line: `⚠️  ${label} not sent: ${a.branch} moved since it was read (now ${head.slice(0, 8)}), and ${merged.error}: run again, so the store is read first` };
+      sendable = merged.send;
+      if (!sendable.length) {
+        st[part] = { sha: head, files: { ...(prev.files ?? {}), ...merged.seen }, readAt: new Date().toISOString() };
+        writeState(ROOT, st);
+        return { ok: !merged.held.length, line: `${merged.held.length ? '⚠️ ' : 'ℹ️ '} ${label}: nothing sent - ${a.branch} moved since it was read (now ${head.slice(0, 8)}): ${mergedSay(merged)}` };
+      }
+    }
     const there = new Set();
     for (let page = 1; page <= 50; page++) {
       const r = await api.get(`/repository/tree?ref=${encodeURIComponent(head)}&recursive=true&per_page=100&page=${page}${place.path ? `&path=${encodeURIComponent(place.path)}` : ''}`, { write: true });
@@ -618,6 +630,7 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     }
     const gone = part === 'styleguide' ? staleBeside(sendable, beside, (f) => pages[f] ?? '') : [];
     if (!changed.length && !gone.length) return { ok: true, line: `ℹ️  ${label}: ${describePlace(place)} already has these files` };
+    const after = merged ? ` - ${a.branch} had moved since it was read: ${mergedSay(merged)}` : '';
     const actions = [...changed.map(([rel, data]) => ({ action: there.has(pre + rel) ? 'update' : 'create', file_path: pre + rel, content: Buffer.from(data).toString('base64'), encoding: 'base64' })),
       ...gone.map((f) => ({ action: 'delete', file_path: pre + f }))];
     // The commit says whose run made it. The token's owner stays the committer, so GitLab's roles and its audit trail
@@ -639,9 +652,9 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
       }
       if (!c.ok && !out) return { ok: false, line: `⚠️  ${label} not sent: GitLab answered ${c.status} to the commit${c.status === 403 ? ` (the token in ${api.writesWith} may not create commits on ${a.branch})` : ''}` };
       out ??= await c.json();
-      st[part] = { sha: out?.id ?? null, files: { ...(prev.sha === head ? prev.files : {}), ...Object.fromEntries(changed.map(([rel, d]) => [rel, hash(d)])) }, readAt: new Date().toISOString() };
+      st[part] = { sha: out?.id ?? null, files: { ...(prev.sha === head ? prev.files : merged ? { ...(prev.files ?? {}), ...merged.seen } : {}), ...Object.fromEntries(changed.map(([rel, d]) => [rel, hash(d)])) }, readAt: new Date().toISOString() };
       writeState(ROOT, st);
-      return { ok: true, url: out?.web_url ?? null, line: `📤 ${label}: ${changed.length} file${changed.length === 1 ? '' : 's'} committed on ${describePlace(place)}${out?.web_url ? ` (${out.web_url})` : ''}` };
+      return { ok: true, url: out?.web_url ?? null, line: `📤 ${label}: ${changed.length} file${changed.length === 1 ? '' : 's'} committed on ${describePlace(place)}${out?.web_url ? ` (${out.web_url})` : ''}${after}` };
     }
     const branch = `design-system-engine/${part}-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}`;
     const b = await api.send('POST', `/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(head)}`);
@@ -651,9 +664,44 @@ export async function pushStore(ROOT, cfg, part, files, message, opts = {}) {
     const m = await api.send('POST', '/merge_requests', { source_branch: branch, target_branch: a.branch, title: message.split('\n')[0], description: message, remove_source_branch: true });
     if (!m.ok) return { ok: false, line: `⚠️  ${label}: the branch ${branch} holds the changes, but GitLab answered ${m.status} to the merge request` };
     const url = (await m.json())?.web_url ?? null;
-    return { ok: true, url, line: `📤 ${label}: ${changed.length} file${changed.length === 1 ? '' : 's'} sent as a merge request into ${a.branch}${url ? ` (${url})` : ''}${a.why ? ` - ${a.why}` : ''}` };
+    return { ok: true, url, line: `📤 ${label}: ${changed.length} file${changed.length === 1 ? '' : 's'} sent as a merge request into ${a.branch}${url ? ` (${url})` : ''}${a.why ? ` - ${a.why}` : ''}${after}` };
   } catch (e) { return { ok: false, line: `⚠️  ${label} not sent: ${e.message}` }; }
 }
+
+// The files of a write whose branch moved since the store was read, each as it is there now (head) against the copy
+// read (prev.files, by hash) and this run's: only this run changed it, sent; only the store, its copy written here;
+// both, the stamps decide (compareStamps), the one built from newer inputs kept and one that cannot be ordered held.
+// → { send, took: [rel], kept: [{ rel, why }], held: [rel], seen: { rel: hash of the copy there } } or { error }
+async function mergeMoved(ROOT, part, api, pre, head, sendable, prev, force = false) {
+  const { stampIn, compareStamps } = await import('./stamp.mjs');
+  const base = resolve(ROOT, part === 'themes' ? THEMES_DIR : part === 'prototypes' ? PROTOTYPES_DIR : '.');
+  const out = { send: [], took: [], kept: [], held: [], seen: {} };
+  for (const [rel, data] of sendable) {
+    const r = await api.get(`/repository/files/${encodeURIComponent(pre + rel)}/raw?ref=${encodeURIComponent(head)}`, { write: true });
+    if (!r.ok && r.status !== 404) return { error: `GitLab answered ${r.status} for ${rel}` };
+    const there = r.ok ? Buffer.from(await r.arrayBuffer()) : null;
+    const theirs = there ? hash(there) : null, ours = hash(data), read = prev.files?.[rel] ?? null;
+    if (theirs) out.seen[rel] = theirs;
+    if (theirs === ours) continue;                                            // the same already there
+    if (theirs === read) { out.send.push([rel, data]); continue; }            // only this run changed it
+    if (!there) { out.send.push([rel, data]); continue; }                     // gone there, written here: sent
+    const here = resolve(base, rel), inside = here.startsWith(base + sep);
+    const take = () => { if (inside) { mkdirSync(dirname(here), { recursive: true }); writeFileSync(here, there); } };
+    const local = existsSync(here) ? hash(readFileSync(here)) : null;
+    if (ours === read && local === read) { take(); out.took.push(rel); continue; }   // only the store changed it: taken here
+    const a = stampIn(there.toString('utf8'), rel), b = stampIn(Buffer.from(data).toString('utf8'), rel);
+    const mineOlder = a && b ? compareStamps(a, b, { ROOT }) : null, theirsOlder = a && b ? compareStamps(b, a, { ROOT }) : null;
+    if (mineOlder?.older && !force) { take(); out.kept.push({ rel, why: mineOlder.why.join('; ') }); }
+    else if (theirsOlder?.older || force) out.send.push([rel, data]);
+    else out.held.push(rel);
+  }
+  return out;
+}
+const mergedSay = (m) => [
+  m.took.length ? `${m.took.length} taken from the store, changed only there` : null,
+  m.kept.length ? `${m.kept.map((k) => k.rel).join(', ')} kept as the store has ${m.kept.length === 1 ? 'it' : 'them'}, built from newer inputs (${m.kept.map((k) => k.why).join('; ')})` : null,
+  m.held.length ? `${m.held.join(', ')} held, changed there and here from inputs that cannot be ordered: run again, so the store is read first, or send it with --force` : null,
+].filter(Boolean).join('; ') || 'nothing of the other run\'s was overwritten';
 
 // ── On each run: the stores the project reads from, brought in ─────────────────────────────────────────────────────
 // The snapshots and the team's decisions (the parts the checks read); the contracts and the style guide are only

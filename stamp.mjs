@@ -77,7 +77,12 @@ export const META = 'rms-design-system-engine-built';
 export function stampOf(file) {
   if (!existsSync(file)) return null;
   let text; try { text = readFileSync(file, 'utf8'); } catch { return null; }
-  if (/\.html?$/i.test(file)) {
+  return stampIn(text, file);
+}
+// The same from a file's text (a copy read from a store), its name saying whether it is a page.
+export function stampIn(text, name = '') {
+  text = String(text ?? '');
+  if (/\.html?$/i.test(name)) {
     const m = text.match(new RegExp(`<meta name="${META}" content="([^"]*)"`));
     try { return m ? JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')) : null; } catch { return null; }
   }
