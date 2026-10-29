@@ -76,7 +76,7 @@ rms-design-system-engine --sign-off "chip size=xl" --by "<who>"  # a named perso
 rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-design-system-engine --figma-change chip "add xl to size like l"  # a change to a component Figma has, only what changes, with its report (what changes, where it is used, what breaks); --change-report chip after, the read before beside the read after
-rms-design-system-engine --spec "a tag like the chip"     # the spec of a new component built in Figma like one the system has: only its variables, components and names; what it cannot ground is a question (--ops adds the steps; --figma-build <name> writes the Figma script)
+rms-design-system-engine --spec "a tag like the chip"     # the spec of a new component built in Figma like one the system has: only its variables, components and names; what it cannot ground is a question (--ops adds the steps; --shared binds the shared variables; --figma-build <name> writes the Figma script)
 rms-design-system-engine --hygiene                       # list every Figma file hygiene finding: values with no variable or style, detached instances, no auto layout, no description, variables bound outside their scope or left on all scopes (the first 15 show on every run)
 rms-design-system-engine --census                        # every value written by hand in the project's styles (colours, spacing, radii, font sizes, durations, layers, shadows), each with its line and the token to use, the files that guess most first; keeps the count in design-system-engine-census.json so it only falls (exits 1 when a file has more than it); --census --all lists every line
 rms-design-system-engine --prune                         # list prune candidates: deprecated tokens, single-option variants, single-use components (totals show on every run)
@@ -1335,7 +1335,7 @@ a rule.
 
 #### A component built in Figma (`--spec`, `--figma-build`)
 
-**--spec.** `--spec "<description>" [--like <component>] [--name <name>] [--ops <file.json>]` writes the spec of a new
+**--spec.** `--spec "<description>" [--like <component>] [--name <name>] [--ops <file.json>] [--shared]` writes the spec of a new
 component to `.design-system-engine-out/specs/<name>.spec.json`, in DSDS's shape (its traits and what it nests), with the
 engine's own part: what was asked, the component it is like, the operations that make it, its questions, what it adds to
 the system and the names it wrote the system's way. It starts as a copy of the component it is most like (named with
@@ -1343,9 +1343,17 @@ the system and the names it wrote the system's way. It starts as a copy of the c
 asked. Each is checked against the system: a variable, a component, a text style or a layer it names must be the
 system's, else it is a question with the nearest the system has; a value (`#ff0000`, `16px`) is always a question, never
 written. A new name (the component, an axis, an option, a property, a layer) is written as the system's construction
-grammar writes that kind of name. The variables the component it is like was given as its own, and its description,
-are asked. Run again with `--spec --name <name> --ops <file>`: the spec keeps what was asked, and the file holds every
-operation so far. The operations, each an object with `op`:
+grammar writes that kind of name. What the description asks beyond the copy is read as a change to it ("with a size xl
+like l", "without the icon", "with the description …", read as `--figma-change` reads words); what it cannot read is a
+question that names the axes and properties the one it is like has, never dropped. The variables the component it is
+like was given as its own are asked, with the shared one each points at: the nearest in its alias chain that is
+neither in their layer (the project's declared `tiers`, else the path before the component's name) nor a primitive
+(the base tier, else `figma.primitivePrefix`). When the chain reaches only a primitive, it is the shared variable that
+resolves to the same primitive in every mode with the same scope and a name for the same thing (text, border); when none
+or several are, the person chooses, and a primitive is never proposed. `--shared` binds every one proposed. Its description is asked. Run again with `--spec --name <name> --ops <file>`: the
+spec keeps what was asked, and the file holds every operation so far. An axis or option is matched as the component
+names it (`Size` is size, and `L`, `large` or `lg` is l). A property is never put on a layer another property already
+drives, and a removed layer takes with it the property that drove only it. The operations, each an object with `op`:
 
 - `rename { what: component | axis | option | property | layer, from, to, axis? }`
 - `addOption { axis, option, like }` (its variants copied from the option it is like), `removeOption { axis, option }`,
@@ -1368,13 +1376,19 @@ system and waits for a named person to sign it off; `--signed-off` records who a
 steps to `.design-system-engine-out/handback/figma-build.json` and the Figma script to `handback/figma-apply.js` (the one
 script the project's hooks let `use_figma` run, once the person says yes; a project whose `writes.figma` is `no` gets the
 steps alone). The script copies the component it is like beside it, makes only the listed steps in every variant, and
-returns what it changed, skipped and could not find. Then the Figma snapshots are refreshed and `--construction-check`
-and `--hygiene` say what they find on it.
+returns what it changed, skipped and could not find. A variant copied for a new option or axis keeps what its layers
+were wired to (Figma drops the property references of a variant cloned in its set, and the script puts them back), and
+a set grows to hold its variants (one with auto layout and a fixed size on an axis grows on that axis, keeping how each
+axis is sized, so none is clipped); a
+property whose layer is not there is not made; a variable is the file's own, else one of the libraries the file uses,
+imported by key. Then the Figma snapshots are refreshed and `--construction-check` and `--hygiene` say what they find on
+it.
 
 **--figma-change.** `--figma-change <component> "<change>" [--ops <file.json>] [--task <issue link>] [--signed-off "<who>"]`
 changes a component the system has, only what changes, with the same operations. It reads a few changes in words (`add
 xl to size like l`, `add a boolean showBadge on Content/Badge`, `rename Label to Text`, `remove the option size=xs`, `bind
-Content gap to spacing/s`, `move chip/label/color to text/default`, `description: "…"`) and says what it could not read;
+Content gap to spacing/s`, `move chip/label/color to text/default`, `description: "…"`, `remove the size small`) and
+says what it could not read;
 `--ops` gives them as operations, `--task` reads the change from a GitLab issue. It writes the change to
 `.design-system-engine-out/changes/<component>.change.json` and prints its report, from two structured reads of the
 component (the capture now, and the same once the change is made), never from memory: its skeleton (each layer added,
