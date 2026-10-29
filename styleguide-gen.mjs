@@ -1446,8 +1446,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     if (cfg.styleguide?.health?.weights && typeof cfg.styleguide.health.weights === 'object') view.healthWeights = cfg.styleguide.health.weights;
     // Each card's number at every past release, for its trend: the record kept with the snapshots, filled from what
     // history still holds (the page built before, and the pages the project committed at each release tag). Not for a
-    // page of some components only, nor the code capture's own copy.
-    if (!opts.only?.length && !opts.out) try {
+    // page of some components only, nor the code capture's own copy, nor the parts another page is drawn with.
+    if (!opts.only?.length && !opts.out && !opts.partsOnly) try {
       const hh = await import('./health-history.mjs');
       const file = join(ROOT, hh.HEALTH_FILE), kept = hh.readHealth(file);
       const tags = (view.releaseLog ?? []).map((g) => g.release).filter(Boolean);
