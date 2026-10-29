@@ -38,7 +38,7 @@ Each section says why it matters, then what it does not do well today. A line wi
 
 **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
 
-*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all.*
+*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all. One that cannot be drawn says why.*
 
 - Compares every colour, size, font, shadow and duration with Figma, in every mode (light and dark, phone and desktop).
 - Checks each component's options, defaults and states: hover, focus, pressed, disabled and selected.
