@@ -18,7 +18,7 @@
 import { ground, predict, modelOf, opWords } from './figma-ops.mjs';
 import { diffModels, diffLines } from './component-diff.mjs';
 import { dsdsId, DSDS_VERSION } from './contract-dsds.mjs';
-import { wordsOf } from './construction-grammar.mjs';
+import { wordsOf, memberOf } from './construction-grammar.mjs';
 
 export const EXT = 'x-rms-design-system-engine';
 const squash = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -28,7 +28,7 @@ export function likeOf(description = '', components = [], { like = null } = {}) 
   const find = (w) => names.find((n) => squash(n) === squash(w)) ?? null;
   if (like) return { like: find(like), candidates: find(like) ? [] : names.filter((n) => squash(n).includes(squash(like))).slice(0, 5) };
   const said = String(description).match(/\b(?:like|como|igual a|based on|baseado n[oa])\s+(?:the |an? |o |a )?["'`]?([\w/.-]+(?:\s[\w-]+)?)/i);
-  if (said) { const hit = find(said[1]) ?? find(said[1].split(/\s/)[0]); if (hit) return { like: hit, candidates: [] }; }
+  if (said) { const hit = find(said[1]) ?? find(said[1].split(/\s/)[0]) ?? memberOf(said[1].split(/\s/)[0], description, names); if (hit) return { like: hit, candidates: [] }; }
   // The components whose names share the most words with the description.
   const stem = (w) => (w.length > 3 ? w.replace(/s$/, '') : w);
   const words = new Set(wordsOf(description).filter((w) => w.length > 2).map(stem));

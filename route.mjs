@@ -11,6 +11,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { PLACES as WRITE_PLACES, mayWrite } from './writes.mjs';
 import { codeRoots } from './code-roots.mjs';
 import { createPairing } from './component-pairing.mjs';
+import { memberOf } from './construction-grammar.mjs';
 import { join, relative, basename } from 'node:path';
 
 // What the router needs from the project: is there a config, which components, when the snapshots were
@@ -210,9 +211,10 @@ const CONSTRUCTION_FIX = /\b(fix|correct|corrig\w*|consert\w*|repair)\b[\s\S]{0,
 // own variables, components and names, then the script the person says yes to.
 const IN_FIGMA = /\b(in|no|na|into|em)\s+figma(?![-\w/.])/i;
 const FIGMA_BUILD = /\b(build|create|make|design|draw|add|cria\w*|constr[oó]i\w*|desenha\w*|fa[zç]a?|adiciona\w*)\b[\s\S]{0,80}(\b(new|novo|nova)\b[\s\S]{0,30}\b(components?|componentes?)\b|\b(like|como|igual a|based on|baseado n[oa])\s+(the |an? |o |a )?([\w-]+))/i;
-// Built like one of the system's components ("like the chip"), or a new component said as one; "like the L one" is an
-// option of the component changed, not a component to build like.
-const figmaBuild = (t, components = []) => { const m = t.match(FIGMA_BUILD); return !!m && (!!m[3] || components.some((c) => c.toLowerCase() === String(m[7] ?? '').toLowerCase())); };
+// Built like one of the system's components ("like the chip", or "a danger button like the secondary one" in a family
+// with buttonSecondary), or a new component said as one; "like the L one" is an option of the component changed, not a
+// component to build like.
+const figmaBuild = (t, components = []) => { const m = t.match(FIGMA_BUILD); return !!m && (!!m[3] || components.some((c) => c.toLowerCase() === String(m[7] ?? '').toLowerCase()) || !!memberOf(m[7], t, components)); };
 const FIGMA_CHANGE = /\b(add|rename|remove|delete|drop|bind|rebind|acrescent\w*|adicion\w*|renome\w*|remov\w*|apag\w*|tira\w*)\b/i;
 const ISSUE_LINK = /https?:\/\/\S+\/-\/(issues|work_items)\/\d+/i;
 const RULES = [

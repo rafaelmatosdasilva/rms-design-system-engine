@@ -71,6 +71,16 @@ export function caseFits(name, rule) {
 // A name's words: camelCase, PascalCase, kebab, snake and spaces alike (showBadgeDot → show, badge, dot).
 export const wordsOf = (name) => String(name ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[\s_-]+/).filter(Boolean).map((w) => w.toLowerCase());
 
+// The one component of a family a request names by its own word ("a danger button like the secondary one" is
+// buttonSecondary): its name holds that word, and every other word of its name is in the request. None, or several, is null.
+export const memberOf = (word, text, names = []) => {
+  const w = String(word ?? '').toLowerCase();
+  const stem = (x) => (x.length > 3 ? x.replace(/s$/, '') : x);
+  const said = new Set(wordsOf(String(text ?? '').replace(/[^\w\s-]/g, ' ')).map(stem));
+  const hits = w ? names.filter((n) => { const ws = wordsOf(n); return ws.length > 1 && ws.includes(w) && ws.every((x) => x === w || said.has(stem(x))); }) : [];
+  return hits.length === 1 ? hits[0] : null;
+};
+
 // A property's own name, without the id Figma adds to every kind but a variant (showIcon#79399:1 → showIcon).
 const propName = (key) => String(key).replace(/#[^#]*$/, '');
 
