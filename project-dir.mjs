@@ -75,10 +75,18 @@ export let GITLAB_SOURCE = null;
 // Commands that only print (a recipe, the router, the version) use the mirror as it is, without asking GitLab.
 const PRINT_ONLY = ['--version', '--route', '--recipe', '--reference', '--summary', '--help'];
 const printOnly = process.argv.slice(2).some((a) => PRINT_ONLY.some((f) => a === f || a.startsWith(f + '=')));
+// The engine's own files of the mirror, when a setting keeps them in a folder of their own (workspace.mjs): put into
+// the mirror now, taken back when the run ends.
+export let WORKSPACE = null;
 async function fromGitlab(p, dir) {
   const r = await syncGitlab(p, { from: PROJECT_FROM, dir, offline: printOnly });
   console.error(describe(r));
-  if (r.dir) GITLAB_SOURCE = { path: r.path, ref: r.ref, sha: r.sha, committedAt: r.committedAt, stale: Boolean(r.stale) };
+  if (r.dir) {
+    GITLAB_SOURCE = { path: r.path, ref: r.ref, sha: r.sha, committedAt: r.committedAt, stale: Boolean(r.stale) };
+    const { openWorkspace } = await import('./workspace.mjs');
+    WORKSPACE = openWorkspace(p, r.dir, { from: PROJECT_FROM });
+    if (WORKSPACE) { console.error(WORKSPACE.note); process.on('exit', WORKSPACE.close); }
+  }
   return r;
 }
 if (asked) {

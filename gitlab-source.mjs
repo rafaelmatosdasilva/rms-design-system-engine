@@ -6,7 +6,8 @@
 // the archive again only when it has moved, so the engine always checks what is on GitLab now. Files the engine
 // writes in the mirror (ds-config.json, snapshots, its output) are kept across refreshes; a file removed on GitLab
 // is removed from the mirror. DESIGN_SYSTEM_ENGINE_MIRRORS keeps them all in one folder instead, per host and
-// project — a cache on this computer rather than folders beside the work.
+// project — a cache on this computer rather than folders beside the work. DESIGN_SYSTEM_ENGINE_WORKSPACE keeps the
+// engine's own files apart from the mirror (workspace.mjs), so a mirror holds only the code between runs.
 //
 // Token: GITLAB_TOKEN (read_api is enough), from the environment or a .env where the engine runs (else in the
 // mirror, else, for a run inside the mirror, in the folder that holds it), never logged. It is only ever sent to gitlab.com or a host named in GITLAB_HOST (gitlab-fetch.mjs's rule),
@@ -53,7 +54,8 @@ export function parseGitlabProject(input, env = process.env) {
 // DESIGN_SYSTEM_ENGINE_MIRRORS moves them all somewhere else, kept apart per host and project — a cache on this
 // computer (~/.cache/rms-engine/mirrors) rather than a folder beside the work. A mirror holds what the engine writes
 // into it (its setup, the snapshots, its output), so moving it moves those too: a run after the setting changes
-// starts a fresh mirror and fetches the project again, and what the old one held stays where it was.
+// starts a fresh mirror and fetches the project again, and what the old one held stays where it was (with a
+// workspace, workspace.mjs, the engine's files are in the workspace, and the first run moves in the old mirror's).
 export const mirrorDir = (from, p, env = process.env) => {
   const name = p.path.split('/').pop().replace(/[^\w.-]/g, '') || 'project';
   const set = String(envVar(env, 'MIRRORS') ?? '').trim();

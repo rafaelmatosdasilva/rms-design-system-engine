@@ -122,6 +122,8 @@ Add `/-/tree/<branch>` for a branch other than the default one.
 
 Files the engine writes in the mirror (`ds-config.json`, snapshots, its output) are kept from one refresh to the next. Commands that only print (`--version`, `--route`, `--recipe`) never call GitLab.
 
+**Your setup apart from the code.** Set `DESIGN_SYSTEM_ENGINE_WORKSPACE` to a folder and the engine's own files (the setup, the snapshots, the contracts, the history, the hand-back, the output) live there, per host and project, instead of inside the mirror. Each run puts them into the mirror before it reads anything and takes back what it wrote when it ends, so the mirror is only a copy of the code that you can keep in a cache (`DESIGN_SYSTEM_ENGINE_MIRRORS`) or delete. The first run with the setting moves in what your mirror already holds. If a run stops before the end, nothing is lost: the next run keeps the newer copy.
+
 ### Ask in Claude Code
 
 The easy way is to ask in plain language. Every request is on the [Commands](commands.md) page.
@@ -552,6 +554,7 @@ A run whose inputs are older than those of the output already there keeps that o
 | `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` | Uses only the project's own TypeScript |
 | `DESIGN_SYSTEM_ENGINE_CHROME=none` | Reads the code with no browser, even where Chrome is installed |
 | `DESIGN_SYSTEM_ENGINE_MIRRORS=<folder>` | Keeps every project mirror in one folder on this computer (for example `~/.cache/rms-engine/mirrors`), per host and project, instead of beside the work |
+| `DESIGN_SYSTEM_ENGINE_WORKSPACE=<folder>` | Keeps the engine's own files of a GitLab project (setup, snapshots, contracts, history, hand-back, output) in that folder, per host and project, apart from the mirror of its code |
 | `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` | Records which recipes and commands ran, locally |
 
 Put tokens in a `.env` in the folder you run the engine from.
