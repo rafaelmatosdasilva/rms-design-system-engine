@@ -77,4 +77,6 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine update Figma to match the code` | What the code proves, written into Figma after you say yes |
 | `/rms-design-system-engine send the gaps to Figma` | The prototypes' gap list as a to do list in Figma |
+| `/rms-design-system-engine build a tag in Figma like the chip` | A new component built in Figma the system's way, started from the chip with only the system's variables and names, after someone signs it off and you say yes |
+| `/rms-design-system-engine add a size XL to the chip in Figma like L` | Only that change, in every variant after you say yes, with where the chip is used and what the change breaks |
 | `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
