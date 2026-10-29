@@ -268,9 +268,11 @@ export function codeCases(base = {}, api = {}, max = 8) {
 // ── What to render when Figma has no variants: the code's own props ─────────────────────────────────────────────────
 // api: textComponentApi(file, text) → { props: { name: { default, options } } }; text: the component's source.
 // → [{ label, props }]: the default first, then each other value of each option, each on/off prop flipped, each text
-// emptied (or set, when it starts empty), each icon set and emptied, at most `max`.
+// emptied (or set, when it starts empty), each icon set and emptied, at most `max`. kinds (propKinds): what the
+// project's other components declare a prop of the same name as, so a bare one (buttonSize: String) draws in their
+// options rather than in its own name.
 const TEXTY = /^(label|title|text|content|caption|heading|description|placeholder|message|helper(text)?|hint|subtitle|name)$/i;
-export function variantsFromCode(api = {}, text = '', max = 16) {
+export function variantsFromCode(api = {}, text = '', max = 16, kinds = {}) {
   const props = Object.entries(api.props ?? {});
   const typed = (p, t) => new RegExp(`\\b${p}\\??\\s*:\\s*(?:${t})\\b|\\b${p}\\s*:\\s*\\{[^}]*type\\s*:\\s*(?:${t})\\b|\\b${p}\\s*:\\s*(?:${t[0].toUpperCase() + t.slice(1)})\\b`, 'i').test(text);
   const isBool = (p, d) => d.default === 'true' || d.default === 'false' || d.default === true || d.default === false || typed(p, 'boolean');
@@ -282,6 +284,8 @@ export function variantsFromCode(api = {}, text = '', max = 16) {
     if (d.options?.length) { for (const o of d.options) if (String(o) !== String(base[p])) cases.push({ label: `${p}=${o}`, props: { ...base, [p]: o } }); continue; }
     if (isBool(p, d)) { cases.push({ label: `${p}=${!base[p]}`, props: { ...base, [p]: !base[p] } }); continue; }
     if (/icon/i.test(p)) { if (base[p]) cases.push({ label: `${p}=""`, props: { ...base, [p]: '' } }); continue; }
+    const like = !TEXTY.test(p) && kinds[p]?.options?.length > 1 ? kinds[p].options : null;
+    if (like) { for (const o of like) if (String(o) !== String(base[p] ?? kinds[p].default ?? like[0])) cases.push({ label: `${p}=${o}`, props: { ...base, [p]: o } }); continue; }
     if (TEXTY.test(p) || typed(p, 'string')) cases.push(base[p] ? { label: `${p}=""`, props: { ...base, [p]: '' } } : { label: `${p}="${p}"`, props: { ...base, [p]: p.charAt(0).toUpperCase() + p.slice(1) } });
   }
   return cases.slice(0, max);

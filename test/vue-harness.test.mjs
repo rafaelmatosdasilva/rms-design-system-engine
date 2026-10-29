@@ -247,6 +247,27 @@ test('a part loaded by a name it is given gets the name of a file it can load, t
   assert.deepEqual(asyncChoices(dir, join(dir, 'src', 'Picker.vue'), '<script setup>\nconst part = defineAsyncComponent(() => import(`./tiles/${tileKind}.vue`))\n</script>', keyedNames(dir), ['size']), [], 'a bare name no declared prop gives is not taken for one');
 });
 
+test('a value no page writes takes what the project\'s other components declare that prop as, never its own name', async () => {
+  const { propKinds, listSamples } = await import('../vue-harness.mjs');
+  const apis = {
+    'a/Solid.vue': { props: { tileSize: { type: 'string', options: ['s', 'm', 'l'], default: 'm' }, stretched: { type: 'boolean' }, count: { type: 'number' } } },
+    'a/Ghost.vue': { props: { tileSize: { type: 'string', options: ['s', 'm'] }, stretched: { type: 'boolean' } } },
+    'a/Strip.vue': { props: { tileSize: { type: 'string' } } },
+    'a/notes.js': { props: { tileSize: { type: 'number' } } },
+  };
+  const kinds = propKinds(Object.keys(apis), (f) => apis[f]);
+  assert.deepEqual(kinds.tileSize, { type: 'string', options: ['s', 'm', 'l'], default: 'm' }, 'the type most give it, the options of the one that lists the most; only .vue files');
+  assert.equal(kinds.stretched.type, 'boolean');
+  const tpl = '<template><div v-for="t in tiles"><x :tile-size="t.tileSize" :stretched="t.stretched" :count="t.count" :align="t.align" :label="t.label"/></div></template>';
+  const items = listSamples(tpl, ['tiles'], { align: 'center' }, null, {}, kinds).tiles;
+  assert.deepEqual(items[1], { tileSize: 'm', stretched: false, count: 2, align: 'center 2', label: 'Label 2' }, 'its default option, off, a number; a sample of a field with no options and a text keep their words');
+  assert.equal(listSamples(tpl, ['tiles'], { align: 'center' }, null, {}, { ...kinds, align: { type: 'string', options: ['left', 'center'] } }).tiles[0].align, 'center', 'a sample of a field with options is used as it is');
+  const { variantsFromCode } = await import('../component-harness.mjs');
+  const labels = variantsFromCode({ props: { tileSize: { type: 'string' }, label: { type: 'string' } } }, "defineProps({ tileSize: String, label: String })", 16, kinds).map((c) => c.label);
+  assert.deepEqual(labels.filter((l) => l.startsWith('tileSize')), ['tileSize=s', 'tileSize=l'], 'a bare prop drawn in the options the others declare, not as tileSize="tileSize"');
+  assert.ok(labels.includes('label="label"'), 'a text still shows its own name as its words');
+});
+
 test('a state Figma\'s default variant has on (Disabled) starts off; its on is a case of its own', () => {
   const cases = harnessCases({ properties: { disabled: { type: 'VARIANT', defaultValue: 'true', variantOptions: ['false', 'true'] }, size: { type: 'VARIANT', defaultValue: 's', variantOptions: ['s', 'm'] } } });
   assert.equal(cases[0].props.disabled, 'false');
@@ -266,7 +287,7 @@ test('a Vue component drawn as the product draws it: Figma\'s names in the code\
   const r = await renderedVue(dir, {}, ['button'], { propsSnap, locate: () => join(dir, 'src', 'components', 'Button.vue'), chromePath: CHROME, max: 4 });
   assert.deepEqual(r.failed, [], JSON.stringify(r));
   const at = (label) => r.cases.button.find((c) => c.label === label)?.markup ?? '';
-  assert.match(at('default'), /class="btn s" data-ready="1" data-hint=""><span class="label">LABEL<\/span><i class="icon" data-icon="m\/home-m">/, 'labelContent as label through the app\'s plugin, size as buttonSize, the icon its pages use, an object it reads given, not disabled');
+  assert.match(at('default'), /class="btn s" data-ready="1" data-hint="Hint 1"><span class="label">LABEL<\/span><i class="icon" data-icon="m\/home-m">/, 'labelContent as label through the app\'s plugin, size as buttonSize, the icon its pages use, an object it reads given with the field it reads, not disabled');
   assert.doesNotMatch(at('showLabel=false'), /class="label"/, 'its label off: none given');
   assert.match(at('disabled=true'), /disabled=""/);
 });
