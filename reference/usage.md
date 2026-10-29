@@ -1034,8 +1034,8 @@ contracts, the style guide, the differences kept on purpose (`kept`: a design ru
 with its intent layer; with the decisions when the setup names no place for them) and the other decisions (answers to
 proposals, accepted debt, checks made by hand), each in a GitLab project (a folder in it, a branch of it) or a folder (`stores.mjs`). `ds-config.json → stores`
 names the place of each; the configuration reference has the format. Each run reads the snapshots, the kept
-differences and the decisions from their stores when the store's commit moved, never over a file changed on this computer since it was last read
-(that one is kept, and said). The contracts (`--contracts-out` with no folder), the style guide
+differences and the decisions from their stores when the store's commit moved. A file changed on this computer since it
+was last read is replaced only by a copy built from newer inputs (its stamp); otherwise it is kept, and said. The contracts (`--contracts-out` with no folder), the style guide
 (`--publish-styleguide`), the kept differences (after `--keep`), the decisions (after `--intent-decide`, `--checked`),
 the snapshots
 (`--refresh-snapshots`) and the intent layer (`--intent-changes --commit`, `--review-drafts --commit`, the fixes made on

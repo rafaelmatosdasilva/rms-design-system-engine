@@ -164,6 +164,29 @@ test('read from the store: only its kind of file, a change made here is kept, an
   assert.ok(!g.writes().length);
 });
 
+test('read from the store: a file changed here and there is decided by what each copy was built from', async () => {
+  const snap = (v, read) => JSON.stringify({ v, ...(read ? { _built: { code: null, figma: null, figmaRead: read, engine: null, at: read } } : {}) });
+  const F = { older: 'src/figma-vars.snapshot.json', newer: 'src/figma-structure.snapshot.json', loose: 'src/figma-icons.snapshot.json' };
+  const g = fakeGitlab({ files: { [F.older]: snap(1, '2026-10-20T10:00:00Z'), [F.newer]: snap(1, '2026-10-20T10:00:00Z'), [F.loose]: snap(1) } });
+  const ROOT = project();
+  const cfg = cfgWith({ snapshots: { read: LINK } });
+  await pullStore(ROOT, cfg, 'snapshots', { env, http: g.http });
+  // Both sides read Figma again: here once before the store's read, once after; a third with no stamps.
+  writeFileSync(join(ROOT, F.older), snap('mine', '2026-10-21T09:00:00Z'));
+  writeFileSync(join(ROOT, F.newer), snap('mine', '2026-10-23T09:00:00Z'));
+  writeFileSync(join(ROOT, F.loose), snap('mine'));
+  Object.assign(g.files, { [F.older]: snap('theirs', '2026-10-22T09:00:00Z'), [F.newer]: snap('theirs', '2026-10-22T09:00:00Z'), [F.loose]: snap('theirs') });
+  g.head = 'f'.repeat(40);
+  const r = await pullStore(ROOT, cfg, 'snapshots', { env, http: g.http });
+  assert.deepEqual(r.written, [F.older]);
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.older), 'utf8')).v, 'theirs', 'the store read Figma later: taken');
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.newer), 'utf8')).v, 'mine', 'this computer read it later: kept');
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.loose), 'utf8')).v, 'mine', 'no stamps to order them: kept, as before');
+  assert.match(r.line, /figma-vars\.snapshot\.json over this computer's, built from older inputs/);
+  assert.match(r.line, /figma-structure\.snapshot\.json changed here and in .*: this computer's kept, built from newer inputs/);
+  assert.match(r.line, /figma-icons\.snapshot\.json changed here and in .*, from inputs that cannot be ordered: this computer's kept/);
+});
+
 test('two runs write one store: each file merged, the copy built from newer inputs kept, one that cannot be ordered held', async () => {
   const stamp = (figma) => ({ code: null, figma, figmaRead: null, engine: null, at: '2026-10-29T10:00:00Z' });
   const snap = (v, figma) => JSON.stringify({ v, ...(figma ? { _built: stamp(figma) } : {}) });

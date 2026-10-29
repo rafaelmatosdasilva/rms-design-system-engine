@@ -469,8 +469,9 @@ export function folderFiles(dir, part) {
 }
 
 // ── Reading a store into the project ──────────────────────────────────────────────────────────────────────────────
-// Only when its commit moved (GitLab) or a file differs (folder); a file changed here since it was last read is kept,
-// and said. → { line, changed, written: [rel] } | null (no store for the part)
+// Only when its commit moved (GitLab) or a file differs (folder). A file changed here and in the store since it was
+// last read is decided by what each copy was built from (stamp.mjs): the store's taken when it was built from newer
+// inputs, else this computer's kept, and said either way. → { line, changed, written: [rel], kept: [rel] } | null
 export async function pullStore(ROOT, cfg, part, opts = {}) {
   const place = storesOf(cfg)[part]?.read;
   if (!place) return null;
@@ -514,7 +515,8 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
       }
     }
   } catch (e) { return { line: `⚠️  ${label} not read from ${describePlace(place)}: ${e.message}`, changed: false, written: [] }; }
-  const written = [], kept = [], files = { ...(prev.files ?? {}) };
+  const written = [], kept = [], keptNewer = [], newer = [], files = { ...(prev.files ?? {}) };
+  const { stampIn, compareStamps } = await import('./stamp.mjs');
   const base = resolve(ROOT, part === 'themes' ? THEMES_DIR : part === 'prototypes' ? PROTOTYPES_DIR : '.');
   for (const [rel, data] of remote) {
     if (!safeRel(rel) || !TAKES[part]?.(rel)) continue;
@@ -523,16 +525,22 @@ export async function pullStore(ROOT, cfg, part, opts = {}) {
     const there = hash(data);
     const here = existsSync(fp) ? hash(readFileSync(fp)) : null;
     if (here === there) { files[rel] = there; continue; }
-    if (here && prev.files?.[rel] !== here) { kept.push(rel); continue; }   // changed here since the last read: kept
+    if (here && prev.files?.[rel] !== here) {                                // changed here and there since the last read
+      const mine = stampIn(readFileSync(fp, 'utf8'), rel), theirs = stampIn(Buffer.from(data).toString('utf8'), rel);
+      const c = mine && theirs ? compareStamps(theirs, mine, { ROOT }) : null;   // is this computer's older?
+      if (!c?.older) { (mine && theirs && compareStamps(mine, theirs, { ROOT }).older ? keptNewer : kept).push(rel); continue; }
+      newer.push({ rel, why: c.why.join('; ') });
+    }
     mkdirSync(dirname(fp), { recursive: true }); writeFileSync(fp, data); written.push(rel); files[rel] = there;
   }
   st[part] = { sha, files, readAt: new Date().toISOString() };
   writeState(ROOT, st);
   const at = `${describePlace(place)}${sha ? ` ${sha.slice(0, 8)}` : ''}`;
   const lines = [];
-  if (written.length) lines.push(`📥 ${label}: ${written.length} file${written.length === 1 ? '' : 's'} from ${at}`);
-  if (kept.length) lines.push(`⚠️  ${label}: ${kept.join(', ')} changed here and in ${describePlace(place)}: this computer's kept${part === 'snapshots' ? ' (send it with --refresh-snapshots, or delete it to take the store\'s)' : ''}`);
-  return { line: lines.join('\n') || null, changed: written.length > 0, written, kept };
+  if (written.length) lines.push(`📥 ${label}: ${written.length} file${written.length === 1 ? '' : 's'} from ${at}${newer.length ? `, ${newer.map((n) => n.rel).join(', ')} over this computer's, built from older inputs (${newer.map((n) => n.why).join('; ')})` : ''}`);
+  if (keptNewer.length) lines.push(`ℹ️  ${label}: ${keptNewer.join(', ')} changed here and in ${describePlace(place)}: this computer's kept, built from newer inputs${part === 'snapshots' ? ' (send it with --refresh-snapshots)' : ''}`);
+  if (kept.length) lines.push(`⚠️  ${label}: ${kept.join(', ')} changed here and in ${describePlace(place)}, from inputs that cannot be ordered: this computer's kept${part === 'snapshots' ? ' (send it with --refresh-snapshots, or delete it to take the store\'s)' : ''}`);
+  return { line: lines.join('\n') || null, changed: written.length > 0, written, kept: [...keptNewer, ...kept] };
 }
 async function treeFiles(api, path, sha, part) {
   const out = new Map(), pre = path ? path + '/' : '';
