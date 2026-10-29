@@ -43,8 +43,55 @@ export function answer(term, { catalog = {}, tokens = [], varOf = (p) => null } 
   if (comp) return { kind: 'component', name: comp[0], entry: comp[1] };
   const tok = tokens.find((x) => norm(x.path) === t || norm(varOf(x.path)) === t || norm(x.path.replace(/\/(color|default)$/, '')) === t);
   if (tok) return { kind: 'token', token: tok, cssVar: varOf(tok.path) };
-  const near = [...comps.map(([n]) => n), ...tokens.map((x) => x.path)].filter((n) => t && (norm(n).includes(t) || t.includes(norm(n)))).slice(0, 8);
-  return { kind: 'none', term, near };
+  return { kind: 'none', term, near: nearest(term, comps, tokens, varOf) };
+}
+
+// The words of a name or a sentence (buttonPrimary, surface/base/color, "the main action"), lowercased.
+const words = (s) => String(s ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1);
+// Two words alike: the same, one the other's start (button, buttons), the same stem (loading, loader), or a letter
+// apart in a long one (two swapped count as one).
+const stem = (w) => (w.length > 5 ? w.replace(/(ing|ers|er|ed|es|s)$/, '') : w);
+const alike = (a, b) => a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a) || stem(a) === stem(b))) || (Math.min(a.length, b.length) >= 5 && distance(a, b) <= 1);
+function distance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);   // two letters swapped
+  }
+  return d[a.length][b.length];
+}
+
+// The closest component and token names to a term that matches none: a name the term is part of (or the other way
+// round), one spelled a letter or two apart (bdage for badge), and one whose words, or the words of its description,
+// are the term's (the main action finds buttonPrimary, divider colour finds border/divider/color). → [name], at most 8
+export function nearest(term, comps = [], tokens = [], varOf = () => null) {
+  const t = norm(term), tw = words(term);
+  if (!t) return [];
+  const scored = [];
+  const score = (name, alsoNames, text) => {
+    const n = norm(name);
+    let s = 0;
+    if (n.includes(t) || t.includes(n)) s += 10;
+    else if (t.length >= 4 && distance(n, t) <= Math.max(1, Math.floor(t.length / 5))) s += 8;
+    const own = [...words(name), ...alsoNames.flatMap(words)], said = words(text);
+    let all = tw.length > 0;
+    for (const w of tw) { if (own.some((x) => alike(w, x))) s += 3; else if (said.some((x) => alike(w, x))) s += 2; else all = false; }
+    if (all && tw.length > 1) s += 3;   // every word of it, in its name or its description
+    if (s >= (tw.length > 1 ? 3 : 2)) scored.push([name, s]);
+  };
+  for (const [n, e] of comps) score(n, [e?.selector ?? ''], e?.description ?? '');
+  for (const x of tokens) score(x.path, [varOf(x.path) ?? ''], x.description ?? '');
+  return scored.sort((a, b) => b[1] - a[1] || a[0].length - b[0].length).slice(0, 8).map(([n]) => n);
+}
+
+// The command to run after an answer, for an agent reading it as data: the closest name asked again, the component
+// built from its sheet, or the UI checked once written with what was found.
+export function nextFor(a, { sheet = false, notBuilt = false } = {}) {
+  if (a.kind === 'none') return a.near.length ? `rms-design-system-engine --query ${a.near[0]}` : null;
+  if (a.kind === 'component' && sheet) return `rms-design-system-engine --component ${a.name}`;
+  if (a.kind === 'component' && notBuilt) return null;
+  return 'rms-design-system-engine --check-ui <file>';
 }
 
 // The contrast a pair gives where its two colours are closest, and whether the names promise what the values break.
@@ -160,7 +207,11 @@ async function main() {
     const typography = read(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json').typography ?? {};
     for (const a of answers) if (a.kind === 'component' && toBuild.has(a.name)) sheets[a.name] = buildSheetLines(a.name, d, { struct, props, nesting, typography, file: cfg.componentFiles?.[a.name] ?? null });
   }
-  if (json) console.log(JSON.stringify(answers.map((a) => (sheets[a.name] ? { ...a, buildSheet: sheets[a.name] } : unbuilt.has(a.name) ? { ...a, notBuilt: true } : a)), null, 2));
+  if (json) console.log(JSON.stringify(answers.map((a) => {
+    const one = sheets[a.name] ? { ...a, buildSheet: sheets[a.name] } : unbuilt.has(a.name) ? { ...a, notBuilt: true } : a;
+    const next = nextFor(a, { sheet: !!sheets[a.name], notBuilt: unbuilt.has(a.name) });
+    return next ? { ...one, next } : one;
+  }), null, 2));
   else {
     console.log('');
     for (const a of answers) { for (const l of [...answerLines(sheets[a.name] ? a : { ...a, notBuilt: unbuilt.has(a.name) }), ...(sheets[a.name] ?? [])]) console.log(l); console.log(''); }
@@ -168,7 +219,10 @@ async function main() {
     const built = answers.filter((a) => a.kind === 'component' && !unbuilt.has(a.name));
     if (first) console.log(`NEXT: build ${first} as written above, then run rms-design-system-engine --component ${first} until it passes\n`);
     else if (built.length) console.log('NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>\n');
-    else if (answers.some((a) => a.kind === 'component')) console.log(`NEXT: ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not in the code: do not stop to ask which way. Write the UI now with components and variables the code has (rms-design-system-engine --query <name>), and say in the reply that ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not built and what the system lacks for the request (a colour it has none of: "the system has no green")\n`);
+    else if (answers.some((a) => a.kind === 'token')) console.log('NEXT: write the UI with these variables, then check it with rms-design-system-engine --check-ui <file>\n');
+    const missed = answers.filter((a) => a.kind === 'none' && a.near.length);
+    if (missed.length && !first && !built.length) console.log(`NEXT: ask again with the closest name: rms-design-system-engine --query ${missed.map((a) => a.near[0]).join(' ')}\n`);
+    if (!first && !built.length && answers.some((a) => a.kind === 'component')) console.log(`NEXT: ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not in the code: do not stop to ask which way. Write the UI now with components and variables the code has (rms-design-system-engine --query <name>), and say in the reply that ${answers.filter((a) => a.kind === 'component').map((a) => a.name).join(', ')} is not built and what the system lacks for the request (a colour it has none of: "the system has no green")\n`);
   }
   process.exit(answers.every((a) => a.kind !== 'none') ? 0 : 1);
 }
