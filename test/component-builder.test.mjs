@@ -213,3 +213,16 @@ test('a new component asked for in Figma routes to its spec; Figma\'s roles and 
   assert.equal(route('fix the construction of the chip in Figma', c).recipe, 'figma-edits');
   assert.equal(route('build the chip from Figma', c).recipe, 'build-from-figma');
 });
+
+test('a new component like one of a family ("like the secondary one") routes to its spec, and the spec starts from that one', () => {
+  const c = { components: ['buttonPrimary', 'buttonSecondary', 'linkSecondary', 'chip'] };
+  for (const ask of ['create a danger button in Figma, like the secondary one', 'make a danger button in Figma like the secondary one']) {
+    assert.deepEqual([route(ask, c).recipe, route(ask, c).run], ['build-component-figma', [`rms-design-system-engine --spec ${JSON.stringify(ask)}`]], ask);
+    assert.deepEqual(likeOf(ask, c.components), { like: 'buttonSecondary', candidates: [] }, ask);
+  }
+  // A word two families share, with neither family named, is not a component to build like.
+  assert.notEqual(route('create a danger one in Figma, like the secondary one', c).recipe, 'build-component-figma');
+  assert.equal(likeOf('create a danger one like the secondary one', c.components).like, null);
+  // An option of the component changed stays a change.
+  assert.equal(route('add a size XL to the chip in Figma like L', c).recipe, 'change-component-figma');
+});
