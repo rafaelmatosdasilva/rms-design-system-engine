@@ -736,6 +736,25 @@ function diffTokens(prevFlat, nextFlat) {
 // An index an agent can read whole (2 to 4 MB llms files no agent can load). Past this size the catalog
 // table stays in catalog.json and the index says to ask for one component with --query.
 export const LLMS_MAX_BYTES = 64 * 1024;
+// Each token's Figma description worth an agent's reading, the brand's first and the rest in the dictionary's order:
+// never one that only names what it sets (font-weight) or says only that it is deprecated. → [{ path, description }]
+export function tokenGuidance(tree) {
+  const out = [];
+  const walk = (node, path) => {
+    for (const [k, v] of Object.entries(node ?? {})) {
+      if (k.startsWith('$') || !v || typeof v !== 'object') continue;
+      const p = [...path, k];
+      if ('$value' in v) {
+        const d = String(v.$description ?? '').replace(/@deprecated\b/gi, '').trim();
+        if (d.length >= 8 && /\s/.test(d)) out.push({ path: p.join('/'), description: d });
+      } else walk(v, p);
+    }
+  };
+  walk(tree, []);
+  const brand = (x) => /\bbrand/i.test(x.description);
+  return [...out.filter(brand), ...out.filter((x) => !brand(x))];
+}
+
 export function buildLlms(built, tokens, tokenCount, catalog = null, { maxBytes = LLMS_MAX_BYTES, primitives = [], authority = [], intentLayer = null, pairs = [], from = 'Figma + code', decidedAgainst = [], partOf = {} } = {}) {
   const families = Object.keys(tokens).filter((k) => !k.startsWith('$'));
   const lines = ['# Design system — machine-readable index', '',
@@ -780,6 +799,16 @@ export function buildLlms(built, tokens, tokenCount, catalog = null, { maxBytes 
   // The colour pairs, so a text or icon colour is never put on a surface it was not made for. Written here because
   // this is the file an agent reads whole: a pair looked up one token at a time is a pair nobody looks up.
   if (pairs.length) lines.push(...pairLines(pairs).map((l, i) => (i ? l : `**${l}**`)), '');
+  // What each token is for, in the team's own words (its Figma description), the brand's first: guidance an agent
+  // otherwise only gets one token at a time, and so picks a colour by its name alone.
+  const said = tokenGuidance(tokens);
+  if (said.length) {
+    // Tokens that say the same are one line: the words once, the tokens after them.
+    const by = new Map();
+    for (const x of said) by.set(x.description, [...(by.get(x.description) ?? []), x.path]);
+    lines.push(`**What the tokens are for, in the team's words (their Figma descriptions, ${said.length} tokens):**`,
+      ...[...by].map(([d, ps]) => `  ${short(d)}: ${ps.slice(0, 6).join(', ')}${ps.length > 6 ? ` and ${ps.length - 6} more` : ''}`), '');
+  }
   // What the team already ruled out, and why (decisions.mjs): an agent that does not know an option was looked at and
   // turned down proposes it again. Before the catalog, so a long catalog never pushes it out.
   if (decidedAgainst.length) lines.push('## Decided against', '', 'The team looked at these and turned them down. Do not propose them again:', ...decidedAgainst, '');
