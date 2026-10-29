@@ -473,3 +473,105 @@ test('a Code Connect file that writes a prop only while a property has a value n
   assert.match(mod, /x\.role !== 'condition' \|\| types\.includes\(Boolean\)/, 'a condition sets only an on/off');
   assert.match(mod, /x\.unclear \|\| x\.equals != null\) continue/, 'only a plain switch removes a part');
 });
+
+test('a component that reads the route is drawn at a path its code expects: a name of the table it looks the path up in, a word or a path it compares', async () => {
+  const { routeFor } = await import('../vue-harness.mjs');
+  const menu = `const route = useRoute()
+const shown = ref('parts')
+const pick = (path) => {
+  const base = path.split('/')[1]
+  const menus = { guides: guidesMenu, parts: partsMenu }
+  return menus[base]
+}`;
+  assert.deepEqual(routeFor(menu), { path: '/parts' }, 'the table\'s name its code also writes as a word of its own');
+  assert.deepEqual(routeFor(menu.replace("ref('parts')", 'ref(null)')), { path: '/guides' }, 'else the table\'s first');
+  assert.deepEqual(routeFor("const r = useRoute()\nconst section = r.path.split('/')[2]\nif (section === 'cards') x()"), { path: '/page/cards' }, 'a word it compares the part with, at that part');
+  assert.deepEqual(routeFor("<template><b v-if=\"$route.path.startsWith('/docs')\" /></template>"), { path: '/docs' });
+  assert.match(routeFor('const r = useRoute(); r.params.slug.split("-")').why, /no path it expects could be read from its code/);
+  assert.equal(routeFor('const x = 1'), null, 'a component that reads no route is drawn as before');
+});
+
+test('the items of a list inside an object get the fields the code reads of them, and those a child it hands each to reads; a list inside an item is empty', async () => {
+  const { objectSamples, childFacing } = await import('../vue-harness.mjs');
+  const code = `<template><row-line v-for="(row, index) in shown" :info="row" /><i v-for="e in props.docs.events">{{ e.name }} {{ e.link.path }}</i></template>
+<script setup>
+const props = defineProps({ docs: Object })
+const shown = computed(() => {
+  return props.docs.rows?.reduce((acc, item) => {
+    acc.push(item)
+    if (item.subRows) item.subRows.map((sub) => acc.push(sub.label))
+    return acc
+  }, [])
+})
+</script>`;
+  const child = '<template><b>{{ info.kind.split(", ") }} {{ info.title }}</b></template>';
+  const got = objectSamples(code, ['docs'], {}, {}, { items: { row: [{ text: child, prop: 'info' }] } });
+  assert.deepEqual(got.docs.rows[1], { kind: 'Kind 2', title: 'Title 2', subRows: [] }, 'what the child reads of each, and a list inside an item given empty');
+  assert.deepEqual(got.docs.events[0], { name: 'Name 1', link: { path: 'Path 1' } }, 'a list it loops over in its template, with the fields it reads');
+  assert.deepEqual(objectSamples(code, ['docs'], {}, {}, { flat: true }).docs.rows, ['Row 1', 'Row 2', 'Row 3'], 'a page drawn as a whole is given what it always was');
+  const dir = tempDir('vue-items-');
+  mkdirSync(join(dir, 'src'), { recursive: true });
+  writeFileSync(join(dir, 'src', 'RowLine.vue'), `<script setup>defineProps({ info: Object })</script>${child}`);
+  const passed = childFacing(dir, join(dir, 'src', 'DocsTable.vue'), code.replace('<script setup>', "<script setup>\nimport RowLine from './RowLine.vue'"), (f, t) => textComponentApi(f, t));
+  assert.deepEqual(passed.items.row.map((x) => x.prop), ['info'], 'an item handed whole to a child that takes an object');
+});
+
+test('an icon that loads from a folder its code globs is given a name of a file in that folder', async () => {
+  const { asyncChoices } = await import('../vue-harness.mjs');
+  const dir = tempDir('vue-glob-');
+  mkdirSync(join(dir, 'src', 'glyphs', 'arrows'), { recursive: true });
+  writeFileSync(join(dir, 'src', 'glyphs', 'star.svg'), '<svg/>');
+  writeFileSync(join(dir, 'src', 'glyphs', 'arrows', 'up.svg'), '<svg/>');
+  const file = join(dir, 'src', 'AcGlyph.vue');
+  const deep = "<script setup>\nconst props = defineProps({ glyph: String })\nconst all = import.meta.glob('./glyphs/**/*.svg')\nconst load = computed(() => all[`./glyphs/${props.glyph}.svg`])\n</script>";
+  assert.deepEqual(asyncChoices(dir, file, deep, {}, ['glyph']), [{ prop: 'glyph', field: null, list: false, names: ['arrows/up', 'star'] }], 'every file the glob lists, by its path from the folder');
+  assert.deepEqual(asyncChoices(dir, file, deep.replace('**/*.svg', '*.svg'), { glyph: { star: 2 } }, ['glyph'])[0].names, ['star'], 'only the folder itself when the glob does not reach under it');
+  assert.deepEqual(asyncChoices(dir, file, deep, {}, ['glyph'], { globs: false }), [], 'a page drawn as a whole: as before');
+});
+
+test('components drawn alone get the route they read, nested items and an icon of their own folder; an error that names no input is said as the input that was missing', { skip: STORES, timeout: budget(300000) }, async () => {
+  const dir = tempDir('vue-last-');
+  const C = join(dir, 'src', 'components');
+  mkdirSync(join(C, 'glyphs'), { recursive: true });
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'acme', private: true, dependencies: { vue: '^3.5.0', 'vue-router': '^4.0.0' } }));
+  writeFileSync(join(dir, 'vite.config.js'), "import vue from '@vitejs/plugin-vue'\nexport default { plugins: [vue()] }");
+  symlinkSync(TOOLS, join(dir, 'node_modules'), 'dir');
+  writeFileSync(join(C, 'NavMenu.vue'), `<script setup>
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+const route = useRoute()
+const menu = ref([])
+const show = (path) => {
+  const base = path.split('/')[1]
+  const menus = { guides: [{ id: 'g', label: 'Guides' }], parts: [{ id: 'p', label: 'Parts' }] }
+  menu.value = menus[base]
+  menu.value = menu.value.map((m) => ({ ...m, open: true }))
+}
+watch(route, (r) => show(r.path), { immediate: true })
+</script><template><ul class="nav"><li v-for="m in menu" :key="m.id">{{ m.label }}</li></ul></template>`);
+  writeFileSync(join(C, 'RowLine.vue'), '<script setup>defineProps({ info: Object })</script><template><p class="row">{{ info.kind.split(", ").join("+") }}</p></template>');
+  writeFileSync(join(C, 'DocsTable.vue'), `<script setup>
+import { computed } from 'vue'
+import RowLine from './RowLine.vue'
+const props = defineProps({ docs: Object })
+const shown = computed(() => props.docs.rows?.reduce((acc, item) => { acc.push(item); if (item.subRows) item.subRows.map((sub) => acc.push(sub)); return acc }, []))
+</script><template><div class="docs"><row-line v-for="(row, i) in shown" :key="i" :info="row" /></div></template>`);
+  writeFileSync(join(C, 'glyphs', 'star.vue'), '<template><svg class="star" /></template>');
+  writeFileSync(join(C, 'AcGlyph.vue'), `<script setup>
+import { computed, defineAsyncComponent } from 'vue'
+const props = defineProps({ glyph: String })
+const all = import.meta.glob('./glyphs/**/*.vue')
+const part = computed(() => (all[\`./glyphs/\${props.glyph}.vue\`] ? defineAsyncComponent(all[\`./glyphs/\${props.glyph}.vue\`]) : null))
+</script><template><component :is="part" v-if="part" /></template>`);
+  writeFileSync(join(C, 'OddCard.vue'), '<script setup>defineProps({ entry: [Object, Array] })</script><template><b class="odd">{{ entry.title }}</b></template>');
+  writeFileSync(join(C, 'SummaryBox.vue'), "<script setup>\nimport RowLine from './RowLine.vue'\nconst summary = {}\n</script><template><row-line :info=\"summary\" /></template>");
+  const names = ['NavMenu', 'DocsTable', 'AcGlyph', 'OddCard', 'SummaryBox'];
+  const r = await renderedVue(dir, {}, names, { locate: (n) => join(C, `${n}.vue`), chromePath: CHROME });
+  const failed = (n) => r.failed.filter((f) => f.component === n);
+  for (const n of ['NavMenu', 'DocsTable', 'AcGlyph']) assert.deepEqual(failed(n), [], `${n}: ${JSON.stringify(r.failed)}`);
+  assert.match(r.markup.NavMenu, /<li>Parts<\/li>|<li>Guides<\/li>/, 'drawn at a path its menu table has');
+  assert.match(r.markup.DocsTable, /<p class="row">Kind 1<\/p>/, 'each item has the fields the child it is handed to reads');
+  assert.match(r.markup.AcGlyph, /<svg class="star"/, 'an icon of its own folder');
+  assert.match(failed('OddCard')[0]?.why ?? '', /the input entry was missing: it was not given, and OddCard\.vue reads entry\.title as it draws/, JSON.stringify(r.failed));
+  assert.match(failed('SummaryBox')[0]?.why ?? '', /the input info\.kind was missing in RowLine\.vue, a part it draws with what it hands it, which reads info\.kind\.split/, JSON.stringify(r.failed));
+});
