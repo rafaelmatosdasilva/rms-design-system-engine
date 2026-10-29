@@ -209,7 +209,7 @@ export function propSamples(ROOT) {
 // on/off one off but the first item's selected or active. So a list draws as a list. → { propName: [items] }
 // With an example from Figma whose instances are the list's items (a bar's tabs): one item a tab, each field from the
 // tab's own property (label from LabelContent, icon from mainIcon, its icon as the code names its file), else its words.
-export function listSamples(text, propNames = [], samples = {}, example = null, icons = {}) {
+export function listSamples(text, propNames = [], samples = {}, example = null, icons = {}, kinds = {}) {
   const tpl = /<template\b[\s\S]*<\/template>/.exec(String(text))?.[0] ?? '';
   const out = {};
   const sq = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -238,12 +238,40 @@ export function listSamples(text, propNames = [], samples = {}, example = null, 
       out[list] = figmaItems.map((it, i) => Object.fromEntries(fields.map((f) => [f, fromFigma(it, f, i)]).filter(([, v]) => v !== undefined)));
       continue;
     }
-    const value = (f, i) => /^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) ? i === 0 && /selected|active|current/i.test(f)
-      : typeof samples[f] === 'string' ? (/icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) ? samples[f] : `${samples[f]} ${i + 1}`)
-        : `${f.charAt(0).toUpperCase() + f.slice(1)} ${i + 1}`;
+    // A field no page writes as text: what the components that take a prop of that name declare it as (kinds), an
+    // on/off off, one with options its default or first option, a number counted, before its own name and number.
+    const value = (f, i) => {
+      const k = kinds[f];
+      if (/^(is|has|show|with)[A-Z]|^(disabled|selected|active|checked|open|expanded|current)$/i.test(f) || k?.type === 'boolean') return i === 0 && /selected|active|current/i.test(f);
+      if (typeof samples[f] === 'string') return /icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) || k?.options?.length ? samples[f] : `${samples[f]} ${i + 1}`;
+      if (k?.options?.length) return k.options.includes(k.default) ? k.default : k.options[0];
+      if (k?.type === 'number') return i + 1;
+      return `${f.charAt(0).toUpperCase() + f.slice(1)} ${i + 1}`;
+    };
     out[list] = [0, 1, 2].map((i) => (fields.length ? Object.fromEntries(fields.map((f) => [f, value(f, i)])) : `Item ${i + 1}`));
   }
   return out;
+}
+
+// What the project's components declare each prop name as, across all of them (buttonSize: a string with options s, m
+// and l, default m; fullWidth: an on/off): the type most of them give it, and the options and default of the one that
+// lists the most. So a value passed through a list's items, or a prop one component leaves bare, takes one the others
+// take. → { name: { type, options, default } }
+export function propKinds(files, apiOf) {
+  const seen = {};
+  for (const f of files) {
+    if (!/\.vue$/.test(f)) continue;
+    let api; try { api = apiOf(f); } catch { continue; }
+    for (const [k, d] of Object.entries(api?.props ?? {})) {
+      const s = (seen[k] ??= { types: {}, best: null });
+      if (d.type) s.types[d.type] = (s.types[d.type] ?? 0) + 1;
+      if ((d.options?.length ?? 0) > (s.best?.options?.length ?? 0)) s.best = d;
+    }
+  }
+  return Object.fromEntries(Object.entries(seen).map(([k, s]) => {
+    const type = Object.entries(s.types).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    return [k, { type, options: s.best?.options ?? null, default: s.best?.default ?? null }];
+  }));
 }
 
 // How often the project's code writes each name for a key (kind: 'Solid', tileKind: 'Outline'), in its scripts and
@@ -613,6 +641,7 @@ const why1 = (e) => String(e?.message ?? e).split('\n')[0];
 export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16 } = {}) {
   const groups = [], missing = [], samples = propSamples(ROOT), icons = iconPaths(ROOT), pageData = pageSamples(ROOT);
   let keyed = null;   // keyedNames, read once, with the first component
+  let kinds = null;   // propKinds, read once, with the first component
   // The examples the design team placed in Figma (--figma-examples), each component opened as one of them.
   let examples = null; try { examples = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotExamples ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json')), 'utf8')); } catch { /* not read yet */ }
   // The project's own Code Connect files, pairing each Figma property with the code's prop (code-connect-map.mjs).
@@ -620,7 +649,8 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
   let ccInclude = null; try { ccInclude = JSON.parse(readFileSync(join(ROOT, 'figma.config.json'), 'utf8'))?.codeConnect?.include ?? null; } catch { /* none */ }
   const ccMaps = codeConnectMaps(ROOT, { include: ccInclude });
   const { harnessCases, variantsFromCode, pageColours, codeCases, decidedCases } = await import('./component-harness.mjs');
-  const { textComponentApi } = await import('./component-source.mjs');
+  const { textComponentApi, componentSourceFiles } = await import('./component-source.mjs');
+  const kindsOf = () => (kinds ??= propKinds(componentSourceFiles(ROOT, cfg), (f) => { try { return textComponentApi(f, read(f)); } catch { return null; } }));
   for (const name of names) {
     const file = locate(name);
     if (!file) { missing.push(`${name} (no component file found)`); continue; }
@@ -644,9 +674,9 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const figmaCases = fromFigma ? harnessCases(propsSnap[name], max, example) : null;
     const connect = codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [];
     const choices = asyncChoices(ROOT, resolve(ROOT, file), text, keyed ??= keyedNames(ROOT), Object.keys(api.props ?? {}));
-    const cases = withCaseChoices((figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c)), choices);
+    const cases = withCaseChoices((figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max, kindsOf())).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c)), choices);
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    const fill = withChoices({ ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
+    const fill = withChoices({ ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons, kindsOf()), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
     groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
