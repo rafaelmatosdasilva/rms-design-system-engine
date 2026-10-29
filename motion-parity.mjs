@@ -19,6 +19,7 @@ import { bezierOf, sameEasing, timeMs } from './css-values.mjs';
 // its layers) and animation styles; and each overlay a prototype opens, with the component it shows and its transition.
 export const MOTION_CAPTURE_JS = `
 const PAGE_IDS = __PAGE_IDS__;
+const START = __START__, BUDGET = __BUDGET__;
 const pages = PAGE_IDS ? (await Promise.all(PAGE_IDS.map((id) => figma.getNodeByIdAsync(id)))).filter(Boolean) : figma.root.children;
 const out = {}, motion = {}, overlays = [], seen = new Set();
 const FIELDS = ['ROTATION', 'OPACITY', 'TRANSLATION_X', 'TRANSLATION_Y', 'TRANSLATION_XY', 'SCALE_X', 'SCALE_Y', 'SCALE_XY'];
@@ -59,52 +60,63 @@ const motionOf = (root, variant) => {
   visit(root, root.name, 0);
   return list;
 };
-for (const page of pages) {
+let size = 2, next = null, held = 0;
+pages: for (let p = START.page; p < pages.length; p++) {
+  const page = pages[p];
   await page.loadAsync();   // loaded where it is: switching the page would change the file
   const sets = page.findAllWithCriteria({ types: ['COMPONENT_SET'] });
-  for (const set of sets) {
-    const list = [];
-    for (const v of set.children) {
-      for (const r of (v.reactions || [])) {
-        const actions = r.actions || (r.action ? [r.action] : []);
-        for (const a of actions) {
-          if (!a || a.type !== 'NODE' || !a.destinationId) continue;
-          const to = set.children.find((c) => c.id === a.destinationId);
-          if (!to) continue;
-          const t = a.transition || null;
-          list.push({ from: v.variantProperties || {}, to: to.variantProperties || {}, trigger: r.trigger ? r.trigger.type : null, timeout: r.trigger && r.trigger.type === 'AFTER_TIMEOUT' ? r.trigger.timeout : undefined, type: t ? t.type : 'INSTANT', duration: t && typeof t.duration === 'number' ? t.duration : 0, easing: t && t.easing ? t.easing : null });
-        }
+  const solo = page.findAllWithCriteria({ types: ['COMPONENT'] }).filter((c) => !(c.parent && c.parent.type === 'COMPONENT_SET'));
+  const items = [...sets, ...solo, 'overlays'];
+  for (let i = p === START.page ? START.item : 0; i < items.length; i++) {
+    const n = items[i];
+    const list = [], ov = [];
+    let m = [];
+    if (n === 'overlays') {
+      const opens = page.findAll((x) => 'reactions' in x && (x.reactions || []).some((r) => (r.actions || (r.action ? [r.action] : [])).some((a) => a && a.type === 'NODE' && (a.navigation === 'OVERLAY' || a.navigation === 'SWAP'))));
+      for (const o of opens) for (const r of o.reactions) for (const a of (r.actions || (r.action ? [r.action] : []))) {
+        if (!a || a.type !== 'NODE' || !(a.navigation === 'OVERLAY' || a.navigation === 'SWAP') || !a.destinationId) continue;
+        const dest = await figma.getNodeByIdAsync(a.destinationId);
+        const component = dest ? await shown(dest) : null;
+        if (!component) continue;
+        const t = a.transition || null;
+        const rec = { component, frame: dest.name, from: (await ownerOf(o)) || o.name, trigger: r.trigger ? r.trigger.type : null, navigation: a.navigation, position: 'overlayPositionType' in dest ? dest.overlayPositionType : null, transition: t ? { type: t.type, direction: t.direction || null, duration: t.duration, easing: t.easing || null } : null };
+        const key = JSON.stringify([component, rec.transition]);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        ov.push(rec);
       }
-      const m = motionOf(v, v.name);
-      if (m.length) motion[set.name] = (motion[set.name] || []).concat(m);
-    }
-    if (list.length) out[set.name] = (out[set.name] || []).concat(list);
-  }
-  for (const c of page.findAllWithCriteria({ types: ['COMPONENT'] })) {
-    if (c.parent && c.parent.type === 'COMPONENT_SET') continue;
-    const m = motionOf(c, null);
-    if (m.length) motion[c.name] = (motion[c.name] || []).concat(m);
-  }
-  const opens = page.findAll((n) => 'reactions' in n && (n.reactions || []).some((r) => (r.actions || (r.action ? [r.action] : [])).some((a) => a && a.type === 'NODE' && (a.navigation === 'OVERLAY' || a.navigation === 'SWAP'))));
-  for (const n of opens) for (const r of n.reactions) for (const a of (r.actions || (r.action ? [r.action] : []))) {
-    if (!a || a.type !== 'NODE' || !(a.navigation === 'OVERLAY' || a.navigation === 'SWAP') || !a.destinationId) continue;
-    const dest = await figma.getNodeByIdAsync(a.destinationId);
-    const component = dest ? await shown(dest) : null;
-    if (!component) continue;
-    const t = a.transition || null;
-    const rec = { component, frame: dest.name, from: (await ownerOf(n)) || n.name, trigger: r.trigger ? r.trigger.type : null, navigation: a.navigation, position: 'overlayPositionType' in dest ? dest.overlayPositionType : null, transition: t ? { type: t.type, direction: t.direction || null, duration: t.duration, easing: t.easing || null } : null };
-    const key = JSON.stringify([component, rec.transition]);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    overlays.push(rec);
+    } else if (n.type === 'COMPONENT_SET') {
+      for (const v of n.children) {
+        for (const r of (v.reactions || [])) {
+          const actions = r.actions || (r.action ? [r.action] : []);
+          for (const a of actions) {
+            if (!a || a.type !== 'NODE' || !a.destinationId) continue;
+            const to = n.children.find((c) => c.id === a.destinationId);
+            if (!to) continue;
+            const t = a.transition || null;
+            list.push({ from: v.variantProperties || {}, to: to.variantProperties || {}, trigger: r.trigger ? r.trigger.type : null, timeout: r.trigger && r.trigger.type === 'AFTER_TIMEOUT' ? r.trigger.timeout : undefined, type: t ? t.type : 'INSTANT', duration: t && typeof t.duration === 'number' ? t.duration : 0, easing: t && t.easing ? t.easing : null });
+          }
+        }
+        m = m.concat(motionOf(v, v.name));
+      }
+    } else m = motionOf(n, null);
+    if (!list.length && !m.length && !ov.length) continue;
+    const add = JSON.stringify([n.name || '', list, m, ov]).length;
+    if (held && size + add > BUDGET) { next = { page: p, item: i }; break pages; }
+    if (list.length) out[n.name] = (out[n.name] || []).concat(list);
+    if (m.length) motion[n.name] = (motion[n.name] || []).concat(m);
+    overlays.push(...ov);
+    size += add; held++;
   }
 }
-return { _captured: new Date().toISOString(), _note: 'Read-only capture of prototype transitions between variants, Motion keyframes and overlays (motion-parity.mjs).', version: 2, components: out, motion, overlays };
+return { _captured: new Date().toISOString(), _note: 'Read-only capture of prototype transitions between variants, Motion keyframes and overlays (motion-parity.mjs).', version: 2, components: out, motion, overlays, count: held, start: START, next };
 `;
 
-export const motionCaptureScript = (pageIds = null) => {
+// An answer holds what fits in budget characters, from start (a page and an item on it: a set, a component, or the
+// page's overlays last); it says where the next starts (next, null when all are read) and how many items it holds.
+export const motionCaptureScript = (pageIds = null, { start = { page: 0, item: 0 }, budget = 15000 } = {}) => {
   const ids = pageIds == null ? null : [pageIds].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
-  return MOTION_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(ids && ids.length ? ids : null)).trim() + '\n';
+  return MOTION_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(ids && ids.length ? ids : null)).replace('__START__', JSON.stringify(start)).replace('__BUDGET__', String(budget)).trim() + '\n';
 };
 
 // Figma's easing as CSS: its presets are cubic-bezier curves; a spring has none (null, with its name).
