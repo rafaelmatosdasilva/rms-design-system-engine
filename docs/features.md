@@ -218,7 +218,7 @@ How it checks the agent's work, in a loop, before you see it:
 - What breaks only in a combination of modes, such as dark on a phone.
 - Brands that pin a value they should inherit from the brand they extend.
 - Two components whose own rules are nearly the same.
-- One health number for the system, and one per area, on the style guide's Health page.
+- A health number per area on the style guide's Status page, and AI readiness, each beside its value at past releases and the change since the last one.
 
 ## Keep AI agents on the system · Stable
 
