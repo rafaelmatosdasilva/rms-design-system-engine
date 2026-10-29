@@ -72,6 +72,7 @@ rms-design-system-engine --exemption-debt                # list every exemption/
 rms-design-system-engine --code-drift                    # list props that exist in code but not in Figma (code→design "sync back" advisory; totals show on every run)
 rms-design-system-engine --contract-completeness         # list components whose emitted contract has no description (agent-readiness gaps; totals show on every run)
 rms-design-system-engine --agent-rules [--write[=<file>]]  # the engine's rules for an agent with no hooks (Cursor, Copilot): shown, and asked about; --write puts them in AGENTS.md, CLAUDE.md, .cursorrules, .github/copilot-instructions.md or .cursor/rules (those the project has, else AGENTS.md), between markers, once the person says yes (the hook holds it until then)
+rms-design-system-engine --sign-off "chip size=xl" --by "<who>"  # a named person signs off what an edit adds to the system itself (a token, a component's option): the hook lets that edit through; --sign-off alone lists them
 rms-design-system-engine --edit-check [file …]           # the check the hook makes on each UI edit, on demand: the files named, else every UI file changed since the last commit; exits 1 when something the system does not have was added
 rms-design-system-engine --query badge --hb-radius-control  # a component's props (names exactly as the code writes them, Figma's where they differ) and where it lives, or a token's variable, values per mode and, for a text colour, the surfaces it reads on
 rms-design-system-engine --figma-change chip "add xl to size like l"  # a change to a component Figma has, only what changes, with its report (what changes, where it is used, what breaks); --change-report chip after, the read before beside the read after
@@ -193,6 +194,7 @@ checks each piece once it exists.
   class and added to `paths.themeCSS` after the token file, said once in the report, so every gate reads it.
 - **A token an edit invents.** In any project, a custom property an edit adds with a value of its own (a colour, a size) that Figma has no variable for is handed back, in the theme too; one that only points at the system's tokens, or that Figma has, is not.
 - **A new component is a decision.** A class rule an edit adds whose declarations are mostly a system component's (most of the larger rule written alike) goes back at once: use that component, with a new option if it needs one, or ask the person whether the new one belongs in the system. Never kept without asking.
+- **A change to the system itself is signed off.** An edit that gives the theme (`paths.themeCSS`) a token it did not declare, or a component a quoted option beside its own that its contract does not have (`['s', 'l', 'xl']`), adds to what every product gets: the project's hook holds it until a named person signs it off. `--sign-off "<what>" --by "<who>"` records it in `design-system-engine-signoffs.json` (the hook asks first unless the person's latest message gives the sign-off), and the edit then goes through; `--sign-off` alone lists them. The record is never edited by hand, and `--signed-off` on `--figma-build` and `--figma-change` is held the same way.
 - **A last check before the agent finishes.** The Stop hook runs the edit check once more over every UI file the session changed, against the last commit; a value the system does not have that an edit left in place goes back once, with the file and the line. Lines that were already in the commit do not count.
 - **Never a secret in the chat.** Whatever the request, the Stop hook sends back once a final reply that asks the person for a token, key or password: the person puts it in the project's `.env` themselves. A design token named in a question is not a secret.
 - **Measured differences fail.** In build mode a value the browser measures on the rendered component that differs from Figma (a height, a line height, a colour) fails Gate [13] (Structure), and its direction is always back to Figma's value: the code was just written from it. A value the page could only read as the browser's default is shown, not failed. `renderedParityStrict: false` keeps them advisory.
@@ -1361,15 +1363,20 @@ Content gap to spacing/s`, `move chip/label/color to text/default`, `description
 component (the capture now, and the same once the change is made), never from memory: its skeleton (each layer added,
 removed or renamed, matched by node id, so a rename is never a removal and an addition), its architecture (variant axes
 and options, properties, what each drives, the variants), its variables (each layer and field's bindings, from → to),
-and where it is used (its contract's products, the components it sits inside, the screens; team files the engine does
-not read are said, not counted). A removal or a rename breaks what leans on it; a new option, axis or property adds to
+and where it is used (its contract's products, the components it sits inside, the screens, and with `FIGMA_TOKEN` its
+instances in every team file from Figma's library analytics, on the plans that have them; otherwise those files are said
+not seen, and why). A removal or a rename breaks what leans on it; a new option, axis or property adds to
 the system: both wait for `--signed-off`. The faults the component already has by the construction grammar's rules are
 listed apart, never fixed with the change. Then the script (`handback/figma-apply.js`), run with `use_figma` once the
 person says yes.
 
 **--change-report.** `--change-report <component>`, once Figma is read again: the read before beside the read after,
 section by section, and each place where it is not what the change said (warned when Figma was last read before the
-change). Each report is kept in the change's file (`done`).
+change). Each report is kept in the change's file (`done`) and, once made, in `changes/done/`. The style guide has a
+**Changes in Figma** page: one table, a row a change (its component, what was asked, waiting, made as said or not as
+said), each opening its before and after in the side panel (what the change said it does, what Figma shows once read
+again, where it is used, what it breaks and adds, who signed it off, the faults it already had); each component's History
+lists its changes, linked to that panel.
 
 #### A scheduled pipeline (`--ci-changed`)
 
@@ -1798,7 +1805,7 @@ It writes `.design-system-engine-out/handback/figma-edits.json` (each edit, its 
 as it is, keeps every annotation a person wrote, and returns `{ changed, skipped, missing }` (and `todo`, the list it wrote). The agent shows the list, and only when the person says yes runs
 the script unchanged with the Figma MCP's `use_figma`; the project hooks refuse any other script that writes to Figma,
 and ask first when the person's last message does not approve. Then `--refresh-figma` reads the new annotations.
-Descriptions, missing components and layout are never written: they stay in `figma-changes.md`.
+Descriptions, missing components and layout are never written: they stay in `changes-in-Figma.md`.
 
 #### Adoption baseline / ratchet (opt-in, gate-level)
 

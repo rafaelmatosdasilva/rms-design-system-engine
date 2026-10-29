@@ -7,6 +7,8 @@
 //   • denies editing a Figma snapshot by hand: they come from the capture, never from a hand edit;
 //   • asks the person before editing ds-config.json, committing, pushing, applying the hand-back patch, or writing the
 //     engine's rules into an agent's instruction file;
+//   • holds an edit that adds to the design system itself (a token in the theme, an option on a component) until a named
+//     person signed it off (sign-off.mjs, --sign-off), and asks before a sign-off the person did not give;
 //   • keeps the records of the system's decisions for the person: what was accepted as debt, the exception
 //     lists and the approved reference pictures (replaced or deleted; a new one is not yet approved) change only
 //     when the person's latest message asks for it, and the record of what both sides last agreed on is the
@@ -28,6 +30,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from '
 import { join, basename, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { route, routeText, projectState, SAY, PROTOTYPE } from './route.mjs';
+import { additionsOf, signedOff, SIGN_OFFS } from './sign-off.mjs';
 import { readDoc } from './skill-files.mjs';
 import { editCheck, editHookOutput, sessionLeftovers } from './edit-check.mjs';
 import { PROJECT, OUT_DIR } from './names.mjs';
@@ -174,6 +177,24 @@ export const stopOutput = (reason) => (reason ? JSON.stringify({ decision: 'bloc
 // The files where the system's decisions are recorded. 'agreed' is
 // written by the engine only; the others change when the person asks.
 const ACCEPT_ASKED = /\baccept|known (debt|difference)|as debt|d[ií]vida|aceit|\bbaseline|ratchet|lock (it |them )?in/i;   // the router's accept-debt words, or the baseline named
+const SIGNOFF_ASKED = /\bsign(s|ed|ing)?\b[\w\s-]{0,20}?\boff\b|\b(approv\w*|aprov\w*|autoriz\w*|i agree|go ahead|yes)\b|\b(assin\w*|valid\w*)\b/i;   // the person signs it off, or says who does
+// An edit that adds to the system itself (a token to the theme, an option to a component): held until a named person
+// signed it off (sign-off.mjs), as ds-config.json is held. → a verdict, or null
+function systemHold(event, file, cfg) {
+  if (!file || !CODE.test(String(file))) return null;
+  const root = resolve(event.cwd ?? process.cwd()), input = event.tool_input ?? {};
+  let before = ''; try { before = readFileSync(resolve(root, String(file)), 'utf8'); } catch { /* a new file */ }
+  let after = before;
+  if (event.tool_name === 'Write') after = String(input.content ?? '');
+  else if (event.tool_name === 'Edit') after = input.replace_all ? before.split(String(input.old_string ?? '')).join(String(input.new_string ?? '')) : before.replace(String(input.old_string ?? ''), String(input.new_string ?? ''));
+  else if (event.tool_name === 'MultiEdit') for (const e of input.edits ?? []) after = e.replace_all ? after.split(String(e.old_string ?? '')).join(String(e.new_string ?? '')) : after.replace(String(e.old_string ?? ''), String(e.new_string ?? ''));
+  else return null;
+  let adds = [];
+  try { adds = additionsOf({ file, before, after, cfg, root }).filter((a) => !signedOff(root, a.what)); } catch { return null; }
+  if (!adds.length) return null;
+  const list = adds.map((a) => a.what).join('; ');
+  return { decision: 'deny', reason: `This edit adds to the design system itself (${list}), which every product then gets: it waits for a named person to sign it off. Tell the person what it adds and ask who signs it off (the system's owner, or themselves if they are); once they say, run rms-design-system-engine --sign-off ${JSON.stringify(adds[0].what)} --by "<who>"${adds.length > 1 ? ' for each' : ''}, then make the edit again. To use what the system has instead, take the closest one it already has and say so.` };
+}
 const KEEP_ASKED = /\b(keep|kept|keeping)\b|\b(on purpose|intentional\w*|deliberate\w*|by design)\b|\b(mant[eé]m|manter|mantemos|mantenha|de prop[oó]sito|intencional\w*)\b/i;   // the person keeps a difference on purpose
 const EXCEPTION_ASKED = /\b(exception|exempt|ignore|skip|mapping|map|exce[çc][õoã]|isen[çc]|ignor|mapa|mapeamento|set ?up|configur|install|init)\w*/i;   // setting the project up writes the map too
 const NAMES_ASKED = /\b(renam|name|bind|alias|record|contract|map)\w*|\b(renome|nome|v[ií]ncul|regist|contrat|mape)\w*/i;   // the person asks to record or rename a binding
@@ -232,6 +253,9 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
     const file = input.file_path ?? input.notebook_path ?? input.path;
     if (isSnapshot(file)) return { decision: 'deny', reason: `${basename(file)} is written by the Figma capture, never by hand (a hand edit fakes a refresh). Refresh it with the capture (rms-design-system-engine --recipe refresh-figma), or leave it stale and say so.` };
     if (basename(String(file ?? '')) === 'ds-config.json') return { decision: 'ask', reason: 'ds-config.json is the project\'s parity setup. Confirm this edit is what you asked for (guidelines links go through rms-design-system-engine --guidelines, never a hand edit).' };
+    if (basename(String(file ?? '')) === SIGN_OFFS) return { decision: 'deny', reason: `${SIGN_OFFS} records who signed off what is added to the system: it is written by rms-design-system-engine --sign-off "<what>" --by "<who>", once the person names who signs it off, never by hand.` };
+    const held = systemHold(event, file, cfg);
+    if (held) return held;
     const kind = decisionFile(file, cfg);
     if (kind && !(kind === 'pictures' && !existsSync(resolve(event.cwd ?? process.cwd(), String(file))))) return decisionVerdict(kind, file, userText);   // a new picture is not an approved one
     // A prototype changes nothing in the system: it is a composition under prototypes/, drawn by the engine.
@@ -251,6 +275,8 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
     }
     // Accepting debt is the person's decision, even through the engine: --baseline runs when they asked for it.
     if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--baseline\b/.test(cmd) && userText !== null && !ACCEPT_ASKED.test(userText)) return { decision: 'ask', reason: DECISION.debt.reason('The baseline') };
+    // Who signs off what is added to the system is the person's to say: --sign-off and --signed-off run when they said so.
+    if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--sign(ed)?-off\b/.test(cmd) && userText !== null && !SIGNOFF_ASKED.test(userText)) return { decision: 'ask', reason: 'A sign-off says a named person agreed to add this to the system. The person\'s last message does not say who signs it off: ask them, and record only the name they give.' };
     // Keeping a difference on purpose is the person's decision, even through the engine: --keep runs when they said so.
     if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--keep\b/.test(cmd) && userText !== null && !KEEP_ASKED.test(userText)) return { decision: 'ask', reason: DECISION.kept.reason('The kept differences file') };
     // A check made by hand is the person's to record: --checked and --unchecked run when they said so.

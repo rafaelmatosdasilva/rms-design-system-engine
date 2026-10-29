@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-10: A change to the system itself is signed off, and the changes made in Figma have a page (continuous evaluation)
+
+What changed since the entry below (engine 02226fe): A new component in Figma, built the system's way: --spec and --figma-build (#121); A component changed in Figma, with its change report; evals for building and changing (#122); The guide is measured whole or file by file: two branches that changed different guide files merge without a third run (#124); A change to the system itself waits for a named person to sign it off; The changes made in Figma, where people see them: a Changes in Figma page, each on its component's History; The Changes in Figma page's address is its name in the menu. The guide changed in `reference/usage.md`.
+
+Guide set measured: `d84dac2a1417` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md afcb4830` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 80c49112` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6c5a3936` `cookbook/guidelines-links.md d729d7b1` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 50abedb9` `cookbook/refresh-figma.md cbd2b4d4` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md dd518f54` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md dd7e799d` `rms-design-system-engine.md 24cee88d`
+
+| Haiku, engine b121b51 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.056 | $0.057 |
+| Input a run | 102k | 99k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 99k a run against 102k. no task changed state, and no run moved: the same result. Records: `records/system-sign-off`.
+
 ## 2026-10: A component changed in Figma with its report: the change-component-figma recipe, and evals for building (continuous evaluation)
 
 What changed since the entry below (engine 33f86b6): A component changed in Figma with its change report: --figma-change, --change-report, and evals for building; A change said with "like the L one" routes to the change, not to a new component. The guide changed in `cookbook/build-component-figma.md`, `cookbook/change-component-figma.md`, `cookbook/refresh-figma.md`, `reference/usage.md`, `rms-design-system-engine.md`.

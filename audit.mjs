@@ -1981,6 +1981,10 @@ if (process.argv.includes('--figma-change') || process.argv.includes('--change-r
     for (const l of realLines(result, component)) console.log(l);
     ch.done = [...(ch.done ?? []), { at: new Date().toISOString(), readAt, real: result.real, mismatch: result.mismatch }];
     writeFileSync(changeFile, JSON.stringify(ch, null, 2) + '\n');
+    // Kept once made, for the style guide's Changes in Figma page and the component's History (a new change replaces the
+    // one waiting, never this).
+    mkdirSync(join(changesDir, 'done'), { recursive: true });
+    writeFileSync(join(changesDir, 'done', `${component}-${String(ch.at).replace(/[:.]/g, '-')}.json`), JSON.stringify(ch, null, 2) + '\n');
     console.log(result.mismatch.length ? `NEXT: tell the person what is not what the change said; change nothing in Figma unless they ask (${relative(ROOT, changeFile)}).` : `NEXT: tell the person; then run ${cmd} --construction-check and ${cmd} --hygiene, and say what they find on ${component}.`);
     process.exit(0);
   }
@@ -2010,7 +2014,11 @@ if (process.argv.includes('--figma-change') || process.argv.includes('--change-r
   }
   const contract = read(join(ccfg.contracts?.out ?? 'contracts', `${component}.contract.json`));
   const prev = read(changeFile);
-  const ch = changeOf({ component, asked: asked || prev?.asked || '', ops, captures, grammar: grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} }), livesIn: contract?.livesIn ?? null, at: new Date().toISOString() });
+  // Its instances in every team file, where Figma's library analytics may be read (an Enterprise plan); else why not.
+  const { libraryUsage } = await import('./figma-analytics.mjs');
+  const figmaToken = process.env.FIGMA_TOKEN ?? (() => { for (const d of [ROOT, dirname(ROOT)]) { try { const m = /^\s*FIGMA_TOKEN\s*=\s*['"]?([^'"\n#]+)/m.exec(readFileSync(join(d, '.env'), 'utf8')); if (m) return m[1].trim(); } catch { /* none here */ } } return null; })();
+  const library = await libraryUsage(component, { fileKey: ccfg.figmaFileKey ?? null, token: figmaToken });
+  const ch = changeOf({ component, asked: asked || prev?.asked || '', ops, captures, grammar: grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} }), livesIn: contract?.livesIn ?? null, library, at: new Date().toISOString() });
   const who = _argValue('--signed-off');
   if (who) ch.signedOff = { by: who, at: ch.at, what: [...ch.held, ...ch.breaking].map((h) => h.what) };
   mkdirSync(changesDir, { recursive: true });
@@ -2113,6 +2121,23 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   writeFileSync(join(dir, 'figma-apply.js'), opsScript(sx.ops, { nodes, what: 'figma-build' }));
   console.log(`   (${relative(ROOT, join(dir, 'figma-build.json'))} · ${relative(ROOT, join(dir, 'figma-apply.js'))})`);
   console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the steps above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${scfg.figmaFileKey ? ` (fileKey ${scfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --construction-check and ${cmd} --hygiene: say what they find on ${spec.name}.`);
+  process.exit(0);
+}
+// ── A change to the system itself, signed off (sign-off.mjs) ──
+// --sign-off "<what>" --by "<who>": a named person agreed to add it to the system (a token, a component's option), so the
+// guard lets the edit that adds it through. --sign-off alone lists what was signed off.
+if (process.argv.includes('--sign-off')) {
+  const { recordSignOff, readSignOffs, SIGN_OFFS } = await import('./sign-off.mjs');
+  const i = process.argv.indexOf('--sign-off'), what = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null, by = _argValue('--by');
+  if (!what) {
+    const all = readSignOffs(ROOT);
+    console.log(all.length ? `Signed off to add to the system (${all.length}, ${SIGN_OFFS}):\n${all.map((x) => `   • ${x.what}: ${x.by}, ${String(x.at).slice(0, 10)}`).join('\n')}` : 'Nothing signed off yet: an edit that adds to the system (a token, a component\'s option) waits for one.');
+    process.exit(0);
+  }
+  if (!by || !by.trim()) { console.log(`❌ A sign-off names who gave it: rms-design-system-engine --sign-off ${JSON.stringify(what)} --by "<who>" (the name the person gives, never one you choose).`); process.exit(2); }
+  recordSignOff(ROOT, { what, by: by.trim() });
+  console.log(`✅ Signed off by ${by.trim()}: ${what} (${SIGN_OFFS}).`);
+  console.log('NEXT: make the edit that adds it; the guard lets it through now. Say who signed it off in your answer.');
   process.exit(0);
 }
 // ── The construction grammar's decisions and fixes (construction-grammar.mjs) ──

@@ -1418,6 +1418,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       for (const r of g.figma.rules) r.toFix = r.toFix.map((t) => ({ ...t, fix: fixOf(r, t) }));
       if (g.figma.rules.length) view.construction = { rules: g.figma.rules, components: g.figma.components, families: g.figma.families ?? [], listed: constructionShow === 'listed' };
     } catch { /* no Construction page */ }
+    // Each change made to a component in Figma through the engine (component-change.mjs): the Changes in Figma page, and
+    // each on its component's History.
+    try {
+      const { changesView } = await import('./component-change.mjs');
+      const fc = changesView(ROOT, { outDir: OUT_DIR, readdirSync, readFileSync, join });
+      if (fc.length) view.figmaChanges = fc;
+    } catch { /* no changes */ }
     // How much each area weighs in the Health page's one number (styleguide.health.weights); the page's own otherwise.
     if (cfg.styleguide?.health?.weights && typeof cfg.styleguide.health.weights === 'object') view.healthWeights = cfg.styleguide.health.weights;
     // What the system retired that is still in use: each deprecated component on its own page and in its To do
