@@ -130,6 +130,7 @@ test('a control nobody annotated: its parts read from its layers\' names and fro
     [['Label', 'label'], ['Helper text', 'description'], ['Error message', 'errormessage'], ['Chevron', 'indicator']], 'a part named twice is taken once');
   assert.deepEqual(partsFromNames(['Plus', 'Value', 'Minus'], 'spinbutton').map((x) => x.part), ['increment', 'decrement']);
   assert.deepEqual(partsFromNames(['Label'], null), [], 'not a control: no parts owed');
+  assert.deepEqual(partsFromNames(['Icon', 'Label'], 'button').map((x) => x.part), ['indicator'], 'a button\'s Label layer is its own words, not a part');
   assert.deepEqual(partsInMarkup('<div class="tile-field"><label for="a">Name</label><input id="a"><span class="tile-field__hint">x</span><em class="tile-error-text">y</em><i class="icon-check"></i></div>').map((x) => x.part),
     ['label', 'description', 'errormessage', 'indicator']);
 });

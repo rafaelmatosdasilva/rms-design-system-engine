@@ -51,6 +51,7 @@ export function partRolesOf(entry = {}) {
 // text", "Chevron", "Plus"): the same parts, marked read from the name, so a component nobody annotated still has its
 // label tied to its field and its indicator silent. Only for a control (a role is given); a layer named for a part
 // twice is taken once. → [{ layer, part, fromName: true }]
+const FIELD_ROLES = /^(textbox|textfield|searchbox|combobox|listbox|checkbox|radio|switch|spinbutton|slider)$/i;
 export function partsFromNames(layers = [], role = null) {
   if (!role) return [];
   const out = [], seen = new Set();
@@ -58,6 +59,8 @@ export function partsFromNames(layers = [], role = null) {
     const words = String(layer ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z]+/).filter(Boolean);
     const part = partRoleOf(words.join('')) ?? partRoleOf(words.slice(0, 2).join('')) ?? partRoleOf(words[0] ?? '');
     if (!part || part === 'panel' || part === 'value' || seen.has(part)) continue;
+    // A "Label" layer of a button, a tab or a link is its own words, which name it: only a field's label is a part.
+    if (part === 'label' && !FIELD_ROLES.test(String(role))) continue;
     seen.add(part); out.push({ layer, part, fromName: true });
   }
   return out;
