@@ -1034,8 +1034,8 @@ contracts, the style guide, the differences kept on purpose (`kept`: a design ru
 with its intent layer; with the decisions when the setup names no place for them) and the other decisions (answers to
 proposals, accepted debt, checks made by hand), each in a GitLab project (a folder in it, a branch of it) or a folder (`stores.mjs`). `ds-config.json → stores`
 names the place of each; the configuration reference has the format. Each run reads the snapshots, the kept
-differences and the decisions from their stores when the store's commit moved, never over a file changed on this computer since it was last read
-(that one is kept, and said). The contracts (`--contracts-out` with no folder), the style guide
+differences and the decisions from their stores when the store's commit moved. A file changed on this computer since it
+was last read is replaced only by a copy built from newer inputs (its stamp); otherwise it is kept, and said. The contracts (`--contracts-out` with no folder), the style guide
 (`--publish-styleguide`), the kept differences (after `--keep`), the decisions (after `--intent-decide`, `--checked`),
 the snapshots
 (`--refresh-snapshots`) and the intent layer (`--intent-changes --commit`, `--review-drafts --commit`, the fixes made on
@@ -1054,8 +1054,10 @@ GitLab, with the token that would write: the token's role in the project (Develo
 push to the branch (a protected branch it may not push takes a merge request instead), and a commit with nothing in it,
 which a token that may write sees refused as empty (400) and a read-only token as forbidden (403), since a
 fine-grained token cannot be asked for its scopes. Nothing is written by that. When GitLab says no, nothing is sent and
-one line says why and who can grant it; the run goes on. A write is refused when the branch moved since the run read
-the store, so nothing written meanwhile is overwritten. The engine runs on each person's computer and could be edited:
+one line says why and who can grant it; the run goes on. When the branch moved since the run read the store (another
+run wrote it), each file is merged and nothing written meanwhile is overwritten: one only this run changed is sent, one
+only the store changed is taken, and one both changed keeps the copy built from newer inputs (its stamp); one whose
+inputs cannot be ordered is held and named, and `--force` sends it. The engine runs on each person's computer and could be edited:
 GitLab's roles, protected branches and per-project tokens are the lock, and they stay one even if it is bypassed.
 
 **A link that moved still works.** Each GitLab link (the code, the intent layer, a store, the profile) is asked of

@@ -164,6 +164,62 @@ test('read from the store: only its kind of file, a change made here is kept, an
   assert.ok(!g.writes().length);
 });
 
+test('read from the store: a file changed here and there is decided by what each copy was built from', async () => {
+  const snap = (v, read) => JSON.stringify({ v, ...(read ? { _built: { code: null, figma: null, figmaRead: read, engine: null, at: read } } : {}) });
+  const F = { older: 'src/figma-vars.snapshot.json', newer: 'src/figma-structure.snapshot.json', loose: 'src/figma-icons.snapshot.json' };
+  const g = fakeGitlab({ files: { [F.older]: snap(1, '2026-10-20T10:00:00Z'), [F.newer]: snap(1, '2026-10-20T10:00:00Z'), [F.loose]: snap(1) } });
+  const ROOT = project();
+  const cfg = cfgWith({ snapshots: { read: LINK } });
+  await pullStore(ROOT, cfg, 'snapshots', { env, http: g.http });
+  // Both sides read Figma again: here once before the store's read, once after; a third with no stamps.
+  writeFileSync(join(ROOT, F.older), snap('mine', '2026-10-21T09:00:00Z'));
+  writeFileSync(join(ROOT, F.newer), snap('mine', '2026-10-23T09:00:00Z'));
+  writeFileSync(join(ROOT, F.loose), snap('mine'));
+  Object.assign(g.files, { [F.older]: snap('theirs', '2026-10-22T09:00:00Z'), [F.newer]: snap('theirs', '2026-10-22T09:00:00Z'), [F.loose]: snap('theirs') });
+  g.head = 'f'.repeat(40);
+  const r = await pullStore(ROOT, cfg, 'snapshots', { env, http: g.http });
+  assert.deepEqual(r.written, [F.older]);
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.older), 'utf8')).v, 'theirs', 'the store read Figma later: taken');
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.newer), 'utf8')).v, 'mine', 'this computer read it later: kept');
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.loose), 'utf8')).v, 'mine', 'no stamps to order them: kept, as before');
+  assert.match(r.line, /figma-vars\.snapshot\.json over this computer's, built from older inputs/);
+  assert.match(r.line, /figma-structure\.snapshot\.json changed here and in .*: this computer's kept, built from newer inputs/);
+  assert.match(r.line, /figma-icons\.snapshot\.json changed here and in .*, from inputs that cannot be ordered: this computer's kept/);
+});
+
+test('two runs write one store: each file merged, the copy built from newer inputs kept, one that cannot be ordered held', async () => {
+  const stamp = (figma) => ({ code: null, figma, figmaRead: null, engine: null, at: '2026-10-29T10:00:00Z' });
+  const snap = (v, figma) => JSON.stringify({ v, ...(figma ? { _built: stamp(figma) } : {}) });
+  const F = { only: 'src/figma-vars.snapshot.json', theirs: 'src/figma-icons.snapshot.json', older: 'src/figma-structure.snapshot.json', newer: 'src/figma-props.snapshot.json', loose: 'src/figma-examples.snapshot.json' };
+  const read = { [F.only]: snap(1, '5'), [F.theirs]: snap(1, '5'), [F.older]: snap(1, '5'), [F.newer]: snap(1, '5'), [F.loose]: snap(1) };
+  const g = fakeGitlab({ files: { ...read } });
+  const ROOT = project();
+  const cfg = cfgWith({ snapshots: { read: LINK } });
+  await pullStore(ROOT, cfg, 'snapshots', { env, http: g.http });
+  // This run changes four of them; meanwhile another run writes the store (the branch moves).
+  const mine = { [F.only]: snap('mine', '6'), [F.older]: snap('mine', '6'), [F.newer]: snap('mine', '8'), [F.loose]: snap('mine') };
+  for (const [rel, text] of Object.entries(mine)) writeFileSync(join(ROOT, rel), text);
+  Object.assign(g.files, { [F.theirs]: snap('theirs', '7'), [F.older]: snap('theirs', '7'), [F.newer]: snap('theirs', '7'), [F.loose]: snap('theirs') });
+  g.head = 'd'.repeat(40);
+  const r = await pushStore(ROOT, cfg, 'snapshots', localFiles(ROOT, cfg, 'snapshots'), 'm', { env, http: g.http, force: false });
+  assert.equal(r.ok, true, r.line);
+  const commit = g.writes().find((c) => c[1].endsWith('/repository/commits'));
+  assert.deepEqual(commit[3].actions.map((x) => x.file_path).sort(), [F.newer, F.only].sort(), 'only what this run changed alone, and what it built from newer inputs');
+  assert.equal(JSON.parse(g.files[F.older]).v, 'theirs', 'built from an older Figma version than the store\'s: the store\'s kept');
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.older), 'utf8')).v, 'theirs', '... and taken here');
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.theirs), 'utf8')).v, 'theirs', 'changed only in the store: taken here');
+  assert.equal(JSON.parse(g.files[F.loose]).v, 'theirs', 'no stamps to order them: held, neither overwritten');
+  assert.equal(JSON.parse(readFileSync(join(ROOT, F.loose), 'utf8')).v, 'mine');
+  assert.match(r.line, /had moved since it was read/);
+  assert.match(r.line, /figma-structure\.snapshot\.json kept as the store has it, built from newer inputs \(Figma version 6 is older than the Figma version 7/);
+  assert.match(r.line, /figma-examples\.snapshot\.json held/);
+  // The one held, sent on purpose.
+  g.head = 'e'.repeat(40);
+  const forced = await pushStore(ROOT, cfg, 'snapshots', new Map([[F.loose, readFileSync(join(ROOT, F.loose))]]), 'm', { env, http: g.http, force: true });
+  assert.equal(forced.ok, true, forced.line);
+  assert.equal(JSON.parse(g.files[F.loose]).v, 'mine');
+});
+
 test('a folder store: read and written on this computer; the lines say what each person may do', async () => {
   const ROOT = project(), shared = project();
   mkdirSync(join(shared, 'team'), { recursive: true });
