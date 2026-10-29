@@ -5866,6 +5866,17 @@ function reportFull(label, items, shown) {
     } catch { /* advisory: never fails */ }
   }
 
+  // ── A token in the first layer where its value can change (layer-placement.mjs, advice) ──
+  // A moded collection's tokens that are defined the same in every mode: they belong in a layer without the modes.
+  {
+    try {
+      const vsnapL = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotVars ?? 'figma-vars.snapshot.json'), 'utf8'));
+      const lp = await import('./layer-placement.mjs');
+      const lines = lp.layerPlacementLines(lp.layerPlacement(vsnapL));
+      if (lines.length) { console.log(`\n🧱 ${lines[0]}`); for (const l of lines.slice(1)) console.log(C.dim(`   ${l}`)); }
+    } catch { /* advice: never fails */ }
+  }
+
   // ── Token tiers (I10b, project-DECLARED, advisory) ──────────────────────────
   _section('advice');
   // Runs ONLY when ds-config.json declares `tiers` (never imposes a tier model). Classifies each
