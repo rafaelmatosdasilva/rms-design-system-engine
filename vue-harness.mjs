@@ -245,66 +245,112 @@ const LIST_ONLY = /^(map|forEach|filter|find|findIndex|flatMap|some|every|reduce
 const LIST_OR_TEXT = /^(slice|length|indexOf|includes|at|concat)$/;
 const TEXT_ONLY = /^(startsWith|endsWith|charAt|charCodeAt|toLowerCase|toUpperCase|toLocaleLowerCase|toLocaleUpperCase|trim|trimStart|trimEnd|split|replace|replaceAll|padStart|padEnd|substring|substr|match|localeCompare|normalize)$/;
 const DATE_FIELD = /^(from|to|start|end|min|max)$|(date|day|month|year|time)$/i;
-export function objectSamples(text, objectProps = [], samples = {}, kinds = {}, onward = {}) {
-  const numeric = onward.numeric ?? [], icons = onward.icons ?? [];
-  const src = String(text), out = {};
-  const ID = '[A-Za-z_$][\\w$]*';
-  // The names a table of the component's own lists at its top level (const parts = { Plain: …, Money: … }).
-  const tableNames = (t) => {
-    const at = new RegExp(`\\b(?:const|let|var)\\s+${t}\\s*=\\s*\\{`).exec(src);
-    if (!at) return [];
-    const names = [];
-    let depth = 1, i = at.index + at[0].length, start = i;
-    for (; i < src.length && depth; i++) {
-      const ch = src[i];
-      if (ch === '{' || ch === '(' || ch === '[') depth++;
-      else if (ch === '}' || ch === ')' || ch === ']') depth--;
-      if ((depth === 1 && ch === ',') || depth === 0) {
-        const key = /^\s*['"]?([A-Za-z_$][\w$-]*)['"]?\s*:/.exec(src.slice(start, i))?.[1];
-        if (key) names.push(key);
-        start = i + 1;
-      }
+// The names a table of the code's own lists at its top level (const parts = { Plain: …, Money: … }).
+function tableNames(src, t) {
+  const at = new RegExp(`\\b(?:const|let|var)\\s+${t}\\s*=\\s*\\{`).exec(src);
+  if (!at) return [];
+  const names = [];
+  let depth = 1, i = at.index + at[0].length, start = i;
+  for (; i < src.length && depth; i++) {
+    const ch = src[i];
+    if (ch === '{' || ch === '(' || ch === '[') depth++;
+    else if (ch === '}' || ch === ')' || ch === ']') depth--;
+    if ((depth === 1 && ch === ',') || depth === 0) {
+      const key = /^\s*['"]?([A-Za-z_$][\w$-]*)['"]?\s*:/.exec(src.slice(start, i))?.[1];
+      if (key) names.push(key);
+      start = i + 1;
     }
-    return names;
+  }
+  return names;
+}
+const ID = '[A-Za-z_$][\\w$]*';
+// What the code does with each field of a name (props.cell, or an item of a list: row): looped over, measured, a word
+// method called on it, read into further, compared with a word, looked up in a table. → { field: use }
+function fieldUses(src, p, flat = false) {
+  const uses = {};
+  const use = (f) => (uses[f] ??= { list: false, maybe: false, text: false, sub: new Set(), word: null, table: null });
+  // What is done with a field: a method or a field after it (p.f.map(, p.f.label), or an index (p.f[0]).
+  const after = (u, next, call, index) => {
+    if (index) u.maybe = true;
+    else if (!next) return;
+    else if (LIST_ONLY.test(next)) u.list = true;
+    else if (LIST_OR_TEXT.test(next)) u.maybe = true;
+    else if (TEXT_ONLY.test(next)) u.text = true;
+    else if (!call) u.sub.add(next);
   };
+  const field = `(?:\\bprops\\.|[^.\\w$])${p}\\??\\.(${ID})`;
+  for (const m of src.matchAll(new RegExp(`${field}(?:\\??\\.(${ID})(\\s*\\()?|(\\[))?`, 'g'))) after(use(m[1]), m[2], m[3], m[4]);
+  for (const m of src.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${ID})\\s*=\\s*(?:props\\.)?${p}\\??\\.(${ID})\\s*(?:;|\\n)`, 'g'))) {
+    const [, local, f] = m, u = use(f);
+    for (const n of src.matchAll(new RegExp(`\\b${local}(?:\\??\\.(${ID})(\\s*\\()?|(\\[))`, 'g'))) after(u, n[1], n[2], n[3]);
+  }
+  for (const m of src.matchAll(new RegExp(`${field}\\s*===?\\s*(['"])([^'"\\n]{1,40})\\2|(['"])([^'"\\n]{1,40})\\5\\s*===?\\s*(?:props\\.)?${p}\\??\\.(${ID})`, 'g'))) {
+    const u = use(m[1] ?? m[6]);
+    u.word ??= m[3] ?? m[5];
+  }
+  for (const m of src.matchAll(new RegExp(`\\b(${ID})\\[\\s*(?:props\\.)?${p}\\??\\.(${ID})\\s*\\]`, 'g'))) {
+    const u = use(m[2]);
+    if (!u.table) { const names = tableNames(src, m[1]); if (names.length) u.table = names; }
+  }
+  // Looped over in the template (v-for="row in props.docs.rows"): a list.
+  if (!flat) for (const m of src.matchAll(new RegExp(`v-for\\s*=\\s*["'][^"']*?\\s(?:in|of)\\s+(?:props\\.)?${p}\\??\\.(${ID})\\s*["']`, 'g'))) use(m[1]).list = true;
+  return uses;
+}
+// The names the code gives the items of a list (props.p.f): the item of a loop over it (p.f.map((row) => …), the
+// second name of a reduce, v-for="row in p.f"), also through a name it is first kept in (const rows = props.p.f) or a
+// list made from it (const shown = computed(() => props.p.f.filter(…)), v-for="row in shown"). → Set of names
+function itemNames(src, p, f) {
+  const lists = [`(?:props\\.)?${p}\\??\\.${f}`];
+  for (const m of src.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${ID})\\s*=\\s*(?:props\\.)?${p}\\??\\.${f}\\s*(?:;|\\n)`, 'g'))) lists.push(m[1]);
+  // A list made from it: a name declared with it in its own statement, up to the next one.
+  for (const m of src.matchAll(new RegExp(`(?:^|\\n)[ \\t]*(?:export\\s+)?(?:const|let|var)\\s+(${ID})\\s*=([\\s\\S]*?)(?=\\n[ \\t]*(?:const|let|var|function|export|watch|watchEffect|onMounted|onBeforeMount|defineExpose|defineEmits|<\\/script>)\\b|$)`, 'g'))) {
+    if (new RegExp(`(?<![\\w$.])(?:props\\.)?${p}\\??\\.${f}(?![\\w$])`).test(m[2]) && !lists.includes(m[1])) lists.push(`${m[1]}(?:\\.value)?`);
+  }
+  const names = new Set();
+  for (const l of lists) {
+    const at = `(?<![\\w$.])${l}(?![\\w$])`;
+    for (const m of src.matchAll(new RegExp(`${at}\\??\\.(?:map|forEach|filter|find|findIndex|flatMap|some|every)\\s*\\(\\s*(?:async\\s*)?\\(?\\s*(${ID})|${at}\\??\\.reduce\\s*\\(\\s*\\(\\s*${ID}\\s*,\\s*(${ID})`, 'g'))) names.add(m[1] ?? m[2]);
+    for (const m of src.matchAll(new RegExp(`v-for\\s*=\\s*["']\\s*\\(?\\s*(${ID})(?:\\s*,\\s*${ID})*\\s*\\)?\\s+(?:in|of)\\s+${l}\\s*["']`, 'g'))) names.add(m[1]);
+  }
+  for (const n of ['acc', 'index', 'i', 'idx']) names.delete(n);
+  return names;
+}
+// The fields a name is given (an object prop, or the i-th item of one of its lists), from what the code does with each.
+// depth: 0 for a prop, 1 for an item; a list inside an item is given empty, as deeper than that is never guessed.
+function shapeOf(src, p, { samples, kinds, onward, i = 0, depth = 0, path = p }) {
+  const numeric = onward.numeric ?? [], icons = onward.icons ?? [];
+  const fields = {};
+  for (const [f, u] of Object.entries(fieldUses(src, p, onward.flat))) {
+    const list = u.list || (u.maybe && !u.text && /[^s]s$/.test(f));
+    if (!list && DATE_FIELD.test(f)) continue;
+    if (list && depth > 0) fields[f] = [];
+    else if (list) fields[f] = [0, 1, 2].map((n) => (onward.flat ? null : itemOf(src, p, f, n, { samples, kinds, onward })) ?? sampleValue(f.replace(/s$/, ''), n, samples, kinds));
+    else if (u.sub.size && !u.text && !u.word) fields[f] = Object.fromEntries([...u.sub].filter((g) => !DATE_FIELD.test(g)).map((g) => [g, sampleValue(g, i, samples, kinds)]));
+    else if (u.table) { const used = onward.keyed?.[f] ?? {}; fields[f] = [...u.table].sort((a, b) => (used[b] ?? 0) - (used[a] ?? 0))[0]; }
+    else if (u.word != null) fields[f] = u.word;
+    else if (numeric.includes(`${path}.${f}`)) fields[f] = 1;
+    else if (icons.includes(`${path}.${f}`) && typeof samples.icon === 'string') fields[f] = samples.icon;
+    else fields[f] = sampleValue(f, i, samples, kinds);
+  }
+  return fields;
+}
+// The n-th item of a list field (props.p.f), with the fields the code reads of its items, and those of a child it
+// passes each item to as an object (onward.items: { row: [{ text, prop }] }, childFacing): null when it reads none.
+function itemOf(src, p, f, n, { samples, kinds, onward }) {
+  const item = {};
+  for (const x of itemNames(src, p, f)) {
+    for (const c of onward.items?.[x] ?? []) Object.assign(item, shapeOf(String(c.text), c.prop, { samples, kinds, onward: {}, i: n, depth: 1 }));
+    Object.assign(item, shapeOf(src, x, { samples, kinds, onward: {}, i: n, depth: 1 }));
+  }
+  return Object.keys(item).length ? item : null;
+}
+// The items of a list inside it (props.docs.rows, looped over with row.label read, or each row passed to a child that
+// reads its fields) are objects with those fields; a list inside an item is given empty. onward.flat: neither (a page
+// drawn as a whole, page-render.mjs, is drawn as it always was).
+export function objectSamples(text, objectProps = [], samples = {}, kinds = {}, onward = {}) {
+  const src = String(text), out = {};
   for (const p of objectProps) {
-    const uses = {};
-    const use = (f) => (uses[f] ??= { list: false, maybe: false, text: false, sub: new Set(), word: null, table: null });
-    // What is done with a field: a method or a field after it (p.f.map(, p.f.label), or an index (p.f[0]).
-    const after = (u, next, call, index) => {
-      if (index) u.maybe = true;
-      else if (!next) return;
-      else if (LIST_ONLY.test(next)) u.list = true;
-      else if (LIST_OR_TEXT.test(next)) u.maybe = true;
-      else if (TEXT_ONLY.test(next)) u.text = true;
-      else if (!call) u.sub.add(next);
-    };
-    const field = `(?:\\bprops\\.|[^.\\w$])${p}\\??\\.(${ID})`;
-    for (const m of src.matchAll(new RegExp(`${field}(?:\\??\\.(${ID})(\\s*\\()?|(\\[))?`, 'g'))) after(use(m[1]), m[2], m[3], m[4]);
-    for (const m of src.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${ID})\\s*=\\s*(?:props\\.)?${p}\\??\\.(${ID})\\s*(?:;|\\n)`, 'g'))) {
-      const [, local, f] = m, u = use(f);
-      for (const n of src.matchAll(new RegExp(`\\b${local}(?:\\??\\.(${ID})(\\s*\\()?|(\\[))`, 'g'))) after(u, n[1], n[2], n[3]);
-    }
-    for (const m of src.matchAll(new RegExp(`${field}\\s*===?\\s*(['"])([^'"\\n]{1,40})\\2|(['"])([^'"\\n]{1,40})\\5\\s*===?\\s*(?:props\\.)?${p}\\??\\.(${ID})`, 'g'))) {
-      const u = use(m[1] ?? m[6]);
-      u.word ??= m[3] ?? m[5];
-    }
-    for (const m of src.matchAll(new RegExp(`\\b(${ID})\\[\\s*(?:props\\.)?${p}\\??\\.(${ID})\\s*\\]`, 'g'))) {
-      const u = use(m[2]);
-      if (!u.table) { const names = tableNames(m[1]); if (names.length) u.table = names; }
-    }
-    const fields = {};
-    for (const [f, u] of Object.entries(uses)) {
-      const list = u.list || (u.maybe && !u.text && /[^s]s$/.test(f));
-      if (!list && DATE_FIELD.test(f)) continue;
-      if (list) fields[f] = [0, 1, 2].map((i) => sampleValue(f.replace(/s$/, ''), i, samples, kinds));
-      else if (u.sub.size && !u.text && !u.word) fields[f] = Object.fromEntries([...u.sub].filter((g) => !DATE_FIELD.test(g)).map((g) => [g, sampleValue(g, 0, samples, kinds)]));
-      else if (u.table) { const used = onward.keyed?.[f] ?? {}; fields[f] = [...u.table].sort((a, b) => (used[b] ?? 0) - (used[a] ?? 0))[0]; }
-      else if (u.word != null) fields[f] = u.word;
-      else if (numeric.includes(`${p}.${f}`)) fields[f] = 1;
-      else if (icons.includes(`${p}.${f}`) && typeof samples.icon === 'string') fields[f] = samples.icon;
-      else fields[f] = sampleValue(f, 0, samples, kinds);
-    }
+    const fields = shapeOf(src, p, { samples, kinds, onward });
     if (Object.keys(fields).length) out[p] = fields;
   }
   return out;
@@ -317,14 +363,16 @@ export function objectSamples(text, objectProps = [], samples = {}, kinds = {}, 
 // as a number (String or Number), a number, so a child that does arithmetic on it draws; one its child takes as its icon
 // (<ac-icon :icon="value">), an icon; a prop its child falls back
 // from when it is not given (props.language || its own), left unset, so the child's own fallback draws rather than an
-// empty one. A text (label, title, content) keeps its words. apiOf(file) → textComponentApi; readText(file) → its text.
-// → { numeric: ['figure', 'item.amount'], icons: ['value'], fallback: ['language'] }
+// empty one. A text (label, title, content) keeps its words. A name of its own it passes whole to a child that takes an
+// object (<row-line :info="row"> in a loop over a list), with that child's text, so the list's items get the fields the
+// child reads (items, objectSamples). apiOf(file) → textComponentApi; readText(file) → its text.
+// → { numeric: ['figure', 'item.amount'], icons: ['value'], fallback: ['language'], items: { row: [{ text, prop: 'info' }] } }
 const TEXT_PROP = /(label|title|text|description|caption|heading|subtitle|message|hint|placeholder|content|name)$/i;
 export function childFacing(ROOT, file, text, apiOf, readText = (f) => readFileSync(f, 'utf8'), globals = {}) {
   const src = String(text);
   const tpl = /<template\b[\s\S]*<\/template>/.exec(src)?.[0] ?? '';
   const script = src.replace(tpl, '');
-  const out = { numeric: [], icons: [], fallback: [] };
+  const out = { numeric: [], icons: [], fallback: [], items: {} };
   if (!tpl) return out;
   const imports = new Map();
   for (const m of script.matchAll(/\bimport\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g)) imports.set(m[1], m[2]);
@@ -367,6 +415,7 @@ export function childFacing(ROOT, file, text, apiOf, readText = (f) => readFileS
       if (/\bnumber\b/.test(props[name].type ?? '') && !TEXT_PROP.test(name) && !TEXT_PROP.test(e[2] ?? e[1]) && !out.numeric.includes(path)) out.numeric.push(path);
       if (/icon$/i.test(name) && /\bstring\b/.test(props[name].type ?? '') && !/icon$/i.test(e[2] ?? e[1]) && !out.icons.includes(path)) out.icons.push(path);
       if (!e[2] && props[name].default == null && fallbackProps(childText, [name]).length && !out.fallback.includes(e[1])) out.fallback.push(e[1]);
+      if (!e[2] && /^object$/i.test(props[name].type ?? '')) (out.items[e[1]] ??= []).push({ text: childText, prop: name });
     }
   }
   return out;
@@ -457,7 +506,7 @@ export function keyedNames(ROOT) {
 // whose file is there. A name that is no file of that folder loads nothing, and the component fails before it draws.
 // propNames: the props its API declares. → [{ prop, field, list, names }], the ones the project's code writes most for
 // it first (keyedNames).
-export function asyncChoices(ROOT, file, text, keyed = {}, propNames = []) {
+export function asyncChoices(ROOT, file, text, keyed = {}, propNames = [], { globs = true } = {}) {
   const src = String(text);
   const tpl = /<template\b[\s\S]*<\/template>/.exec(src)?.[0] ?? '';
   const script = src.replace(tpl, '');
@@ -468,14 +517,28 @@ export function asyncChoices(ROOT, file, text, keyed = {}, propNames = []) {
     if (p.length === 2) return { prop: p[0], field: p[1], list: false };
     return p.length === 1 && (own || declared(p[0])) ? { prop: p[0], field: null, list: false } : null;
   };
-  for (const m of script.matchAll(/\bimport\s*\(\s*`([^`$]*)\$\{\s*(?:([A-Za-z_$][\w$]*)\s*\(\s*)?([A-Za-z_$][\w$.]*)\s*\)?\s*\}([^`$]*)`\s*\)/g)) {
-    const [, prefix, table, expr, suffix] = m;
-    const at = prefix.startsWith('@/') ? join(ROOT, 'src', prefix.slice(2)) : prefix.startsWith('.') ? resolve(dirname(file), prefix) : null;
+  const where = (prefix) => (prefix.startsWith('@/') ? join(ROOT, 'src', prefix.slice(2)) : prefix.startsWith('.') ? resolve(dirname(file), prefix) : prefix.startsWith('/') ? join(ROOT, prefix) : null);
+  // Each file under a folder, by its path from that folder (icons/arrow.svg as icons/arrow.svg).
+  const under = (dir) => { const out = []; const walk = (d, rel) => { let es = []; try { es = readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of es) { if (e.name.startsWith('.')) continue; if (e.isDirectory()) walk(join(d, e.name), rel + e.name + '/'); else out.push(rel + e.name); } }; walk(dir, ''); return out; };
+  const sources = [];
+  for (const m of script.matchAll(/\bimport\s*\(\s*`([^`$]*)\$\{\s*(?:([A-Za-z_$][\w$]*)\s*\(\s*)?([A-Za-z_$][\w$.]*)\s*\)?\s*\}([^`$]*)`\s*\)/g)) sources.push({ m, prefix: m[1], table: m[2], expr: m[3], suffix: m[4], deep: false });
+  // A folder its build lists to load from (const icons = import.meta.glob('../assets/icons/**/*.svg')) and a name it
+  // looks up there (icons[`../assets/icons/${props.icon}.svg`]): a name of a file that glob lists, in the folders
+  // under it too when it reaches into them (**), so an icon of its own folder draws, never another folder's.
+  if (globs) for (const g of script.matchAll(/\bimport\.meta\.glob\s*\(\s*['"]([^'"]+)['"]/g)) {
+    const base = g[1].slice(0, g[1].search(/[*{[]/) < 0 ? g[1].length : g[1].search(/[*{[]/)), ext = /\*(\.[\w.]+)$/.exec(g[1])?.[1] ?? '';
+    if (!base.endsWith('/')) continue;
+    for (const m of script.matchAll(/`([^`$]*)\$\{\s*([A-Za-z_$][\w$.]*)\s*\}([^`$]*)`/g)) {
+      if (m[1].startsWith(base) && (!ext || m[3].endsWith(ext))) sources.push({ m, prefix: m[1], table: null, expr: m[2], suffix: m[3], deep: g[1].slice(base.length).includes('**') });
+    }
+  }
+  for (const { m, prefix, table, expr, suffix, deep } of sources) {
+    const at = where(prefix);
     if (!at) continue;
     const dir = prefix.endsWith('/') ? at : dirname(at), start = prefix.endsWith('/') ? '' : basename(at);
     // Never the component's own file (a group that loads its items from its own folder): a build lists a folder's files
     // to load by name without the one that asks (import.meta.glob), so its own name loads nothing.
-    let names = []; try { names = readdirSync(dir).filter((f) => f.startsWith(start) && f.endsWith(suffix) && f.length > start.length + suffix.length && resolve(dir, f) !== resolve(file)).map((f) => f.slice(start.length, f.length - suffix.length)).sort(); } catch { continue; }
+    let names = []; try { names = (deep ? under(dir) : readdirSync(dir)).filter((f) => f.startsWith(start) && f.endsWith(suffix) && f.length > start.length + suffix.length && resolve(dir, f) !== resolve(file)).map((f) => f.slice(start.length, f.length - suffix.length)).sort(); } catch { continue; }
     if (!names.length) continue;
     // A table between the name and the file (fileFor(kind)): the table's names whose file is in the folder.
     if (table) {
@@ -563,6 +626,38 @@ export function iconPaths(ROOT) {
   const out = {};
   for (const rel of svgFiles(join(ROOT, folder))) { const name = rel.replace(/\.svg$/i, ''); const base = name.split('/').pop(); if (!(base in out)) out[base] = name; }
   return out;
+}
+
+// The route a component that reads the current one (useRoute(), $route) is drawn at: a path whose part it reads is one
+// it expects. A part it cuts from the path (const base = path.split('/')[1]) and looks up in a table of its own
+// (menus[base], with const menus = { guides: …, parts: … }) is one of the table's names: the one its code also writes
+// as a word of its own (ref('parts')), else the first; one it compares with a word (base === 'parts') that word; a path
+// it compares the whole path, or its start, with ('/parts', startsWith('/parts')) that path. None of these: drawn at
+// '/', and why is kept, so a case that fails says the route it was given may not be one it expects.
+// → null (it reads no route) | { path: '/parts' } | { path: '/', why }
+export function routeFor(text) {
+  const src = String(text);
+  if (!/\buseRoute\s*\(|\$route\b|\bcurrentRoute\b/.test(src)) return null;
+  const at = (n, key) => '/' + [...Array(Math.max(0, n - 1)).fill('page'), key].join('/');
+  const own = (names) => names.find((k) => new RegExp(`(?:\\(|=|:)\\s*['"]${k}['"]`).test(src)) ?? names[0];
+  // A part cut from a path and kept in a name (const base = path.split('/')[1]), or looked up as it is cut.
+  for (const m of src.matchAll(new RegExp(`\\b(?:const|let|var)\\s+(${ID})\\s*=\\s*[^;\\n]*?\\.split\\(\\s*['"]\\/['"]\\s*\\)\\s*\\[\\s*(\\d+)\\s*\\]`, 'g'))) {
+    const [, part, n] = m;
+    if (Number(n) < 1) continue;
+    for (const t of src.matchAll(new RegExp(`\\b(${ID})\\s*\\[\\s*${part}\\s*\\]`, 'g'))) {
+      const names = tableNames(src, t[1]);
+      if (names.length) return { path: at(Number(n), own(names)) };
+    }
+    const word = new RegExp(`\\b${part}\\s*===?\\s*['"]([\\w-]+)['"]|['"]([\\w-]+)['"]\\s*===?\\s*${part}\\b`).exec(src);
+    if (word) return { path: at(Number(n), word[1] ?? word[2]) };
+  }
+  for (const t of src.matchAll(new RegExp(`\\b(${ID})\\s*\\[[^\\]\\n]*?\\.split\\(\\s*['"]\\/['"]\\s*\\)\\s*\\[\\s*(\\d+)\\s*\\]\\s*\\]`, 'g'))) {
+    const names = tableNames(src, t[1]);
+    if (names.length && Number(t[2]) >= 1) return { path: at(Number(t[2]), own(names)) };
+  }
+  const whole = /\.path\s*(?:===?\s*|\.startsWith\(\s*)['"](\/[\w\/-]*)['"]/.exec(src) ?? /['"](\/[\w\/-]*)['"]\s*===?\s*[\w$.]*\.path\b/.exec(src);
+  if (whole) return { path: whole[1] };
+  return { path: '/', why: 'it reads the current route, and no path it expects could be read from its code, so it was drawn at "/"' };
 }
 
 // The ids the project's components teleport to (<teleport to="#modals-overlay">), its App making them on its page.
@@ -662,7 +757,7 @@ export function appSetup(ROOT) {
 export function harnessModule(groups, styles = [], plugins = {}) {
   return `${styles.map((s) => `import ${JSON.stringify(s)};`).join('\n')}
 import { createApp, h, reactive } from 'vue';
-${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill, connect, frame, fallback, numeric, icons, refs }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {}, connect: connect ?? [], frame: frame ?? null, fallback: fallback ?? [], numeric: numeric ?? [], icons: icons ?? [], refs: refs ?? [] }))).replace(/</g, '\\u003c')};
+${plugins.pinia ? "import { createPinia } from 'pinia';\n" : ''}${plugins.router ? "import { createRouter, createMemoryHistory } from 'vue-router';\n" : ''}const GROUPS = ${JSON.stringify(groups.map(({ name, role, cases, options, fill, connect, frame, fallback, numeric, icons, refs, route, alone, file }) => ({ name, role, cases, options: options ?? {}, fill: fill ?? {}, connect: connect ?? [], frame: frame ?? null, fallback: fallback ?? [], numeric: numeric ?? [], icons: icons ?? [], refs: refs ?? [], route: route ?? null, alone: !!alone, ...(alone ? { file } : {}) }))).replace(/</g, '\\u003c')};
 const LOAD = {
 ${groups.map((g) => `  ${JSON.stringify(g.name)}: () => import(${JSON.stringify(g.file)}),`).join('\n')}
 };
@@ -797,6 +892,38 @@ const explain = (g, e) => {
   if (fn) return 'its template calls ' + fn[1] + '(), which nothing gives it: neither its own script nor anything the app\\'s entry installs (' + m + ')';
   return m;
 };
+// A raw error that names no input (Cannot read properties of undefined (reading 'split')), for a component drawn alone:
+// the value that was undefined, read from where the error was thrown in the code the build serves (its stack's first
+// frame of the project's own), said as the input that was missing: a prop of its own not given, or given without that
+// field, or a value of a part it draws. Unnamed when the stack or the code does not say.
+const RAW = /^Cannot read properties of (?:undefined|null) \\(reading '([^']+)'\\)/;
+const named = async (g, e, given) => {
+  const m = String(e && e.message || e).split('\\n')[0], r = RAW.exec(m);
+  if (!r) return null;
+  const at = String(e && e.stack || '').split('\\n').map((l) => /(https?:\\/\\/[^\\s()]+?):(\\d+):(\\d+)\\)?\\s*$/.exec(l)).find((x) => x && !/\\/node_modules\\/|\\/@vite\\/|\\/@id\\/|\\/vue-harness\\//.test(x[1]));
+  if (!at) return null;
+  let code = ''; try { code = await (await fetch(at[1])).text(); } catch (_) { return null; }
+  const line = code.split('\\n')[Number(at[2]) - 1] || '', col = Number(at[3]) - 1;
+  const key = r[1].replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&');
+  let best = null;
+  for (const x of line.matchAll(new RegExp('((?:[A-Za-z_$][\\\\w$]*\\\\??\\\\.)*[A-Za-z_$][\\\\w$]*)\\\\??\\\\.' + key + '(?![\\\\w$])', 'g'))) {
+    if (!best || Math.abs(x.index + x[0].length - col) < Math.abs(best.index + best[0].length - col)) best = x;
+  }
+  if (!best) return null;
+  const parts = best[1].replace(/\\?/g, '').split('.').filter((p, i, a) => !(i < a.length - 1 && /^(_ctx|\\$props|__props|props|\\$setup|_vm|this)$/.test(p)));
+  if (!parts.length) return null;
+  const file = decodeURIComponent(at[1].split('?')[0].split('/').pop());
+  const own = at[1].split('?')[0].endsWith(g.file.split('/').pop());
+  const decl = Array.isArray(g.C.props) ? g.C.props : Object.keys(g.C.props || {});
+  const read = parts.join('.') + '.' + r[1];
+  if (own && decl.includes(parts[0])) {
+    if (!given.includes(parts[0]) || parts.length === 1) return 'the input ' + parts[0] + ' was missing: it was not given, and ' + file + ' reads ' + read + ' as it draws (' + m + ')';
+    return 'the input ' + parts[0] + ' was given without ' + parts.slice(1).join('.') + ': ' + file + ' reads ' + read + ' as it draws (' + m + ')';
+  }
+  if (own) return parts.join('.') + ' was undefined where ' + file + ' reads ' + read + ': a value of its own, made from something other than its props (a route, a store, what its app gives)' + (g.route && g.route.why ? '; ' + g.route.why : '') + ' (' + m + ')';
+  return 'the input ' + parts.join('.') + ' was missing in ' + file + ', a part it draws with what it hands it, which reads ' + read + ' (' + m + ')';
+};
+const errors = new Map();
 (async () => {
 const setup = [];
 for (const x of SETUP) {
@@ -830,17 +957,18 @@ for (const g of GROUPS) {
   try { C = (await LOAD[g.name]()).default; } catch (e) { failed.push({ name: g.name, component: g.name, why: String(e && e.message || e).split('\\n')[0] }); continue; }
   if (!C) { failed.push({ name: g.name, component: g.name, why: 'no component exported' }); continue; }
   drawn.push({ g, sec, C });
+  g.C = C;
   for (const c of g.cases) {
     const box = document.createElement('div'); box.className = 'dse-case'; box.setAttribute('data-dse-case', c.label); sec.append(box);
     if (g.frame) { box.style.width = g.frame[0] + 'px'; box.style.height = g.frame[1] + 'px'; }
     const state = reactive(fit(C, c.props, g.role, g.options, g.fill, g.connect, g.fallback, g.numeric, g.icons));
     if (!given[g.name]) given[g.name] = Object.keys(state);
     const app = createApp({ render: () => h(C, { ...state, ...listeners(C, state) }) });
-    app.config.errorHandler = (e) => failed.push({ name: g.name + ' (' + c.label + ')', component: g.name, case: c.label, of: g.cases.length, why: explain(g, e) });
+    app.config.errorHandler = (e) => { const f = { name: g.name + ' (' + c.label + ')', component: g.name, case: c.label, of: g.cases.length, why: explain(g, e) }; failed.push(f); if (g.alone) errors.set(f, [e, Object.keys(state)]); };
     app.config.warnHandler = () => {};
     inherit(app);
     install(app);
-${plugins.pinia ? "    if (!app.config.globalProperties.$pinia) app.use(createPinia());\n" : ''}${plugins.router ? "    if (!app.config.globalProperties.$router) app.use(createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] }));\n" : ''}    try { app.mount(box); } catch (e) { failed.push({ name: g.name + ' (' + c.label + ')', component: g.name, case: c.label, of: g.cases.length, why: explain(g, e) }); }
+${plugins.pinia ? "    if (!app.config.globalProperties.$pinia) app.use(createPinia());\n" : ''}${plugins.router ? "    if (!app.config.globalProperties.$router) {\n      const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] });\n      app.use(router);\n      // A component drawn alone that reads the route: at the path its code expects (routeFor).\n      if (g.alone && g.route && g.route.path && g.route.path !== '/') { try { await router.push(g.route.path); await router.isReady(); } catch (_) { /* drawn at '/' */ } }\n    }\n" : ''}    try { app.mount(box); } catch (e) { const f = { name: g.name + ' (' + c.label + ')', component: g.name, case: c.label, of: g.cases.length, why: explain(g, e) }; failed.push(f); if (g.alone) errors.set(f, [e, Object.keys(state)]); }
     gather(box);
   }
 }
@@ -861,6 +989,15 @@ for (const { g, sec, C } of drawn) {
   const decl = Array.isArray(C.props) ? C.props : Object.keys(C.props || {});
   const none = decl.filter((d) => !(given[g.name] || []).includes(d));
   failed.push({ name: g.name, component: g.name, why: 'it drew nothing in any of its ' + g.cases.length + ' case' + (g.cases.length === 1 ? '' : 's') + ': its template shows nothing for the props it was given' + (none.length ? ' (none given for ' + none.join(', ') + ')' : '') });
+}
+// An error of a component drawn alone said in no terms of its own: the input that was missing (named), else the route
+// it reads that may not be one it expects (routeFor's why).
+for (const [f, [e, given]] of errors) {
+  const raw = String(e && e.message || e).split('\\n')[0];
+  if (f.why !== raw) continue;   // already said in its own terms
+  const g = GROUPS.find((x) => x.name === f.component);
+  let why = null; try { why = g && await named(g, e, given); } catch (_) { /* said as it was */ }
+  if (why) f.why = why; else if (g && g.route && g.route.why) f.why = g.route.why + ' (' + raw + ')';
 }
 window.__dseHarnessFailed = failed;
 window.__dseHarnessReady = true;
@@ -901,10 +1038,13 @@ ${script}</body></html>`;
 const why1 = (e) => String(e?.message ?? e).split('\n')[0];
 
 // The harness for a project: its Vue components (a .vue file each) in their variants, served by its own build.
-// names: the components to render; locate(name) → its file; read(file) → its text.
+// names: the components to render; locate(name) → its file; read(file) → its text. alone: each is a component drawn on
+// its own, given what its code reads besides its props: the items of a list inside an object (objectSamples), a name
+// from the folder it globs (asyncChoices), the route it expects (routeFor), and an error it throws named by the input
+// that was missing. A page drawn as a whole (page-render.mjs) leaves it off and is drawn as it always was.
 // → { url, close (a promise once it has stopped), groups, missing: [why], build: 'Vite' | 'Nuxt' | 'Vue CLI' |
 // 'webpack' }, or { url: null, why } when nothing can be rendered.
-export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16 } = {}) {
+export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16, alone = false } = {}) {
   const groups = [], missing = [], samples = propSamples(ROOT), icons = iconPaths(ROOT), pageData = pageSamples(ROOT);
   let keyed = null;   // keyedNames, read once, with the first component
   let kinds = null;   // propKinds, read once, with the first component
@@ -943,19 +1083,19 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const example = bestExample(examples, name, propsSnap[name]);
     const figmaCases = fromFigma ? harnessCases(propsSnap[name], max, example) : null;
     const connect = codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [];
-    const choices = asyncChoices(ROOT, resolve(ROOT, file), text, keyed ??= keyedNames(ROOT), Object.keys(api.props ?? {}));
+    const choices = asyncChoices(ROOT, resolve(ROOT, file), text, keyed ??= keyedNames(ROOT), Object.keys(api.props ?? {}), { globs: alone });
     const cases = withCaseChoices((figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max, kindsOf())).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c)), choices);
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
     const objects = Object.entries(api.props ?? {}).filter(([, d]) => /^object$/i.test(d.type ?? '') && d.default == null).map(([k]) => k);
     // What it passes on to the children it draws, as they take it (childFacing).
     const declared = Object.keys(api.props ?? {});
     const onward = childFacing(ROOT, resolve(ROOT, file), text, childApi, read, globals);
-    const fill = withChoices({ ...objectSamples(text, objects, samples, kindsOf(), { ...onward, keyed }), ...listSamples(text, declared, samples, example, icons, kindsOf()), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
+    const fill = withChoices({ ...objectSamples(text, objects, samples, kindsOf(), { ...onward, keyed, flat: !alone }), ...listSamples(text, declared, samples, example, icons, kindsOf()), ...(pageData[resolve(ROOT, file)] ?? {}) }, choices);
     const fallback = [...new Set([...fallbackProps(text, declared), ...onward.fallback.filter((p) => declared.includes(p) && api.props[p]?.default == null)])];
     // The elements its template names (ref="field") and the methods its code calls on them (field.value.focus()).
     const refs = [...new Set([...String(/<template\b[\s\S]*<\/template>/.exec(text)?.[0] ?? '').matchAll(/\sref\s*=\s*["']([A-Za-z_$][\w$]*)["']/g)].map((m) => m[1]))]
       .map((r) => ({ name: r, methods: [...new Set([...text.matchAll(new RegExp(`\\b${r}\\.value\\??\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g'))].map((m) => m[1]))] }));
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, fallback, numeric: onward.numeric.filter((p) => declared.includes(p)), icons: onward.icons.filter((p) => declared.includes(p)), refs, from: fromFigma ? 'figma' : 'code' });
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, fallback, numeric: onward.numeric.filter((p) => declared.includes(p)), icons: onward.icons.filter((p) => declared.includes(p)), refs, ...(alone ? { route: routeFor(text), alone: true } : {}), from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);
@@ -1134,7 +1274,7 @@ export async function renderedVue(ROOT, cfg, names, { propsSnap = {}, locate, re
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue } = await import('./cdp.mjs');
   const chrome = chromePath ?? findChrome({ playwright: true });
   if (!chrome) return none('Chrome not found (set CHROME_PATH)');
-  const h = await startVueHarness(ROOT, cfg, names, { propsSnap, locate, read, max });
+  const h = await startVueHarness(ROOT, cfg, names, { propsSnap, locate, read, max, alone: true });
   if (!h.url) return none(h.why);
   const theme = [cfg.paths?.themeCSS].flat().filter(Boolean).map((f) => String(f).replace(/^\.?\//, ''));
   let browser = null, cdp = null;
