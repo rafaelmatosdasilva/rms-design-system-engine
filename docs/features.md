@@ -7,26 +7,31 @@ Everything the engine can do, one line each. How each part works is in the [tech
 | Stage | What it means |
 |---|---|
 | **Stable** | Use it on real work. |
-| **Beta** | It works, with the gaps named under its heading. |
-| **Experimental** | Try it, and expect rough edges. |
+| **Beta** | Works on real projects. Its known gaps are listed under its heading. |
+| **Experimental** | New, or only tried on simple cases. Check what it gives you. |
 
-A line with its own stage in brackets is behind the rest of its group.
+Each goal says why we need it, then what it does not do well today. A line with its own stage in brackets is behind the rest of its group.
 
 **On this page**
 
-- [Checks your code against Figma](#checks-your-code-against-figma--stable)
-- [Catches problems before they ship](#catches-problems-before-they-ship--stable)
-- [Accessibility](#accessibility--stable)
-- [A living style guide](#a-living-style-guide--stable)
-- [Prototypes with your real components](#prototypes-with-your-real-components--experimental)
-- [Starts from Figma only](#starts-from-figma-only--experimental)
-- [Keeps products aligned](#keeps-products-aligned--beta)
-- [Brings Figma in line with the code](#brings-figma-in-line-with-the-code--beta)
-- [Works with your AI tools](#works-with-your-ai-tools--stable)
-- [You stay in control](#you-stay-in-control)
-- [The checks](#the-checks)
+| Goal | Why we need it | Stage |
+|---|---|---|
+| [Keep the code matching Figma](#keep-the-code-matching-figma--stable) | So what ships looks like what was designed. | Stable |
+| [Catch shortcuts before they ship](#catch-shortcuts-before-they-ship--stable) | Small hacks add up until the system falls apart. | Stable |
+| [Check the accessibility of every component](#check-the-accessibility-of-every-component--stable) | So everyone can use what you ship. | Stable |
+| [Keep one living style guide](#keep-one-living-style-guide--stable) | Designers, developers and agents see the same truth. | Stable |
+| [Create high-fidelity prototypes from real components and code](#create-high-fidelity-prototypes-from-real-components-and-code--experimental) | What you test is what you can build. | Experimental |
+| [Turn a Figma-only system into code](#turn-a-figma-only-system-into-code--experimental) | The code matches the design from the first line. | Experimental |
+| [Build new components in Figma by the system's rules](#build-new-components-in-figma-by-the-systems-rules--experimental) | The library grows without drifting. | Experimental |
+| [Write into Figma what the code already proves](#write-into-figma-what-the-code-already-proves--beta) | Figma and the code tell the same story. | Beta |
+| [Keep every product on the system](#keep-every-product-on-the-system--beta) | Each change reaches every product without breaking it. | Beta |
+| [Keep AI agents on the system](#keep-ai-agents-on-the-system--stable) | Agents guess; real names and checks stop that. | Stable |
+| [Stay in control](#stay-in-control) | Nothing changes without your yes. | — |
+| [The checks](#the-checks) | Every check the engine runs, one line each. | — |
 
-## Checks your code against Figma · Stable
+## Keep the code matching Figma · Stable
+
+**Why:** So what ships looks like what was designed.
 
 *Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all.*
 
@@ -40,7 +45,9 @@ A line with its own stage in brackets is behind the rest of its group.
 - Compares each product's screen with the screen designed for it. *(Beta)*
 - Puts every difference in one list, with who fixes it: you in Figma, or Claude in the code.
 
-## Catches problems before they ship · Stable
+## Catch shortcuts before they ship · Stable
+
+**Why:** Small hacks add up until the system falls apart.
 
 *Today: everything here is advice. None of it fails a run on its own.*
 
@@ -53,7 +60,9 @@ A line with its own stage in brackets is behind the rest of its group.
 - Checks Tailwind classes against Figma.
 - Reviews the Figma file itself: values with no token, detached instances, missing auto layout and descriptions.
 
-## Accessibility · Stable
+## Check the accessibility of every component · Stable
+
+**Why:** So everyone can use what you ship.
 
 *Today: automated checks against WCAG 2.2 A and AA. They find many failures, but they cannot prove a product meets WCAG or judge whether its words make sense. What a screen reader says is read from the browser, not from VoiceOver or NVDA themselves.*
 
@@ -67,7 +76,9 @@ A line with its own stage in brackets is behind the rest of its group.
 - Checks your designed screens in Figma for contrast and target size. *(Beta)*
 - Tries again only what changed, so a second run takes seconds.
 
-## A living style guide · Stable
+## Keep one living style guide · Stable
+
+**Why:** Designers, developers and agents see the same truth.
 
 *Today: it shows only what Figma and the code agree on. Anything still different is a task, not drawn.*
 
@@ -81,9 +92,11 @@ A line with its own stage in brackets is behind the rest of its group.
 - Rates how ready your guidelines are for AI agents.
 - Shows your intent layer, why each piece exists and how to use it, beside Figma and the code. *(Beta: read from DSDS pages on GitLab)*
 
-## Prototypes with your real components · Experimental
+## Create high-fidelity prototypes from real components and code · Experimental
 
-*Today: good for simple screens. It does not yet know your products' own patterns, so richer screens and flows need a lot of guidance from you. Its quality checks are measured (layout, your rules, accessibility), so whether a screen is the right design for your users is still for a person to judge. It does not create new components in Figma.*
+**Why:** What you test is what you can build.
+
+*Today: good for simple screens. It does not yet know your products' own patterns, so richer screens and flows need a lot of guidance from you. Its quality checks are measured (layout, your rules, accessibility), so whether a screen is the right design for your users is still for a person to judge.*
 
 What it makes:
 
@@ -105,10 +118,12 @@ How it checks the agent's work, in a loop, before you see it:
 What it gives back:
 
 - Marks what the system is missing, and keeps a list of those gaps for your design team.
-- Sends those gaps to Figma as to-do cards, after you say yes.
+- Sends those gaps to Figma as to-do cards, after you say yes, ready to be [built there the system's way](#build-new-components-in-figma-by-the-systems-rules--experimental).
 - Follows what your team already decided, and never uses a retired component.
 
-## Starts from Figma only · Experimental
+## Turn a Figma-only system into code · Experimental
+
+**Why:** The code matches the design from the first line.
 
 *Today: measured on a small system only, with tokens, four components and one screen.*
 
@@ -116,7 +131,35 @@ What it gives back:
 - Gives Claude Figma's exact names and values before it writes the code.
 - Checks every piece once it is built.
 
-## Keeps products aligned · Beta
+## Build new components in Figma by the system's rules · Experimental
+
+**Why:** The library grows without drifting.
+
+*Today: new. One component at a time, through the Figma tool of your Claude session.*
+
+- Builds a new component in Figma from your description, starting from the component it is most like.
+- Uses only the system's own variables, components, text styles and names. It never makes up a value.
+- Asks you whatever the system cannot answer, instead of guessing.
+- Follows how your system builds components: names, properties, layers and auto layout.
+- Changes an existing component, with a report of where it is used and what the change breaks.
+- Fixes a component's construction to follow your system's rules, such as renaming its layers.
+- A new component waits for someone to sign it off, and nothing changes in Figma until you say yes.
+- Checks the component once it is built.
+
+## Write into Figma what the code already proves · Beta
+
+**Why:** Figma and the code tell the same story.
+
+*Today: it writes only what the code already proves. Descriptions and layouts stay tasks for your design team.*
+
+- Writes each component's accessibility spec into Figma.
+- Pins accessibility problems on the layers of your designed screens.
+- Links each component to its code file in Dev Mode.
+- Shows you every change first. Nothing changes until you say yes.
+
+## Keep every product on the system · Beta
+
+**Why:** Each change reaches every product without breaking it.
 
 *Today: tracking which version of the system each product uses is new.*
 
@@ -127,16 +170,9 @@ What it gives back:
 - Opens one issue per difference in your tracker, and closes it once it is fixed.
 - Reads products kept in their own repositories.
 
-## Brings Figma in line with the code · Beta
+## Keep AI agents on the system · Stable
 
-*Today: it writes only what the code already proves. Descriptions, missing components and layouts stay tasks for your design team.*
-
-- Writes each component's accessibility spec into Figma.
-- Pins accessibility problems on the layers of your designed screens.
-- Links each component to its code file in Dev Mode.
-- Shows you every change first. Nothing changes until you say yes.
-
-## Works with your AI tools · Stable
+**Why:** Agents guess; real names and checks stop that.
 
 *Today: the live checks run in Claude Code. Other tools get the same rules, and a check you run by hand.*
 
@@ -148,9 +184,11 @@ What it gives back:
 - Adds the same rules to the instruction files of Cursor, Copilot and other agents. *(Beta)*
 - Answers agents that have no terminal, such as a prototyping tool, through MCP. *(Beta)*
 
-## You stay in control
+## Stay in control
 
-These are principles, not features, so they have no stage.
+**Why:** Nothing changes without your yes.
+
+*These are principles, not features, so they have no stage.*
 
 - It never changes code people wrote. It flags what it finds and hands back a patch.
 - It only reads Figma, unless you say yes to a change.
@@ -190,4 +228,3 @@ Each check is called a gate. To run just one, see [Parity](commands.md#parity) o
 | 23 | Shadows match | When your design defines them |
 | 24 | Renders correctly in a browser | Checked on the real page, not only in the code, every text style and mode included |
 | 25 | What this audit actually checked | Which components and states were covered, and which were skipped |
-
