@@ -77,9 +77,9 @@ test('a style guide part is signed by its components as the page data gives them
 });
 
 test('the project is signed by its files, less the packages, what the engine writes and the configuration', () => {
-  const dir = makeFixture({ 'src/Card.vue': '<template><div/></template>', 'package.json': '{}', 'ds-config.json': { a: 1 }, 'node_modules/x/index.js': '1', [`${OUT_DIR}/code.snapshot.json`]: '{}', 'a11y-results.snapshot.json': '{}', 'design-system-engine-check-result.json': '{}', 'src/figma-vars.snapshot.json': '{"v":1}' });
+  const dir = makeFixture({ 'src/Card.vue': '<template><div/></template>', 'package.json': '{}', 'ds-config.json': { a: 1 }, 'node_modules/x/index.js': '1', [`${OUT_DIR}/code.snapshot.json`]: '{}', 'a11y-results.snapshot.json': '{}', 'health-history.snapshot.json': '{}', 'design-system-engine-check-result.json': '{}', 'src/figma-vars.snapshot.json': '{"v":1}' });
   const sig = projectSignature(dir);
-  for (const f of ['node_modules/x/index.js', `${OUT_DIR}/code.snapshot.json`, 'a11y-results.snapshot.json', 'design-system-engine-check-result.json', 'ds-config.json']) {
+  for (const f of ['node_modules/x/index.js', `${OUT_DIR}/code.snapshot.json`, 'a11y-results.snapshot.json', 'health-history.snapshot.json', 'design-system-engine-check-result.json', 'ds-config.json']) {
     writeFileSync(join(dir, f), 'changed');
     assert.equal(projectSignature(dir), sig, f);
   }
