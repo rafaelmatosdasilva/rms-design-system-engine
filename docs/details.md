@@ -1028,6 +1028,11 @@ Nobody copies a value by hand. The engine writes a read-only script for one chun
 - `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshots: the structure, the props, the raw values, and the state tokens and bindings.
 - A component's facts the capture does not read are kept. A component no longer in Figma is taken out, and the import names it.
 - On a refresh only the checksums are asked, and only the components that changed are read again.
+- Each component's motion and effects (`--figma-motion`, `--figma-effects`) are read the same way:
+  - First the checksums, one per component (and one per page for the overlays its prototype opens), a page of them at a time.
+  - Then only the components whose checksum the last capture did not have, as many as fit in each answer. The others are reused from what the last capture kept.
+  - Each record is checked against its checksum. One cut or edited while it was saved is refused. When Figma changed after the checksums were read, the checksums are read again and nothing read is lost.
+  - Each step writes the next script and says what to run. The snapshot is written once every component is held.
 - No script switches Figma's page: switching it is saved with the file, so a capture that only reads would still change it.
 - With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshots.
 

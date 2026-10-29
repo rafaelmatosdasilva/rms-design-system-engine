@@ -10,18 +10,20 @@
 import { blankComments, walkCss } from './css-source.mjs';
 import { lengthPx, parseColor } from './css-values.mjs';
 import { customProps } from './motion-components.mjs';
+import { HASH_SRC } from './figma-capture.mjs';
 
 // Run with use_figma or figma-cli on the file (PAGE_IDS: the pages to read, null for every page). It only reads: each
 // component's own frame (a set's default variant, its first) and its layers to two levels down: their effects (with
 // the variable or the effect style behind each), a gradient or an image fill, Clip content, blend mode and opacity.
-// An answer holds what fits in BUDGET characters (figma-cli and the Figma MCP cut an answer at about 20,000): from
-// START (a page and a component on it), it says where the next one starts (next, null when all are read) and how many
-// components it holds (count), so a cut or edited answer is caught.
+// An answer holds what fits in BUDGET characters (figma-cli and the Figma MCP cut an answer at about 20,000), read in
+// two calls (capture-chunks.mjs): CALL 'sums' gives each component's checksum over its record, from START (a page and a
+// component on it), and says where the next page of them starts (next, null when all are read); CALL 'read' gives the
+// records of the components IDS names, each with its checksum, as many as fit.
 export const EFFECTS_CAPTURE_JS = `
 const PAGE_IDS = __PAGE_IDS__;
-const START = __START__, BUDGET = __BUDGET__;
+const CALL = __CALL__, START = __START__, IDS = __IDS__, BUDGET = __BUDGET__;
+__HASH__
 const pages = PAGE_IDS ? (await Promise.all(PAGE_IDS.map((id) => figma.getNodeByIdAsync(id)))).filter(Boolean) : figma.root.children;
-const out = {};
 const varName = async (b) => { if (!b || !b.id) return null; const v = await figma.variables.getVariableByIdAsync(b.id); return v ? v.name : null; };
 const rgba = (c) => (c ? { r: Math.round(c.r * 255), g: Math.round(c.g * 255), b: Math.round(c.b * 255), a: Math.round((c.a == null ? 1 : c.a) * 1000) / 1000 } : null);
 const read = async (n) => {
@@ -57,27 +59,37 @@ const walk = async (n, depth) => {
   }
   return rec;
 };
+const want = IDS ? new Set(IDS) : null, entries = [];
 let size = 2, next = null;
-pages: for (let p = START.page; p < pages.length; p++) {
+pages: for (let p = CALL === 'sums' ? START.page : 0; p < pages.length; p++) {
   const page = pages[p];
   await page.loadAsync();   // loaded where it is: switching the page would change the file
   const items = [...page.findAllWithCriteria({ types: ['COMPONENT_SET'] }).filter((s) => s.children[0]), ...page.findAllWithCriteria({ types: ['COMPONENT'] }).filter((c) => !c.parent || c.parent.type !== 'COMPONENT_SET')];
-  for (let i = p === START.page ? START.item : 0; i < items.length; i++) {
+  for (let i = CALL === 'sums' && p === START.page ? START.item : 0; i < items.length; i++) {
     const n = items[i], set = n.type === 'COMPONENT_SET';
+    if (want && !want.has(n.id)) continue;
     const r = await walk(set ? n.children[0] : n, 0);
     if (!set && !kept(r)) continue;
-    const rec = kept(r) ? r : {}, add = JSON.stringify(n.name).length + JSON.stringify(rec).length + 2;
-    if (Object.keys(out).length && size + add > BUDGET) { next = { page: p, item: i }; break pages; }
-    out[n.name] = rec; size += add;
+    // What JSON keeps, so the checksum is over what the answer carries.
+    const rec = JSON.parse(JSON.stringify({ name: n.name, rec: kept(r) ? r : {} })), sum = cyrb53(JSON.stringify(rec));
+    const e = CALL === 'sums' ? [n.id, sum] : [n.id, sum, rec], add = JSON.stringify(e).length + 1;
+    if (entries.length && size + add > BUDGET) { next = { page: p, item: i }; break pages; }
+    entries.push(e); size += add;
+    if (want) { want.delete(n.id); if (!want.size) break pages; }
   }
 }
-return { _captured: new Date().toISOString(), _note: 'Read-only capture of each component\\'s effects, gradient and image fills, Clip content, blend mode and opacity (effects-parity.mjs).', components: out, count: Object.keys(out).length, start: START, next };
+const note = 'Read-only capture of each component\\'s effects, gradient and image fills, Clip content, blend mode and opacity (effects-parity.mjs).';
+if (CALL === 'sums') return { capture: 'effects', kind: 'sums', _note: note, start: START, next, sums: entries };
+return { capture: 'effects', kind: 'read', _note: note, items: entries, ...(next ? {} : { gone: [...want] }) };
 `;
 
 export const CAPTURE_BUDGET = 15000;
-export const effectsCaptureScript = (pageIds = null, { start = { page: 0, item: 0 }, budget = CAPTURE_BUDGET } = {}) => {
-  const ids = pageIds == null ? null : [pageIds].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
-  return EFFECTS_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(ids && ids.length ? ids : null)).replace('__START__', JSON.stringify(start)).replace('__BUDGET__', String(budget)).trim() + '\n';
+// The script for one call: { call: 'sums', start } (a page of the checksums) or { call: 'read', ids } (the records of
+// those components), as capture-chunks.mjs asks for them.
+export const effectsCaptureScript = (pageIds = null, { call = 'sums', start = { page: 0, item: 0 }, ids = null, budget = CAPTURE_BUDGET } = {}) => {
+  const pages = pageIds == null ? null : [pageIds].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
+  return EFFECTS_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(pages && pages.length ? pages : null)).replace('__CALL__', JSON.stringify(call)).replace('__START__', JSON.stringify(start))
+    .replace('__IDS__', JSON.stringify(call === 'read' ? ids ?? [] : null)).replace('__BUDGET__', String(budget)).replace('__HASH__', () => HASH_SRC).trim() + '\n';
 };
 
 // The effects snapshot from a capture's answer (what use_figma returned, saved as a file).
