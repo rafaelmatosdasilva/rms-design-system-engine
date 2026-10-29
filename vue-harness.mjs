@@ -9,7 +9,7 @@
 // Vue project has it. What it lacks is said, never worked around with a build of the engine's.
 // The variants are Figma's when it has the component, else the code's own props (component-harness.mjs variantsFromCode).
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
-import { join, relative, dirname, resolve, sep } from 'node:path';
+import { join, relative, dirname, resolve, sep, basename } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
@@ -242,6 +242,83 @@ export function listSamples(text, propNames = [], samples = {}, example = null, 
       : typeof samples[f] === 'string' ? (/icon|image|img|src|href|url|link|path|type|variant|size|color/i.test(f) ? samples[f] : `${samples[f]} ${i + 1}`)
         : `${f.charAt(0).toUpperCase() + f.slice(1)} ${i + 1}`;
     out[list] = [0, 1, 2].map((i) => (fields.length ? Object.fromEntries(fields.map((f) => [f, value(f, i)])) : `Item ${i + 1}`));
+  }
+  return out;
+}
+
+// How often the project's code writes each name for a key (kind: 'Solid', tileKind: 'Outline'), in its scripts and
+// data under src. → { key: { name: count } }
+export function keyedNames(ROOT) {
+  const count = {};
+  const walk = (d) => {
+    let names; try { names = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of names) {
+      if (e.name.startsWith('.') || /^(node_modules|figma|tests?)$/.test(e.name)) continue;
+      const p = join(d, e.name);
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!/\.(vue|m?js|ts)$/.test(e.name)) continue;
+      let src; try { src = readFileSync(p, 'utf8'); } catch { continue; }
+      for (const m of src.matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*['"]([A-Za-z][\w-]{0,40})['"]/g)) ((count[m[1]] ??= {})[m[2]] = (count[m[1]][m[2]] ?? 0) + 1);
+    }
+  };
+  walk(join(ROOT, 'src'));
+  return count;
+}
+
+// The parts a component loads by a name it is given (defineAsyncComponent(() => import(`../tiles/${kind}.vue`))), and
+// where that name comes from: a field of the items of a list it loops over (partFor(tile.kind) in a v-for over
+// tiles), or a field of an object prop (props.item.tileKind). A name that is no file of that folder
+// loads nothing, and the component fails before it draws. → [{ prop, field, list, names }], names the folder's files,
+// the ones the project's code writes most for that field first (keyedNames).
+export function asyncChoices(ROOT, file, text, keyed = {}) {
+  const src = String(text);
+  const tpl = /<template\b[\s\S]*<\/template>/.exec(src)?.[0] ?? '';
+  const script = src.replace(tpl, '');
+  const out = [];
+  const pathOf = (e) => { const p = e.replace(/^props\./, '').split('.'); return p.length === 2 ? { prop: p[0], field: p[1], list: false } : null; };
+  for (const m of script.matchAll(/\bimport\s*\(\s*`([^`$]*)\$\{\s*([A-Za-z_$][\w$.]*)\s*\}([^`$]*)`\s*\)/g)) {
+    const [, prefix, expr, suffix] = m;
+    const at = prefix.startsWith('@/') ? join(ROOT, 'src', prefix.slice(2)) : prefix.startsWith('.') ? resolve(dirname(file), prefix) : null;
+    if (!at) continue;
+    const dir = prefix.endsWith('/') ? at : dirname(at), start = prefix.endsWith('/') ? '' : basename(at);
+    let names = []; try { names = readdirSync(dir).filter((f) => f.startsWith(start) && f.endsWith(suffix) && f.length > start.length + suffix.length).map((f) => f.slice(start.length, f.length - suffix.length)).sort(); } catch { continue; }
+    if (!names.length) continue;
+    const targets = [];
+    if (expr.includes('.')) { const t = pathOf(expr); if (t) targets.push(t); }
+    else {
+      // A const set from a prop's field (const tileKind = props.item.tileKind).
+      const set = new RegExp(`\\b(?:const|let|var)\\s+${expr}\\s*=\\s*((?:props\\.)?[A-Za-z_$][\\w$]*\\.[A-Za-z_$][\\w$]*)\\s*(?:;|\\n)`).exec(script);
+      if (set) { const t = pathOf(set[1]); if (t) targets.push(t); }
+      // The parameter of the function around the import, called in the template with a field of a v-for's item.
+      const fns = [...script.slice(0, m.index).matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>|\bfunction\s+([A-Za-z_$][\w$]*)\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/g)];
+      const fn = fns.reverse().find((f) => (f[2] ?? f[4]) === expr);
+      const call = fn && (fn[1] ?? fn[3]);
+      for (const v of call ? tpl.matchAll(/v-for\s*=\s*["']\s*\(?\s*([A-Za-z_$][\w$]*)(?:\s*,\s*[A-Za-z_$][\w$]*)*\s*\)?\s+(?:in|of)\s+(?:props\.)?([A-Za-z_$][\w$]*)\s*["']/g) : []) {
+        const c = new RegExp(`\\b${call}\\s*\\(\\s*${v[1]}\\.([A-Za-z_$][\\w$]*)\\s*\\)`).exec(tpl);
+        if (c) targets.push({ prop: v[2], field: c[1], list: true });
+      }
+    }
+    for (const t of targets) {
+      const used = keyed[t.field] ?? {};
+      out.push({ ...t, names: [...names].sort((a, b) => (used[b] ?? 0) - (used[a] ?? 0)) });
+    }
+  }
+  return out;
+}
+
+// The data a component is given (fill), each name it loads a part by (asyncChoices) one that part's folder has: the
+// name already given when the folder has it (in any case), else the next most used, so a list's items differ.
+export function withChoices(fill, choices) {
+  const out = { ...fill };
+  const pick = (names, v, i) => names.find((n) => n.toLowerCase() === String(v ?? '').toLowerCase()) ?? names[i % names.length];
+  for (const { prop, field, list, names } of choices) {
+    if (list) {
+      const items = Array.isArray(out[prop]) && out[prop].length ? out[prop] : [{}, {}, {}];
+      out[prop] = items.map((it, i) => (it && typeof it === 'object' ? { ...it, [field]: pick(names, it[field], i) } : it));
+    } else {
+      const was = out[prop] && typeof out[prop] === 'object' && !Array.isArray(out[prop]) ? out[prop] : {};
+      out[prop] = { ...was, [field]: pick(names, was[field], 0) };
+    }
   }
   return out;
 }
@@ -493,6 +570,7 @@ const why1 = (e) => String(e?.message ?? e).split('\n')[0];
 // 'webpack' }, or { url: null, why } when nothing can be rendered.
 export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate, read = (f) => readFileSync(f, 'utf8'), max = cfg.a11y?.maxVariants ?? 16 } = {}) {
   const groups = [], missing = [], samples = propSamples(ROOT), icons = iconPaths(ROOT), pageData = pageSamples(ROOT);
+  let keyed = null;   // keyedNames, read once, with the first component
   // The examples the design team placed in Figma (--figma-examples), each component opened as one of them.
   let examples = null; try { examples = JSON.parse(readFileSync(join(ROOT, cfg.paths?.snapshotExamples ?? join(dirname(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), 'figma-examples.snapshot.json')), 'utf8')); } catch { /* not read yet */ }
   // The project's own Code Connect files, pairing each Figma property with the code's prop (code-connect-map.mjs).
@@ -525,7 +603,8 @@ export async function startVueHarness(ROOT, cfg, names, { propsSnap = {}, locate
     const connect = codeConnectFor(ccMaps, name, propsSnap[name]?.nodeId)?.props ?? [];
     const cases = (figmaCases ? [...figmaCases, ...decidedCases(propsSnap[name], figmaCases[0]?.props ?? {}, connect), ...codeCases(figmaCases[0]?.props ?? {}, api, 8)] : variantsFromCode(api, text, max)).map((c) => (named ? { ...c, props: { 'aria-label': label, ...c.props } } : c));
     const options = Object.fromEntries(Object.entries(api.props ?? {}).filter(([, d]) => d.options?.length).map(([k, d]) => [k, d.options]));
-    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill: { ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), ...(pageData[resolve(ROOT, file)] ?? {}) }, connect, from: fromFigma ? 'figma' : 'code' });
+    const fill = withChoices({ ...listSamples(text, Object.keys(api.props ?? {}), samples, example, icons), ...(pageData[resolve(ROOT, file)] ?? {}) }, asyncChoices(ROOT, resolve(ROOT, file), text, keyed ??= keyedNames(ROOT)));
+    groups.push({ name, file: resolve(ROOT, file), role, cases, options, fill, connect, from: fromFigma ? 'figma' : 'code' });
   }
   if (!groups.length) return { url: null, why: 'no Vue component file (.vue) for the design system\'s components' };
   const pb = await projectBuild(ROOT);
