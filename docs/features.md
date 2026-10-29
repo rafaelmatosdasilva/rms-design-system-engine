@@ -198,7 +198,8 @@ How it checks the agent's work, in a loop, before you see it:
 
 - Renames a token everywhere in one change, with a patch for each product.
 - Lists every place still using a retired component or token, with what to use instead.
-- Tells each product which system version it runs, and what a newer one changes for it.
+- Tells each product which system version it runs, and what a newer one changes for it, in its code and its docs.
+- Names a product late to move on the Tasks list, for its own team.
 - Opens one issue per difference in your tracker, and closes it once it is fixed.
 - Reviews the screens a product builds with the system as pages, and scores each out of 10.
 - Reads products kept in their own repositories.
