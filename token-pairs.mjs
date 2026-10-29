@@ -47,7 +47,11 @@ const parts = (name) => {
   const n = String(name).replace(/^--/, '');
   return (n.includes('/') ? n.split('/') : n.split(/[-_]/)).map((x) => x.trim()).filter((x) => x && !DROP.test(x));
 };
-// What a foreground is for: the `on x` it names, else its own last word (text/primary → primary).
+// The words that make a token a foreground: its role (text, icon), an `on x`, or its last part ending in one (badgeText).
+const ROLE = /^(text|fg|foreground|content|icons?|label|title|subtitle|heading|caption|description|placeholder|helper|hint)$/i;
+const roleAt = (p) => p.findIndex((x, i) => ROLE.test(x) || /^on([-_].+)?$/i.test(x) || (i === p.length - 1 && /[a-z](Text|Label|Icon|Foreground)$/.test(x)));   // badgeText last, never noteText/background
+// What a foreground is for: the `on x` it names, else its own last word (text/primary → primary); none when that word
+// is only its role (button/text/color says what it is, not what it goes on).
 const madeFor = (fg) => {
   const p = parts(fg);
   for (let i = 0; i < p.length; i++) {
@@ -55,10 +59,13 @@ const madeFor = (fg) => {
     if (!m) continue;
     return (m[1] || p.slice(i + 1).join('-')).toLowerCase() || null;
   }
-  return p.length > 1 ? p[p.length - 1].toLowerCase() : null;
+  return p.length > 1 && !ROLE.test(p[p.length - 1]) && roleAt(p) < p.length - 1 ? p[p.length - 1].toLowerCase() : null;
 };
+// Where a token belongs: the parts before its role (advanced/buttonLink for advanced/buttonLink/text/hover/color).
+const scopeOf = (n) => { const p = parts(n), i = roleAt(p); return (i > 0 ? p.slice(0, i) : p.slice(0, -1)).join('/').toLowerCase(); };
+const inScope = (bg, scope) => parts(bg).map((x) => x.toLowerCase()).join('/').startsWith(scope + '/');
 // A foreground or a surface, read the same way in either shape.
-const isForeground = (n) => parts(n).some((x) => /^(text|fg|foreground|content|icon|label)$/i.test(x) || /^on([-_].+)?$/i.test(x));
+const isForeground = (n) => roleAt(parts(n)) >= 0;
 const notASurface = (n) => parts(n).some((x) => /^(border|stroke|outline|divider|separator|shadow|focus|ring)$/i.test(x));
 const worstRatio = (modes, fg, bg) => {
   const opaque = (v) => { const c = parseColor(v); return c && (c[3] == null || c[3] >= 1) ? { r: c[0], g: c[1], b: c[2] } : null; };
@@ -76,9 +83,15 @@ export function pairsOf(colorByMode, { min = 4.5 } = {}) {
   const out = [];
   for (const fg of names.filter(isForeground)) {
     const want = madeFor(fg);
-    // The surfaces whose names carry the same word, the ones named as a surface first.
-    const named = want ? surfaces.filter((bg) => parts(bg).some((s) => s.toLowerCase() === want) || parts(bg).join('-').toLowerCase().endsWith(want))
-      .sort((a, b) => Number(parts(b).some((s) => SURFACE_WORD.test(s))) - Number(parts(a).some((s) => SURFACE_WORD.test(s)))) : [];
+    // A token of one component (two parts or more before its role) goes on that component's own surfaces: never on
+    // another's that shares a word with it (one's hover text on another's hover background).
+    const scope = scopeOf(fg), own = scope.includes('/') ? surfaces.filter((bg) => inScope(bg, scope)) : null;
+    const pool = own ?? surfaces;
+    const surfaceFirst = (a, b) => Number(parts(b).some((s) => SURFACE_WORD.test(s))) - Number(parts(a).some((s) => SURFACE_WORD.test(s)));
+    // The surfaces whose names carry the same word (a whole word), the ones named as a surface first; for a
+    // component's token with no such word, its surface at rest.
+    const named = want ? pool.filter((bg) => parts(bg).some((s) => s.toLowerCase() === want) || parts(bg).join('-').toLowerCase().endsWith('-' + want)).sort(surfaceFirst)
+      : own ? own.filter((bg) => parts(bg).some((s) => SURFACE_WORD.test(s)) && !parts(bg).some((s) => /^(hover|press(ed)?|active|focus|selected|current|disabled|error)$/i.test(s))).sort(surfaceFirst) : [];
     // Nothing in the names: a text colour readable on exactly one surface has its pair by elimination.
     const only = !named.length && readable[fg]?.length === 1 ? readable[fg] : [];
     const surface = named[0] ?? only[0] ?? null;
