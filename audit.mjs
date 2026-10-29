@@ -2221,16 +2221,19 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   let scfg = {};
   try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   const { grammarOf } = await import('./construction-grammar.mjs');
-  const { specOf, specLines, likeOf, nameOf, EXT } = await import('./component-spec.mjs');
-  const { opsScript, opWords } = await import('./figma-ops.mjs');
+  const { specOf, specLines, likeOf, nameOf, askedOf, primitiveTest, tierTest, EXT } = await import('./component-spec.mjs');
+  const { opsScript, opWords, modelOf } = await import('./figma-ops.mjs');
   const { mayWrite } = await import('./writes.mjs');
   const read = (p) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return null; } };
   const authored = read(scfg.contracts?.authored ?? 'contract.authored.json') ?? {};
   const props = read(scfg.paths?.compPropsSnapshot ?? 'src/figma-component-props.snapshot.json') ?? {};
   const structure = read(scfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {};
-  const values = read('component-values.snapshot.json') ?? {}, varNames = read(scfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?.variableScopes ?? {};
+  const vars = read(scfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {};
+  const values = read('component-values.snapshot.json') ?? {}, varNames = vars.variableScopes ?? {};
   const skeleton = read((await import('./figma-capture.mjs')).componentFiles(scfg).skeleton) ?? {};
-  const captures = { props, skeleton, values, varNames };
+  // What each variable points at, nearest first: the first mode's colours, then every other kind.
+  const aliases = { ...(vars.otherAliases ?? {}), ...(Object.values(vars.aliases ?? {})[0] ?? {}) };
+  const captures = { props, skeleton, values, varNames, aliases, aliasesByMode: vars.aliases ?? {}, isPrimitive: primitiveTest({ tiers: scfg.tiers, prefix: scfg.figma?.primitivePrefix }), tierOf: tierTest({ tiers: scfg.tiers }) };
   if (!Object.keys(props).filter((n) => !n.startsWith('_')).length) { console.log('❌ No Figma capture to build from: refresh Figma (--recipe refresh-figma), then ask again.'); process.exit(2); }
   const grammar = grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} });
   const specDir = join(ROOT, OUT_DIR, 'specs'), specFile = (n) => join(specDir, `${n}.spec.json`);
@@ -2250,7 +2253,15 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
       process.exit(0);
     }
     if (!name && !scratch) { console.log(`What is the new component called? It is built like ${l.like}.`); console.log(`NEXT: ask the person, then run ${cmd} --spec "<description>" --like ${l.like} --name <name>.`); process.exit(0); }
-    const { spec } = specOf({ description, like: l.like, name, ops, captures, grammar, at: new Date().toISOString() });
+    // What the description asks beyond the copy, read as a change to the one it is like; once the person's operations
+    // are given, what was not read is theirs to have written.
+    const asked = scratch ? { ops: [], unread: [] } : askedOf(description, modelOf(l.like, captures));
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    ops = [...asked.ops.filter((a) => !ops.some((o) => same(o, a))), ...ops];
+    const unread = opsFile ? [] : asked.unread;
+    // --shared: the like's own variables bound to the shared one each points at, as the spec proposed.
+    if (process.argv.includes('--shared')) for (const o of specOf({ description, like: l.like, name, ops, captures, grammar }).spec[EXT].shared ?? []) if (!ops.some((x) => same(x, o))) ops.push(o);
+    const { spec } = specOf({ description, like: l.like, name, ops, unread, captures, grammar, at: new Date().toISOString() });
     if (!spec.name) { console.log('❌ The spec has no component to build: give --like, or a create operation.'); process.exit(2); }
     mkdirSync(specDir, { recursive: true });
     writeFileSync(specFile(spec.name), JSON.stringify(spec, null, 2) + '\n');

@@ -48,6 +48,14 @@ test('the few changes said in words: an option like another, a property on a lay
   assert.deepEqual(parseChange('rename the property size to scale', m).ops, [{ op: 'rename', what: 'axis', from: 'size', to: 'scale' }]);
 });
 
+test('more said in words: a description without quotes, an option named after its axis, a layer in any case', () => {
+  const m = modelOf('chipFilter', captures);
+  assert.deepEqual(parseChange('change the description to A chip for filters', m).ops, [{ op: 'describe', text: 'A chip for filters' }]);
+  assert.deepEqual(parseChange('remove the size small', m).ops, [{ op: 'removeOption', axis: 'size', option: 's' }]);
+  assert.deepEqual(parseChange('remove the Icon', m).ops, [{ op: 'removeLayer', layer: 'Content/icon' }]);
+  assert.deepEqual(parseChange('add XL to Size like L', m).ops, [{ op: 'addOption', axis: 'size', option: 'XL', like: 'L' }]);
+});
+
 test('the report: what changes, where it is used, what breaks, what it adds, and the faults it already had, apart', () => {
   const ops = parseChange('add xl to size like l; remove the property showCount; rename Label layer to Text', modelOf('chipInput', captures)).ops;
   const ch = changeOf({ component: 'chipInput', asked: 'x', ops: [...ops, { op: 'removeProperty', name: 'showClose' }], captures, grammar, livesIn });

@@ -23,7 +23,7 @@ Each section says why it matters, then what it does not do well today. A line wi
 | [Publish a living style guide](#publish-a-living-style-guide--stable) | One site with a playground, specs, variants, parity, accessibility and history for each component, plus a status page and tasks that name the owning team. | Design, engineering and product see the same status, with no doc going stale. | Stable |
 | [Prototype with real components](#prototype-with-real-components--experimental) | Clickable screens built only with your coded components, their real props and tokens, in light and dark, at every screen size. | User tests and reviews run on the real product. What passes can ship without being redrawn. | Experimental |
 | [Catch drift in prototypes and code](#catch-drift-in-prototypes-and-code--stable) | In every prototype, product screen and AI edit: hand-built copies of components, hard-coded values and made-up variables, each with what to use instead. What the system lacks goes on a list for design. | Shortcuts do not pile up until the system falls apart. | Stable |
-| [Generate components in Figma](#generate-components-in-figma--experimental) | Ask in plain words ("a tag like the chip", "add a size XL to the chip") and the AI builds or changes it in Figma with only your variables, names and structure, after someone signs it off. | New components follow the system's rules from the start. | Experimental |
+| [Generate components in Figma](#generate-components-in-figma--beta) | Ask in plain words ("a tag like the chip", "add a size XL to the chip") and the AI builds or changes it in Figma with only your variables, names and structure, after someone signs it off. | New components follow the system's rules from the start. | Beta |
 | [Review the Figma library](#review-the-figma-library--stable) | Values with no token, detached instances and missing auto layout, plus your system's own building rules and which components break them, with renames to apply. | A clean library is what makes every other check reliable. | Stable |
 | [Update Figma from the code](#update-figma-from-the-code--beta) | Accessibility specs, screen issues and Dev Mode links written into Figma, after you say yes. | Designers see in Figma what developers already know. | Beta |
 | [Build code from Figma](#build-code-from-figma--experimental) | The build order from a Figma-only system, with exact names and values, and each piece checked once built. | Engineering starts from the designed system, not an interpretation of it. | Experimental |
@@ -146,16 +146,19 @@ How it checks the agent's work, in a loop, before you see it:
 - Checks Tailwind classes against Figma.
 - Keeps what the system lacks on a list for your design team, with what stands in meanwhile, and sends it to Figma as to-do cards after you say yes.
 
-## Generate components in Figma · Experimental
+## Generate components in Figma · Beta
 
 **Why it matters:** New components follow the system's rules from the start.
 
-*Today: new. One component at a time, through the Figma tool of your Claude session.*
+*Today: one component at a time, through the Figma tool of your Claude session. It reads a few kinds of change in words (an option like another, a property on a layer, a rename, a removal, a binding, the description); anything else, the AI writes as steps for you to check. A component like none in the system starts from empty auto layout and is built step by step. Variables from a library the file uses are looked up, but this has not yet been tried on a real library.*
 
 - Builds a new component from your description ("a tag like the chip"), starting from the one it is most like.
+- Reads the rest of the same sentence ("with a size XL like L", "without the icon"), and asks about any part it could not read instead of dropping it.
 - Changes an existing one ("add a size XL to the chip"), with where it is used and what the change breaks.
 - Uses only the system's own variables, components, text styles and names. It never makes up a value.
-- Asks whatever the system cannot answer, instead of guessing.
+- Asks whatever the system cannot answer, instead of guessing. When the original has variables of its own, it names the shared variable each one points at, so one answer binds them all. It never proposes binding a component straight to a primitive.
+- Grows the component set to hold new variants, so none is clipped.
+- Keeps every copied variant wired to its properties, and never adds a property that would drive nothing.
 - Follows how your system builds components: names, properties, layers and auto layout.
 - Writes nothing until someone signs it off and you say yes, then checks the result.
 
