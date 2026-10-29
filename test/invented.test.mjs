@@ -29,7 +29,7 @@ test('what a check saw an agent invent: the wrong name, and the right one where 
 
 test('inventions add up across runs, and feed the catalog so the next agent reads them beside the real values', () => {
   const dir = tempDir('invented-');
-  assert.deepEqual(readInvented(dir), { components: {}, props: {}, values: {} });
+  assert.deepEqual(readInvented(dir), { components: {}, props: {}, values: {}, events: {} });
 
   noteInvented(dir, findings);
   noteInvented(dir, findings);
@@ -70,4 +70,22 @@ test('the page check\'s own record feeds the same table: one lesson, whichever r
   // The same lesson from both roads is one entry, counted twice, not two entries disagreeing.
   noteInvented(dir, [{ message: '"Pill" is not in the catalog (did you mean Chip?)' }]);
   assert.equal(readInvented(dir).components.Pill.times, 2);
+});
+
+test('an event it does not emit, and the page check\'s tags filed under the catalog\'s names; each component lists what was written for it', async () => {
+  const { inventedFor } = await import('../invented.mjs');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const { buildLlms } = await import('../contract-gen.mjs');
+  const inv = inventionsIn([{ message: 'tile-strip emits no "click-tile" (it emits: clicked, closed)' }]);
+  assert.deepEqual(inv.events['tile-strip.click-tile'], { right: 'clicked', times: 1 }, 'the closest of the ones it emits');
+  const dir = tempDir('invented-pages-');
+  mkdirSync(join(dir, '.design-system-engine-out', 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'inventions.json'), JSON.stringify({
+    runs: [{ items: [{ message: 'tile-strip emits no "click-tile" (it emits: clicked)' }, { message: 'tile-strip has no prop "showFooters" (did you mean showFooter?)' }] }],
+    byComponent: { tileStrip: { last: [{ message: 'tile-strip emits no "click-tile" (it emits: clicked)' }] } },
+  }));
+  const read = readInvented(dir);
+  assert.deepEqual(inventedFor(read, 'tileStrip'), [{ kind: 'event', wrong: 'click-tile', right: 'clicked', times: 1 }, { kind: 'prop', wrong: 'showFooters', right: 'showFooter', times: 1 }]);
+  const text = buildLlms([{ name: 'tileStrip', contract: { name: 'tileStrip', invented: inventedFor(read, 'tileStrip') } }], {}, 0, null);
+  assert.match(text, /    - agents here wrote \(never write it\): event click-tile → clicked, prop showFooters → showFooter/);
 });
