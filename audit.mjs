@@ -5765,6 +5765,32 @@ function reportFull(label, items, shown) {
     } catch { /* advisory: never fails */ }
   }
 
+  // ── A token's job, read from who uses it (token-jobs.mjs, advisory) ─────────────
+  // A border token a control uses is held at 3:1 (border or fill) against the page, and one a control and something
+  // decorative both use is named as doing two jobs. From each component's own rules in the system's CSS and its files.
+  {
+    try {
+      const catFile = join(ROOT, cfg.contracts?.out ?? 'contracts', 'catalog.json');
+      if (existsSync(catFile)) {
+        const tj = await import('./token-jobs.mjs');
+        const { componentSourceFiles } = await import('./component-source.mjs');
+        const theme = [cfg.paths?.themeCSS, ...(cfg.paths?.pluginCSS ?? [])].flat().filter((f) => f && !/^https?:/.test(f)).map((f) => join(ROOT, f));
+        const sources = [...new Set([...theme, ...componentSourceFiles(ROOT, cfg).filter((f) => /\.(vue|svelte|css|scss)$/.test(f))])]
+          .map((f) => { try { return { file: relative(ROOT, f), text: tj.cssOf(f, readFileSync(f, 'utf8')) }; } catch { return null; } }).filter(Boolean);
+        const comps = Object.entries(JSON.parse(readFileSync(catFile, 'utf8')).components ?? {}).map(([name, e]) => ({ name, cls: String(e.selector ?? '').match(/^\.[\w-]+/)?.[0] })).filter((c) => c.cls);
+        const rows = tj.tokenJobs(sources, comps, { page: cfg.a11y?.pageBackground ?? null });
+        mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+        writeFileSync(join(ROOT, OUT_DIR, 'token-jobs.json'), JSON.stringify(rows, null, 1) + '\n');
+        const lines = tj.tokenJobLines(rows);
+        if (lines.length) {
+          console.log(`\n🧩 Border tokens on controls: ${rows.filter((r) => r.low.length).length} under 3:1 against the page, ${rows.filter((r) => r.others.length).length} doing two jobs (of ${rows.length} a control's edge uses; ${OUT_DIR}/token-jobs.json):`);
+          for (const l of lines.slice(0, 12)) console.log(`   ${l}`);
+          if (lines.length > 12) console.log(`   … ${lines.length - 12} more`);
+        } else if (rows.length) console.log(`\nℹ️  Border tokens on controls: each of the ${rows.length} a control's edge uses reaches 3:1, by its border or its fill, and does one job.`);
+      }
+    } catch { /* advisory: never fails */ }
+  }
+
   // ── Token tiers (I10b, project-DECLARED, advisory) ──────────────────────────
   _section('advice');
   // Runs ONLY when ds-config.json declares `tiers` (never imposes a tier model). Classifies each

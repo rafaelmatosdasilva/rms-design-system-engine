@@ -362,6 +362,7 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - A text colour is checked against its background token by name (`badge/label/warning` on `badge/background/warning`).
 - Where the code paints the background as a tint (a `color-mix` or an opacity), only the rendered contrast decides. A tint is measured in every colour mode over each surface the system defines (Figma colour tokens with `/surface/` in the name, or `a11y.surfaces`), and the worst is reported with its surface.
 - The pairs follow what Figma draws. The capture records, for each text and icon colour, the fill of the layer right under it.
+- A border token a control shows itself by (an input's outline, a tile you pick) is held at 3:1 against the page by its border or its fill, as WCAG 1.4.11 asks of the boundary, even where borders are otherwise not paired. One that a control and something decorative (a card, a divider) both use is named as doing two jobs, with a control border of its own proposed. Advisory: `.design-system-engine-out/token-jobs.json`.
 
 ### Target size
 
