@@ -26,10 +26,10 @@ export async function showroomBundle(ROOT, screens = {}, cfg = {}) {
   const entry = `import { createApp, h } from 'vue';
 ${pinia ? "import { createPinia } from 'pinia';" : ''}
 ${router ? "import { createRouter, createMemoryHistory } from 'vue-router';" : ''}
-${setup.map((x, i) => `import ${x.named ? `{ ${x.named} as S${i} }` : `S${i}`} from ${JSON.stringify(x.spec)};`).join('\n')}
+${setup.map((x, i) => `import ${x.named ? `{ ${x.named} as S${i} }` : `S${i}`} from ${JSON.stringify(x.spec)};${x.keySpec ? `\nimport ${x.keyNamed ? `{ ${x.keyNamed} as K${i} }` : `K${i}`} from ${JSON.stringify(x.keySpec)};` : ''}`).join('\n')}
 ${keys.map((k, i) => `import V${i} from ${JSON.stringify(fromRoot(screens[k]))};`).join('\n')}
 const SCREENS = { ${keys.map((k, i) => `${JSON.stringify(k)}: V${i}`).join(', ')} };
-const SETUP = [${setup.map((x, i) => `{ kind: ${JSON.stringify(x.kind)}, name: ${JSON.stringify(x.name ?? null)}, v: S${i} }`).join(', ')}];
+const SETUP = [${setup.map((x, i) => `{ kind: ${JSON.stringify(x.kind)}, name: ${JSON.stringify(x.name ?? null)}, v: ${[`S${i}`, ...(x.path ?? [])].join('?.')}, key: ${x.keySpec ? `K${i}` : JSON.stringify(x.key ?? null)} }`).join(', ')}];
 window.__dseShowroom = {
   keys: Object.keys(SCREENS),
   mount(el, key) {
@@ -42,6 +42,10 @@ window.__dseShowroom = {
         if (x.kind === 'use') app.use(x.v);
         else if (x.kind === 'component') app.component(x.name, x.v);
         else if (x.kind === 'directive') app.directive(x.name, x.v);
+        else if (x.kind === 'global') app.config.globalProperties[x.name] = x.v;
+        else if (x.kind === 'provide' && x.key != null) app.provide(x.key, x.v);
+        else if (x.kind === 'mixin') app.mixin(x.v);
+        else if (x.kind === 'call' && typeof x.v === 'function') x.v(app);
       } catch (e) { /* one the app cannot take twice: the rest still installed */ }
     }
     ${pinia ? 'if (!app.config.globalProperties.$pinia) app.use(createPinia());' : ''}

@@ -284,11 +284,29 @@ export function variantsFromCode(api = {}, text = '', max = 16, kinds = {}) {
     if (d.options?.length) { for (const o of d.options) if (String(o) !== String(base[p])) cases.push({ label: `${p}=${o}`, props: { ...base, [p]: o } }); continue; }
     if (isBool(p, d)) { cases.push({ label: `${p}=${!base[p]}`, props: { ...base, [p]: !base[p] } }); continue; }
     if (/icon/i.test(p)) { if (base[p]) cases.push({ label: `${p}=""`, props: { ...base, [p]: '' } }); continue; }
-    const like = !TEXTY.test(p) && kinds[p]?.options?.length > 1 ? kinds[p].options : null;
-    if (like) { for (const o of like) if (String(o) !== String(base[p] ?? kinds[p].default ?? like[0])) cases.push({ label: `${p}=${o}`, props: { ...base, [p]: o } }); continue; }
+    const words = !TEXTY.test(p) ? comparedWords(text, p) : [];
+    const like = words.length ? words : !TEXTY.test(p) && kinds[p]?.options?.length > 1 ? kinds[p].options : null;
+    if (like) { for (const o of like) if (String(o) !== String(base[p] ?? kinds[p]?.default ?? like[0])) cases.push({ label: `${p}=${o}`, props: { ...base, [p]: o } }); continue; }
     if (TEXTY.test(p) || typed(p, 'string')) cases.push(base[p] ? { label: `${p}=""`, props: { ...base, [p]: '' } } : { label: `${p}="${p}"`, props: { ...base, [p]: p.charAt(0).toUpperCase() + p.slice(1) } });
   }
   return cases.slice(0, max);
+}
+
+// The words a component's code compares a text prop with (props.view === 'month'), then the cases of a switch on it
+// (switch (props.view) { case 'day': }): the values it draws, where it lists none, so a case never gives it words of its
+// own name it would refuse (a view that is not one). → ['day', 'month', 'year']
+export function comparedWords(text = '', p) {
+  const src = String(text), out = [];
+  const add = (w) => { if (w && !out.includes(w)) out.push(w); };
+  const at = `(?:\\bprops\\.|[^.\\w$])${p}\\b`;
+  for (const m of src.matchAll(new RegExp(`${at}\\s*[!=]==?\\s*(['"])([\\w-]{1,40})\\1|(['"])([\\w-]{1,40})\\3\\s*[!=]==?\\s*(?:props\\.)?${p}\\b(?!\\s*\\.)`, 'g'))) add(m[2] ?? m[4]);
+  for (const m of src.matchAll(new RegExp(`\\bswitch\\s*\\(\\s*(?:props\\.)?${p}\\s*\\)\\s*\\{`, 'g'))) {
+    let depth = 1, i = m.index + m[0].length;
+    const start = i;
+    for (; i < src.length && depth; i++) { if (src[i] === '{') depth++; else if (src[i] === '}') depth--; }
+    for (const c of src.slice(start, i).matchAll(/\bcase\s+(['"])([\w-]{1,40})\1\s*:/g)) add(c[2]);
+  }
+  return out;
 }
 
 // The page: every component's cases, each in a box that names it (data-dse-component, data-dse-case). A component
