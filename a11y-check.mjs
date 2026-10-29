@@ -86,7 +86,8 @@ import { modeSwitch, styleguideSwitch } from './code-capture.mjs';
 import { codeSnapshotPath, OUT_DIR } from './names.mjs';
 import { roleWord as roleWordOf } from './role-markup.mjs';
 import { parseColor as parseCssColor } from './css-values.mjs';
-import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from './wcag21.mjs';
+import { WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE, WCAG22 } from './wcag21.mjs';
+import { PAGE_FACTS, pageCriteria } from './page-criteria.mjs';
 import { loadCategories, requirementEntry, noteKind, isRequirement } from './annotation-categories.mjs';
 import { partRoleOf, annotatedBehaviours, partRolesOf, partsFromNames, behavioursFor, roleKey, markInstanceExpression, behaviourExpression, partRoleExpression, stateFindings } from './behaviour-contract.mjs';
 
@@ -2037,6 +2038,7 @@ export const AXE_SAME = {
   list: ['context'], listitem: ['context'], 'aria-required-parent': ['context'], 'aria-required-children': ['context'], 'definition-list': ['context'], dlitem: ['context'],
   'target-size': ['target'], 'video-caption': ['captions'], 'no-autoplay-audio': ['autoaudio'], 'autocomplete-valid': ['autocomplete'],
   'label-content-name-mismatch': ['labelname'], 'empty-heading': ['emptylabel'], 'page-has-heading-one': ['heading'], 'scrollable-region-focusable': ['keyboard'],
+  'document-title': ['pagetitle'], 'html-has-lang': ['pagelang'], 'html-lang-valid': ['pagelang'], bypass: ['bypass'],
   'avoid-inline-spacing': ['spacing'], 'meta-viewport': ['zoom'], tabindex: ['tabindex'], 'th-has-data-cells': ['table'], 'td-headers-attr': ['table'], 'td-has-header': ['table'],
 };
 // The element a finding is about, as tag#id.class: what comes before " in <component>", " (why)" or "::placeholder".
@@ -2360,12 +2362,13 @@ async function main() {
   const notDrawn = [];   // a component its own code stopped from drawing on the page of components, with why (harnessNotDrawn)
   const ranChecks = new Set();   // the page-wide checks that finished (a keyboard trap, spacing, reflow, zoom, WCAG 2.1)
   const behavioursNotChecked = new Set();   // components whose behaviours the target cannot run (the style guide draws markup only)
+  const pageFacts = [];   // what each whole page shows of the criteria that belong to a page (page-criteria.mjs)
   // A selector the browser cannot parse is the run's, not a page's: said once at the end, so a page it was dropped from
   // is still read whole and kept (a set, so a page put back brings it too).
   const invalidRoots = new Set();
   // What each page adds to the lists above, kept under its signature once it was read and finished (settle), or put
   // back from an earlier run instead of opening it.
-  const acc = { findings, axeViolations, unrendered, unread, unfinished, notJudged, accounted, heard, changes, instances, opened, notOpened, notDrawn, ranChecks, behavioursNotChecked, invalidRoots };
+  const acc = { findings, axeViolations, unrendered, unread, unfinished, notJudged, accounted, heard, changes, instances, opened, notOpened, notDrawn, ranChecks, behavioursNotChecked, invalidRoots, pageFacts };
   const reusedPages = [], cutTargets = new Set();
   let pending = null;
   const settle = () => {
@@ -3195,6 +3198,12 @@ async function main() {
       const h1 = (await evalv(deepSweepExpression(null, 'headings'))) ?? [];
       if (h1.length !== 1) findings.push({ kind: 'heading', plugin: label, desc: h1.length ? `${label}: ${h1.length} main headings (${h1.slice(0, 3).join(', ')})` : `${label}: no main heading (h1)` });
     });
+    // What the page shows of the criteria that belong to a page (its title, its language, a way past its repeated
+    // blocks, its navigation, its help, its forms): tried across the pages once all are read.
+    if (target.page) await step(async () => {
+      const facts = await evalv(PAGE_FACTS);
+      if (facts && typeof facts === 'object') pageFacts.push({ label, ...(target.product ? { product: target.product } : {}), ...facts });
+    });
 
     if (axeSource) {
       const v = await runAxe(send, sessionId, axeSource, roots, !!target.styleguide);
@@ -3208,6 +3217,10 @@ async function main() {
   settle();
   for (const bad of invalidRoots) unread.push(`${String(bad).replace(/^\./, '')} (its selector ${bad} is not valid CSS, so it was not checked)`);
   roots = dsRoots;
+  // The criteria that belong to a page, tried on each page and across the pages of one product (page-criteria.mjs);
+  // where the flows are named (a11y.flows), a flow never asking twice for what it was given.
+  const pagesResult = pageFacts.length ? pageCriteria(pageFacts, { flows: cfg.a11y?.flows ?? [] }) : null;
+  if (pagesResult) findings.push(...pagesResult.findings);
   if (REUSE) { try { mkdirSync(dirname(keptPath), { recursive: true }); writeFileSync(keptPath, JSON.stringify({ pages: keptToWrite(keptBefore, keptNow) }) + '\n'); } catch { /* keeping is a convenience */ } }
   if (reusedPages.length && !JSON_MODE) console.log(`ℹ️  [a11y] ${reusedPages.length} of ${targets.length} page${targets.length === 1 ? '' : 's'} unchanged since ${reusedPages.length === 1 ? 'it was' : 'they were'} last checked: ${reusedPages.length === 1 ? 'its results are' : 'their results are'} put back, not checked again (--fresh checks every page again)`);
   // What was found on a product's own page says which product.
@@ -3302,6 +3315,8 @@ async function main() {
     // The page-wide checks that finished: a criterion they stand for (a keyboard trap, text spacing, reflow, zoom) is
     // met only where its check ran.
     ran: [...ranChecks],
+    // The criteria that belong to a page, each with its status and the pages it was tried on (page-criteria.mjs).
+    ...(pagesResult ? { pages: { criteria: pagesResult.criteria, groups: pagesResult.groups, flows: pagesResult.flows } } : {}),
     issues: buckets.flatMap(([kind, list]) => list.map((f) => { const r = a11yFindingRecord(kind, f); const n = ownerName(f.desc); if (n) r.component = n; const u = figmaOf(f.desc); if (u) r.figma = u; return r; })),
     // What could not be read, rendered or finished: never a clean result, so an agent or CI can tell.
     ...(unread.length || unrendered.length || unfinished.length || notOpened.length || notDrawn.length ? { notRead: [...unread, ...unrendered.map((u) => `${u} (not rendered)`), ...notOpened.map((u) => `${u} (not opened)`), ...notDrawn.map((u) => `${u} (not drawn from its code)`), ...unfinished] } : {}),
@@ -3381,6 +3396,13 @@ async function main() {
   if (RUN_AXE && axeSource) console.log(`\naxe-core's rules ran on the same page${axeSaid}.`);
   if (leftOut.length) console.log(`\n⏭  Left out of this run: ${leftOut.join('; ')}. The verdict covers the rest only.`);
 
+  // ── The criteria that belong to a page: each with its status and the pages it was tried on ──
+  if (pagesResult) {
+    const WORD = { done: '✅ Passes', todo: '❌ To fix', check: '👀 A person checks' };
+    console.log(`\nOn the pages themselves (${plural(pageFacts.length, 'page', 'pages')}${pagesResult.flows.length ? `, ${plural(pagesResult.flows.length, 'flow', 'flows')}` : ''}):`);
+    for (const c of WCAG22.filter((k) => pagesResult.criteria[k.sc])) console.log(`  ${WORD[pagesResult.criteria[c.sc].st]}  ${c.sc} ${c.name}: ${pagesResult.criteria[c.sc].note}`);
+  }
+
   // ── Smart nudge: how to get deeper results (only when a styleguide wasn't the target) ──
   if (!sg && !harness && !targets.every((t) => t.harness) && cfg.a11y?.styleguide !== false) {
     const sgOut = cfg.styleguide?.out ?? 'apps/styleguide/index.html';
@@ -3413,7 +3435,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 // result: the audit's a11y.json. → [{ area: 'Products', type, kind, who, say, todo }]
 export function productA11yTodos(result) {
   const by = new Map();
-  for (const i of result?.issues ?? []) if (i.product) { if (!by.has(i.product)) by.set(i.product, []); by.get(i.product).push(i); }
+  // What fails a criterion that belongs to a page has a row of its own for each criterion (page-criteria.mjs).
+  const ofPage = new Set(WCAG22.flatMap((c) => c.pageKinds ?? []));
+  for (const i of result?.issues ?? []) if (i.product && !ofPage.has(i.issue)) { if (!by.has(i.product)) by.set(i.product, []); by.get(i.product).push(i); }
   return [...by].map(([product, list]) => {
     const kinds = new Map();
     for (const i of list) kinds.set(i.issue, (kinds.get(i.issue) ?? 0) + 1);

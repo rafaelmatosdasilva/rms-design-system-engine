@@ -8,7 +8,9 @@
 //   person - needs a person's judgement (whether a caption is accurate, whether a heading describes): `person` says
 //            what to look at.
 //   page   - belongs to the page or the product a component sits in (its title, a skip link, consistent navigation),
-//            not to a component.
+//            not to a component. `pageKinds` are the findings that fail it on a product's own pages, tried there and
+//            across them (page-criteria.mjs); a criterion with `pageKinds` and another `how` (3.3.7) is a person's on a
+//            component and tried on the pages of a named flow.
 //   media  - applies only where the component plays video or sound.
 // The style guide shows each one per component (Accessibility area), the audit counts them. Plain words in `says`.
 import { readFileSync } from 'node:fs';
@@ -41,8 +43,8 @@ export const WCAG21 = [
   { sc: '2.2.1', name: 'Timing Adjustable', level: 'A', how: 'static', kinds: ['timing'], says: 'Nothing that needs reading or acting on disappears on a short timer.' },
   { sc: '2.2.2', name: 'Pause, Stop, Hide', level: 'A', how: 'auto', kinds: ['pause'], ran: ['moving'], says: 'What moves by itself for more than 5 seconds can be paused (a loading indicator is fine).' },
   { sc: '2.3.1', name: 'Three Flashes or Below Threshold', level: 'A', how: 'auto', kinds: ['flash'], ran: ['moving'], says: 'Nothing flashes more than three times a second.' },
-  { sc: '2.4.1', name: 'Bypass Blocks', level: 'A', how: 'page', says: 'The page lets a person skip past repeated blocks.' },
-  { sc: '2.4.2', name: 'Page Titled', level: 'A', how: 'page', says: 'The page has a title that says what it is.' },
+  { sc: '2.4.1', name: 'Bypass Blocks', level: 'A', how: 'page', pageKinds: ['bypass'], says: 'The page lets a person skip past repeated blocks.' },
+  { sc: '2.4.2', name: 'Page Titled', level: 'A', how: 'page', pageKinds: ['pagetitle'], says: 'The page has a title that says what it is.' },
   { sc: '2.4.3', name: 'Focus Order', level: 'A', how: 'auto', kinds: ['order', 'tabindex', 'focusreturn', 'pageorder', 'modalescape'], ran: ['order', 'modalescape', 'focusreturn'], says: 'Tab moves through it in an order that makes sense, and the focus comes back after a dialog closes.' },
   { sc: '2.4.4', name: 'Link Purpose (In Context)', level: 'A', how: 'auto', kinds: ['link', 'samename'], ran: ['link', 'samename'], says: 'A link says where it goes.' },
   { sc: '2.4.5', name: 'Multiple Ways', level: 'AA', how: 'page', says: 'The product offers more than one way to find a page.' },
@@ -52,16 +54,16 @@ export const WCAG21 = [
   { sc: '2.5.2', name: 'Pointer Cancellation', level: 'A', how: 'auto', kinds: ['pointerdown'], ran: ['pointerdown'], says: 'A control acts when released, so sliding off cancels it.' },
   { sc: '2.5.3', name: 'Label in Name', level: 'A', how: 'auto', kinds: ['labelname'], ran: ['labelname'], says: 'The words shown on a control are in its name, so voice control finds it.' },
   { sc: '2.5.4', name: 'Motion Actuation', level: 'A', how: 'static', kinds: ['motionact'], says: 'Nothing works only by shaking or tilting the device.' },
-  { sc: '3.1.1', name: 'Language of Page', level: 'A', how: 'page', says: 'The page says its language.' },
+  { sc: '3.1.1', name: 'Language of Page', level: 'A', how: 'page', pageKinds: ['pagelang'], says: 'The page says its language.' },
   { sc: '3.1.2', name: 'Language of Parts', level: 'AA', how: 'person', person: 'Words in another language are marked with lang.', says: 'Words in another language are marked.' },
   { sc: '3.2.1', name: 'On Focus', level: 'A', how: 'auto', kinds: ['onfocus'], ran: ['onfocus'], says: 'Taking the focus changes nothing else.' },
   { sc: '3.2.2', name: 'On Input', level: 'A', how: 'auto', kinds: ['oninput'], ran: ['oninput'], says: 'Changing a value does not open a page, send a form or move the focus.' },
-  { sc: '3.2.3', name: 'Consistent Navigation', level: 'AA', how: 'page', says: 'Navigation repeated across pages stays in the same order.' },
-  { sc: '3.2.4', name: 'Consistent Identification', level: 'AA', how: 'page', says: 'What does the same thing is named the same way across pages.' },
+  { sc: '3.2.3', name: 'Consistent Navigation', level: 'AA', how: 'page', pageKinds: ['navorder'], says: 'Navigation repeated across pages stays in the same order.' },
+  { sc: '3.2.4', name: 'Consistent Identification', level: 'AA', how: 'page', pageKinds: ['namedalike'], says: 'What does the same thing is named the same way across pages.' },
   { sc: '3.3.1', name: 'Error Identification', level: 'A', how: 'auto', kinds: ['rolecontract', 'partrole'], says: 'An error is said in words and linked to its field.' },
   { sc: '3.3.2', name: 'Labels or Instructions', level: 'A', how: 'auto', kinds: ['name', 'placeholderlabel'], says: 'A field has a label.' },
   { sc: '3.3.3', name: 'Error Suggestion', level: 'AA', how: 'person', person: 'An error message says how to put it right.', says: 'An error says how to put it right.' },
-  { sc: '3.3.4', name: 'Error Prevention (Legal, Financial, Data)', level: 'AA', how: 'page', says: 'A form that commits money, law or data can be checked or undone.' },
+  { sc: '3.3.4', name: 'Error Prevention (Legal, Financial, Data)', level: 'AA', how: 'page', pageKinds: ['legalstep'], says: 'A form that commits money, law or data can be checked or undone.' },
   { sc: '4.1.1', name: 'Parsing', level: 'A', how: 'auto', kinds: ['dupid'], ran: ['aria'], says: 'Each id is used once.' },
   { sc: '4.1.2', name: 'Name, Role, Value', level: 'A', how: 'auto', kinds: ['name', 'aria', 'ariastate', 'rolecontract', 'semantics', 'statefollows', 'fakelink'], ran: ['aria'], says: 'Each control has a name, a role and a state a screen reader can tell.' },
   { sc: '4.1.3', name: 'Status Messages', level: 'AA', how: 'auto', kinds: ['status', 'unannounced'], ran: ['status'], says: 'A message, a toast or a loader is announced without taking the focus.' },
@@ -73,8 +75,8 @@ export const WCAG22_NEW = [
   { sc: '2.4.11', name: 'Focus Not Obscured (Minimum)', level: 'AA', how: 'audit', kinds: ['obscured'], says: 'A control is never completely hidden (by a sticky header, a banner) when it takes the focus.' },
   { sc: '2.5.7', name: 'Dragging Movements', level: 'AA', how: 'auto', kinds: ['dragging'], ran: ['dragging'], person: 'What is done by dragging can also be done with a single click or tap (buttons to move an item, a click on a track).', says: 'What is done by dragging can also be done with one click or tap.' },
   { sc: '2.5.8', name: 'Target Size (Minimum)', level: 'AA', how: 'audit', kinds: ['target'], says: 'A control is at least 24 by 24 pixels, or has room around it.' },
-  { sc: '3.2.6', name: 'Consistent Help', level: 'A', how: 'page', says: 'Help (a contact, a chat, a help page) sits in the same place on every page that offers it.' },
-  { sc: '3.3.7', name: 'Redundant Entry', level: 'A', how: 'person', person: 'A flow never asks for something the person already gave in it (it is filled in, or offered to pick).', says: 'A flow never asks twice for the same thing.' },
+  { sc: '3.2.6', name: 'Consistent Help', level: 'A', how: 'page', pageKinds: ['helpplace'], says: 'Help (a contact, a chat, a help page) sits in the same place on every page that offers it.' },
+  { sc: '3.3.7', name: 'Redundant Entry', level: 'A', how: 'person', person: 'A flow never asks for something the person already gave in it (it is filled in, or offered to pick).', pageKinds: ['askedagain'], says: 'A flow never asks twice for the same thing.' },
   { sc: '3.3.8', name: 'Accessible Authentication (Minimum)', level: 'AA', how: 'auto', kinds: ['authpaste', 'authfill'], ran: ['auth'], says: 'Signing in never needs a memory test: a password field takes paste and a password manager.' },
 ];
 export const WCAG22 = [...WCAG21.filter((c) => c.sc !== '4.1.1').map((c) => (c.sc === '4.1.2' ? { ...c, kinds: [...c.kinds, 'dupid'] } : c)), ...WCAG22_NEW]
@@ -116,11 +118,20 @@ export const WCAG21_GUIDE = {
   comboboxkeys: { title: (n) => `${plural(n, 'combobox does', 'comboboxes do')} not answer its keys`, why: 'A keyboard user opens a combobox\'s list with the Down arrow and closes it with Escape, staying in the field; without them the list is reached only with a mouse.', fix: 'Open the list on Down (aria-expanded="true"), close it on Escape (aria-expanded="false") and keep the focus in the field.' },
   weakname: { title: (n) => `${plural(n, 'control has', 'controls have')} a name that says little`, why: 'A screen reader says the name, then the role: "icon, button", "chevron-down, button" or "Close button, button" tells the person little or says the same thing twice.', fix: 'Name it for what it does ("Close", "Next month", "Delete invoice"), never for its look, its icon or its role.' },
   samename: { title: (n) => `${plural(n, 'set of links says', 'sets of links say')} the same words for different places`, why: 'A screen reader lists the links by their words; two that read the same but go to different places cannot be told apart.', fix: 'Give each its own words ("Edit invoice 12", "Edit invoice 13"), or add the difference with aria-describedby or visually hidden text.' },
+  // Tried on a product's own pages and across them (page-criteria.mjs).
+  pagetitle: { title: (n) => `${plural(n, 'page has', 'pages have')} no title of its own`, why: 'The title is the first thing a screen reader says and the name of the tab: with none, or the same on every page, people cannot tell where they are.', fix: 'Give each page a <title> that says what it is ("Order summary - Acme").' },
+  pagelang: { title: (n) => `${plural(n, 'page does', 'pages do')} not say its language`, why: 'A screen reader reads the words with the voice of the page\'s language; with none said, it guesses and can read them in the wrong one.', fix: 'Put lang on <html>, as a language tag (lang="en", lang="pt-BR").' },
+  bypass: { title: (n) => `${plural(n, 'page gives', 'pages give')} no way past its repeated blocks`, why: 'Someone on a keyboard or a screen reader goes through the header and the menu again on every page before reaching what it is about.', fix: 'Put the page\'s content in <main>, and add a skip link to it as the first stop ("Skip to content", href="#main").' },
+  navorder: { title: (n) => `${plural(n, 'page puts', 'pages put')} its navigation in another order`, why: 'People learn where each item of a menu is; one that moves from page to page has to be read again each time.', fix: 'Keep the items a navigation repeats in the same order on every page (one shared navigation component).' },
+  namedalike: { title: (n) => `${plural(n, 'link reads', 'links read')} otherwise than on another page`, why: 'A link to the same place named differently on each page reads as two different things to a screen reader user.', fix: 'Name what does the same thing the same way on every page (one shared header, navigation and footer).' },
+  helpplace: { title: (n) => `${plural(n, 'page moves', 'pages move')} its help`, why: 'People who need help look for it where they found it before; help that moves is hard to find again.', fix: 'Keep the help (a help page, a contact, a chat) in the same part of every page, in the same order among what the pages repeat.' },
+  askedagain: { title: (n) => `${plural(n, 'field asks', 'fields ask')} again for what the flow was given`, why: 'Typing the same thing twice is hard for people with memory or motor difficulties, and errors creep in.', fix: 'Fill it in from the earlier step, or offer it to pick ("Same as the delivery address"). A password asked again to keep an account safe is fine.' },
+  legalstep: { title: (n) => `${plural(n, 'form commits', 'forms commit')} money, a signature or data with no review found`, why: 'A payment, a signature or a deletion sent by mistake can be costly; people need to check it first, or undo it after.', fix: 'Add a step that shows what will be sent and lets it be corrected, a checkbox to confirm it, or a way to undo it after. A person checks the flow.' },
   status: { title: (n) => `${plural(n, 'message is', 'messages are')} not announced`, why: 'A toast, a "saved" message or a loader appears without a screen reader being told, so people who cannot see it miss it.', fix: 'Put it in role="status" (role="alert" for errors) or aria-live="polite", present on the page before the message arrives.' },
 };
 
 // The criterion each finding kind fails, in WCAG 2.2 (a duplicate id is under 4.1.2 there). WCAG21_KIND is its older name.
-export const WCAG_KIND = Object.fromEntries(WCAG22.flatMap((c) => (c.kinds ?? []).map((k) => [k, c.sc])).reverse());
+export const WCAG_KIND = Object.fromEntries(WCAG22.flatMap((c) => [...(c.kinds ?? []), ...(c.pageKinds ?? [])].map((k) => [k, c.sc])).reverse());
 export const WCAG21_KIND = WCAG_KIND;
 
 // The in-page checks, as source the audit injects and the style guide carries.

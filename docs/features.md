@@ -62,6 +62,7 @@ Each section says why it matters, then what it does not do well today. A line wi
 - Measures touch targets, on the page and again on a small 320 pixel screen.
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
+- Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
 - Lists what the Figma file is missing, such as a focus state or an error message.
 - Checks your designed screens in Figma for contrast and target size. *(Beta)*
 - Tries again only what changed, so a second run takes seconds.
