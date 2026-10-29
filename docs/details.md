@@ -339,6 +339,10 @@ The screen capture (`--figma-screens`, read only) records where each instance si
 - **Another state.** A page that lacks more than a third of a screen's components (at least three) opens in another state. It is listed as not compared, with the way to fix it, a `setup` script on the screen's entry (inline, or a file path such as `screens/results.js`).
 - **Large answers.** One answer from Figma holds at most 20 KB. The capture keeps a list to its first three items, takes as many screens as fit, and writes the script for the rest with a NEXT line until every screen is read.
 
+### A token in the right layer
+
+A token belongs in the first layer where its value can change. A collection with modes (Light and Dark, a brand) is where values change with them; a token in it defined the same way in every mode (the same alias or value) never uses them, and can live in a layer without modes that aliases this one, following every mode through it. The audit says how many of a moded collection's tokens are like that, by family. Advice only: Figma's collections are your team's design.
+
 ### Mode combinations
 
 The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Tasks page under The system.
