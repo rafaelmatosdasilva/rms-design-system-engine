@@ -20,7 +20,7 @@
 //     waiting to be made (changes/<component>.change.json) and the ones made and read again (changes/done/), newest first
 //
 // Pure but for changesView, which reads the changes the engine kept.
-import { ground, predict, modelOf, opWords, FIELDS } from './figma-ops.mjs';
+import { ground, predict, modelOf, opWords, FIELDS, optionNamed } from './figma-ops.mjs';
 import { diffModels, diffLines } from './component-diff.mjs';
 
 const W = `["'\`]?`;
@@ -30,8 +30,9 @@ const CLAUSE = /\s*(?:;|\n|\.\s+|,\s*then\s+|\s+and then\s+|\s+then\s+)\s*/i;
 export function parseChange(text = '', model = null) {
   const ops = [], unread = [];
   const axes = model?.axes ?? [], props = model?.properties ?? [], layers = Object.values(model?.layers ?? {}).map((l) => l.path);
-  const axisOf = (opt) => axes.find((a) => a.options.some((o) => o.name === opt))?.name ?? null;
+  const axisOf = (opt) => axes.find((a) => a.options.some((o) => o.name === opt))?.name ?? axes.find((a) => optionNamed(model, a.name, opt))?.name ?? null;
   const pathOf = (n) => layers.find((p) => p === n) ?? layers.find((p) => p.split('/').at(-1).toLowerCase() === String(n).toLowerCase()) ?? n;
+  const isLayer = (n) => layers.some((p) => p === n || p.split('/').at(-1).toLowerCase() === String(n).toLowerCase());
   // The component and Figma named in the words are where it is, not what changes: "add xl to the chip's size in Figma".
   const esc = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const n = model?.name ? esc(model.name) : null;
@@ -70,6 +71,11 @@ export function parseChange(text = '', model = null) {
       ops.push({ op: 'removeOption', axis: axisNamed(m[2]), option: m[1] });
       continue;
     }
+    // remove the <axis> <option> ("remove the size small")
+    if ((m = c.match(new RegExp(`^(?:remove|delete|drop) (?:the )?([\\w-]+)(?: option| variant)? ${W}([\\w.-]+(?: [\\w-]+)?)${W}$`, 'i'))) && axisNamed(m[1]) && optionNamed(model, axisNamed(m[1]), m[2])) {
+      ops.push({ op: 'removeOption', axis: axisNamed(m[1]), option: optionNamed(model, axisNamed(m[1]), m[2]) });
+      continue;
+    }
     // rename [the component|axis|option|property|layer] <from> to <to>
     if ((m = c.match(new RegExp(`^rename (?:the )?(?:(component|axis|variant|option|property|layer) )?${W}${NAME}${W} (?:to|as|into) ${W}([\\w/ -]+?)${W}$`, 'i')))) {
       const from = m[2].trim(), to = m[3].trim();
@@ -77,7 +83,7 @@ export function parseChange(text = '', model = null) {
       const said0 = { variant: 'axis' }[m[1]?.toLowerCase()] ?? m[1]?.toLowerCase();
       const said = said0 === 'property' && !props.some((p) => p.name === from) && axes.some((a) => a.name === from) ? 'axis' : said0;
       if (from.includes('=')) { const [axis, opt] = from.split('='); ops.push({ op: 'rename', what: 'option', axis, from: opt, to }); continue; }
-      const what = said ?? (props.some((p) => p.name === from) ? 'property' : axes.some((a) => a.name === from) ? 'axis' : axisOf(from) ? 'option' : layers.some((p) => p === from || p.split('/').at(-1) === from) ? 'layer' : from === model?.name ? 'component' : null);
+      const what = said ?? (props.some((p) => p.name === from) ? 'property' : axes.some((a) => a.name === from) ? 'axis' : axisOf(from) ? 'option' : isLayer(from) ? 'layer' : from === model?.name ? 'component' : null);
       if (!what) { unread.push(raw); continue; }
       ops.push(what === 'option' ? { op: 'rename', what, axis: axisOf(from), from, to } : what === 'layer' ? { op: 'rename', what, from: pathOf(from), to } : { op: 'rename', what, from, to });
       continue;
@@ -88,7 +94,7 @@ export function parseChange(text = '', model = null) {
       if (n.includes('=')) { const [axis, option] = n.split('='); ops.push({ op: 'removeOption', axis, option }); continue; }
       if (what === 'property' || (!what && props.some((p) => p.name === n))) { ops.push({ op: 'removeProperty', name: n }); continue; }
       if (what === 'option' || (!what && axisOf(n))) { ops.push({ op: 'removeOption', axis: axisOf(n), option: n }); continue; }
-      if (what === 'layer' || (!what && layers.some((p) => p === n || p.split('/').at(-1) === n))) { ops.push({ op: 'removeLayer', layer: pathOf(n) }); continue; }
+      if (what === 'layer' || (!what && isLayer(n))) { ops.push({ op: 'removeLayer', layer: pathOf(n) }); continue; }
       unread.push(raw); continue;
     }
     // bind [the] <layer|frame> <field> to <variable>
@@ -101,7 +107,7 @@ export function parseChange(text = '', model = null) {
     // move every <variable> to <variable>
     if ((m = c.match(new RegExp(`^(?:rebind|move|replace) (?:every (?:binding of )?)?${W}([\\w/.-]+)${W} (?:to|with|by) ${W}([\\w/.-]+)${W}$`, 'i'))) && m[1].includes('/')) { ops.push({ op: 'rebind', from: m[1], to: m[2] }); continue; }
     // its description: "…"
-    if ((m = c.match(/^(?:set |write |change )?(?:its |the )?description(?: to| as|:)?\s+["“](.+)["”]$/i))) { ops.push({ op: 'describe', text: m[1] }); continue; }
+    if ((m = c.match(/^(?:set |write |change |update )?(?:its |the )?description(?: to| as|:)?\s+(?:["“](.+)["”]|(.+))$/i))) { ops.push({ op: 'describe', text: (m[1] ?? m[2]).trim() }); continue; }
     unread.push(raw);
   }
   return { ops, unread };

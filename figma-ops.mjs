@@ -94,6 +94,14 @@ export function modelOf(name, { props = {}, skeleton = {}, values = {}, varNames
 const keyAt = (m, path) => (path === '' ? '' : Object.entries(m.layers).find(([, l]) => l.path === path)?.[0] ?? null);
 const under = (path, p) => path === p || path.startsWith(p + '/');
 const optionsOf = (m, axis) => m.axes.find((a) => a.name === axis)?.options ?? [];
+// The axis and option a person means, as the component names them: "Size" is size, and "L", "large" or "lg" is l.
+const SIZES = [['xxs', 'extra extra small', '2xs'], ['xs', 'extra small', 'x-small', 'xsmall'], ['s', 'small', 'sm'], ['m', 'medium', 'md', 'regular'], ['l', 'large', 'lg'], ['xl', 'extra large', 'x-large', 'xlarge'], ['xxl', 'extra extra large', '2xl']];
+const sizeOf = (w) => SIZES.find((g) => g.includes(String(w).toLowerCase().replace(/[_]/g, ' ').trim()));
+export const axisNamed = (m, w) => (m?.axes ?? []).find((a) => a.name === w)?.name ?? (m?.axes ?? []).find((a) => a.name.toLowerCase() === String(w ?? '').toLowerCase())?.name ?? null;
+export function optionNamed(m, axis, w) {
+  const opts = optionsOf(m, axis).map((o) => o.name), low = String(w ?? '').toLowerCase();
+  return opts.find((o) => o === w) ?? opts.find((o) => o.toLowerCase() === low) ?? (sizeOf(w) ? opts.find((o) => sizeOf(o) === sizeOf(w)) : null) ?? null;
+}
 
 // ── The model once the operations are made ──
 export function predict(model, ops = [], captures = {}) {
@@ -211,6 +219,8 @@ export function ground(input = [], { captures = {}, grammar = null, target = nul
     }
     if (o.op === 'rename') {
       if (!['component', 'axis', 'option', 'property', 'layer'].includes(o.what)) { ask(at, `rename takes what: component, axis, option, property or layer (not ${o.what}).`); return; }
+      if (m && o.what === 'axis') o.from = axisNamed(m, o.from) ?? o.from;
+      if (m && o.what === 'option') { o.axis = axisNamed(m, o.axis) ?? o.axis; o.from = optionNamed(m, o.axis, o.from) ?? o.from; }
       if (o.what === 'axis' && m && !m.axes.some((a) => a.name === o.from)) { ask(at, `${m.name} has no variant axis ${o.from}.`); return; }
       if (o.what === 'option' && m && !optionsOf(m, o.axis).some((x) => x.name === o.from)) { ask(at, `${m.name}'s ${o.axis} has no option ${o.from}.`); return; }
       if (o.what === 'property' && m && !m.properties.some((p) => p.name === o.from)) { ask(at, `${m.name} has no property ${o.from}.`); return; }
@@ -222,12 +232,15 @@ export function ground(input = [], { captures = {}, grammar = null, target = nul
       if (existing && o.what !== 'layer') breaking.push({ what: `the ${o.what} ${o.what === 'option' ? `${o.axis}=${o.from}` : o.from} renamed ${o.to}: an instance keeps working, but the code and every product that names it must follow` });
     }
     if (o.op === 'addOption') {
+      if (m) { o.axis = axisNamed(m, o.axis) ?? o.axis; o.like = optionNamed(m, o.axis, o.like) ?? o.like; }
+      if (m && optionNamed(m, o.axis, o.option)) { ask(at, `${m.name}'s ${o.axis} already has ${optionNamed(m, o.axis, o.option)}.`); return; }
       if (m && !m.axes.some((a) => a.name === o.axis)) { ask(at, `${m.name} has no variant axis ${o.axis}${m.axes.length ? ` (it has ${m.axes.map((a) => a.name).join(', ')})` : ''}.`); return; }
       if (m && !optionsOf(m, o.axis).some((x) => x.name === o.like)) { ask(at, `Which of ${m.name}'s ${o.axis} options is the new ${o.option} like (${optionsOf(m, o.axis).map((x) => x.name).join(', ')})? Its variants start as copies of that one's.`); return; }
       o.option = nameIt('option', o.option, { axis: o.axis });
       if (existing) held.push({ what: `a new option, ${o.axis}=${o.option}, on ${m?.name}` });
     }
     if (o.op === 'removeOption') {
+      if (m) { o.axis = axisNamed(m, o.axis) ?? o.axis; o.option = optionNamed(m, o.axis, o.option) ?? o.option; }
       if (m && !optionsOf(m, o.axis).some((x) => x.name === o.option)) { ask(at, `${m.name}'s ${o.axis} has no option ${o.option}.`); return; }
       if (existing) breaking.push({ what: `the option ${o.axis}=${o.option} removed: every instance set to it, and every product that uses it, breaks` });
     }
@@ -241,6 +254,8 @@ export function ground(input = [], { captures = {}, grammar = null, target = nul
       if (!kind) { ask(at, `A property is a boolean, a text or a swap (not ${o.kind}).`); return; }
       if (!layerOk(at, o.layer ?? '')) return;
       if (!o.layer) { ask(at, `Which layer does ${o.name} drive? A property that drives no layer is a fault the system flags.`); return; }
+      const field = { BOOLEAN: 'visible', TEXT: 'characters', INSTANCE_SWAP: 'mainComponent' }[kind], took = m && m.layers[keyAt(m, o.layer)]?.wired?.[field];
+      if (took) { ask(at, `${o.layer} is already ${{ visible: 'shown or hidden', characters: 'written', mainComponent: 'swapped' }[field]} by ${took}: rename ${took} (a rename operation), or give ${o.name} another layer.`); return; }
       if (kind === 'INSTANCE_SWAP' && !components.has(o.default)) { ask(at, `Which of the system's components does ${o.name} show unless swapped? (the system has no ${o.default})`); return; }
       o.name = nameIt('property', o.name, { propKind: kind });
       if (existing) held.push({ what: `a new ${o.kind} property, ${o.name}, on ${m?.name}` });
@@ -263,10 +278,21 @@ export function ground(input = [], { captures = {}, grammar = null, target = nul
     if (o.op === 'removeLayer') {
       if (!layerOk(at, o.layer)) return;
       if (existing) breaking.push({ what: `the layer ${o.layer} removed: a product that overrides it loses that` });
+      // A property that drove only the layers removed would drive nothing, a fault the system flags: it goes too.
+      const gone = Object.values(m?.layers ?? {}).filter((l) => under(l.path, o.layer)), kept = Object.values(m?.layers ?? {}).filter((l) => !under(l.path, o.layer));
+      const drove = [...new Set(gone.flatMap((l) => Object.values(l.wired ?? {})))].filter((p) => !kept.some((l) => Object.values(l.wired ?? {}).includes(p)) && m.properties.some((x) => x.name === p));
+      ops.push(o); m = predict(m, [o], captures);
+      for (const name of drove) {
+        const r = { op: 'removeProperty', name };
+        if (existing) breaking.push({ what: `the property ${name} removed with the layer it drove: every instance that sets it, and every product that uses it, breaks` });
+        ops.push(r); m = predict(m, [r], captures);
+      }
+      return;
     }
     if (o.op === 'bind') {
       if (!FIELDS.includes(o.field)) { ask(at, `bind takes a field: ${FIELDS.join(', ')} (not ${o.field}).`); return; }
       if (!layerOk(at, o.layer ?? '') || !varOk(at, o.variable)) return;
+      if (o.where && m) o.where = Object.fromEntries(Object.entries(o.where).map(([k, x]) => { const a = axisNamed(m, k) ?? k; return [a, optionNamed(m, a, x) ?? x]; }));
       if (o.where && m) for (const [k, x] of Object.entries(o.where)) if (!optionsOf(m, k).some((y) => y.name === x)) { ask(at, `${m.name} has no variant ${k}=${x} to bind on.`); return; }
     }
     if (o.op === 'rebind') { if (!varOk(at, o.from) || !varOk(at, o.to)) return; }
@@ -288,7 +314,17 @@ const changed = [], skipped = [], missing = [];
 const pageOf = async (n) => { let p = n; while (p && p.type !== 'PAGE') p = p.parent; if (p && p.loadAsync) await p.loadAsync(); return p; };
 const nodeOf = async (name) => (nodes[name] ? await figma.getNodeByIdAsync(nodes[name]) : null);
 const vars = await figma.variables.getLocalVariablesAsync();
-const varOf = (name) => vars.find((v) => v.name === name);
+// The file's own variables first, then the libraries it uses (imported once, by key), when this run may read them.
+let library = null;
+const varOf = async (name) => {
+  const own = vars.find((v) => v.name === name);
+  if (own || !figma.teamLibrary) return own;
+  try {
+    if (!library) { library = []; for (const c of await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync()) library.push(...await figma.teamLibrary.getVariablesInLibraryCollectionAsync(c.key)); }
+    const hit = library.find((v) => v.name === name);
+    return hit ? await figma.variables.importVariableByKeyAsync(hit.key) : undefined;
+  } catch (e) { return undefined; }
+};
 const textStyles = await figma.getLocalTextStylesAsync();
 const variantsOf = (s) => (s.type === 'COMPONENT_SET' ? s.children.filter((c) => c.type === 'COMPONENT') : [s]);
 const axesOf = (v) => Object.fromEntries(String(v.name).split(/,\\s*/).map((p) => p.split('=').map((x) => x.trim())).filter((p) => p.length === 2));
@@ -299,6 +335,9 @@ const fonts = async (n) => { if (n.type !== 'TEXT') return; const f = n.fontName
 const inside = (s) => [s, ...(s.findAll ? s.findAll((n) => { for (let p = n.parent; p && p !== s; p = p.parent) if (p.type === 'INSTANCE') return false; return true; }) : [])];
 // New variants go in a row under the others, and the set grows to hold them.
 const fit = (s) => { if (s.type !== 'COMPONENT_SET' || (s.layoutMode && s.layoutMode !== 'NONE')) return; let w = 0, h = 0; for (const c of s.children) { w = Math.max(w, c.x + c.width); h = Math.max(h, c.y + c.height); } s.resizeWithoutConstraints(Math.max(s.width, w + 20), Math.max(s.height, h + 20)); };
+// A variant copied inside its set loses what its layers were wired to (Figma drops the property references on clone):
+// each layer gets its source's back, by position.
+const rewire = async (from, to) => { if (from.componentPropertyReferences && Object.keys(from.componentPropertyReferences).length && 'componentPropertyReferences' in to) { await fonts(to); try { to.componentPropertyReferences = { ...from.componentPropertyReferences }; } catch (e) { /* a reference Figma will not take here */ } } const a = from.children || [], b = to.children || []; if (from.type !== 'INSTANCE') for (let i = 0; i < Math.min(a.length, b.length); i++) await rewire(a[i], b[i]); };
 const below = (s) => (s.type === 'COMPONENT_SET' ? Math.max(0, ...s.children.map((c) => c.y + c.height)) + 40 : 0);
 const FIELDS = { gap: ['itemSpacing'], counterAxisSpacing: ['counterAxisSpacing'], padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'], paddingX: ['paddingLeft', 'paddingRight'], paddingY: ['paddingTop', 'paddingBottom'], radius: ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] };
 const bindOne = async (l, field, v) => {
@@ -352,7 +391,7 @@ ${target ? "if (!set) return { changed, skipped, missing: ['the component (node 
       if (!from.length) { missing.push(o.axis + '=' + o.like); continue; }
       if (variantsOf(set).some((v) => axesOf(v)[o.axis] === o.option)) { skipped.push(o.axis + '=' + o.option); continue; }
       let x = 0; const y = below(set);
-      for (const v of from) { const c = v.clone(); set.appendChild(c); c.name = named({ ...axesOf(v), [o.axis]: o.option }); c.x = x; c.y = y; x += c.width + 20; }
+      for (const v of from) { const c = v.clone(); set.appendChild(c); await rewire(v, c); c.name = named({ ...axesOf(v), [o.axis]: o.option }); c.x = x; c.y = y; x += c.width + 20; }
       fit(set); changed.push(o.axis + '=' + o.option + ': ' + from.length + ' variant' + (from.length === 1 ? '' : 's') + ', copied from ' + o.like);
     } else if (o.op === 'removeOption') {
       const gone = variantsOf(set).filter((v) => axesOf(v)[o.axis] === o.option);
@@ -361,11 +400,13 @@ ${target ? "if (!set) return { changed, skipped, missing: ['the component (node 
     } else if (o.op === 'addAxis') {
       const first = o.default || o.options[0], rest = o.options.filter((x) => x !== first), was = variantsOf(set);
       let x = 0; const y = below(set);
-      for (const v of was) { const a = axesOf(v); for (const opt of rest) { const c = v.clone(); set.appendChild(c); c.name = named({ ...a, [o.axis]: opt }); c.x = x; c.y = y; x += c.width + 20; } v.name = named({ ...a, [o.axis]: first }); }
+      for (const v of was) { const a = axesOf(v); for (const opt of rest) { const c = v.clone(); set.appendChild(c); await rewire(v, c); c.name = named({ ...a, [o.axis]: opt }); c.x = x; c.y = y; x += c.width + 20; } v.name = named({ ...a, [o.axis]: first }); }
       fit(set); changed.push('axis ' + o.axis + ' (' + o.options.join(', ') + ')');
     } else if (o.op === 'addProperty') {
       const type = { boolean: 'BOOLEAN', text: 'TEXT', swap: 'INSTANCE_SWAP', 'instance swap': 'INSTANCE_SWAP' }[o.kind];
       if (keyOf(set, o.name)) { skipped.push('property ' + o.name); continue; }
+      // No property is made that would drive nothing.
+      if (!variantsOf(set).some((v) => layerIn(v, o.layer))) { missing.push('property ' + o.name + ' (no layer ' + o.layer + ')'); continue; }
       let def = o.default;
       if (type === 'INSTANCE_SWAP') { const c = await nodeOf(o.default); if (!c) { missing.push(o.default); continue; } def = c.type === 'COMPONENT_SET' ? c.defaultVariant.id : c.id; }
       if (type === 'BOOLEAN') def = def !== false && def !== 'false';
@@ -409,13 +450,13 @@ ${target ? "if (!set) return { changed, skipped, missing: ['the component (node 
       let n = 0; for (const v of variantsOf(set)) { const l = layerIn(v, o.layer); if (l) { l.remove(); n++; } }
       (n ? changed : skipped).push('layer ' + o.layer + (n ? ' removed' : ''));
     } else if (o.op === 'bind') {
-      const v = varOf(o.variable);
+      const v = await varOf(o.variable);
       if (!v) { missing.push('variable ' + o.variable); continue; }
       let n = 0;
       for (const x of variantsOf(set).filter((x) => !o.where || Object.entries(o.where).every(([k, y]) => axesOf(x)[k] === y))) { const l = layerIn(x, o.layer || ''); if (!l) continue; await bindOne(l, o.field, v); n++; }
       (n ? changed : missing).push((o.layer || 'its frame') + ' ' + o.field + ' → ' + o.variable + (n ? '' : ' (no such layer)'));
     } else if (o.op === 'rebind') {
-      const a = varOf(o.from), b = varOf(o.to);
+      const a = await varOf(o.from), b = await varOf(o.to);
       if (!a || !b) { missing.push('variable ' + (a ? o.to : o.from)); continue; }
       let n = 0;
       for (const node of inside(set)) {
