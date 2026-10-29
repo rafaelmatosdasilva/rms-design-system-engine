@@ -384,7 +384,7 @@ A focus outline taken off a class counts as put back when a more specific rule s
 
 ### A control's parts
 
-A control's parts are checked with it: the label tied to its field, the error joined by `aria-describedby` while it shows (with `aria-invalid` set), the hint joined the same way, the indicator (a check, a chevron) silent for screen readers, the + and - of a stepper each with a name. Figma's layer annotations say which layer is which part ("role: label"); where nobody annotated them, the layers' own names say it (Label, Error message, Helper text, Chevron, Plus), and the finding says it was read from the name. The accessibility spec offered to Figma lists the parts the code's markup shows, so annotating them is one approval away.
+A control's parts are checked with it: the label tied to its field, the error joined by `aria-describedby` while it shows (with `aria-invalid` set), the hint joined the same way, the indicator (a check, a chevron) silent for screen readers, the + and - of a stepper each with a name. Figma's layer annotations say which layer is which part ("role: label"); where nobody annotated them, the layers' own names say it (Label, Error message, Helper text, Chevron, Plus), and the finding says it was read from the name. The accessibility spec offered to Figma lists the parts the code's markup shows, so annotating them is one approval away. Before any browser, a field's own source is read for the same wiring (a `<label>` tied with `for` or wrapping the field, the error and hint joined with `aria-describedby`, `aria-invalid` while the error shows, an indicator with `aria-hidden`), and what is missing is said with the role check.
 
 ### Products' pages
 

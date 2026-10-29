@@ -134,3 +134,15 @@ test('a control nobody annotated: its parts read from its layers\' names and fro
   assert.deepEqual(partsInMarkup('<div class="tile-field"><label for="a">Name</label><input id="a"><span class="tile-field__hint">x</span><em class="tile-error-text">y</em><i class="icon-check"></i></div>').map((x) => x.part),
     ['label', 'description', 'errormessage', 'indicator']);
 });
+
+test('a field\'s parts wired in its own source: its label tied, its error and hint joined, its indicator silent', async () => {
+  const { partWiringFindings } = await import('../behaviour-contract.mjs');
+  const loose = '<template><div><label>Name</label><input id="a"><span class="tile-field__hint">h</span><span class="tile-field-error">e</span><i class="icon-chevron"></i></div></template>';
+  assert.deepEqual(partWiringFindings(loose, 'textbox').map((x) => x.split(' ')[x.startsWith('its') ? 1 : 0]), ['<label>', 'error', 'aria-invalid="true"', 'hint', 'indicator']);
+  const wired = '<template><label :for="id">N</label><input :id="id" :aria-describedby="hintId" :aria-invalid="bad"><span class="tile-field-error">e</span><i class="chevron" aria-hidden="true"></i></template>';
+  assert.deepEqual(partWiringFindings(wired, 'textbox'), []);
+  assert.deepEqual(partWiringFindings('<template><label><input type="checkbox"> Agree</label></template>', 'checkbox'), [], 'a label wrapping its field is tied');
+  assert.deepEqual(partWiringFindings('<template><input v-bind="$attrs"><span class="hint">h</span></template>', 'textbox'), [], 'attributes passed through: whoever uses it joins the hint');
+  assert.deepEqual(partWiringFindings(loose, 'button'), [], 'only a field');
+  assert.deepEqual(partWiringFindings('<template><tile-input /></template>', 'textbox'), [], 'no field of its own in the source: left to the browser');
+});
