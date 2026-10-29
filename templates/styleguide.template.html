@@ -2451,9 +2451,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   var WHO = { figma: 'You in Figma', code: 'A developer in the code', figmaCode: 'In Figma and in the code', both: 'You decide', person: 'You check by hand' };
   // The team that owns what a task is about (ds-config.json owners: a component, a layer or a token prefix to a team),
   // said after who acts: the longest key that is the component's name, or a token prefix the task names ("primitives/");
-  // "*" for everything else. None set: nothing said.
+  // "*" for everything else. None set: nothing said. A task that already knows its team (a product's own) says that one.
   var OWNERS = (typeof DATA !== 'undefined' && DATA.owners) || {};
-  function teamNote(about) {
+  function teamNote(about, team) {
+    if (team) return ' · ' + team;
     var a = String(about || ''), keys = Object.keys(OWNERS).sort(function (x, y) { return y.length - x.length; });
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i], kl = k.toLowerCase(), al = a.toLowerCase();
@@ -2489,7 +2490,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // A control the page draws itself (its segmented control, tooltip, card) is the template's, never the system's work:
   // no task. The system's own gaps are in Parity.
   // What the tokens owe (descriptions to write in Figma, a value written by hand twice, an alias to a removed token).
-  (DATA.systemTodo || []).forEach(function (t) { if (t.component) return;   /* one tied to a component is on that component's page */ TODO.push({ who: t.who, comp: null, area: t.area || 'System', type: t.type || 'Tokens, ' + t.kind.toLowerCase(), pairing: t.pairing, match: t.match, say: t.say, todo: t.todo }); });
+  (DATA.systemTodo || []).forEach(function (t) { if (t.component) return;   /* one tied to a component is on that component's page */ TODO.push({ who: t.who, comp: null, area: t.area || 'System', type: t.type || 'Tokens, ' + t.kind.toLowerCase(), pairing: t.pairing, match: t.match, team: t.team, say: t.say, todo: t.todo }); });
   // A component whose file is still to confirm (a proposal, or files near its name) is that decision, not one to build.
   var PAIRING = {}; (DATA.systemTodo || []).forEach(function (t) { if (t.pairing) PAIRING[t.pairing] = true; });
   // A component only the code has, once Figma's components are captured: not on the page, a task each, with its file.
@@ -7779,8 +7780,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var sys = TODO.filter(function (t) { return !t.comp; }).map(function (t, i) {
       var comp = /^Figma has the (.+) component; the code does not have it yet\.$/.exec(t.say || '');
       // A component only the code has: its file on the code's side, nothing on Figma's.
-      if (t.codeFile) return { from: t, key: '\u0000system:' + i + ':' + t.say, area: 'Parity', kind: 'Component', figma: '<span class="pg-par-none">Not there</span>', code: '<code>' + esc(t.codeFile) + '</code>', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say), st: 'todo', rel: PAR_REL.code, at: DATA.builtAt || null };
-      return { key: '\u0000system:' + i + ':' + t.say, area: t.area || (comp ? 'Parity' : 'Style guide'), kind: t.type || (comp ? 'Component' : 'Stand-in'), figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say), st: t.who !== 'both' ? 'todo' : 'check', rel: comp ? PAR_REL.figma : '', from: t, at: DATA.builtAt || null };
+      if (t.codeFile) return { from: t, key: '\u0000system:' + i + ':' + t.say, area: 'Parity', kind: 'Component', figma: '<span class="pg-par-none">Not there</span>', code: '<code>' + esc(t.codeFile) + '</code>', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say, t.team), st: 'todo', rel: PAR_REL.code, at: DATA.builtAt || null };
+      return { key: '\u0000system:' + i + ':' + t.say, area: t.area || (comp ? 'Parity' : 'Style guide'), kind: t.type || (comp ? 'Component' : 'Stand-in'), figma: comp ? '<code>' + esc(comp[1]) + '</code>' : '', code: comp ? '<span class="pg-par-none">Not there</span>' : '', todo: esc(t.say) + '<span class="pg-todo">' + esc(doWhat(t.todo)) + '</span>', who: (WHO[t.who] || WHO.both) + teamNote(t.say, t.team), st: t.who !== 'both' ? 'todo' : 'check', rel: comp ? PAR_REL.figma : '', from: t, at: DATA.builtAt || null };
     });
     if (sys.length) order.push({ name: null, rows: sys });
     COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (c) {
