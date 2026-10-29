@@ -57,3 +57,35 @@ test('a mark is taken back when the check is fixed', () => {
   assert.equal(gone.length, 1);
   assert.deepEqual(readWrong(d).map((x) => x.check), ['Markup']);
 });
+
+test('each finding marked wrong is a case its check must pass: still raised, or passed now, only for the checks that ran', async () => {
+  const { wrongCases, caseLines } = await import('../wrong.mjs');
+  const d = dir();
+  recordWrong(d, [f('Token values', 'chip radius differs', 'chip'), f('Markup', 'tile has no id', 'tile'), f('Icons', 'star path differs')], { why: 'it reads the hover rule' });
+  const cases = wrongCases(d, [{ check: 'Token values', what: 'chip radius differs' }], ['Token values', 'Markup']);
+  assert.deepEqual(cases.still.map((m) => m.what), ['chip radius differs'], 'still raised: the check is still wrong');
+  assert.deepEqual(cases.fixed.map((m) => m.what), ['tile has no id'], 'its check ran and no longer raises it: passed');
+  const lines = caseLines(cases);
+  assert.match(lines[0], /^Marked wrong and still raised: 1/);
+  assert.match(lines[1], /Token values: chip radius differs \(wrong because: it reads the hover rule\)/);
+  assert.ok(lines.some((l) => /--unwrong --match/.test(l)));
+  assert.deepEqual(caseLines(wrongCases(d, [], [])), [], 'a run that ran none of their checks says nothing of them');
+});
+
+test('--wrong marks the last audit\'s findings that match, only with why; --unwrong takes them back', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const d = dir();
+  writeFileSync(join(d, 'ds-config.json'), '{}');
+  mkdirSync(join(d, '.design-system-engine-out'), { recursive: true });
+  writeFileSync(join(d, '.design-system-engine-out', 'findings.json'), JSON.stringify({ findings: [{ check: 'Token values', evidence: 'chip radius differs', component: 'chip' }, { check: 'Markup', evidence: 'tile has no id', component: 'tile' }] }));
+  const run = (...a) => spawnSync(process.execPath, [join(process.cwd(), 'audit.mjs'), ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  assert.match(run('--wrong', '--match', 'radius').stdout, /needs why/);
+  const ok = run('--wrong', '--match', 'radius', '--why', 'it reads the hover rule', '--by', 'QA');
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.deepEqual(readWrong(d).map((m) => [m.what, m.why, m.by]), [['chip radius differs', 'it reads the hover rule', 'QA']]);
+  assert.match(run('--wrong').stdout, /Marked wrong \(design-system-engine-wrong\.json\): 1/);
+  assert.equal(run('--wrong', '--match', 'nothing', '--why', 'x').status, 1);
+  assert.equal(run('--unwrong', '--match', 'radius').status, 0);
+  assert.deepEqual(readWrong(d), []);
+});
