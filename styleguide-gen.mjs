@@ -1219,6 +1219,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const tt = typographyTodos(check ?? {}, readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json') ?? {});
       if (tt.length) view.systemTodo = [...(view.systemTodo ?? []), ...tt];
     } catch { /* the page builds without it */ }
+    // A product still on an older version past a release's day (releases.mjs): a task on the Tasks list, for its team.
+    if (!opts.only?.length) try {
+      const rel = await import('./releases.mjs');
+      const releases = rel.readReleases(ROOT);
+      if (releases.length) {
+        const { tokenToVar, resolveNamingSpec } = await import('./naming-convention.mjs');
+        const spec = resolveNamingSpec(cfg), products = rel.productsOf(ROOT, cfg);
+        const late = rel.lateTodos(products.map((p) => rel.productImpact(p, releases, { cssOf: (t) => tokenToVar(t, spec) })), products, cfg);
+        if (late.length) view.systemTodo = [...(view.systemTodo ?? []), ...late];
+      }
+    } catch { /* the page builds without it */ }
     // Its parity with Figma: each fact the agreed record holds (equal on both sides, since when), its props and tokens,
     // what differs, what the code does not build and what the last audit could not compare (its census). Then how a
     // product brings it in (its import line and its file) and the system's components it is built with.

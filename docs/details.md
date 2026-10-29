@@ -431,10 +431,13 @@ A component only the code has is written to `handback/figma-to-build.md` with it
 
 ### Retiring and renaming
 
-**Which version each product uses.** Each time the contracts are published with a breaking change (a prop, option or state removed, a default changed, a token removed), the release is recorded with the system's version, the day and what broke, in `design-system-engine-releases.json` (commit it), with the day by which the products move to it (`migrationDays`, 90 by default). Each product says the version it uses (`products` in `ds-config.json`, or its own `package.json` depending on the system's package), and `rms-design-system-engine --products` tells each one behind which changes since its version its own files touch, and by when; one past that day is named late. Nothing is blocked.
-
 - **Retired components and tokens.** A component marked deprecated (`@deprecated` and `@use-instead` in its Figma description, or `contract.authored.json`), a token whose Figma description says `@deprecated`, or an old name a rename kept. The audit lists each in `handback/migrations.md`, with what replaces it, when and why, and every file and line still using it, docs included. Each token swap gets a patch (`migrations.diff`, `migrations-<product>.diff`).
 - **Renamed tokens.** `rms-design-system-engine --rename-sweep` pairs each old name with its new one by value in every mode, and writes one patch for the system and one for each product, every rule, script and doc. The old name stays in the theme pointing at the new one until every product has moved. A full audit says in one line when the code still writes a renamed token by its old name.
+
+**Which version each product uses.** Each time the contracts are published with a breaking change (a prop, option or state removed, a default changed, a token removed), the release is recorded with the system's version, the day and what broke, in `design-system-engine-releases.json` (commit it), with the day by which the products move to it (`migrationDays`, 90 by default). Each product says the version it uses (`products` in `ds-config.json`, or its own `package.json` depending on the system's package), and `rms-design-system-engine --products` tells each one behind which changes since its version its own files touch, and by when; one past that day is named late. Nothing is blocked.
+
+- **Its docs too.** A product's README and every Markdown or MDX page in its folder are read with its code (never its changelog). Docs kept elsewhere are named in its entry: `"docs": "handbook/shop"`. In a doc, a component counts only as the code writes it (`tileCard`, `<tile-card>`, `<TileCard>`), never as a word of prose.
+- **Late, on the Tasks list.** A product still on an older version past a release's day is a task under Products on the style guide's Tasks list: what it is still on, what it was to take by when, and how many of its files the changes touch. Its own team acts: `"team"` in its `products` entry, else `owners` under its name (Who owns what), else its name's team.
 
 Nothing is applied until you ask.
 

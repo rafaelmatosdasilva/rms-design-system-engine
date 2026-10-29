@@ -15,9 +15,12 @@ test('a task names its owning team: the component\'s, else the layer of a token 
   assert.equal(note('kit/tile/border/color is under 3:1'), ' · Tiles team', 'the longest key first');
   assert.equal(note('badgeNote'), ' · Product teams');
   assert.equal(teamNoteWith({})('tileCard'), '', 'none set: nothing said');
+  assert.equal(note('Acme shop is still on 1.2.0', 'Checkout team'), ' · Checkout team', 'a task that knows its team (a late product\'s) says it');
 });
 
 test('every who-acts label on the Tasks list carries the owning team', () => {
   assert.equal((page.match(/\+ teamNote\(/g) ?? []).length, 4);
   assert.doesNotMatch(page, /WHO\[[tx]\.who\] \|\| WHO\.both(?!\) \+ teamNote)/, 'no label left without it');
+  assert.equal((page.match(/teamNote\(t\.say, t\.team\)/g) ?? []).length, 2, 'a system task carries the team it knows');
+  assert.match(page, /DATA\.systemTodo[^\n]*team: t\.team/);
 });
