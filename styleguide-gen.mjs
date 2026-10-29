@@ -743,7 +743,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const { RULE_FILES } = await import('./agent-rules.mjs');
         const agentFiles = RULE_FILES.map((f) => { try { return { name: f, lines: readFileSync(join(ROOT, f), 'utf8').split(/\n+/) }; } catch { return null; } }).filter(Boolean);
         const absent = (await import('./layer-questions.mjs')).absentComponent([...view.components.map((c) => c.name), ...Object.keys(readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {})], { layer: snap, more: agentFiles });
-        absent.entry = src.entry ?? null; absent.entryUrl = src.url && src.entry ? `${src.url}/-/blob/${src.ref || 'HEAD'}/${src.entry}` : null;
+        absent.entry = src.entry ?? null; absent.entryUrl = (await import('./doc-host.mjs')).fileUrl(src, src.entry);
         view.intentLayer = { absent, ...(snap.system?.drafts?.length ? { systemDrafts: snap.system.drafts } : {}), source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
           noPage: decided.noPage, addProposals: decided.addProposals };
         // What else the agents read about each component, beside its intent-layer page, each with where it comes

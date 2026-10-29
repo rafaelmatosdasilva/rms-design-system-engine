@@ -175,7 +175,8 @@ const flatWords = (s) => String(s ?? '').toLowerCase().replace(/[\u201c\u201d"'`
 const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key');
 const INIT_THEME_CSS      = _argValue('--theme-css');
 const INIT_SOURCE_URL     = _argValue('--figma-source-url');
-// The team's written documentation for agents, optional: a GitLab project of DSDS pages (the intent layer), or a page
+// The team's written documentation for agents, optional: the intent layer (DSDS or Markdown pages in a GitLab or GitHub
+// repository, or a folder of the project), or a page
 // (a GitLab wiki or Markdown file, a Notion page) of guidelines. One link; which it is comes from the link itself.
 const INIT_DOCS           = _argValue('--documentation');
 // The request setup was reached from (--then='check the button'): carried through setup's questions, and routed again
@@ -1686,10 +1687,12 @@ if (process.argv.includes('--guidelines') || process.argv.some((a) => a.startsWi
   process.exit(failed ? 1 : 0);
 }
 
-// ── --intent-layer <link>: set the GitLab project that holds the intent layer, read it now, and exit ─────────
-// The link (a project, or /-/tree/<branch>) goes into ds-config.json → intentLayer; the layer is read at once into its
-// snapshot and the run says how many pages it found and how many components they name, or the one thing to fix.
-// --entry=<path> names the index when the project holds more than one system.dsds.json. No link: the one set.
+// ── --intent-layer <link or folder>: set where the intent layer lives, read it now, and exit ─────────
+// A GitLab project (or /-/tree/<branch>), a GitHub repository (or /tree/<branch>/<folder>) or a folder of the project
+// goes into ds-config.json → intentLayer; the layer is read at once into its snapshot and the run says how many pages
+// it found and how many components they name, or the one thing to fix. Its pages are DSDS or Markdown (MDX), found
+// from its files; --format=dsds|markdown says which. --entry=<path> names the index when the project holds more than
+// one system.dsds.json. No link: the one set.
 if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.startsWith('--intent-layer='))) {
   const cfgPath = join(ROOT, 'ds-config.json');
   if (!existsSync(cfgPath)) { console.error('❌ ds-config.json not found. Run the first-time setup first (rms-design-system-engine --init).'); process.exit(1); }
@@ -1698,9 +1701,31 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
   const { parseGitlabProject, hostEnvFrom, tokenFrom } = await import('./gitlab-source.mjs');
   const link = _argValues('--intent-layer').flatMap((v) => v.split(/[\s,]+/)).map((s) => s.trim()).filter(Boolean)[0];
   const entry = _argValues('--entry')[0] ?? null;
+  const format = _argValues('--format')[0] ?? null;
   if (!link) {
     const c = il.intentLayerConfig(conf);
-    console.log(c ? `\nIntent layer: ${c.url}${c.entry ? `  (index ${c.entry})` : ''}  → ${c.out}` : '\nNo intent layer set yet. Name its GitLab project: rms-design-system-engine --intent-layer <link>');
+    console.log(c ? `\nIntent layer: ${c.host === 'folder' ? `the folder ${c.folder}` : c.url}${c.path ? `  (folder ${c.path})` : ''}${c.entry ? `  (index ${c.entry})` : ''}  → ${c.out}` : '\nNo intent layer set yet. Name where it lives: rms-design-system-engine --intent-layer <GitLab or GitHub link, or a folder of this project>');
+    process.exit(0);
+  }
+  const host = (await import('./doc-host.mjs')).hostOf(link);
+  if (format && !/^(dsds|markdown|md|mdx)$/i.test(format)) { console.log(`\n❌ --format=${format}: the intent layer is read as dsds or markdown.`); process.exit(1); }
+  if (host !== 'gitlab') {
+    const { parseGithub } = await import('./doc-host.mjs');
+    if (host === 'github' && !parseGithub(link)) { console.log(`\n❌ ${link}\n   This is not a GitHub repository link (https://github.com/<owner>/<repo>, or /tree/<branch>/<folder>), so it was not set.`); process.exit(1); }
+    if (host === 'folder' && !(existsSync(resolve(ROOT, link)) && statSync(resolve(ROOT, link)).isDirectory())) { console.log(`\n❌ ${link}\n   This is not a folder of this project, so it was not set.`); process.exit(1); }
+    const prev = il.intentLayerConfig(conf);
+    const place = host === 'folder' ? relative(ROOT, resolve(ROOT, link)).split('\\').join('/') || '.' : link;
+    const extra = { ...(entry || prev?.entry ? { entry: entry || prev.entry } : {}), ...(format ? { format: /^dsds$/i.test(format) ? 'dsds' : 'markdown' } : {}), ...(prev && prev.out !== il.DEFAULT_OUT ? { out: prev.out } : {}) };
+    conf.intentLayer = Object.keys(extra).length ? { [host]: place, ...extra } : place;
+    writeFileSync(cfgPath, JSON.stringify(conf, null, 2) + '\n');
+    const r = await il.syncIntentLayer(ROOT, conf, {});
+    console.log('\n' + il.describeSync(r));
+    if (r?.error) {
+      if (host === 'github') console.log('   If the repository is private, or GitHub limits requests without a token, put a GitHub token that can read it in this project\'s .env as GITHUB_TOKEN=... (never paste it into the chat).');
+      console.log(`\nNEXT: make the fix named above, then run rms-design-system-engine --intent-layer ${link} again`);
+      process.exit(1);
+    }
+    console.log(`\nNEXT: rms-design-system-engine   (every run reads it again when ${host === 'folder' ? 'a page in it changed' : 'its commit moved'}, and folds it into the design intent, the contracts and the style guide)`);
     process.exit(0);
   }
   const envDirs = [ROOT, ...(existsSync(join(ROOT, '.gitlab-source.json')) ? [dirname(resolve(ROOT))] : [])];   // a mirror's .env is beside it
@@ -1710,7 +1735,7 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
   const p = parseGitlabProject(link, hostEnv) ?? (linkHost ? parseGitlabProject(link, { ...hostEnv, GITLAB_HOST: [hostEnv.GITLAB_HOST, linkHost].filter(Boolean).join(',') }) : null);
   if (!p) { console.log(`\n❌ ${link}\n   This is not a GitLab project link (https://<host>/<group>/<project>), so it was not set.`); process.exit(1); }
   const prev = il.intentLayerConfig(conf);
-  conf.intentLayer = entry || prev?.entry || (prev && prev.out !== il.DEFAULT_OUT) ? { gitlab: link, ...(entry || prev?.entry ? { entry: entry || prev.entry } : {}), ...(prev && prev.out !== il.DEFAULT_OUT ? { out: prev.out } : {}) } : link;
+  conf.intentLayer = entry || prev?.entry || format || (prev && prev.out !== il.DEFAULT_OUT) ? { gitlab: link, ...(entry || prev?.entry ? { entry: entry || prev.entry } : {}), ...(format ? { format: /^dsds$/i.test(format) ? 'dsds' : 'markdown' } : {}), ...(prev && prev.out !== il.DEFAULT_OUT ? { out: prev.out } : {}) } : link;
   writeFileSync(cfgPath, JSON.stringify(conf, null, 2) + '\n');
   const r = await il.syncIntentLayer(ROOT, conf, {});
   console.log('\n' + il.describeSync(r));
@@ -1732,7 +1757,7 @@ if (process.argv.includes('--watch-intent-layer')) {
   try { wcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
   const { syncIntentLayer, intentLayerConfig } = await import('./doc-source-dsds.mjs');
   const c = intentLayerConfig(wcfg);
-  if (!c) { console.log('No intent layer is set: rms-design-system-engine --intent-layer <GitLab link> first.'); process.exit(2); }
+  if (!c) { console.log('No intent layer is set: rms-design-system-engine --intent-layer <GitLab or GitHub link, or a folder> first.'); process.exit(2); }
   const at = process.argv.indexOf('--watch-intent-layer'), minutes = Math.max(1, Number(process.argv[at + 1]) || 5);
   const now = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   console.log(`👀 Watching ${c.url} every ${minutes} min: the style guide is built again when its commit moves. Stop with Ctrl+C.`);
@@ -3153,7 +3178,7 @@ async function bootstrapConfig() {
   if (INIT_NONINTERACTIVE && !INIT_CODE_GIVEN) {
     console.log(C.yellow('  ⚠️  Setup needs to know where the code is first. Nothing was written.'));
     console.log(C.dim(`  This folder (${ROOT}) ${holds()}.`));
-    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}${INIT_DOCS ? '' : '; and, if they have it, a link to its written documentation for agents: an intent layer on GitLab, a wiki or Notion page (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or repository link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${INIT_DOCS ? ` --documentation='${INIT_DOCS}'` : ` --documentation='<the documentation link, if they gave one>'`}${thenArg}.`);
+    console.log(`NEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab${INIT_FIGMA_URL ? '' : '; and, if they have one, the link to its Figma file (optional)'}${INIT_DOCS ? '' : '; and, if they have it, a link to its written documentation for agents: an intent layer in a GitLab or GitHub repository or a docs folder, a wiki or Notion page (optional)'}. Then run rms-design-system-engine --init --project='<. for this folder, or the folder or repository link>'${figmaArg || ` --figma-url='<the Figma link, if they gave one>'`}${INIT_DOCS ? ` --documentation='${INIT_DOCS}'` : ` --documentation='<the documentation link, if they gave one>'`}${thenArg}.`);
     process.exit(2);
   }
   // Told the code is in a folder that has none: the code is somewhere else, or it starts here from Figma. One question.
@@ -3237,7 +3262,7 @@ async function bootstrapConfig() {
         process.exit(r.status ?? 1);
       }
     }
-    if (!INIT_DOCS) docsAns = (await ask('Link to your written documentation for agents (an intent layer on GitLab, a wiki or Notion page), or Enter to skip: ')).trim();
+    if (!INIT_DOCS) docsAns = (await ask('Link to your written documentation for agents (an intent layer: a GitLab or GitHub repository, or a docs folder; a wiki or Notion page), or Enter to skip: ')).trim();
     const themeAns = defaultHint
       ? ((await ask(`Token CSS file(s) [${defaultHint}]: `)).trim() || defaultHint)
       : (await ask(`Token CSS file(s) (e.g. src/styles/theme.css${figmaRaw ? '; leave empty to build them from Figma' : ''}): `)).trim();
@@ -3428,8 +3453,9 @@ async function bootstrapConfig() {
 }
 
 // The team's written documentation for agents, from one link: a GitLab wiki page or Markdown file, or a Notion page, is a
-// guidelines page (--guidelines); any other GitLab project link is the intent layer (--intent-layer). Each command
-// records it in ds-config.json, reads it once and says, in plain words, what it read or the one thing to fix.
+// guidelines page (--guidelines); any other GitLab project link, a GitHub repository or a folder of the project is the
+// intent layer (--intent-layer). Each command records it in ds-config.json, reads it once and says, in plain words, what
+// it read or the one thing to fix.
 function addDocumentation(link) {
   const page = /notion\.(so|site)\//i.test(link) || /\/-\/(wikis|blob|raw)\//.test(link);
   console.log(C.dim(`\n  Documentation for agents: ${page ? 'a guidelines page' : 'the intent layer'} (${link})`));

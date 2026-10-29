@@ -1,4 +1,4 @@
-// intent-layer.mjs - the team's intent layer (DSDS pages on GitLab) read through the API into a snapshot, matched to
+// intent-layer.mjs - the team's intent layer (DSDS pages on GitLab; other hosts and Markdown in intent-sources.test.mjs) read through the API into a snapshot, matched to
 // the system's components, folded into the design intent, the contracts, llms.txt, the prototype context and the
 // style guide, and a report of what of it reaches the agents. An invented system (Acme); network through an injected
 // fetch serving a tar.gz built here.
@@ -114,8 +114,8 @@ const ENV = { GITLAB_TOKEN: 't0k', GITLAB_HOST: 'git.acme.test' };
 // ── Pure parts ────────────────────────────────────────────────────────────────────────────────────────────────────
 test('config: a bare link or an object; nothing set is null', () => {
   assert.equal(intentLayerConfig({}), null);
-  assert.deepEqual(intentLayerConfig({ intentLayer: LINK }), { url: LINK, entry: null, out: 'intent-layer.snapshot.json', contracts: null });
-  assert.deepEqual(intentLayerConfig({ intentLayer: { gitlab: LINK, entry: '/docs/system.dsds.json', out: 'x.json', contracts: '/specs/contracts/' } }), { url: LINK, entry: 'docs/system.dsds.json', out: 'x.json', contracts: 'specs/contracts' });
+  assert.deepEqual(intentLayerConfig({ intentLayer: LINK }), { host: 'gitlab', url: LINK, entry: null, out: 'intent-layer.snapshot.json', contracts: null });
+  assert.deepEqual(intentLayerConfig({ intentLayer: { gitlab: LINK, entry: '/docs/system.dsds.json', out: 'x.json', contracts: '/specs/contracts/' } }), { host: 'gitlab', url: LINK, entry: 'docs/system.dsds.json', out: 'x.json', contracts: 'specs/contracts' });
 });
 
 test('kinds land in the layers of the design intent; titles map to the kinds the style guide shows', () => {

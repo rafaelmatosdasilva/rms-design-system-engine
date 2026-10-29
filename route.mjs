@@ -199,8 +199,18 @@ const FIGMA_BRANCH = /\bfigma\b[\s\S]{0,30}\b(branch|ramo)\b|\b(branch|ramo)\b[\
 // The team's guidance rated for what agents can take from it; the extraction test only when they ask for it.
 const RATE_GUIDANCE = /\b(rate|grade|score|classif\w*|evaluate|assess|review|avalia\w*|classifica\w*)\b[\s\S]{0,60}\b(guidance|guidelines?|documentation|docs|intent|diretrizes|documenta[çc][ãa]o)\b|\b(guidance|guidelines?|documentation|docs)\b[\s\S]{0,40}\b(for|para)\s+(agents?|ai|llms?|agentes)\b/i;
 const EXTRACT_ASKED = /\bextract\w*|\bwith a model\b|\bmodel test\b|\bteste?\b[\s\S]{0,20}\bmodelo\b/i;
-// The team's intent layer: a GitLab project of DSDS pages, named with "intent layer" and its link (any host).
+// The team's intent layer, named with "intent layer" and where it is: its link (a GitLab project on any host, a GitHub
+// repository) or a folder of the project.
 const INTENT_LAYER = /\bintent[- ]layer\b|\bcamada de inten[çc][ãa]o\b/i;
+const FOLDER_SAID = /\b(folder|directory|pasta|diret[óo]rio)\b|(^|\s)\.{0,2}\/?[\w-]+\/[\w./-]*(?=\s|$)/i;
+// The folder named: a path (docs/intent, ./docs), "the docs folder", or "folder docs". → its path, or null
+const folderNamed = (t) => {
+  const path = /(?:^|\s)(\.{0,2}\/?[\w-]+\/[\w./-]*?)[.,;:!?]?(?=\s|$)/.exec(t)?.[1];
+  if (path) return path;
+  const the = /\b([\w.-]+)\s+(?:folder|directory)\b/i.exec(t)?.[1];
+  if (the && !/^(the|a|an|this|that|our|my|its|their|in|of)$/i.test(the)) return the;
+  return /\b(?:folder|directory|pasta|diret[óo]rio)\s+(?:called\s+|named\s+)?[`'"]?([\w./-]+)/i.exec(t)?.[1] ?? null;
+};
 const ANY_LINK = /https?:\/\/[^\s)>\]]+/i;
 // How the system builds a component in Figma (its construction grammar): before building from Figma, which a request
 // naming components and Figma would otherwise reach.
@@ -223,7 +233,7 @@ const RULES = [
   ['build-component-figma', (t, s) => figmaBuild(t, s.components) && IN_FIGMA.test(t) && !/\b(roles?|annotations?|accessibility|a11y|acessibilidade|prototype|prot[oó]tipo|screen|ecr[ãa])\b/i.test(t), 'figma-build'],
   // A change to one component Figma has ("add a size xl to the chip in Figma"), or a tracker's task asking one.
   ['change-component-figma', (t, s) => s.named.length === 1 && (FIGMA_CHANGE.test(t) && IN_FIGMA.test(t) || ISSUE_LINK.test(t) && /\bfigma\b/i.test(t)) && !figmaBuild(t, s.components) && !/\b(roles?|annotations?|accessibility|a11y|acessibilidade|construction|constru[çc][ãa]o)\b/i.test(t) && !/\b\d+(\.\d+)?\s*(px|rem|%|pt)\b|#[0-9a-f]{3,8}\b/i.test(t), 'figma-change'],
-  ['guidelines-links', (t) => INTENT_LAYER.test(t) && ANY_LINK.test(t), 'intent-layer'],
+  ['guidelines-links', (t) => INTENT_LAYER.test(t) && (ANY_LINK.test(t) || FOLDER_SAID.test(t)), 'intent-layer'],
   ['guidelines-links', (t) => RATE_GUIDANCE.test(t) && !LINK.test(t), 'guidance-rating'],
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
@@ -443,7 +453,11 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
         : `The engine lists every Figma edit and writes the script for it; ${may === 'yes' ? 'this project lets the engine change the design file, so run' : 'show the person the list and ask. Only when they say yes, run'} .design-system-engine-out/handback/figma-apply.js with the Figma MCP's use_figma, unchanged, and report what it returns. Never write a Figma script of your own; what needs a person (descriptions, missing components, layout) is listed for the design team.`);
       return { recipe, question: false, run: [`${cmd} --figma-edits`], notes };
     }
-    if (kind === 'intent-layer') return { recipe, question: false, run: [`${cmd} --intent-layer ${t.match(ANY_LINK)[0]}`], notes };
+    if (kind === 'intent-layer') {
+      const where = t.match(ANY_LINK)?.[0] ?? folderNamed(t);
+      if (!where) return { recipe, question: false, run: [`${cmd} --intent-layer '<the folder or link>'`], notes, ask: 'the folder of this project, or the link to the GitLab or GitHub repository, that holds the intent layer', askHow: 'the folder as a path from this project, or the link' };
+      return { recipe, question: false, run: [`${cmd} --intent-layer ${/[\s'"]/.test(where) ? `'${where}'` : where}`], notes };
+    }
     if (recipe === 'guidelines-links' && !kind) return { recipe, question, run: [`${cmd} --guidelines ${links(t).join(' ')}`], notes };
     if (recipe === 'prototype') {
       notes.push('A prototype is made only of the design system\'s components with their own options, and the engine\'s layout pieces; never write HTML, CSS or a component for it, and never change the system\'s files. Write it as a composition in prototypes/<name>.json, run --prototype on it, and fix each ❌ line until it is drawn. A need nothing fits is a Missing box; tell the person every gap it lists, as written.');
@@ -587,7 +601,7 @@ function setupRun(t, cmd, { cloud = false, then = true } = {}) {
     !figma && `the link to ${css || project ? 'the design system\'s' : 'its'} Figma file, if they have one (optional: without it only the code is checked)`,
   ].filter(Boolean);
   // Asked with the rest, in the same message, never as a question of its own when nothing else is missing.
-  if (ask.length && !docs) ask.push('a link to its written documentation for agents, if they have one (optional: an intent layer on GitLab, a wiki or Notion page)');
+  if (ask.length && !docs) ask.push('a link to its written documentation for agents, if they have one (optional: an intent layer in a GitLab or GitHub repository or a docs folder, a wiki or Notion page)');
   const request = String(t ?? '').trim().replace(/\s+/g, ' ');
   const after = then && request && !SETUP_ASKED.test(request) ? ` --then=${shellQuote(request.slice(0, 400))}` : '';
   return { run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link; left out when there is none>'}'${code}${docs ? ` --documentation='${docs}'` : ask.length ? ` --documentation='<the documentation link; left out when there is none>'` : ''}${after}`],

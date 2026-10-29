@@ -80,7 +80,7 @@ reference it points to say, never from memory or from this table alone.
 | the whole design system checked | `full-audit` |
 | the Figma data refreshed, or it is stale | `refresh-figma` |
 | to set the parity up (no `ds-config.json` yet) | `first-setup` |
-| to add a GitLab or Notion guidelines link, or the GitLab project of the intent layer | `guidelines-links` |
+| to add a GitLab or Notion guidelines link, or where the intent layer is | `guidelines-links` |
 | a difference fixed (in code, or what to change in Figma) | `fix-a-difference` |
 | known differences accepted as debt | `accept-debt` |
 | states, variants or combinations mapped or explained | `states-and-variants` |
@@ -166,7 +166,7 @@ node <install-dir>/audit.mjs --init \
 
 **Setup asks the person, in one message, before it writes anything: where the code is (this folder,
 another folder, or a link to its repository on GitHub or GitLab), the link to the Figma file, and a link to the
-written documentation for agents (an intent layer on GitLab, a wiki or Notion page).** The code is required and never
+written documentation for agents (an intent layer in a repository or a docs folder, a wiki or Notion page).** The code is required and never
 guessed; the Figma link is optional (without it only the code's own checks run, nothing is compared with Figma,
 and the components are the code's own), and so is the documentation link (`--documentation=<link>`). The router asks what the request leaves out, in one message; a setup run
 that does not know where the code is writes nothing, and its NEXT line asks. Pass the answer as

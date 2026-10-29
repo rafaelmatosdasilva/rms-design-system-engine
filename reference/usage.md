@@ -325,16 +325,31 @@ prototypes, the style guide and its Documentation page) takes only that shape an
 another source (a design tool's own specs, another format) is one adapter, nothing else changed. Where two sources
 document one component, the first configured one is its page. The first source is the intent layer below.
 
-**The intent layer, a GitLab project of DSDS pages.** When the team documents why each piece exists and how
-to use it in DSDS (the Design System Documentation Standard: an index `system.dsds.json` whose entity groups
-`$ref` one file per component, foundation, pattern, template or page), `rms-design-system-engine --intent-layer
-<project link>` (or `--init --documentation=<link>`) sets `ds-config.json → intentLayer` and reads it at once. A
-project with no Figma file gets all of it too: its components are the code's own, each with its file's props. It is **read-only**: the engine only
-asks GitLab for the project, its latest commit and one archive (GET, a `read_api` token is enough) and never
-writes to the layer; the only file it writes is its own snapshot in your project. Every run reads it again through the
-GitLab API when the branch's commit moved (one archive of the index's folder, read in memory, no clone), with the
-same token rules as above, into `intent-layer.snapshot.json`; GitLab not reachable keeps the snapshot and says
-from which commit. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
+**The intent layer: DSDS or Markdown pages, on GitLab, GitHub or in a folder.** When the team documents why each
+piece exists and how to use it, in DSDS (the Design System Documentation Standard: an index `system.dsds.json`
+whose entity groups `$ref` one file per component, foundation, pattern, template or page) or as Markdown and MDX
+pages, `rms-design-system-engine --intent-layer <link or folder>` (or `--init --documentation=<link>`) sets
+`ds-config.json → intentLayer` and reads it at once. It lives in a GitLab project (any host), a GitHub repository
+(`/tree/<branch>/<folder>` reads one folder of it) or a folder of the project (read as it is on disk, edits not yet
+committed included, its links to the project's own repository). The format is found from the files (DSDS when there
+is a `*.dsds.json`), or said with `--format=dsds|markdown`. Markdown pages are read into the same shape as a DSDS
+page: a page is a file, or a component's folder of tabs (`button/usage.mdx`, `button/accessibility.mdx`: one page,
+its code and api tabs and its `react/` or `rails/` folders left out), or the `.mdx` beside a component's code
+(`Button/Button.mdx` next to `Button.tsx`, which is its code file); its name is the front matter's `title`, a
+Storybook `<Meta title>`'s last part, its first heading or its file's name; its kind is the front matter's `kind`,
+the Meta title's first part, or the nearest folder named for a layer (components, patterns, foundations, templates,
+pages, flows); each `##` is a section and each `###` under it is read by its own title; Do and Don't examples
+(`<Do>`, `<Dont>`, a `<DoDont type>` or its caption) become its Do and Don't lines; a table is a line a row; MDX
+imports, exports and tags are taken out and their words kept. The layer's own README is the system's page. A
+project with no Figma file gets all of it too: its components are the code's own, each with its file's props. It is **read-only** while it is read:
+GitLab is asked for the project, its latest commit and one archive (GET, a `read_api` token is enough); GitHub for
+its latest commit, its tree and each page's file (GET; `GITHUB_TOKEN` or `GH_TOKEN` from the environment or `.env`,
+sent only to GitHub, needed for a private repository, and to date every page past GitHub's 60 calls an hour without
+one). The only file it writes is its own snapshot in your project. Every run reads it again when the branch's commit
+moved (a folder: when a page in it changed), with the same token rules as above, into `intent-layer.snapshot.json`;
+a host not reachable keeps the snapshot and says from which commit. The fixes the engine makes in the layer
+(`intentLayer.autoFix`, `--intent-changes`) are committed only to a DSDS layer on GitLab; for any other, the
+Documentation page lists each change for a person to make. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
 Usage rules; When not to use or What not to do; Common mistakes; Limitations; a numbered title is read by its
 words), with its use cases (recommended, discouraged) and checklists (rules). Facts the engine reads from Figma
 and the code (anatomy, API, states, tokens, source) are left out, and so is a line written on every page of a

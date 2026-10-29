@@ -76,7 +76,7 @@ test('guidelines links, setup and refresh', () => {
   const noUrl = r('audit the chip', { hasConfig: false, components: [] });
   assert.equal(noUrl.recipe, 'first-setup');   // no config yet: setup comes first, whatever was asked, and the request after it
   assert.deepEqual(noUrl.run, ["rms-design-system-engine --init --figma-url='<the Figma link; left out when there is none>' --project='<. for this folder, or the folder or repository link>' --documentation='<the documentation link; left out when there is none>' --then='audit the chip'"]);
-  assert.equal(noUrl.ask, "where the design system's code is (this folder, another folder on this computer, or a link to its repository on GitHub or GitLab), and the link to its Figma file, if they have one (optional: without it only the code is checked), and a link to its written documentation for agents, if they have one (optional: an intent layer on GitLab, a wiki or Notion page)");
+  assert.equal(noUrl.ask, "where the design system's code is (this folder, another folder on this computer, or a link to its repository on GitHub or GitLab), and the link to its Figma file, if they have one (optional: without it only the code is checked), and a link to its written documentation for agents, if they have one (optional: an intent layer in a GitLab or GitHub repository or a docs folder, a wiki or Notion page)");
   assert.match(routeText(noUrl, '', 'rms-design-system-engine'), /\nNEXT: before running anything, ask the person, in one message: where the design system's code is/);
   const refresh = route('refresh the Figma snapshots, the design changed yesterday', { ...P, snapshotDate: '2026-03-02' });
   assert.equal(refresh.recipe, 'refresh-figma');
@@ -109,7 +109,7 @@ test('setup takes where the code is and the Figma link from the request, and ask
     assert.match(r(text, none).ask, /^where the design system's code is/, `asked where the code is: ${text}`);
   }
   assert.doesNotMatch(r(`aqui está o figma ${F}`, none).ask, /Figma/, 'a Figma link given is not asked again');
-  assert.equal(r('set up the parity for this folder', none).ask, "the link to the design system's Figma file, if they have one (optional: without it only the code is checked), and a link to its written documentation for agents, if they have one (optional: an intent layer on GitLab, a wiki or Notion page)");
+  assert.equal(r('set up the parity for this folder', none).ask, "the link to the design system's Figma file, if they have one (optional: without it only the code is checked), and a link to its written documentation for agents, if they have one (optional: an intent layer in a GitLab or GitHub repository or a docs folder, a wiki or Notion page)");
 });
 
 test('what --route prints: the route, the commands, one NEXT line, and the recipe', () => {
@@ -225,10 +225,16 @@ test('a component named loosely is found, and a word several components share is
   assert.deepEqual(q('run the accessibility on button primary').run, ['rms-design-system-engine --component buttonPrimary --only accessibility']);
 });
 
-test('an intent layer\'s GitLab project, on any host, sets the intent layer', () => {
+test('an intent layer\'s GitLab project, on any host, a GitHub repository or a folder of the project sets the intent layer', () => {
   const il = r('use this intent layer: https://git.acme.test/design/intent');
   assert.equal(il.recipe, 'guidelines-links');
   assert.deepEqual(il.run, ['rms-design-system-engine --intent-layer https://git.acme.test/design/intent']);
+  assert.deepEqual(r('our intent layer is https://github.com/acme/ds/tree/main/docs').run, ['rms-design-system-engine --intent-layer https://github.com/acme/ds/tree/main/docs']);
+  assert.deepEqual(r('use docs/intent as the intent layer').run, ['rms-design-system-engine --intent-layer docs/intent']);
+  assert.deepEqual(r('the intent layer is in the guidelines folder').run, ['rms-design-system-engine --intent-layer guidelines']);
+  const which = r('read the intent layer from a folder');
+  assert.deepEqual(which.run, ["rms-design-system-engine --intent-layer '<the folder or link>'"]);
+  assert.match(which.ask, /folder of this project, or the link/);
 });
 
 test('setup takes the documentation link from the request, and never asks for it on its own', () => {
