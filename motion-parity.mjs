@@ -12,16 +12,21 @@
 
 import { walkCss } from './css-source.mjs';
 import { bezierOf, sameEasing, timeMs } from './css-values.mjs';
+import { HASH_SRC } from './figma-capture.mjs';
 
 // Run with use_figma or figma-cli on the file, once (PAGE_IDS: the pages to read, null for every page). It only reads:
 // every component set's variants and each prototype reaction that changes one variant into another, with its trigger
 // (and the delay of an After delay) and transition; each component's Motion keyframes (its timeline's tracks, on it and
 // its layers) and animation styles; and each overlay a prototype opens, with the component it shows and its transition.
+// It is read in two calls (capture-chunks.mjs), each answer within BUDGET characters: CALL 'sums' gives the checksum
+// of each item's record (a set, a component outside a set, or a page's overlays), from START (a page and an item on
+// it), and says where the next page of them starts (next, null when all are read); CALL 'read' gives the records of
+// the items IDS names, each with its checksum, as many as fit.
 export const MOTION_CAPTURE_JS = `
 const PAGE_IDS = __PAGE_IDS__;
-const START = __START__, BUDGET = __BUDGET__;
+const CALL = __CALL__, START = __START__, IDS = __IDS__, BUDGET = __BUDGET__;
+__HASH__
 const pages = PAGE_IDS ? (await Promise.all(PAGE_IDS.map((id) => figma.getNodeByIdAsync(id)))).filter(Boolean) : figma.root.children;
-const out = {}, motion = {}, overlays = [], seen = new Set();
 const FIELDS = ['ROTATION', 'OPACITY', 'TRANSLATION_X', 'TRANSLATION_Y', 'TRANSLATION_XY', 'SCALE_X', 'SCALE_Y', 'SCALE_XY'];
 const ownerOf = async (n) => {
   if (n.type === 'COMPONENT') return n.parent && n.parent.type === 'COMPONENT_SET' ? n.parent.name : n.name;
@@ -60,16 +65,18 @@ const motionOf = (root, variant) => {
   visit(root, root.name, 0);
   return list;
 };
-let size = 2, next = null, held = 0;
-pages: for (let p = START.page; p < pages.length; p++) {
+const want = IDS ? new Set(IDS) : null, entries = [];
+let size = 2, next = null;
+pages: for (let p = CALL === 'sums' ? START.page : 0; p < pages.length; p++) {
   const page = pages[p];
   await page.loadAsync();   // loaded where it is: switching the page would change the file
   const sets = page.findAllWithCriteria({ types: ['COMPONENT_SET'] });
   const solo = page.findAllWithCriteria({ types: ['COMPONENT'] }).filter((c) => !(c.parent && c.parent.type === 'COMPONENT_SET'));
   const items = [...sets, ...solo, 'overlays'];
-  for (let i = p === START.page ? START.item : 0; i < items.length; i++) {
-    const n = items[i];
-    const list = [], ov = [];
+  for (let i = CALL === 'sums' && p === START.page ? START.item : 0; i < items.length; i++) {
+    const n = items[i], id = n === 'overlays' ? page.id + '#overlays' : n.id;
+    if (want && !want.has(id)) continue;
+    const list = [], ov = [], seen = new Set();
     let m = [];
     if (n === 'overlays') {
       const opens = page.findAll((x) => 'reactions' in x && (x.reactions || []).some((r) => (r.actions || (r.action ? [r.action] : [])).some((a) => a && a.type === 'NODE' && (a.navigation === 'OVERLAY' || a.navigation === 'SWAP'))));
@@ -101,22 +108,26 @@ pages: for (let p = START.page; p < pages.length; p++) {
       }
     } else m = motionOf(n, null);
     if (!list.length && !m.length && !ov.length) continue;
-    const add = JSON.stringify([n.name || '', list, m, ov]).length;
-    if (held && size + add > BUDGET) { next = { page: p, item: i }; break pages; }
-    if (list.length) out[n.name] = (out[n.name] || []).concat(list);
-    if (m.length) motion[n.name] = (motion[n.name] || []).concat(m);
-    overlays.push(...ov);
-    size += add; held++;
+    // What JSON keeps, so the checksum is over what the answer carries.
+    const rec = JSON.parse(JSON.stringify({ name: n === 'overlays' ? '' : n.name, ...(list.length ? { transitions: list } : {}), ...(m.length ? { motion: m } : {}), ...(ov.length ? { overlays: ov } : {}) }));
+    const sum = cyrb53(JSON.stringify(rec)), e = CALL === 'sums' ? [id, sum] : [id, sum, rec], add = JSON.stringify(e).length + 1;
+    if (entries.length && size + add > BUDGET) { next = { page: p, item: i }; break pages; }
+    entries.push(e); size += add;
+    if (want) { want.delete(id); if (!want.size) break pages; }
   }
 }
-return { _captured: new Date().toISOString(), _note: 'Read-only capture of prototype transitions between variants, Motion keyframes and overlays (motion-parity.mjs).', version: 2, components: out, motion, overlays, count: held, start: START, next };
+const note = 'Read-only capture of prototype transitions between variants, Motion keyframes and overlays (motion-parity.mjs).';
+if (CALL === 'sums') return { capture: 'motion', kind: 'sums', _note: note, version: 2, start: START, next, sums: entries };
+return { capture: 'motion', kind: 'read', _note: note, version: 2, items: entries, ...(next ? {} : { gone: [...want] }) };
 `;
 
-// An answer holds what fits in budget characters, from start (a page and an item on it: a set, a component, or the
-// page's overlays last); it says where the next starts (next, null when all are read) and how many items it holds.
-export const motionCaptureScript = (pageIds = null, { start = { page: 0, item: 0 }, budget = 15000 } = {}) => {
-  const ids = pageIds == null ? null : [pageIds].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
-  return MOTION_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(ids && ids.length ? ids : null)).replace('__START__', JSON.stringify(start)).replace('__BUDGET__', String(budget)).trim() + '\n';
+// The script for one call: { call: 'sums', start } (a page of the checksums, from start: a page and an item on it, a
+// set, a component, or the page's overlays last) or { call: 'read', ids } (the records of those items), as
+// capture-chunks.mjs asks for them.
+export const motionCaptureScript = (pageIds = null, { call = 'sums', start = { page: 0, item: 0 }, ids = null, budget = 15000 } = {}) => {
+  const pages = pageIds == null ? null : [pageIds].flat().filter(Boolean).map((id) => String(id).replace('-', ':'));
+  return MOTION_CAPTURE_JS.replace('__PAGE_IDS__', JSON.stringify(pages && pages.length ? pages : null)).replace('__CALL__', JSON.stringify(call)).replace('__START__', JSON.stringify(start))
+    .replace('__IDS__', JSON.stringify(call === 'read' ? ids ?? [] : null)).replace('__BUDGET__', String(budget)).replace('__HASH__', () => HASH_SRC).trim() + '\n';
 };
 
 // Figma's easing as CSS: its presets are cubic-bezier curves; a spring has none (null, with its name).
