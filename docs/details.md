@@ -544,6 +544,26 @@ Run on the style guide, it also opens each product's built page whole, with ever
 
 Findings are named after the product and listed on the Status page under Products.
 
+### Pages and flows
+
+Some WCAG criteria belong to a page, not to a component. They are tried on each product page the check opens (a product's built page, a page given with `--url` or `a11y.urls`, a page found on the dev server), and across the pages of one product. Pages of two products are never compared.
+
+| Criterion | What is tried | How it can end |
+|---|---|---|
+| 2.4.2 Page Titled | A title on each page, not the same on two pages | Passes, to fix, or a person checks two pages that share a title |
+| 3.1.1 Language of Page | A `lang` on the page, written as a language tag | Passes or to fix |
+| 2.4.1 Bypass Blocks | A main landmark, or a skip link that lands on the page | Passes or to fix. A long header with no skip link is advice |
+| 3.2.3 Consistent Navigation | Each navigation, by its name, keeps the items it shares in the same order | Passes or to fix |
+| 3.2.4 Consistent Identification | A link to the same place, in a header, navigation or footer, reads the same on each page | To fix, or a person checks the buttons and icons |
+| 3.2.6 Consistent Help | Help (a help page, a contact, a chat) stays in the same part of the page, among the same things | Passes or to fix |
+| 3.3.7 Redundant Entry | A field a later page of a flow asks for again, empty when it opens | A person checks |
+| 3.3.4 Error Prevention | A form whose button reads as paying, signing or deleting, with or without a way to review or undo it | A person checks |
+
+- **Flows.** Name each flow in `ds-config.json` → `a11y.flows`, its pages in order: `[{ "name": "Checkout", "pages": ["cart.html", "/checkout/address", "/checkout/pay"] }]`. A page is matched by its address or the end of it. With no flow named, 3.3.7 is a person's to check.
+- **What a person decides.** The pages are opened one by one and never filled in, so a field a flow fills once it runs looks empty here. Whether a step really commits money or data, and whether its review lets people correct it, is read from words only. These end as A person checks, never as Passes.
+- **One page alone.** 3.2.3, 3.2.4 and 3.2.6 need two pages of the product. With one, the check says so and asks for more pages.
+- **Where it shows.** The check prints each criterion with how it stands and the pages it was tried on, and `--json` keeps them under `pages`. On the style guide's Status page, each one left to fix or to check is a row under Accessibility, with its pages. The Accessibility card's note says how each one stands.
+
 ### How sure each finding is
 
 - **Blocker.** Measured on the page against WCAG 2.1 A or AA.

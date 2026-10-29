@@ -685,7 +685,8 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         c.a11y.sources = src;
       }
       const say = (g) => ({ one: g.title(1), many: g.title(7).replace(/^7 /, '{n} '), fix: g.fix });
-      view.wcag21 = { criteria: WCAG22, guide: Object.fromEntries(Object.entries(WCAG21_GUIDE).map(([k, g]) => [k, say(g)])), staticRan: !!st };
+      // The criteria that belong to a page, as the last audit tried them on the products' own pages (page-criteria.mjs).
+      view.wcag21 = { criteria: WCAG22, guide: Object.fromEntries(Object.entries(WCAG21_GUIDE).map(([k, g]) => [k, say(g)])), staticRan: !!st, ...(result?.pages ? { pages: result.pages } : {}) };
     } catch { /* the page shows what it can measure */ }
     // How to use it: the same four sections on every page, from what Figma, the code and the authored contract say.
     try {
@@ -1200,6 +1201,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // What the browser check found on each product's own page, checked as a whole.
       const { productA11yTodos } = await import('./a11y-check.mjs');
       view.systemTodo.push(...productA11yTodos(readJson(join(OUT_DIR, 'a11y.json'))));
+      // The criteria that belong to a page, tried on the products' own pages: one row for each left to fix or to check.
+      const { pageCriteriaTodos } = await import('./page-criteria.mjs');
+      const { WCAG22: W22 } = await import('./wcag21.mjs');
+      view.systemTodo.push(...pageCriteriaTodos(readJson(join(OUT_DIR, 'a11y.json'))?.pages, Object.fromEntries(W22.map((k) => [k.sc, k.name]))));
       // Where a product's page is laid out otherwise than its designed screens.
       const { screenTodos } = await import('./screen-parity.mjs');
       view.systemTodo.push(...screenTodos(readJson(join(OUT_DIR, 'screens.json'))));
