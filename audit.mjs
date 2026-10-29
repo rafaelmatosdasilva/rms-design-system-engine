@@ -73,7 +73,7 @@ const WIDTH      = 60;
 // The profile given now (--profile, read where the run started: project-dir.mjs) or remembered in ds-config.json is
 // written in when its maintainers changed it, and this person is told what GitLab lets them write; then the snapshots
 // and the team's decisions are read from their stores. Commands that only print, or make a profile, skip both.
-const STORE_QUIET = ['--version', '--route', '--recipe', '--reference', '--summary', '--help', '--profile-export', '--profile-new', '--make-command'].some((f) => process.argv.slice(2).some((a) => a === f || a.startsWith(f + '=')));
+const STORE_QUIET = ['--version', '--route', '--recipe', '--reference', '--summary', '--help', '--profile-export', '--profile-new', '--make-command', '--products'].some((f) => process.argv.slice(2).some((a) => a === f || a.startsWith(f + '=')));
 const STORE_OFFLINE = process.argv.includes('--offline');
 if (!STORE_QUIET) {
   const pf = await import('./profile.mjs');
@@ -916,9 +916,31 @@ if (process.argv.includes('--contracts-out')) {
   if (toStore && !cstore.folder && !r.invalid.length) { const sent = await st.pushStore(ROOT, pcfg, 'contracts', st.folderFiles(dir, 'contracts'), `Contracts published with rms-design-system-engine (${r.components.length})`, { offline: STORE_OFFLINE }); console.log(sent.line); }
   console.log(`📐 Contracts published → ${r.outDir}  (${r.components.length} contract${r.components.length === 1 ? '' : 's'}${r.removed?.length ? ` · ${r.removed.length} removed` : ''}${r.skipped?.length ? ` · ${r.skipped.length} not written, listed in README.md` : ''})`);
   for (const i of r.invalid.slice(0, 20)) console.log(`   ❌ ${i.name}: ${i.errs.slice(0, 3).join('; ')}`);
+  // A breaking change is a release the products move to by a day (releases.mjs): recorded with the system's version.
+  try {
+    const rel = await import('./releases.mjs');
+    const changes = rel.changesOf(r.breaking ?? []), version = rel.systemVersion(ROOT, pcfg);
+    const entry = !r.invalid.length && changes.length && version ? rel.recordRelease(ROOT, { version, changes, days: pcfg.migrationDays ?? 90 }) : null;
+    if (entry) console.log(`   📦 Release ${version}: ${changes.length} breaking change${changes.length === 1 ? '' : 's'}, the products to move by ${entry.moveBy} (${rel.RELEASES_FILE}; rms-design-system-engine --products says what each one touches)`);
+    else if (changes.length && !version) console.log(`   ⚠️  ${changes.length} breaking change${changes.length === 1 ? '' : 's'} with no system version to record them under: set ds-config.json systemVersion (or the package.json version)`);
+  } catch { /* the record is a convenience */ }
   if (r.undefinedRefs?.length) console.log(`   ⚠️  ${r.undefinedRefs.length} token(s) Figma binds that the variables do not have, listed in README.md: fix them in Figma`);
   console.log(r.invalid.length ? `NEXT: fix the ${r.invalid.length} invalid contract(s) above, then publish again` : `NEXT: review the diff in ${dir}, commit it on a branch and open a merge request`);
   process.exit(r.invalid.length ? 1 : 0);
+}
+
+// ── --products: the system version each product uses, and what the releases since change for it (releases.mjs) ──
+if (process.argv.includes('--products')) {
+  let pcfg2 = {};
+  try { pcfg2 = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const rel = await import('./releases.mjs');
+  const { resolveNamingSpec, tokenToVar } = await import('./naming-convention.mjs');
+  const spec = resolveNamingSpec(pcfg2), releases = rel.readReleases(ROOT), products = rel.productsOf(ROOT, pcfg2);
+  if (!products.length) { console.log('No product is named: add each to ds-config.json products ({ "<name>": { "dir": "<its folder>", "uses": "<system version>" } }), or name its folder in pluginDirs and its package.json depends on the system\'s package.'); process.exit(0); }
+  console.log(`System ${rel.systemVersion(ROOT, pcfg2) ?? '(no version)'}${releases.length ? `, ${releases.length} release${releases.length === 1 ? '' : 's'} with breaking changes recorded (${rel.RELEASES_FILE})` : ', no release with a breaking change recorded yet'}.`);
+  for (const l of rel.impactLines(products.map((p) => rel.productImpact(p, releases, { cssOf: (t) => tokenToVar(t, spec) })))) console.log(l.startsWith('  ') ? `   ${l.trim()}` : `• ${l}`);
+  console.log('Advice: nothing is blocked. NEXT: move each product to the latest version by its date, changing what each line names.');
+  process.exit(0);
 }
 
 // ── --figma-effects: each component's shadows, blurs, gradient and image fills, clipping and blend mode ──
