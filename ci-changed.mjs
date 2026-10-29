@@ -24,7 +24,8 @@ export function sourcesOf(ROOT, cfg = {}) {
     const r = s?.read;
     if (r?.gitlab) out.push({ what: part, gitlab: r.gitlab, ref: r.branch ?? r.ref ?? null, path: r.path ?? null });
   }
-  const il = typeof cfg.intentLayer === 'string' ? cfg.intentLayer : cfg.intentLayer?.gitlab;
+  // The intent layer, when it is a GitLab project (a GitHub one or a folder of the project is not asked of GitLab).
+  const il = typeof cfg.intentLayer === 'string' ? (/^https?:\/\//i.test(cfg.intentLayer) && !/^https?:\/\/(www\.)?github\.com\//i.test(cfg.intentLayer) ? cfg.intentLayer : null) : cfg.intentLayer?.gitlab ?? (cfg.intentLayer?.url && !/github\.com\//i.test(cfg.intentLayer.url) ? cfg.intentLayer.url : null);
   if (il && !out.some((x) => x.what === 'intentLayer')) out.push({ what: 'intentLayer', gitlab: il, ref: null });
   // The profile: a file in a project (…/-/blob/<ref>/<path>).
   const prof = /^(https?:\/\/[^/]+\/.+?)\/-\/blob\/([^/]+)\/(.+)$/.exec(String(cfg.profile?.source ?? ''));

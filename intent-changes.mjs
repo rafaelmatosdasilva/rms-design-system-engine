@@ -41,6 +41,8 @@ const MARK = '**Draft:** ';
 export function layerAccess(ROOT, cfg, { env = process.env } = {}) {
   const c = intentLayerConfig(cfg);
   if (!c) return { error: 'ds-config.json names no intent layer (intentLayer)' };
+  // The layer is read from GitHub or a folder of the project too; the engine writes its changes only to a GitLab project.
+  if (c.host !== 'gitlab') return { error: `the engine writes its changes to an intent layer on GitLab only, and this one is ${c.host === 'github' ? 'on GitHub' : `the folder ${c.folder}`}: the Documentation page lists each change for a person to make` };
   const e = { ...env };
   const folders = [ROOT, ...(existsSync(join(ROOT, STATE_FILE)) ? [dirname(resolve(ROOT))] : [])];
   e.GITLAB_HOST = hostEnvFrom(e, folders);

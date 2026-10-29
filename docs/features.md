@@ -19,7 +19,7 @@ Each section says why it matters, then what it does not do well today. A line wi
 | [Compare Figma and code](#compare-figma-and-code--stable) | Every token, prop, state and size compared in every mode, measured in a real browser. Product pages checked against their Figma screens, and approved frames watched for changes. Each difference says who fixes it. | No more visual QA by eye. Drift is caught before release, not by users. | Stable |
 | [Test accessibility](#test-accessibility--stable) | Every component tested against WCAG 2.2 AA in every state and colour mode: contrast, keyboard, focus, target size and what a screen reader announces. One verdict per component. | Problems are fixed once, in the component, not in every screen later. | Stable |
 | [Write component contracts](#write-component-contracts--stable) | Each component's props, variants, states, tokens and what it nests, rewritten from Figma and the code on every run, plus the one file AI tools read. | Developers and AI tools build from the same spec, and nobody keeps it up to date by hand. | Stable |
-| [Draft the intent layer](#draft-the-intent-layer--beta) | Why each component exists, when to use it and when not, and every decision in one history. Guidelines that contradict, repeat or cannot be checked are flagged. | What designers know becomes something teammates and agents can read. | Beta |
+| [Draft the intent layer](#draft-the-intent-layer--stable) | Why each component exists, when to use it and when not, and every decision in one history. Guidelines that contradict, repeat or cannot be checked are flagged. | What designers know becomes something teammates and agents can read. | Stable |
 | [Publish a living style guide](#publish-a-living-style-guide--stable) | One site with a playground, specs, variants, parity, accessibility and history for each component, plus a status page and tasks that name the owning team. | Design, engineering and product see the same status, with no doc going stale. | Stable |
 | [Prototype with real components](#prototype-with-real-components--experimental) | Clickable screens built only with your coded components, their real props and tokens, in light and dark, at every screen size. | User tests and reviews run on the real product. What passes can ship without being redrawn. | Experimental |
 | [Catch drift in prototypes and code](#catch-drift-in-prototypes-and-code--stable) | In every prototype, product screen and AI edit: hand-built copies of components, hard-coded values and made-up variables, each with what to use instead. What the system lacks goes on a list for design. | Shortcuts do not pile up until the system falls apart. | Stable |
@@ -79,12 +79,13 @@ Each section says why it matters, then what it does not do well today. A line wi
 - Records each breaking change as a release of the system, so products know what moved.
 - Checks your Figma Code Connect mappings against the contracts.
 
-## Draft the intent layer · Beta
+## Draft the intent layer · Stable
 
 **Why it matters:** What designers know becomes something teammates and agents can read.
 
-*Today: the intent layer is read from DSDS pages on GitLab. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
+*Today: it reads DSDS or Markdown and MDX pages, from GitLab, GitHub or a folder in your project. Its own fixes are committed only to a DSDS layer on GitLab; anywhere else, each one is listed for a person to make. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
 
+- Reads your documentation where it already lives: a docs folder, a documentation site's pages, or the `.mdx` beside each component. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
 - Shows why each component exists, when to use it and when not, beside Figma and the code.
 - Writes what it is sure of, such as the element a component renders, and drafts the rest, such as an example, for a person to approve.
 - Keeps every decision in one history: differences kept on purpose, proposals answered, what was ruled out and why.

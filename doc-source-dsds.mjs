@@ -1,4 +1,6 @@
-// doc-source-dsds.mjs - a documentation source: the team's intent layer written in DSDS and kept in a GitLab project.
+// doc-source-dsds.mjs - a documentation source: the team's intent layer, written in DSDS or as Markdown (MDX) pages,
+// kept in a GitLab project, a GitHub repository or a folder of the project (doc-host.mjs says where; the Markdown
+// pages are read by doc-source-markdown.mjs into the same shape as a DSDS page).
 //
 // One adapter of the documentation sources intent-layer.mjs reads (its SOURCES): it turns its own format into the
 // shape every reader takes (see "A documentation source" there), and knows nothing of what reads it.
@@ -10,17 +12,21 @@
 // states, the tokens a component uses) are left out.
 //
 // ds-config.json → intentLayer:
-//   "intentLayer": "https://<host>/<group>/<project>"                    (or /-/tree/<branch>)
-//   "intentLayer": { "gitlab": "<link>", "entry": "docs/dsds/system.dsds.json", "out": "intent-layer.snapshot.json" }
+//   "intentLayer": "https://<host>/<group>/<project>"                    (or /-/tree/<branch>): a GitLab project
+//   "intentLayer": "https://github.com/<owner>/<repo>"                   (or /tree/<branch>/<folder>): a GitHub repository
+//   "intentLayer": "docs"                                                a folder in the project, as it is on disk
+//   "intentLayer": { "gitlab" | "github" | "folder": "<place>", "path": "<folder in it>", "format": "dsds" | "markdown",
+//                    "entry": "docs/dsds/system.dsds.json", "out": "intent-layer.snapshot.json" }
+// The format is found from the files when not said: DSDS when there is a *.dsds.json, else the Markdown and MDX pages.
 // Without an entry, the shortest path ending in system.dsds.json is the index, else every *.dsds.json with an entity.
 // The component contracts in the same repository (*.contract.json, published with --contracts-out) are read too, for
 // their links and what each lists; "contracts": "<folder>" names their folder when the entry's folder does not hold it.
 //
-// READ-ONLY. The engine never writes to the intent layer: it only asks GitLab (GET) for the project, the branch's latest
-// commit and one archive, and the only file it writes is its own snapshot in the project. A read_api token is enough.
-// Read through the GitLab REST API, no clone: the branch's latest commit, then one archive of the folder that holds the
-// index, read in memory. Nothing is fetched again while the commit has not moved. The token is gitlab-source.mjs's:
-// GITLAB_TOKEN from the environment or the project's .env, only ever sent to gitlab.com or a host named in GITLAB_HOST.
+// READ-ONLY. The engine never writes to the intent layer while it reads it: it only asks its host (GET) for the latest
+// commit and the files of one folder, and the only file it writes is its own snapshot in the project. A read_api token
+// (GitLab) or a token that can read the repository (GitHub, none for a public one) is enough. No clone: nothing is
+// fetched again while the commit has not moved (a folder: while no file in it changed). Each host's token goes only to
+// that host (doc-host.mjs).
 // What was read is written to one snapshot file (out), so a run without the network still has the layer, and says
 // from which commit.
 //
@@ -30,36 +36,48 @@
 // DEGRADE-SAFE: any failure keeps the snapshot already there and returns { error } in plain words; never throws.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join, resolve, dirname, posix } from 'node:path';
-import { gunzipSync } from 'node:zlib';
-import { parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, untar, plainGet, STATE_FILE, projectApi } from './gitlab-source.mjs';
-import { tokenAllowedFor } from './gitlab-fetch.mjs';
+import { resolve, dirname, posix } from 'node:path';
 import { contractSummaries } from './shared-contracts.mjs';
+import { layerHost, hostOf, isLink, parseGithub, fileUrl as hostFileUrl } from './doc-host.mjs';
 
 export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
 // not moved, so a fix to the reading (a placeholder left out) reaches a project at once. Raise it with every change
 // to what is read.
-export const READER = 16;   // 16: a root's Parts section, each part's documentation under its name (component-parts.mjs); 15: a page's Decisions section, read as its decisions (decisions.mjs); 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
+export const READER = 17;   // 17: Markdown and MDX pages, and GitHub and a project's folder as hosts (doc-host.mjs); 16: a root's Parts section, each part's documentation under its name (component-parts.mjs); 15: a page's Decisions section, read as its decisions (decisions.mjs); 14: each page's Markdown spec (the file a person edits; the JSON is generated from it); 13: the names a generated definitions section gives (its events, props, slots), and those it only names; 12: a prose section's line already led by its title keeps it once, and a drafted line in it stays a draft; 11: a component page's own prose sections read as its rules, under their titles; 10: a team's own titles for rules (Accessibility, … Rule) read as rules; 9: a token's own line is never one of a template's; 8: shared rules are the system's, a line differing only by the page's names is repeated; 7: drafted lines set apart, and the repeated lines kept as written; 3: reads DSDS 0.23 (entries, refs, sections with freeform and guidelines) as well as 0.15; 4: a guidelines section by its title (when to use, when not to, mistakes, limitations); 5: the component contracts kept beside it (shared-contracts.mjs); 6: when each page's file last changed
 export const LABEL = 'the intent layer';
 
 export const DEFAULT_OUT = 'intent-layer.snapshot.json';
-const TIMEOUT_MS = Math.max(1000, parseInt(process.env.GITLAB_FETCH_TIMEOUT_MS, 10) || 30000);
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // ── Config ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-// → { url, entry, out } | null
-// The layer's place may come from ds-config.json → stores.intentLayer (a company's profile, stores.mjs) instead; its
-// other settings (entry, out, contracts) stay in intentLayer.
+// → { host: 'gitlab' | 'github' | 'folder', url, folder?, path?, ref?, format?, entry, out, contracts } | null
+// url: the link, or the folder's path for a folder. path: the folder in the repository the layer is read from (a GitHub
+// link's /tree/<branch>/<folder> says it too). The layer's place may come from ds-config.json → stores.intentLayer (a
+// company's profile, stores.mjs) instead; its other settings (entry, out, contracts) stay in intentLayer.
+const slashes = (s) => String(s ?? '').trim().replace(/^\.?\/+|\/+$/g, '');
 export function intentLayerConfig(cfg) {
   const raw = cfg?.intentLayer;
   const st = cfg?.stores?.intentLayer, read = st && typeof st === 'object' && 'read' in st ? st.read : st;
-  const storeUrl = typeof read === 'string' ? read : read?.gitlab ? `${String(read.gitlab).replace(/\/+$/, '')}${read.branch ? `/-/tree/${read.branch}` : ''}` : null;
-  if ((!raw && !storeUrl) || (st && typeof st === 'object' && 'read' in st && st.read == null)) return null;   // read nowhere: no layer
-  const o = typeof raw === 'string' ? { gitlab: raw } : (raw ?? {});
-  const url = String(storeUrl ?? o.gitlab ?? o.url ?? '').trim();
-  if (!url) return null;
-  return { url, entry: o.entry ? String(o.entry).replace(/^\/+/, '') : null, out: o.out || DEFAULT_OUT, contracts: o.contracts ? String(o.contracts).replace(/^\/+|\/+$/g, '') : null };
+  const store = typeof read === 'string' ? { place: read, host: hostOf(read) }
+    : read?.gitlab ? { place: `${String(read.gitlab).replace(/\/+$/, '')}${read.branch ? `/-/tree/${read.branch}` : ''}`, host: 'gitlab' }
+      : read?.github ? { place: String(read.github), host: 'github', ref: read.branch ?? null, path: read.path ?? null }
+        : read?.folder ? { place: posix.join(slashes(read.folder) || '.', slashes(read.path)), host: 'folder' } : null;
+  if ((!raw && !store) || (st && typeof st === 'object' && 'read' in st && st.read == null)) return null;   // read nowhere: no layer
+  const o = typeof raw === 'string' ? (isLink(raw) ? { url: raw } : { folder: raw }) : (raw ?? {});
+  const given = o.gitlab ? ['gitlab', o.gitlab] : o.github ? ['github', o.github] : o.folder != null ? ['folder', o.folder] : o.url ? [hostOf(o.url), o.url] : [null, ''];
+  const host = store?.host ?? given[0];
+  let url = String(store?.place ?? given[1] ?? '').trim();
+  if (!url || !host) return null;
+  const gh = host === 'github' ? parseGithub(url) : null;
+  if (host === 'folder') url = slashes(url) || '.';
+  const path = slashes(store?.path ?? o.path ?? gh?.path ?? '') || null;
+  const ref = store?.ref ?? o.branch ?? o.ref ?? gh?.ref ?? null;
+  const format = /^(dsds|markdown|md|mdx)$/i.test(o.format ?? '') ? (/^dsds$/i.test(o.format) ? 'dsds' : 'markdown') : null;
+  return {
+    host, url, ...(host === 'folder' ? { folder: url } : {}), ...(path ? { path } : {}), ...(host !== 'gitlab' && ref ? { ref } : {}), ...(format ? { format } : {}),
+    entry: o.entry ? String(o.entry).replace(/^\/+/, '') : null, out: o.out || DEFAULT_OUT, contracts: o.contracts ? String(o.contracts).replace(/^\/+|\/+$/g, '') : null,
+  };
 }
 
 // ── Where each entity sits in the design intent ─────────────────────────────────────────────────────────────────────
@@ -101,7 +119,7 @@ const FACT_TITLE = /^(source|sources|tokens? used|tokens|api|props|properties|ev
 const PLACEHOLDER_DEF = /^((an? )?(event|slot|prop(erty)?) (emitted|exposed|accepted|provided|defined) by the component|(the )?(default|named) slot|no description( yet)?|)\.?$/i;
 // Section titles written for people by their nature (where a fact was confirmed, examples, links to other pages, a
 // mapping to the code, notes on tokens the contracts carry): left on the page as they are, never read as rules.
-export const FOR_PEOPLE = /^(evidence|.*\bexamples?|cross[- ]references?|references?|see also|related|related pages|changelog|history|sources?|.*\bmapping|token notes)$/i;
+export const FOR_PEOPLE = /^(evidence|.*\bexamples?|cross[- ]references?|references?|see also|related|related pages|changelog|history|sources?|.*\bmapping|token notes|table of contents|contents|on this page)$/i;
 // A section that is mostly code (a fenced block, markup) with little prose around it: an example, for people.
 export const isExample = (text) => /```|^\s*</m.test(String(text)) && String(text).replace(/```[\s\S]*?```/g, '').replace(/^\s*<[^\n]*$/gm, '').trim().length < 200;
 // A title's own words: its last part ("Overview / When To Use"), any numbering ("2. Overview") dropped.
@@ -130,16 +148,19 @@ export function mdParts(text) {
   return out;
 }
 
-// A Markdown body → its lines: each bullet or paragraph one item, markers dropped.
+// A Markdown body → its lines: each bullet or paragraph one item, markers dropped. A bullet written over several lines
+// is one item, up to the next bullet or blank line.
 export function itemsOf(body) {
   const out = [];
-  let para = [];
+  let para = [], inBullet = false;
   const flush = () => { if (para.length) { out.push(para.join(' ')); para = []; } };
   for (const raw of String(body ?? '').split(/\r?\n/)) {
     const line = raw.trim();
-    if (!line) { flush(); continue; }
+    if (!line) { flush(); inBullet = false; continue; }
     const bullet = /^(?:[-*•+]|\d+[.)])\s+(.*)$/.exec(line);
-    if (bullet) { flush(); out.push(bullet[1].trim()); continue; }
+    if (bullet) { flush(); out.push(bullet[1].trim()); inBullet = true; continue; }
+    if (inBullet && !/^#/.test(line)) { out[out.length - 1] += ' ' + line; continue; }
+    inBullet = false;
     para.push(line.replace(/^#+\s*/, ''));
   }
   flush();
@@ -308,14 +329,14 @@ const openText = (t) => String(t).replace(/^\s*(?:\*\*|__)?(?:open question|tbd|
 
 // The system's own page holds drafts as any page does: set apart, never one of its rules, until a person approves them.
 // → true when the line was a draft (and is now in drafts)
-function heldDraft(line, where, drafts) {
+export function heldDraft(line, where, drafts) {
   const t = String(line ?? '').replace(/^\s*[-*]\s+/, '');
   if (!DRAFT.test(t)) return false;
   drafts.push({ where, text: t.replace(DRAFT, '').trim(), ...draftTask(t) });
   return true;
 }
 // A section's text without its drafted lines (each one held). → the text left
-const heldLines = (body, where, drafts) => body.split('\n').filter((l) => !heldDraft(l, where, drafts)).join('\n').trim();
+export const heldLines = (body, where, drafts) => body.split('\n').filter((l) => !heldDraft(l, where, drafts)).join('\n').trim();
 
 // The index and its entity files → { system: { name, version, sections, drafts? }, entities: [view] }.
 // files: Map(path → parsed JSON). entry: the index's path, or null to take every file with an entity.
@@ -431,144 +452,121 @@ export function readSnapshot(ROOT, cfg) {
   if (!p || !existsSync(p)) return null;
   try { const s = JSON.parse(readFileSync(p, 'utf8')); return Array.isArray(s?.entities) ? s : null; } catch { return null; }
 }
-// A link to one file of the layer on GitLab, on the branch it was read from.
-export const fileUrl = (src, file) => (src?.url && file ? `${src.url}/-/blob/${encodeURI(src.ref ?? 'HEAD')}/${file.split('/').map(encodeURIComponent).join('/')}` : null);
+// A link to one file of the layer where it lives (GitLab, GitHub, the project's own repository), on the branch it was
+// read from.
+export const fileUrl = hostFileUrl;
 
-// ── Reading it from GitLab ──────────────────────────────────────────────────────────────────────────────────────────
-function why(status, host) {
-  if (status === 401) return 'GitLab did not accept the token (401): check GITLAB_TOKEN in .env, it may be wrong, expired or revoked';
-  if (status === 403) return 'GitLab refused (403): the token needs the read_api scope and access to this project';
-  if (status === 404) return `not found on ${host} (404): check the link, or the project is private and no token was sent (GITLAB_TOKEN in .env, and GITLAB_HOST=${host} for a company GitLab)`;
-  return `GitLab answered ${status}`;
-}
-
+// ── Reading it where it lives ───────────────────────────────────────────────────────────────────────────────────────
 // Read the layer and write its snapshot. opts: { env, fetchImpl, offline, now }.
 // → { ok, changed, out, source, entities, boilerplate } | { error, out, stale } (stale: the snapshot kept is from an earlier commit)
+const HOST_NAME = { gitlab: 'GitLab', github: 'GitHub', folder: 'its folder' };
 export async function syncIntentLayer(ROOT, cfg, opts = {}) {
   const c = intentLayerConfig(cfg);
   if (!c) return null;
   const out = resolve(ROOT, c.out);
   const prev = readSnapshot(ROOT, cfg);
   const kept = (error) => ({ error, out: c.out, stale: !!prev, source: prev?._source ?? null });
-  if (opts.offline) return kept('not checked against GitLab this run');
-  const env = { ...(opts.env ?? process.env) };
-  // The .env where it runs, and, for a project that is a GitLab mirror (gitlab-source.mjs), the folder that holds it:
-  // where the project was first named with --project=, and where its .env is.
-  const folders = [ROOT, ...(existsSync(join(ROOT, STATE_FILE)) ? [dirname(resolve(ROOT))] : [])];
-  env.GITLAB_HOST = hostEnvFrom(env, folders);
-  // A link set as the intent layer is a GitLab project by declaration, on any host; the token still goes only where
-  // GITLAB_HOST allows (below).
-  let host = ''; try { host = new URL(c.url).host; } catch { /* not a link */ }
-  const p = parseGitlabProject(c.url, env) ?? (host ? parseGitlabProject(c.url, { ...env, GITLAB_HOST: [env.GITLAB_HOST, host].filter(Boolean).join(',') }) : null);
-  if (!p) return { error: `${c.url} is not a GitLab project link`, out: c.out, stale: !!prev };
-  const token = tokenFrom(env, folders);
-  const headers = token && tokenAllowedFor(p.host, env) ? { 'PRIVATE-TOKEN': token } : {};
-  const notSent = token && !headers['PRIVATE-TOKEN'] ? `; a GITLAB_TOKEN is set but not sent to ${p.host}: add GITLAB_HOST=${p.host} to .env` : '';
-  const fetchImpl = opts.fetchImpl ?? plainGet;
-  // A read GITLAB_TOKEN refuses (revoked, expired) is asked again with the layer's own GITLAB_WRITE_TOKEN, which reads it.
-  const write = writeTokenFrom(env, folders);
-  const again = write && write !== token && tokenAllowedFor(p.host, env) ? { 'PRIVATE-TOKEN': write } : null;
-  // Every call is a GET: the layer is read, never changed.
-  const get = async (url) => {
-    const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined;
-    try {
-      const r = await fetchImpl(url, { method: 'GET', headers, signal });
-      return (r.status === 401 || r.status === 403) && again ? await fetchImpl(url, { method: 'GET', headers: again, signal }) : r;
-    } catch { return { ok: false, status: 0 }; }
-  };
-  const fail = (r) => kept(r.status ? why(r.status, p.host) + notSent : `could not reach ${p.host}`);
+  if (opts.offline && c.host !== 'folder') return kept(`not checked against ${HOST_NAME[c.host]} this run`);
+  const h = layerHost(ROOT, c, opts);
+  if (h.error) return { error: h.error, out: c.out, stale: !!prev };
   try {
-    // The layer by its id, found from the link even when it moved or names the project.
-    const { base, project } = await projectApi(p.origin, p.path, get);
-    let ref = p.ref || project?.default_branch;
-    if (!ref) {
-      const r = await get(base);
-      if (!r.ok) return fail(r);
-      ref = (await r.json())?.default_branch || 'main';
-    }
-    const cm = await get(`${base}/repository/commits/${encodeURIComponent(ref)}`);
-    if (!cm.ok) return fail(cm);
-    const head = await cm.json();
-    const sha = String(head?.id ?? '');
-    if (!/^[0-9a-f]{7,64}$/i.test(sha)) return kept('GitLab gave no commit for this branch');
-    const source = { id: ID, label: LABEL, url: `${p.origin}/${p.path}`, ref, sha, committedAt: String(head.committed_date ?? ''), entry: c.entry, entryGiven: c.entry ?? null };
-    if (prev?._source?.sha === sha && prev?._source?.url === source.url && (prev._source.entryGiven ?? null) === (c.entry ?? null) && prev._reader === READER) {
+    const head = await h.head();
+    if (head.error) return kept(head.error);
+    const { ref, sha } = head;
+    const source = { id: ID, label: LABEL, host: h.kind, ...(h.web && h.web !== h.kind ? { web: h.web } : {}), url: h.url, ...(h.folder != null ? { folder: h.folder } : {}), ...(h.prefix ? { prefix: h.prefix } : {}), ref, sha, committedAt: String(head.committedAt ?? ''), ...(head.digest ? { digest: head.digest } : {}), entry: c.entry, entryGiven: c.entry ?? null, ...(c.path ? { path: c.path } : {}) };
+    const same = (a, b) => (a ?? null) === (b ?? null);
+    if (prev?._source?.sha === sha && same(prev._source.url, source.url) && same(prev._source.entryGiven, c.entry) && same(prev._source.path, c.path) && same(prev._source.digest, head.digest) && same(prev._source.formatGiven, c.format) && prev._reader === READER) {
       return { ok: true, changed: false, out: c.out, source: prev._source, entities: prev.entities.length, boilerplate: prev.boilerplate ?? 0 };
     }
-    const folder = c.entry && posix.dirname(c.entry) !== '.' ? posix.dirname(c.entry) : null;
-    const a = await get(`${base}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}${folder ? `&path=${encodeURIComponent(folder)}` : ''}`);
-    if (!a.ok) return fail(a);
-    const files = new Map(), layerFiles = [], specs = new Map();
-    const keep = (archive) => {
-      for (const f of untar(gunzipSync(Buffer.from(archive)))) {
-        layerFiles.push(f.path);   // every file's path, so a page that names another file of the layer can be checked
-        // A Markdown spec: the file a person edits, which each page is generated from.
-        if (/\.md$/i.test(f.path) && /(^|\/)specs\//.test(f.path)) { specs.set(f.path, f.data.toString('utf8')); continue; }
+    // The folder read: the one named, else the index's.
+    const folder = c.path ?? (c.entry && posix.dirname(c.entry) !== '.' ? posix.dirname(c.entry) : null) ?? (c.host === 'folder' && c.folder !== '.' ? c.folder : null);
+    const files = new Map(), layerFiles = [], specs = new Map(), pages = new Map();
+    const keep = ({ files: got, paths }) => {
+      layerFiles.push(...paths);   // every file's path, so a page that names another file of the layer can be checked
+      for (const f of got) {
+        // A Markdown page (or a DSDS layer's Markdown spec: the file a person edits, which each page is generated from).
+        if (/\.(md|mdx|markdown)$/i.test(f.path)) { const t = f.data.toString('utf8'); pages.set(f.path, t); if (/\.md$/i.test(f.path) && /(^|\/)specs\//.test(f.path)) specs.set(f.path, t); continue; }
         if (!/\.json$/i.test(f.path)) continue;
         try { files.set(f.path, JSON.parse(f.data.toString('utf8'))); } catch { /* not JSON: not read */ }
       }
     };
-    keep(await a.arrayBuffer());
-    // The component contracts kept in the layer (intentLayer.contracts): read from the same commit when the entry's
-    // folder does not hold them. They are read for their links and what they list, never changed.
+    const got = await h.files(folder, sha);
+    if (got.error) return kept(got.error);
+    keep(got);
+    // The component contracts kept in the layer (intentLayer.contracts): read from the same commit when the folder read
+    // does not hold them. They are read for their links and what they list, never changed.
     if (c.contracts && folder && !(c.contracts + '/').startsWith(folder + '/')) {
-      const k = await get(`${base}/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}&path=${encodeURIComponent(c.contracts)}`);
-      if (k.ok) keep(await k.arrayBuffer());
+      const k = await h.files(c.contracts, sha);
+      if (!k.error) keep(k);
     }
-    const entry = c.entry ?? [...files.keys()].filter((f) => /(^|\/)system\.dsds\.json$/i.test(f)).sort((x, y) => x.split('/').length - y.split('/').length || x.length - y.length)[0] ?? null;
-    if (c.entry && !files.has(c.entry)) return kept(`${c.entry} is not in ${p.path} on ${ref}: check intentLayer.entry`);
-    const { system, entities } = readDsds(files, entry);
-    if (!entities.length) return kept(`no DSDS entities found in ${p.path} on ${ref} (looked for system.dsds.json and *.dsds.json files)`);
+    if (c.entry && !files.has(c.entry)) return kept(`${c.entry} is not in ${source.url} on ${ref}: check intentLayer.entry`);
+    // DSDS when said, or when the layer has a DSDS file; else its Markdown pages.
+    const dsdsFiles = [...files.keys()].filter((f) => /\.dsds\.json$/i.test(f));
+    const format = c.format ?? (c.entry || dsdsFiles.length || !pages.size ? 'dsds' : 'markdown');
+    source.format = format;
+    if (c.format) source.formatGiven = c.format;
+    const where = c.host === 'folder' ? `the folder ${source.folder}` : `${source.url.replace(/^https?:\/\//, '')} on ${ref}`;
+    let system, entities;
+    if (format === 'dsds') {
+      const entry = c.entry ?? dsdsFiles.filter((f) => /(^|\/)system\.dsds\.json$/i.test(f)).sort((x, y) => x.split('/').length - y.split('/').length || x.length - y.length)[0] ?? null;
+      ({ system, entities } = readDsds(files, entry));
+      if (!entities.length) return kept(!dsdsFiles.length && !pages.size ? `no DSDS entities and no Markdown or MDX pages found in ${where}` : `no DSDS entities found in ${where} (looked for system.dsds.json and *.dsds.json files${pages.size ? '; it has Markdown pages: set intentLayer.format to "markdown" to read those' : ''})`);
+      source.entry = entry;
+    } else {
+      const { readMarkdown } = await import('./doc-source-markdown.mjs');
+      ({ system, entities } = readMarkdown(pages, { paths: layerFiles, root: folder ?? '' }));
+      if (!entities.length) return kept(`no DSDS entities and no Markdown or MDX pages found in ${where}`);
+      source.entry = system?.file ?? null;
+    }
     const boilerplate = dropBoilerplate(entities);
     for (const e of entities) e.url = fileUrl(source, e.file);
     // Each page's own spec, where it has one (its code file's, else its title's); a family's spec several pages are
     // written from is named as shared.
-    try {
+    if (format === 'dsds') try {
       const { specIndex, specOf } = await import('./intent-changes.mjs');
       const idx = specIndex(specs, { codes: entities.map((e) => e.code) });
       for (const e of entities) { const sp = specOf(e, idx); if (sp) { e.spec = sp.spec; e.specUrl = fileUrl(source, sp.spec); if (sp.shared) e.specShared = true; else { const mp = mdParts(specs.get(sp.spec)); if (Object.keys(mp).length) e.parts = { ...(e.parts ?? {}), ...mp }; } } }
     } catch { /* the pages stand without it */ }
     // When each page's file last changed: the files a new commit changed (one compare with the commit read before) take
-    // its date; a file not dated yet asks for its own last commit, once. A date not known is left out, never guessed.
-    const fileDates = { ...(prev?._reader >= 6 ? prev.fileDates ?? {} : {}) };
+    // its date; a file not dated yet asks for its own last commit, once. A date not known is left out, never guessed. A
+    // page made of several files (a component's tabs) takes the latest of theirs.
+    const fileDates = { ...(prev?._reader >= 6 && c.host !== 'folder' ? prev.fileDates ?? {} : {}) };
     const previous = prev?._reader >= 6 ? prev?._source?.sha : null;
-    if (previous && previous !== sha) {
-      const cmp = await get(`${base}/repository/compare?from=${encodeURIComponent(previous)}&to=${encodeURIComponent(sha)}`);
-      if (cmp.ok) { try { for (const d of (await cmp.json())?.diffs ?? []) { if (d.new_path) fileDates[d.new_path] = source.committedAt; if (d.deleted_file) delete fileDates[d.old_path]; } } catch { /* the files ask below */ } }
+    if (previous && previous !== sha && c.host !== 'folder') {
+      const d = await h.changed(previous, sha);
+      if (d) { for (const f of d.changed) fileDates[f] = source.committedAt; for (const f of d.removed) delete fileDates[f]; }
       else for (const k of Object.keys(fileDates)) delete fileDates[k];
     }
-    const undated = [...new Set(entities.map((e) => e.file).filter(Boolean))].filter((f) => !fileDates[f]);
+    const filesOf = (e) => e.files ?? [e.file];
+    const undated = [...new Set(entities.flatMap(filesOf).filter(Boolean))].filter((f) => !fileDates[f]);
     for (let i = 0; i < undated.length; i += 8) {
-      await Promise.all(undated.slice(i, i + 8).map(async (f) => {
-        const c = await get(`${base}/repository/commits?ref_name=${encodeURIComponent(sha)}&path=${encodeURIComponent(f)}&per_page=1`);
-        if (!c.ok) return;
-        try { const at = (await c.json())?.[0]?.committed_date; if (at) fileDates[f] = String(at); } catch { /* left undated */ }
-      }));
+      await Promise.all(undated.slice(i, i + 8).map(async (f) => { const at = await h.lastChange(f, sha); if (at) fileDates[f] = at; }));
     }
-    for (const e of entities) if (fileDates[e.file]) e.updatedAt = fileDates[e.file];
-    source.entry = entry;
+    for (const e of entities) { const at = filesOf(e).map((f) => fileDates[f]).filter(Boolean).sort().pop(); if (at) e.updatedAt = at; }
     source.fetchedAt = (opts.now ?? new Date()).toISOString();
     const snap = {
-      _note: 'The intent layer as read from GitLab (rms-design-system-engine). Regenerated when its commit moves; do not edit by hand, edit the layer itself.',
+      _note: `The intent layer as read from ${HOST_NAME[c.host]} (rms-design-system-engine). Regenerated when it changes; do not edit by hand, edit the layer itself.`,
       _source: source, _reader: READER, system, boilerplate, entities,
       contracts: contractSummaries(files, (f) => fileUrl(source, f)),
       fileDates,
       layerFiles: [...new Set(layerFiles)].sort(),
+      ...(got.note ? { note: got.note } : {}),
     };
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(snap, null, 2) + '\n');
-    return { ok: true, changed: true, out: c.out, source, entities: entities.length, boilerplate, previous: prev?._source?.sha ?? null };
+    return { ok: true, changed: true, out: c.out, source, entities: entities.length, boilerplate, previous: prev?._source?.sha ?? null, ...(got.note ? { note: got.note } : {}) };
   } catch (e) {
-    return kept(`could not read ${p.host}: ${e.message}`);
+    return kept(`could not read ${h.name ?? c.url}: ${e.message}`);
   }
 }
 
 // One line for the person.
 export function describeSync(r) {
   if (!r) return '';
-  const at = (s) => (s?.sha ? `${s.url.replace(/^https?:\/\//, '')} @ ${s.ref} ${s.sha.slice(0, 8)}${s.committedAt ? ` (${s.committedAt.slice(0, 10)})` : ''}` : '');
+  const at = (s) => (!s?.sha ? '' : s.host === 'folder' ? `the folder ${s.folder ?? s.url}${s.ref && s.ref !== 'HEAD' ? ` (${s.ref})` : ''}` : `${s.url.replace(/^https?:\/\//, '')} @ ${s.ref} ${s.sha.slice(0, 8)}${s.committedAt ? ` (${s.committedAt.slice(0, 10)})` : ''}`);
   if (r.error) return r.stale ? `⚠️  Intent layer: ${r.error} - using the copy of ${at(r.source)}` : `❌ Intent layer: ${r.error}`;
-  return `🧭 Intent layer: ${at(r.source)} - ${r.entities} pages${r.boilerplate ? ` (${r.boilerplate} repeated lines left out)` : ''}, ${r.changed ? 'read' : 'up to date'} → ${r.out}`;
+  const fmt = r.source?.format === 'markdown' ? 'Markdown pages' : 'pages';
+  return `🧭 Intent layer: ${at(r.source)} - ${r.entities} ${fmt}${r.boilerplate ? ` (${r.boilerplate} repeated lines left out)` : ''}, ${r.changed ? 'read' : 'up to date'} → ${r.out}${r.note ? `\n   ⚠️  ${r.note}` : ''}`;
 }
 
 
