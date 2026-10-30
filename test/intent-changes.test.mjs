@@ -242,6 +242,25 @@ test('what else a component page lacks: its role and an example written from the
   assert.ok(md.indexOf('## Common mistakes') < md.indexOf('## Limitations') && md.indexOf('## Limitations') < md.indexOf('## Role') && md.indexOf('## Role') < md.indexOf('## Example'), 'the written sections first, then the reference ones');
 });
 
+test('a role the code cannot say (it renders a div) is asked, and comes back a draft for review; one that is not an ARIA role is not kept', () => {
+  const facts = factsFrom({ components: { tileOne: { file: 'src/tiles/TileOne.vue', root: 'div', props: { size: { options: ['s', 'm'] } } }, tileTwo: { file: 'src/tiles/TileTwo.vue', root: 'div', props: {} } } });
+  const page = (name, file) => ({ kind: 'component', layer: 'components', name, id: `component-${file}`, file: `specs/dsds/${file}.dsds.json`, code: `src/tiles/${name.replace(' ', '')}.vue`, purpose: ['A tile.'], whenToUse: ['Use it for one subject.'], whenNotToUse: ['Not for lists.'], mistakes: ['Two in a row.'], limitations: ['One subject only.'], rules: [], sections: [{ title: 'Example', text: '<TileOne />' }, { title: 'Do and don\'t', text: 'Do: keep it short.' }] });
+  const a = page('Tile One', 'tile-one'), b = page('Tile Two', 'tile-two');
+  const snap = { _source: {}, entities: [a, b] };
+  const report = useReport(snap, new Map([['tileOne', a], ['tileTwo', b]]), { names: ['tileOne', 'tileTwo'], wrongOf: () => [] });
+  const plan = planOf(snap, report);
+  assert.ok(plan.every((it) => it.need.includes('role')));
+  const asked = [];
+  draftPlan(plan, facts, (prompt) => { asked.push(prompt); return JSON.stringify({ '0.d': { role: 'link' }, '1.d': { role: 'clickable card' } }); });
+  assert.match(asked[0], /"need": \[\s*"role"\s*\]/, 'its role is asked');
+  assert.match(asked[0], /"role": "<the ARIA role/);
+  assert.deepEqual(plan[0].drafted.map((d) => `${d.sure ? 'sure ' : ''}${d.where}: ${d.text}`), ['Role: Role: link'], 'a draft, not sure');
+  assert.deepEqual(plan[1].drafted, []);
+  assert.deepEqual(plan[1].dropped, [{ text: 'Role: clickable card', why: 'it is not one of the ARIA roles' }]);
+  const md = applyPlan(plan.slice(0, 1), new Map([['specs/tile-one.md', '# Tile One\n\n- Source: `src/tiles/TileOne.vue`\n\n## Purpose\n\nA tile.\n']])).files.get('specs/tile-one.md');
+  assert.match(md, /## Role\n\n- \*\*Draft:\*\* Role: link\n/, 'judged: a Draft');
+});
+
 test('a large change goes as several commits, each made on the one before, and stops when someone else committed between', async () => {
   const { commitToBranch } = await import('../intent-changes.mjs');
   const files = new Map(Array.from({ length: 90 }, (_, i) => [`specs/page-${i}.md`, 'x'.repeat(100)]));
