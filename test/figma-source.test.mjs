@@ -1,7 +1,7 @@
 // The way to read Figma, chosen automatically: design.json, figma-cli, the session's Figma MCP, the API.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, readFileSync, utimesSync } from 'node:fs';
+import { writeFileSync, readFileSync, utimesSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -54,4 +54,18 @@ test('--from-figma-cli reads a design.json; a newer one is read by the audit on 
   r = run();
   assert.match(r.stdout, /Figma read from design\.json \(Tidepool\)/);
   assert.match(readFileSync(join(dir, '.design-system-engine-out', 'summary.md'), 'utf8'), /read from design\.json \(Tidepool\), written by figma-cli, in this run/);
+});
+
+test('a Figma read is sent to the team\'s snapshots store at once, so it is everyone\'s; --keep-snapshots keeps it here', { timeout: budget(300000) }, () => {
+  const dir = fixtureProject(TP, 'fc-send-');
+  const cfgPath = join(dir, 'ds-config.json'), cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+  writeFileSync(cfgPath, JSON.stringify({ ...cfg, stores: { snapshots: { read: 'shared', write: 'shared' } } }, null, 2));
+  writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign()));
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', PATH: '/usr/bin:/bin' } });
+  const kept = run('--from-figma-cli', '--keep-snapshots');
+  assert.equal(kept.status, 0, kept.stderr);
+  assert.ok(!existsSync(join(dir, 'shared')) || !readdirSync(join(dir, 'shared'), { recursive: true }).some((f) => /figma-vars/.test(f)), 'kept here');
+  const r = run('--from-figma-cli');
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(readdirSync(join(dir, 'shared'), { recursive: true }).some((f) => /figma-vars\.snapshot\.json$/.test(f)), r.stdout);
 });

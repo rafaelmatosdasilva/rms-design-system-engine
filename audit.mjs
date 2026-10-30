@@ -503,6 +503,20 @@ if (process.argv.includes('--make-command')) {
   process.exit(0);
 }
 
+// The snapshots sent to the team's snapshots store once Figma was read again, so the read is everyone's and the style
+// guide's History lists it (one store commit a read): only when the project has a store this person may write, and not
+// with --offline or --keep-snapshots (the snapshots then stay in this folder until --refresh-snapshots).
+async function sendSnapshots(cfg) {
+  if (process.argv.includes('--keep-snapshots')) return;
+  const st = await import('./stores.mjs');
+  if (!st.storesOf(cfg).snapshots.write) return;
+  const { intentLayerConfig } = await import('./doc-source-dsds.mjs');
+  const files = st.localFiles(ROOT, cfg, 'snapshots', { intentOut: intentLayerConfig(cfg)?.out });
+  if (!files.size) return;
+  const r = await st.pushStore(ROOT, cfg, 'snapshots', files, `Figma read again with rms-design-system-engine (${files.size} file${files.size === 1 ? '' : 's'})`, { offline: STORE_OFFLINE });
+  console.log(r.line);
+}
+
 // --refresh-snapshots: the snapshots this folder holds sent to the team's snapshots store, as one commit (or a merge
 // request into a protected branch), when GitLab lets this person write it. The capture itself is the refresh-figma recipe.
 if (process.argv.includes('--refresh-snapshots')) {
@@ -1223,6 +1237,8 @@ if (process.argv.includes('--capture-script') || process.argv.includes('--captur
   }
   // The structure is read in the same run as the variables (Step 1c): say so when only one was read.
   for (const k of kinds.filter((x) => !tried.includes(x))) console.log(`${k === 'components' ? 'Components' : 'Variables'}: none read in checked chunks yet. Read them in the same run: rms-design-system-engine --capture-script ${k} sums.`);
+  // A whole read, every kind in it: the team's from now on.
+  if (ok && kinds.every((k) => tried.includes(k))) await sendSnapshots(ccfg);
   process.exit(ok ? 0 : 1);
 }
 
@@ -1839,6 +1855,7 @@ if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refres
       const i = process.argv.indexOf('--from-figma-cli'), file = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : src.designJsonPath(fcConfig);
       console.log(`✅ ${src.importLine(await src.importDesign(ROOT, fcConfig, file))}`);
       await settleConfig(fcConfig);
+      await sendSnapshots(fcConfig);
       console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
       process.exit(0);
     }
@@ -1849,6 +1866,7 @@ if (process.argv.includes('--from-figma-cli') || process.argv.includes('--refres
     else if (route.route === 'rest') { console.log('NEXT: rms-design-system-engine (it refreshes from the Figma API as it runs)'); process.exit(0); }
     else { console.log('NEXT: rms-design-system-engine --recipe refresh-figma (read the variables and components with the Figma tool of this session)'); process.exit(0); }
     await settleConfig(fcConfig);
+    await sendSnapshots(fcConfig);
     console.log('NEXT: rms-design-system-engine (the audit, on the refreshed snapshots)');
     process.exit(0);
   } catch (e) { console.error(`❌ Figma not read: ${e.message}`); process.exit(1); }
