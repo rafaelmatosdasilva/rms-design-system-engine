@@ -1,0 +1,7 @@
+# Advisories this test-only folder knowingly carries. Nothing here ships: these are the Nuxt build tools the Vue
+# harness tests run in CI. Each entry says why it stays and when to look again.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2027-01-31
+reason = "deepmerge prototype poisoning (low). No fixed release exists; it reaches Nuxt through nitropack's node-resolve plugin, which merges the build's own options, never outside input."

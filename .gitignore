@@ -45,3 +45,4 @@ test/.vue-cli-tools/*
 test/.nuxt-tools/*
 !test/.*-tools/package.json
 !test/.*-tools/package-lock.json
+!test/.*-tools/osv-scanner.toml

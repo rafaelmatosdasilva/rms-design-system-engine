@@ -1,1 +1,8 @@
-{ "private": true, "description": "Nuxt, for test/vue-builds.test.mjs.", "dependencies": { "nuxt": "4", "vue": "3" } }
+{
+  "private": true,
+  "description": "Nuxt, for test/vue-builds.test.mjs.",
+  "dependencies": {
+    "nuxt": "^4.6.3",
+    "vue": "3"
+  }
+}
