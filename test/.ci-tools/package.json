@@ -1,1 +1,7 @@
-{ "private": true, "description": "Tools the CI installs globally: TypeScript for JSX, npm 11 for the Vue build tools.", "dependencies": { "typescript": "6", "npm": "11" } }
+{
+  "private": true,
+  "description": "TypeScript for the JSX the build scorer and the component harness read, found as a machine-wide one is.",
+  "dependencies": {
+    "typescript": "6"
+  }
+}

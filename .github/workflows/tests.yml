@@ -16,10 +16,10 @@ jobs:
         with:
           node-version: 22
       # Every tool below comes from its folder's committed lockfile (npm ci), so each run installs exactly the versions
-      # last tested. The build scorer and the component harness read JSX with TypeScript, found as a machine-wide one
-      # is (NODE_PATH, tsc on the PATH). npm 11 places Nuxt's peer dependencies, where npm 10 (the one Node 22 ships)
-      # crashes ("reading 'edgesOut'").
-      - name: Install TypeScript and npm 11
+      # last tested, with the runner's own npm (a lockfile needs no peer resolution, so npm 10 is enough for Nuxt). The
+      # build scorer and the component harness read JSX with TypeScript, found as a machine-wide one is (NODE_PATH, tsc
+      # on the PATH).
+      - name: Install TypeScript
         run: |
           npm ci --prefix test/.ci-tools --no-audit --no-fund
           echo "$PWD/test/.ci-tools/node_modules/.bin" >> "$GITHUB_PATH"
@@ -29,7 +29,6 @@ jobs:
       # test/vue-builds.test.mjs).
       - name: Install the Vue build tools the Vue tests use
         run: |
-          npm --version
           npm ci --prefix test/.vue-tools --no-audit --no-fund
           npm ci --prefix test/.vue-cli-tools --no-audit --no-fund
           npm ci --prefix test/.nuxt-tools --no-audit --no-fund
