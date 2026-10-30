@@ -2,7 +2,7 @@
 // rule gets a known-good and a known-bad run; a scorer that passes a bad run fails here. No model tokens.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import { context, decisionPoints } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken } from './skill-evals/rules.mjs';
 import { DEV, COMBO, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, tempDir } from './helpers.mjs';
 
 const CSS_BAD = '.tp-chip.tp-chip--l.tp-chip--icon { height: 36px; }\n.tp-field {\n  height: 36px; box-sizing: border-box;\n}\n';
 const CSS_FIXED = '.tp-chip.tp-chip--l.tp-chip--icon { height: 32px; }\n.tp-field {\n  height: 36px; box-sizing: border-box;\n}\n';
@@ -197,6 +197,21 @@ test('a run on an API key goes through the Agent SDK and keeps only the key, nev
   assert.equal(runnerOf({ ANTHROPIC_API_KEY: 'k' }), 'sdk');
   assert.equal(runnerOf({ CLAUDE_CODE_OAUTH_TOKEN: 'o' }), 'cli');
   assert.deepEqual(childEnv({ PATH: '/bin', ANTHROPIC_API_KEY: 'k', CLAUDE_CODE_OAUTH_TOKEN: 'o' }, { HOME: '/h' }), { PATH: '/bin', ANTHROPIC_API_KEY: 'k', HOME: '/h' });
+});
+
+test('the API key comes from its own file when the environment has none, and the environment wins over the file', async () => {
+  const { withKeyFile, runnerOf } = await import('./skill-evals/lib.mjs');
+  const dir = tempDir('eval-key-');
+  const file = join(dir, 'anthropic-key');
+  writeFileSync(file, '\n  sk-test-file  \n');
+  assert.equal(withKeyFile({ PATH: '/bin' }, file).ANTHROPIC_API_KEY, 'sk-test-file');
+  assert.equal(runnerOf(withKeyFile({ PATH: '/bin' }, file)), 'sdk');
+  assert.equal(withKeyFile({ ANTHROPIC_API_KEY: 'sk-env' }, file).ANTHROPIC_API_KEY, 'sk-env');
+  assert.equal(withKeyFile({ DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE: file }).ANTHROPIC_API_KEY, 'sk-test-file');
+  assert.deepEqual(withKeyFile({ PATH: '/bin' }, join(dir, 'missing')), { PATH: '/bin' });
+  writeFileSync(file, '\n');
+  assert.equal(runnerOf(withKeyFile({ CLAUDE_CODE_OAUTH_TOKEN: 'o' }, file)), 'cli');
+  rmSync(dir, { recursive: true, force: true });
 });
 
 test('no CLI on PATH: a run by path that ends "not in parity" (exit 1) still counts as run', () => {

@@ -8,7 +8,7 @@
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
 import { join, dirname, basename, relative } from 'node:path';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findChrome } from '../../cdp.mjs';
@@ -48,7 +48,17 @@ export function sdkOptions({ model, maxTurns = 40, budget = 3, resume = null, ro
 // Which way a run goes. With ANTHROPIC_API_KEY set, through the Agent SDK: the API credits a Claude plan includes pay
 // for the SDK and not for Claude Code, so `claude -p` on that key is refused. Otherwise through `claude -p`, on the
 // plan's own login (CLAUDE_CODE_OAUTH_TOKEN), as before.
-export function runnerOf(env = process.env) { return env.ANTHROPIC_API_KEY ? 'sdk' : 'cli'; }
+export function runnerOf(env = withKeyFile(process.env)) { return env.ANTHROPIC_API_KEY ? 'sdk' : 'cli'; }
+// The API key for the evaluation only, from a file only its owner reads (~/.config/rms-engine/anthropic-key, or the
+// file DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE names), when the environment holds none. Kept out of the shell's profile,
+// so nothing else on the machine (Claude Code itself in a terminal) picks the key up and bills the API instead of the plan.
+export const KEY_FILE = join(homedir(), '.config', 'rms-engine', 'anthropic-key');
+export function withKeyFile(env, file = env.DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE || KEY_FILE) {
+  if (env.ANTHROPIC_API_KEY) return env;
+  let key = '';
+  try { key = readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).find(Boolean) ?? ''; } catch { /* no file: the plan's login */ }
+  return key ? { ...env, ANTHROPIC_API_KEY: key } : env;
+}
 // The SDK, installed for the evaluation only (npm ci --prefix test/.eval-tools): the engine itself has no dependencies.
 const SDK = join(ENGINE, 'test', '.eval-tools', 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'sdk.mjs');
 // The CLI that runs each task, found once on this machine's PATH: a run's own PATH leaves out ~/.local/bin (where
@@ -206,8 +216,9 @@ export async function runClaude({ cwd, home, path, prompt, model, resume = null,
   // A run that installs its own Playwright must not clean up the machine's shared browsers (its garbage collection
   // removes every browser no installed copy links to, which leaves the scorer with no Chrome).
   const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
-  const env = childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
-  const { events, err, timedOut } = runnerOf() === 'sdk'
+  const base = withKeyFile(process.env);
+  const env = childEnv(base, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
+  const { events, err, timedOut } = runnerOf(base) === 'sdk'
     ? await viaSdk(prompt, sdkOptions({ model, maxTurns, budget, resume, route, cwd, env }), timeoutMs)
     : await viaCli(claudeArgs({ prompt, model, maxTurns, budget, resume, route, cwd }), { cwd, env }, timeoutMs);
   const result = events.filter((e) => e.type === 'result').at(-1);
@@ -230,7 +241,7 @@ function viaCli(args, { cwd, env }, timeoutMs) {
 }
 // The SDK's messages are the CLI's stream-json events, so everything that reads a run reads them unchanged.
 async function viaSdk(prompt, options, timeoutMs) {
-  if (!existsSync(SDK)) throw new Error('ANTHROPIC_API_KEY is set, so runs go through the Agent SDK, which is not installed: npm ci --prefix test/.eval-tools');
+  if (!existsSync(SDK)) throw new Error('An API key is set (ANTHROPIC_API_KEY or the key file), so runs go through the Agent SDK, which is not installed: npm ci --prefix test/.eval-tools');
   const { query } = await import(SDK);
   const abortController = new AbortController();
   const events = [];
