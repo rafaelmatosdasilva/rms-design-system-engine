@@ -40,7 +40,7 @@ export function projectDir(argv = process.argv.slice(2), env = process.env, cwd 
 // What an answer says to run, said as this server's tools: the command line's text is the answer, and an agent with no
 // shell reads `rms-design-system-engine --query chip` as the query tool with terms chip. A command no tool runs (the
 // audit, --component, --recipe) is left as written, with one line saying it needs a terminal.
-const ESC = SKILL.replace(/[-]/g, '\\-');
+const ESC = SKILL.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');   // the name as a regular expression, every special character escaped
 const CALL = (verb) => (verb === 'run ' ? 'call ' : verb === 'Run ' ? 'Call ' : verb === 'then ' ? 'then call ' : verb);
 export function forMcp(text) {
   let t = String(text ?? '');
