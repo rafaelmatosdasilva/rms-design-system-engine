@@ -1286,6 +1286,18 @@ check every edit gets on what changed since the last commit, never failing the f
 `.design-system-engine-out/ui-check.json`, so a generation log can keep them beside the raw output; the error count is
 the generation's quality score. Exit 1 on any error.
 
+#### The same answers through MCP (`mcp.mjs`, for an agent with no shell)
+
+An agent with no shell (a prototyping tool, a chat assistant) reaches the engine through its MCP server instead:
+`claude mcp add design-system -- node <install folder>/mcp.mjs --project=<the project's folder>` (any MCP client
+starts it the same way, over stdio). Its tools run the same commands in the project and hand back the text they print:
+`query` (`terms`: what `--query` prints), `catalog` (`for`, `answered`, `detail`: what `--prototype --catalog` prints),
+`check_ui` (`file`: what `--check-ui` prints, for a generated UI in JSON or a page) and `summary` (the last audit's
+summary). In what they hand back, each command they cover is said as the tool (`the query tool (terms: chip)`), and a
+command none covers (the audit, `--component`, `--recipe`) is left as written with a line saying it needs a terminal.
+No tool changes the project's code or design file. Where there is a shell, the command line comes first: measured on
+the same tasks, an agent with both used the command line, and the server is what an agent with no shell needs.
+
 #### The construction grammar (`--query construction`, `--construction`, `--figma-fix`, `--construction-check`)
 
 How the system builds a component in Figma, mined on every run from its own components and written to
@@ -1407,6 +1419,16 @@ says nothing did. `--ci-changed --record`, after a build that succeeded, keeps t
 so its own commit starts nothing; a folder with no commit yet is a state of its own; a source that cannot be read counts
 as moved.
 
+#### Accessibility never gets worse (`--a11y-no-worse`)
+
+`rms-design-system-engine --a11y-no-worse`, after the audit on a merge request or pull request, compares this run's
+accessibility result (`.design-system-engine-out/a11y.json`) with the one the last build on the base branch kept.
+`--a11y-no-worse --record`, after the audit on the base branch, keeps it in
+`.design-system-engine-out/a11y-last-build.json`, which the pipeline carries to each merge request. Only blockers count,
+on components and products' pages (never prototypes); a blocker the base already had is not new. Exit 0: no new blocker
+(each one fixed since is named), or no base kept yet; exit 1: a new blocker, each one named; exit 2: this run measured
+nothing, so nothing can be compared. It only reports: the pipeline decides what a failing exit stops.
+
 #### Prototypes
 
 `rms-design-system-engine --prototype --catalog` prints everything a prototype may use, in this order: what it was read
@@ -1465,18 +1487,15 @@ and whose examples (`Example:`) are shown as examples.
   data-why="…" />` is a gap, kept in `prototypes/gaps.json`. It ends with ✅ Ready or ❌ Not ready. The project's hook runs
   the same check on every edit of a page in `prototypes/` (`prototype.dir` in `ds-config.json`), from the system the
   last `--prototype` run kept (`.design-system-engine-out/prototypes/page-system.json`); so does `--check-ui <page>`.
-<<<<<<< HEAD
   `--prototype <file> --handoff` writes `prototypes/<name>.handoff.md` beside it: what the page is made of (each
   component, how often, how it is written and where its file is), what the system lacked for it, and what is still
   unresolved. It measures nothing new - every number comes from the check that just ran - and it is written whether or
   not the page is ready, because a page that is not ready is exactly the one someone else needs the facts about.
-=======
   `--prototype <file> --comment "<what you saw>" [--on <component>] [--line <n>]` keeps what a person said about the
   page beside it (`prototypes/<name>.comments.json`, committed), and `--close <id> --answer "<what changed>"` closes
   one with what it produced. Every run of that page prints the open ones, oldest first, above what the check found: a
   person's words outrank a rule, and whoever reads them is about to change the page. Closing one needs an answer,
   because a comment closed with nothing said is one nobody can learn from.
->>>>>>> 1352113 (What a person said about a prototype is kept with it)
 - **As a page, the same for every framework** (`page-quality.mjs`, `page-render.mjs`). Beside the system's own checks,
   the page is read for the habits agents fall into (🎨 AS A PAGE, a score out of 10): a card inside a card, more than
   one main action in view (an action inside a dialog or a panel is that layer's own), a destructive action styled as
@@ -1951,6 +1970,8 @@ whatever surface the project serves, in this order:
    whole, with every rule, axe-core's page rules (heading order, landmarks) included. Each finding carries its
    product (`product` in `a11y.json`) and the style guide lists them on the Status page under Products, one row per
    product. `a11y.products: false` leaves them out.
+   The page criteria (2.4.2, 3.1.1, 2.4.1, 3.2.3, 3.2.4, 3.2.6, 3.3.7, 3.3.4) are tried on each such page whole and
+   across the pages of one product (never two products'), each flow in `a11y.flows` read page by page in its order (`--reference config`).
    **The components rendered from their own code** (`component-harness.mjs`) — in build mode, or when there is no
    page to open: each React component (`.jsx`/`.tsx`) in each of its Figma variants on one served page, its CSS
    linked and its JSX turned into calls to a small stand-in for React that keeps each component's state and updates

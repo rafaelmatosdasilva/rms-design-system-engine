@@ -273,7 +273,8 @@ export function context(events, dir, saved = null) {
   const results = events.filter((e) => e.type === 'result');
   const final = results.map((r) => String(r.result ?? '')).join('\n\n');
   const bash = calls.filter((c) => c.name === 'Bash').map((c) => ({ command: String(c.input.command ?? ''), result: c.result, isError: c.isError }));
-  const engine = bash.filter((b) => ENGINE_CALL.test(b.command));
+  // A command the run had no shell for (a route without one refuses Bash) asked the engine nothing.
+  const engine = bash.filter((b) => ENGINE_CALL.test(b.command) && !(b.isError && /No such tool available/.test(b.result)));
   // The engine's answers through its MCP server: each call's tool (query, catalog, check_ui, summary) and arguments.
   const mcp = calls.filter((c) => c.name.startsWith(`mcp__${MCP_SERVER}__`)).map((c) => ({ tool: c.name.slice(`mcp__${MCP_SERVER}__`.length), input: c.input, result: c.result, isError: c.isError }));
   const git = (...a) => { if (saved) return ''; try { return execFileSync('git', a, { cwd: dir, encoding: 'utf8' }); } catch { return ''; } };
