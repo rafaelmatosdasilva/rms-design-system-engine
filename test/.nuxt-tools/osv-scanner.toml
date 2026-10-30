@@ -5,3 +5,8 @@
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2027-01-31
 reason = "deepmerge prototype poisoning (low). No fixed release exists; it reaches Nuxt through nitropack's node-resolve plugin, which merges the build's own options, never outside input."
+
+[[IgnoredVulns]]
+id = "GHSA-vjh5-4x84-xrqp"
+ignoreUntil = 2027-01-31
+reason = "Fixed in Nuxt 4.6.2, and this folder runs 4.6.3. The advisory's 3.x range has no upper bound, so it also matches 4.x. The harness never serves Nuxt's server routes either: it builds client-side."
