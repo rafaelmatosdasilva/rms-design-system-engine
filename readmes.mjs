@@ -127,7 +127,6 @@ const SNAPSHOT_TEXT = {
   'component-composition': 'Which components each component nests',
   'a11y-results': "Each component's accessibility results from the last build, so the next build tries only what changed",
   'open-since': 'When each open task was first found, so the guide says how long each one has been open',
-  'health-history': "The Status page's numbers at each release, so each card shows its trend beside today's",
 };
 const snapshotText = (f) => SNAPSHOT_TEXT[basename(f).replace(/\.snapshot\.json$/i, '')] ?? 'A snapshot the engine reads';
 // A place, for a table: the project, then its folder.

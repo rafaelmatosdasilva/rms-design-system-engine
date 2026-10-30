@@ -1157,7 +1157,7 @@ const PROJECT_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'cov
 export function projectSignature(ROOT, cfg = {}, { list = null, read = (f) => readFileSync(f) } = {}) {
   const outDir = OUT_DIR.split('/')[0];
   const sgOut = cfg?.styleguide?.out ? relative(ROOT, resolve(ROOT, dirname(cfg.styleguide.out))) : null;
-  const skipFile = (rel) => rel === 'ds-config.json' || /(^|\/)(a11y-results|open-since|health-history)\.snapshot\.json$/.test(rel) || /-result\.json$/.test(rel);
+  const skipFile = (rel) => rel === 'ds-config.json' || /(^|\/)(a11y-results|open-since)\.snapshot\.json$/.test(rel) || /-result\.json$/.test(rel);
   const files = list ?? (() => {
     const out = [];
     const walk = (dir) => {

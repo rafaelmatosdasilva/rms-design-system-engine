@@ -750,7 +750,7 @@ An automated check finds many failures, but it cannot show that a product meets 
 | Page | What you find there |
 |---|---|
 | Overview | A card for each foundation and component, with a thumbnail drawn from your own code, and a search across everything |
-| Health | How far the system has come, by area, each number beside its value at past releases |
+| Health | How far the system has come, in one number and by area |
 | Tasks | Everything still open, with who acts and what to do |
 | Foundations | Colours, typography, spacing, radii, motion and icons |
 | Components | One page for each component, in areas you switch between |
@@ -774,18 +774,6 @@ Every row says what to do and who acts.
 Each row also shows its status (To fix, To check, New in the last audit), when it was last updated and where it was read. The system's own items come first. Under The system you find what the tokens owe, such as descriptions to write in Figma, a token named after a product, an alias that points nowhere, and a retired token still in use.
 
 Accessibility is tried while the page is built and kept in it, so the page opens with the final results and nothing runs while you read. A component the build could not try is tried in your browser instead. A page whose own script fails is never published, so the last good page stays.
-
-### Health over time
-
-Each card on the Status page shows today's number and how it has moved, release by release.
-
-- **What is kept.** Each card's percentage (matched, built, passed, written) and AI readiness, the share of components an agent can pick and use from your guidance alone (a fifth card, under the four).
-- **Per release.** A release is one of your project's version tags, as History groups the commits. Each keeps the last numbers measured on code it holds. Work after the last tag counts for the next release until its tag exists.
-- **On each card.** The change since the last release in words (Up 4 points since v1.2.0), a small line, and every value written out with its release, oldest first, today's last. The line is never the only way to read it.
-- **No history yet.** The card shows today's number alone and says the trend starts now.
-- **When it is kept.** A build that tries the page in a browser (`--styleguide` without `--no-a11y-bake`) keeps today's numbers. Accessibility is kept only once every component is tried, and in the default theme. In another theme, the Accessibility card lists the default theme's past values without comparing.
-- **Where it is kept.** `health-history.snapshot.json`, with the snapshots, so a snapshots store shares it with the team. Two copies are merged release by release: each keeps the numbers measured from the newer inputs (the code, Figma and the engine each run was built from). A run from an older checkout never replaces them.
-- **Filled from history.** When nothing was kept for a release, the engine reads the page built before and, if your project commits its style guide, the page at each release tag. Each page carries the record as it was when it was built.
 
 ### Each component's page
 
@@ -848,7 +836,7 @@ Agents read your guidelines and Figma's descriptions to pick and use each compon
 - **Names that mislead.** A token, property or component named in the text that the system does not have is listed first, to rename or take out. A name with a `*` (`--card-*`) is a family, there when one of the system's names starts with it.
 - **Where you see it.** In each component's Documentation area, one row per piece (Example; Properties, done, naming the contract file that holds them; Names that do not exist; beside What it is and When to use), and on the Status page's tasks under Documentation while something is missing.
 - **A test with a model, when you ask.** A model answers questions from your guidance alone, such as the options of each property, and the engine scores the answers against the real ones. It uses your model tokens.
-- **The whole document** gets a class too, from how many of its components are ready. The Status page shows it as AI readiness, with its trend.
+- **The whole document** gets a class too, from how many of its components are ready.
 - **What a screen meets first.** Each component's Documentation area also asks what its page leaves open at the edges: what it does when its content does not fit (it scrolls, wraps, is cut or grows), and, for a component with two actions, what it shows with one. Asked only where it applies, and no more once the page says it.
 
 ### Foundations
@@ -1103,7 +1091,7 @@ Then it says which source decides when two disagree. The goal of the people who 
 - **Stale names.** A name in backticks that is no token, property or component of the system is listed to rename or take out.
 - **The extraction test.** `--extract` asks a model, through `guidelines.extract.cmd` (`claude -p` by default), the options of each property from the guidance alone, and scores the answers. It uses your model tokens.
 - **The guidance evaluation.** `guidelines` is a level of `eval-run.mjs --levels`, so you see whether agents build better with your guidelines.
-- **In the style guide.** Each component's rating sits in its Documentation area, and the whole document's on the Status page as AI readiness, with its value at past releases.
+- **In the style guide.** Each component's rating sits in its Documentation area.
 
 ### Figma quota
 
