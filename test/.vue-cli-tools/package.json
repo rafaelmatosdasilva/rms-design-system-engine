@@ -1,0 +1,1 @@
+{ "private": true, "description": "Vue CLI and webpack, for test/vue-builds.test.mjs.", "dependencies": { "@vue/cli-service": "5", "vue": "3", "sass": "1", "sass-loader": "16" } }

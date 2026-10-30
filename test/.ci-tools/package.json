@@ -1,0 +1,1 @@
+{ "private": true, "description": "Tools the CI installs globally: TypeScript for JSX, npm 11 for the Vue build tools.", "dependencies": { "typescript": "6", "npm": "11" } }

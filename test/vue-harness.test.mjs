@@ -3,7 +3,7 @@
 // the browser accessibility check and for the style guide, its SCSS compiled.
 //
 // The Vue tests use the build tools a Vue project has installed, laid in a gitignored folder as CI does:
-//   npm install --prefix test/.vue-tools vite@6 @vitejs/plugin-vue@5 vue@3 sass@1 pinia@3 vue-router@4
+//   npm ci --prefix test/.vue-tools
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, writeFileSync, readFileSync, symlinkSync, existsSync, mkdirSync } from 'node:fs';
@@ -23,7 +23,7 @@ const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
 const TOOLS = join(ENGINE, 'test', '.vue-tools', 'node_modules');
 const CHROME = findChrome({ playwright: true });
 const READY = CHROME && typeof WebSocket !== 'undefined' && existsSync(join(TOOLS, 'vite')) ? false
-  : 'no Chrome, or no Vue build tools (npm install --prefix test/.vue-tools vite@6 @vitejs/plugin-vue@5 vue@3 sass@1)';
+  : 'no Chrome, or no Vue build tools (npm ci --prefix test/.vue-tools)';
 
 const CHIP = `<script setup lang="ts">
 withDefaults(defineProps<{ tone?: 'quiet' | 'loud'; label?: string; selected?: boolean }>(), { tone: 'quiet', label: 'Filter', selected: false });
@@ -143,7 +143,7 @@ const cart = useCart();
 </script>
 <template><RouterLink class="hb-cart" to="/cart">{{ cart.items }} items</RouterLink></template>
 `;
-const STORES = existsSync(join(TOOLS, 'pinia')) && existsSync(join(TOOLS, 'vue-router')) ? READY : 'no pinia or vue-router (npm install --prefix test/.vue-tools pinia@3 vue-router@4)';
+const STORES = existsSync(join(TOOLS, 'pinia')) && existsSync(join(TOOLS, 'vue-router')) ? READY : 'no pinia or vue-router (npm ci --prefix test/.vue-tools)';
 
 test('a Vue component that reads a Pinia store and links with the router renders with the project\'s own Pinia and router', { skip: STORES, timeout: budget(300000) }, async () => {
   const project = (deps) => {

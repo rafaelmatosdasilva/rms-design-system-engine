@@ -37,8 +37,11 @@ test/skill-evals/results/build/*.jsonl
 test/skill-evals/results/prototype/*.jsonl
 test/skill-evals/results/prototype/transcripts/
 test/skill-evals/results/route/
-# The Vue build tools the Vue harness tests use (npm install --prefix test/.vue-tools, test/.vue-cli-tools and
-# test/.nuxt-tools, as CI does)
-test/.vue-tools
-test/.vue-cli-tools
-test/.nuxt-tools
+# The tools CI installs from their lockfiles (npm ci --prefix test/.ci-tools, test/.vue-tools, test/.vue-cli-tools
+# and test/.nuxt-tools): each folder's package.json and package-lock.json are kept, what they install is not.
+test/.ci-tools/*
+test/.vue-tools/*
+test/.vue-cli-tools/*
+test/.nuxt-tools/*
+!test/.*-tools/package.json
+!test/.*-tools/package-lock.json
