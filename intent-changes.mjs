@@ -183,6 +183,8 @@ export function exampleOf(b) {
   const set = Object.entries(b.props ?? {}).filter(([p, v]) => (!b.codeProps || b.codeProps.includes(p)) && Array.isArray(v) && v.length && v.every((x) => typeof x === 'string' && !/^(true|false)$/.test(x))).slice(0, 3);
   return '`<' + b.tag + set.map(([p, v]) => ` ${p}="${v[0]}"`).join('') + ' />`';
 }
+// The roles a drafted one may be: the ARIA roles a component takes as a whole (a drafter's other answer is not kept).
+const ROLES = new Set(['button', 'link', 'checkbox', 'radio', 'radiogroup', 'switch', 'tab', 'tablist', 'tabpanel', 'menu', 'menubar', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'listbox', 'option', 'combobox', 'textbox', 'searchbox', 'spinbutton', 'slider', 'progressbar', 'meter', 'dialog', 'alertdialog', 'alert', 'status', 'log', 'tooltip', 'navigation', 'list', 'listitem', 'table', 'row', 'cell', 'columnheader', 'grid', 'gridcell', 'tree', 'treeitem', 'region', 'group', 'toolbar', 'separator', 'img', 'figure', 'heading', 'banner', 'contentinfo', 'complementary', 'form', 'search', 'article', 'feed', 'timer', 'none']);
 const ROLE_OF = { button: 'button', a: 'link', nav: 'navigation', ul: 'list', ol: 'list', table: 'table', dialog: 'dialog', select: 'combobox', textarea: 'textbox', form: 'form', header: 'banner', footer: 'contentinfo', aside: 'complementary', progress: 'progressbar' };
 const headKey = (h) => h.replace(/^#+\s*/, '').replace(/^\d+(\.\d+)*[.)]?\s+/, '').trim().toLowerCase();
 // Take a line out (a list item or a paragraph line equal to it); a heading left with nothing under it goes too.
@@ -434,8 +436,10 @@ export function draftJobs(plan, facts) {
   for (const [i, it] of plan.entries()) {
     const name = it.page.component;
     for (const [j, r] of it.rewrite.entries()) jobs.push({ key: `${i}.r${j}`, kind: 'rewrite', it, r, ask: { key: `${i}.r${j}`, task: 'rewrite', line: r.line, problems: r.findings.map((f) => f.truth), facts: name ? briefOf(name, facts) : null, layer: it.entity.layer, page: it.entity.name } });
-    // Its role and an example are taken from the code, never asked (draftPlan).
-    const parts = it.need.filter((n) => typeof n === 'string' && n !== 'role' && n !== 'example');
+    // An example is taken from the code, never asked; so is its role when the element its code renders has one
+    // (sureParts). When it does not (a div, a span), the role is asked, and comes back a draft for the team to review.
+    const root = name ? briefOf(name, facts).root : null;
+    const parts = it.need.filter((n) => typeof n === 'string' && n !== 'example' && (n !== 'role' || !ROLE_OF[root]));
     const differ = it.need.find((n) => n?.differ)?.differ;
     const ownUse = it.need.find((n) => n?.ownUse)?.ownUse;
     if (name && (parts.length || differ)) jobs.push({ key: `${i}.d`, kind: 'draft', it, ask: { key: `${i}.d`, task: 'draft', need: parts, differFrom: differ ?? null, facts: briefOf(name, facts, it.entity), other: differ ? briefOf(differ, facts) : null, ...(ownUse ? { ownUse: true, shared: ownUse } : {}) } });
@@ -447,7 +451,7 @@ export function draftPrompt(asks) {
   return `You write the documentation of a design system's components, for the people and agents who build with it. Answer with one JSON object and nothing else: { "<key>": <answer> } for every key below.
 
 For a "rewrite": the line has the problems listed. Write it again so that it says what it meant with only what the facts have: { "text": "<the line>" }. If nothing in the facts can say it, { "text": null, "why": "<one short sentence>" }.
-For a "draft": write the parts listed in need, for the component in facts: { "purpose": "<one sentence: what it is for>", "whenToUse": ["<line>", …], "whenNotToUse": ["<line>", …], "mistakes": ["<a mistake people make with it, and what to do instead>", …], "limitations": ["<what it does not do, or only does when a prop is set>", …], "doDont": ["Do: <line>", "Don't: <line>"] } (2 or 3 lines each, only the parts asked). With differFrom: also say when to use this one and not the other component (facts in other), in whenToUse, and when to use the other one instead, in whenNotToUse, naming it in backticks. With ownUse: every "when to use" line it has now is shared word for word with other components (in shared): write whenToUse lines that only this one meets, never one of those.
+For a "draft": write the parts listed in need, for the component in facts: { "purpose": "<one sentence: what it is for>", "whenToUse": ["<line>", …], "whenNotToUse": ["<line>", …], "mistakes": ["<a mistake people make with it, and what to do instead>", …], "limitations": ["<what it does not do, or only does when a prop is set>", …], "doDont": ["Do: <line>", "Don't: <line>"], "role": "<the ARIA role the component has as a whole, from what it does in facts (button, link, checkbox, tab, dialog, list…), or none when it only lays out or shows content>" } (2 or 3 lines each, only the parts asked). With differFrom: also say when to use this one and not the other component (facts in other), in whenToUse, and when to use the other one instead, in whenNotToUse, naming it in backticks. With ownUse: every "when to use" line it has now is shared word for word with other components (in shared): write whenToUse lines that only this one meets, never one of those.
 
 ${RULES}
 
@@ -490,6 +494,12 @@ export function draftPlan(plan, facts, run, { batch = 12, answers = null } = {})
         else if (!text && a?.why) j.it.rewritten.push({ line: j.r.line, text: null, why: flat(a.why) });
         else j.it.dropped.push({ text: text ?? j.r.line, why: text ? 'the rewrite still names what the system does not have' : 'no answer' });
         continue;
+      }
+      // A drafted role: only one of the ARIA roles, written as a sure one is ("Role: button"), but as a draft.
+      if (j.ask.need.includes('role') && typeof a?.role === 'string') {
+        const role = a.role.trim().toLowerCase().replace(/^role:\s*/, '');
+        if (ROLES.has(role)) j.it.drafted.push({ where: 'Role', text: `Role: ${role}` });
+        else j.it.dropped.push({ text: `Role: ${a.role}`, why: 'it is not one of the ARIA roles' });
       }
       for (const [k, where] of [['purpose', 'Purpose'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['doDont', 'Do and don\'t']]) {
         if (!j.ask.need.includes(k) && !['purpose', 'whenToUse', 'whenNotToUse'].includes(k)) continue;   // these three also say how it differs from its twin
