@@ -1,0 +1,11 @@
+# The engine has no npm dependencies, so only the workflows' actions are kept current. Each is pinned by commit;
+# Dependabot opens a pull request when a newer version is out, and the tests decide if it merges.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
