@@ -139,8 +139,10 @@ try {
   if (said) console.log(`⚠️  ${said}`);
 } catch { /* no record to compare with */ }
 const left = jobs.length - rows.length;
+// The API key's credits are spent: waiting for a usage limit to reset never brings them back, so this stops rather than pausing.
+if (refused && /credit balance (is )?too low/i.test(refused)) { console.log('✗ the API key has no credits left: the runs carry on with --resume once next month\'s credits arrive, or with credits bought in the Console.'); process.exit(2); }
 // A run with no login never gets one by waiting: stop, so continuous.mjs does not wait out a usage limit that is not there.
-if (refused && /not logged in/i.test(refused)) { console.log('✗ a run is not logged in: its fresh HOME holds no login (macOS keeps it in the keychain). Run `claude setup-token` and set CLAUDE_CODE_OAUTH_TOKEN, or ANTHROPIC_API_KEY.'); process.exit(2); }
+if (refused && /not logged in/i.test(refused)) { console.log('✗ a run is not logged in: its fresh HOME holds no login (macOS keeps it in the keychain). Run `claude setup-token` and set CLAUDE_CODE_OAUTH_TOKEN (billed to the plan), or set ANTHROPIC_API_KEY (its API credits, through the Agent SDK: npm ci --prefix test/.eval-tools).'); process.exit(2); }
 if (refused) console.log(`⏸ stopped: the API refused a run (${refused}). ${left} runs not measured; run the same command with --resume after the limit resets.`);
 else if (left) console.log(`⚠ ${left} runs failed in the harness; run the same command with --resume to retry them.`);
 process.exit(refused || left ? 3 : 0);

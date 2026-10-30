@@ -25,6 +25,6 @@ Open an issue on GitHub. Say what you ran, what you expected and what happened i
 - **Every test passing,** none skipped for want of Chrome or the test tools.
 - **No new npm dependency.** The engine has none, and that is part of what it promises.
 - **Nothing private.** No client, product, person, host or token name, in code, tests, examples or messages. Examples use invented names (Acme, cardTile). The required Privacy check refuses anything else.
-- **Docs that match.** A change people can see updates the README, `docs/` or the guide files in the same pull request. A change to the guide files (`rms-design-system-engine.md`, `cookbook/`, `reference/`) also needs a fresh skill evaluation, recorded in `test/skill-evals/RESULTS.md`.
+- **Docs that match.** A change people can see updates the README, `docs/` or the guide files in the same pull request. A change to the guide files (`rms-design-system-engine.md`, `cookbook/`, `reference/`) also needs a fresh skill evaluation, recorded in `test/skill-evals/RESULTS.md`. The evaluation (`node test/skill-evals/continuous.mjs`) runs on your Claude plan's login, billed against its usage limits. With `ANTHROPIC_API_KEY` set, it runs through the Agent SDK instead (`npm ci --prefix test/.eval-tools` first), billed to that key's API credits, which include the monthly credits a Max or Team plan comes with. Those credits don't cover Claude Code.
 
 A pull request merges when the privacy check, the test suite and CodeQL pass.
