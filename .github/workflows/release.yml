@@ -35,7 +35,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
       - name: Tag and publish the next version
         id: tag
         env:
@@ -86,16 +86,26 @@ jobs:
         run: |
           cp "${{ steps.attest.outputs.bundle-path }}" "$ARCHIVE.intoto.jsonl"
           gh release upload "${{ steps.tag.outputs.next }}" "$ARCHIVE" "$ARCHIVE.intoto.jsonl"
-      # The same version as an npm package on GitHub Packages, for teams that install from a registry. Its name, version
-      # and registry are set here only: the committed package.json stays the private one the repository runs from.
+      # The same version as an npm package, on npmjs.org (rms-design-system-engine) and on GitHub Packages
+      # (@rafaelmatosdasilva/rms-design-system-engine), for teams that install from a registry. Its name, version and
+      # registry are set here only: the committed package.json stays the private one the repository runs from.
+      # npmjs.org takes it through trusted publishing (OIDC, no stored token) with signed provenance. NPM_TOKEN, when
+      # the repository has it, serves only the very first publish, before npm lets a trusted publisher be attached.
       - name: Publish the package to GitHub Packages
         if: steps.tag.outputs.next != ''
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          GH_PACKAGES_TOKEN: ${{ github.token }}
         run: |
           next="${{ steps.tag.outputs.next }}"
           npm pkg delete private
           npm pkg set name=@rafaelmatosdasilva/rms-design-system-engine version="${next#v}" \
-            repository.type=git repository.url=git+https://github.com/rafaelmatosdasilva/rms-design-system-engine.git \
-            publishConfig.registry=https://npm.pkg.github.com
-          npm publish
+            repository.type=git repository.url=git+https://github.com/rafaelmatosdasilva/rms-design-system-engine.git
+          echo "//npm.pkg.github.com/:_authToken=$GH_PACKAGES_TOKEN" > "$RUNNER_TEMP/gh-packages.npmrc"
+          npm publish --registry https://npm.pkg.github.com --userconfig "$RUNNER_TEMP/gh-packages.npmrc"
+      - name: Publish the package to npmjs.org
+        if: steps.tag.outputs.next != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm pkg set name=rms-design-system-engine
+          npm publish --provenance --access public
