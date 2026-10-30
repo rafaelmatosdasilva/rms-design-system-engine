@@ -16,8 +16,8 @@ Each section says why it matters, then what it does not do well today. A line ma
 | [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | In every product screen and AI edit: hand-built copies of components, hard-coded values and made-up variables, each with what to use instead. | Shortcuts do not pile up until the system falls apart. | Actively improving |
 | [Review the Figma library](#review-the-figma-library) | Values with no token, detached instances and missing auto layout, plus your system's own building rules and which components break them, with renames to apply. | A clean library is what makes every other check reliable. | Ready to use |
 | [Track system health](#track-system-health) | Tokens named after a product, broken aliases, tokens in the wrong layer, and what breaks only in combinations such as dark on a phone. | Structural risks show up before they spread. | Ready to use |
-| [Keep AI agents on the system](#keep-ai-agents-on-the-system) | Every UI edit an AI makes checked as it happens, agents given the real names and past decisions, and a measure of whether your guidance helps. | AI builds fast but invents components; this keeps it on the system. | Actively improving |
-| [Fit your team's setup](#fit-your-teams-setup) | Reads code straight from GitLab, follows a Figma branch and handles very large files. | It works with the tools you already use. | Actively improving |
+| [Keep AI agents on the system](#keep-ai-agents-on-the-system) | Every UI edit an AI makes checked as it happens, agents given the real names and past decisions, and a measure of whether your guidance helps. | AI builds fast but invents components; this keeps it on the system. | Early development |
+| [Fit your team's setup](#fit-your-teams-setup) | Reads code straight from GitLab, follows a Figma branch and handles very large files. | It works with the tools you already use. | Early development |
 | [Update Figma from the code](#update-figma-from-the-code) | Accessibility specs, screen issues and Dev Mode links written into Figma, after you say yes. | Designers see in Figma what developers already know. | Coming soon |
 | [Keep products on the system](#keep-products-on-the-system) | Token renames and retired components carried to every product with a patch each, which system version each product runs, and one issue per difference in your tracker. | Products take up system changes without a migration project. | Coming soon |
 | [Generate components in Figma](#generate-components-in-figma) | Ask in plain words ("a tag like the chip", "add a size XL to the chip") and the AI builds or changes it in Figma with only your variables, names and structure, after someone signs it off. | New components follow the system's rules from the start. | Coming soon |
@@ -145,7 +145,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 ## Keep AI agents on the system
 
-**Actively improving** · **Why it matters:** AI builds fast but invents components; this keeps it on the system.
+**Early development** · **Why it matters:** AI builds fast but invents components; this keeps it on the system.
 
 *Today: the live checks run in Claude Code. Other tools get the same rules, and a check you run by hand.*
 
@@ -158,7 +158,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 ## Fit your team's setup
 
-**Actively improving** · **Why it matters:** It works with the tools you already use.
+**Early development** · **Why it matters:** It works with the tools you already use.
 
 *Today: every browser check runs in Chrome.*
 
