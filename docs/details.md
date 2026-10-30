@@ -184,9 +184,39 @@ Both routes are measured on the same tasks:
 
 ## What it checks
 
-Every run compares your code with Figma and reports in plain words. The 25 gates are listed in [Features and capabilities](features.md#the-checks). Here is what a developer needs to know about each.
+Every run compares your code with Figma and reports in plain words, through 25 checks called gates. To run just one, see [Parity](commands.md#parity) on the Commands page.
 
 The engine reads what your design system defines in Figma, its tokens and each component's parts, states and options. Then it checks your code against it, value by value and in a real browser. It is not a screenshot comparison.
+
+### The gates
+
+| # | Gate | What it looks at |
+|---|---|---|
+| 1 | Data is up to date | You are comparing with today's Figma, not an old copy |
+| 2 | Figma frame unchanged | The design still looks like the version you approved |
+| 3 | Token values match Figma | Colours, sizes and fonts, in every mode |
+| 4 | Tokens used in screens exist | Nothing a screen uses is missing from the code |
+| 5 | Every mode is covered | Things that should change between modes really do |
+| 6 | Exception lists are valid | Your "ignore this" notes still point at real things |
+| 7 | No invented CSS variables | Every variable in the code comes from a Figma token, under that token's name |
+| 8 | Docs tell the truth | Your docs mention only things that exist |
+| 9 | No invented text casing | No forced UPPERCASE the design did not ask for |
+| 10 | No hand-built DS components | Screens use the real component, and no product draws its own copy of one |
+| 11 | Clean CSS | Nothing unused, nothing that contradicts Figma |
+| 12 | Nested components keep their styles | One component's look does not leak into another |
+| 13 | Structure matches | Heights, spacing, corners, widths and alignment, measured in a browser at each breakpoint and colour mode |
+| 14 | All states are built | Hover, disabled, selected and the rest, in every mode |
+| 15 | Component props match Figma | The same names, defaults and choices, written one way across the system |
+| 16 | Sub-components match Figma | The parts inside a component are the right ones |
+| 17 | Templates compose the right components | Each page is built from what Figma shows |
+| 18 | Markup matches | Classes, icons and every control the design shows |
+| 19 | Required pieces are in place | Icon slots, component slots and form fields |
+| 20 | Icons match Figma | From the shared set, drawn the same way |
+| 21 | Transitions match | Durations and easing |
+| 22 | Motion matches | When your design defines it |
+| 23 | Shadows match | When your design defines them |
+| 24 | Renders correctly in a browser | Checked on the real page, not only in the code, every text style and mode included |
+| 25 | What this audit actually checked | Which components and states were covered, and which were skipped |
 
 ### What it compares
 
