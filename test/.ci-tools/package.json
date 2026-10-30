@@ -1,7 +1,8 @@
 {
   "private": true,
-  "description": "TypeScript for the JSX the build scorer and the component harness read, found as a machine-wide one is.",
+  "description": "TypeScript for the JSX the build scorer and the component harness read, found as a machine-wide one is; fast-check for the property tests (test/property.js).",
   "dependencies": {
-    "typescript": "6"
+    "typescript": "6",
+    "fast-check": "4"
   }
 }
