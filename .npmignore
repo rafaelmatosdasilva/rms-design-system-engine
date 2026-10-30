@@ -1,0 +1,4 @@
+# What the published package leaves out: the tests and their tools, and the repository's own automation.
+test/
+.github/
+.githooks/

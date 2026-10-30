@@ -1,7 +1,8 @@
 # Publishes a release automatically: every Monday, when main has commits since the last version tag, it tags the
 # next version and creates a GitHub Release whose notes list the pull requests merged since the previous one.
 # How big the step is (patch, minor or major) comes from the release labels on those pull requests
-# (release-version.mjs). Nobody runs this by hand. Only tags and releases are written: main itself is never pushed to.
+# (release-version.mjs). Nobody runs this by hand. Only tags, releases and the package are written: main itself is never
+# pushed to.
 name: release
 
 on:
@@ -19,12 +20,13 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Only this job writes, and only tags, the release and its signed provenance.
+    # Only this job writes, and only tags, the release, its signed provenance and the package.
     permissions:
       contents: write
       pull-requests: read
       id-token: write
       attestations: write
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,6 +35,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+          registry-url: https://npm.pkg.github.com
       - name: Tag and publish the next version
         id: tag
         env:
@@ -83,3 +86,16 @@ jobs:
         run: |
           cp "${{ steps.attest.outputs.bundle-path }}" "$ARCHIVE.intoto.jsonl"
           gh release upload "${{ steps.tag.outputs.next }}" "$ARCHIVE" "$ARCHIVE.intoto.jsonl"
+      # The same version as an npm package on GitHub Packages, for teams that install from a registry. Its name, version
+      # and registry are set here only: the committed package.json stays the private one the repository runs from.
+      - name: Publish the package to GitHub Packages
+        if: steps.tag.outputs.next != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          next="${{ steps.tag.outputs.next }}"
+          npm pkg delete private
+          npm pkg set name=@rafaelmatosdasilva/rms-design-system-engine version="${next#v}" \
+            repository.type=git repository.url=git+https://github.com/rafaelmatosdasilva/rms-design-system-engine.git \
+            publishConfig.registry=https://npm.pkg.github.com
+          npm publish
