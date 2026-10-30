@@ -1,5 +1,50 @@
 # Skill evaluation results
 
+## 2026-10: MCP answers fit an agent with no shell; the skill says which route; a11y guide lines (continuous evaluation)
+
+What changed since the entry below (engine 78b2e7f): A product late on its system version is named on the Tasks list; its docs are read too (#149); Components drawn alone get the data their children and their app give them; one that cannot draw says why (#154); The intent layer read from GitHub and a project folder, and from Markdown and MDX pages (#157); Accessibility never gets worse: a merge request fails on a blocker the base branch did not have (#160); Markdown intent layer: description kept apart from rules, and the noise of a docs site left out (#163); Components drawn alone get the route, nested items and the icon folder their code reads; a raw error names the missing input (#161); Status cards show each number's trend over releases, with AI readiness (#159); Generate components in Figma reaches beta (#164); Route a generated UI to --check-ui and the last run's result to --summary (#158); Accessibility on pages and flows: the criteria that belong to a page, tried across a product's own pages (#162); Features page: each part Available, with a maturity, or Planned (#166); The Status page without its trend and without the AI readiness card (#168); Docs show only what can be used, under the features page's names (#167); A role the code cannot say is drafted for the team to review (#169); README leads with the shared knowledge layer, shows how it works, and links one page on security and data (#170); Features page: Keep AI agents on the system and Fit your team's setup are in early development (#171); A security policy, and the OpenSSF Scorecard on main and every week (#172); Workflows hardened: read-only tokens, actions pinned by commit, and CodeQL (#173); Test tools from committed lockfiles, and each release signed with its provenance (#174); How to contribute, and the workflows' actions on their Node 24 versions (#176); A page with drafts waiting still gets its other gaps drafted (#175); Test tools on their patched versions, with the one advisory that has no fix recorded and why (#177); Each release also published as a package on GitHub Packages (#178); A Figma read is sent to the team's snapshots store at once (#180); Property tests with fast-check for the value readers every comparison rests on (#179); The Nuxt advisory OSV matches through an open-ended range, recorded with why (#181); Scorecard can also be run on demand (#182); Each release also on npmjs.org, with provenance, through trusted publishing (#184); The skill evaluation runs through the Agent SDK on an API key (#185); The evaluation's API key read from a file only its owner reads (#186); MCP answers fit an agent with no shell; the skill says which route; a11y guide lines. The guide changed in `cookbook/ask-the-system.md`, `cookbook/ci-and-hooks.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
+
+Guide set measured: `37ae1aac5ff5` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 238d4309` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6c5a3936` `cookbook/guidelines-links.md 0d17d437` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 50abedb9` `cookbook/refresh-figma.md cbd2b4d4` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md d0992d02` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md 3c4ab275` `rms-design-system-engine.md 0f804311`
+
+**The agent's command line changed.** The agent's command line bundles other skills than in the runs before (2.1.178 → 2.1.301; added dataviz, design, doctor, plugin-authoring, workflow-authoring; removed schedule): a change in the results may come from them, not from the guide.
+
+| Haiku, engine b088c30 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.059 | $0.035 |
+| Input a run | 108k | 78k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 78k a run against 108k. no task changed state, and no run moved: the same result. Records: `records/2026-10-30-mcp-answers-fit-an-agent`.
+
+## 2026-10: Route benchmark, the command line against the MCP server
+
+The four route tasks (`--set route`) on each route, on `claude-haiku-5-5`, 3 runs each, a budget
+of $1 a run: before this change (engine b30d122) and after it (engine b088c30). The runs before are scored with this
+change's scorers (a command refused for want of a shell asks the engine nothing; "tell me if you want the token fixes
+made" is not a secret asked); as first scored they read shell 9/12, MCP 10/12, neither 8/12.
+
+| Route | Before | After | Input a run, after | Tool calls a run, after |
+|---|---|---|---|---|
+| Shell only (the command line) | 10/12 | 12/12 | 82k | 2.9 |
+| Shell and the MCP server | 12/12 | 12/12 | 64k | 2.2 |
+| MCP server, no shell | 10/12 | 12/12 | 70k | 2.9 |
+| No shell, no server | 3/12 | 3/12 | 101k | 4.6 |
+
+**Reading.** With a shell, the agent used the command line: in the route with both, 9 of 12 runs used it alone, and
+the other 3 (writing a UI) called the server beside it. With no shell, the server is what makes the
+answers right (12/12 against 3/12 with neither, where only the last audit's summary, read as a file, passed). Before
+this change the agent with only the server failed 2 of 3 UI checks: `check_ui` answered in JSON that never said the
+shape it reads, and the query's JSON ended on a shell command (`next`) it then tried to run. After it, the answers are
+the command line's text, their NEXT lines name the tools, `check_ui` says its shapes, and every run passes with less
+input (70k a run against 105k) and fewer calls (2.9 against 4.8). Still seen: 10 of the 12 runs with only the server
+first try the shell command the routed request names (`RUN:`), are refused, then call the tool. A shell's 2 misses
+before were the token task: `--query radius` finds no near name for `radii/chip`, and the agent stopped there. So the
+skill keeps the command line first where there is a shell and names the MCP tools where there is none. Records:
+`records/2026-10-30-route-benchmark-before/route`, `records/2026-10-30-route-benchmark/route` (`route-report.mjs <folder>`).
+
 ## 2026-10: The intent layer read from GitHub and a project folder, and from Markdown and MDX pages (continuous evaluation)
 
 What changed since the entry below (engine 1bc455e): Motion and effects read from Figma in answers that each fit (#133); llms.txt says what each token is for, in the team's words (#134); A border token's job, read from the controls that use it (#135); A component's text colour is paired with its own surface, never another's (#136); A finding marked wrong is a case its check must pass, and --wrong is a command (#138); The names agents invented here, in each contract and in llms.txt (#137); An object a part reads: its dates left out, a list read through a name of its own (#141); A token in the first layer where its value can change (#139); A control's parts are checked even where nobody annotated them (#142); Two runs writing one store are merged by their stamps (#143); The Tasks list names the team that owns each task (#140); Dev Mode links and code syntax written into Figma, after a yes (#144); The design file's own guidance, in llms.txt (#145); A field's parts wired in its own source, before any browser (#146); Which system version each product uses, and what a newer one changes for it (#147); Features page: one line per capability, with how far along each part is (#148); Commands: build a new component in Figma, and change one, the system's way (#152); Route benchmark: the same tasks through the command line and the MCP server (#153); Motion and effects read again only where a checksum changed (#151); A control's parts on the build sheet, and a label across a shadow root said apart (#150); A new component in Figma like one of a family reaches its spec (#155); Features page: each part named by what it does, with what you get and why it matters (#156); The intent layer read from GitHub and a project folder, and from Markdown and MDX pages. The guide changed in `cookbook/guidelines-links.md`, `reference/config.md`, `reference/usage.md`, `rms-design-system-engine.md`.
