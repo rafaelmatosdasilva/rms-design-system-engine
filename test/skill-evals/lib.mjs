@@ -28,15 +28,29 @@ export const ROUTES = {
 };
 // The command line of one headless turn: its tools, and the engine's MCP server pointed at the project when the route
 // has it (no other server, ever).
-export function claudeArgs({ prompt, model, maxTurns = 40, budget = 3, resume = null, route = 'shell', cwd = '.' }) {
+function routeOf(route, cwd) {
   const r = ROUTES[route];
   if (!r) throw new Error(`unknown route ${route}: ${Object.keys(ROUTES).join(', ')}`);
   const servers = r.mcp ? { [MCP_SERVER]: { command: process.execPath, args: [join(ENGINE, 'mcp.mjs'), `--project=${cwd}`] } } : {};
-  const allowed = [...r.tools.split(','), ...(r.mcp ? [`mcp__${MCP_SERVER}`] : [])];
+  return { tools: r.tools, servers, allowed: [...r.tools.split(','), ...(r.mcp ? [`mcp__${MCP_SERVER}`] : [])] };
+}
+export function claudeArgs({ prompt, model, maxTurns = 40, budget = 3, resume = null, route = 'shell', cwd = '.' }) {
+  const { tools, servers, allowed } = routeOf(route, cwd);
   return ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--model', model, '--max-turns', String(maxTurns),
-    '--max-budget-usd', String(budget), '--tools', r.tools, '--allowedTools', allowed.join(' '),
+    '--max-budget-usd', String(budget), '--tools', tools, '--allowedTools', allowed.join(' '),
     '--strict-mcp-config', '--mcp-config', JSON.stringify({ mcpServers: servers }), ...(resume ? ['--resume', resume] : [])];
 }
+// The same turn through the Agent SDK: the same tools, servers, limits and session.
+export function sdkOptions({ model, maxTurns = 40, budget = 3, resume = null, route = 'shell', cwd = '.', env = {} }) {
+  const { tools, servers, allowed } = routeOf(route, cwd);
+  return { cwd, env, model, maxTurns, maxBudgetUsd: budget, tools: tools.split(','), allowedTools: allowed, mcpServers: servers, strictMcpConfig: true, ...(resume ? { resume } : {}) };
+}
+// Which way a run goes. With ANTHROPIC_API_KEY set, through the Agent SDK: the API credits a Claude plan includes pay
+// for the SDK and not for Claude Code, so `claude -p` on that key is refused. Otherwise through `claude -p`, on the
+// plan's own login (CLAUDE_CODE_OAUTH_TOKEN), as before.
+export function runnerOf(env = process.env) { return env.ANTHROPIC_API_KEY ? 'sdk' : 'cli'; }
+// The SDK, installed for the evaluation only (npm ci --prefix test/.eval-tools): the engine itself has no dependencies.
+const SDK = join(ENGINE, 'test', '.eval-tools', 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'sdk.mjs');
 // The CLI that runs each task, found once on this machine's PATH: a run's own PATH leaves out ~/.local/bin (where
 // install.sh puts the engine's command), and the Claude Code installer puts `claude` there too.
 const CLAUDE = (() => { try { return execFileSync('which', ['claude'], { encoding: 'utf8' }).trim() || 'claude'; } catch { return 'claude'; } })();
@@ -122,9 +136,11 @@ export function makeHome(variant, { cliOnPath = true } = {}) {
 // model's credentials stay: CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) is how a run logs in where the fresh
 // HOME holds no login, as on macOS, whose login lives in the keychain.
 const DROP = [/^CLAUDE/, /^MAX_THINKING_TOKENS$/, /^(GH|GITHUB)_TOKEN$/, /^CLOUDSDK_/, /^SESSION_INGRESS/, /^FIGMA_/, /^GITLAB_/, /^DESIGN_SYSTEM_ENGINE_EVAL/];
+// A run on an API key keeps only the key, so it is never billed to the plan instead.
 const KEEP_ENV = new Set(['CLAUDE_CODE_OAUTH_TOKEN']);
 export function childEnv(env, extra = {}) {
-  return { ...Object.fromEntries(Object.entries(env).filter(([k]) => KEEP_ENV.has(k) || !DROP.some((re) => re.test(k)))), ...extra };
+  const keep = env.ANTHROPIC_API_KEY ? new Set() : KEEP_ENV;
+  return { ...Object.fromEntries(Object.entries(env).filter(([k]) => keep.has(k) || !DROP.some((re) => re.test(k)))), ...extra };
 }
 
 // A run that did not run: the API refused it (a usage limit, a 429, an overload) or it spent nothing and
@@ -184,15 +200,23 @@ export function limitReached(events) {
   return null;
 }
 
-// One headless turn. Resolves { events, sessionId, cost, error, infra, limit }.
-export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTurns = 40, budget = 3, timeoutMs = 15 * 60 * 1000, route = 'shell' }) {
-  const args = claudeArgs({ prompt, model, maxTurns, budget, resume, route, cwd });
+// One headless turn, through the SDK or the CLI (runnerOf). Resolves { events, sessionId, cost, error, infra, limit }.
+export async function runClaude({ cwd, home, path, prompt, model, resume = null, maxTurns = 40, budget = 3, timeoutMs = 15 * 60 * 1000, route = 'shell' }) {
+  // Real users have Chrome: the audit's browser reading and accessibility check run in every variant.
+  // A run that installs its own Playwright must not clean up the machine's shared browsers (its garbage collection
+  // removes every browser no installed copy links to, which leaves the scorer with no Chrome).
+  const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
+  const env = childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' });
+  const { events, err, timedOut } = runnerOf() === 'sdk'
+    ? await viaSdk(prompt, sdkOptions({ model, maxTurns, budget, resume, route, cwd, env }), timeoutMs)
+    : await viaCli(claudeArgs({ prompt, model, maxTurns, budget, resume, route, cwd }), { cwd, env }, timeoutMs);
+  const result = events.filter((e) => e.type === 'result').at(-1);
+  const error = timedOut ? `timed out after ${timeoutMs / 60000} min` : !result ? `no result (${err.slice(-300)})` : null;
+  return { events, sessionId: result?.session_id ?? events.find((e) => e.session_id)?.session_id ?? null, cost: result?.total_cost_usd ?? 0, error, infra: timedOut ? null : infraFailure(events), limit: timedOut ? 'timed out' : limitReached(events), stderr: err.slice(-2000) };
+}
+function viaCli(args, { cwd, env }, timeoutMs) {
   return new Promise((resolve) => {
-    // Real users have Chrome: the audit's browser reading and accessibility check run in every variant.
-    // A run that installs its own Playwright must not clean up the machine's shared browsers (its garbage collection
-    // removes every browser no installed copy links to, which leaves the scorer with no Chrome).
-    const chrome = process.env.CHROME_PATH || findChrome({ playwright: true }) || '';
-    const child = spawn(CLAUDE, args, { cwd, env: childEnv(process.env, { HOME: home, PATH: path, CHROME_PATH: chrome, PLAYWRIGHT_SKIP_BROWSER_GC: '1' }), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(CLAUDE, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '', err = '', timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     child.stdout.on('data', (d) => { out += d; });
@@ -200,11 +224,23 @@ export function runClaude({ cwd, home, path, prompt, model, resume = null, maxTu
     child.on('close', () => {
       clearTimeout(timer);
       const events = out.split('\n').filter((l) => l.trim().startsWith('{')).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
-      const result = events.filter((e) => e.type === 'result').at(-1);
-      const error = timedOut ? `timed out after ${timeoutMs / 60000} min` : !result ? `no result (${err.slice(-300)})` : null;
-      resolve({ events, sessionId: result?.session_id ?? events.find((e) => e.session_id)?.session_id ?? null, cost: result?.total_cost_usd ?? 0, error, infra: timedOut ? null : infraFailure(events), limit: timedOut ? 'timed out' : limitReached(events), stderr: err.slice(-2000) });
+      resolve({ events, err, timedOut });
     });
   });
+}
+// The SDK's messages are the CLI's stream-json events, so everything that reads a run reads them unchanged.
+async function viaSdk(prompt, options, timeoutMs) {
+  if (!existsSync(SDK)) throw new Error('ANTHROPIC_API_KEY is set, so runs go through the Agent SDK, which is not installed: npm ci --prefix test/.eval-tools');
+  const { query } = await import(SDK);
+  const abortController = new AbortController();
+  const events = [];
+  let err = '', timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; abortController.abort(); }, timeoutMs);
+  try {
+    for await (const m of query({ prompt, options: { ...options, abortController, stderr: (d) => { err += d; } } })) events.push(m);
+  } catch (e) { if (!timedOut) err += String(e?.message ?? e); }
+  clearTimeout(timer);
+  return { events, err, timedOut };
 }
 
 // What a scorer reads: the tool calls with their results, the text, the engine runs, the files after.

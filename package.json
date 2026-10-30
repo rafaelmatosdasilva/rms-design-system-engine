@@ -7,6 +7,6 @@
   "license": "MIT",
   "author": "Rafael Matos da Silva",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test test/*.test.mjs"
   }
 }
