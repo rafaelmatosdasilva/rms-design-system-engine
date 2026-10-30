@@ -20,6 +20,7 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 - [Keep AI agents on the system](#keep-ai-agents-on-the-system)
 - [Inside Claude Code](#inside-claude-code)
 - [The files it creates](#the-files-it-creates)
+- [Security and data](#security-and-data)
 - [Good to know](#good-to-know)
 - [Environment variables](#environment-variables)
 
@@ -1046,6 +1047,52 @@ Each gets **yes** (write it, and say what changed), **ask** (show the exact chan
 Two things the setting cannot override. On CI there is nobody to answer, so **ask** becomes **no**. And CI never writes the design file or the product's code, whatever the setting says: a run nobody is watching changing what people wrote is how a team stops trusting the engine.
 
 A project that says never gets the list of Figma changes and no script to run. A script nobody may run is a loaded gun left on the table.
+
+## Security and data
+
+What a security review asks, in one place.
+
+### What runs where
+
+- **On your computer, or your CI runner.** The engine is a set of Node scripts. There is no engine server and no engine account, and nothing it reads is sent to its author.
+- **No npm dependencies.** `package.json` lists none, so there is no third-party package to trust. What it uses beside Node is yours: Chrome, TypeScript, and axe-core, which the installer fetches.
+- **Your own sign-ins.** It reaches Figma, your code host and Notion with your own access, so your company's single sign-on and permissions on those tools apply as they are.
+- **The AI model is your Claude account's.** In Claude Code, what the agent reads (files, command output) goes to Anthropic under your account and its terms. The checks themselves are measured, not asked of a model. Two steps ask one, through your own `claude` command: rating your written guidance (the command can be changed, `guidelines.extract.cmd`) and drafting changes to the intent layer.
+
+### What goes over the network
+
+| To | When | What |
+|---|---|---|
+| Figma's API | Refreshing Figma with `FIGMA_TOKEN`, and the style guide's Figma images | Reads the file. Writes only through the script you said yes to |
+| Your GitLab or GitHub | Reading code or documentation kept there | Reads. Writes only where the [write setting](#where-the-engine-may-write-and-where-it-must-never) says yes |
+| GitHub | Installing, and the daily self-update (`DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off) | A `git pull` of the engine |
+| Notion's API | Only when guidelines are kept in Notion, with `NOTION_TOKEN` | Reads the pages shared with that integration |
+| cdnjs | Installing axe-core | A download |
+| Google Fonts and Fontsource | Building the style guide, when the system uses their web fonts | The font names, so the fonts are embedded in the page |
+
+Nothing else. figma-cli, the MCP server, Chrome and the usage log (`DESIGN_SYSTEM_ENGINE_USAGE_LOG=1`) stay on your computer. A Figma webhook exists only if you deploy `webhook-server.mjs` yourself.
+
+### Tokens
+
+- Each token lives in a `.env` in the folder you run the engine from, kept out of git, per person. The installer asks for it hidden and writes a `.env` only you can read.
+- Each is sent only to its own host and never printed.
+- The least each needs: `GITLAB_TOKEN` with `read_api` to read; a Figma token that reads files.
+- None is required. Your own git access reads and writes code hosts, and figma-cli or your Claude session's Figma tool reads Figma.
+
+### What it may change
+
+- **Code people wrote: never.** What it finds comes back as a patch for a person to apply.
+- **Figma, generated code, its own files, your issue tracker:** yes, ask or no, per project ([where the engine may write](#where-the-engine-may-write-and-where-it-must-never)). On CI, ask becomes no, and the design file and product code are never written.
+- **In Claude Code,** the hooks make the AI ask before a commit, a push or a setting change, and it cannot make a check pass on its own ([the hooks keep the rules](#the-hooks-keep-the-rules)).
+
+### Install without piping into a shell
+
+Read the script first, or clone and run it:
+
+```bash
+git clone https://github.com/rafaelmatosdasilva/rms-design-system-engine ~/.claude/skills/rms-design-system-engine
+bash ~/.claude/skills/rms-design-system-engine/install.sh
+```
 
 ## Good to know
 
