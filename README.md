@@ -14,7 +14,7 @@ RMS Design System Engine reads what you have (a Figma file, a codebase, or both)
 
 ## Who it's for
 
-- **Design-led teams** working in Figma who want to turn their design system into working code, build prototypes with real components and verify accessibility.
+- **Design-led teams** working in Figma who want to review their library, document their design system and verify accessibility.
 - **Design and engineering teams** who need to maintain parity between Figma and code, verify implementations against design intent and catch inconsistencies as designs and code evolve.
 - **Code-first teams** who want to improve the reliability, accessibility and maintainability of their codebase, document components, track design system health and ensure AI-generated code follows their implementation rules.
 
@@ -42,13 +42,12 @@ Restart Claude Code and run:
 /rms-design-system-engine set up this project
 ```
 
-Once configured, ask Claude Code to check parity, audit accessibility, generate a style guide, build prototypes or investigate component usage.
+Once configured, ask Claude Code to check parity, audit accessibility, generate a style guide or investigate component usage.
 
 - `/rms-design-system-engine check everything`
 - `/rms-design-system-engine check the button`
 - `/rms-design-system-engine check the accessibility of the button`
 - `/rms-design-system-engine build the style guide`
-- `/rms-design-system-engine prototype a settings page with our components`
 
 [See every command](https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/commands.md), grouped by type.
 
