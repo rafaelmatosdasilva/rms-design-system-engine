@@ -2,7 +2,7 @@
 // rule gets a known-good and a known-bad run; a scorer that passes a bad run fails here. No model tokens.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import { context, decisionPoints } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken } from './skill-evals/rules.mjs';
 import { DEV, COMBO, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, tempDir } from './helpers.mjs';
 
 const CSS_BAD = '.tp-chip.tp-chip--l.tp-chip--icon { height: 36px; }\n.tp-field {\n  height: 36px; box-sizing: border-box;\n}\n';
 const CSS_FIXED = '.tp-chip.tp-chip--l.tp-chip--icon { height: 32px; }\n.tp-field {\n  height: 36px; box-sizing: border-box;\n}\n';
@@ -192,6 +192,28 @@ test('a run starts as a fresh user, not a child of the evaluating session', asyn
   assert.deepEqual(env, { PATH: '/bin', ANTHROPIC_BASE_URL: 'x', CLAUDE_CODE_OAUTH_TOKEN: 'o', HOME: '/h' });
 });
 
+test('a run on an API key goes through the Agent SDK and keeps only the key, never the plan\'s login', async () => {
+  const { childEnv, runnerOf } = await import('./skill-evals/lib.mjs');
+  assert.equal(runnerOf({ ANTHROPIC_API_KEY: 'k' }), 'sdk');
+  assert.equal(runnerOf({ CLAUDE_CODE_OAUTH_TOKEN: 'o' }), 'cli');
+  assert.deepEqual(childEnv({ PATH: '/bin', ANTHROPIC_API_KEY: 'k', CLAUDE_CODE_OAUTH_TOKEN: 'o' }, { HOME: '/h' }), { PATH: '/bin', ANTHROPIC_API_KEY: 'k', HOME: '/h' });
+});
+
+test('the API key comes from its own file when the environment has none, and the environment wins over the file', async () => {
+  const { withKeyFile, runnerOf } = await import('./skill-evals/lib.mjs');
+  const dir = tempDir('eval-key-');
+  const file = join(dir, 'anthropic-key');
+  writeFileSync(file, '\n  sk-test-file  \n');
+  assert.equal(withKeyFile({ PATH: '/bin' }, file).ANTHROPIC_API_KEY, 'sk-test-file');
+  assert.equal(runnerOf(withKeyFile({ PATH: '/bin' }, file)), 'sdk');
+  assert.equal(withKeyFile({ ANTHROPIC_API_KEY: 'sk-env' }, file).ANTHROPIC_API_KEY, 'sk-env');
+  assert.equal(withKeyFile({ DESIGN_SYSTEM_ENGINE_EVAL_KEY_FILE: file }).ANTHROPIC_API_KEY, 'sk-test-file');
+  assert.deepEqual(withKeyFile({ PATH: '/bin' }, join(dir, 'missing')), { PATH: '/bin' });
+  writeFileSync(file, '\n');
+  assert.equal(runnerOf(withKeyFile({ CLAUDE_CODE_OAUTH_TOKEN: 'o' }, file)), 'cli');
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('no CLI on PATH: a run by path that ends "not in parity" (exit 1) still counts as run', () => {
   const ctx = fakeCtx({ calls: [{ name: 'Bash', input: { command: 'node ~/.claude/skills/rms-design-system-engine/audit.mjs --component button' }, result: 'PARITY AUDIT ... hover while disabled', isError: true }], final: 'The button changes on hover while disabled (theme.css:44).' });
   assert.equal(passes('no-cli-on-path', ctx), true);
@@ -303,6 +325,20 @@ test('route benchmark: each route gives the agent its tools, and the engine\'s M
   assert.deepEqual(JSON.parse(opt(claudeArgs({ prompt: 'p', model: 'm', route: 'none' }), '--mcp-config')), { mcpServers: {} });
   assert.deepEqual(Object.keys(ROUTES), ['shell', 'both', 'mcp', 'none']);
   assert.throws(() => claudeArgs({ prompt: 'p', model: 'm', route: 'fax' }), /unknown route/);
+});
+
+test('route benchmark: the Agent SDK gets the same tools, servers, limits and session as the command line', async () => {
+  const { claudeArgs, sdkOptions } = await import('./skill-evals/lib.mjs');
+  const opt = (args, k) => args[args.indexOf(k) + 1];
+  for (const route of ['shell', 'both', 'mcp', 'none']) {
+    const a = { prompt: 'p', model: 'm', maxTurns: 7, budget: 2, resume: 's1', route, cwd: '/tmp/acme' };
+    const cli = claudeArgs(a), sdk = sdkOptions(a);
+    assert.deepEqual(sdk.tools, opt(cli, '--tools').split(','), route);
+    assert.deepEqual(sdk.allowedTools, opt(cli, '--allowedTools').split(' '), route);
+    assert.deepEqual({ mcpServers: sdk.mcpServers }, JSON.parse(opt(cli, '--mcp-config')), route);
+    assert.deepEqual([sdk.model, sdk.maxTurns, sdk.maxBudgetUsd, sdk.resume, sdk.strictMcpConfig, sdk.cwd], ['m', 7, 2, 's1', true, '/tmp/acme'], route);
+  }
+  assert.equal('resume' in sdkOptions({ model: 'm' }), false, 'a first turn starts a new session');
 });
 
 test('route benchmark: a task counts the engine asked by its command or by its MCP tool, never by neither', async () => {

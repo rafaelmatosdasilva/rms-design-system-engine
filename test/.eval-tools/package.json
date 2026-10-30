@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "The Agent SDK the skill evaluation runs each task through when ANTHROPIC_API_KEY is set (test/skill-evals/lib.mjs), so the runs are billed to that key's API credits, not a Claude plan's usage limits. Only the evaluation reads it; the engine itself has no dependencies.",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.301"
+  }
+}
