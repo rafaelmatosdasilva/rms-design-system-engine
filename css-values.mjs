@@ -63,7 +63,7 @@ function oklabToRgb(L, a, b) {
 export function parseColor(input) {
   const s = String(input ?? '').trim().toLowerCase();
   if (!s) return null;
-  if (NAMED[s]) return [...NAMED[s]];
+  if (Object.hasOwn(NAMED, s)) return [...NAMED[s]];   // own keys only: '__proto__' or 'constructor' is no colour
   let m = s.match(/^#([0-9a-f]{3,8})$/);
   if (m) {
     let h = m[1];
@@ -187,7 +187,7 @@ export function sameValue(a, b, kind = 'any', opts = {}) {
 const EASE = { linear: [0, 0, 1, 1], ease: [0.25, 0.1, 0.25, 1], 'ease-in': [0.42, 0, 1, 1], 'ease-out': [0, 0, 0.58, 1], 'ease-in-out': [0.42, 0, 0.58, 1] };
 export function bezierOf(input) {
   const s = String(input ?? '').trim().toLowerCase();
-  if (EASE[s]) return EASE[s];
+  if (Object.hasOwn(EASE, s)) return EASE[s];
   const m = s.match(/^cubic-bezier\(([^)]*)\)$/);
   if (!m) return null;
   const n = m[1].split(',').map((x) => parseFloat(x));
