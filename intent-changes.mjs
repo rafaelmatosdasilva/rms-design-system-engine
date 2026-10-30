@@ -325,6 +325,8 @@ export function jsonAdd(entry, where, line, { sure = false, layout = null } = {}
 // leftForPeople: the lines a drafter said nothing in the system can say (kept, so they are not asked about again).
 // partOf: Map(page name → the code files that use it), for each page of an internal part (intent-proposals.mjs → partsOf).
 // hold: the keys of the Fix proposals the team has not answered (intent-answers.mjs): their sentences wait for the answer.
+// The part a waiting draft is in, by the heading it sits under.
+const DRAFT_PART = { purpose: 'purpose', 'when to use': 'whenToUse', 'when not to use': 'whenNotToUse', 'common mistakes': 'mistakes', limitations: 'limitations', role: 'role', example: 'example', "do and don't": 'doDont' };
 export function planOf(snap, report, { leftForPeople = new Set(), code = null, partOf = new Map(), hold = new Set() } = {}) {
   const byKey = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
   const nameOfCode = (f) => snap.entities.find((x) => x.code && String(x.code).replace(/^\.?\//, '') === String(f).replace(/^\.?\//, ''))?.name ?? String(f).split('/').pop().replace(/\.\w+$/, '');
@@ -354,23 +356,29 @@ export function planOf(snap, report, { leftForPeople = new Set(), code = null, p
       else if (held) rewrite.find((r) => r.line === held).findings.push(f);
     }
     const need = [];
-    if (page.component && !(page.drafts ?? []).length) {
-      if (!e.purpose.length) need.push('purpose');
-      if (!e.whenToUse.length) need.push('whenToUse');
-      if (!e.whenNotToUse.length) need.push('whenNotToUse');
-      if (!e.mistakes.length) need.push('mistakes');
-      if (!e.limitations.length) need.push('limitations');
+    // A part that already has a draft waiting for the team is not drafted again; every other part it lacks still is,
+    // so a page with drafts to review does not keep the rest of its gaps (a role, an example) open until then.
+    const waiting = new Set((page.drafts ?? e.drafts ?? []).map((d) => DRAFT_PART[String(d?.where ?? '').toLowerCase()]).filter(Boolean));
+    if (page.component) {
+      const lacks = (part, has) => !has && !waiting.has(part) && need.push(part);
+      lacks('purpose', e.purpose.length);
+      lacks('whenToUse', e.whenToUse.length);
+      lacks('whenNotToUse', e.whenNotToUse.length);
+      lacks('mistakes', e.mistakes.length);
+      lacks('limitations', e.limitations.length);
       const said = linesOf(e).map((l) => `${l.where}: ${l.text}`);
-      if (!said.some((t) => /^examples?\b/i.test(t) || /```|`<[A-Za-z][\w-]*[\s/>]/.test(t))) need.push('example');
-      if (!said.some((t) => /(^|:\s*)role\s*[:\u2014-]|^(accessibility )?role\b/i.test(t))) need.push('role');
-      if (!said.some((t) => /^do'?s?\s*(and|&)\s*don'?t'?s?\b/i.test(t) || /(^|:\s*)(do|don'?t|do not)\s*:/i.test(t))) need.push('doDont');
+      lacks('example', said.some((t) => /^examples?\b/i.test(t) || /```|`<[A-Za-z][\w-]*[\s/>]/.test(t)));
+      lacks('role', said.some((t) => /(^|:\s*)role\s*[:\u2014-]|^(accessibility )?role\b/i.test(t)));
+      lacks('doDont', said.some((t) => /^do'?s?\s*(and|&)\s*don'?t'?s?\b/i.test(t) || /(^|:\s*)(do|don'?t|do not)\s*:/i.test(t)));
+      // Telling it apart from a twin, and a "when to use" of its own, are judged afresh only while no draft of either waits.
+      const free = !waiting.has('whenToUse') && !waiting.has('whenNotToUse');
       const twin = (page.wrong ?? []).find((f) => f.kind === 'twin');
-      if (twin) need.push({ differ: twin.other });
+      if (twin && free) need.push({ differ: twin.other });
       // What the stress tests found: no "when to use" of its own (every line shared), or agents picking another
       // component for what its page names (drafted: telling them apart is a judgement).
       const k = code?.(e);
-      if (k?.ownless && !need.includes('whenToUse')) need.push('whenToUse', { ownUse: k.shared ?? [] });
-      if (k?.confusedWith && !twin) need.push({ differ: k.confusedWith });
+      if (k?.ownless && free && !need.includes('whenToUse')) need.push('whenToUse', { ownUse: k.shared ?? [] });
+      if (k?.confusedWith && !twin && free) need.push({ differ: k.confusedWith });
     }
     // What the code says for certain, kept as the code is: what each list or object holds. That section is the engine's:
     // each run writes what the page does not say yet and takes out a line the code no longer says (a field gone), with

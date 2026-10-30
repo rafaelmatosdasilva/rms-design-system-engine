@@ -261,6 +261,14 @@ test('a role the code cannot say (it renders a div) is asked, and comes back a d
   assert.match(md, /## Role\n\n- \*\*Draft:\*\* Role: link\n/, 'judged: a Draft');
 });
 
+test('a page with drafts waiting for review still gets drafted the parts it lacks that no draft covers', () => {
+  const e = { kind: 'component', layer: 'components', name: 'Tile One', id: 'component-tile-one', file: 'specs/dsds/tile-one.dsds.json', code: 'src/tiles/TileOne.vue', purpose: ['A tile.'], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], drafts: [{ where: 'When to use', text: 'Use it for one subject.' }, { where: 'Limitations', text: 'One subject only.' }] };
+  const snap = { _source: {}, entities: [e] };
+  const report = useReport(snap, new Map([['tileOne', e]]), { names: ['tileOne'], wrongOf: () => [] });
+  const [it] = planOf(snap, report);
+  assert.deepEqual(it.need, ['whenNotToUse', 'mistakes', 'example', 'role', 'doDont'], 'what waits is not asked again; the rest is');
+});
+
 test('a large change goes as several commits, each made on the one before, and stops when someone else committed between', async () => {
   const { commitToBranch } = await import('../intent-changes.mjs');
   const files = new Map(Array.from({ length: 90 }, (_, i) => [`specs/page-${i}.md`, 'x'.repeat(100)]));
