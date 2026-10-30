@@ -15,19 +15,24 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      # The build scorer and the component harness read JSX with TypeScript, from the project or a global install.
-      - name: Install TypeScript
-        run: npm install -g typescript@6
+      # Every tool below comes from its folder's committed lockfile (npm ci), so each run installs exactly the versions
+      # last tested. The build scorer and the component harness read JSX with TypeScript, found as a machine-wide one
+      # is (NODE_PATH, tsc on the PATH). npm 11 places Nuxt's peer dependencies, where npm 10 (the one Node 22 ships)
+      # crashes ("reading 'edgesOut'").
+      - name: Install TypeScript and npm 11
+        run: |
+          npm ci --prefix test/.ci-tools --no-audit --no-fund
+          echo "$PWD/test/.ci-tools/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "NODE_PATH=$PWD/test/.ci-tools/node_modules" >> "$GITHUB_ENV"
       # The Vue harness renders a Vue project's components with that project's own build (Vite, Vue CLI and webpack,
       # Nuxt): its tests lay the build tools such a project has in folders of their own (test/vue-harness.test.mjs,
       # test/vue-builds.test.mjs).
       - name: Install the Vue build tools the Vue tests use
         run: |
-          # npm 10 (the one Node 22 ships) crashes placing Nuxt's peer dependencies ("reading 'edgesOut'"); npm 11 does not.
-          npm install -g npm@11
-          npm install --prefix test/.vue-tools --no-audit --no-fund vite@6 @vitejs/plugin-vue@5 vue@3 sass@1 pinia@3 vue-router@4
-          npm install --prefix test/.vue-cli-tools --no-audit --no-fund @vue/cli-service@5 vue@3 sass@1 sass-loader@16
-          npm install --prefix test/.nuxt-tools --no-audit --no-fund nuxt@4 vue@3
+          npm --version
+          npm ci --prefix test/.vue-tools --no-audit --no-fund
+          npm ci --prefix test/.vue-cli-tools --no-audit --no-fund
+          npm ci --prefix test/.nuxt-tools --no-audit --no-fund
       # The browser tests use the runner's Chrome (found on PATH); one that skips without it fails the run.
       # Each failing test is also written as an annotation, so its name and first error lines show on the check.
       - name: Run the test suite

@@ -16,9 +16,18 @@ Worth reporting:
 
 Only the latest `main` is supported. The engine updates itself once a day, so a fix reaches every install without anyone acting. An install with the self-update turned off takes it with `rms-design-system-engine --update`.
 
+## Verify a release
+
+Each release carries its code as an archive with signed provenance: a Sigstore attestation that this repository's release workflow built it from that tag. Check it before you use it:
+
+```bash
+gh attestation verify rms-design-system-engine-v1.0.0.tar.gz --repo rafaelmatosdasilva/rms-design-system-engine
+```
+
 ## How the engine is kept safe
 
-- **No npm dependencies.** There is no third-party package to compromise.
-- **Every change goes through a pull request.** Main takes no direct push, a privacy check must pass before anything merges, and the full test suite runs on every change.
+- **No npm dependencies.** There is no third-party package to compromise. The tools the tests use install from committed lockfiles.
+- **Every change goes through a pull request.** Main takes no direct push, and the privacy check, the full test suite and CodeQL's code scanning must pass before anything merges.
+- **Workflows hold read-only tokens.** Only the release job writes, and only tags and releases. Every action is pinned to a commit.
 - **[OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine)** scores how the repository is kept, on every change to main and every week.
 - **What it reads, sends and may change** is on the [Security and data](docs/details.md#security-and-data) page.

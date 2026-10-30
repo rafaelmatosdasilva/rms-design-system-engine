@@ -1,7 +1,7 @@
 # Publishes a release automatically: every Monday, when main has commits since the last version tag, it tags the
 # next version and creates a GitHub Release whose notes list the pull requests merged since the previous one.
 # How big the step is (patch, minor or major) comes from the release labels on those pull requests
-# (release-version.mjs). Nobody runs this by hand. Only tags are written: main itself is never pushed to.
+# (release-version.mjs). Nobody runs this by hand. Only tags and releases are written: main itself is never pushed to.
 name: release
 
 on:
@@ -19,10 +19,12 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Only this job writes, and only tags and the release.
+    # Only this job writes, and only tags, the release and its signed provenance.
     permissions:
       contents: write
       pull-requests: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -32,6 +34,7 @@ jobs:
         with:
           node-version: 24
       - name: Tag and publish the next version
+        id: tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -40,6 +43,7 @@ jobs:
           range=${last:+$last..}HEAD
           if [ -n "$last" ] && [ "$(git rev-list --count "$range")" = 0 ]; then
             echo "No commits since $last: nothing to release."
+            echo "next=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # The labels of each pull request merged in the range, as [[...], [...]].
@@ -58,3 +62,24 @@ jobs:
           else
             gh release create "$next" --title "$next" --generate-notes
           fi
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+      # The release's code as one archive, with signed provenance: a Sigstore attestation that this workflow built it
+      # from that tag, which anyone can check with `gh attestation verify <archive> --repo <this repository>`.
+      - name: Archive the release
+        if: steps.tag.outputs.next != ''
+        run: |
+          name="rms-design-system-engine-${{ steps.tag.outputs.next }}"
+          git archive --format=tar.gz --prefix="$name/" -o "$name.tar.gz" "${{ steps.tag.outputs.next }}"
+          echo "ARCHIVE=$name.tar.gz" >> "$GITHUB_ENV"
+      - id: attest
+        if: steps.tag.outputs.next != ''
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ env.ARCHIVE }}
+      - name: Attach the archive and its provenance
+        if: steps.tag.outputs.next != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp "${{ steps.attest.outputs.bundle-path }}" "$ARCHIVE.intoto.jsonl"
+          gh release upload "${{ steps.tag.outputs.next }}" "$ARCHIVE" "$ARCHIVE.intoto.jsonl"
