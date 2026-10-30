@@ -1,7 +1,7 @@
 name: Scorecard
 
 # OpenSSF Scorecard: an outside score of how this repository is kept (branch protection, pinned actions, token
-# permissions, a security policy, maintenance). It runs on main and once a week, publishes the result to
+# permissions, a security policy, maintenance). It runs on main, once a week and on demand, publishes the result to
 # scorecard.dev for the README's badge, and lists each finding under Security → Code scanning.
 on:
   push:
@@ -9,6 +9,7 @@ on:
   branch_protection_rule:
   schedule:
     - cron: '17 6 * * 1'
+  workflow_dispatch:
 
 permissions: read-all
 
