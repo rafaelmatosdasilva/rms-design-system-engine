@@ -21,6 +21,14 @@ test('a colour reader never throws, and reads any text as null or four channels 
   }), RUNS);
 });
 
+test('a name an object inherits is no colour and no curve', () => {
+  for (const s of ['__proto__', 'constructor', 'hasOwnProperty', 'valueOf']) {
+    assert.equal(parseColor(s), null, s);
+    assert.equal(bezierOf(s), null, s);
+    assert.equal(sameEasing(s, 'ease'), null, s);
+  }
+});
+
 test('a hex colour written any way reads back as the same canonical hex', { skip: MISSING }, () => {
   fc.assert(fc.property(hexColor(), ({ r, g, b, a, text }) => {
     const want = '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('') + (a == null || a === 255 ? '' : a.toString(16).padStart(2, '0'));
