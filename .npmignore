@@ -2,3 +2,6 @@
 test/
 .github/
 .githooks/
+# The release's own archive and its provenance, which the release workflow writes beside the code before publishing.
+*.tar.gz
+*.intoto.jsonl
