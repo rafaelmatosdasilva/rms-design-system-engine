@@ -150,7 +150,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - What breaks only in a combination of modes, such as dark on a phone.
 - Brands that pin a value they should inherit from the brand they extend.
 - Two components whose own rules are nearly the same.
-- A health number per area on the style guide's Status page, and AI readiness, each beside its value at past releases and the change since the last one.
+- A health number per area on the style guide's Status page.
 
 ## Keep AI agents on the system
 

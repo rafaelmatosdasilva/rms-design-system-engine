@@ -1946,25 +1946,6 @@ if (process.argv.includes('--styleguide')) {
           if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[OPEN_FILE, Buffer.from(next)]]), 'When each open task was first found, saved with rms-design-system-engine', { offline: STORE_OFFLINE })).line);
         }
       }
-      // The Status page's numbers today (what its cards say, and its AI readiness), kept for the release this code
-      // belongs to, with the snapshots as the open tasks are: each card shows them as its trend (health-history.mjs).
-      if (!b.skipped && b.health && r.health) {
-        const hh = await import('./health-history.mjs');
-        const { releaseLog } = await import('./component-changelog.mjs');
-        const file = join(ROOT, hh.HEALTH_FILE), prev = hh.readHealth(file);
-        const { record, key, kept } = hh.recordHealth(prev, { values: b.health, code: r.health.code, built: r.health.built, at: new Date().toISOString() }, { ROOT, releaseOf: hh.releaseFinder(ROOT, releaseLog(ROOT)) });
-        const next = hh.healthText(record), rel = key === hh.UNRELEASED ? 'the next release' : key;
-        if (kept) console.log(`   📈 The Status page's numbers for ${rel} kept as they were: they were measured from newer inputs than this run.`);
-        else if (next !== hh.healthText(prev)) {
-          writeFileSync(file, next);
-          const page = resolve(ROOT, r.out), html = readFileSync(page, 'utf8'), withIt = hh.withHealth(html, hh.trendOf(record, r.health.release));
-          if (withIt !== html) writeFileSync(page, withIt);
-          const said = hh.AREAS.filter((a) => b.health[a] != null).map((a) => `${a} ${b.health[a]}%`).join(', ');
-          console.log(`   📈 The Status page's numbers kept for ${rel} (${said}) in ${hh.HEALTH_FILE}: ${r.health.past ? `each card shows them beside ${r.health.past} earlier release${r.health.past === 1 ? '' : 's'}` : 'each card\'s trend starts from them'}.`);
-          const st = await import('./stores.mjs');
-          if (st.storesOf(sgConfig).snapshots.write) console.log((await st.pushStore(ROOT, sgConfig, 'snapshots', new Map([[hh.HEALTH_FILE, Buffer.from(next)]]), `The Status page's numbers for ${rel}, saved with rms-design-system-engine`, { offline: STORE_OFFLINE })).line);
-        }
-      }
     } else {
       // Built without trying them (--no-a11y-bake, a CI's first build): the results saved with the snapshots go in the
       // page all the same, so it shows them at once and the viewer's browser tries only the components that changed

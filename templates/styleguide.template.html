@@ -324,7 +324,7 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 /* ── Health: the dashboard ───────────────────────────────────────────────── */
 /* Tiles for each area's number, then cards for where what is left gathers. Every box is the system's card (its line,
    corners and shadow), every bar a track and a fill in the system's own colours. */
-:where(.sg-health-tile, .sg-health-top, .sg-health-card, .sg-health-list > li, .sg-health, .sg-health-trend) > :where(p, h3, ol) { margin: 0; }
+:where(.sg-health-tile, .sg-health-top, .sg-health-card, .sg-health-list > li, .sg-health) > :where(p, h3, ol) { margin: 0; }
 /* Each card's label, and at its top right the system's own tip trigger saying how its number is counted. Its fill is the
    index cards' (the text's colour, faintly). */
 .sg-health-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }
@@ -412,20 +412,6 @@ body.sg-page { height: auto; min-height: 100vh; overflow: visible; display: bloc
 .sg-health-row > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--sg-text-2); }
 .sg-health-note { margin-top: var(--sg-space-l); font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); }   /* the page's note size, never the body's 16px */
 .sg-health .sg-health-head { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: var(--sg-space-xl) 0 var(--sg-space-s); }
-/* Each card's trend: its number at each past release, oldest first, beside today's (health-history.mjs). The change
-   is said in words with an arrow, never by colour alone; the line is drawn only beside the values written out. */
-.sg-health-tile.is-wide { grid-column: 1 / -1; }   /* AI readiness: a card the width of the four, under them */
-@media (min-width: 601px) { .sg-health-tile.is-wide .sg-health-trend { max-width: 50%; } }   /* its trend as compact as a card's, not stretched across */
-.sg-health-trend { display: flex; flex-direction: column; gap: var(--sg-space-xs); }
-.sg-health-change { display: flex; align-items: center; gap: var(--sg-space-xs); font-size: var(--sg-s); color: var(--sg-text); }
-.sg-health-change > svg { width: var(--sg-mark); height: var(--sg-mark); flex-shrink: 0; color: var(--sg-muted); }
-.sg-health-change.is-up > svg { color: var(--sg-positive); }
-.sg-health-change.is-down > svg { color: var(--sg-negative); }
-.sg-health-spark { display: block; width: 100%; height: var(--sg-space-xl); color: var(--sg-text-2); overflow: visible; }
-.sg-health-past { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sg-space-xxs) var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-text); font-variant-numeric: tabular-nums; }
-.sg-health-past .sg-health-rel { color: var(--sg-text-2); }
-.sg-health-past > .is-now { font-weight: var(--sg-heading-weight); }
-.sg-health-trend-note { font-size: var(--sg-s); color: var(--sg-text-2); }
 .sg-health-cell { display: flex; flex-direction: column; gap: var(--sg-space-xxs); min-width: calc(var(--sg-space-xxl) * 2); font-variant-numeric: tabular-nums; }
 .sg-health-comps td { font-variant-numeric: tabular-nums; }
 
@@ -2700,7 +2686,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var tx = (a.left + a.right) / 2 - cx - f * ((L + R) / 2 - cx), ty = (a.top + a.bottom) / 2 - cy - f * ((T + B) / 2 - cy);
     if (f < 1 || Math.abs(tx) > 0.5 || Math.abs(ty) > 0.5) k.style.transform = 'translate(' + tx.toFixed(1) + 'px, ' + ty.toFixed(1) + 'px) scale(' + f.toFixed(3) + ')';
   }
-  // Health: the system as a dashboard, how far each area has come weighted into one number, its AI readiness and the
+  // Health: the system as a dashboard, how far each area has come weighted into one number, and the
   // components with the most left (fillHealth, from the rows the Status page lists). No task is listed here: they are
   // on the Status page.
   // Showroom: whole screens the design team drew in Figma, written with the system's own components (DATA.showroom,
@@ -8010,37 +7996,6 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var w = DATA.healthWeights && DATA.healthWeights[a[0]]; return [a[0], typeof w === 'number' && w >= 0 ? w : a[1]];
   });
   var HEALTH_PART = { done: 1, kept: 1, check: 0.5, todo: 0 };
-  // Each card's number at every past release (health-history.mjs, kept in the page as sg-health-history): { release,
-  // past: [{ release, at, values: { area: percent } }], kept }, oldest first. None: a page of some components only.
-  var TREND = (function () { try { return JSON.parse((document.getElementById('sg-health-history') || {}).textContent || 'null'); } catch (e) { return null; } })();
-  // Today's numbers as the cards show them, for the build to keep for this release (a number not measured yet, null).
-  var HEALTH_NOW = null;
-  window.__sgHealthNow = function () { return HEALTH_NOW; };
-  // A card's trend: the change since the last release in words, a small line, and every value written out with its
-  // release, oldest first, today's last. No release kept yet: the trend starts now. Accessibility in another theme
-  // than the default one: each release kept the default theme's, so today's is not set beside them.
-  var TREND_ARROW = { up: 'M8 13V3M4 7l4-4 4 4', down: 'M8 3v10M4 9l4 4 4-4', same: 'M3 8h10' };
-  function sparkHTML(vals) {
-    var W = 120, H = 32, pad = 3, lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
-    if (hi - lo < 10) { var mid = (hi + lo) / 2; lo = Math.max(0, mid - 5); hi = Math.min(100, lo + 10); lo = hi - 10; }
-    var pts = vals.map(function (v, i) { return (pad + i * (W - 2 * pad) / (vals.length - 1)).toFixed(1) + ',' + (H - pad - (v - lo) / (hi - lo) * (H - 2 * pad)).toFixed(1); }).join(' ');
-    return '<svg class="sg-health-spark" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
-  }
-  function trendHTML(area, now) {
-    if (!TREND) return '';
-    var past = (TREND.past || []).filter(function (p) { return p && p.values && typeof p.values[area] === 'number'; });
-    if (!past.length) return now == null ? '' : '<div class="sg-health-trend" data-trend="' + esc(area) + '"><p class="sg-health-trend-note">The trend starts now: each release keeps this number.</p></div>';
-    var otherTheme = area === 'Accessibility' && typeof A11Y_THEME === 'string' && A11Y_THEME !== 'default';
-    var last = past[past.length - 1], d = now == null || otherTheme ? null : now - last.values[area];
-    var way = d == null ? null : d > 0 ? 'up' : d < 0 ? 'down' : 'same';
-    var change = way ? '<p class="sg-health-change is-' + way + '"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="' + TREND_ARROW[way] + '"/></svg>' +
-      esc((d > 0 ? 'Up ' + d + ' ' : d < 0 ? 'Down ' + (-d) + ' ' : 'No change') + (d ? (Math.abs(d) === 1 ? 'point' : 'points') : '') + ' since ' + last.release) + '</p>'
-      : otherTheme ? '<p class="sg-health-trend-note">Each release kept the default theme\'s number.</p>' : '';
-    var pts = past.map(function (p) { return { label: p.release, v: p.values[area] }; });
-    if (now != null && !otherTheme) pts.push({ label: 'Today', v: now, now: true });
-    var list = '<ol class="sg-health-past" aria-label="' + esc(area + ' at each release, oldest first') + '">' + pts.map(function (p) { return '<li' + (p.now ? ' class="is-now"' : '') + '><span class="sg-health-rel">' + esc(p.label) + '</span> ' + p.v + '%</li>'; }).join('') + '</ol>';
-    return '<div class="sg-health-trend" data-trend="' + esc(area) + '">' + change + (pts.length > 1 ? sparkHTML(pts.map(function (p) { return p.v; })) : '') + list + '</div>';
-  }
   // Parity and accessibility count the component: whole when nothing in it is left, half when only checks are left
   // (nothing is known to be wrong, someone has to look), nothing while one thing is to fix. Counted by row, the hundreds
   // of values that match and criteria that pass would hide the few that do not. Documentation and motion count each
@@ -8194,7 +8149,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // The count and what it is out of on one line (3 of 133), what it counts under it (full matches).
       // The share done, big (37% matched), and under it how many components are all done (0 of 131 components fully matched).
       var count = '<div class="sg-health-count"><p class="sg-health-num">' + (o.pct == null ? '–' : o.pct + '%') + (o.pct != null ? '<span class="sg-health-out">' + esc(o.pctWord) + '</span>' : '') + '</p>' + (o.of ? '<p class="sg-health-desc">' + esc(o.of) + '</p>' : '') + '</div>';
-      return '<div class="sg-health-tile' + (o.wide ? ' is-wide' : '') + '"><div class="sg-health-top"><p class="sg-health-label">' + esc(o.title) + '</p>' + tip + '</div>' + count + barHTML + legend + trendHTML(o.area || o.title, o.pct) + next + '</div>';
+      return '<div class="sg-health-tile"><div class="sg-health-top"><p class="sg-health-label">' + esc(o.title) + '</p>' + tip + '</div>' + count + barHTML + legend + next + '</div>';
     };
     var lower = function (xs) { return xs.map(function (x) { return x.charAt(0).toLowerCase() + x.slice(1); }); };
     var listed = function (xs) { return xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs.join(''); };
@@ -8229,18 +8184,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var onPages = WCAG && WCAG.pages && WCAG.pages.criteria;
     if (onPages) aT.how += ' The criteria that belong to a page are tried on the products\' own pages, not on a component: ' + WCAG.criteria.filter(function (k) { return onPages[k.sc]; }).map(function (k) { var p = onPages[k.sc]; return k.sc + ' ' + k.name + ', ' + ({ done: 'passes', todo: 'to fix', check: 'to check by hand' })[p.st] + ' (' + p.pages.join(', ') + ')'; }).join('; ') + '.';
     dT.how = 'How much of each component\'s documentation is written: what it is, when to use it, examples, its role and more. Agents read it to use the system the right way.';
-    // AI readiness: the share of components an agent can pick and use from the team's guidance alone (DATA.agentRating,
-    // guidance-rating.mjs), the classes it gives each as the legend. A card the width of the four, under them.
-    var ar = DATA.agentRating, aiT = null;
-    if (ar && ar.total) {
-      var aiP = [['done', ar.ready, 'Ready', 'ready'], ['check', ar.partial, 'Partial', 'partial'], ['fix', ar.thin, 'Thin', 'thin']].filter(function (x) { return x[1] > 0; }).map(function (x) { return { cls: x[0], n: x[1], word: x[2], say: x[1] + ' ' + x[3] }; });
-      aiT = { title: 'AI readiness', pct: Math.floor((ar.ready || 0) / ar.total * 100), pctWord: 'ready', of: '', total: ar.total, parts: aiP, next: null, wide: true,
-        how: 'How many components an agent can pick and use from your guidance alone: what each is, when to use it and when not, its role and an example. Partial and thin ones have some or little of it written.' };
-    }
-    pT.area = 'Parity'; iT.area = 'Code'; aT.area = 'Accessibility'; dT.area = 'Documentation';
-    // Today's numbers, for the build to keep: accessibility only once every component built is tried.
-    HEALTH_NOW = { Parity: pT.pct, Code: iT.pct, Accessibility: countOf(accP, 'Untested') ? null : aT.pct, Documentation: dT.pct, 'AI readiness': aiT ? aiT.pct : null };
-    var tiles = [pT, iT, aT, dT].concat(aiT ? [aiT] : []).map(tile).join('');
+    var tiles = [pT, iT, aT, dT].map(tile).join('');
     var html = '<div class="sg-health"><div class="sg-health-tiles">' + tiles + '</div></div>';
     var box = hl.querySelector('.sg-health-box') || hl.appendChild(document.createElement('div'));
     box.className = 'sg-health-box';

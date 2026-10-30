@@ -574,29 +574,3 @@ test('prototypes are a part: read into the project\'s own folder, and what a per
   const mine = localFiles(dir, cfg, 'prototypes');
   assert.deepEqual([...mine.keys()].sort(), ['Flow.json', 'Reset.vue', 'Signup.vue']);
 });
-
-test('the Status page\'s numbers per release: two copies merged entry by entry, read in or sent, never one over the other', async () => {
-  const stamp = (figma) => ({ code: null, figma, figmaRead: null, engine: null, at: '2026-10-29T10:00:00Z' });
-  const rec = (releases) => JSON.stringify({ version: 1, releases });
-  const e = (p, figma) => ({ at: '2026-10-29T10:00:00Z', built: stamp(figma), values: { Parity: p } });
-  const F = 'health-history.snapshot.json';
-  const g = fakeGitlab({ files: { [F]: rec({ 'v1.0.0': e(10, '5') }) } });
-  const ROOT = project();
-  const cfg = cfgWith({ snapshots: { read: LINK } });
-  await pullStore(ROOT, cfg, 'snapshots', { env, http: g.http });
-  // Here, the next release measured; there, v1.0.0 measured again from a newer Figma version and v1.1.0 kept.
-  writeFileSync(join(ROOT, F), rec({ 'v1.0.0': e(10, '5'), unreleased: e(30, '7') }));
-  g.files[F] = rec({ 'v1.0.0': e(12, '6'), 'v1.1.0': e(20, '6') }); g.head = 'b'.repeat(40);
-  const r = await pullStore(ROOT, cfg, 'snapshots', { env, http: g.http });
-  assert.match(r.line, /health-history\.snapshot\.json changed here and in .*: merged, each entry as measured from the newer inputs/);
-  const here = JSON.parse(readFileSync(join(ROOT, F), 'utf8')).releases;
-  assert.deepEqual(Object.fromEntries(Object.entries(here).map(([k, v]) => [k, v.values.Parity])), { 'v1.0.0': 12, 'v1.1.0': 20, unreleased: 30 });
-  // Sent while another run writes the store: merged again, and what is sent holds both runs' releases.
-  writeFileSync(join(ROOT, F), rec({ ...here, unreleased: e(35, '8') }));
-  g.files[F] = rec({ 'v1.0.0': e(12, '6'), 'v1.1.0': e(20, '6'), 'v1.2.0': e(25, '7') }); g.head = 'c'.repeat(40);
-  const sent = await pushStore(ROOT, cfg, 'snapshots', new Map([[F, readFileSync(join(ROOT, F))]]), 'm', { env, http: g.http });
-  assert.equal(sent.ok, true, sent.line);
-  const there = JSON.parse(g.files[F]).releases;
-  assert.deepEqual(Object.fromEntries(Object.entries(there).map(([k, v]) => [k, v.values.Parity])), { 'v1.0.0': 12, 'v1.1.0': 20, 'v1.2.0': 25, unreleased: 35 });
-  assert.deepEqual(JSON.parse(readFileSync(join(ROOT, F), 'utf8')).releases, there, 'and the same here');
-});
