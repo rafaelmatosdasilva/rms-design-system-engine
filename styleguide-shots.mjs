@@ -45,17 +45,22 @@ export async function guideShots(page, dir, { chromePath = findChrome({ playwrig
     await send('Page.navigate', { url: `file://${page}#status` }, sessionId);
     if (!await waitForTrue(send, sessionId, FILE_PAGE_LOADED, { attempts: 600, tolerateErrors: true })) return { skipped: 'the page did not load' };
     // Every page the menu lists, the pages first and then each component's, as the menu orders them.
+    // A value from the page (a page's id) is handed to the browser as an argument, never written into the code it runs.
+    const global = (await send('Runtime.evaluate', { expression: 'globalThis' }, sessionId)).result?.objectId;
+    const call = async (fn, ...args) => (await send('Runtime.callFunctionOn', { objectId: global, functionDeclaration: String(fn), arguments: args.map((value) => ({ value })), returnByValue: true }, sessionId)).result?.value;
+    const shownNow = (id) => { const s = document.getElementById(id); return !!s && !s.hidden && s.getBoundingClientRect().height > 0; };
     const ids = (await run(`[...document.querySelectorAll('.sg-nav a[href^="#"]')].map((a) => [a.getAttribute('href').slice(1), a.textContent.trim()])`)) ?? [];
     const list = [...ids.filter(([id]) => !/^c-/.test(id)), ...ids.filter(([id]) => /^c-/.test(id))];
     const take = list.slice(0, max);
     const changed = [];
     let compared = 0, fresh = 0, pictured = 0;
     for (const [id, title] of take) {
-      await run(`location.hash = ${JSON.stringify('#' + id)}`);
-      const shown = await waitForTrue(send, sessionId, `(() => { const s = document.getElementById(${JSON.stringify(id)}); return !!s && !s.hidden && s.getBoundingClientRect().height > 0; })()`, { attempts: 200, tolerateErrors: true });
+      await call(function (id) { location.hash = '#' + id; }, id);
+      let shown = false;
+      for (let i = 0; i < 200 && !shown; i++) { shown = await call(shownNow, id).catch(() => false) === true; if (!shown) await new Promise((ok) => setTimeout(ok, 50)); }
       if (!shown) continue;   // a link the menu keeps that opens no page of its own
       pictured++;
-      await run(`(() => { let s = document.getElementById('sg-shots-quiet'); if (!s) { s = document.createElement('style'); s.id = 'sg-shots-quiet'; document.head.appendChild(s); } s.textContent = ${JSON.stringify(QUIET)}; scrollTo(0, 0); })()`);
+      await call(function (css) { let s = document.getElementById('sg-shots-quiet'); if (!s) { s = document.createElement('style'); s.id = 'sg-shots-quiet'; document.head.appendChild(s); } s.textContent = css; scrollTo(0, 0); }, QUIET);
       const h = Math.min(MAX_HEIGHT, Math.max(900, Number(await run('document.documentElement.scrollHeight')) || 900));
       await send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: h, deviceScaleFactor: 1, mobile: false }, sessionId);
       await run('new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(ok, 120))))', true);
