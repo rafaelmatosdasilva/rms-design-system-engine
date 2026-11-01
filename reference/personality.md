@@ -221,4 +221,4 @@ A theme's character shows inside the cards: its colours, corners, line width, ty
 
 The weights above are the engine's reading. If a system's tokens use other names, it reads the nearest token it finds. An axis with nothing to read (no motion tokens, say) leans only on what it has.
 
-To change a weight or add a signal, change the personality block of `bkDraw` in `templates/styleguide.template.html` and this page together.
+To change a weight or add a signal, change the personality block of `bkDraw` in `templates/styleguide/js/11-brand-kit.js` and this page together.
