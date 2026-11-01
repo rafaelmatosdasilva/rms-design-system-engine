@@ -17,6 +17,7 @@ const loadProposal = (IL = {}) => new Function('esc', 'capital', 'IL', `var IL_S
   var ilOwn = ${line('ilOwn')}; var ilCandidates = ${grab('ilCandidates', 'x')}; var ilAnsweredBy = ${grab('ilAnsweredBy', 'x')}; return (${grab('ilProposal', 'p')});`)(esc, capital, IL);
 // What to do on a row: each answer to its open proposals with the command that gives it.
 const loadIfNot = (IL = {}) => new Function('esc', 'IL', `var ENGINE = 'acme-ds'; var decideMark = function () { return ''; }; var sysButton = function (t, l, a) { return '<button' + a + '>' + l + '</button>'; };
+  ${/function plainText\(.*/.exec(tpl)[0]}
   var ilOn = ${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]};
   var ilOwn = ${line('ilOwn')}; var ilOpen = ${line('ilOpen')}; var ilAnswer = ${line('ilAnswer')}; return (${grab('ilIfNot', 'p, html')});`)(esc, IL);
 
