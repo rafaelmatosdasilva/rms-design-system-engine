@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf, candidatesFor, withEvidence, currentAnswers, pendingOf, usageOf, deciderFor, rechecksFor, withdrawn } from '../intent-proposals.mjs';
-import * as truth from '../intent-truth.mjs';
+import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf, candidatesFor, withEvidence, currentAnswers, pendingOf, usageOf, deciderFor, rechecksFor, withdrawn } from '../lib/intent-proposals.mjs';
+import * as truth from '../lib/intent-truth.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ROOT = tempDir('proposals-');

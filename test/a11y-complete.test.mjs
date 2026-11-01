@@ -10,9 +10,9 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { axeFindings, elementKey, tabTrap, spokenLine, cvdFindings, cvdLuminance, accountFor, a11ySummaryLines, guideFor, severityOf, A11Y_GUIDE, a11yVerdict, AXE_SAME } from '../a11y-check.mjs';
-import { WCAG22, WCAG22_NEW, WCAG_KIND, WCAG21_GUIDE } from '../wcag21.mjs';
-import { findChrome } from '../cdp.mjs';
+import { axeFindings, elementKey, tabTrap, spokenLine, cvdFindings, cvdLuminance, accountFor, a11ySummaryLines, guideFor, severityOf, A11Y_GUIDE, a11yVerdict, AXE_SAME } from '../lib/a11y-check.mjs';
+import { WCAG22, WCAG22_NEW, WCAG_KIND, WCAG21_GUIDE } from '../lib/wcag21.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -146,7 +146,7 @@ const PAGE = `<!doctype html><html lang="en"><head><title>All of it</title><styl
 </script></body></html>`;
 const run = (dir, args) => {
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
   catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
   return out;
 };
@@ -241,7 +241,7 @@ test('out of time: what the pages it finished found is kept, the page it was on 
   try {
     const url = (f) => pathToFileURL(join(dir, f)).href;
     const check = (args) => new Promise((done) => {
-      const child = spawn(process.execPath, [join(ENGINE, 'a11y-check.mjs'), ...args, '--no-axe', '--no-states'], { cwd: dir, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } });
+      const child = spawn(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), ...args, '--no-axe', '--no-states'], { cwd: dir, env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } });
       let out = '';
       child.stdout.on('data', (d) => { out += d; });
       child.stderr.on('data', (d) => { out += d; });

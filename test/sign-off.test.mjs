@@ -7,8 +7,8 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
-import { additionsOf, recordSignOff, signedOff, SIGN_OFFS } from '../sign-off.mjs';
-import { judge } from '../guard.mjs';
+import { additionsOf, recordSignOff, signedOff, SIGN_OFFS } from '../lib/sign-off.mjs';
+import { judge } from '../lib/guard.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHIP = `<script setup>\ndefineProps({ size: { type: String, default: 's', validator: (v) => ['s', 'l'].includes(v) } })\n</script>\n`;
@@ -50,15 +50,15 @@ test('a sign-off the person did not give is asked for; one they gave is recorded
   assert.equal(judge(cmd, { cfg, userText: 'add an xl size to the chip' }).decision, 'ask');
   assert.equal(judge(cmd, { cfg, userText: 'the system owner signs it off' }), null);
   assert.equal(judge({ ...cmd, tool_input: { command: 'rms-design-system-engine --figma-build tag --signed-off "me"' } }, { cfg, userText: 'build it' }).decision, 'ask');
-  const out = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--sign-off', 'chip size=xl', '--by', 'the system owner'], { cwd: root, encoding: 'utf8' });
+  const out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--sign-off', 'chip size=xl', '--by', 'the system owner'], { cwd: root, encoding: 'utf8' });
   assert.match(out, /Signed off by the system owner: chip size=xl/);
   assert.equal(JSON.parse(readFileSync(join(root, SIGN_OFFS), 'utf8')).signOffs[0].by, 'the system owner');
-  assert.match(execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--sign-off'], { cwd: root, encoding: 'utf8' }), /chip size=xl: the system owner/);
+  assert.match(execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--sign-off'], { cwd: root, encoding: 'utf8' }), /chip size=xl: the system owner/);
 });
 
 // ── A second reviewer: the one who made a change never signs it off ──
-import { refusal, heldOf, readSignOffs, reviewMode } from '../sign-off.mjs';
-import { gatherDecisions, decisionsMarkdown } from '../decisions.mjs';
+import { refusal, heldOf, readSignOffs, reviewMode } from '../lib/sign-off.mjs';
+import { gatherDecisions, decisionsMarkdown } from '../lib/decisions.mjs';
 
 test('a sign-off is refused when its reviewer is its author: the same session, the same name, or an agent\'s own name', () => {
   assert.match(refusal({ author: { kind: 'agent', session: 'abc12345-1' }, reviewer: { kind: 'agent', name: 'a second agent review', session: 'abc12345-1' } }), /This agent session \(abc12345\) made the change, so it cannot review it/);
@@ -73,7 +73,7 @@ test('a sign-off is refused when its reviewer is its author: the same session, t
 });
 
 const engine = (root, args, env = {}) => {
-  try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CLAUDE_CODE_SESSION_ID: '', DESIGN_SYSTEM_ENGINE_SESSION: '', ...env } }) }; }
+  try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CLAUDE_CODE_SESSION_ID: '', DESIGN_SYSTEM_ENGINE_SESSION: '', ...env } }) }; }
   catch (e) { return { code: e.status, out: String(e.stdout ?? '') + String(e.stderr ?? '') }; }
 };
 const heldToken = (root, value = '40px', session = 'author-session') => judge({ tool_name: 'Edit', cwd: root, session_id: session, tool_input: { file_path: join(root, 'src/theme.css'), old_string: '  --chip-height: 32px;\n', new_string: `  --chip-height: 32px;\n  --chip-height-xl: ${value};\n` } }, { cfg, userText: 'add an xl height token' });

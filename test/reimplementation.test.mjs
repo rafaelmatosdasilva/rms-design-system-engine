@@ -219,7 +219,7 @@ test('[reimplementation] a product that uses the loader, or dresses it with a cl
 });
 
 test('[reimplementation] the finding said plainly, for the code to act on', async () => {
-  const { plainDifference, plainAction } = await import('../run-diff.mjs');
+  const { plainDifference, plainAction } = await import('../lib/run-diff.mjs');
   const what = 'loader: Atlas draws its own instead of using it (.loading-state, .spinner in app/ui.src.html)';
   assert.equal(plainDifference(what), 'Atlas draws its own loader (.loading-state, .spinner) instead of using the system\'s (app/ui.src.html).');
   assert.deepEqual(plainAction(what, 'loader'), { who: 'code', todo: 'Use the system\'s loader in Atlas in place of its own.' });

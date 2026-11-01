@@ -1,6 +1,6 @@
 // The Tasks list names the team that owns what a task is about (ds-config.json owners).
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';

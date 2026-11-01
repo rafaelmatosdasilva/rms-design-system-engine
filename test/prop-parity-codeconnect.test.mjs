@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runGate } from './helpers.mjs';
-import { invertsValue, flipBoolean } from '../prop-binding.mjs';
+import { invertsValue, flipBoolean } from '../lib/prop-binding.mjs';
 
 const GATE = 'component-prop-check.mjs';
 const project = ({ outlinedDefault = true } = {}) => ({

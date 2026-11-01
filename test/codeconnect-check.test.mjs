@@ -1,7 +1,7 @@
 // codeconnect-check.mjs - validate Code Connect mappings against the contract.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeNodeId, parseCodeConnect, codeConnectFindings } from '../codeconnect-check.mjs';
+import { normalizeNodeId, parseCodeConnect, codeConnectFindings } from '../lib/codeconnect-check.mjs';
 
 test('normalizeNodeId canonicalizes every node-id form', () => {
   assert.equal(normalizeNodeId('789-35349'), '789:35349');

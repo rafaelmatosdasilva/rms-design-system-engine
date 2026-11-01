@@ -7,7 +7,7 @@ import { cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { slimOf, recordOf, compare, verdict, accountedFor, baseOfFolder } from '../contract-changes.mjs';
+import { slimOf, recordOf, compare, verdict, accountedFor, baseOfFolder } from '../lib/contract-changes.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -90,7 +90,7 @@ test('nothing kept from the base branch passes and says so; no contracts built c
 test('--contract-changes on a merge request: --record on the base branch, then a removed option fails until a person signs it off; --base reads a published folder', () => {
   const root = tempDir('acme-contract-changes-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), root, { recursive: true });
-  const run = (...args) => { try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI_COMMIT_BRANCH: 'main' } }) }; } catch (e) { return { code: e.status, out: `${e.stdout}${e.stderr}` }; } };
+  const run = (...args) => { try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI_COMMIT_BRANCH: 'main' } }) }; } catch (e) { return { code: e.status, out: `${e.stdout}${e.stderr}` }; } };
   const first = run('--contract-changes');
   assert.equal(first.code, 0, first.out);
   assert.match(first.out, /No contracts kept from the base branch yet/);

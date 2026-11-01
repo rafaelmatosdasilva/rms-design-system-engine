@@ -6,9 +6,9 @@ import { cpSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { scopeView, nestedComponents } from '../styleguide-data.mjs';
+import { scopeView, nestedComponents } from '../lib/styleguide-data.mjs';
 import { budget, tempDir } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -42,7 +42,7 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
 </script>
 <template><button :class="['hb-button', { 'hb-button--secondary': variant === 'Secondary' }]" type="button">{{ label }}<HbBadge /></button></template>
 `);
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   const out = r.stdout + r.stderr;
   assert.match(out, /🖼 {2}Style guide of button → \.design-system-engine-out\/styleguide\/button\.html {2}\(and the component it nests: badge · the engine's template\)/, out);
   assert.match(out, /The whole system's style guide: rms-design-system-engine --styleguide/);

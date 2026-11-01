@@ -1,6 +1,6 @@
 // Every side panel and every filter has its own address in the style guide (templates/styleguide.template.html).
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

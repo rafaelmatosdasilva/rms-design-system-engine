@@ -23,7 +23,7 @@ const contract = (dir, code) => edit(dir, 'structure-contract.mjs', (t) => `${t}
 const css = (dir, from, to) => edit(dir, 'src/theme.css', (t) => { assert.ok(t.includes(from), `the theme holds ${from}`); return t.replace(from, to); });
 const commit = (dir) => { execFileSync('git', ['add', '-A'], { cwd: dir }); execFileSync('git', ['-c', 'user.name=d', '-c', 'user.email=d@e', 'commit', '-qm', 'x', '--allow-empty'], { cwd: dir }); };
 const audit = (dir, env) => {
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
   const out = normalise((r.stdout ?? '') + (r.stderr ?? ''), dir);
   return { out, gates: gates(out) };
 };
@@ -98,7 +98,7 @@ for (const [n, c] of Object.entries(CASES)) {
 
 // The browser check, with Chrome: a component drawn 30px high where Figma has 32px.
 test('[24] catches a component drawn at another height than Figma\'s', { timeout: budget(180000) }, async (t) => {
-  const { findChrome } = await import('../cdp.mjs');
+  const { findChrome } = await import('../lib/cdp.mjs');
   const chrome = process.env.CHROME_PATH || findChrome({ playwright: true });
   if (!chrome) { t.skip('no Chrome'); return; }
   const { clean, bad } = plant({ env: { ...process.env, CHROME_PATH: chrome }, setup: (d) => config(d, (c) => ({ ...c, rendered: { auto: true } })),
@@ -121,7 +121,7 @@ s.listen(0, '127.0.0.1', () => console.log(s.address().port));`);
   const child = spawn(process.execPath, [server], { stdio: ['ignore', 'pipe', 'inherit'] });
   try {
     const port = await new Promise((ok) => child.stdout.once('data', (b) => ok(String(b).trim())));
-    const run = () => spawnSync(process.execPath, [join(ENGINE, 'visual-regression-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), FIGMA_TOKEN: 'stand-in', DESIGN_SYSTEM_ENGINE_FIGMA_API: `http://127.0.0.1:${port}` } });
+    const run = () => spawnSync(process.execPath, [join(ENGINE, 'lib', 'visual-regression-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), FIGMA_TOKEN: 'stand-in', DESIGN_SYSTEM_ENGINE_FIGMA_API: `http://127.0.0.1:${port}` } });
     let r = run();
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.ok(existsSync(join(dir, '.design-system-engine-refs', '1-2.png')) || /reference/i.test(r.stdout), r.stdout);

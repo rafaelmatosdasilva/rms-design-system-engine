@@ -12,15 +12,15 @@ import {
   intentLayerConfig, layerOf, keyOfTitle, itemsOf, entityView, readDsds, dropBoilerplate, matchComponents,
   syncIntentLayer, readIntentLayer, componentIntent, useReport, describeSync, short, intentWords,
   addSource, configuredSources, syncSources, systemNames, namesFrom,
-} from '../intent-layer.mjs';
+} from '../lib/intent-layer.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
-import { rateGuidance, sectionsFrom } from '../guidance-rating.mjs';
-import { generateIntent } from '../intent-gen.mjs';
-import { guidanceView } from '../styleguide-data.mjs';
-import { buildLlms } from '../contract-gen.mjs';
-import { contextFrom, purposeLines, notesOf, NOTES_SHOWN } from '../prototype-context.mjs';
+import { rateGuidance, sectionsFrom } from '../lib/guidance-rating.mjs';
+import { generateIntent } from '../lib/intent-gen.mjs';
+import { guidanceView } from '../lib/styleguide-data.mjs';
+import { buildLlms } from '../lib/contract-gen.mjs';
+import { contextFrom, purposeLines, notesOf, NOTES_SHOWN } from '../lib/prototype-context.mjs';
 
 // ── An invented intent layer ──────────────────────────────────────────────────────────────────────────────────────
 const sections = (items) => ({ kind: 'sections', items: items.map(([title, body]) => ({ title, anchor: title.toLowerCase(), body })) });
@@ -530,7 +530,7 @@ test('no Figma file: the components are the code\'s, and the intent layer still 
   assert.equal(r.intent.components.Main.class, '.acme-main-button');
   assert.equal(r.intent.components.Main.intentLayer.purpose, 'The next step.');
   assert.match(r.intent._sources.components, /the code \(no Figma data\)/);
-  const { generateContracts } = await import('../contract-gen.mjs');
+  const { generateContracts } = await import('../lib/contract-gen.mjs');
   const c = await generateContracts(dir, cfg, {});
   assert.deepEqual(c.components.sort(), ['Filter', 'Main']);
   assert.deepEqual(c.invalid, []);
@@ -551,7 +551,7 @@ test('no Figma file: the components are the code\'s, and the intent layer still 
 test('setup with a documentation link: a GitLab project is the intent layer, a wiki page a guidelines page; the link is kept even when it cannot be read yet', () => {
   const run = (link) => {
     const dir = makeFixture({ 'ds-config.json': { name: 'acme', figmaFileKey: '', paths: { themeCSS: 'theme.css' } }, 'theme.css': ':root{}\n' });
-    const out = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', `--documentation=${link}`], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITLAB_FETCH_TIMEOUT_MS: '1000', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1', GITLAB_TOKEN: '' } });
+    const out = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', `--documentation=${link}`], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITLAB_FETCH_TIMEOUT_MS: '1000', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1', GITLAB_TOKEN: '' } });
     return { out: out.stdout + out.stderr, cfg: JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')) };
   };
   const a = run('https://git.acme.test/design/intent');
@@ -661,21 +661,21 @@ test('a component page\'s Accessibility, "… Rule" and other prose sections are
 });
 
 test('a page is to be written only for a component the code has; one only in Figma waits until it is built', async () => {
-  const { pagesToWrite } = await import('../intent-layer.mjs');
+  const { pagesToWrite } = await import('../lib/intent-layer.mjs');
   const documented = (n) => n === 'tileOne';
   assert.deepEqual(pagesToWrite(['tileOne', 'tileTwo', 'figmaOnly'], documented, { tileOne: 'src/TileOne.vue', tileTwo: 'src/TileTwo.vue' }), ['tileTwo']);
   assert.deepEqual(pagesToWrite(['tileOne', 'tileTwo'], documented, {}), ['tileTwo'], 'no code read: every one');
 });
 
 test('what the agents read from a page, word for word by kind, leaves out the lines found wrong and the drafts', async () => {
-  const { agentText } = await import('../intent-layer.mjs');
+  const { agentText } = await import('../lib/intent-layer.mjs');
   const e = { kind: 'component', layer: 'components', name: 'Tile One', file: 'tile.dsds.json', purpose: ['A tile for one subject.', 'More words.'], whenToUse: ['Use it for one subject.', 'Set `glowMode` on it.'], whenNotToUse: [], mistakes: [], limitations: [], rules: [{ text: 'Keep its title short.', level: 'should' }], sections: [{ title: 'Examples', text: 'A tile.' }], drafts: [{ where: 'When to use', text: 'Use it on a dashboard.' }] };
   assert.deepEqual(agentText(e, {}, [{ kind: 'name', line: 'Set `glowMode` on it.' }]), { purpose: ['A tile for one subject.'], whenToUse: ['Use it for one subject.'], rules: ['Keep its title short. (should)'] });
   assert.deepEqual(agentText({ ...e, layer: 'patterns', whenToUse: [] }).sections, ['Examples: A tile.']);
 });
 
 test('a page the layer\'s generator wrote: a titled line keeps its title once, and a draft in a prose section stays a draft', async () => {
-  const { entityView } = await import('../doc-source-dsds.mjs');
+  const { entityView } = await import('../lib/doc-source-dsds.mjs');
   const page = { kind: 'component', name: 'Chip One', sections: [
     { kind: 'section', for: 'all', title: 'Limitations', freeform: [{ title: 'Limitations', body: '- **Draft:** It takes one choice only.' }] },
     { kind: 'section', for: 'all', title: 'Specification', freeform: [

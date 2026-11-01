@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { PROJECT, projectPath, newPath, codeSnapshotPath, envVar, ENGINE_DIRS, SKILL } from '../names.mjs';
+import { PROJECT, projectPath, newPath, codeSnapshotPath, envVar, ENGINE_DIRS, SKILL } from '../lib/names.mjs';
 import { tempDir } from './helpers.mjs';
 
 const tmp = () => tempDir('names-');
@@ -43,7 +43,7 @@ test('the old names appear nowhere', () => {
 });
 
 test('project hooks that point at an engine that moved point at this one on the next run', async () => {
-  const { installHooks, upgradeHooks, hooksStatus } = await import('../hooks-install.mjs');
+  const { installHooks, upgradeHooks, hooksStatus } = await import('../lib/hooks-install.mjs');
   const dir = tmp();
   const gone = join(tmp(), 'moved-engine');
   installHooks(dir, { engineDir: gone });

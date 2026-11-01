@@ -106,7 +106,7 @@ test('every recipe-check command runs on the demo design system', { timeout: bud
   const env = { ...process.env, GIT_AUTHOR_NAME: 'demo', GIT_AUTHOR_EMAIL: 'demo@example.com', GIT_COMMITTER_NAME: 'demo', GIT_COMMITTER_EMAIL: 'demo@example.com' };
   for (const a of [['init', '-q'], ['add', '-A'], ['commit', '-qm', 'init']]) execFileSync('git', a, { cwd: dir, env });
   // Without Chrome, so the check is fast and the same everywhere; the audit runs first so --summary has one.
-  const run = (args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', timeout: budget(300000), env: { ...process.env, HOME: dir, CHROME_PATH: join(dir, 'no-chrome'), PLAYWRIGHT_BROWSERS_PATH: join(dir, 'none'), NO_COLOR: '1', CI: '1' } });
+  const run = (args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', timeout: budget(300000), env: { ...process.env, HOME: dir, CHROME_PATH: join(dir, 'no-chrome'), PLAYWRIGHT_BROWSERS_PATH: join(dir, 'none'), NO_COLOR: '1', CI: '1' } });
   run([]);
   const checks = RECIPES.flatMap((f) => [...read(f).matchAll(/\n```recipe-check\n([\s\S]*?)\n```/g)].flatMap((m) => m[1].split('\n').filter(Boolean).map((cmd) => ({ f, cmd }))));
   assert.equal(checks.length >= RECIPES.length, true);

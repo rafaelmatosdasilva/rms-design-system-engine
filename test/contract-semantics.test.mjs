@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { generateContracts } from '../contract-gen.mjs';
-import { accessibilityOf } from '../contract-code.mjs';
+import { generateContracts } from '../lib/contract-gen.mjs';
+import { accessibilityOf } from '../lib/contract-code.mjs';
 
 const project = () => makeFixture({
   'vars.json': { light: {} },

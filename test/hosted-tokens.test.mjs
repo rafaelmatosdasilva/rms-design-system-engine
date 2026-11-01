@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mergeHosted, takeableUrls, fetchHosted, hostedAxes } from '../hosted-tokens.mjs';
+import { mergeHosted, takeableUrls, fetchHosted, hostedAxes } from '../lib/hosted-tokens.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -46,7 +46,7 @@ test('setup takes every hosted mode file it is given, writes them to one local f
   writeFileSync(join(dir, 'src', 'app.js'), SIX.map(([c, s]) => `// ${base}/${c}-${s}.css`).join('\n'));
   writeFileSync(join(dir, 'package.json'), '{"name":"p"}');
   const init = (args) => new Promise((resolve) => {
-    const p = spawn(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--project=.', '--no-hooks', ...args], { cwd: dir, env: { ...process.env, NO_COLOR: '1', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1' } });
+    const p = spawn(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--project=.', '--no-hooks', ...args], { cwd: dir, env: { ...process.env, NO_COLOR: '1', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1' } });
     let text = ''; p.stdout.on('data', (d) => { text += d; }); p.stderr.on('data', (d) => { text += d; });
     p.on('close', (code) => resolve({ code, text }));
   });
@@ -65,7 +65,7 @@ test('setup takes every hosted mode file it is given, writes them to one local f
 });
 
 test('setup tries the same address in every other mode: a mode nobody listed (phone) is never left out', async () => {
-  const { siblingUrls } = await import('../hosted-tokens.mjs');
+  const { siblingUrls } = await import('../lib/hosted-tokens.mjs');
   const B = 'https://cdn.example/ds/';
   const given = ['light_desktop', 'dark_desktop', 'light_tablet', 'dark_tablet'].map((n) => `${B}${n}.css`);
   const more = siblingUrls(given);

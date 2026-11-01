@@ -1,7 +1,7 @@
 // design-a11y.mjs: accessibility the Figma file owes, read from the snapshots every project has.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { designA11yFindings, designA11ySheetLines, designA11yBlock, annotatedRole } from '../design-a11y.mjs';
+import { designA11yFindings, designA11ySheetLines, designA11yBlock, annotatedRole } from '../lib/design-a11y.mjs';
 
 const props = {
   button: { annotations: [{ label: 'Role: button' }], properties: { State: { type: 'VARIANT', defaultValue: 'Default', variantOptions: ['Default', 'Hover', 'Focus'] } } },

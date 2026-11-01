@@ -1,7 +1,7 @@
 // How each brand is layered over the brand it extends (brand-layers.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { brandLayering, brandLayerLines } from '../brand-layers.mjs';
+import { brandLayering, brandLayerLines } from '../lib/brand-layers.mjs';
 
 // Acme over the system's Theme, Retail over Acme: Figma's extended collections as figma-brands.mjs reads them.
 const snap = { collections: [

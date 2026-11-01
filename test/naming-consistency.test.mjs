@@ -1,8 +1,8 @@
 // One way of writing names across the system: the style most property names and options follow, and each written otherwise.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { wordsOf, stylesOf, inStyle, dominantStyle, namingFindings, namingLine } from '../naming-consistency.mjs';
-import { plainAction, plainDifference, componentOf } from '../run-diff.mjs';
+import { wordsOf, stylesOf, inStyle, dominantStyle, namingFindings, namingLine } from '../lib/naming-consistency.mjs';
+import { plainAction, plainDifference, componentOf } from '../lib/run-diff.mjs';
 
 test('a name is read for its words and its style; a single word fits every style that writes it so', () => {
   assert.deepEqual(wordsOf('Show dividerLine Top'), ['show', 'divider', 'line', 'top']);

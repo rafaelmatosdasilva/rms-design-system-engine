@@ -3,12 +3,12 @@
 // the defaults that leave a component inert, the page's own width, and what is the page's to fix against the audit's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { intentText, contextFrom, productScreensOf, requestFocus, focusLines } from '../prototype-context.mjs';
-import { fillsWidth, a11yLines } from '../prototype.mjs';
-import { normaliseValues, statesOwed } from '../prototype-states.mjs';
-import { buildCatalog, catalogTable, checkUi } from '../ui-catalog.mjs';
-import { checkPrototype } from '../prototype-pieces.mjs';
-import { screenWidths } from '../prototype-render.mjs';
+import { intentText, contextFrom, productScreensOf, requestFocus, focusLines } from '../lib/prototype-context.mjs';
+import { fillsWidth, a11yLines } from '../lib/prototype.mjs';
+import { normaliseValues, statesOwed } from '../lib/prototype-states.mjs';
+import { buildCatalog, catalogTable, checkUi } from '../lib/ui-catalog.mjs';
+import { checkPrototype } from '../lib/prototype-pieces.mjs';
+import { screenWidths } from '../lib/prototype-render.mjs';
 
 test('what a component is for keeps the words a designer reads, never the notes for whoever builds it', () => {
   assert.equal(intentText('badge — captured from Figma by rms-design-system-engine.'), '', 'the engine\'s own placeholder');

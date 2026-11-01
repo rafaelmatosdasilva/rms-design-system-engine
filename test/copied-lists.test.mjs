@@ -1,7 +1,7 @@
 // Lists an intent-layer page copies from what the engine generates (copied-lists.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copiedLists, listsIn } from '../copied-lists.mjs';
+import { copiedLists, listsIn } from '../lib/copied-lists.mjs';
 
 const comps = ['tileCard', 'pillTag', 'rowItem', 'navBar', 'sideSheet', 'toastNote', 'stepFlow', 'dateField', 'menuList'];
 const facts = {

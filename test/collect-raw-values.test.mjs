@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectRawValues } from '../collect-raw-values.mjs';
+import { collectRawValues } from '../lib/collect-raw-values.mjs';
 
 // Build a balanced tree of `total` nodes so we can prove the budget bounds the walk. Figma's
 // /nodes endpoint expands instance subtrees inline, so a real pathological tree can be millions of

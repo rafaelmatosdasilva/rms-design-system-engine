@@ -6,10 +6,10 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, runGate, budget } from './helpers.mjs';
-import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep, pageLoadedExpression } from '../a11y-check.mjs';
-import { stateContrastFindings, tokenContrastFindings, tintedVars } from '../contrast-check.mjs';
-import { deriveContrastPairs } from '../pair-derive.mjs';
-import { findChrome } from '../cdp.mjs';
+import { contractSemantics, sameRole, A11Y_GUIDE, groupSame, a11yItemLine, makeStep, pageLoadedExpression } from '../lib/a11y-check.mjs';
+import { stateContrastFindings, tokenContrastFindings, tintedVars } from '../lib/contrast-check.mjs';
+import { deriveContrastPairs } from '../lib/pair-derive.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -78,7 +78,7 @@ test('page: target size, a positive tabindex, Escape, reduced motion, forced col
   </body></html>`;
   const dir = makeFixture({ 'page.html': page, 'contract.authored.json': { components: { Chip: { semantics: { element: 'button' } } } }, 'ds-config.json': { componentSelectors: { Chip: '.chip' } } });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
@@ -105,7 +105,7 @@ test('page: target size on a 320px screen too: a control that shrinks on a phone
   </main></body></html>`;
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const targets = d.issues.filter((i) => i.issue === 'target');
@@ -129,7 +129,7 @@ test('page: contrast against what is painted behind the text, a sibling laid und
   </main></body></html>`;
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const low = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector);
@@ -155,7 +155,7 @@ test('page: Escape closes what a trigger opened and gives the focus back to it; 
   </script></body></html>`;
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
@@ -166,7 +166,7 @@ test('page: Escape closes what a trigger opened and gives the focus back to it; 
 });
 
 test('tints: same-colour token pairs are not comparable; a see-through background is blended over its backdrop', async () => {
-  const { backdropOf } = await import('../component-capture.mjs');
+  const { backdropOf } = await import('../lib/component-capture.mjs');
   const t = tokenContrastFindings([{ text: 'l', bg: 'b', name: 'tag label on tag bg' }], (n) => ({ l: '#c20000', b: '#c20000' }[n]));
   assert.deepEqual([t.checked, t.findings.length, t.sameColour.map((x) => x.name)], [0, 0, ['tag label on tag bg']]);
   assert.equal(backdropOf(['rgba(0, 0, 0, 0.5)', 'rgb(255, 255, 255)']), 'rgb(128, 128, 128)');
@@ -230,7 +230,7 @@ test('keyboard, zoom, focus hidden or thin, and Figma annotations', { skip: HAS_
   </body></html>`;
   const dir = makeFixture({ 'page.html': page, 'figma-component-props.snapshot.json': { chip: { nodeId: '1:2', annotations: [{ label: 'Role: button' }] } }, 'ds-config.json': { componentSelectors: { chip: '.chip' } } });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
@@ -244,7 +244,7 @@ test('keyboard, zoom, focus hidden or thin, and Figma annotations', { skip: HAS_
 });
 
 test('annotations: role, name, heading level and alt text are read from the note; other notes stay notes', async () => {
-  const { annotationFacts, annotationMismatches, axeIntact, fileFromTgz } = await import('../a11y-check.mjs');
+  const { annotationFacts, annotationMismatches, axeIntact, fileFromTgz } = await import('../lib/a11y-check.mjs');
   assert.deepEqual(annotationFacts([{ label: 'Role: button. aria-label: Close dialog' }]), { role: 'button', name: 'Close dialog' });
   assert.deepEqual(annotationFacts([{ label: 'Heading level 2' }]), { level: 2, role: 'heading' });
   assert.deepEqual(annotationFacts([{ label: 'Alt text: Sales chart' }]), { name: 'Sales chart', role: 'img' });
@@ -259,7 +259,7 @@ test('annotations: role, name, heading level and alt text are read from the note
 });
 
 test('annotations: composite roles, notes on inner layers; values in any language', async () => {
-  const { annotationFacts, annotationMismatches, annotationFactsFor } = await import('../a11y-check.mjs');
+  const { annotationFacts, annotationMismatches, annotationFactsFor } = await import('../lib/a11y-check.mjs');
   assert.deepEqual(annotationFacts([{ label: 'Role: button. aria-label: Fechar diálogo' }]), { role: 'button', name: 'Fechar diálogo' });
   assert.deepEqual(annotationFacts([{ label: 'role:togglebutton' }]), { role: 'button', pressed: true });
   assert.deepEqual(annotationFacts([{ label: 'role: textinput' }]), { role: 'textbox' });
@@ -284,8 +284,8 @@ test('Gate 10g: a note the accessibility check verifies passes without a contrac
 });
 
 test('Gate 10g and the accessibility facts: a note in a design-intent category asks nothing; an uncategorised one still does', async () => {
-  const { noteKey } = await import('../annotation-categories.mjs');
-  const { annotationFactsFor, annotationUses } = await import('../a11y-check.mjs');
+  const { noteKey } = await import('../lib/annotation-categories.mjs');
+  const { annotationFactsFor, annotationUses } = await import('../lib/a11y-check.mjs');
   const props = { chip: { nodeId: '1:2', properties: {}, annotations: [{ label: 'Role: button' }, { label: 'Only on wide screens' }, { label: 'Use h1 only on page title' }] } };
   const cats = { _updated: '2026-10-08T10:00:00Z', categories: { i: { label: 'Intent' } }, notes: { '1:2': { [noteKey('Only on wide screens')]: 'i', [noteKey('Use h1 only on page title')]: 'i' } } };
   const files = {
@@ -321,7 +321,7 @@ test('annotations in the browser: a toggle button without aria-pressed, and a no
     'ds-config.json': { componentSelectors: { fav: '.fav' } },
   });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const got = d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector);
@@ -355,7 +355,7 @@ test('annotations in the browser: a role is read on the component, never on a co
     'ds-config.json': { componentSelectors: { tile: '.tile', sheet: '.sheet', act: '.act', duo: '.duo', solo: '.solo' } },
   });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const got = d.issues.filter((i) => i.issue === 'annotation').map((i) => i.selector);
@@ -392,7 +392,7 @@ test('role contracts: what each role requires, on the rendered component', { ski
     'ds-config.json': { componentSelectors: { fav: '.fav', pin: '.pin', star: '.star', fakeCheck: '.fake-check', goodCheck: '.good-check', field: '.field', fieldOk: '.field-ok', tab: '.tab', go: '.go' } },
   });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const got = d.issues.filter((i) => i.issue === 'rolecontract').map((i) => i.selector).sort();
@@ -433,7 +433,7 @@ test('a page that was not checked says so in --json, with the reason, never as a
   const dir = makeFixture({ 'page.html': '<!doctype html><html><body><button>x</button></body></html>' });
   // A browser that exits at once. /usr/bin/false is on Linux and macOS alike (macOS has no /bin/false, so the
   // engine would skip the path and start a real Chrome).
-  const out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: '/usr/bin/false' } });
+  const out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: '/usr/bin/false' } });
   const d = JSON.parse(out.slice(out.indexOf('{')));
   assert.match(d.notChecked, /^Chrome failed to start/);
   assert.equal(d.issues, undefined);
@@ -444,7 +444,7 @@ test('page: a component whose selector is not valid CSS is said not checked; the
     <span class="chip">Faint chip</span></main></body></html>`;
   const dir = makeFixture({ 'page.html': page, 'ds-config.json': { componentSelectors: { Chip: '.chip', 'table/row': '.table/row' } } });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--component', 'Chip', '--component', 'table/row', '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--component', 'Chip', '--component', 'table/row', '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   assert.deepEqual(d.notRead, ['table/row (its selector .table/row is not valid CSS, so it was not checked)'], out);
@@ -465,7 +465,7 @@ test('icons: one that carries meaning and fades into its background, and a contr
   </main></body></html>`;
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
@@ -484,7 +484,7 @@ test('page: a field edge is read at rest, never halfway back from its focus look
   </style></head><body><main><h1>Form</h1><label>Name <input id="a"></label> <label>Town <input id="b"></label> <label>Code <input id="c"></label></main></body></html>`;
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   assert.deepEqual(d.issues.filter((i) => i.issue === 'boundary').map((i) => i.selector.split(' ')[0]).sort(), ['input#a', 'input#b', 'input#c'], out);
@@ -503,7 +503,7 @@ test('page: oklch and see-through text are measured as drawn; text inside a disa
   </main></body></html>`.replace('</style>', '.hint::placeholder { color: #cccccc; } .clear::placeholder, .typed::placeholder { color: #595959; } input { border: 1px solid #000; background: #fff; }</style>');
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const contrast = d.issues.filter((i) => i.issue === 'contrast').map((i) => i.selector).sort();
@@ -522,7 +522,7 @@ test('page: focus by outline colour alone, a faint ring on ::after, and a two-to
   </main></body></html>`.replace('id="tint"', 'id="tint" class="tint"').replace('id="pseudo"', 'id="pseudo" class="pseudo"').replace('id="duo"', 'id="duo" class="duo"');
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
@@ -553,7 +553,7 @@ test('page: a field whose frame shows its focus with an easing border passes, an
   </main></body></html>`.replace('.pick input:focus-visible + .dot', '.pick:not(.plain) input:focus-visible + .dot');
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const kinds = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
@@ -574,7 +574,7 @@ test('page: a control edge too faint only in the dark mode is found, with its mo
   const LIGHT_DARK = [{ name: 'Light', snapshotKey: 'light', cssSelector: 'root' }, { name: 'Dark', snapshotKey: 'dark', cssSelector: 'dark-media' }];
   const dir = makeFixture({ 'page.html': page, 'ds-config.json': { figma: { modes: LIGHT_DARK } } });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   const edges = d.issues.filter((i) => i.issue === 'boundary');
@@ -607,7 +607,7 @@ test('annotations on the style guide: read in the component\'s own section; pres
     'ds-config.json': { styleguide: { out: 'sg/index.html' }, componentSelectors: { tile: '.tile', act: '.act', veil: '.veil', scrim: '.scrim', ghost: '.ghost' } },
   });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   assert.equal(d.usedStyleguide, true, out);
@@ -628,7 +628,7 @@ test('keyboard: an option a composite reaches by its arrow keys is reachable; a 
   </main></body></html>`;
   const dir = makeFixture({ 'page.html': page });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = pageResult(out);
   assert.deepEqual(d.issues.filter((i) => i.issue === 'keyboard').map((i) => i.selector).sort(), ['span[role=button]', 'span[role=radio]', 'span[role=radio]'], out);   // each option of the group with no stop
@@ -639,8 +639,8 @@ test('keyboard: an option a composite reaches by its arrow keys is reachable; a 
 // key on the page's own switch would change the component it shows (its words turned off), and every check after it,
 // axe-core's last, would judge that changed one.
 test('style guide: the checks that act (arrow keys, Enter, an opener) act only on components drawn in a preview', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(60000) }, async () => {
-  const { deepSweepExpression } = await import('../a11y-check.mjs');
-  const { launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { deepSweepExpression } = await import('../lib/a11y-check.mjs');
+  const { launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const dir = makeFixture({ 'sg.html': `<!doctype html><html lang="en"><body><main><h1>Guide</h1>
     <section id="c-seg"><div class="pg-ctl"><div class="seg" role="radiogroup" aria-label="Show label" id="own"><span role="radio" aria-checked="true" tabindex="0">On</span><span role="radio" aria-checked="false" tabindex="-1">Off</span></div>
       <span class="seg" role="button" tabindex="0" aria-haspopup="menu" id="ownOpener">More</span></div>

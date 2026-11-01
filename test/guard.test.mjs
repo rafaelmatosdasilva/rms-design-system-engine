@@ -5,11 +5,11 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE, stopCheck, rememberSay } from '../guard.mjs';
-import { SAY, shellPath } from '../route.mjs';
-import { installHooks, hooksStatus, upgradeHooks } from '../hooks-install.mjs';
+import { judge, asksForChange, lastUserText, routePrompt, MAX_RECIPE, stopCheck, rememberSay } from '../lib/guard.mjs';
+import { SAY, shellPath } from '../lib/route.mjs';
+import { installHooks, hooksStatus, upgradeHooks } from '../lib/hooks-install.mjs';
 import { makeFixture } from './helpers.mjs';
-import { PROJECT } from '../names.mjs';
+import { PROJECT } from '../lib/names.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const cfg = { paths: { snapshotVars: 'src/tokens-snap.json', themeCSS: 'src/theme.css' } };
@@ -47,7 +47,7 @@ test('lets through: the engine, reading snapshots, ordinary edits and git reads'
 
 test('as a hook: JSON in, a PreToolUse decision out, silent outside a parity project', () => {
   const dir = makeFixture({ 'ds-config.json': { paths: {} } });
-  const run = (event) => spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: dir, ...event }), encoding: 'utf8' });
+  const run = (event) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'guard.mjs')], { input: JSON.stringify({ cwd: dir, ...event }), encoding: 'utf8' });
   const r = run(edit(join(dir, 'src', 'figma-vars.snapshot.json')));
   assert.equal(r.status, 0);
   const out = JSON.parse(r.stdout);
@@ -55,9 +55,9 @@ test('as a hook: JSON in, a PreToolUse decision out, silent outside a parity pro
   assert.equal(out.hookSpecificOutput.permissionDecision, 'deny');
   assert.equal(run(bash('ls')).stdout, '');
   const other = makeFixture({});
-  const r2 = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: other, ...edit(join(other, 'figma-vars.snapshot.json')) }), encoding: 'utf8' });
+  const r2 = spawnSync(process.execPath, [join(ENGINE, 'lib', 'guard.mjs')], { input: JSON.stringify({ cwd: other, ...edit(join(other, 'figma-vars.snapshot.json')) }), encoding: 'utf8' });
   assert.equal(r2.stdout, '');   // not a parity project: no opinion
-  assert.equal(spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: 'not json', encoding: 'utf8' }).status, 0);   // never breaks work
+  assert.equal(spawnSync(process.execPath, [join(ENGINE, 'lib', 'guard.mjs')], { input: 'not json', encoding: 'utf8' }).status, 0);   // never breaks work
 });
 
 test('install: per project, keeps other settings and hooks, idempotent, removable, gitignored', () => {
@@ -214,7 +214,7 @@ test('the final check: the reply says what the route asked the person to hear, a
   assert.equal(stopCheck(ev('Done.', { prompt_id: 'p3' }), { root }), null);
 
   // As hooks, the way Claude Code runs them: the route remembers, the Stop hook sends the agent back.
-  const run = (event) => spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: root, ...event }), encoding: 'utf8' }).stdout;
+  const run = (event) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'guard.mjs')], { input: JSON.stringify({ cwd: root, ...event }), encoding: 'utf8' }).stdout;
   run({ hook_event_name: 'UserPromptSubmit', session_id: 's2', prompt_id: 'q1', prompt: '/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday' });
   const out = JSON.parse(run({ hook_event_name: 'Stop', session_id: 's2', prompt_id: 'q1', transcript_path: t, last_assistant_message: 'The audit fails on 2 gates.', stop_hook_active: false }));
   assert.equal(out.decision, 'block');
@@ -247,7 +247,7 @@ test('the router as a hook: a request made with the command arrives already rout
   assert.equal(ctx('/rms-design-system-engine'), null);                   // the command alone: nothing to route
   assert.equal(ctx('/rms-design-system-engine audit the chip', { hooks: false }), null);   // opt-out
 
-  const out = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ cwd: dir, hook_event_name: 'UserPromptSubmit', prompt: '/rms-design-system-engine audit the chip' }), encoding: 'utf8' });
+  const out = spawnSync(process.execPath, [join(ENGINE, 'lib', 'guard.mjs')], { input: JSON.stringify({ cwd: dir, hook_event_name: 'UserPromptSubmit', prompt: '/rms-design-system-engine audit the chip' }), encoding: 'utf8' });
   assert.equal(out.status, 0);
   const o = JSON.parse(out.stdout).hookSpecificOutput;
   assert.equal(o.hookEventName, 'UserPromptSubmit');
@@ -279,7 +279,7 @@ test('a project with the older hooks gets the router on its next run; nothing is
 });
 
 test('asking to build, create or implement is asking for a change (English and Portuguese)', async () => {
-  const { asksForChange } = await import('../guard.mjs');
+  const { asksForChange } = await import('../lib/guard.mjs');
   for (const t of ['build the button from Figma', 'create the tokens', 'implement the field', 'constrói o botão', 'cria os tokens', 'implementa o campo']) assert.equal(asksForChange(t), true, t);
   assert.equal(asksForChange('how do I build the button?'), false);
 });

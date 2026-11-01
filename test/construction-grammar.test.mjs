@@ -1,9 +1,9 @@
 // How a system builds a component in Figma, mined from its own components (construction-grammar.mjs).
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { grammarOf, grammarLines, fixOf, caseOf, caseFits, isAutoNamed, wordsOf } from '../construction-grammar.mjs';
+import { grammarOf, grammarLines, fixOf, caseOf, caseFits, isAutoNamed, wordsOf } from '../lib/construction-grammar.mjs';
 
 // Four components that agree, and one (Promo Banner) that breaks most of it.
 const props = {

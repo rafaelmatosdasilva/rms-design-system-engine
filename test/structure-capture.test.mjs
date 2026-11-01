@@ -5,14 +5,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { resolveComponentFile, textComponentApi, componentSourceFiles, textReader, usedComponents, norm } from '../component-source.mjs';
-import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi, callName } from '../component-api.mjs';
-import { symbolsIn, iconRefs, iconUsage } from '../icon-source.mjs';
-import { fingerprint, markupClassSet } from '../markup-source.mjs';
-import { mergeNesting, captureIcons, captureMarkup, captureApis, apiReaderFor, sourceNesting } from '../structure-capture.mjs';
-import { captureCode } from '../code-capture.mjs';
-import { findChrome } from '../cdp.mjs';
-import { usableTypeScript } from '../project-typescript.mjs';
+import { resolveComponentFile, textComponentApi, componentSourceFiles, textReader, usedComponents, norm } from '../lib/component-source.mjs';
+import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi, callName } from '../lib/component-api.mjs';
+import { symbolsIn, iconRefs, iconUsage } from '../lib/icon-source.mjs';
+import { fingerprint, markupClassSet } from '../lib/markup-source.mjs';
+import { mergeNesting, captureIcons, captureMarkup, captureApis, apiReaderFor, sourceNesting } from '../lib/structure-capture.mjs';
+import { captureCode } from '../lib/code-capture.mjs';
+import { findChrome } from '../lib/cdp.mjs';
+import { usableTypeScript } from '../lib/project-typescript.mjs';
 
 const HAS_CHROME = !!findChrome({ playwright: true }) && typeof WebSocket !== 'undefined';
 const TS = loadTypeScript(process.env.TS_FOR_TESTS ?? process.cwd());
@@ -267,8 +267,8 @@ test('capture: nesting built by JavaScript is seen in the rendered page', { skip
 });
 
 test('styleguide: the capture builds a private copy from the template, or names the template it found', async () => {
-  const { styleguidePlan } = await import('../code-capture.mjs');
-  const { generateStyleguide } = await import('../styleguide-gen.mjs');
+  const { styleguidePlan } = await import('../lib/code-capture.mjs');
+  const { generateStyleguide } = await import('../lib/styleguide-gen.mjs');
   const dir = makeFixture({ 'apps/guide/gallery.template.html': '<html><head></head><body><style>/*{{THEME_CSS}}*/</style></body></html>', 'src/theme.css': ':root { --a: 1px; }' });
   const wrong = styleguidePlan(dir, { styleguide: { template: 'apps/styleguide/styleguide.template.html' } });
   assert.equal(wrong.generate, false);
@@ -287,7 +287,7 @@ test('styleguide: the capture builds a private copy from the template, or names 
 // Which TypeScript the engine may use: with DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project only one inside the project (or a
 // workspace above it), never one a machine-wide folder holds.
 test('typescript: a package inside the project or a workspace above it is the project\'s; a machine-wide one is not', async () => {
-  const { withinProject } = await import('../project-typescript.mjs');
+  const { withinProject } = await import('../lib/project-typescript.mjs');
   assert.equal(withinProject('/w/app', '/w/app/node_modules/typescript/lib/typescript.js'), true);
   assert.equal(withinProject('/w/app', '/w/node_modules/typescript/lib/typescript.js'), true);
   assert.equal(withinProject('/w/app', '/usr/local/lib/node_modules_global/typescript/lib/typescript.js'), false);

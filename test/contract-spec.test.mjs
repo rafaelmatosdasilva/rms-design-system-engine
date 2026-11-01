@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { cpSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { specOf, specDocuments, specKey, SPEC_FORMAT } from '../contract-spec.mjs';
-import { stateTokens } from '../contract-code.mjs';
-import { generateContracts } from '../contract-gen.mjs';
+import { specOf, specDocuments, specKey, SPEC_FORMAT } from '../lib/contract-spec.mjs';
+import { stateTokens } from '../lib/contract-code.mjs';
+import { generateContracts } from '../lib/contract-gen.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));

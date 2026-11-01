@@ -56,7 +56,7 @@ jobs:
             labels="$labels$l,"
           done
           labels="${labels%,}]"
-          next=$(node release-version.mjs "$last" "$(node -p "require('./package.json').version")" "$labels")
+          next=$(node lib/release-version.mjs "$last" "$(node -p "require('./package.json').version")" "$labels")
           echo "Releasing $next (previous: ${last:-none})"
           git tag "$next"
           git push origin "$next"

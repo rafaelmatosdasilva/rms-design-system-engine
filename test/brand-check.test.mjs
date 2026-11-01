@@ -1,7 +1,7 @@
 // brand-check.mjs - multi-brand token coverage. Opt-in, project-declared.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { brandCoverage, resolveBrands } from '../brand-check.mjs';
+import { brandCoverage, resolveBrands } from '../lib/brand-check.mjs';
 
 test('flags a token defined in some brands but missing in others', () => {
   const r = brandCoverage({ light: ['bg', 'fg', 'accent'], bold: ['bg', 'fg'] });

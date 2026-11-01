@@ -4,7 +4,7 @@
 // not differences).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { compareTokens, compareComponents, measuredLine } from '../capture-compare.mjs';
+import { compareTokens, compareComponents, measuredLine } from '../lib/capture-compare.mjs';
 
 const maps = (over = {}) => ({ EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {}, ...over });
 const cfg = { figma: { namingConvention: { dropSegments: ['color', 'default'] } } };
@@ -93,8 +93,8 @@ test('components: padding of icon-only instances is not compared with a labelled
 });
 
 test('icons: compared by viewBox and path data; missing and code-only icons counted', async () => {
-  const { compareIcons } = await import('../capture-compare.mjs');
-  const { pathHash } = await import('../icon-source.mjs');
+  const { compareIcons } = await import('../lib/capture-compare.mjs');
+  const { pathHash } = await import('../lib/icon-source.mjs');
   const code = { icons: {
     'icon-a': { viewBox: '0 0 16 16', paths: 1, pathHash: pathHash(['M1']), definedAt: ['a.html:3'] },
     'icon-b': { viewBox: '0 0 24 24', paths: 1, pathHash: pathHash(['M2']), definedAt: ['a.html:4'] },
@@ -108,7 +108,7 @@ test('icons: compared by viewBox and path data; missing and code-only icons coun
 });
 
 test('nesting: Figma sub-components against what the code nests', async () => {
-  const { compareNesting } = await import('../capture-compare.mjs');
+  const { compareNesting } = await import('../lib/capture-compare.mjs');
   const code = { nesting: { Card: { instancesSeen: 2, contains: { Badge: { renderedIn: ['app'] }, Avatar: { inSource: true } } } } };
   const r = compareNesting(code, { Card: ['Badge', 'Button', 'Icon/Star'], Modal: ['Button'] });
   assert.equal(r.match, 1);
@@ -201,7 +201,7 @@ test('colours: every mode against the token value, paint opacity included; a var
 });
 
 test('variants: each Figma axis value is the default, a produced state or a declared one; the rest is listed', async () => {
-  const { compareVariants } = await import('../capture-compare.mjs');
+  const { compareVariants } = await import('../lib/capture-compare.mjs');
   const code = { components: { chip: { states: { 'State=Hover': {} }, statesNotProduced: [{ state: 'State=Focus' }] } } };
   const structure = { chip: { defaultVariant: 'State=Default, Size=M', variants: { 'State=Default, Size=M': {}, 'State=Hover, Size=M': {}, 'State=Focus, Size=M': {}, 'State=Default, Size=L': {} } } };
   const r = compareVariants(code, structure);
@@ -210,7 +210,7 @@ test('variants: each Figma axis value is the default, a produced state or a decl
 });
 
 test('breakpoints: a responsive token against the value measured at that breakpoint width', async () => {
-  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  const { compareBreakpoints } = await import('../lib/capture-compare.mjs');
   const code = { components: { card: { props: { paddingLeft: { rule: '.card', at: 'a.css:3' } }, breakpoints: { Phone: { width: 375, paddingLeft: '8px', columnGap: '8px' }, Desktop: { width: 1024, paddingLeft: '16px', columnGap: '8px' } } } } };
   const structure = { card: { paddingVar: { lr: 'padding/page' }, gapVar: 'gap/m' } };
   const vars = { breakpoints: { Phone: { 'viewport/min-width': '0', 'padding/page': '12px' }, Desktop: { 'viewport/min-width': '1024', 'padding/page': '16px' } } };
@@ -220,7 +220,7 @@ test('breakpoints: a responsive token against the value measured at that breakpo
 });
 
 test('every mode: sizing and type tokens in each mode the code was read in, breakpoints from a sizing collection and in every colour mode', async () => {
-  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  const { compareBreakpoints } = await import('../lib/capture-compare.mjs');
   // A token a Sizing collection sets per mode: checked in each mode the code has a reading for, against that mode's value.
   const two = (a, b) => ({ modes: { light: { value: a, confidence: 'verified' }, desktop: { value: a, confidence: 'verified' }, phone: { value: b, confidence: 'verified' } } });
   const code = { tokens: { '--padding-m': two('12px', '12px'), '--gap-s': { modes: { light: { value: '8px', confidence: 'verified' } } } } };
@@ -250,7 +250,7 @@ test('a state in a mode with a rule of its own: its difference points at that mo
 });
 
 test('variant combinations: built from propertyMap selectors; compared with height and visible layers', async () => {
-  const { variantCombos } = await import('../code-capture.mjs');
+  const { variantCombos } = await import('../lib/code-capture.mjs');
   const states = [{ label: 'Size=L', selector: '.chip.chip--l' }, { label: 'Icon=True', selector: '.chip.has-icon' }, { label: 'State=Hover', selector: '.chip:hover' }];
   const figma = { defaultVariant: 'Size=M, Icon=False, State=Default', variants: { 'Size=M, Icon=False, State=Default': {}, 'Size=L, Icon=True, State=Default': {}, 'Size=L, Icon=False, State=Default': {}, 'Size=S, Icon=True, State=Default': {} } };
   assert.deepEqual(variantCombos(figma, states), [{ name: 'Size=L, Icon=True, State=Default', parts: [{ label: 'size=l', selector: '.chip.chip--l' }, { label: 'icon=true', selector: '.chip.has-icon' }] }]);   // Size=S has no selector
@@ -284,7 +284,7 @@ test('components: Figma\'s own minimum height, and a state set on a part compare
 });
 
 test('capture: options a component\'s own checkbox draws are that checkbox ticked or not; a lone :checked option is not', async () => {
-  const { checkedOptions } = await import('../code-capture.mjs');
+  const { checkedOptions } = await import('../lib/code-capture.mjs');
   assert.deepEqual(checkedOptions({ True: '.sw-input:checked + .sw-track', False: '.sw-track' }),
     { True: { part: '.sw-input', value: true }, False: { part: '.sw-input', value: false } });
   assert.deepEqual(checkedOptions({ On: '.cb-input:checked ~ .cb-box', Off: '.cb-box' }), { On: { part: '.cb-input', value: true }, Off: { part: '.cb-input', value: false } });
@@ -293,7 +293,7 @@ test('capture: options a component\'s own checkbox draws are that checkbox ticke
 });
 
 test('capture: Figma\'s default variant is drawn with the classes the contract gives it, never a state or a part', async () => {
-  const { defaultVariantClasses } = await import('../code-capture.mjs');
+  const { defaultVariantClasses } = await import('../lib/code-capture.mjs');
   const props = { properties: { Type: { type: 'VARIANT', defaultValue: 'Negative' }, State: { type: 'VARIANT', defaultValue: 'Hover' }, 'Size#1:2': { type: 'VARIANT', defaultValue: 'M' }, Label: { type: 'TEXT', defaultValue: 'x' } } };
   const map = { Type: { Negative: '.badge.high', Positive: '.badge.low' }, State: { Hover: '.badge:hover' }, Size: { M: '.badge .badge-icon' } };
   assert.deepEqual(defaultVariantClasses(props, map, '.badge'), ['high']);
@@ -378,7 +378,7 @@ test('components: a % line height and letter spacing are worked out from Figma\'
 // sameColor reads it), and a variant's opacity is read on the state that has that value, never one whose name only
 // contains it ("on" is not "Icon=Only").
 test('components: colours equal within a rounding step; a variant found by its value, not by a substring', async () => {
-  const { sameValue } = await import('../component-capture.mjs');
+  const { sameValue } = await import('../lib/component-capture.mjs');
   assert.equal(sameValue('color', 'rgb(10, 20, 30)', 'rgb(11, 20, 30)'), true);
   assert.equal(sameValue('color', 'rgb(10, 20, 30)', 'rgb(13, 20, 30)'), false);
   assert.equal(sameValue('color', 'rgba(10, 20, 30, 0.5)', 'rgba(10, 20, 30, 0.6)'), false);
@@ -426,7 +426,7 @@ test('components: raw padding, radius and gap on the default variant are compare
 
 // at each breakpoint every side of the padding and every corner is compared, and a vertical stack's gap is its row gap.
 test('breakpoints: bottom and right padding, every corner, and a vertical gap', async () => {
-  const { compareBreakpoints } = await import('../capture-compare.mjs');
+  const { compareBreakpoints } = await import('../lib/capture-compare.mjs');
   const at = { width: 375, paddingTop: '12px', paddingRight: '12px', paddingBottom: '4px', paddingLeft: '12px', rowGap: '2px', columnGap: '8px',
     borderTopLeftRadius: '8px', borderTopRightRadius: '8px', borderBottomRightRadius: '0px', borderBottomLeftRadius: '8px' };
   const code = { components: { card: { props: {}, breakpoints: { Phone: at } } } };

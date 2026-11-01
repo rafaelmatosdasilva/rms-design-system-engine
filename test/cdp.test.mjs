@@ -7,7 +7,7 @@ import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { budget, tempDir } from './helpers.mjs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { findChrome, playwrightChromium, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED, sweepDeadProfiles } from '../cdp.mjs';
+import { findChrome, playwrightChromium, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED, sweepDeadProfiles } from '../lib/cdp.mjs';
 
 const none = () => null;
 
@@ -74,7 +74,7 @@ test('a browser never outlives the run that opened it, and never holds it open',
   // A run that opens a browser and ends without closing it: the forgetful caller this guards against. It prints the
   // browser's own process id, which is what this test then follows.
   const out = execFileSync(process.execPath, ['--input-type=module', '-e', `
-    import { launchChrome } from ${JSON.stringify(pathToFileURL(join(ENGINE, 'cdp.mjs')).href)};
+    import { launchChrome } from ${JSON.stringify(pathToFileURL(join(ENGINE, 'lib', 'cdp.mjs')).href)};
     const r = await launchChrome(${JSON.stringify(CHROME)});
     if (!r.wsUrl.startsWith('ws://')) throw new Error('no socket');
     console.log(r.chrome.pid);
@@ -113,7 +113,7 @@ test('a browser killed leaves neither its profile nor its socket folder behind',
 test('a run killed before it cleaned up has its browser ended and its folders swept by the next', { skip: !CHROME || typeof WebSocket === 'undefined' ? 'no Chrome available' : false, timeout: budget(60000) }, async () => {
   const { spawn } = await import('node:child_process');
   const { readlinkSync, existsSync } = await import('node:fs');
-  const cdp = pathToFileURL(join(ENGINE, 'cdp.mjs')).href;
+  const cdp = pathToFileURL(join(ENGINE, 'lib', 'cdp.mjs')).href;
   const run = spawn(process.execPath, ['--input-type=module', '-e',
     `import { launchChrome } from ${JSON.stringify(cdp)}; const b = await launchChrome(${JSON.stringify(CHROME)}, { tmpPrefix: 'cdp-orphan-' }); console.log(b.userDataDir + '\\t' + b.chrome.pid); setInterval(() => {}, 1000);`]);
   const [dir, chromePid] = await new Promise((resolve, reject) => {

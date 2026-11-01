@@ -3,9 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fc, MISSING, byte, hexColor, decimal, css } from './property.js';
-import { parseColor, colorHex, sameColor, sameHex, lengthPx, timeMs, sameValue, bezierOf, sameEasing } from '../css-values.mjs';
-import { hexToRgb } from '../contrast-check.mjs';
-import { tokenToVar, varToToken, DEFAULT_NAMING } from '../naming-convention.mjs';
+import { parseColor, colorHex, sameColor, sameHex, lengthPx, timeMs, sameValue, bezierOf, sameEasing } from '../lib/css-values.mjs';
+import { hexToRgb } from '../lib/contrast-check.mjs';
+import { tokenToVar, varToToken, DEFAULT_NAMING } from '../lib/naming-convention.mjs';
 
 const RUNS = { numRuns: 500 };
 

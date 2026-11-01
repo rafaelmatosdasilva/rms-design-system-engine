@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { autoUpdate, updatedLine } from '../self-update.mjs';
+import { autoUpdate, updatedLine } from '../lib/self-update.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const ENV = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@e', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@e' };

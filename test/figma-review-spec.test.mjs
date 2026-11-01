@@ -2,7 +2,7 @@
 // accessibility spec as the code gives it, both in their own annotation categories and replaced on each run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reviewEdits, specEdits, nameSource, statesOf, pinWords, applyScript, editLines, annotationEdits, REVIEW_CATEGORY, SPEC_CATEGORY } from '../figma-edits.mjs';
+import { reviewEdits, specEdits, nameSource, statesOf, pinWords, applyScript, editLines, annotationEdits, REVIEW_CATEGORY, SPEC_CATEGORY } from '../lib/figma-edits.mjs';
 
 const SCREENS = [{ id: '10:1', name: 'Start' }, { id: '10:2', name: 'Export' }, { id: '10:3', name: 'Export' }];
 const FINDINGS = [

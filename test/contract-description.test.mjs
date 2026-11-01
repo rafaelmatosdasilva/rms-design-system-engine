@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { generateContracts, descriptionOf } from '../contract-gen.mjs';
-import { componentComment, commentWords } from '../component-source.mjs';
-import { syncIntentLayer } from '../intent-layer.mjs';
+import { generateContracts, descriptionOf } from '../lib/contract-gen.mjs';
+import { componentComment, commentWords } from '../lib/component-source.mjs';
+import { syncIntentLayer } from '../lib/intent-layer.mjs';
 
 test('the code\'s own comment on a component: Vue, Svelte, React and TypeScript, never a licence or a lint switch', () => {
   assert.equal(componentComment('CardTile.vue', '<!--\n  A tile for one subject:\n  its picture and its title.\n\n  Internal notes.\n-->\n<template><div class="card-tile" /></template>'), 'A tile for one subject: its picture and its title.');

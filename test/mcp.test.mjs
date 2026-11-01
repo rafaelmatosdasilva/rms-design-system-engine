@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { handle, callTool, projectDir, TOOLS, forMcp } from '../mcp.mjs';
+import { handle, callTool, projectDir, TOOLS, forMcp } from '../lib/mcp.mjs';
 import { makeFixture, budget } from './helpers.mjs';
 
 const SERVER = join(dirname(fileURLToPath(import.meta.url)), '..', 'mcp.mjs');

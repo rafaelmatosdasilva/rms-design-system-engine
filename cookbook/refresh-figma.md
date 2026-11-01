@@ -1543,8 +1543,8 @@ Apply the same B→C pattern for `__D__` (dark), `__AL__` (alias light), `__AD__
 ## Phase 1 - Step 6: Verify resolvers
 
 ```bash
-node ~/.claude/skills/rms-design-system-engine/parity-check.mjs
-node ~/.claude/skills/rms-design-system-engine/structure-check.mjs
+node ~/.claude/skills/rms-design-system-engine/lib/parity-check.mjs
+node ~/.claude/skills/rms-design-system-engine/lib/structure-check.mjs
 ```
 
 If either reports FAIL, reconcile CSS before Phase 2.

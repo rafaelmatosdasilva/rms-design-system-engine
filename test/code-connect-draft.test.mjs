@@ -7,8 +7,8 @@ import { cpSync, existsSync, readFileSync, writeFileSync, readdirSync } from 'no
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { draftFor, draftsFor, formOf } from '../code-connect-draft.mjs';
-import { parseConnectFile } from '../code-connect-map.mjs';
+import { draftFor, draftsFor, formOf } from '../lib/code-connect-draft.mjs';
+import { parseConnectFile } from '../lib/code-connect-map.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -98,7 +98,7 @@ test('--code-connect-draft writes the drafts to the engine\'s own folder only, n
   const root = tempDir('acme-cc-draft-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), root, { recursive: true });
   const before = readdirSync(join(root, 'src', 'components')).sort();
-  const out = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--code-connect-draft'], { cwd: root, encoding: 'utf8' });
+  const out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--code-connect-draft'], { cwd: root, encoding: 'utf8' });
   assert.match(out, /Code Connect drafts? → \.design-system-engine-out\/code-connect-drafts/);
   const draft = join(root, '.design-system-engine-out', 'code-connect-drafts', 'src', 'components', 'Button.figma.jsx');
   assert.ok(existsSync(draft), out);
@@ -106,7 +106,7 @@ test('--code-connect-draft writes the drafts to the engine\'s own folder only, n
   assert.deepEqual(readdirSync(join(root, 'src', 'components')).sort(), before, 'nothing written into the code');
   // A component a Code Connect file maps already is left alone.
   writeFileSync(join(root, 'src', 'components', 'Button.figma.jsx'), "figma.connect(Button, 'https://www.figma.com/design/AcmeKey/Kit?node-id=10-1', { props: {}, example: () => <Button /> })\n");
-  const again = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--code-connect-draft'], { cwd: root, encoding: 'utf8' });
+  const again = execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--code-connect-draft'], { cwd: root, encoding: 'utf8' });
   assert.match(again, /1 already mapped/);
   assert.ok(!existsSync(draft), 'rewritten whole: the old draft is gone');
 });

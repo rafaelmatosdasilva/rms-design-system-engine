@@ -8,11 +8,11 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { makeFixture, EMPTY_ENGINE_MAP, runGate } from './helpers.mjs';
-import { captureCode, readFreshSnapshot } from '../code-capture.mjs';
+import { captureCode, readFreshSnapshot } from '../lib/code-capture.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const run = (dir, gate) => {
-  try { return { code: 0, out: execFileSync('node', [join(ENGINE, gate)], { cwd: dir, encoding: 'utf8' }) }; }
+  try { return { code: 0, out: execFileSync('node', [join(ENGINE, 'lib', gate)], { cwd: dir, encoding: 'utf8' }) }; }
   catch (e) { return { code: e.status ?? 1, out: (e.stdout || '') + (e.stderr || '') }; }
 };
 async function withSnapshot(files, edit) {

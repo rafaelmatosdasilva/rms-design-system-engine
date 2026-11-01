@@ -5,9 +5,9 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync } from 'node
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf, neverOf, ruledOut } from '../prototype-context.mjs';
-import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from '../product-conventions.mjs';
-import { checkPrototype } from '../prototype-pieces.mjs';
+import { contextFrom, purposeLines, ruleLines, usesAgainstPurpose, sectionsOf, limitsFrom, requestFocus, focusLines, breakpointsOf, neverOf, ruledOut } from '../lib/prototype-context.mjs';
+import { pageFacts, deriveConventions, consistencyFindings, consistencyLine } from '../lib/product-conventions.mjs';
+import { checkPrototype } from '../lib/prototype-pieces.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -167,7 +167,7 @@ test('the request against everything known: the guidelines\' opening and the sec
 });
 
 test('a prototype request made with the command is kept for the catalog', async () => {
-  const { routePrompt } = await import('../guard.mjs');
+  const { routePrompt } = await import('../lib/guard.mjs');
   const root = tempDir('proto-request-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), root, { recursive: true });
   routePrompt({ prompt: '/rms-design-system-engine prototype a settings page with our components' }, { root, cfg: {} });
@@ -214,7 +214,7 @@ test('the catalog shows what each component is for and the product\'s pages; a d
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   // The composition path (a system whose components are not code): what Figma and the guidelines say, drawn by the engine.
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, frameworkComponents: false, guidelines: { sources: ['guidelines.md'] } }, null, 2));
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   assert.equal(run('--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json').status, 0);
 
   const cat = run('--prototype', '--catalog');
@@ -254,7 +254,7 @@ test('without importing anything, the designed screens set the product\'s pages 
   // The composition path: designed screens are its starting points (a page in code reads no Figma).
   const cfg0 = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, frameworkComponents: false }, null, 2));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--prototype', '--catalog', '--for', 'a notification settings page with a Save button'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--prototype', '--catalog', '--for', 'a notification settings page with a Save button'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /FOR THIS REQUEST {2}"a notification settings page with a Save button"\n {2}start from: Settings \(designed in Figma; rms-design-system-engine --prototype --from-screens brings it into prototypes\/\)/);
   assert.match(r.stdout, /components its words point to: button/);
@@ -273,7 +273,7 @@ test('the frame: containers a designed page holds at the top (a bar, a panel) ar
 });
 
 test('an option the code has no prop for is drawn on the part its name points to; the check says so only when there is none', async () => {
-  const { drawnByName } = await import('../prototype-pieces.mjs');
+  const { drawnByName } = await import('../lib/prototype-pieces.mjs');
   const markup = '<div class="listItem"><span class="listItem-title">x</span><span class="listItem-description">y</span></div>';
   assert.equal(drawnByName('TitleContent', { type: 'text', default: 'Title' }, markup), true);
   assert.equal(drawnByName('Show Description', { type: 'boolean' }, markup), true);
@@ -289,7 +289,7 @@ test('a request word many components\' notes share (the product\'s name) points 
 });
 
 test('the request: a component it names that the prototype leaves out is owed; one the documentation rules out for it is an error unless its purpose says otherwise', async () => {
-  const { requestFindings } = await import('../prototype-context.mjs');
+  const { requestFindings } = await import('../lib/prototype-context.mjs');
   const cat = { components: { emptyState: { description: 'Shown when a list has nothing.', props: {} }, listItem: { description: 'A row.', props: {} }, tag: { description: 'A small status label.', props: {} } } };
   const ctx = contextFrom(cat, null, sectionsOf('## tag\nA status that does not change. Never a message that comes and goes, like a confirmation.'));
   const asked = requestFindings(ctx, 'a Saved views screen: a list of saved views and an empty state for when there are none', [{ component: 'listItem', props: {} }]);
@@ -312,7 +312,7 @@ test('build mode: a text colour set on the component\'s text part counts; none a
     cpSync(join(ref, 'src', 'styles'), join(dir, 'src', 'styles'), { recursive: true });
     cpSync(join(ref, 'src', 'components'), join(dir, 'src', 'components'), { recursive: true });
     if (fieldCss) writeFileSync(join(dir, 'src', 'components', 'field.css'), fieldCss);
-    return spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_FETCH: '1' }, timeout: budget(300000) }).stdout;
+    return spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_FETCH: '1' }, timeout: budget(300000) }).stdout;
   };
   assert.doesNotMatch(make(null), /"color" not set in "\.field"/, 'the reference sets it on .field__input');
   const none = readFileSync(join(ENGINE, 'test', 'skill-evals', 'build-reference', 'src', 'components', 'field.css'), 'utf8').replace(/ color: var\(--text-primary\);/, '');
@@ -320,7 +320,7 @@ test('build mode: a text colour set on the component\'s text part counts; none a
 });
 
 test('a component\'s usage (when to use, common mistakes, limitations) and its Do and Don\'t are part of what a prototype is held to', async () => {
-  const { requestFindings } = await import('../prototype-context.mjs');
+  const { requestFindings } = await import('../lib/prototype-context.mjs');
   const cat = { components: {
     chip: { description: 'A filter people switch on and off.\nWhen to use: filtering a list by one value\nCommon mistakes: a chip as a link to another page', props: {} },
     button: { description: 'The main action.', props: {} },
@@ -354,7 +354,7 @@ test('a component\'s usage (when to use, common mistakes, limitations) and its D
 });
 
 test('the prototype context reads the Do and Don\'t pictures\' captions from the references and contract.authored.json', async () => {
-  const { loadContext } = await import('../prototype-context.mjs');
+  const { loadContext } = await import('../lib/prototype-context.mjs');
   const dir = tempDir('proto-usage-');
   mkdirSync(join(dir, 'refs', 'components', 'chip', 'dont'), { recursive: true });
   writeFileSync(join(dir, 'refs', 'components', 'chip', 'dont', '01 Chips as tabs between sections.png'), '');
@@ -367,7 +367,7 @@ test('the prototype context reads the Do and Don\'t pictures\' captions from the
 });
 
 test('a need said in a phrase (a message confirming it was saved) is a kind the system lacks, unless it has a toast or a banner', async () => {
-  const { kindsLacking } = await import('../prototype-context.mjs');
+  const { kindsLacking } = await import('../lib/prototype-context.mjs');
   const ctx = { components: { button: {}, field: {} } };
   assert.deepEqual(kindsLacking(ctx, 'a Save button, and a message confirming the changes were saved'), ['confirmation message']);
   assert.deepEqual(kindsLacking({ components: { toast: {} } }, 'a message confirming the changes were saved'), []);
@@ -375,13 +375,13 @@ test('a need said in a phrase (a message confirming it was saved) is a kind the 
 });
 
 test('the engine\'s layout pieces a system lacks are one gap line', async () => {
-  const { groupLayout, gapLine } = await import('../prototype-pieces.mjs');
+  const { groupLayout, gapLine } = await import('../lib/prototype-pieces.mjs');
   const lines = groupLayout([{ kind: 'component', need: 'toast' }, { kind: 'layout', need: 'a Row layout component' }, { kind: 'layout', need: 'a Stack layout component' }]).map(gapLine);
   assert.deepEqual(lines, ['component: toast', "layout: Row and Stack layout components; the prototype uses the engine's own meanwhile"]);
 });
 
 test('a difference between pages says how to match it in the composition', async () => {
-  const { howToMatch } = await import('../product-conventions.mjs');
+  const { howToMatch } = await import('../lib/product-conventions.mjs');
   assert.equal(howToMatch({ what: 'where the actions sit', here: 'middle', product: 'end' }), "make the group of actions the page's last part");
   assert.equal(howToMatch({ what: 'how the actions line up', here: 'start', product: 'end' }), 'give the Row that holds the actions justify "end"');
   assert.equal(howToMatch({ what: 'page alignment', here: 'center', product: 'stretch' }), 'give the Page align "stretch"');
@@ -389,7 +389,7 @@ test('a difference between pages says how to match it in the composition', async
 });
 
 test('a request that has a part open another owes an "opens"; a state alone is not it', async () => {
-  const { requestFindings } = await import('../prototype-context.mjs');
+  const { requestFindings } = await import('../lib/prototype-context.mjs');
   const ctx = { components: { button: { purpose: 'The main action on a screen.' } }, rules: [] };
   const req = 'a project page with a Delete project button that opens a confirmation';
   const without = requestFindings(ctx, req, [{ id: 'b', component: 'button', props: { Label: 'Delete project' } }]);
@@ -402,7 +402,7 @@ test('a request that has a part open another owes an "opens"; a state alone is n
 });
 
 test('a difference kept on purpose reaches the agent as the side the team chose', async () => {
-  const { contextFrom: cf, purposeLines: pl } = await import('../prototype-context.mjs');
+  const { contextFrom: cf, purposeLines: pl } = await import('../lib/prototype-context.mjs');
   const ctx = cf({ components: { tileOne: { props: {} } } }, null, null, { kept: [{ component: 'tileOne', what: 'radius 8 where Figma has 4', truth: 'code', reason: 'the product\'s cards' }] });
   assert.match(pl(ctx, ['tileOne']).join('\n'), /kept on purpose radius 8 where Figma has 4 \(the code is right\): the product's cards/);
 });

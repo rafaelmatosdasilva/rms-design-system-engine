@@ -2,7 +2,7 @@
 // layers composited, words on an image or a gradient, a control under 24 by 24; documentation left out.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { screenA11yCaptureScript, screenA11ySnapshot, mergeA11yScreens, surfaceOf, screenA11yFindings, screenA11yLines } from '../screen-a11y.mjs';
+import { screenA11yCaptureScript, screenA11ySnapshot, mergeA11yScreens, surfaceOf, screenA11yFindings, screenA11yLines } from '../lib/screen-a11y.mjs';
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 const rgb = (h) => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });

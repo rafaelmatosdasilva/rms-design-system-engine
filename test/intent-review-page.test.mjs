@@ -2,7 +2,7 @@
 // evidence, who it waits on and who answered it; a page whose component changed reviewed as that; rows counted by who
 // they wait on. An invented system (Acme).
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

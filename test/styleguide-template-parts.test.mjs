@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENGINE_TEMPLATE, PART, joinTemplate, readTemplate, templateText } from '../styleguide-template.mjs';
+import { ENGINE_TEMPLATE, PART, joinTemplate, readTemplate, templateText } from '../lib/styleguide-template.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));

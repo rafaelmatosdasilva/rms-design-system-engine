@@ -1,12 +1,12 @@
 // The style guide is the system's own: its controls come from what the code realizes, its look from the system's
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
-import { modeAxes, realizedControls, chromeRoles, segmentedUi, tabsUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } from '../styleguide-data.mjs';
-import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
-import { differences, differencesMarkdown, plainDifference, plainAction } from '../run-diff.mjs';
-import { appDir } from '../code-roots.mjs';
+import { modeAxes, realizedControls, chromeRoles, segmentedUi, tabsUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } from '../lib/styleguide-data.mjs';
+import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../lib/styleguide-check.mjs';
+import { differences, differencesMarkdown, plainDifference, plainAction } from '../lib/run-diff.mjs';
+import { appDir } from '../lib/code-roots.mjs';
 
 const defs = {
   'Label Content': { type: 'TEXT', defaultValue: 'Label' },

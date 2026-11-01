@@ -1,7 +1,7 @@
 // The drafts of an intent layer page, in the Documentation panel: under the task that asks for them, each with the
 // command for each decision (templates/styleguide.template.html), and that one decision on the command line.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -106,7 +106,7 @@ test('a part\'s page: what moves to its root\'s page is shown as it will read th
 });
 
 test('a part\'s page says what happens to it in plain words', () => {
-  const gen = readFileSync(fileURLToPath(new URL('../styleguide-gen.mjs', import.meta.url)), 'utf8');
+  const gen = readFileSync(fileURLToPath(new URL('../lib/styleguide-gen.mjs', import.meta.url)), 'utf8');
   assert.match(gen, /p\.todo = \[`\$\{p\.component\} only lives inside \$\{root\}, so its guidance moves to \$\{root\}'s page and this page goes away\.`\]/);
 });
 

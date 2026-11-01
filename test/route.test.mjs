@@ -1,7 +1,7 @@
 // route.mjs: the request routed to a recipe and the exact command by the engine, the same on any model.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { route, routeText, namedComponents, otherSystem } from '../route.mjs';
+import { route, routeText, namedComponents, otherSystem } from '../lib/route.mjs';
 
 const P = { hasConfig: true, components: ['button', 'chip', 'field', 'statusBar'] };
 const r = (text, p = P) => route(text, p);
@@ -127,7 +127,7 @@ test('what --route prints: the route, the commands, one NEXT line, and the recip
 });
 
 test('a question about a component\'s props or a token routes to the query, with the names it asks about', async () => {
-  const { route } = await import('../route.mjs');
+  const { route } = await import('../lib/route.mjs');
   const P = { components: ['chip', 'badge'] };
   assert.deepEqual([route('what props does the chip take?', P).recipe, route('what props does the chip take?', P).run], ['ask-the-system', ['rms-design-system-engine --query chip']]);
   assert.deepEqual(route('que valores aceita o size do badge?', P).run, ['rms-design-system-engine --query badge']);

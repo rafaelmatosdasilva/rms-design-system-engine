@@ -1,7 +1,7 @@
 // class-use.mjs: which classes a page's code really puts on elements (Gate [10] and the style guide's Used in).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { usedClasses } from '../class-use.mjs';
+import { usedClasses } from '../lib/class-use.mjs';
 
 test('a class on an element, in a markup string or from script is a use; a CSS rule or a comment is not', () => {
   const page = `<style>.panel { padding: 4px; }</style><!-- the panel, drawn by hand -->

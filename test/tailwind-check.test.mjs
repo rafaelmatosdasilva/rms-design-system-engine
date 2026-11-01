@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { themeValues, arbitraryFindings, arbitraryLine, usesTailwind, projectArbitrary } from '../tailwind-check.mjs';
-import { editCheck } from '../edit-check.mjs';
+import { themeValues, arbitraryFindings, arbitraryLine, usesTailwind, projectArbitrary } from '../lib/tailwind-check.mjs';
+import { editCheck } from '../lib/edit-check.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const css = '@import "tailwindcss";\n@theme {\n  --color-action-primary: #0A6C74;\n  --color-status-danger: #b42318;\n  --radius-control: 6px;\n  --spacing-2: 8px;\n  --text-sm: 14px;\n  --font-weight-semibold: 600;\n}\n';
@@ -52,7 +52,7 @@ test('the project, and the edit hook, only where Tailwind is used', () => {
 });
 
 test('part two: the Tailwind preset names tokens the way @theme does', async () => {
-  const { resolveNamingSpec, tokenToVar } = await import('../naming-convention.mjs');
+  const { resolveNamingSpec, tokenToVar } = await import('../lib/naming-convention.mjs');
   const spec = resolveNamingSpec({ figma: { namingConvention: { preset: 'tailwind', dropSegments: ['color'] } } });
   assert.equal(tokenToVar('surface/base/color', spec), '--color-surface-base');
   assert.equal(tokenToVar('action/primary/text/color', spec), '--color-action-primary-text');
@@ -68,7 +68,7 @@ test('part two: the Tailwind preset names tokens the way @theme does', async () 
 });
 
 test('a theme variable is used through its utility', async () => {
-  const { usedByUtility } = await import('../tailwind-check.mjs');
+  const { usedByUtility } = await import('../lib/tailwind-check.mjs');
   const src = '<b className="hover:bg-action-primary/50 rounded-control p-2 md:flex">x</b>';
   assert.equal(usedByUtility('--color-action-primary', src), true);
   assert.equal(usedByUtility('--radius-control', src), true);
@@ -79,8 +79,8 @@ test('a theme variable is used through its utility', async () => {
 });
 
 test('each component\'s classes against Figma: height, padding, corner and colours', async () => {
-  const { utilityFindings, utilityLine, sizePx, spacingBase } = await import('../tailwind-check.mjs');
-  const { resolveNamingSpec, tokenToVar } = await import('../naming-convention.mjs');
+  const { utilityFindings, utilityLine, sizePx, spacingBase } = await import('../lib/tailwind-check.mjs');
+  const { resolveNamingSpec, tokenToVar } = await import('../lib/naming-convention.mjs');
   const spec = resolveNamingSpec({ figma: { namingConvention: { preset: 'tailwind', dropSegments: ['color'] } } });
   const varOf = (tok, raw) => tokenToVar(tok, spec, { raw });
   assert.equal(spacingBase('@theme { --spacing: 0.25rem; }'), 4);
@@ -104,7 +104,7 @@ test('each component\'s classes against Figma: height, padding, corner and colou
 });
 
 test('a theme variable with a dot in its name is used through its utility', async () => {
-  const { usedByUtility } = await import('../tailwind-check.mjs');
+  const { usedByUtility } = await import('../lib/tailwind-check.mjs');
   assert.equal(usedByUtility('--spacing-0.5', '<div class="p-0.5">'), true);
   assert.equal(usedByUtility('--spacing-0.5', '<div class="p-0x5">'), false);
 });

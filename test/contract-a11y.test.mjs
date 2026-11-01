@@ -7,9 +7,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { markupFacts, measuredFacts, withA11yFacts, factsFile, writeA11yFacts, readA11yFacts, a11yFactsPath } from '../contract-a11y.mjs';
-import { WCAG_PAGE_SOURCE } from '../wcag21.mjs';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { markupFacts, measuredFacts, withA11yFacts, factsFile, writeA11yFacts, readA11yFacts, a11yFactsPath } from '../lib/contract-a11y.mjs';
+import { WCAG_PAGE_SOURCE } from '../lib/wcag21.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { makeFixture, fixtureProject, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -123,10 +123,10 @@ test('page: each control as the browser gives it to a screen reader', { skip: HA
 
 test('demo system: the style guide\'s build measures each component, and its contract says what a screen reader is given', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(300000) }, async () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'a11y-facts-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', timeout: budget(280000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', timeout: budget(280000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.ok(existsSync(a11yFactsPath(dir)), 'kept in the output folder for the contracts');
-  const { generateContracts } = await import('../contract-gen.mjs');
+  const { generateContracts } = await import('../lib/contract-gen.mjs');
   const cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));
   const built = await generateContracts(dir, cfg, { force: true });
   assert.deepEqual(built.invalid, [], JSON.stringify(built.invalid));
@@ -143,7 +143,7 @@ test('demo system: the style guide\'s build measures each component, and its con
 });
 
 test('code: a JSX or TSX component gives its element, its role and its ARIA from what it returns, as a Vue template does', async () => {
-  const { accessibilityOf } = await import('../contract-code.mjs');
+  const { accessibilityOf } = await import('../lib/contract-code.mjs');
   assert.deepEqual(accessibilityOf("export function AcmeChip({ label, on }) { return (<button className='acme-chip' type='button' aria-pressed={on}><span aria-hidden='true' />{label}</button>); }"),
     { element: { value: 'button', from: 'code' }, aria: { value: ['aria-pressed', 'aria-hidden'], from: 'code' } });
   assert.deepEqual(accessibilityOf("type Props = { title: string };\nexport const AcmeCard = ({ title }: Props): JSX.Element => <section role=\"region\" aria-label={title} className=\"acme-card\" />;"),

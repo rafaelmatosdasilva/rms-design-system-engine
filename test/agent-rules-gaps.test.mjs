@@ -6,9 +6,9 @@ import { writeFileSync, readFileSync, mkdirSync, cpSync, appendFileSync } from '
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { rulesSection, ruleTargets, writeRules, otherAgents, START, END } from '../agent-rules.mjs';
-import { judge } from '../guard.mjs';
-import { checkPrototype, mergeGaps, gapLine, pageGaps } from '../prototype-pieces.mjs';
+import { rulesSection, ruleTargets, writeRules, otherAgents, START, END } from '../lib/agent-rules.mjs';
+import { judge } from '../lib/guard.mjs';
+import { checkPrototype, mergeGaps, gapLine, pageGaps } from '../lib/prototype-pieces.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -47,7 +47,7 @@ test('written into the instruction files the project has, in place of the old se
 test('the command shows the rules and asks; it writes only with --write, which the hook holds until the person says yes', () => {
   const d = dir();
   writeFileSync(join(d, 'AGENTS.md'), '# Agents\n');
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--agent-rules', ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--agent-rules', ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = run();
   assert.equal(r.status, 0);
   assert.match(r.stdout, /NEXT: ask the person whether to add them to AGENTS\.md; once they say yes, run rms-design-system-engine --agent-rules --write\./);
@@ -66,7 +66,7 @@ test('--edit-check runs the hook\'s check on demand, on the files changed since 
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), d, { recursive: true });
   const git = (...a) => spawnSync('git', a, { cwd: d, encoding: 'utf8' });
   git('init', '-q'); git('add', '-A'); git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'init');
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--edit-check', ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--edit-check', ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = run();
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /nothing the design system does not have was added since the last commit/);

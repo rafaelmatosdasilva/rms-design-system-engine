@@ -3,7 +3,7 @@
 // no token). Degrade-safe: no token / bad response -> null (caller keeps the committed file).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pageIdFromUrl, blocksToMarkdown, fetchNotionMarkdown } from '../notion-fetch.mjs';
+import { pageIdFromUrl, blocksToMarkdown, fetchNotionMarkdown } from '../lib/notion-fetch.mjs';
 
 test('pageIdFromUrl extracts the dashed id from a Notion url (and a bare id)', () => {
   assert.equal(pageIdFromUrl('https://www.notion.so/team/Doc-Title-3bbebcef3937804f970dd600d624e9e9'),

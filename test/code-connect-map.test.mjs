@@ -2,7 +2,7 @@
 // (figma.selectedInstance.get…, an attribute of figma.html) and the classic one (figma.connect with props).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseConnectFile, codeConnectFor } from '../code-connect-map.mjs';
+import { parseConnectFile, codeConnectFor } from '../lib/code-connect-map.mjs';
 
 test('the template form: each variable by the attribute it fills, a switch by the part it gives, a key of an object prop by its list', () => {
   const text = `// url=https://www.figma.com/file/AbC/buttonPrimary?node-id=3621-53438

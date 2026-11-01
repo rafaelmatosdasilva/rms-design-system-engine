@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, symlinkSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { projectBuild, renderedVue } from '../vue-harness.mjs';
-import { findChrome } from '../cdp.mjs';
+import { projectBuild, renderedVue } from '../lib/vue-harness.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { addComment, closeComment, readComments, openComments, commentLines, answered, commentsPath } from '../comments.mjs';
+import { addComment, closeComment, readComments, openComments, commentLines, answered, commentsPath } from '../lib/comments.mjs';
 import { tempDir } from './helpers.mjs';
 
 const dir = () => tempDir('comments-');

@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { prototypePage } from '../prototype.mjs';
-import { VISUAL_EXPRESSION, visualFindings } from '../prototype-visual.mjs';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { prototypePage } from '../lib/prototype.mjs';
+import { VISUAL_EXPRESSION, visualFindings } from '../lib/prototype-visual.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { frameworkGateSkipReason } from '../component-framework-gate.mjs';
+import { frameworkGateSkipReason } from '../lib/component-framework-gate.mjs';
 
 test('runs the gate for a framework project with a normal result (no skip)', () => {
   assert.equal(frameworkGateSkipReason(true, 0), null);   // frameworkComponents on, gate passed

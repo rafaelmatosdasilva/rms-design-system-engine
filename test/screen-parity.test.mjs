@@ -8,9 +8,9 @@ import { spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { readingOrder, screenFindings, productOfScreen, projectScreens, screenTodos, mergeScreens, screenSnapshot, screenScopes, cutPlaces, pageShift } from '../screen-parity.mjs';
-import { screenCaptureScript } from '../screen-layout.mjs';
-import { findChrome } from '../cdp.mjs';
+import { readingOrder, screenFindings, productOfScreen, projectScreens, screenTodos, mergeScreens, screenSnapshot, screenScopes, cutPlaces, pageShift } from '../lib/screen-parity.mjs';
+import { screenCaptureScript } from '../lib/screen-layout.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -153,7 +153,7 @@ test('in the browser: the product\'s page at the screen\'s size, against the scr
     assert.deepEqual(r.screens[0].findings.map((f) => f.message), ['the page shows 2 buttons; "Shop / Home" has 1', 'the space between actionBar and the panel below it is 24px on the page, 16px on "Shop / Home"']);
     // --figma-screens writes the capture script for the screens ds-config.json names, then keeps the answer and says
     // what differs.
-    const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: ds, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: chromePath } });
+    const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: ds, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: chromePath } });
     const a = run('--figma-screens');
     assert.match(a.stdout, /Screen capture script for 2 screens → \.design-system-engine-out\/figma-capture\/screen-capture\.js \(read-only/, a.stdout + a.stderr);
     assert.match(readFileSync(join(ds, '.design-system-engine-out/figma-capture/screen-capture.js'), 'utf8'), /const SCREEN_IDS = \["1:2","3:4"\];/);

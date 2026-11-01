@@ -3,8 +3,8 @@
 // made of both, undone in reverse.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { combinedModes, mergeSwitches, modeSwitchFor } from '../mode-resolver.mjs';
-import { styleguideSwitch } from '../code-capture.mjs';
+import { combinedModes, mergeSwitches, modeSwitchFor } from '../lib/mode-resolver.mjs';
+import { styleguideSwitch } from '../lib/code-capture.mjs';
 
 test('mode pairs: dark with high contrast, a colour mode with another colour collection, never one axis twice', () => {
   const modes = [

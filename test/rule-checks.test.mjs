@@ -3,16 +3,16 @@
 // one rewritten as a sentence a reviewer can check. The same rules written in English and in Portuguese are read alike.
 // An invented system (Acme): Tile, Button, Card.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { ruleContext, classifyRule, rewriteOf, pageRules, layerRules, ruleProposals, ruleTotals, ruleReport, markedRules, ruleKey } from '../rule-checks.mjs';
-import { withGuard, guardsOf, guardFindings } from '../lessons.mjs';
-import { editCheck } from '../edit-check.mjs';
-import { entityView } from '../intent-layer.mjs';
+import { ruleContext, classifyRule, rewriteOf, pageRules, layerRules, ruleProposals, ruleTotals, ruleReport, markedRules, ruleKey } from '../lib/rule-checks.mjs';
+import { withGuard, guardsOf, guardFindings } from '../lib/lessons.mjs';
+import { editCheck } from '../lib/edit-check.mjs';
+import { entityView } from '../lib/intent-layer.mjs';
 import { tempDir } from './helpers.mjs';
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
 
@@ -186,7 +186,7 @@ function project(rules) {
   return root;
 }
 // As a person runs it: on CI the engine never writes its own files (writes.mjs), so the run is not a CI one.
-const run = (root, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+const run = (root, ...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
 
 test('--check-intent says each page\'s rules; a yes writes the guard and the rule is checked from then on; a no is kept', () => {
   const root = project(['Never put a Button inside a Tile.', 'Nunca uses o tom `loud` no Tile.', 'Use it appropriately.', 'Use Tile when content belongs together.']);

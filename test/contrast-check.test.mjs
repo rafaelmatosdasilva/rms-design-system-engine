@@ -1,7 +1,7 @@
 // contrast-check.mjs - token-level WCAG contrast, no browser. Pure math on token values.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hexToRgb, tokenContrastFindings } from '../contrast-check.mjs';
+import { hexToRgb, tokenContrastFindings } from '../lib/contrast-check.mjs';
 
 test('hexToRgb parses 3/6/8-digit hex, rejects junk', () => {
   assert.deepEqual(hexToRgb('#fff'), { r: 255, g: 255, b: 255 });

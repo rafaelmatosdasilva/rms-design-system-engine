@@ -8,12 +8,12 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
-import { intentLayerConfig, syncIntentLayer, describeSync, readIntentLayer, matchComponents, componentIntent, itemsOf } from '../intent-layer.mjs';
-import { frontMatter, plainText, mdSections, readMarkdown, metaTitle, resolveLinks, decodeEntities } from '../doc-source-markdown.mjs';
-import { entityView } from '../doc-source-dsds.mjs';
-import { parseGithub, hostOf, fileUrl } from '../doc-host.mjs';
-import { layerAccess, layerFiles, commitToBranch, openMergeRequest, mayWrite, mdAdd } from '../intent-changes.mjs';
-import { generateIntent } from '../intent-gen.mjs';
+import { intentLayerConfig, syncIntentLayer, describeSync, readIntentLayer, matchComponents, componentIntent, itemsOf } from '../lib/intent-layer.mjs';
+import { frontMatter, plainText, mdSections, readMarkdown, metaTitle, resolveLinks, decodeEntities } from '../lib/doc-source-markdown.mjs';
+import { entityView } from '../lib/doc-source-dsds.mjs';
+import { parseGithub, hostOf, fileUrl } from '../lib/doc-host.mjs';
+import { layerAccess, layerFiles, commitToBranch, openMergeRequest, mayWrite, mdAdd } from '../lib/intent-changes.mjs';
+import { generateIntent } from '../lib/intent-gen.mjs';
 
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
 const GH = 'https://github.com/northwind/ds';
@@ -309,8 +309,8 @@ test('a folder layer\'s changes are written in the folder for a person to commit
 });
 
 test('a Markdown page is its own source: the plan\'s lines are written in it, and a new page starts beside its siblings', async () => {
-  const { applyPlan } = await import('../intent-changes.mjs');
-  const { startPage } = await import('../intent-answers.mjs');
+  const { applyPlan } = await import('../lib/intent-changes.mjs');
+  const { startPage } = await import('../lib/intent-answers.mjs');
   const files = new Map([['docs/components/button-main.md', MD['docs/components/button-main.md']], ['docs/components/chip-filter/usage.mdx', MD['docs/components/chip-filter/usage.mdx']]]);
   const e = { name: 'Button Main', file: 'docs/components/button-main.md', code: 'src/ButtonMain.vue' };
   const r = applyPlan([{ entity: e, remove: ['To submit a form.'], drafted: [{ where: 'Limitations', text: 'One label line only.' }] }], files);
@@ -376,7 +376,7 @@ test('a GitHub layer\'s changes: one commit on its branch while it has not moved
 
 test('--intent-layer takes a folder of the project or a GitHub link; a folder that is not there is not set', () => {
   const dir = makeFixture({ ...files(), 'ds-config.json': { name: 'northwind', figmaFileKey: '', paths: { themeCSS: 'theme.css' } }, 'theme.css': ':root{}\n' });
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--intent-layer', ...a], { cwd: dir, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--intent-layer', ...a], { cwd: dir, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
   const ok = run('./docs');
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /the folder docs - 3 Markdown pages/);
@@ -430,7 +430,7 @@ test('Notion: the page\'s child pages as folders of pages, its database rows wit
 });
 
 test('Confluence: the page and its descendants, in folders by their ancestors, storage format as Markdown; basic auth on the cloud', async () => {
-  const { storageToMarkdown } = await import('../doc-tools.mjs');
+  const { storageToMarkdown } = await import('../lib/doc-tools.mjs');
   assert.equal(storageToMarkdown('<h2>When to use</h2><ul><li><p>To submit a form.</p></li></ul><p>Plain &amp; <strong>bold</strong>.</p><table><tbody><tr><th>Size</th><th>Use</th></tr><tr><td>sm</td><td>Dense lists</td></tr></tbody></table><ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[<b>x</b>]]></ac:plain-text-body></ac:structured-macro><ac:image><ri:attachment ri:filename="a.png"/></ac:image>'),
     '## When to use\n\n- To submit a form.\n\nPlain & **bold**.\n\n| Size | Use |\n| sm | Dense lists |\n\n```\n<b>x</b>\n```');
   // A tag split by another is still taken out; an escaped one stays as text; a link in a list item stays a link.

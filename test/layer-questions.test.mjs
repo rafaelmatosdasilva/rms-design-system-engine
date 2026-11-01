@@ -1,7 +1,7 @@
 // Two questions an agent asks the documentation, answered from the intent layer (layer-questions.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tokenByPurpose, tokenAnswerer, absentComponent, questionLines, saysSomething } from '../layer-questions.mjs';
+import { tokenByPurpose, tokenAnswerer, absentComponent, questionLines, saysSomething } from '../lib/layer-questions.mjs';
 
 const layer = {
   system: { sections: [{ title: 'Before using the data', text: 'Read the agent sections first.' }] },

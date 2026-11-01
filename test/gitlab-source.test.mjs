@@ -9,7 +9,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, plainGet, isMirrorOf, STATE_FILE } from '../gitlab-source.mjs';
+import { parseGitlabProject, untar, syncGitlab, describe, mirrorDir, projectFromState, plainGet, isMirrorOf, STATE_FILE } from '../lib/gitlab-source.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -203,7 +203,7 @@ test('the engine run end to end: --project=<GitLab link> sets up the mirror, rem
   const host = `127.0.0.1:${server.address().port}`;
   const from = tempDir('gl-run-');
   writeFileSync(join(from, '.env'), `GITLAB_TOKEN=glpat-run\nGITLAB_HOST=${host}\n`);
-  const run = (args) => new Promise((ok) => { const p = spawn(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: from, env: { ...process.env, NO_COLOR: '1', GITLAB_TOKEN: '', GITLAB_HOST: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } }); let out = ''; p.stdout.on('data', (d) => { out += d; }); p.stderr.on('data', (d) => { out += d; }); p.on('close', (code) => ok({ code, out })); });
+  const run = (args) => new Promise((ok) => { const p = spawn(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: from, env: { ...process.env, NO_COLOR: '1', GITLAB_TOKEN: '', GITLAB_HOST: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } }); let out = ''; p.stdout.on('data', (d) => { out += d; }); p.stderr.on('data', (d) => { out += d; }); p.on('close', (code) => ok({ code, out })); });
   try {
     const r = await run(['--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--no-hooks', `--project=http://${host}/acme/ui-kit`]);
     assert.equal(r.code, 0, r.out);
@@ -253,7 +253,7 @@ test('a folder that is already the copy of the project is used where it is, neve
 });
 
 test('a project link that moved, or names the project, is found: every call then goes to the project by its id', async () => {
-  const { projectApi } = await import('../gitlab-source.mjs');
+  const { projectApi } = await import('../lib/gitlab-source.mjs');
   const res = (status, body) => ({ ok: status === 200, status, json: async () => body });
   const O = 'https://git.acme.example';
   const moved = await projectApi(O, 'design/old-name', async () => res(200, { id: 7, path_with_namespace: 'design/new-name' }));

@@ -4,11 +4,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { makeFixture, runGate, budget, tempDir } from './helpers.mjs';
-import { createPairing, pairingTasks, stateBase, stateSiblings, folderForms, words } from '../component-pairing.mjs';
-import { resolveComponentFile, componentSourceFiles, textReader } from '../component-source.mjs';
-import { loadLocator } from '../component-locator.mjs';
-import { projectState } from '../route.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { createPairing, pairingTasks, stateBase, stateSiblings, folderForms, words } from '../lib/component-pairing.mjs';
+import { resolveComponentFile, componentSourceFiles, textReader } from '../lib/component-source.mjs';
+import { loadLocator } from '../lib/component-locator.mjs';
+import { projectState } from '../lib/route.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const vue = (cls, style = '', script = '') => `<template><div class="${cls}"><slot /></div></template>\n<script setup>${script}</script>\n<style>${style}</style>\n`;
 const snap = (components, props = {}, colors = {}) => ({
@@ -260,7 +260,7 @@ test('the audit and the style guide list a proposal to confirm or pin, and never
   writeFileSync(join(dir, 'figma', 'structure.snapshot.json'), JSON.stringify(structure, null, 2));
   mkdirSync(join(dir, 'components', 'tags'), { recursive: true });
   writeFileSync(join(dir, 'components', 'tags', 'Default.vue'), '<template><span class="hb-tag-item"><slot /></span></template>\n');
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
   const audit = run('--no-a11y-bake');
   assert.match(audit.stdout, /🔗 Which file is each Figma component: 1 on one sign only\. Not paired until you confirm it, or pin it in ds-config\.json → componentFiles\.\n {3}· Figma's tag may be components\/tags\/Default\.vue \(a generic file name in its folder\): one sign only, so it is not paired\./);
   assert.doesNotMatch(audit.stdout, /🧱 /, 'the proposed file is not a component only in code');

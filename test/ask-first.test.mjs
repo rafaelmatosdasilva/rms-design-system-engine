@@ -2,9 +2,9 @@
 // left open ([open], TBD) is never guidance. An invented system (Acme): two page shells, a side panel, a few components.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { entityView, isOpen } from '../doc-source-dsds.mjs';
-import { componentIntent, useReport } from '../intent-layer.mjs';
-import { contextFrom, requestFocus, focusLines, askFirst } from '../prototype-context.mjs';
+import { entityView, isOpen } from '../lib/doc-source-dsds.mjs';
+import { componentIntent, useReport } from '../lib/intent-layer.mjs';
+import { contextFrom, requestFocus, focusLines, askFirst } from '../lib/prototype-context.mjs';
 
 const page = (name, purpose, more = {}) => ({ kind: 'component', name, description: purpose, sections: [{ kind: 'guidelines', title: 'When to use', items: (more.when ?? []).map((statement) => ({ statement })) }, ...(more.rules ? [{ kind: 'guidelines', title: 'Rules', items: more.rules.map((statement) => ({ statement })) }] : [])] });
 const view = (e, group = 'components') => entityView(e, `${group}/${e.name}.json`, group);

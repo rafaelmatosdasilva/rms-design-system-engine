@@ -2,7 +2,7 @@
 // written by the engine, so every test is about reading and about what an agent is told before it proposes again.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decisionsFrom, decisionView, ruledOutLines, decisionsMarkdown, writtenDecisions, gatherDecisions, KINDS } from '../decisions.mjs';
+import { decisionsFrom, decisionView, ruledOutLines, decisionsMarkdown, writtenDecisions, gatherDecisions, KINDS } from '../lib/decisions.mjs';
 import { makeFixture } from './helpers.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -120,7 +120,7 @@ test('an answer whose component changed since is to review again: it still stand
 });
 
 test('an answer about a page of the intent layer names the page, in its words and as what it affects', async () => {
-  const { decisionsFrom, pageOf } = await import('../decisions.mjs');
+  const { decisionsFrom, pageOf } = await import('../lib/decisions.mjs');
   assert.equal(pageOf('move:dropdownRow'), 'dropdownRow');
   assert.equal(pageOf('fix:cardTile:primaryAction'), 'cardTile');
   assert.equal(pageOf('review:Saving'), 'Saving');

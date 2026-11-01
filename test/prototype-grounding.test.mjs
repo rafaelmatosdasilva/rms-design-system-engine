@@ -2,9 +2,9 @@
 // documentation's "goes only inside" rules held as errors.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { contextFrom, intentLayerOf, purposeLines, ruleLines, detailFor, insideFrom, insideFindings } from '../prototype-context.mjs';
-import { buildCatalog, checkUi } from '../ui-catalog.mjs';
-import { componentIntent } from '../intent-layer.mjs';
+import { contextFrom, intentLayerOf, purposeLines, ruleLines, detailFor, insideFrom, insideFindings } from '../lib/prototype-context.mjs';
+import { buildCatalog, checkUi } from '../lib/ui-catalog.mjs';
+import { componentIntent } from '../lib/intent-layer.mjs';
 
 test('an intent layer page says each line once, its role and its examples apart from its rules', () => {
   const il = intentLayerOf({

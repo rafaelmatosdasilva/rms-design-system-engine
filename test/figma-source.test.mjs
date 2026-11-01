@@ -5,7 +5,7 @@ import { writeFileSync, readFileSync, utimesSync, existsSync, readdirSync } from
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { chooseFigmaSource, figmaCliPort, refreshFromFigmaCli } from '../figma-source.mjs';
+import { chooseFigmaSource, figmaCliPort, refreshFromFigmaCli } from '../lib/figma-source.mjs';
 import { fixtureProject, budget } from './helpers.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
 
@@ -41,7 +41,7 @@ test('figma-cli is run to write design.json, then it is read; a failed snapshot 
 test('--from-figma-cli reads a design.json; a newer one is read by the audit on its own, and the summary says so', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(TP, 'fc-audit-');
   writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign()));
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', PATH: '/usr/bin:/bin' } });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', PATH: '/usr/bin:/bin' } });
   let r = run('--from-figma-cli');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /✅ Figma read from design\.json \(Tidepool\): 18 colours in 2 modes, 8 sizes, 6 components/);
@@ -62,7 +62,7 @@ test('a Figma read is sent to the team\'s snapshots store at once, so it is ever
   const cfgPath = join(dir, 'ds-config.json'), cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
   writeFileSync(cfgPath, JSON.stringify({ ...cfg, stores: { snapshots: { read: 'shared', write: 'shared' } } }, null, 2));
   writeFileSync(join(dir, 'design.json'), JSON.stringify(tidepoolDesign()));
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', PATH: '/usr/bin:/bin' } });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', PATH: '/usr/bin:/bin' } });
   const kept = run('--from-figma-cli', '--keep-snapshots');
   assert.equal(kept.status, 0, kept.stderr);
   assert.ok(!existsSync(join(dir, 'shared')) || !readdirSync(join(dir, 'shared'), { recursive: true }).some((f) => /figma-vars/.test(f)), 'kept here');

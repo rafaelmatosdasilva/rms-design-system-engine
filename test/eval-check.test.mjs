@@ -2,7 +2,7 @@
 // candidate an agent produced: raw literals that should be tokens, invented vars, DS-class usage.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evalConformance } from '../eval-check.mjs';
+import { evalConformance } from '../lib/eval-check.mjs';
 
 const ctx = { cssVars: new Set(['--color-bg', '--radii-button']), dsClasses: new Set(['.buttonPrimary']) };
 
@@ -52,7 +52,7 @@ test('counts inline style attributes (metric), independent of violations', () =>
 });
 
 test('a candidate that does not use the component the case expects avoided the system, and fails', async () => {
-  const { usesComponent } = await import('../eval-check.mjs');
+  const { usesComponent } = await import('../lib/eval-check.mjs');
   const c = { ...ctx, componentClass: new Map([['chip', '.chip'], ['buttonPrimary', '.buttonPrimary']]) };
   const used = evalConformance('<button class="chip">Filter</button>', c, { component: 'chip' });
   assert.equal(used.metrics.avoided, false);
@@ -74,7 +74,7 @@ test('a candidate that does not use the component the case expects avoided the s
 });
 
 test('a component class with a regex character is matched as written, not as a pattern', async () => {
-  const { usesComponent } = await import('../eval-check.mjs');
+  const { usesComponent } = await import('../lib/eval-check.mjs');
   assert.equal(usesComponent('<a class="tp-btn+x">Go</a>', 'button', '.tp-btn+x'), true);
   assert.equal(usesComponent('<a class="tp-btnnx">Go</a>', 'button', '.tp-btn.x'), false);
 });

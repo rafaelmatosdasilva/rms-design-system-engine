@@ -1,7 +1,7 @@
 // The component contracts viewed in DSDS 0.23 (contract-dsds.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dsdsEntry, dsdsDocuments, dsdsId, DSDS_VERSION } from '../contract-dsds.mjs';
+import { dsdsEntry, dsdsDocuments, dsdsId, DSDS_VERSION } from '../lib/contract-dsds.mjs';
 
 const contract = {
   id: 'acme.buttonPrimary', name: 'buttonPrimary', description: 'The one main action of a view.',

@@ -1,7 +1,7 @@
 // prune-check.mjs - "prune candidates" advisory. Pure over emitted artifacts.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectDeprecatedTokens, pruneCandidates } from '../prune-check.mjs';
+import { collectDeprecatedTokens, pruneCandidates } from '../lib/prune-check.mjs';
 
 test('collectDeprecatedTokens finds $deprecated leaves by dot-path, skips live ones', () => {
   const dict = {
@@ -48,7 +48,7 @@ test('pruneCandidates accepts a plain-object reach map and empty inputs', () => 
 });
 
 test('the token budget, the same value written by hand in two tokens and tokens only one component uses', async () => {
-  const { sameInEveryMode } = await import('../prune-check.mjs');
+  const { sameInEveryMode } = await import('../lib/prune-check.mjs');
   const vars = { color: {
     light: { 'text/primary': '#111', 'icon/primary': '#111', 'text/muted': '#666', 'border/strong': '#111', 'chip/text/color': '#111', 'badge/text/color': '#111' },
     dark: { 'text/primary': '#eee', 'icon/primary': '#eee', 'text/muted': '#999', 'border/strong': '#fff', 'chip/text/color': '#eee', 'badge/text/color': '#eee' },

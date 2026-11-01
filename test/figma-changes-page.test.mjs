@@ -2,13 +2,13 @@
 // Changes in Figma page and each component's History), and where a component is used in every team file (Figma's library
 // analytics, figma-analytics.mjs), or why those files were not seen.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { changesView, changeLines } from '../component-change.mjs';
-import { libraryUsage } from '../figma-analytics.mjs';
+import { changesView, changeLines } from '../lib/component-change.mjs';
+import { libraryUsage } from '../lib/figma-analytics.mjs';
 
 const change = (component, at, extra = {}) => ({ kind: 'change', component, at, asked: `add xl to ${component}'s size`, ops: [{ op: 'addOption', axis: 'size', option: 'xl', like: 'l' }], report: { skeleton: [], architecture: [{ change: 'added', what: 'option size=xl' }], variables: [] }, breaking: [], held: [{ what: 'a new option' }], faults: [], ...extra });
 
@@ -45,5 +45,5 @@ test('the style guide has the Changes in Figma page, and each component\'s Histo
   assert.match(tpl, /section\('changes-in-Figma', 'Changes', 'Changes in Figma'/);
   assert.match(tpl, /card\('What the change said it does'[\s\S]*card\('What Figma shows once it was made'/);
   assert.match(tpl, /#changes-in-Figma\?panel=' \+ esc\(encodeURIComponent\('doc:fc:'/);
-  assert.match(readFileSync(new URL('../styleguide-gen.mjs', import.meta.url), 'utf8'), /view\.figmaChanges = fc/);
+  assert.match(readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8'), /view\.figmaChanges = fc/);
 });

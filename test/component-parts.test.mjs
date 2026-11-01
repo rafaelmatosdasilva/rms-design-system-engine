@@ -2,7 +2,7 @@
 // root's nesting, agree; asked about when only one says so; the team's answer wins.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { partsOf, partAnswers } from '../component-parts.mjs';
+import { partsOf, partAnswers } from '../lib/component-parts.mjs';
 
 const NAMES = ['tileList', 'tileListRow', 'tileListAlt', 'tileCardRow', 'tileCardBank', 'chipGroup', 'chip', 'grid', 'grid/Row', 'grid/Cell/text',
   'searchField', 'pillBackground', 'pill', 'orderRow', 'buttonQuiet', 'buttonPromo'];
@@ -49,7 +49,7 @@ test('the team\'s answer wins: Part of: in Figma, a heading under the root\'s Pa
 });
 
 test('a part is documented in its root\'s page: ### its name under Parts, read from the spec and the page alike', async () => {
-  const { mdParts, entityView } = await import('../doc-source-dsds.mjs');
+  const { mdParts, entityView } = await import('../lib/doc-source-dsds.mjs');
   assert.deepEqual(mdParts('# Tile list\n\n## Usage\n\n- For lists.\n\n## Parts\n\n### tileListRow\n\nPart of tileList, placed only inside it.\n\n- One line a row.\n\n### `tileListHead`\n\nPart of tileList, placed only inside it.\n\n## API\n\n- size'),
     { tileListRow: ['One line a row.'], tileListHead: [] }, 'the line that makes it a part is not its documentation');
   const v = entityView({ kind: 'component', name: 'tileList', sections: [{ kind: 'section', title: 'Parts', freeform: [{ title: 'tileListRow', body: '- One line a row.' }] }, { kind: 'section', title: 'Usage', body: '- For lists.' }] }, 'a.json');
@@ -58,7 +58,7 @@ test('a part is documented in its root\'s page: ### its name under Parts, read f
 });
 
 test('an answer is written in the intent layer: the part under its root\'s Parts and a decision; or a component of its own', async () => {
-  const { partPlan, mdAddPart } = await import('../intent-changes.mjs');
+  const { partPlan, mdAddPart } = await import('../lib/intent-changes.mjs');
   const md = '# Tile list\n\n## Purpose\n\nA list.\n\n## API\n\n- size\n';
   assert.equal(mdAddPart(md, 'tileListRow', 'Part of tileList, placed only inside it.'), md.replace(/\s*$/, '\n\n') + '## Parts\n\n### tileListRow\n\nPart of tileList, placed only inside it.\n');
   const once = mdAddPart('# T\n\n## Parts\n\n### a\n\nPart of T.\n\n## Decisions\n\n- x\n', 'b', 'Part of T.');
@@ -76,7 +76,7 @@ test('an answer is written in the intent layer: the part under its root\'s Parts
 });
 
 test('agents place the root: llms.txt lists a part under it, never as a component to choose', async () => {
-  const { buildLlms } = await import('../contract-gen.mjs');
+  const { buildLlms } = await import('../lib/contract-gen.mjs');
   const built = [{ name: 'tileList', contract: { description: 'A list.', props: [] } }, { name: 'tileListRow', contract: { description: 'A row.', props: [] } }];
   const txt = buildLlms(built, {}, 0, null, { partOf: { tileListRow: { root: 'tileList', docs: ['One line a row.'] } } });
   assert.match(txt, /\[tileList\]/);
@@ -85,7 +85,7 @@ test('agents place the root: llms.txt lists a part under it, never as a componen
 });
 
 test('asked in words, a part goes to --part: the one named before "part of" is the part, the one after its root', async () => {
-  const { route } = await import('../route.mjs');
+  const { route } = await import('../lib/route.mjs');
   const P = { hasConfig: true, components: ['tileList', 'tileListRow'] };
   assert.deepEqual(route('tileListRow is a part of tileList', P).run, ['rms-design-system-engine --part tileListRow tileList']);
   assert.deepEqual(route('tileListRow is its own component', P).run, ['rms-design-system-engine --part tileListRow none']);

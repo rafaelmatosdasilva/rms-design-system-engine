@@ -8,10 +8,10 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './helpers.mjs';
-import { modelOf } from '../figma-ops.mjs';
-import { parseChange, changeOf, changeLines, realOf, realLines } from '../component-change.mjs';
-import { grammarOf } from '../construction-grammar.mjs';
-import { route } from '../route.mjs';
+import { modelOf } from '../lib/figma-ops.mjs';
+import { parseChange, changeOf, changeLines, realOf, realLines } from '../lib/component-change.mjs';
+import { grammarOf } from '../lib/construction-grammar.mjs';
+import { route } from '../lib/route.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -98,7 +98,7 @@ test('--figma-change and --change-report: the report, held for sign-off, the scr
   write('src/skeleton.json', skeleton);
   write('component-values.snapshot.json', values);
   write('contracts/chipFilter.contract.json', { name: 'chipFilter', livesIn });
-  const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
+  const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
   assert.match(cli('--figma-change', 'chipFilter', 'make it nicer'), /not one the engine reads in words[\s\S]*--figma-change chipFilter --ops <file>/);
   const first = cli('--figma-change', 'chipFilter', 'add xl to size like l, then rename Label layer to Text');
   assert.match(first, /chipFilter: the change asked .*, 2 steps:/);
@@ -137,7 +137,7 @@ test('--figma-change: local or shared, who made it, never signed off by its auth
   write('contracts/chipFilter.contract.json', { name: 'chipFilter', livesIn });
   // A person runs it by hand (no agent session): the name their git uses is its author.
   const person = { CLAUDE_CODE_SESSION_ID: '', DESIGN_SYSTEM_ENGINE_SESSION: '', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.name', GIT_CONFIG_VALUE_0: 'Design lead' };
-  const cli = (env, ...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '', ...env } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
+  const cli = (env, ...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '', ...env } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
   const asked = 'add xl to size like l, then rename Label layer to Text';
   const first = cli(person, '--figma-change', 'chipFilter', asked);
   assert.match(first, /\nShared: chipFilter's Figma component is the system's: 1 product uses it \(Checkout\); [^\n]*It waits on Chips team\./);

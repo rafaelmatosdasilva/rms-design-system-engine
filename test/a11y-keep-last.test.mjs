@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { keepA11yResult } from '../a11y-check.mjs';
+import { keepA11yResult } from '../lib/a11y-check.mjs';
 import { tempDir } from './helpers.mjs';
 
 const last = { total: 172, ran: ['keyboard trap'], checkedAt: '2026-10-26T22:10:49.406Z', issues: [] };
@@ -35,7 +35,7 @@ test('a run that measured something takes the last one\'s place', () => {
 });
 
 test('the audit never deletes the last result before the check runs, and reports only this run\'s', () => {
-  const src = readFileSync(fileURLToPath(new URL('../audit.mjs', import.meta.url)), 'utf8');
+  const src = readFileSync(fileURLToPath(new URL('../lib/audit.mjs', import.meta.url)), 'utf8');
   assert.doesNotMatch(src, /unlinkSync\(A11Y_JSON\)/, 'the last result is never removed up front');
   assert.match(src, /'--json-out', A11Y_RUN/, 'the check writes beside it');
   assert.doesNotMatch(src, /readFileSync\(A11Y_JSON, 'utf8'\)/, 'this run\'s report reads this run\'s result (A11Y_NOW), never the kept one');

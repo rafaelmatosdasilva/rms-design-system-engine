@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { noteCardsRead, cardsRead, CARDS_FILE, WINDOW_MS } from '../cards-read.mjs';
+import { noteCardsRead, cardsRead, CARDS_FILE, WINDOW_MS } from '../lib/cards-read.mjs';
 import { tempDir } from './helpers.mjs';
 
 test('cards read: noted with when, read back within the window, forgotten after it', () => {

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { tempDir } from './helpers.mjs';
 
-const GATE = fileURLToPath(new URL('../mode-completeness-check.mjs', import.meta.url));
+const GATE = fileURLToPath(new URL('../lib/mode-completeness-check.mjs', import.meta.url));
 
 // Build a throwaway project fixture and run the gate against it (cwd = fixture).
 // Returns { code, out }. The gate reads ds-config.json / design-system-engine-map.mjs / the snapshot from cwd.

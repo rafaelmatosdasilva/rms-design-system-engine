@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { loadAgreed, classify, recordAgreed, AGREED_FILE } from '../agreed.mjs';
-import { compareTokens } from '../capture-compare.mjs';
+import { loadAgreed, classify, recordAgreed, AGREED_FILE } from '../lib/agreed.mjs';
+import { compareTokens } from '../lib/capture-compare.mjs';
 
 const f = (key, figma, code, same = figma === code) => ({ key, figma, code, same });
 
@@ -39,7 +39,7 @@ test('the comparison records every fact it compares, matching or not', () => {
 });
 
 test('hand-back: a patch for the code, a list for Figma, nothing applied', async () => {
-  const { patchLine, codePatch, figmaChanges, wantOf } = await import('../handback.mjs');
+  const { patchLine, codePatch, figmaChanges, wantOf } = await import('../lib/handback.mjs');
   assert.equal(patchLine('  gap: var(--gap-m);   /* note */', 'gap', 'var(--gap-xl)'), '  gap: var(--gap-xl);   /* note */');
   assert.equal(patchLine('.x { padding: var(--p-s) var(--p-m); }', 'padding (left/right)', 'var(--p-l)'), '.x { padding: var(--p-s) var(--p-l); }');
   assert.equal(patchLine('  padding: 8px;', 'padding (top/bottom)', '4px'), null);         // one value sets both axes: by hand
@@ -55,7 +55,7 @@ test('hand-back: a patch for the code, a list for Figma, nothing applied', async
 });
 
 test('hand-back: changed lines next to each other share one hunk, and the patch applies', async () => {
-  const { codePatch } = await import('../handback.mjs');
+  const { codePatch } = await import('../lib/handback.mjs');
   const { execFileSync } = await import('node:child_process');
   const { writeFileSync } = await import('node:fs');
   const dir = makeFixture({ 'a.css': '.bar {\n  padding: 0 var(--p-l);\n  gap: var(--gap-m);\n}\n' });
@@ -70,7 +70,7 @@ test('hand-back: changed lines next to each other share one hunk, and the patch 
 });
 
 test('census: what the comparison actually reached, per component', async () => {
-  const { censusOf, censusLines } = await import('../capture-compare.mjs');
+  const { censusOf, censusLines } = await import('../lib/capture-compare.mjs');
   const r = {
     facts: [{ key: 'chip · gap', component: 'chip', same: true }, { key: 'chip · radius', component: 'chip', same: false }, { key: 'token a [light]', same: true }],
     notComparable: [{ component: 'chip', field: 'height', why: 'the code height follows its content' }, { component: 'tag', field: 'width', why: 'x' }, { component: 'chip', field: 'width', why: 'the code height follows its content' }],
@@ -87,7 +87,7 @@ test('census: what the comparison actually reached, per component', async () => 
 });
 
 test('history: bouncing facts are churn; who moved first, per area', async () => {
-  const { churn, leaders, leadersLine, areaOf } = await import('../agreed.mjs');
+  const { churn, leaders, leadersLine, areaOf } = await import('../lib/agreed.mjs');
   const dir = makeFixture({});
   const run = (at, gapF, gapC, tokF, tokC) => recordAgreed(dir, [f('chip · gap', gapF, gapC), f('token ink [light]', tokF, tokC)], { at, commit: null });
   run('2026-09-01T00:00:00Z', '8px', '8px', '#000', '#000');
@@ -108,8 +108,8 @@ test('history: bouncing facts are churn; who moved first, per area', async () =>
 });
 
 test('a value set only by a global reset: the fix goes on the component, never on the reset', async () => {
-  const { measuredLine, pageLevelRule } = await import('../capture-compare.mjs');
-  const { codePatch } = await import('../handback.mjs');
+  const { measuredLine, pageLevelRule } = await import('../lib/capture-compare.mjs');
+  const { codePatch } = await import('../lib/handback.mjs');
   assert.equal(pageLevelRule('*'), true);
   assert.equal(pageLevelRule('html, body'), true);
   assert.equal(pageLevelRule('.panel'), false);
@@ -122,7 +122,7 @@ test('a value set only by a global reset: the fix goes on the component, never o
 });
 
 test('a measured fraction of a pixel with no variable behind it is listed for a person, never patched', async () => {
-  const { wantOf } = await import('../handback.mjs');
+  const { wantOf } = await import('../lib/handback.mjs');
   assert.equal(wantOf({ figma: 78.79 }), null, 'a frame that hugs its content measures 78.79: not a design value');
   assert.equal(wantOf({ figma: 32 }), '32px');
   assert.equal(wantOf({ expectedVar: '--thickness', figma: 1.5 }), 'var(--thickness)', 'a variable is always the answer');

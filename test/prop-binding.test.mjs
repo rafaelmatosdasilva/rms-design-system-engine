@@ -2,7 +2,7 @@
 // the project wrote, then a documented alias, then its Code Connect file, then the same name; a near name only suggests.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bindingSources, bindFigmaProp, suggestionFor, readingsOf } from '../prop-binding.mjs';
+import { bindingSources, bindFigmaProp, suggestionFor, readingsOf } from '../lib/prop-binding.mjs';
 
 const codeProps = { tileSize: {}, label: {}, disabled: {}, icon: {} };
 
@@ -42,7 +42,7 @@ test('what a Code Connect file decides beyond a value: each attribute a property
 });
 
 test('a key of an object prop is that prop at that key; every attribute a property fills is listed', async () => {
-  const { valuesOf } = await import('../prop-binding.mjs');
+  const { valuesOf } = await import('../lib/prop-binding.mjs');
   const recorded = bindingSources({ codeConnect: { captionWords: 'opts.caption' } });
   assert.deepEqual(bindFigmaProp('captionWords', { type: 'TEXT' }, { codeProps: { opts: {} }, recorded }), { code: 'opts', as: 'prop', source: 'codeConnect', exactName: true, key: 'caption' });
   assert.equal(bindFigmaProp('captionWords', { type: 'TEXT' }, { codeProps: { other: {} }, recorded }), null, 'no such object prop: no binding');
@@ -51,7 +51,7 @@ test('a key of an object prop is that prop at that key; every attribute a proper
 });
 
 test('the naming conventions pair only where the types agree; a near name is never one', async () => {
-  const { conventionFor } = await import('../prop-binding.mjs');
+  const { conventionFor } = await import('../lib/prop-binding.mjs');
   const cp = { caption: { type: 'string' }, heading: { type: 'string' }, tileSize: { type: 'string', options: ['s', 'm'] }, otherSize: { type: 'string', options: ['s', 'm', 'l'] }, isPinned: { type: 'boolean' }, alert: { type: 'boolean' } };
   assert.deepEqual(conventionFor('captionContent', { type: 'TEXT' }, cp), { code: 'caption', role: 'value', source: 'convention' });
   assert.deepEqual(conventionFor('showCaption', { type: 'BOOLEAN' }, cp), { code: 'caption', role: 'condition', source: 'convention' });
@@ -63,7 +63,7 @@ test('the naming conventions pair only where the types agree; a near name is nev
 });
 
 test('a convention never says showX decides an x its Code Connect file always writes; a plural on/off pairs', async () => {
-  const { conventionFor } = await import('../prop-binding.mjs');
+  const { conventionFor } = await import('../lib/prop-binding.mjs');
   const cp = { badge: { type: 'string' }, showBadgeCounts: { type: 'boolean' } };
   assert.equal(conventionFor('showBadge', { type: 'BOOLEAN' }, cp, { codeConnectProps: [{ figma: 'Badge', code: 'badge', role: 'value' }] }), null);
   assert.deepEqual(conventionFor('showBadge', { type: 'BOOLEAN' }, cp, { codeConnectProps: [{ figma: 'Badge', code: 'badge', role: 'value' }, { figma: 'other', code: 'badge', role: 'condition' }] }), { code: 'badge', role: 'condition', source: 'convention' });

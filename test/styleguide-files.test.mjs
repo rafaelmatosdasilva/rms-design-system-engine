@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { splitPage, writeStyleguide, readPage, pageData, copyPage, dataScript, dataOfScript } from '../styleguide-files.mjs';
-import { pageFiles } from '../stores.mjs';
+import { splitPage, writeStyleguide, readPage, pageData, copyPage, dataScript, dataOfScript } from '../lib/styleguide-files.mjs';
+import { pageFiles } from '../lib/stores.mjs';
 import { tempDir } from './helpers.mjs';
 
 // Text a data file must carry exactly: a backtick, ${, a < the inline tag escaped, a backslash before each, a line separator.

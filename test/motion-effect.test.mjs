@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { tempDir } from './helpers.mjs';
 
-const MOTION = fileURLToPath(new URL('../motion-check.mjs', import.meta.url));
-const EFFECT = fileURLToPath(new URL('../effect-check.mjs', import.meta.url));
+const MOTION = fileURLToPath(new URL('../lib/motion-check.mjs', import.meta.url));
+const EFFECT = fileURLToPath(new URL('../lib/effect-check.mjs', import.meta.url));
 
 function run(gate, { themeCss, snapshot, config }) {
   const dir = tempDir('me-gate-');

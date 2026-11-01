@@ -7,9 +7,9 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { factsFrom, checkPage, twins, checkLayer, componentChanges, report, CHANGES_FILE, changesSince, changeWords } from '../intent-truth.mjs';
-import { useReport, componentIntent, agentText, matchComponents, ACTIONS } from '../intent-layer.mjs';
-import { intentLayerOf } from '../prototype-context.mjs';
+import { factsFrom, checkPage, twins, checkLayer, componentChanges, report, CHANGES_FILE, changesSince, changeWords } from '../lib/intent-truth.mjs';
+import { useReport, componentIntent, agentText, matchComponents, ACTIONS } from '../lib/intent-layer.mjs';
+import { intentLayerOf } from '../lib/prototype-context.mjs';
 import { tempDir } from './helpers.mjs';
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
 
@@ -209,12 +209,12 @@ test('--check-intent checks a page before it is written, and exits 1 on a findin
   mkdirSync(join(root, 'draft', 'components'), { recursive: true });
   const draft = (statement) => writeFileSync(join(root, 'draft', 'components', 'tile.dsds.json'), JSON.stringify({ kind: 'component', id: 'component-tile-one', name: 'Tile One', sections: [{ kind: 'guidelines', title: 'When to use', items: [{ statement }] }] }));
   draft('Use `tone="bright"` for alerts.');
-  const bad = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--check-intent', 'draft'], { cwd: root, encoding: 'utf8' });
+  const bad = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--check-intent', 'draft'], { cwd: root, encoding: 'utf8' });
   assert.equal(bad.status, 1, bad.stdout + bad.stderr);
   assert.match(bad.stdout, /`tone` takes `calm`, `loud`/);
   assert.match(bad.stdout, /NEXT: fix each finding in the page/);
   draft('Use `tone="loud"` for alerts.');
-  const ok = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--check-intent', 'draft'], { cwd: root, encoding: 'utf8' });
+  const ok = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--check-intent', 'draft'], { cwd: root, encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /1 page checked: nothing on it is contradicted by the system/);
 });
@@ -237,14 +237,14 @@ test('a name in a list under "Incorrect:" is an example not to follow, not a fin
 });
 
 test('a name is in the system when the code, Figma or the project has it: the documentation rating asks the same', async () => {
-  const { inSystem } = await import('../intent-truth.mjs');
+  const { inSystem } = await import('../lib/intent-truth.mjs');
   const f = factsFrom({ components: { tileOne: { props: { size: {} } } }, tokens: ['--acme-space-s'], text: 'props: { errorMessage: String }', files: ['src/tiles/Tile.vue'], layerFiles: ['specs/guide.md'] });
   for (const n of ['tileOne', 'size', '--acme-space-s', 'errorMessage', 'src/tiles/Tile.vue', 'specs/guide.md', 'aria-label', 'button', '<TileOne size="s" />']) assert.equal(inSystem(f, n), true, n);
   for (const n of ['tileTwo', 'warningMessage', 'src/tiles/Gone.vue']) assert.equal(inSystem(f, n), false, n);
 });
 
 test('a project that commits its Figma snapshots: each read of Figma that changed a component dates it, its first read does not', async () => {
-  const { systemFacts } = await import('../intent-truth.mjs');
+  const { systemFacts } = await import('../lib/intent-truth.mjs');
   const dir = tempDir('truth-figma-git-');
   const env = (at) => ({ ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t', GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at });
   const git = (at, ...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8', env: env(at) });
@@ -262,7 +262,7 @@ test('a project that commits its Figma snapshots: each read of Figma that change
 });
 
 test('a decision is dated like a page: its component is found from its key, and a change after it (or after its confirmation) marks it', async () => {
-  const { decisionComponent, decisionsToReview } = await import('../intent-truth.mjs');
+  const { decisionComponent, decisionsToReview } = await import('../lib/intent-truth.mjs');
   const pages = { 'Tile One': 'tileOne', Picker: 'datePicker' };
   const pc = (p) => pages[p] ?? null;
   assert.deepEqual(['add:cardTile', 'fix:Tile One:tileRow', 'move:Picker', 'review:Tile One', 'recheck:add:cardTile', 'other:x'].map((k) => decisionComponent(k, pc)), ['cardTile', 'tileOne', 'datePicker', null, null, null]);

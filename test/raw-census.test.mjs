@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { censusTokens, censusText, censusOf, censusAgainst, censusLines, CENSUS_FILE } from '../raw-census.mjs';
+import { censusTokens, censusText, censusOf, censusAgainst, censusLines, CENSUS_FILE } from '../lib/raw-census.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -85,7 +85,7 @@ test('the whole project: style files, component files and pages, the theme\'s ow
   const c = censusOf(dir, { paths: { themeCSS: 'src/theme.css' } });
   assert.deepEqual(c.files.map((f) => [f.file, f.errors, f.warnings]), [['src/card.css', 3, 0], ['src/Chip.vue', 1, 0], ['src/theme.css', 1, 0], ['app/ui.html', 0, 1]]);
   assert.equal(c.errors, 5);
-  const run = () => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--census'], { cwd: dir, encoding: 'utf8' });
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--census'], { cwd: dir, encoding: 'utf8' });
   let r = run();
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /5 errors, 1 warning in 4 files/);

@@ -23,12 +23,12 @@ export function askedBy(ctx, { cli = () => false, mcp = () => false } = {}) {
 
 // The audit once, before the run: the catalog and the last summary are there, as in a project that uses the engine.
 export function audited(dir) {
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, stdio: 'ignore', env: { ...process.env, NO_COLOR: '1' }, timeout: 5 * 60 * 1000 });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, stdio: 'ignore', env: { ...process.env, NO_COLOR: '1' }, timeout: 5 * 60 * 1000 });
 }
 
 // The generated UI checked again by the scorer, in the run's project: 0 errors, or what failed.
 export function uiPasses(dir, file) {
-  const r = spawnSync(process.execPath, [join(ENGINE, 'ui-check.mjs'), file, '--json'], { cwd: dir, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'ui-check.mjs'), file, '--json'], { cwd: dir, encoding: 'utf8' });
   let out = null; try { out = JSON.parse(r.stdout); } catch { /* not JSON: no catalog, no file, or not valid JSON */ }
   if (!out) return { ok: false, detail: (r.stdout || r.stderr).trim().split('\n').slice(0, 3).join(' | ') };
   return { ok: out.ok === true, detail: (out.findings ?? []).filter((f) => f.level === 'error').map((f) => f.message).join(' | ') };

@@ -2,13 +2,13 @@
 // style guide's History as an Intent layer card: the pages it changed, the commit that made it, and the components those
 // pages document; each component's own History lists the changes to its page.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -41,7 +41,7 @@ test('the layer\'s changes on History: a card each, linked to the components the
   assert.deepEqual(data.intentChanges.map((x) => [x.to, x.pages, x.components, x.files]), [['c2d4e6f8a0b1', ['button', 'Saving'], ['button'], 2], ['b0b1b2b3b4b5', [], [], 1]]);
   assert.equal(JSON.parse(readFileSync(snapFile, 'utf8')).changes.length, 2, 'kept as they were while the layer did not move');
 
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const c = await launchChrome(chromePath);

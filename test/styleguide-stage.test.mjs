@@ -8,7 +8,7 @@ import { cpSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { deprecationOf, statusView } from '../styleguide-data.mjs';
+import { deprecationOf, statusView } from '../lib/styleguide-data.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -26,7 +26,7 @@ test('what replaces a component being retired: a release that retired it, else a
 });
 
 test('in the browser: a stage suggested from what the page measures, the team\'s own kept, and a retired one naming its replacement', { timeout: budget(300000) }, async (t) => {
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = tempDir('sg-stage-');

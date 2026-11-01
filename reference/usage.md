@@ -164,8 +164,8 @@ rms-design-system-engine --route "<request>"             # the first step for an
 rms-design-system-engine --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)
 rms-design-system-engine --reference [name]              # print a reference file from the skill (no name lists them)
 rms-design-system-engine --guide classic|current         # link the command to the guide as one file (as before the split), or back
-node ~/.claude/skills/rms-design-system-engine/parity-check.mjs --fix                   # auto-fix sizing/typography divergences in theme.css
-node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
+node ~/.claude/skills/rms-design-system-engine/lib/parity-check.mjs --fix                   # auto-fix sizing/typography divergences in theme.css
+node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --list                 # list registered Figma webhooks for this file
 ```
 
 ### Build mode

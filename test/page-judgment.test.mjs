@@ -1,17 +1,17 @@
 // A model judges each Showroom screen against its brief, only when asked (page-judgment.mjs). The model is never
 // called here: every answer comes from a stand-in for the person's command.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { decisionsFrom, decisionsFor, judgmentPrompt, parseAnswer, parseJudgment, judgePages, judgmentLine, judgmentLines, showroomReviews, outline, componentsOf, captureShots, RESULT_FILE, CACHE_FILE, DEFAULT_CMD } from '../page-judgment.mjs';
-import { proposedRules, proposalFor } from '../lessons.mjs';
-import { route } from '../route.mjs';
+import { decisionsFrom, decisionsFor, judgmentPrompt, parseAnswer, parseJudgment, judgePages, judgmentLine, judgmentLines, showroomReviews, outline, componentsOf, captureShots, RESULT_FILE, CACHE_FILE, DEFAULT_CMD } from '../lib/page-judgment.mjs';
+import { proposedRules, proposalFor } from '../lib/lessons.mjs';
+import { route } from '../lib/route.mjs';
 import { tempDir, fixtureProject, budget } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEMO = fileURLToPath(new URL('./fixtures/demo-ds', import.meta.url));
@@ -197,17 +197,17 @@ test('in the style guide: the page review under each screen, then the model\'s j
   assert.match(tpl, /Advisory: a person checks each one\./);
   assert.match(tpl, /window\.__dseShowroomJudge = function \(j\)/);
   assert.match(tpl, /\+ reviewHTML\(s\) \+ '<\/div>' \+/, 'under the screen, in its column');
-  assert.match(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /showroomReviews\(ROOT, cfg\)/);
+  assert.match(readFileSync(join(ENGINE, 'lib', 'styleguide-gen.mjs'), 'utf8'), /showroomReviews\(ROOT, cfg\)/);
 });
 
 test('in the browser: a screen of the built style guide is shot at its size, and its page shows the review and the judgment', { timeout: budget(300000) }, async (t) => {
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'pj-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
-  const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const b = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(b.status, 0, b.stdout + b.stderr);
   // A Showroom screen in the page's data, as a build that drew one writes it, with its review and a judgment.
   const file = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');

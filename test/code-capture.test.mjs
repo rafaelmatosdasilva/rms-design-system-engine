@@ -4,9 +4,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeFixture } from './helpers.mjs';
-import { captureCode, modeSwitch } from '../code-capture.mjs';
-import { loadCssSources, rootTokens, walkCss, resolveVars, canonValue, blankComments } from '../css-source.mjs';
-import { findChrome } from '../cdp.mjs';
+import { captureCode, modeSwitch } from '../lib/code-capture.mjs';
+import { loadCssSources, rootTokens, walkCss, resolveVars, canonValue, blankComments } from '../lib/css-source.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const HAS_CHROME = !!findChrome({ playwright: true }) && typeof WebSocket !== 'undefined';
 const browserTest = (name, fn) => test(name, { skip: HAS_CHROME ? false : 'no Chrome available' }, fn);
@@ -146,7 +146,7 @@ browserTest('tokens injected at runtime by a page script are seen, and an app ch
 });
 
 // ── Components (browser) ─────────────────────────────────────────────────────────
-import { partFor, winningDecl, stateRecipe } from '../component-capture.mjs';
+import { partFor, winningDecl, stateRecipe } from '../lib/component-capture.mjs';
 
 test('partFor: the right slot of a shorthand for each side', () => {
   assert.equal(partFor('padding', 'var(--a) var(--b)', 'paddingRight'), 'var(--b)');
@@ -332,7 +332,7 @@ browserTest('disabled wins: hover and press must not change a disabled component
   assert.deepEqual(Object.keys(hover('btn').changed), ['backgroundColor']);
   assert.equal(hover('btn').changed.backgroundColor.to, 'rgb(0, 0, 128)');
   assert.deepEqual(hover('ok').changed, {});
-  const { compareComponents } = await import('../capture-compare.mjs');
+  const { compareComponents } = await import('../lib/capture-compare.mjs');
   const r = compareComponents(snapshot, { btn: {}, ok: {} }, {}, {}, { EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {} });
   assert.deepEqual(r.differ.filter((d) => /while disabled/.test(d.field)).map((d) => `${d.component} ${d.field}: ${d.code}`), ['btn hover while disabled (isDisabled=True): changes background']);
 });
@@ -352,7 +352,7 @@ browserTest('disabled wins: every border side, the shadow and the outline, and n
   assert.deepEqual(Object.keys(hover('tab').changed), ['borderBottomColor', 'boxShadow', 'outlineColor', 'outlineWidth', 'outlineStyle']);
   assert.equal(hover('tab').changed.outlineStyle.rule, '.tab:hover');
   assert.deepEqual(Object.keys(hover('link').changed), ['color']);
-  const { compareComponents } = await import('../capture-compare.mjs');
+  const { compareComponents } = await import('../lib/capture-compare.mjs');
   const r = compareComponents(snapshot, { tab: {}, link: {} }, {}, {}, { EXPLICIT: {}, EXPLICIT_SIZING: {}, SKIP_TOKENS: new Set(), NULL_TOKENS: new Set(), KNOWN_NULL: new Set(), SIZING_SKIP: new Map(), TYPO: {} });
   assert.deepEqual(r.differ.filter((d) => /hover while disabled/.test(d.field)).map((d) => `${d.component}: ${d.code}`), ['tab: changes bottom border colour, shadow, outline colour, outline width, outline', 'link: changes text colour']);
 });
@@ -370,7 +370,7 @@ browserTest('disabled wins: a state the user cannot reach is not a leak', async 
 });
 
 test("the project's own style guide page is opened with ?all, so its shrunken card thumbnails are never measured", async () => {
-  const src = (await import('node:fs')).readFileSync(new URL('../code-capture.mjs', import.meta.url), 'utf8');
+  const src = (await import('node:fs')).readFileSync(new URL('../lib/code-capture.mjs', import.meta.url), 'utf8');
   assert.equal((src.match(/label === 'styleguide' \? '\?all' : ''/g) ?? []).length, 2);
 });
 

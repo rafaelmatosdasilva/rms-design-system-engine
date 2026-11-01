@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { createLocator, loadLocator, leadingToken } from '../component-locator.mjs';
+import { createLocator, loadLocator, leadingToken } from '../lib/component-locator.mjs';
 
 test('resolution order: componentSelectors, then the contract selector map, then a selector-like name, then the convention', () => {
   const L = createLocator(
@@ -36,7 +36,7 @@ test('loadLocator reads COMPONENT_CSS_SELECTORS from the project contract, and s
 });
 
 test('with no Figma data and no contract, the class comes from the component\'s own code before the convention', async () => {
-  const { codeRootClasses } = await import('../component-locator.mjs');
+  const { codeRootClasses } = await import('../lib/component-locator.mjs');
   const dir = makeFixture({
     'ds-config.json': {},
     // The name in another spelling, on the first element of the template.

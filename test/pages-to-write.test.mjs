@@ -9,9 +9,9 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
-import { rankPages, seedLines, startLimit, toStart, pagesToWriteLines, reachOf } from '../pages-to-write.mjs';
+import { rankPages, seedLines, startLimit, toStart, pagesToWriteLines, reachOf } from '../lib/pages-to-write.mjs';
 
-const ENGINE = fileURLToPath(new URL('../audit.mjs', import.meta.url));
+const ENGINE = fileURLToPath(new URL('../lib/audit.mjs', import.meta.url));
 const lives = (products, extra = {}) => ({ products: products.map(([name, files, uses]) => ({ name, files, uses })), files: [], inside: [], holds: [], screens: [], ...extra });
 const USAGE = {
   tileMedia: lives([['Shop', 4, 9], ['Admin', 2, 3]]),
@@ -81,8 +81,8 @@ const PROJECT = {
 const CFG = { paths: { snapshotStructure: 'struct.json' }, componentFiles: { buttonMain: 'src/ButtonMain.vue', tileMedia: 'src/TileMedia.vue', chipFilter: 'src/ChipFilter.vue' }, intentLayer: { folder: 'docs', startPages: 1 } };
 
 test('a run that writes the layer starts the most used page to write and drafts an example where none is shown', async () => {
-  const { syncIntentLayer } = await import('../intent-layer.mjs');
-  const { prepareLayerFix } = await import('../intent-changes.mjs');
+  const { syncIntentLayer } = await import('../lib/intent-layer.mjs');
+  const { prepareLayerFix } = await import('../lib/intent-changes.mjs');
   const dir = makeFixture({ ...PROJECT, 'ds-config.json': CFG });
   assert.equal((await syncIntentLayer(dir, CFG, {})).ok, true);
   const p = await prepareLayerFix(dir, CFG, { drafts: false });

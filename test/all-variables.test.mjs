@@ -1,7 +1,7 @@
 // allVariables (styleguide-data.mjs): every token Figma has, for the Tokens page. Every name below is invented.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { allVariables } from '../styleguide-data.mjs';
+import { allVariables } from '../lib/styleguide-data.mjs';
 
 const snap = {
   _collections: { color: 'Theme', colorModes: ['Light', 'Dark'], sizing: ['Theme'] },
@@ -33,7 +33,7 @@ test('every token Figma has, its type by its name first, its modes and values, t
 });
 
 test('Figma\'s tokens from the capture: each in its own collection, every mode, its alias, nothing guessed', async () => {
-  const { tokensFromItems } = await import('../figma-capture.mjs');
+  const { tokensFromItems } = await import('../lib/figma-capture.mjs');
   const items = [
     { k: 'collection', id: 'c1', v: { id: 'c1', name: 'Theme', modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] } },
     { k: 'collection', id: 'c2', v: { id: 'c2', name: 'Breakpoint', modes: [{ modeId: 'p', name: 'Phone' }, { modeId: 'w', name: 'Desktop' }] } },

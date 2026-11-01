@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addedLines, editFindings, editCheck, componentTagIn, normHex, themeSizes, importFindings, nestedComponents, nestingFindings } from '../edit-check.mjs';
-import { varsByMode, pairsOf } from '../token-pairs.mjs';
-import { steeringTruth } from '../steering-check.mjs';
+import { addedLines, editFindings, editCheck, componentTagIn, normHex, themeSizes, importFindings, nestedComponents, nestingFindings } from '../lib/edit-check.mjs';
+import { varsByMode, pairsOf } from '../lib/token-pairs.mjs';
+import { steeringTruth } from '../lib/steering-check.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -182,14 +182,14 @@ test('the hook: a UI edit in a parity project, with an opt-out; everything else 
   // Nothing added: an edit that only removed lines.
   assert.equal(editCheck({ tool_name: 'Edit', tool_input: { file_path: join(dir, 'src/pages/Filters.jsx'), old_string: 'a\nb', new_string: 'a' } }, { root: dir, cfg: {} }), null);
   // Through the guard, as Claude Code runs it: the reason goes back to the agent.
-  const out = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify(write('src/pages/Filters.jsx')), encoding: 'utf8' });
+  const out = spawnSync(process.execPath, [join(ENGINE, 'lib', 'guard.mjs')], { input: JSON.stringify(write('src/pages/Filters.jsx')), encoding: 'utf8' });
   assert.equal(out.status, 0);
   const j = JSON.parse(out.stdout);
   assert.equal(j.decision, 'block');
   assert.match(j.reason, /size="md" is not a value this prop takes/);
   // No ds-config.json: not a parity project, nothing to say.
   const plain = makeFixture({ 'a.css': '.x{color:#fff}' });
-  const none = spawnSync(process.execPath, [join(ENGINE, 'guard.mjs')], { input: JSON.stringify({ hook_event_name: 'PostToolUse', cwd: plain, tool_name: 'Write', tool_input: { file_path: join(plain, 'a.css'), content: '.x{color:#fff}' } }), encoding: 'utf8' });
+  const none = spawnSync(process.execPath, [join(ENGINE, 'lib', 'guard.mjs')], { input: JSON.stringify({ hook_event_name: 'PostToolUse', cwd: plain, tool_name: 'Write', tool_input: { file_path: join(plain, 'a.css'), content: '.x{color:#fff}' } }), encoding: 'utf8' });
   assert.equal(none.stdout, '');
 });
 
@@ -275,7 +275,7 @@ test('a component put inside another the way the system never does, with the cat
 });
 
 test('a plain element the edit styled as a declared primitive: the component to write, only on added lines', async () => {
-  const { primitiveTable } = await import('../primitives.mjs');
+  const { primitiveTable } = await import('../lib/primitives.mjs');
   const primitives = primitiveTable({ primitives: [{ component: 'Text', props: { size: 'medium', color: 'secondary' }, when: { font: 'var(--body-medium)', color: 'var(--text-secondary)' } }] });
   const p = { ...ctx, truth: steeringTruth({ catalog, cssVars: ['--body-medium', '--text-secondary'] }), primitives, rules: new Map([['hint', new Map([['font', 'var(--body-medium)'], ['color', 'var(--text-secondary)']])]]) };
   const full = '<span class="hint">old</span>\n<p style="font: var(--body-medium); color: var(--text-secondary)">new</p>\n<span class="hint">new</span>';

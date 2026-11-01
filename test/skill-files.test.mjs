@@ -5,7 +5,7 @@ import { writeFileSync, mkdirSync, symlinkSync, readFileSync, existsSync } from 
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { listDocs, readDoc, printDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, GUIDE, logUsage } from '../skill-files.mjs';
+import { listDocs, readDoc, printDoc, doctor, classicGuide, writeClassicGuide, fetchClassic, GUIDE, logUsage } from '../lib/skill-files.mjs';
 import { makeFixture, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -32,7 +32,7 @@ test('recipes and reference: listed with their "use when", printed by name, neve
 });
 
 test('through the audit command, from any folder', () => {
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--recipe', 'nope'], { cwd: makeFixture({}), encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--recipe', 'nope'], { cwd: makeFixture({}), encoding: 'utf8' });
   assert.equal(r.status, 2);
 });
 

@@ -5,8 +5,8 @@
 // ("a per-component light override does not win under a global dark mode").
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveModeCSS } from '../styleguide-gen.mjs';
-import { codeSizeCSS } from '../styleguide-data.mjs';
+import { deriveModeCSS } from '../lib/styleguide-gen.mjs';
+import { codeSizeCSS } from '../lib/styleguide-data.mjs';
 
 // A DS token file: neutrals flip by mode, semantics ride on them, plus a
 // size-axis var and a typography var (which must NOT leak into colour blocks),
@@ -137,7 +137,7 @@ test('[styleguide bugfix] a MID-FILE orphan brace is dropped at its position, no
 });
 
 test('styleguide: app usage labels are short initials, the name for one word, full names on a clash', async () => {
-  const { appLabels } = await import('../styleguide-gen.mjs');
+  const { appLabels } = await import('../lib/styleguide-gen.mjs');
   assert.deepEqual(appLabels(['order-history', 'checkout', 'userSettings']), [['order-history', 'OH'], ['checkout', 'checkout'], ['userSettings', 'US']]);
   assert.deepEqual(appLabels(['order-history', 'open-hub']), [['order-history', 'order-history'], ['open-hub', 'open-hub']]);
 });

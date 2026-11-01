@@ -6,8 +6,8 @@ import { writeFileSync, readFileSync, cpSync, appendFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildStamp, compareStamps, mayWrite, stampOf, stampMeta, stampLine } from '../stamp.mjs';
-import { generateContracts } from '../contract-gen.mjs';
+import { buildStamp, compareStamps, mayWrite, stampOf, stampMeta, stampLine } from '../lib/stamp.mjs';
+import { generateContracts } from '../lib/contract-gen.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));

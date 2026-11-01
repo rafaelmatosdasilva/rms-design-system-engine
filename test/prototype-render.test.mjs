@@ -6,8 +6,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { fixtureProject, budget } from './helpers.mjs';
-import { findChrome } from '../cdp.mjs';
-import { screenBoxes, screenInstances, screenFor, compareWithScreen, compositionPaths, owedFromScreen, interactionLines } from '../prototype-render.mjs';
+import { findChrome } from '../lib/cdp.mjs';
+import { screenBoxes, screenInstances, screenFor, compareWithScreen, compositionPaths, owedFromScreen, interactionLines } from '../lib/prototype-render.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TIDEPOOL = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
@@ -98,7 +98,7 @@ test('--prototype measures the drawn page against the designed screen, saves its
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
     mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8'));
   }
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
   let r = run('--prototype', '--from-screens', 'src/figma/figma-screen-layout.snapshot.json');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /📏 AGAINST THE DESIGNED SCREEN "Settings" \(this prototype redraws it\)/);
@@ -124,7 +124,7 @@ test('a part that opens another opens it in the browser, with the focus inside; 
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
     mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8'));
   }
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/m' }, children: [
     { component: 'chip', props: { Label: 'Email' } },

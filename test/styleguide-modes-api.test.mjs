@@ -2,12 +2,12 @@
 // [data-size="phone"] on <html>), and whose components' API says more than Figma does: each preview and section in a
 // mode of its own, the page on Auto, and a Playground control for each prop only the code takes.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { attrModeCSS, colourAttrMode, modeAxes, modeScopes, codeControls, apiView } from '../styleguide-data.mjs';
-import { textComponentApi, extractTypes, extractDocumented } from '../component-source.mjs';
-import { codeCases, figmaPropFor } from '../component-harness.mjs';
+import { attrModeCSS, colourAttrMode, modeAxes, modeScopes, codeControls, apiView } from '../lib/styleguide-data.mjs';
+import { textComponentApi, extractTypes, extractDocumented } from '../lib/component-source.mjs';
+import { codeCases, figmaPropFor } from '../lib/component-harness.mjs';
 
 const cfg = { figma: { modes: [{ name: 'Light', cssSelector: 'root' }, { name: 'Dark', cssSelector: 'data:theme=dark' }] } };
 const THEME = ':root { --bg: #fff; --gap: 16px; }\n:root[data-theme="dark"] { --bg: #000; }\n:root[data-size="phone"] { --gap: 8px; }\n:root[data-theme="dark"][data-size="phone"] { --bg: #111; }';

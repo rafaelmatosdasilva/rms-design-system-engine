@@ -1,7 +1,7 @@
 // a workaround built around a component is a missing API. What counts, and the look-alikes that do not.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { workaroundFindings, workaroundLines, projectWorkarounds, missingApis } from '../workaround-check.mjs';
+import { workaroundFindings, workaroundLines, projectWorkarounds, missingApis } from '../lib/workaround-check.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const ds = new Map([['row', 'listRow'], ['menu', 'menu'], ['field', 'input']]);

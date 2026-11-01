@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
-const SCRIPTS_DIR = fileURLToPath(new URL('..', import.meta.url));
+const SCRIPTS_DIR = fileURLToPath(new URL('../lib/', import.meta.url));
 
 // A time limit in a test is there to stop a hang, never to measure how fast this computer is. The full suite starts
 // many browser tests at once, so one that finishes in two minutes on its own can take far longer while the others

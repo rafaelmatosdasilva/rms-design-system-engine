@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { showroomQuality, showroomQualityLines, titledHeadings } from '../showroom-quality.mjs';
+import { showroomQuality, showroomQualityLines, titledHeadings } from '../lib/showroom-quality.mjs';
 import { tempDir } from './helpers.mjs';
 
 const DEMO = fileURLToPath(new URL('./fixtures/demo-ds', import.meta.url));

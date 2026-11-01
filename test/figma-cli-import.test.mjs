@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { snapshotsFromDesign, varsFromDesign, importFigmaCli, tokensFromDesign } from '../figma-cli-import.mjs';
+import { snapshotsFromDesign, varsFromDesign, importFigmaCli, tokensFromDesign } from '../lib/figma-cli-import.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
@@ -61,7 +61,7 @@ test('the command writes the snapshots ds-config names, and the audit reads them
   assert.equal(r.paths.vars, 'src/figma/figma-vars.snapshot.json');
   const vars = JSON.parse(readFileSync(join(dir, r.paths.vars), 'utf8'));
   assert.deepEqual(vars.color, tpVars.color);
-  const a = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const a = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(a.status, 0, a.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));
   assert.match(a.stdout, /TO BUILD {2}17 tokens/);
 });
@@ -77,13 +77,13 @@ test('each collection\'s modes in Figma\'s own order, by snapshot key, for the s
 });
 
 test('a hidden stroke paint is not a stroke', async () => {
-  const { structureFromComponent } = await import('../figma-cli-import.mjs');
+  const { structureFromComponent } = await import('../lib/figma-cli-import.mjs');
   assert.equal(structureFromComponent({ t: 'COMPONENT', h: 24, strokes: [{ type: 'SOLID', visible: false }] }).strokeOnDefault, false);
   assert.equal(structureFromComponent({ t: 'COMPONENT', h: 24, strokes: [{ type: 'SOLID' }] }).strokeOnDefault, true);
 });
 
 test('design.json\'s read is dated to the time figma-cli wrote it when it records the day alone, so it is not older than a read that morning', async () => {
-  const { readAt } = await import('../figma-cli-import.mjs');
+  const { readAt } = await import('../lib/figma-cli-import.mjs');
   const at = (iso) => () => new Date(iso);
   assert.equal(readAt('2026-10-20', 'design.json', at('2026-10-20T17:05:00.000Z')), '2026-10-20T17:05:00.000Z');
   assert.equal(readAt('2026-10-20', 'design.json', at('2026-10-24T09:00:00.000Z')), '2026-10-20T00:00:00.000Z', 'a file touched days later: the day alone');
@@ -93,7 +93,7 @@ test('design.json\'s read is dated to the time figma-cli wrote it when it record
 });
 
 test('a set\'s structure is read from its resting variant, never from a disabled or error variant Figma lists first', async () => {
-  const { structureFromComponent } = await import('../figma-cli-import.mjs');
+  const { structureFromComponent } = await import('../lib/figma-cli-import.mjs');
   const set = (vp, names) => ({ t: 'COMPONENT_SET', vp, kids: names.map((n, i) => ({ t: 'COMPONENT', n, h: 10 + i })) });
   assert.equal(structureFromComponent(set({ Size: { values: ['s'] }, Disabled: { values: ['true', 'false'] } }, ['Size=s, Disabled=true', 'Size=s, Disabled=false'])).defaultVariant, 'Size=s, Disabled=false');
   assert.equal(structureFromComponent(set({ State: { values: ['error', 'disabled', 'default'] } }, ['State=disabled', 'State=error', 'State=default'])).defaultVariant, 'State=default');

@@ -2,14 +2,14 @@
 // snapshot), what it is made of in Figma's order, whether its code uses each one, and the frame it comes from. The
 // template composition gate reads the same answer (template-composition.mjs), so the page and the gate agree.
 import { test } from 'node:test';
-import { templateText } from '../styleguide-template.mjs';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { templateComposition, templatesSnapshot } from '../template-composition.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { templateComposition, templatesSnapshot } from '../lib/template-composition.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -61,7 +61,7 @@ test('a template\'s parts: used, not in the code, kept out on purpose, in progre
 
 test('the style guide carries each template with its parts, its Figma link and its picture, and draws the Templates page', { timeout: budget(300000) }, async (t) => {
   const { dir } = project();
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', FIGMA_TOKEN: '' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', FIGMA_TOKEN: '' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const file = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
   const page = readPage(file);
@@ -74,7 +74,7 @@ test('the style guide carries each template with its parts, its Figma link and i
   assert.equal(profile.file, null);
   assert.match(profile.pictureWhy, /no reference image and no FIGMA_TOKEN/);
 
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const c = await launchChrome(chromePath);

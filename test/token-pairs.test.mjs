@@ -1,8 +1,8 @@
 // the surfaces each text colour can be read on, derived from the token values in every mode.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readableOn, ratio, pairsOf, brokenPairs, wrongPairs, pairLines } from '../token-pairs.mjs';
-import { flattenTokens, answer, answerLines } from '../query.mjs';
+import { readableOn, ratio, pairsOf, brokenPairs, wrongPairs, pairLines } from '../lib/token-pairs.mjs';
+import { flattenTokens, answer, answerLines } from '../lib/query.mjs';
 
 test('a text colour is readable on a surface only when it meets 4.5:1 in every mode', () => {
   const colors = {

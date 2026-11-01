@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeFigmaFetch } from '../figma-fetch.mjs';
+import { makeFigmaFetch } from '../lib/figma-fetch.mjs';
 
 // A stalled/rate-limited Figma response used to hang the whole audit (Node's fetch has no
 // timeout). figmaFetch must abort after the timeout and reject with a clear, catchable error so
@@ -107,7 +107,7 @@ test('a long limit stops at once, and later calls never reach the network', asyn
 });
 
 test('the budget line: calls spent, a skip, or the limit in words', async () => {
-  const { budgetLine, waitWords, unchangedSince } = await import('../figma-fetch.mjs');
+  const { budgetLine, waitWords, unchangedSince } = await import('../lib/figma-fetch.mjs');
   assert.equal(budgetLine({ calls: 14, failed: 0, limit: null }), 'Figma refresh: 14 API calls.');
   assert.equal(budgetLine({ calls: 1, failed: 0, limit: null }, { skipped: { version: '42', at: '2026-09-30' } }),
     'Figma file unchanged since the last refresh (version 42, 2026-09-30): refresh skipped, 1 API call used. FIGMA_REFRESH=force refreshes anyway.');

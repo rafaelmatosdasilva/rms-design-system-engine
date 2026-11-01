@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { runEvals, loadContext, generateCandidate, judgeCandidate, summarize } from '../eval-run.mjs';
+import { runEvals, loadContext, generateCandidate, judgeCandidate, summarize } from '../lib/eval-run.mjs';
 import { makeFixture, tempDir } from './helpers.mjs';
 
 const ctx = { cssVars: new Set(['--color-bg']), dsClasses: new Set(['.buttonPrimary']) };
@@ -84,7 +84,7 @@ test('judgeCandidate passes the component guidance (the "why") into the payload'
 
 // the same cases per kind of guidance, compared with bare.
 test('guidance levels: each level scored by the same checks, accessibility included, compared with bare', async () => {
-  const { runLevels, levelLines } = await import('../eval-run.mjs');
+  const { runLevels, levelLines } = await import('../lib/eval-run.mjs');
   const out = { bare: '<div style="color:#ff0000">x</div>', steering: '<button class="buttonPrimary"><svg/></button>', parity: '<button class="buttonPrimary">Go</button>' };
   const by = runLevels([{ id: 'a' }, { id: 'b' }], ctx, ['bare', 'steering', 'parity'], (c, level) => out[level], 2);
   assert.equal(by.bare.summary.zeroFixRate, 0);
@@ -98,7 +98,7 @@ test('guidance levels: each level scored by the same checks, accessibility inclu
 });
 
 test('guidance levels: the context each level gets, and the whole run from ds-config', async () => {
-  const { levelContext } = await import('../eval-run.mjs');
+  const { levelContext } = await import('../lib/eval-run.mjs');
   const { spawnSync } = await import('node:child_process');
   const { join } = await import('node:path');
   const dir = makeFixture({
@@ -113,7 +113,7 @@ test('guidance levels: the context each level gets, and the whole run from ds-co
   assert.deepEqual(st.files, ['AGENTS.md']);
   assert.match(readFileSync(st.path, 'utf8'), /^# AGENTS\.md\n\n# Agents\nUse the chip component\./);
   assert.match(levelContext(dir, cfg, 'parity').why, /no contracts\/llms\.txt yet/);
-  const r = spawnSync(process.execPath, [join(process.cwd(), 'eval-run.mjs'), '--levels', 'bare,steering,parity'], { cwd: dir, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [join(process.cwd(), 'lib', 'eval-run.mjs'), '--levels', 'bare,steering,parity'], { cwd: dir, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /bare +1\/1 produced · 0% zero-fix · 1 violation\(s\)/);
   assert.match(r.stdout, /steering +1\/1 produced · 100% zero-fix · 0 violation\(s\) · 0 inline style\(s\) · 0 accessibility finding\(s\)  \(vs bare: zero-fix \+100 points, violations -1, accessibility 0\)/);
@@ -121,7 +121,7 @@ test('guidance levels: the context each level gets, and the whole run from ds-co
 });
 
 test('a generate command that ignores its stdin still produces its candidate', async () => {
-  const { generateCandidate } = await import('../eval-run.mjs');
+  const { generateCandidate } = await import('../lib/eval-run.mjs');
   // A long prompt and a command that exits at once: writing the prompt can fail with EPIPE, never the candidate.
   const c = { id: 'x', prompt: 'p'.repeat(1024 * 1024) };
   for (let i = 0; i < 20; i++) assert.equal(generateCandidate(c, 'echo "<b>ok</b>"', ''), '<b>ok</b>\n');
@@ -129,7 +129,7 @@ test('a generate command that ignores its stdin still produces its candidate', a
 });
 
 test('the expected component is never shown to the agent, and avoiding it is counted', async () => {
-  const { runLevels, levelLines } = await import('../eval-run.mjs');
+  const { runLevels, levelLines } = await import('../lib/eval-run.mjs');
   let seen = '';
   generateCandidate({ id: 'f', prompt: 'a filter people can switch on and off', component: 'chip' }, 'agent', '', (cmd, input) => { seen = input; return 'x'; });
   assert.equal(seen, 'a filter people can switch on and off');
@@ -145,7 +145,7 @@ test('the expected component is never shown to the agent, and avoiding it is cou
 });
 
 test('a prompt that names a component is flagged, in any case and spelling', async () => {
-  const { promptLeaks } = await import('../eval-run.mjs');
+  const { promptLeaks } = await import('../lib/eval-run.mjs');
   const cases = [
     { id: 'a', prompt: 'Add a Chip for each filter' },
     { id: 'b', prompt: 'a primary button to save' },
@@ -157,7 +157,7 @@ test('a prompt that names a component is flagged, in any case and spelling', asy
 });
 
 test('--ci: a run worse than the last one fails (a drop of more than 5 points, or more avoidance, type errors or accessibility findings)', async () => {
-  const { ciDrop } = await import('../eval-run.mjs');
+  const { ciDrop } = await import('../lib/eval-run.mjs');
   assert.deepEqual(ciDrop({ zeroFixRate: 80 }, { zeroFixRate: 76 }), []);   // within 5 points
   assert.deepEqual(ciDrop({ zeroFixRate: 80 }, { zeroFixRate: 70 }), ['zero-fix 80% → 70%']);
   assert.deepEqual(ciDrop({ zeroFixRate: 80, avoided: 0, typeErrors: 1 }, { zeroFixRate: 80, avoided: 2, typeErrors: 3 }), ['avoided the system 0 → 2', 'type errors 1 → 3']);
@@ -170,19 +170,19 @@ test('--ci: a run worse than the last one fails (a drop of more than 5 points, o
     'evals/f.html': '<button class="chip" style="padding: 9px">Filter</button>',
     'evals-history.json': [{ timestamp: 'x', cases: 1, zeroFixRate: 100, violations: 0 }],
   });
-  const r = spawnSync(process.execPath, [join(process.cwd(), 'eval-run.mjs'), '--ci'], { cwd: dir, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [join(process.cwd(), 'lib', 'eval-run.mjs'), '--ci'], { cwd: dir, encoding: 'utf8' });
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout, /Worse than the last run: zero-fix 100% → 0% \(--ci: failing\)/);
 });
 
 test('a component name with a regex character is found in a prompt as written', async () => {
-  const { promptLeaks } = await import('../eval-run.mjs');
+  const { promptLeaks } = await import('../lib/eval-run.mjs');
   assert.deepEqual(promptLeaks([{ id: 'a', prompt: 'build the c++ card' }], ['c++']), [{ id: 'a', name: 'c++' }]);
   assert.deepEqual(promptLeaks([{ id: 'b', prompt: 'build the cxx card' }], ['c.x']), []);
 });
 
 test('the tokens a generation spent, from the file EVAL_USAGE names', async () => {
-  const { readUsage } = await import('../eval-run.mjs');
+  const { readUsage } = await import('../lib/eval-run.mjs');
   const { writeFileSync, existsSync } = await import('node:fs');
   const { join } = await import('node:path');
   const dir = tempDir('usage-');

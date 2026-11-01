@@ -6,8 +6,8 @@ import { cpSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { harnessCases, propsOf, pageColours, loadTypeScript } from '../component-harness.mjs';
-import { findChrome } from '../cdp.mjs';
+import { harnessCases, propsOf, pageColours, loadTypeScript } from '../lib/component-harness.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -38,7 +38,7 @@ const tidepool = (stepper = null) => {
 };
 const check = (dir) => {
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(200000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = e.stdout ?? ''; }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(200000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = e.stdout ?? ''; }
   return JSON.parse(out.slice(out.indexOf('{')));
 };
 const ready = CHROME && loadTypeScript(ENGINE) ? false : 'no Chrome or no TypeScript available';
@@ -77,7 +77,7 @@ export function Stepper({ Value = '1', ...rest }) {
 });
 
 test('a value written only while another prop is on is drawn with that prop on too, each of its values', async () => {
-  const { decidedCases, harnessCases } = await import('../component-harness.mjs');
+  const { decidedCases, harnessCases } = await import('../lib/component-harness.mjs');
   const entry = { properties: { 'tone#1:2': { type: 'VARIANT', defaultValue: 'calm', variantOptions: ['calm', 'loud'] }, framed: { type: 'VARIANT', defaultValue: 'false', variantOptions: ['false', 'true'] } } };
   const base = harnessCases(entry)[0].props;
   const connect = [{ figma: 'tone', code: 'tone', role: 'value' }, { figma: 'framed', code: 'tone', role: 'condition' }, { figma: 'framed', code: 'framed', role: 'value' }];

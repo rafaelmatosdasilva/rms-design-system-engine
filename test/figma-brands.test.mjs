@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { brandsCaptureScript, brandsSnapshot, readBrandsWith, brandList, brandDeclarations, brandCss, brandOf } from '../figma-brands.mjs';
+import { brandsCaptureScript, brandsSnapshot, readBrandsWith, brandList, brandDeclarations, brandCss, brandOf } from '../lib/figma-brands.mjs';
 
 const LIST = { _read: '2026-10-15T00:00:00Z', _file: 'Themes', collections: [
   { name: 'Acme', parent: 'Theme', root: 'Theme', modes: ['Light', 'Dark'], overridden: 2 },
@@ -73,7 +73,7 @@ test('read through a runner: the list, then each collection in parts, a part cut
 });
 
 test('a layer a brand switches off draws nothing: its colours transparent, its offsets and widths 0', async () => {
-  const { hiddenLayers } = await import('../figma-brands.mjs');
+  const { hiddenLayers } = await import('../lib/figma-brands.mjs');
   const names = ['bannerMain/shadow/display', 'bannerMain/shadow/color', 'bannerMain/shadow/Y', 'bannerMain/shadow/blur', 'bannerMain/radius', 'button/border/default/display', 'button/border/default/color'];
   const baseValue = (v) => ({ 'bannerMain/shadow/display': true, 'button/border/default/display': 'false' })[v] ?? null;
   const off = hiddenLayers({ 'bannerMain/shadow/display': { Dark: false }, 'button/border/default/display': { Dark: false } }, 'Dark', { names, baseValue });
@@ -84,7 +84,7 @@ test('a layer a brand switches off draws nothing: its colours transparent, its o
 });
 
 test('brands kept as stylesheets give the same snapshot: a file a brand, each block in the mode its selector names', async () => {
-  const { brandsFromCss } = await import('../figma-brands.mjs');
+  const { brandsFromCss } = await import('../lib/figma-brands.mjs');
   const snap = brandsFromCss([
     { name: 'acme.css', css: ':root { --primitives-green: #0a6; --base-accent: var(--primitives-green); }\n[data-theme="dark"] { --primitives-green: #0f9; }' },
     { name: 'retail.css', css: '/* extends: acme */\n:root { --primitives-green: #c50; }' },
@@ -128,7 +128,7 @@ test('a link with an opacity to a colour that has one already keeps the inner on
 });
 
 test('fontFaces: one file per weight and style, the smallest format the folder has', async () => {
-  const { fontFaces } = await import('../figma-brands.mjs');
+  const { fontFaces } = await import('../lib/figma-brands.mjs');
   const f = (name) => ({ name, data: Buffer.from(name) });
   const faces = fontFaces('Acme Sans', [f('AcmeSans-Bold.otf'), f('AcmeSans-Bold.woff2'), f('AcmeSans-Bold.ttf'), f('AcmeSans-BoldItalic.otf'), f('AcmeSans-Regular.ttf'), f('AcmeSans-Regular.woff'), f('Other-Bold.woff2')]);
   assert.equal(faces.length, 3);

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { fillSnapshotHistory, storeFigmaChangelogs } from '../snapshot-history.mjs';
+import { fillSnapshotHistory, storeFigmaChangelogs } from '../lib/snapshot-history.mjs';
 import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';

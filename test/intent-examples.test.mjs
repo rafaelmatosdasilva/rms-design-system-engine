@@ -4,12 +4,12 @@
 // system (Acme) and invented products (Shop, Admin).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { callsIn, apiOf, commonCall, exampleText, tagsOf } from '../intent-examples.mjs';
-import { sureParts, applyPlan, planOf, mdReview, jsonReview, mdAddExample, jsonAddExample, describeChanges } from '../intent-changes.mjs';
-import { entityView } from '../doc-source-dsds.mjs';
-import { readMarkdown } from '../doc-source-markdown.mjs';
-import { factsFrom } from '../intent-truth.mjs';
-import { useReport } from '../intent-layer.mjs';
+import { callsIn, apiOf, commonCall, exampleText, tagsOf } from '../lib/intent-examples.mjs';
+import { sureParts, applyPlan, planOf, mdReview, jsonReview, mdAddExample, jsonAddExample, describeChanges } from '../lib/intent-changes.mjs';
+import { entityView } from '../lib/doc-source-dsds.mjs';
+import { readMarkdown } from '../lib/doc-source-markdown.mjs';
+import { factsFrom } from '../lib/intent-truth.mjs';
+import { useReport } from '../lib/intent-layer.mjs';
 
 // The tile's contract: two Figma props bound to code props, one the code has alone, an event and a named slot.
 const CONTRACT = {

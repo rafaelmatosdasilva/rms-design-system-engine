@@ -2,7 +2,7 @@
 // comes from the check that produced it, because a package that disagreed with the check is worse than none.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handoffPackage, handoffLines } from '../handoff.mjs';
+import { handoffPackage, handoffLines } from '../lib/handoff.mjs';
 
 const page = { components: {
   chip: { name: 'chip', tag: 'Chip', file: 'src/components/Chip.vue', props: { size: {}, tone: {} } },
