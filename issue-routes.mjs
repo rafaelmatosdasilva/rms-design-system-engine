@@ -19,6 +19,8 @@
 // Nothing is carried out here. Each route names the command that makes that fix, and what the project lets the
 // engine do there (writes.mjs), so the line a person reads is the same line whether or not they may run it.
 
+import { findingScope, scopeSummary, scopeLine } from './local-shared.mjs';
+
 // A check whose fix is words rather than values.
 const INTENT = /^(Documentation|Intent layer|Guidance|What agents got wrong|Docs tell the truth)/i;
 // A check whose fix is in the design file.
@@ -47,8 +49,9 @@ export function routeFor(finding = {}) {
 
 // Every open issue with the fix it needs. issues: what the tracker has, keyed (issues.mjs); findings: this run's.
 // An issue whose difference no run finds any more is not routed: it is already being closed.
-// → [{ key, iid, title, route, why, how, cmd, may }]
-export function routePlan(issues = [], findings = [], { keyOf, writes = {} } = {}) {
+// Each says too whether it is local or shared (local-shared.mjs, ctx: { usage, owners }), as its body does.
+// → [{ key, iid, title, route, why, how, cmd, may, scope }]
+export function routePlan(issues = [], findings = [], { keyOf, writes = {}, ctx = {} } = {}) {
   const byKey = new Map(findings.map((f) => [keyOf(f), f]));
   const out = [];
   for (const i of issues) {
@@ -56,7 +59,7 @@ export function routePlan(issues = [], findings = [], { keyOf, writes = {} } = {
     if (!f) continue;
     const { route, why } = routeFor(f);
     const place = ROUTE[route].place;
-    out.push({ key: i.key, iid: i.iid ?? null, title: i.title ?? f.evidence, component: f.component ?? null, route, why, how: ROUTE[route].how, cmd: ROUTE[route].cmd, may: place ? writes[place] ?? 'ask' : null });
+    out.push({ key: i.key, iid: i.iid ?? null, title: i.title ?? f.evidence, component: f.component ?? null, route, why, how: ROUTE[route].how, cmd: ROUTE[route].cmd, may: place ? writes[place] ?? 'ask' : null, scope: findingScope(f, ctx) });
   }
   return out;
 }
@@ -67,7 +70,8 @@ export const routeCounts = (plan = []) => Object.fromEntries(ROUTES.map((r) => [
 // What a person reads: each kind together, with the one command that makes it and what the project allows there.
 export function routeLines(plan = [], { most = 6 } = {}) {
   if (!plan.length) return [];
-  const out = [`🛠  ${plan.length} open issue${plan.length === 1 ? '' : 's'}, by the fix each one needs:`];
+  const sc = scopeLine(scopeSummary(plan));
+  const out = [`🛠  ${plan.length} open issue${plan.length === 1 ? '' : 's'}, by the fix each one needs${sc ? ` (${sc})` : ''}:`];
   for (const r of ROUTES) {
     const mine = plan.filter((x) => x.route === r);
     if (!mine.length) continue;

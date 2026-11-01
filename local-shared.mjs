@@ -18,6 +18,11 @@
 //       what, component?, product?, reach?, ambiguous? }
 //   todoScope(task, ctx) / editScope({ file, before, after, root, cfg, usage }) / changeScope(change, ctx): the same for a
 //     style guide task, an agent's edit and a change made in Figma
+//   proposalScope(proposal, { page }, ctx): the intent layer's Fix, Add, Move and reviews (intent-proposals.mjs): a page
+//     of a product's flow or screen is local, any other page (a component's, a template's, the system's) is shared
+//   findingScope(finding, ctx) / issueScopeLine(scope): an issue the engine opens, and the one line its body says it in
+//   sideScope({ name, side: 'figma' | 'code' }, ctx): a component only one side has (only in Figma: the system's to build,
+//     so shared; only in one product's code: that product's own, so local)
 //   scopeSummary(items) → { shared, local, waiting: [{ name, n }] }; scopeLine(summary) → "2 shared, waiting on Cards
 //     team (2); 3 local, each product team's own"
 //   usageFrom(ROOT, cfg) → { <component>: livesIn }: the usage map as the last audit wrote it into the catalog and contracts
@@ -111,6 +116,45 @@ export function changeScope(ch = {}, ctx = {}) {
   const change = (ch.breaking ?? []).length ? 'breaking' : (ch.held ?? []).length ? 'add' : 'change';
   const reach = ch.usedBy?.products ? ch.usedBy.products.filter((p) => !/^the system's own pages/.test(p)).map((p) => p.replace(/ \(\d+ files?\)$/, '')) : undefined;
   return scopeOf({ home: 'system', kind: 'figma', change, what: `${ch.component}'s Figma component`, component: ch.component, ...(reach ? { reach } : {}) }, ctx);
+}
+
+// A proposal of the intent layer's (intent-proposals.mjs), by the page it is about: a flow's or a page's (a product's
+// own screens) stays in that product; a component's, a template's, a pattern's or a foundation's is what every product
+// reads, so it is shared. An Add is a component with no page yet, so the system's. What a yes does sets how hard it is
+// to undo: a page written or a name kept is easy, a page moved can be undone, a decision withdrawn is a decision.
+const PRODUCT_LAYERS = new Set(['flows', 'pages']);
+export function proposalScope(x = {}, { page = null } = {}, ctx = {}) {
+  const ofProduct = !!page && (PRODUCT_LAYERS.has(page.layer) || !!page.product);
+  const component = page ? page.component ?? page.about?.partOf ?? page.about?.is ?? null : x.subject ?? null;
+  const change = x.kind === 'add' ? 'add' : x.kind === 'move' ? 'change' : x.kind === 'recheck' ? 'change' : 'fix';
+  const what = page ? `${page.name}'s page` : `${x.subject}'s page`;
+  return scopeOf({ home: ofProduct ? 'product' : 'system', kind: 'page', change, what, component: ofProduct ? null : component, product: page?.product ?? null, ambiguous: !!x.split }, ctx);
+}
+
+// A difference the engine opens an issue for: one about a product (its screen, its own CSS: a control a product's page
+// builds by hand where the system has the component) is that product's; one about a component, a token or Figma is the
+// system's.
+const PRODUCT_CHECK = /^No hand-built DS components/i;
+export function findingScope(f = {}, ctx = {}) {
+  const product = f.product ?? null;
+  if (product || f.home === 'product' || PRODUCT_CHECK.test(String(f.check ?? ''))) return scopeOf({ home: 'product', kind: f.check ?? 'finding', change: 'fix', what: f.component ? `${f.component} in ${product ?? 'a product\'s own screen'}` : `${product ? `${product}'s` : 'a product\'s'} own screen`, product }, ctx);
+  return scopeOf({ home: 'system', kind: f.component ? 'component' : 'token', change: 'fix', what: f.component ?? (f.check ? `the system's ${String(f.check).toLowerCase()}` : 'the system'), component: f.component ?? null }, ctx);
+}
+// The one line an issue's body says it in: "Shared: waits on Cards team — <reason>" or "Local: the product team's own —
+// <reason>".
+export function issueScopeLine(sc) {
+  if (!sc) return '';
+  const why = String(sc.reason ?? '').replace(/^(Shared|Local):\s*/, '');
+  return sc.scope === 'shared' ? `Shared: waits on ${sc.decider?.name ?? 'whoever decides for the system (ds-config.json owners)'} — ${why}` : `Local: the product team's own — ${why}`;
+}
+
+// A component only one side has. Only in Figma, not built yet: the system's to build, shared. Only in the code: one
+// product's own when only one product's code uses it (the usage map), local; else the system's, shared.
+export function sideScope({ name, side = 'code', file = null } = {}, ctx = {}) {
+  if (side === 'figma') return scopeOf({ home: 'system', kind: 'component', change: 'add', what: name, component: name, reach: productsUsing(ctx.usage, name) ?? [] }, ctx);
+  const using = productsUsing(ctx.usage, name);
+  if (using?.length === 1) return scopeOf({ home: 'product', kind: 'component', change: 'change', what: `${name}${file ? ` (${file})` : ''}`, product: using[0] }, ctx);
+  return scopeOf({ home: 'system', kind: 'component', change: 'change', what: name, component: name }, ctx);
 }
 
 // How many of each, and on whom the shared ones wait. items: [{ scope: { scope, decider } }] or the scopes themselves.

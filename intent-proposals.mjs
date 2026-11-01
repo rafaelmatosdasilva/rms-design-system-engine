@@ -32,12 +32,16 @@
 //
 // Who decides: ds-config.json → owners (decided-by.mjs → ownerOf). Each proposal names the one it waits on (decider); an
 // answer given by someone else is kept, and said.
+//
+// Local or shared (local-shared.mjs → proposalScope): each proposal says which, with its reason in one line. One about a
+// product's flow or page stays in that product; one about a component's page (or a template's, a pattern's, a
+// foundation's) changes what every product reads.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { projectPath } from './names.mjs';
 import { ownerOf, notTheOwner } from './decided-by.mjs';
-import { usageFrom } from './local-shared.mjs';
+import { usageFrom, proposalScope } from './local-shared.mjs';
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const words = (n) => String(n ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -339,7 +343,10 @@ export async function decidedLayer(ROOT, cfg) {
   const decisions = currentAnswers(found, kept);
   // Its evidence, and the one it waits on (ds-config.json → owners).
   const usage = usageOf(ROOT, cfg);
-  const proposals = new Map([...found].map(([k, x]) => [k, { ...withEvidence(k, x, { usage, decisions, report }), decider: deciderFor(x, report, cfg.owners) }]));
+  // Local or shared, with its reason (local-shared.mjs): a product's flow or page is its team's own; any other page, and
+  // a component with no page yet, is what every product reads.
+  const scopeCtx = { usage, owners: cfg.owners };
+  const proposals = new Map([...found].map(([k, x]) => [k, { ...withEvidence(k, x, { usage, decisions, report }), decider: deciderFor(x, report, cfg.owners), scope: proposalScope(x, { page: report.pages.find((q) => q.name === (x.page ?? x.host)) ?? null }, scopeCtx) }]));
   const done = applyDecisions({ report, noPage, proposals, decisions });
   return { snap, report: { ...report, pages: done.pages }, noPage: done.noPage, addProposals: done.addProposals, noPageRechecks: done.noPageRechecks, proposals, decisions, wrongOf, names };
 }

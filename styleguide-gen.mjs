@@ -1649,13 +1649,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // what it is about (a product's page or version is that product's; the system's tokens, text styles and modes are
     // the system's). The Tasks page counts them and says on whom the shared ones wait.
     try {
-      const { scopeOf, todoScope, usageFrom } = await import('./local-shared.mjs');
+      const { scopeOf, todoScope, usageFrom, sideScope } = await import('./local-shared.mjs');
       const usage = usageFrom(ROOT, cfg), sctx = { usage, owners: cfg.owners };
       for (const c of new Set([...(view.allComponents ?? []), ...view.components])) {
         const known = Object.keys(usage).some((n) => n.toLowerCase() === String(c.name).toLowerCase());
         c.scope = scopeOf({ home: 'system', kind: 'component', change: 'change', what: c.name, component: c.name, ...(known || !Array.isArray(c.usage) ? {} : { reach: c.usage.map((u) => u?.name ?? u?.key ?? u).filter(Boolean) }) }, sctx);
       }
       for (const t of view.systemTodo ?? []) t.scope = todoScope(t, sctx);
+      // A component only one side has: only in Figma, not built yet, is the system's to build; only in one product's
+      // code is that product's own. Counted with the rest on the Tasks page.
+      for (const k of view.notInFigma ?? []) k.scope = sideScope({ name: k.name, side: 'code', file: k.file }, sctx);
+      if (view.notAgreed?.waiting?.length) view.notAgreed.scopes = Object.fromEntries(view.notAgreed.waiting.map((w) => String(w).replace(/ \(not built yet\)$/, '')).map((n) => [n, sideScope({ name: n, side: 'figma' }, sctx)]));
     } catch { /* the page builds without it */ }
     lastView = view;
     agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, notInFigma: view.notInFigma?.length ?? 0, line: view.notAgreed.line, ...(view.scope ? { scope: view.scope } : {}) };

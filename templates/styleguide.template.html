@@ -2520,8 +2520,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // A component whose file is still to confirm (a proposal, or files near its name) is that decision, not one to build.
   var PAIRING = {}; (DATA.systemTodo || []).forEach(function (t) { if (t.pairing) PAIRING[t.pairing] = true; });
   // A component only the code has, once Figma's components are captured: not on the page, a task each, with its file.
-  (DATA.notInFigma || []).forEach(function (k) { TODO.push({ who: 'figma', comp: null, area: 'Parity', type: 'Component', codeOnly: k.name, codeFile: k.file, say: 'The code has ' + k.name + ' (' + k.file + '); Figma has no component for it.', todo: 'Add ' + k.name + ' to Figma, remove it from the code, or keep it as a known exception.' }); });
-  ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); if (PAIRING[n]) return; TODO.push({ who: 'code', comp: null, figmaOnly: n, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code.' }); });
+  (DATA.notInFigma || []).forEach(function (k) { TODO.push({ who: 'figma', comp: null, area: 'Parity', type: 'Component', codeOnly: k.name, codeFile: k.file, say: 'The code has ' + k.name + ' (' + k.file + '); Figma has no component for it.', todo: 'Add ' + k.name + ' to Figma, remove it from the code, or keep it as a known exception.', scope: k.scope || null }); });
+  ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); if (PAIRING[n]) return; TODO.push({ who: 'code', comp: null, figmaOnly: n, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code.', scope: (DATA.notAgreed.scopes || {})[n] || null }); });
   // A Figma name with a slash is a part of the component named before it (chartBars/bar is chartBars's), never a
   // component of its own: counted and listed with its parent. The parent is the component of that name, a leading mark
   // or a trailing note left out (🟡 tableCell (deprecated) is tableCell/amount's), else the family's own name.
@@ -3505,6 +3505,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return list.map(function (x) {
         return '<p class="sg-il-line"><strong>' + esc(x.kind === 'fix' ? x.subject + ': ' : '') + esc(x.proposal) + '</strong></p>'
           + (x.split ? '<p class="sg-il-line"><span class="pg-par-val">The evidence is split: a person decides.</span></p>' : '')
+          // Local or shared, with its reason (local-shared.mjs): only a shared one waits on who decides it.
+          + (x.scope && x.scope.reason ? '<p class="sg-il-line"><span class="pg-par-val" data-scope="' + esc(x.scope.scope) + '">' + esc(x.scope.reason) + '</span></p>' : '')
           + ((x.candidates || []).length ? ilCandidates(x) : (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join(''))
           + ilAnsweredBy(x);   // how to answer: in What to do
       }).join('');

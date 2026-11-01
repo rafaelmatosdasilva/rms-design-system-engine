@@ -586,7 +586,7 @@ if (process.argv.includes('--intent-decide')) {
     console.log(`📝 ${open.length} proposal${open.length === 1 ? '' : 's'} wait for the team's answer${on.length ? ` (${waitingLine(on)})` : ''}:`);
     // Evidence first: every answer it could take, with what speaks for it, where from and how strongly.
     const cands = (v) => (v.candidates ?? []).map((c) => `    ${c.answer === v.recommends ? '▸' : ' '} ${c.answer}: ${c.says}${c.evidence.length ? '' : ' (nothing speaks for it)'}\n${c.evidence.map((e) => `        · ${e.from}, ${e.strength}: ${e.says}`).join('\n')}`).join('\n');
-    for (const [k, v] of open) console.log(`\n${k}${v.decider ? `  (waits on ${v.decider.name})` : ''}\n  → ${v.proposal}${v.split ? ' The evidence is split: a person decides.' : ''}\n${v.candidates?.length ? cands(v) : v.evidence.map((e) => '    · ' + e).join('\n')}\n${pr.optionsOf(v).map((o) => `    ${o.answer}: ${o.does}`).join('\n')}`);
+    for (const [k, v] of open) console.log(`\n${k}${v.decider ? `  (waits on ${v.decider.name})` : ''}\n  → ${v.proposal}${v.split ? ' The evidence is split: a person decides.' : ''}${v.scope ? `\n  ${v.scope.reason}` : ''}\n${v.candidates?.length ? cands(v) : v.evidence.map((e) => '    · ' + e).join('\n')}\n${pr.optionsOf(v).map((o) => `    ${o.answer}: ${o.does}`).join('\n')}`);
     console.log('\nNEXT: ask the person which answer for each (or for all), saying what each does; record it with --intent-decide "<key>[,<key>…]" <answer>; never answer for them.');
     process.exit(0);
   }
@@ -7468,7 +7468,10 @@ function reportFull(label, items, shown) {
       const { mayWrite } = await import('./writes.mjs');
       const { readKept } = await import('./kept.mjs');
       const found = (() => { try { return JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'findings.json'), 'utf8')).findings ?? []; } catch { return []; } })();
-      const wanted = issuesFor(found, { kept: readKept(ROOT), who: cfg.issues?.who ?? null });
+      // Each says whether it is local or shared, and who a shared one waits on (local-shared.mjs, ds-config.json owners).
+      const { usageFrom } = await import('./local-shared.mjs');
+      const scopeCtx = { usage: usageFrom(ROOT, cfg), owners: cfg.owners };
+      const wanted = issuesFor(found, { kept: readKept(ROOT), who: cfg.issues?.who ?? null, ctx: scopeCtx });
       const { answer: may, why: whyNot } = mayWrite(cfg, 'issues');
       const { openIssues, gitlabSender, issuesProject } = await import('./issues-gitlab.mjs');
       const host = may === 'yes' ? await issuesProject(issuesLink, { ROOT }) : { why: null };
@@ -7486,7 +7489,7 @@ function reportFull(label, items, shown) {
         const { keyIn } = await import('./issues.mjs');
         // Both what is already open and what this run would open: a person reads one list of what needs doing.
         const all = [...plan.open, ...open.map((i) => ({ key: keyIn(i.body), iid: i.iid, title: i.title })).filter((i) => i.key)];
-        const routed = routePlan(all, found, { keyOf: (f) => keptKey(`${f.check} :: ${f.evidence}`), writes: cfg.writes ?? {} });
+        const routed = routePlan(all, found, { keyOf: (f) => keptKey(`${f.check} :: ${f.evidence}`), writes: cfg.writes ?? {}, ctx: scopeCtx });
         for (const l of routeLines(routed)) console.log(C.dim(l));
       } catch { /* the issues above still say what was found */ }
       if (may === 'yes' && host.base) {

@@ -73,3 +73,9 @@ test('an Add answered with no page, its component changed since, has its own row
   assert.match(tpl, /p\.recheckFor \? 'recheck:' \+ p\.recheckFor/);
   assert.match(tpl, /if \(p\.recheckFor\) return 'Component ' \+ p\.recheckFor;/);
 });
+
+// Each proposal says whether it is local or shared, with its reason, under it.
+test('a proposal says local or shared with its reason', () => {
+  const html = loadProposal()({ proposals: [{ kind: 'fix', subject: 'tileRow', proposal: 'Keep it.', scope: { scope: 'local', reason: "Local: Checkout's page stays in one product: no other product gets it; easy to undo, low risk." } }] });
+  assert.match(html, /<span class="pg-par-val" data-scope="local">Local: Checkout's page stays in one product/);
+});
