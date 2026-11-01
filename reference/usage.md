@@ -106,6 +106,9 @@ rms-design-system-engine --docs                          # ALSO build the styleg
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
 rms-design-system-engine --watch-intent-layer [min]     # keep running: build the style guide again each time the intent layer gets a new commit (checks every 5 min)
+rms-design-system-engine --auto [min]                   # keep running (every 10 min): when something a build is made from moved (--ci-changed's sources), the team's sequence once, only the steps the moved sources feed, recorded, and published only when the page changed; one line a round in .design-system-engine-out/auto.log. --once: one round. For a team with no CI runner
+rms-design-system-engine --auto --install [min]         # macOS: write a LaunchAgent that runs --auto --once every N min in this folder, and print the launchctl line for the person to run (never run it for them); Linux: print the crontab line. --auto --uninstall says how to remove it. No token is written
+rms-design-system-engine --outputs                      # the contracts and the design intent made again from the intent layer as it is now, without the gates (what --auto runs when only the layer moved)
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --pages-to-write [N]           # the components with no intent-layer page, most used first (products, files, uses); each run that writes the layer starts the top intentLayer.startPages (10 by default) as drafts
 rms-design-system-engine --prop-pairs                    # the Figma properties the engine suggests pairing with a code prop, each a yes or no for a person
@@ -935,7 +938,8 @@ most every six hours, and says in one line what moved since and when the page wa
 the store's pipelines (GitLab's Pipeline: Read), also a pipeline that has waited for a runner or failed. A style guide
 build always asks, and says how to publish when the page is behind; with `"styleguide": { "publish": "auto" }` it
 publishes itself, where GitLab lets the person write the store, so a pipeline that cannot run never leaves the team on
-an old page; `--no-publish` builds a preview that is never published. `--guide-status` asks now. The Status page shows, by its title, when it was built and with which engine.
+an old page; `--no-publish` builds a preview that is never published. `--guide-status` asks now, and says whether
+`--auto` rebuilds the guide on this computer and what its last round did. The Status page shows, by its title, when it was built and with which engine.
 
 Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome?, publish? }` (`publish: "auto"`: a build publishes to the style guide store when the published page is behind). `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
 DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20

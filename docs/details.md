@@ -912,6 +912,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - On every push to the design system's default branch.
   - At once, when the intent layer's own repository says it changed. Publishing writes that repository's small job to `.design-system-engine-out/intent-layer-job.yml`, with the token to add once.
   - Every hour, when the intent layer, a store, the Figma file or the engine moved since the last build. An hour with nothing new stops in seconds. On GitLab, add the hourly schedule once (Build → Pipeline schedules).
+- **No CI runner?** Your own computer can rebuild and publish it instead ([Rebuilt on your own computer](#rebuilt-on-your-own-computer)).
 - **A guide published to your team's store** updates by itself too. Publishing to the store also writes a job for the store's own project (`.design-system-engine-out/style-guide-store-job.yml`), for teams whose code is in a repository they may only read:
   - it builds from your company's profile, which says where the code, the intent layer, the stores and Figma are;
   - it runs every hour when something moved, and at once when the intent layer's job starts it;
@@ -920,6 +921,28 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
+
+### Rebuilt on your own computer
+
+Some teams have no CI runner, so no pipeline ever rebuilds their guide. `--auto` does it on a person's own computer instead.
+
+- **It only builds when something moved.** Every 10 minutes it asks the same sources as `--ci-changed`: the code, the stores, the intent layer, the profile, the Figma file and the engine. When nothing moved, it waits.
+- **It runs only what the change feeds.** One table in `lib/auto-build.mjs` says which steps each source feeds:
+
+  | What moved | What runs |
+  |---|---|
+  | The intent layer | The contracts and the design intent, then the style guide, its check and the publish. No audit. |
+  | The themes | The style guide, its check and the publish |
+  | The code, Figma, the snapshots, the team's decisions or the profile | The audit, then everything after it |
+  | The engine | Everything, since its output may differ. Each step's own caches keep it short. |
+
+- **It publishes only a page that changed.** The published `built-from.json` keeps the page's fingerprint, so a build that made the same page sends only that record.
+- **A failed step is never published.** The round says where it failed, and the next round tries again.
+- **One round at a time.** A lock file stops a second round while one runs.
+- **One line a round** in `.design-system-engine-out/auto.log`: what moved, what ran, how long, and whether it published.
+- **It runs without a terminal.** `--auto --install` writes a macOS LaunchAgent that runs one round every 10 minutes, and prints the `launchctl` line for you to run once. On Linux it prints a crontab line. `--auto --uninstall` says how to remove it.
+- **No token is stored.** Each step reads them from the project's `.env`, as every run does.
+- **`--guide-status`** says whether it is installed, and what its last round did.
 
 ### What's in it
 
