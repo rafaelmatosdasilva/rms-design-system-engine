@@ -275,7 +275,7 @@ test('--lesson keeps a correction and proposes its guard; --lesson-answer yes wr
   writeFileSync(join(d, 'ds-config.json'), JSON.stringify({ writes: { engine: 'ask' } }));
   mkdirSync(join(d, 'contracts'), { recursive: true });
   writeFileSync(join(d, 'contracts', 'catalog.json'), JSON.stringify({ components: { cardTile: {}, buttonClock: {} } }));
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, CI: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
   assert.match(run('--lesson', 'Put a buttonClock inside a cardTile').stdout, /needs why/);
   const kept = run('--lesson', 'Put a buttonClock inside a cardTile', '--why', 'a tile holds one action', '--by', 'QA');
   assert.equal(kept.status, 0, kept.stdout + kept.stderr);
