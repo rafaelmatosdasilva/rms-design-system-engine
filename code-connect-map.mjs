@@ -17,10 +17,11 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.des
 const nodeIdOf = (raw) => { const m = /node-id=(\d+)(?:-|:|%3A)(\d+)/i.exec(String(raw ?? '')); return m ? `${m[1]}:${m[2]}` : null; };
 const slugOf = (url) => { const m = /figma\.com\/(?:file|design)\/[^/]+\/([^?/#]+)/i.exec(String(url ?? '')); return m ? decodeURIComponent(m[1]) : null; };
 
-// The values of an enum's map ({ s: 's', Large: 'lg' }): Figma's option → the code's value.
+// The values of an enum's map ({ s: 's', Large: 'lg', 'Extra large': 'xl', True: true }): Figma's option → the code's
+// value, a true, false or number written as its text.
 function valuesOf(body) {
   const out = {};
-  for (const m of String(body ?? '').matchAll(/(?:^|[,{\s])(['"]?)([^'":,{}\s]+)\1\s*:\s*(['"])([^'"]*)\3/g)) out[m[2]] = m[4];
+  for (const m of String(body ?? '').matchAll(/(?:^|[,{\s])(?:'([^']+)'|"([^"]+)"|([^'":,{}\s]+))\s*:\s*(?:(['"])([^'"]*)\4|(true|false|-?\d+(?:\.\d+)?)(?=\s*[,}]|\s*$))/g)) out[m[1] ?? m[2] ?? m[3]] = m[5] ?? m[6];
   return Object.keys(out).length ? out : undefined;
 }
 // The object literal right after a position, its braces balanced.

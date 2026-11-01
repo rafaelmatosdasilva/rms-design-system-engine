@@ -299,3 +299,11 @@ test('what a run already found is printed again with --summary, never a new run 
   assert.deepEqual(r('what changed since the last audit?').run, ['rms-design-system-engine']);
   assert.deepEqual(r('build the chip like last time').run, ['rms-design-system-engine --component chip']);
 });
+
+test('Code Connect files drafted from the contracts, for the components that have none; a check of the ones there, or how to write one, is not that', () => {
+  for (const q of ['draft the Code Connect files', 'write Code Connect files for the components that have none', 'cria os rascunhos de code connect']) {
+    assert.deepEqual([r(q).recipe, r(q).run], ['ask-the-system', ['rms-design-system-engine --code-connect-draft']], q);
+  }
+  assert.notDeepEqual(r('check the Code Connect mappings').run, ['rms-design-system-engine --code-connect-draft']);
+  assert.notDeepEqual(r('how do I write a Code Connect file?').run, ['rms-design-system-engine --code-connect-draft']);
+});
