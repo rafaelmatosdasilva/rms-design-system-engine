@@ -411,6 +411,9 @@ function buildContract(name, { contract, structure, props, authored, composition
     if (tk) out.tokens = tk;
     const acc = accessibilityOf(code.text, { figmaRole: roleWord(p?.annotations), authored: a.semantics });
     if (acc) out.accessibility = acc;
+    // One element, said once: semantics.element is accessibility.element's value (the authored one, else the code's), so
+    // the two never disagree; where it was read is said in accessibility.
+    if (out.semantics && acc?.element && out.semantics.element !== acc.element.value) out.semantics = { ...out.semantics, element: acc.element.value };
     // Published, a contract says what is known: the whole description, and no empty placeholder for what nobody wrote.
     if (code.publish) {
       if (!a.semantics) delete out.semantics;
@@ -564,7 +567,7 @@ const CONTRACT_SCHEMA = {
       type: 'object', additionalProperties: false,
       properties: { element: sourced(str), role: sourced(str), aria: sourced(strs), keyboard: sourced(strs) },
     },
-    semantics: { type: 'object' },
+    semantics: { type: 'object', description: 'The authored semantics (contract.authored.json). Its element is always accessibility.element\'s value, null when neither says one.', properties: { element: { type: ['string', 'null'] }, aria: { type: 'object' } } },
     notes: str,
     whenNotToUse: str,
     status: {

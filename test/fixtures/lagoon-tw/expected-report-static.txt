@@ -191,7 +191,7 @@
 ℹ️  Prune candidates: 4 (leaner library = cheaper agent context). Advisory - decide keep or drop.
      1 group(s) of tokens with the same value written by hand · 3 token(s) only one component uses
      Run with --prune to list them.
-ℹ️  Contract completeness: 0/3 have a description · 3/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
+ℹ️  Contract completeness: 0/3 have a description · 1/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
      3 without a description (run with --contract-completeness to list)
 
 ♿ Accessibility from the code (no browser needed): nothing found in 3 markup and 1 style file.

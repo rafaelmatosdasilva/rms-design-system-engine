@@ -204,8 +204,10 @@ export function accessibilityOf(codeText = '', { figmaRole = null, authored = nu
   const out = {};
   const el = authored?.element ?? root;
   if (el) out.element = { value: el, from: authored?.element ? 'authored' : 'code' };
-  const r = authored?.role ?? figmaRole ?? role;
-  if (r) out.role = { value: r, from: authored?.role ? 'authored' : figmaRole ? 'figma' : 'code' };
+  // The authored role is written as semantics.aria.role (or semantics.role).
+  const authoredRole = authored?.role ?? authored?.aria?.role ?? null;
+  const r = authoredRole ?? figmaRole ?? role;
+  if (r) out.role = { value: r, from: authoredRole ? 'authored' : figmaRole ? 'figma' : 'code' };
   if (aria.length) out.aria = { value: aria, from: 'code' };
   if (keys.length) out.keyboard = { value: keys, from: 'code' };
   return Object.keys(out).length ? out : null;

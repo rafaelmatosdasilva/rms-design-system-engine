@@ -109,7 +109,7 @@ export function buildCatalog(built, { code = null, selectorFor = null, examples 
     if (c.status?.state && c.status.state !== 'current') entry.status = c.status.state;
     if (c.useInstead?.length) entry.useInstead = c.useInstead;
     if (c.whenNotToUse) entry.whenNotToUse = c.whenNotToUse;
-    const rendered = renderedFacts(code?.components?.[name], c.semantics);
+    const rendered = renderedFacts(code?.components?.[name], c.semantics, c.accessibility);
     if (rendered) entry.rendered = rendered;
     if (examples[name]) entry.example = examples[name];
     components[name] = entry;
@@ -126,13 +126,13 @@ export function buildCatalog(built, { code = null, selectorFor = null, examples 
 // state changes, by token where the code uses one. Only real instances count: a bare or hidden copy
 // takes the size of its test host, not its own.
 const INTERACTIVE = /^(button|a|input|select|textarea|summary|link|checkbox|radio|switch|tab|menuitem|option|slider|combobox|textbox|spinbutton)$/i;
-function renderedFacts(c, semantics) {
+function renderedFacts(c, semantics, accessibility = null) {
   if (!c) return null;
   const out = {};
   const real = ['found', 'isolated-copy'].includes(c.instance?.how);
   if (real && c.size?.height) {
     out.size = { width: Math.round(c.size.width), height: Math.round(c.size.height) };
-    const role = semantics?.aria?.role ?? semantics?.element;
+    const role = accessibility?.role?.value ?? semantics?.aria?.role ?? accessibility?.element?.value ?? semantics?.element;
     if (role && INTERACTIVE.test(role)) out.targetSize = { ...out.size, atLeast24: out.size.width >= 24 && out.size.height >= 24 };
   }
   const states = {};

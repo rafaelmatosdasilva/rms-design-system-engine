@@ -6916,7 +6916,8 @@ function reportFull(label, items, shown) {
             name: j.id || f.replace(/\.contract\.json$/, ''),
             // The engine's own placeholder says nothing: a component with only that has no description.
             desc: !!(j.description && String(j.description).trim() && !/— captured from Figma by rms-design-system-engine\.$/.test(j.description)),
-            sem: !!(j.semantics && typeof j.semantics === 'object' && Object.keys(j.semantics).length),
+            // An element or a role said somewhere: an empty placeholder ({ element: null, aria: {} }) is none.
+            sem: !!(j.semantics?.element || Object.keys(j.semantics?.aria ?? {}).length || j.accessibility?.element || j.accessibility?.role),
             guidance,
           });
         }

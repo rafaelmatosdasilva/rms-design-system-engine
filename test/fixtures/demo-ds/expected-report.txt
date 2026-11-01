@@ -267,7 +267,7 @@ Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
 ℹ️  Prune candidates: 6 (leaner library = cheaper agent context). Advisory - decide keep or drop.
      1 group(s) of tokens with the same value written by hand · 5 token(s) only one component uses
      Run with --prune to list them.
-ℹ️  Contract completeness: 1/4 have a description · 4/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance. Advisory only.
+ℹ️  Contract completeness: 1/4 have a description · 3/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance. Advisory only.
      3 without a description (run with --contract-completeness to list)
 
 ♿ Accessibility from the code (no browser needed): 1 finding in 3 markup and 1 style file (1 focus outline removed and not put back). Advisory.
