@@ -384,11 +384,11 @@ function readStatement(src, from) {
   }
   return src.slice(from, i).trim();
 }
-// getEnum('x', { s: 's', Large: 'lg' }) → { values: { s: 's', Large: 'lg' } }
+// getEnum('x', { s: 's', Large: 'lg', 'Extra large': 'xl' }) → { values: { s: 's', Large: 'lg', 'Extra large': 'xl' } }
 function valueMapOf(init) {
   const body = /,\s*\{([\s\S]*)\}\s*\)\s*$/.exec(init)?.[1];
   if (!body) return {};
   const values = {};
-  for (const m of body.matchAll(/(?:^|[,{\s])(['"]?)([^'":,{}\s]+)\1\s*:\s*(?:(['"])([^'"]*)\3|(true|false|\d+))/g)) values[m[2]] = m[4] ?? m[5];
+  for (const m of body.matchAll(/(?:^|[,{\s])(?:'([^']+)'|"([^"]+)"|([^'":,{}\s]+))\s*:\s*(?:(['"])([^'"]*)\4|(true|false|\d+))/g)) values[m[1] ?? m[2] ?? m[3]] = m[5] ?? m[6];
   return Object.keys(values).length ? { values } : {};
 }

@@ -40,6 +40,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | Ask in Claude Code | What you get |
 |---|---|
 | `/rms-design-system-engine which props does the badge take?` | A component's props and where it is used, or a token's values |
+| `/rms-design-system-engine draft the Code Connect files` | A draft Code Connect file for each component that has none, from its contract, in the engine's own folder, with a TODO for what a person decides |
 
 ## Write the intent layer
 

@@ -160,7 +160,34 @@ export function stateTokens(variantBindings = {}, figmaProps = {}, componentToke
       if (only.length) byState[`${axis}=${val}`] = only.sort();
     }
   }
-  return { used: [...all].sort(), ...(Object.keys(byState).length ? { byState } : {}) };
+  const byVariant = paintsOf(variants, figmaProps);
+  return { used: [...all].sort(), ...(Object.keys(byState).length ? { byState } : {}), ...(byVariant.length ? { byVariant } : {}) };
+}
+
+// What each variant paints with, and where: the frame's own fill and stroke, and its text's fill (a text layer at most
+// one level down), with the variant's Figma values as Figma writes them. Layers deeper down are a nested component's,
+// never this one's. The capture keeps the variant's values in lower case: they are read back to Figma's.
+function paintsOf(variants, figmaProps = {}) {
+  const axes = Object.entries(figmaProps ?? {}).filter(([, d]) => d?.type === 'VARIANT' && Array.isArray(d.variantOptions)).map(([k, d]) => [strip(k), d.variantOptions]);
+  const out = [];
+  for (const v of variants) {
+    const when = {};
+    for (const [k, val] of Object.entries(v.props ?? {})) {
+      const axis = axes.find(([a]) => same(a, k));
+      const opt = axis?.[1].find((o) => same(o, val));
+      if (axis && opt != null) when[axis[0]] = opt;
+    }
+    if (!Object.keys(when).length) continue;
+    const paints = [];
+    for (const b of v.bindings) {
+      if (!b?.token || !['fills', 'strokes'].includes(b.bindingField)) continue;
+      const text = !!b.isText;
+      if (text ? (b.depth ?? 0) > 1 || b.bindingField !== 'fills' : (b.depth ?? 0) !== 0) continue;
+      if (!paints.some((p) => p.token === b.token && p.field === b.bindingField && !!p.text === text)) paints.push({ token: b.token, field: b.bindingField, ...(text ? { text: true } : {}) });
+    }
+    if (paints.length) out.push({ when, paints });
+  }
+  return out;
 }
 
 // What the code says about its accessibility: the element its markup starts with, an explicit role, the aria attributes

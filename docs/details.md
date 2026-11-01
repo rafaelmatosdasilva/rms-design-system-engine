@@ -167,6 +167,8 @@ rms-design-system-engine --only accessibility   # only the accessibility check
 rms-design-system-engine --only parity          # every check against Figma, without accessibility
 rms-design-system-engine --only 3               # one gate by number, or by name: --only "token values", --only states,props
 rms-design-system-engine --a11y-no-worse        # after the audit on a merge request: fails on an accessibility blocker the base branch did not have
+rms-design-system-engine --contract-changes     # on a merge request: what it changes in each component's contract, failing on a breaking change nobody accounted for
+rms-design-system-engine --code-connect-draft   # a draft Code Connect file for each component that has none, in .design-system-engine-out/code-connect-drafts
 ```
 
 - `--only` runs that part and nothing else, and the summary says so, so a part never reads as the whole system passing. A word it does not know prints the list of gates.
@@ -562,6 +564,130 @@ For every text and icon colour, the engine works out the one surface it was made
 ### The contracts in DSDS too
 
 Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](https://designsystemdocspec.org) 0.23, for a team that documents its system in that format: one file per component and an index. Each says what the engine reads from Figma and the code (the variants and states, what it nests, what to use instead, its status) and links the rest, as DSDS asks: the contract as its spec, the code file as its source, the Figma component, and your own page, whose guidance is never copied back.
+
+### The contracts in the open component specs format
+
+`contracts/specs/` holds the same components in the open component specs format (schema 0.39), for a team that specifies its components that way. One spec per component, and `index.json`.
+
+Each spec says only what the contract knows:
+
+- **Its anatomy.** The frame, the frames inside it that Figma lays out, the text layer each text property writes, the instance each swap swaps, and each slot.
+- **Its props.** Each with its type, its values and its default. A variant of False and True is a boolean. What the code calls the prop, and how it writes Figma's values, sits beside it.
+- **Its styles, as tokens.** The frame's padding, gap, corner radius, height and type style. Its fill and stroke in the default, and what each variant paints differently. A text colour goes on the text only when the component has one text property.
+
+Anything else is left out, never guessed: where a part sits, a part whose kind the contract does not know, a text colour with several texts to choose from. The index says what each spec leaves out. It also links each spec to its contract, its code file and its Figma component, so nothing is copied twice.
+
+### Code Connect drafts
+
+The engine reads the Figma Code Connect files your project commits. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](commands.md#write-component-contracts)).
+
+- **From what the contract pairs.** Each Figma property's code prop, an enum's values as Figma and the code write them, the booleans, the texts, the instances it swaps, and a switch that decides whether another prop is written.
+- **In the form you already use.** The classic `figma.connect` form or the template form, whichever your own files are in. With none yet, React gets the classic form and Vue, Svelte and web components the template form. `--form=classic` or `--form=template` picks one.
+- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, a slot, the import.
+- **Never in your code.** The drafts go to `.design-system-engine-out/code-connect-drafts/`, in the same folders as each component's file. A person checks each one, moves it beside its component and publishes it with their own Code Connect tooling.
+- **Read back before it is written.** Each draft reads back through the same reader the engine uses for your Code Connect files, to the same pairs it was written from (a test holds it to that).
+
+### Contract changes on a merge request
+
+A merge request (GitLab) or pull request (GitHub) can show what it changes in the component contracts, before anyone merges it.
+
+- **What it compares.** The contracts built from the merge request's code with the base branch's. The base is what the last build on the base branch kept, or the contracts you published last (`--base <folder>`).
+- **Per component.** The props, options, states, slots, code props, events and tokens added, removed or changed.
+- **What breaks.** A prop, an option or a state removed, a default changed, or a whole component removed. These are the same rules the engine uses to record a release.
+- **Who uses it.** The products that use each changed component, with how many files, and the system version each product is on.
+
+A breaking change is accounted for when any of these is true:
+
+- A person signed it off: `rms-design-system-engine --sign-off "breaking change to cardTile" --by "<who>"`.
+- It is recorded as a release in `design-system-engine-releases.json`, newer than the base.
+- The component's own version has a new major in `contract.authored.json`.
+
+What you get:
+
+| Situation | Exit | What it says |
+|---|---|---|
+| A breaking change nothing accounts for | 1 | Each change, such as `− prop Size options: L (breaking)`, and how to account for it |
+| Changes, none of them breaking, or every one accounted for | 0 | Each change, and who signed it off or which release holds it |
+| Nothing kept from the base branch yet | 0 | That there is nothing to compare, so it passes |
+| No contract could be built from this code | 2 | That nothing can be compared |
+
+- **How strict.** `ds-config.json` `contractChanges.failOn`, or `--fail-on`: `unaccounted` (the default), `breaking` (any breaking change fails) or `never` (it only reports).
+- **For the merge request.** The same report is written to `.design-system-engine-out/contract-changes.md`, ready to post as a comment.
+- **It only reports.** It never changes your code. Your pipeline decides what a failing exit stops.
+
+#### Set it up in CI
+
+Two steps:
+
+1. **On the base branch**, keep each build's contracts: `rms-design-system-engine --contract-changes --record`. It writes `.design-system-engine-out/contracts-last-build.json`.
+2. **On each merge request or pull request**, compare: `rms-design-system-engine --contract-changes`.
+
+GitLab (`.gitlab-ci.yml`):
+
+```yaml
+.contracts:
+  image: node:24-bookworm
+  before_script:
+    - git clone --depth 1 https://github.com/rafaelmatosdasilva/rms-design-system-engine.git ../engine
+
+contracts-keep:
+  extends: .contracts
+  script:
+    - node ../engine/audit.mjs --contract-changes --record
+  artifacts:
+    paths: [.design-system-engine-out/contracts-last-build.json]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+contract-changes:
+  extends: .contracts
+  script:
+    - mkdir -p .design-system-engine-out
+    - 'curl -fsSL -H "JOB-TOKEN: $CI_JOB_TOKEN" -o .design-system-engine-out/contracts-last-build.json "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/artifacts/$CI_DEFAULT_BRANCH/raw/.design-system-engine-out/contracts-last-build.json?job=contracts-keep" || true'
+    - node ../engine/audit.mjs --contract-changes
+  artifacts:
+    when: always
+    paths: [.design-system-engine-out/contract-changes.md]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+```
+
+Before the base branch keeps its first build, nothing is fetched and the check passes, saying so.
+
+GitHub (`.github/workflows/contract-changes.yml`):
+
+```yaml
+name: contract changes
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: git clone --depth 1 https://github.com/rafaelmatosdasilva/rms-design-system-engine.git ../engine
+      - uses: actions/cache/restore@v4
+        with:
+          path: .design-system-engine-out/contracts-last-build.json
+          key: contracts-main-${{ github.sha }}
+          restore-keys: contracts-main-
+      - if: github.event_name == 'pull_request'
+        run: node ../engine/audit.mjs --contract-changes
+      - if: github.event_name == 'push'
+        run: node ../engine/audit.mjs --contract-changes --record
+      - if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: .design-system-engine-out/contracts-last-build.json
+          key: contracts-main-${{ github.sha }}
+```
+
+Name your base branch where it says `main`. To post the report on the pull request, add a step that reads `.design-system-engine-out/contract-changes.md`.
 
 ## Write the intent layer
 
