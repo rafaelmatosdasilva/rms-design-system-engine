@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/rafaelmatosdasilva/rms-design-system-engine/tests.yml?branch=main&label=2%2C000%2B%20tests&logo=github" alt="2,000+ tests, run on every change"></a>
-  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/test/skill-evals/RESULTS.md"><img src="https://img.shields.io/badge/AI%20evaluated-results-0b7285" alt="AI evaluated: published results"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine"><img src="https://api.scorecard.dev/projects/github.com/rafaelmatosdasilva/rms-design-system-engine/badge" alt="OpenSSF Scorecard"></a>
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#security-and-data"><img src="https://img.shields.io/badge/privacy-local--first-2b8a3e" alt="Privacy: local-first"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/dependencies-0-2b8a3e" alt="No npm dependencies"></a>
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#code-on-gitlab"><img src="https://img.shields.io/badge/company%20GitLab-supported-fc6d26?logo=gitlab&logoColor=white" alt="Company GitLab supported"></a>
