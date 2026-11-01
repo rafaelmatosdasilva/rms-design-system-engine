@@ -180,5 +180,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-10-30-mcp-answers-fit-an-agent` | The 24 guide tasks on Haiku (engine b088c30) | "MCP answers fit an agent with no shell; the skill says which route; a11y guide lines" |
 | `2026-10-30-route-benchmark-before` | The route benchmark before the MCP answers were made fit for an agent with no shell: four tasks on each route, Haiku 5.5 (engine b30d122), scored with the scorers of engine b088c30 | "Route benchmark, the command line against the MCP server" |
 | `2026-10-30-route-benchmark` | The same benchmark after it (engine b088c30) | "Route benchmark, the command line against the MCP server" |
+| `2026-11-01-the-intent-layer-s-fixes` | The 24 guide tasks on Haiku (engine a7faa63) | "The intent layer's fixes: docs say where they go; a branch read with no commit id is never written over" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

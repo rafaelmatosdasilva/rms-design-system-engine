@@ -17,6 +17,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { projectPath } from './names.mjs';
 import { readIntentLayer, systemNames, matchComponents, codeFilesOf } from './intent-layer.mjs';
+import { projectLessons, lessonDecisions } from './lessons.mjs';
 
 // What each kind of decision is called where a person reads it, and whether it rules an option out for an agent.
 export const KINDS = {
@@ -27,14 +28,18 @@ export const KINDS = {
   checked: { said: 'checked by hand', rules: false },
   written: { said: 'written by the team', rules: true },
   layer: { said: 'written in the intent layer', rules: true },
+  lesson: { said: 'learned from a correction', rules: true },
+  rule: { said: 'a rule from repeated findings', rules: false },
+  proposed: { said: 'proposed from repeated findings', rules: false },
 };
 
 const trim = (s, n = 300) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : t; };
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const capital = (s) => { const t = String(s ?? ''); return t ? t[0].toUpperCase() + t.slice(1) : t; };
 
 // Every decision in one shape, whatever file it came from.
 // → { component, kind, what, ruledOut: [string], why, by, at, from, said } (said: the decision as the person gave it)
-export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [] } = {}) {
+export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [], lessons = [] } = {}) {
   const out = [];
   const add = (d) => { if (d.what) out.push({ component: null, ruledOut: [], why: null, by: null, at: null, said: null, ...d, what: trim(d.what), why: d.why ? trim(d.why) : null, said: d.said ? trim(d.said, 600) : null }); };
 
@@ -63,6 +68,9 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
   for (const w of written) add({ ...w, kind: 'written', from: w.from ?? 'DECISIONS.md' });
   // Written on the page of the intent layer it is about, under its Decisions heading (the team's own record).
   for (const l of layer) add({ ...l, kind: 'layer', from: l.from ?? 'the intent layer' });
+  // What people corrected in what agents made, and the rules repeated findings propose (lessons.mjs), each with what it
+  // became: a correction rules out the mistake it corrected, so an agent is told it before it makes it again.
+  for (const l of lessons) add({ ...l, kind: KINDS[l.kind] ? l.kind : 'lesson', from: l.from ?? 'the lessons' });
 
   return out.sort((a, b) => String(b.at ?? '').localeCompare(String(a.at ?? '')));
 }
@@ -100,7 +108,9 @@ export function gatherDecisions(ROOT, { gaps = null, writtenFile = 'DECISIONS.md
   const checked = Object.entries(checkedFile?.components ?? {}).map(([name, c]) => ({ name, ...(c ?? {}) }));
   const merged = gaps ?? json(join('.design-system-engine-out', 'prototypes', 'gaps.json'), {}).merged ?? [];
   const written = existsSync(resolve(ROOT, writtenFile)) ? writtenDecisions(readFileSync(resolve(ROOT, writtenFile), 'utf8'), writtenFile) : [];
-  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written, layer: layerDecisions(ROOT) }));
+  let lessons = [];
+  try { lessons = lessonDecisions(projectLessons(ROOT)); } catch { /* no lessons yet */ }
+  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written, layer: layerDecisions(ROOT), lessons }));
 }
 
 // A DECISIONS.md the team wrote: each `## <heading>` a decision, the component when the heading names one, and a
@@ -134,10 +144,10 @@ export function ruledOutLines(view, name, { most = 4 } = {}) {
 // The log a person reads: the decisions about each component, then the ones about the system as a whole.
 export function decisionsMarkdown(view, { title = 'Decisions' } = {}) {
   const lines = [`# ${title}`, '',
-    `> Gathered by rms-design-system-engine from where each decision was made: the kept differences, the answered proposals, the accepted differences, the checks made by hand, the prototypes' gap list, and a DECISIONS.md the team wrote. Nothing here is written by the engine, and nothing here is rewritten by it.`, ''];
+    `> Gathered by rms-design-system-engine from where each decision was made: the kept differences, the answered proposals, the accepted differences, the checks made by hand, the prototypes' gap list, the lessons, and a DECISIONS.md the team wrote. Nothing here is written by the engine, and nothing here is rewritten by it.`, ''];
   if (!view.total) { lines.push('Nothing decided yet.'); return lines.join('\n') + '\n'; }
   lines.push(`${view.total} decision${view.total === 1 ? '' : 's'}, ${view.ruledOut} of them ruling an option out.`, '');
-  const one = (d) => `- **${d.what}**${d.ruledOut.length ? ` — ruled out: ${d.ruledOut.join(', ')}` : ''}${d.why ? `  \n  Why: ${d.why}` : ''}  \n  *${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''}, from ${d.from}*`;
+  const one = (d) => `- **${d.what}**${d.ruledOut.length && d.kind !== 'lesson' ? ` — ruled out: ${d.ruledOut.join(', ')}` : ''}${d.why ? `  \n  Why: ${d.why}` : ''}${d.became ? `  \n  ${d.became}` : ''}${d.back ? `  \n  🔁 ${capital(d.back)}` : ''}  \n  *${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''}, from ${d.from}*`;
   for (const name of Object.keys(view.byComponent).sort()) {
     lines.push(`## ${name}`, '', ...view.byComponent[name].map(one), '');
   }

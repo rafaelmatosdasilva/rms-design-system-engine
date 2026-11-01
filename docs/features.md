@@ -46,7 +46,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 **Ready to use** · **Why it matters:** What designers know becomes something teammates and agents can read.
 
-*Today: it reads DSDS or Markdown and MDX pages, from GitLab, GitHub or a folder in your project. Its own fixes are committed only to a DSDS layer on GitLab; anywhere else, each one is listed for a person to make. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
+*Today: it reads DSDS or Markdown and MDX pages, from GitLab, GitHub or a folder in your project. Its own fixes go back where the layer lives, in its own format: a commit or a merge request on GitLab, a commit or a pull request on GitHub, or the pages in your folder rewritten for you to commit. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
 
 - Reads your documentation where it already lives: a docs folder, a documentation site's pages, or the `.mdx` beside each component. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
 - Shows why each component exists, when to use it and when not, beside Figma and the code.
@@ -147,6 +147,10 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Gives agents the real component names, what each token is for and the decisions already made.
 - Remembers names agents invent, and tells the next agent the right one.
 - Stops the AI from making a check pass on its own.
+- Keeps each correction you make to what an AI made as a lesson, with your reason, and turns it into the strongest guard that holds it once you say yes: a check, a step agents read, or a rule for your guidelines.
+- Notices a line an AI wrote that a person changed since, and asks whether it was a correction.
+- Proposes a rule when the same finding comes back on three screens or in three edits.
+- Says when a lesson comes back, and which guard did not hold.
 - Measures whether your guidance actually helps agents build better.
 - Adds the same rules to the instruction files of Cursor, Copilot and other agents. *(Coming soon)*
 

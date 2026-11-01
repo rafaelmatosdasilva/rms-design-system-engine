@@ -28,7 +28,10 @@
 //     slot. Read from the component tags, the edit's added lines only;
 //   • a class rule the edit added that nearly copies one of the system's components (system-advice.mjs): a new
 //     component is a decision, so it goes back to use that component, with a new option if it needs one, or to ask
-//     the person whether the new one belongs in the system.
+//     the person whether the new one belongs in the system;
+//   • what a lesson ruled out (lessons.mjs): a prop combination on a component, or a value, that a person corrected
+//     once and said yes to holding as a check (the authored contract's guards), and a component a lesson keeps out
+//     of another (neverCombineWith), read straight from the authored contract so it holds before the next build.
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
@@ -46,6 +49,7 @@ import { markupFindings, cssFindings, styleOnly, projectStyleText } from './a11y
 import { codeSnapshotPath } from './names.mjs';
 import { colorHex, COLOUR_NAMES } from './css-values.mjs';
 import { classRules, nearCopies, systemRules } from './system-advice.mjs';
+import { guardsOf, guardFindings } from './lessons.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
 const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs)\//;
@@ -311,7 +315,20 @@ export function editTruth(ROOT, cfg = {}) {
   const sys = typeof ic.system === 'string' && ic.system && ic.system !== json('package.json').name ? ic.system : null;
   const replaced = ic.replaced && typeof ic.replaced === 'object' ? ic.replaced : {};
   const imports = sys || Object.keys(replaced).length ? { replaced, system: sys, exports: sys ? json(join('node_modules', sys, 'package.json')).exports ?? null : null } : null;
-  const nesting = Object.keys(catalog.components ?? {}).length ? catalog.components : null;
+  // The authored contract: a component a lesson keeps out of another holds now, not after the next build of the
+  // catalog, and the guards lessons became are checked on every edit.
+  const authored = json(cfg.contracts?.authored ?? 'contract.authored.json');
+  const never = Object.entries(authored.components ?? {}).filter(([, e]) => Array.isArray(e?.neverCombineWith) && e.neverCombineWith.length);
+  let nesting = Object.keys(catalog.components ?? {}).length ? catalog.components : null;
+  if (never.length) {
+    nesting = { ...(nesting ?? {}) };
+    for (const [name, e] of never) {
+      const at = Object.keys(nesting).find((n) => normName(n) === normName(name)) ?? name;
+      nesting[at] = { ...(nesting[at] ?? {}), neverCombineWith: [...new Set([...(nesting[at]?.neverCombineWith ?? []), ...e.neverCombineWith])] };
+      for (const c of e.neverCombineWith) if (!Object.keys(nesting).some((n) => normName(n) === normName(c))) nesting[c] = {};
+    }
+  }
+  const guards = guardsOf(authored);
   // The system's components as near-copy targets, read only once an edit adds a class rule.
   const names = [...new Set([...Object.keys(catalog.components ?? {}), ...Object.keys(json(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json').components ?? {})])].filter((n) => !n.startsWith('_'));
   const classes = Object.fromEntries(names.map((n) => [n, cfg.componentSelectors?.[n] ?? `.${n.charAt(0).toLowerCase()}${n.slice(1)}`]));
@@ -322,12 +339,12 @@ export function editTruth(ROOT, cfg = {}) {
   // writing a pair the system never made, and it is told so with the contrast the two give.
   const colorVars = varsByMode(theme);
   const pairs = Object.keys(colorVars).length ? pairsOf(colorVars) : [];
-  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, imports, nesting, copies, colorVars, pairs, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
+  return { truth, tokenByValue, figmaRaw, figmaVars, figmaValues, tailwind, primitives, rules, a11y, imports, nesting, copies, colorVars, pairs, guards, sizes: themeSizes(theme), themeFiles: new Set(themePaths.map((p) => resolve(ROOT, p))) };
 }
 
 // → [{ line, text }] for the lines the edit added. `fullText` is the file after the edit (for line numbers and
 // the variables it declares itself).
-export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null, imports = null, nesting = null, copies = null, colorVars = null, pairs = [] }, { isTheme = false, sheet = false, component = false, declaredBefore = null } = {}) {
+export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = new Set(), figmaVars = null, figmaValues = new Set(), tailwind = null, primitives = [], rules = new Map(), a11y = null, sizes = null, imports = null, nesting = null, copies = null, colorVars = null, pairs = [], guards = [] }, { isTheme = false, sheet = false, component = false, declaredBefore = null, file = null } = {}) {
   const out = [];
   const all = String(fullText ?? '').split('\n');
   const declared = new Set([...String(fullText ?? '').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
@@ -450,11 +467,22 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
       push(w.line, `${w.text} is the system's colour for ${w.meant}, not for ${w.surface}${w.ratio == null ? '' : ` (${w.ratio}:1 there${w.readable ? '' : ', under 4.5:1'})`}: put it on ${w.meant}, or use the colour made for ${w.surface}`, { kind: 'pair' });
     }
   }
+  // What a lesson ruled out, where the edit added it: a person corrected it once and said yes to holding it as a check.
+  if (guards.length && !isTheme) {
+    const addedAt = new Set(added.map(lineOf).filter(Boolean));
+    for (const f of guardFindings(fullText, addedAt, guards, { file })) push(f.line, f.text, { kind: 'lesson', lesson: f.lesson });
+  }
   return out;
 }
 
 // The hook's answer: the reason Claude Code hands back to the agent, or null to stay silent.
-export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
+// opts.run: the check already made for this edit (editCheckRun), so the hook does not make it twice.
+export function editCheck(event, opts = {}) {
+  return editReason(opts.run !== undefined ? opts.run : editCheckRun(event, opts));
+}
+// The check itself: the file it read, the lines the edit added and what it found in them, for the hook's answer and
+// for what is kept across edits (lessons.mjs). → { rel, added, found } or null when the edit is not one to check.
+export function editCheckRun(event, { root, cfg = {}, headOf = null } = {}) {
   if (cfg.hooks === false || cfg.editCheck === false) return null;
   const file = event?.tool_input?.file_path;
   if (!file || !UI.test(file)) return null;
@@ -463,17 +491,21 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
   if (/\.html?$/i.test(abs) && existsSync(abs.replace(/\.(html?)$/i, '.src.$1'))) return null;   // built from the .src beside it
   const head = headOf ? headOf(rel) : (() => { try { return execFileSync('git', ['show', `HEAD:${rel}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; } })();
   const added = addedLines(event, { headText: head });
-  if (!added.length) return null;
+  if (!added.length) return { rel, added, found: [] };
   const ctx = editTruth(root, cfg);
   let full = ''; try { full = existsSync(abs) ? readFileSync(abs, 'utf8') : ''; } catch { /* the edit's own text is enough */ }
   // The tokens the file declared before this edit (its committed text, else the text the edit replaced).
   const before = head ?? (event?.tool_name === 'Edit' ? String(event.tool_input?.old_string ?? '') : event?.tool_name === 'MultiEdit' ? (event.tool_input?.edits ?? []).map((e) => e.old_string).join('\n') : '');
   const declaredBefore = new Set([...String(before).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
-  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs), declaredBefore });
-  if (!found.length) return null;
+  const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs), declaredBefore, file: rel });
+  return { rel, added, found };
+}
+function editReason(run) {
+  if (!run?.found?.length) return null;
+  const { rel, found } = run;
   const lines = found.slice(0, 12).map((f) => `  ${basename(rel)}${f.line ? `:${f.line}` : ''}  ${f.text}`);
   const n = found.length, them = n === 1 ? 'it' : 'them', count = (k) => found.filter((f) => f.kind === k).length;
-  const system = n - count('silencer') - count('a11y');
+  const system = n - count('silencer') - count('a11y') - count('lesson');
   const title = system === n
     ? `rms-design-system-engine checked this edit against the design system: ${n} thing${n === 1 ? '' : 's'} it added the system does not have.`
     : `rms-design-system-engine checked this edit: ${n} thing${n === 1 ? '' : 's'} to fix.`;
@@ -481,7 +513,7 @@ export function editCheck(event, { root, cfg = {}, headOf = null } = {}) {
     ? `Take ${them} out and fix what the check reports. When that cannot be done, ask the person before switching a check off.`
     : count('copy') === n
     ? `Use the system's component instead, or ask the person whether the new one belongs in the system. Never keep a copy without asking.`
-    : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}${count('copy') ? ' A rule that nearly copies a system component: use the component, or ask the person whether to add the new one to the system.' : ''}`;
+    : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${count('lesson') ? ' What a lesson ruled out was corrected by a person before: write it another way, or ask them.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}${count('copy') ? ' A rule that nearly copies a system component: use the component, or ask the person whether to add the new one to the system.' : ''}`;
   return `${title}\n${lines.join('\n')}${n > 12 ? `\n  and ${n - 12} more` : ''}\n${next}`;
 }
 
