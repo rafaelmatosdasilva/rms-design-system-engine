@@ -433,6 +433,8 @@ test('Confluence: the page and its descendants, in folders by their ancestors, s
   const { storageToMarkdown } = await import('../doc-tools.mjs');
   assert.equal(storageToMarkdown('<h2>When to use</h2><ul><li><p>To submit a form.</p></li></ul><p>Plain &amp; <strong>bold</strong>.</p><table><tbody><tr><th>Size</th><th>Use</th></tr><tr><td>sm</td><td>Dense lists</td></tr></tbody></table><ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[<b>x</b>]]></ac:plain-text-body></ac:structured-macro><ac:image><ri:attachment ri:filename="a.png"/></ac:image>'),
     '## When to use\n\n- To submit a form.\n\nPlain & **bold**.\n\n| Size | Use |\n| sm | Dense lists |\n\n```\n<b>x</b>\n```');
+  // A tag split by another is still taken out; an escaped one stays as text; a link in a list item stays a link.
+  assert.equal(storageToMarkdown('<ul><li><p>Use <a href="https://x.test/a">the link</a>.</p></li></ul><p>a <scr<script>ipt>b &lt;c&gt;</p>'), '- Use [the link](https://x.test/a).\n\na b <c>');
   const link = 'https://acme.atlassian.net/wiki/spaces/DS/pages/100/Intent+layer';
   const calls = [];
   const fetchImpl = async (url, o = {}) => {

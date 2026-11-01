@@ -126,6 +126,8 @@ export function parseConfluence(link) {
 }
 // Confluence's storage format (XHTML with ac: macros) → Markdown: headings, paragraphs, lists, tables a row a line, code
 // macros fenced; other macros and images out.
+// Every tag out, again until none is left (one taken out may join the halves of another), then any lone < left of one.
+const noTags = (t, by = '') => { let s = String(t ?? ''), was; do { was = s; s = s.replace(/<[^<>]*>/g, by); } while (s !== was); return s.replace(/</g, ''); };
 export function storageToMarkdown(xml) {
   let s = String(xml ?? '');
   // Code first, set aside, so nothing below reads it as markup.
@@ -133,14 +135,15 @@ export function storageToMarkdown(xml) {
   s = s.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\]><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g, (m, c) => { code.push(c); return `\n\n\u0000${code.length - 1}\u0000\n\n`; });
   s = s.replace(/<ac:image[\s\S]*?<\/ac:image>/g, '').replace(/<ac:structured-macro[^>]*ac:name="(?:toc|children|jira|attachments|gallery)"[\s\S]*?<\/ac:structured-macro>/g, '');
   s = s.replace(/<ac:structured-macro[^>]*\/>/g, '').replace(/<\/?ac:(?:structured-macro|rich-text-body|parameter|layout|layout-section|layout-cell)[^>]*>/g, '\n');
-  s = s.replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/g, (m, n, t) => `\n${'#'.repeat(Number(n))} ${t.replace(/<[^>]+>/g, '').trim()}\n`);
-  s = s.replace(/<tr[^>]*>([\s\S]*?)<\/tr>/g, (m, row) => `\n| ${[...row.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((c) => c[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).join(' | ')} |`);
-  s = s.replace(/<li[^>]*>([\s\S]*?)<\/li>/g, (m, t) => `\n- ${t.replace(/<\/?(?:p|span|strong|em|b|i|u)[^>]*>/g, '').replace(/\s+/g, ' ').trim()}`);
-  s = s.replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, (m, h, t) => `[${t.replace(/<[^>]+>/g, '')}](${h})`);
+  s = s.replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/g, (m, n, t) => `\n${'#'.repeat(Number(n))} ${noTags(t).trim()}\n`);
+  s = s.replace(/<tr[^>]*>([\s\S]*?)<\/tr>/g, (m, row) => `\n| ${[...row.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((c) => noTags(c[1], ' ').replace(/\s+/g, ' ').trim()).join(' | ')} |`);
+  s = s.replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, (m, h, t) => `[${noTags(t)}](${h})`);
+  s = s.replace(/<li[^>]*>([\s\S]*?)<\/li>/g, (m, t) => `\n- ${noTags(t.replace(/<(?:strong|b)>([\s\S]*?)<\/(?:strong|b)>/g, '**$1**')).replace(/\s+/g, ' ').trim()}`);
   s = s.replace(/<(?:strong|b)>([\s\S]*?)<\/(?:strong|b)>/g, '**$1**').replace(/<code>([\s\S]*?)<\/code>/g, '`$1`');
   // A list or a table ends with a blank line, so the paragraph after it is not read as its last item's continuation.
   s = s.replace(/<\/(?:ul|ol|table)>/g, '\n\n');
-  s = s.replace(/<\/p>|<br\s*\/?>/g, '\n').replace(/<p[^>]*>/g, '\n').replace(/<[^>]+>/g, '');
+  s = s.replace(/<\/p>|<br\s*\/?>/g, '\n').replace(/<p[^>]*>/g, '\n');
+  s = noTags(s);
   s = decodeEntities(s).split('\n').map((l) => l.replace(/\s+$/, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
   return s.replace(/\u0000(\d+)\u0000/g, (m, i) => `\`\`\`\n${code[Number(i)]}\n\`\`\``);
 }
