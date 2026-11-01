@@ -1122,7 +1122,8 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     // A package that holds the system's own component files is the system's, never a product named by its folder.
     files = productFiles(ROOT, cfg, { systemFiles: targets.map((n) => apiEntryOf(n)?.file).filter(Boolean) });
     const screens = readJSON(resolve(ROOT, paths.snapshotScreenComponents || 'figma-screen-components.snapshot.json')) || {};
-    lives = usageMap(targets, { files, classFor, composition, codeNesting: code?.nesting ?? {}, screens });
+    const definedIn = Object.fromEntries(targets.map((n) => [n, apiEntryOf(n)?.file]).filter(([, f]) => f));
+    lives = usageMap(targets, { files, classFor, composition, codeNesting: code?.nesting ?? {}, screens, definedIn });
   } catch { /* best-effort */ }
 
   // 3) Per-component contracts + validate + change/reference detection.
