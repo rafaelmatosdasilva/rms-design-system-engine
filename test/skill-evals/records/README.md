@@ -189,5 +189,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-01-point-the-hooks-workflows-install` | The 24 guide tasks on Haiku (engine 36f540e) | "Point the hooks, workflows, install, docs and tests at lib/; keep four root entries" |
 | `2026-11-01-usage-and-config-reference-pages` | The 24 guide tasks on Haiku (engine aa621b1) | "Usage and config reference: pages to write, suggested prop pairs, and where a contract's description and rules come from" |
 | `2026-11-01-skill-evaluation-pages-to-write` | The 24 guide tasks on Haiku (engine 5497b03) | "Skill evaluation: pages to write, suggested prop pairs, where a contract's description and rules come from; every run passed" |
+| `2026-11-01-skill-evaluation-sign-this-off` | The 24 guide tasks on Haiku (engine 26c396d) | "Skill evaluation: "sign this off" says a change waits for sign-off as well as "sign-off" does" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

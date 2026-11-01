@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-11: Skill evaluation: "sign this off" says a change waits for sign-off as well as "sign-off" does (continuous evaluation)
+
+What changed since the entry below (engine 5497b03): Intent changes: the engine's Data lines follow the code, and only changes made are said (#224); Props that say nothing of what they are for: flagged, with drafted descriptions to approve (#227); The guide names pages to write, suggested prop pairs, and where a contract's description and rules come from (#226); Measured accessibility facts no longer go missing, and the content check knows a list's item fields (#230); README: tech stack badges, each linked to its proof (#231); Tests: the commands test runs in its own home; a module at the root fails the layout test (#228); The style guide rebuilds itself on a person's own computer, only the steps a change feeds (--auto); Skill evaluation: "sign this off" says a change waits for sign-off as well as "sign-off" does. The guide changed in `cookbook/publish-styleguide.md`, `reference/usage.md`.
+
+Guide set measured: `24595209751d` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 597032e7` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 99e2f8b4` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md d583fc5a` `cookbook/refresh-figma.md 3d4c5584` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 8738ac48` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md f5c041c9` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 26c396d | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.037 | $0.036 |
+| Input a run | 89k | 78k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 78k a run against 89k. no task changed state, and no run moved: the same result. Records: `records/2026-11-01-skill-evaluation-sign-this-off`.
+
 ## 2026-11: Skill evaluation: pages to write, suggested prop pairs, where a contract's description and rules come from; every run passed (continuous evaluation)
 
 What changed since the entry below (engine 36f540e): Each finding names its product; the Figma build script imports a library's variables by key (#215); Intent layer: an example drafted on each page, and pages to write most used first (#216); Contracts: descriptions from the intent layer and the code, one element, no stale contracts, named products (#218); Rules agents can be held to: each intent-layer rule checked, checkable or judgment (#217); A component's own file is never counted as a use of it, whatever its name (#222); Features page: fitting your team's setup is actively improving (#220); Contracts say what a screen reader is given; suggested prop pairs asked as yes or no (#219); Features: generate components in Figma and code, where you choose (#221); The engine's modules move into lib/, so the README is the first thing on the page (#225); Usage and config reference: pages to write, suggested prop pairs, and where a contract's description and rules come from. The guide changed in `reference/config.md`, `reference/usage.md`.
