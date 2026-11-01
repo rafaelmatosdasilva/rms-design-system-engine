@@ -1650,7 +1650,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // the system's). The Tasks page counts them and says on whom the shared ones wait.
     try {
       const { scopeOf, todoScope, usageFrom, sideScope } = await import('./local-shared.mjs');
-      const usage = usageFrom(ROOT, cfg), sctx = { usage, owners: cfg.owners };
+      const { productResolver } = await import('./usage-map.mjs');
+      const resolveProduct = productResolver(ROOT, cfg);
+      const usage = usageFrom(ROOT, cfg), sctx = { usage, owners: cfg.owners, productOf: (f) => resolveProduct(resolve(ROOT, f)) };
       for (const c of new Set([...(view.allComponents ?? []), ...view.components])) {
         const known = Object.keys(usage).some((n) => n.toLowerCase() === String(c.name).toLowerCase());
         c.scope = scopeOf({ home: 'system', kind: 'component', change: 'change', what: c.name, component: c.name, ...(known || !Array.isArray(c.usage) ? {} : { reach: c.usage.map((u) => u?.name ?? u?.key ?? u).filter(Boolean) }) }, sctx);

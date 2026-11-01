@@ -31,7 +31,8 @@
 //     never written; every new name is written the system's way (the construction grammar's rules); what adds to the
 //     system (a new component, option, axis or property) is held for sign-off; what a product may lean on (a removal,
 //     a rename) is breaking
-//   opsScript(ops, { target, nodes }) → the Figma plugin script that makes exactly them and returns what it changed
+//   opsScript(ops, { target, nodes, keys }) → the Figma plugin script that makes exactly them and returns what it changed;
+//     keys ({ variable name → key }, from the Figma MCP's search_design_system) are a library's variables, imported by key
 //
 // Pure: no file is read or written here.
 import { fixOf, wordsOf } from './construction-grammar.mjs';
@@ -306,7 +307,7 @@ export function ground(input = [], { captures = {}, grammar = null, target = nul
 // ── The Figma plugin script ──
 // target: the node id of the component changed (null when it is built); nodes: { component name → node id }, for the
 // components it copies or nests.
-export function opsScript(ops = [], { target = null, nodes = {}, what = 'figma-build' } = {}) {
+export function opsScript(ops = [], { target = null, nodes = {}, what = 'figma-build', keys = {} } = {}) {
   return `// Written by rms-design-system-engine --${what}. Run it with the Figma MCP's use_figma only after the person said yes.
 const ops = ${JSON.stringify(ops, null, 2)};
 const nodes = ${JSON.stringify(nodes, null, 2)};
@@ -314,11 +315,16 @@ const changed = [], skipped = [], missing = [];
 const pageOf = async (n) => { let p = n; while (p && p.type !== 'PAGE') p = p.parent; if (p && p.loadAsync) await p.loadAsync(); return p; };
 const nodeOf = async (name) => (nodes[name] ? await figma.getNodeByIdAsync(nodes[name]) : null);
 const vars = await figma.variables.getLocalVariablesAsync();
-// The file's own variables first, then the libraries it uses (imported once, by key), when this run may read them.
+// A library's variables by name, each with its key (the Figma MCP's search_design_system, --keys). A run through the
+// MCP cannot list a library's variables (figma.teamLibrary answers with none there), so a key is how one is imported.
+const keys = ${JSON.stringify(keys ?? {}, null, 2)};
+// The file's own variables first, then a library's by its key, then the libraries this run can list (imported once).
 let library = null;
 const varOf = async (name) => {
   const own = vars.find((v) => v.name === name);
-  if (own || !figma.teamLibrary) return own;
+  if (own) return own;
+  if (keys[name]) { try { return await figma.variables.importVariableByKeyAsync(keys[name]); } catch (e) { return undefined; } }
+  if (!figma.teamLibrary) return undefined;
   try {
     if (!library) { library = []; for (const c of await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync()) library.push(...await figma.teamLibrary.getVariablesInLibraryCollectionAsync(c.key)); }
     const hit = library.find((v) => v.name === name);

@@ -21,6 +21,8 @@
 //   proposalScope(proposal, { page }, ctx): the intent layer's Fix, Add, Move and reviews (intent-proposals.mjs): a page
 //     of a product's flow or screen is local, any other page (a component's, a template's, the system's) is shared
 //   findingScope(finding, ctx) / issueScopeLine(scope): an issue the engine opens, and the one line its body says it in
+//   productIn(text, productOf): the one product the files a finding or a task names belong to (ctx.productOf: a file
+//     path → its product's name, or null for the system's own; usage-map.mjs productResolver)
 //   sideScope({ name, side: 'figma' | 'code' }, ctx): a component only one side has (only in Figma: the system's to build,
 //     so shared; only in one product's code: that product's own, so local)
 //   scopeSummary(items) → { shared, local, waiting: [{ name, n }] }; scopeLine(summary) → "2 shared, waiting on Cards
@@ -33,6 +35,17 @@ import { join, relative, resolve } from 'node:path';
 import { ownerOf, waitingOn } from './decided-by.mjs';
 
 export const SCOPES = ['local', 'shared'];
+
+// The files a line names (src/a/b.vue, apps/x/y.css:12), and the one product they all belong to. A line that names a
+// system file too, or two products, is no one product's: null.
+const FILE = /(?:^|[\s(`'"=])((?:\.{0,2}\/)?(?:[\w@.+-]+\/)+[\w@.+-]+\.[a-z]{1,6})(?::\d+)?/gi;
+export function productIn(text, productOf) {
+  if (typeof productOf !== 'function') return null;
+  const files = [...new Set([...String(text ?? '').matchAll(FILE)].map((m) => m[1]).filter((f) => !/^https?:/.test(f) && !/\/\//.test(f)))];
+  if (!files.length) return null;
+  const names = new Set(files.map((f) => { try { return productOf(f) ?? ''; } catch { return ''; } }));
+  return names.size === 1 && !names.has('') ? [...names][0] : null;
+}
 
 // Where each component is used, as the audit last wrote it: the catalog's livesIn, else each contract's. No new read of
 // the products. → { name: livesIn }
@@ -82,7 +95,7 @@ export function scopeOf(item = {}, { usage = {}, owners = null } = {}) {
 // still swaps in its own code) is the product's; the rest (the system's tokens, its text styles, a decision on a
 // component's file, the modes) is the system's.
 export function todoScope(t = {}, ctx = {}) {
-  const product = t.product ?? (/^Products$/.test(t.area ?? '') ? String(t.type ?? '').split(',')[0].trim() || null : null);
+  const product = t.product ?? (/^Products$/.test(t.area ?? '') ? String(t.type ?? '').split(',')[0].trim() || null : null) ?? productIn([t.file, t.where, t.todo].filter(Boolean).join(' '), ctx.productOf);
   const ofProduct = !!product || /^Pages,/.test(t.type ?? '') || (t.kind === 'Retired' && t.who === 'code');
   const change = t.kind === 'Retired' && t.who !== 'code' ? 'remove' : t.who === 'both' ? 'change' : 'fix';
   return scopeOf({ home: ofProduct ? 'product' : 'system', kind: t.kind, change, what: ofProduct ? (product ? `${product}'s ${String(t.kind ?? 'task').toLowerCase()}` : 'the products\' own pages') : t.component ?? (t.kind ? `the system's ${String(t.kind).toLowerCase()}` : 'the system'), component: t.component ?? null, product, area: t.area, ambiguous: t.who === 'both' }, ctx);
@@ -133,10 +146,10 @@ export function proposalScope(x = {}, { page = null } = {}, ctx = {}) {
 
 // A difference the engine opens an issue for: one about a product (its screen, its own CSS: a control a product's page
 // builds by hand where the system has the component) is that product's; one about a component, a token or Figma is the
-// system's.
+// system's. A finding with no product of its own is given the one the files it names belong to (ctx.productOf).
 const PRODUCT_CHECK = /^No hand-built DS components/i;
 export function findingScope(f = {}, ctx = {}) {
-  const product = f.product ?? null;
+  const product = f.product ?? productIn([f.file, f.evidence].filter(Boolean).join(' '), ctx.productOf);
   if (product || f.home === 'product' || PRODUCT_CHECK.test(String(f.check ?? ''))) return scopeOf({ home: 'product', kind: f.check ?? 'finding', change: 'fix', what: f.component ? `${f.component} in ${product ?? 'a product\'s own screen'}` : `${product ? `${product}'s` : 'a product\'s'} own screen`, product }, ctx);
   return scopeOf({ home: 'system', kind: f.component ? 'component' : 'token', change: 'fix', what: f.component ?? (f.check ? `the system's ${String(f.check).toLowerCase()}` : 'the system'), component: f.component ?? null }, ctx);
 }

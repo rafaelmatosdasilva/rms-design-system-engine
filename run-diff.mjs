@@ -9,6 +9,7 @@
 // own text. Two findings whose text differs only in numbers are one finding that changed.
 // Pure: the audit reads and writes the file.
 import { authorityOf } from './authority.mjs';
+import { productIn } from './local-shared.mjs';
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 const GATE = /^(✅|❌|⚠️|⏭)\s+\[(\d+)\]\s+(.+?)(?:\s{2}\(.*)?$/;
@@ -156,7 +157,9 @@ const POINTER = /^(↳|🔗|⏭|📋|coverage source:|least checked:)|not a diff
 // the verification headline and the style guide read these records; findings.json keeps them with each gate's verdict.
 // rules: { <check>: <plain rule> }, failing: the checks whose gate failed.
 const idOf = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
-export function findingRecords(findings = [], names = [], { prev = null, rules = {}, failing = [] } = {}) {
+// productOf (a file path → its product's name, usage-map.mjs productResolver): a finding whose files are all one
+// product's says which, so its issue and its task are that product's (local-shared.mjs).
+export function findingRecords(findings = [], names = [], { prev = null, rules = {}, failing = [], productOf = null } = {}) {
   // A finding keeps its identity when only its line number moved (an edit higher up the same file).
   const same = (f) => String(f).replace(/(\.[\w]+):\d+\b/g, '$1');
   const old = new Set((prev ?? []).map(same));
@@ -166,8 +169,9 @@ export function findingRecords(findings = [], names = [], { prev = null, rules =
     const check = i > 0 ? f.slice(0, i) : '';
     const evidence = (i > 0 ? f.slice(i + 4) : f).replace(/^\s*(❌|⚠️|ℹ️)\s*/, '');
     // authority: the level of the order of authority the check's rule stands on (standard, decision or heuristic).
+    const product = productIn(evidence, productOf);
     return { id: idOf(same(f)), check, rule: rules[check] ?? null, authority: authorityOf(check), component: componentOf(f, names), evidence, verdict: bad.has(check) ? 'fails' : 'advisory',
-      side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(same(f)) : false, difference: !NOT_A_DIFFERENCE.test(f) && !POINTER.test(evidence.trim()) };
+      side: FIGMA_WORK.test(f) ? 'figma' : 'decide', new: prev ? !old.has(same(f)) : false, difference: !NOT_A_DIFFERENCE.test(f) && !POINTER.test(evidence.trim()), ...(product ? { product } : {}) };
   });
 }
 // Each gate's own verdict, beside its findings: passes, fails, accepted (its failures are recorded debt) or not checked.
