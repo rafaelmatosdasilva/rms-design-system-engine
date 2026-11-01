@@ -107,6 +107,9 @@ rms-design-system-engine --no-contracts                  # skip the standard con
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
 rms-design-system-engine --watch-intent-layer [min]     # keep running: build the style guide again each time the intent layer gets a new commit (checks every 5 min)
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
+rms-design-system-engine --pages-to-write [N]           # the components with no intent-layer page, most used first (products, files, uses); each run that writes the layer starts the top intentLayer.startPages (10 by default) as drafts
+rms-design-system-engine --prop-pairs                    # the Figma properties the engine suggests pairing with a code prop, each a yes or no for a person
+rms-design-system-engine --prop-pair <component> "<Figma property>" yes|no  # the person's answer: a yes pairs them in the next contracts, a no is kept so it is not asked again
 rms-design-system-engine --intent-changes               # make the changes the Intent layer review asks for in the layer's own files (repeated lines out, contradicted sentences written again as drafts, missing parts drafted), into .design-system-engine-out/intent-changes/ to read first
 rms-design-system-engine --intent-changes --merge-request  # the same, sent to the layer as one merge request for the team to review; only when the person asks
 rms-design-system-engine --writes                       # what this project lets the engine change, one answer per place; --writes <figma|code|generated|engine> <yes|ask|no> records one
@@ -375,7 +378,7 @@ Main" is `buttonMain`), its identifier, or the code file it names; the group the
 its layer (a component in a "Templates" group is a template).
 
 Where it is used: each component's `intentLayer` in `design-intent.json` (with its page's link), the contract's
-`intent` block, a `for:` line in `llms.txt` when Figma has no description and its first `avoid:` line (the
+`intent` block and its description (the page's purpose, unless one is authored; `descriptionFrom` says where it came from), each rule with its status (checked, checkable or judgment), a `for:` line in `llms.txt` and its first `avoid:` line (the
 authored `whenNotToUse` first), and the prototype context (its own `intent` lines per component, its "when not
 to use" lines as never sentences the check holds; each pattern, template, page and flow page as a rule). In the
 style guide each component's Documentation merges it with Figma, the code and the contract, each line under its
