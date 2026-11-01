@@ -7,7 +7,7 @@ import { writeFileSync, mkdirSync, readFileSync, existsSync, cpSync, realpathSyn
 import { join, dirname } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { codeSignature, engineSignature, figmaVersionNow, snapshotFigmaVersion, makeWatch, jobFor } from '../lib/watch.mjs';
+import { codeSignature, engineSignature, figmaVersionNow, snapshotFigmaVersion, makeWatch, jobFor, installWatch, uninstallWatch, realJobDir } from '../lib/watch.mjs';
 import { OUT_DIR } from '../lib/names.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
@@ -130,6 +130,38 @@ test('the background job: a LaunchAgent on a Mac, a user service on Linux, each 
   assert.match(jobFor({ ROOT, engineDir: '/opt/engine', platform: 'win32', home: 'C:\\' }).unsupported, /on a Mac or on Linux, not on win32: keep rms-design-system-engine --watch running in a terminal/);
 });
 
+test('install and uninstall: launchctl or systemctl asked only for a job in this computer\'s own folder, through the runner given', () => {
+  const home = tempDir('watch-own-'), other = tempDir('watch-other-'), ROOT = tempDir('watch-proj-');
+  for (const platform of ['darwin', 'linux']) {
+    const calls = [], run = (argv) => { calls.push(argv[0] + ' ' + argv[2]); return { status: 0 }; };
+    const own = jobFor({ ROOT, engineDir: '/opt/engine', platform, home, uid: 501 });
+    assert.equal(dirname(own.file), realJobDir(platform, home));
+    let r = installWatch(own, { run, realHome: home, platform });
+    assert.deepEqual([r.ok, r.started], [true, true]);
+    assert.ok(existsSync(own.file));
+    assert.deepEqual(calls, platform === 'darwin' ? ['launchctl gui/501'] : ['systemctl daemon-reload', 'systemctl enable'], 'started through the runner');
+    calls.length = 0;
+    installWatch(own, { run, realHome: home, platform });
+    assert.equal(calls[0], platform === 'darwin' ? 'launchctl gui/501/' + own.label : 'systemctl disable', 'installed again: the old one stopped first');
+    calls.length = 0;
+    assert.equal(uninstallWatch(own, { run, realHome: home, platform }).removed, true);
+    assert.ok(!existsSync(own.file));
+    assert.ok(calls.length >= 1);
+    // Another home than this computer's own (HOME set elsewhere, as in a test): the file only, the runner never called.
+    calls.length = 0;
+    const borrowed = jobFor({ ROOT, engineDir: '/opt/engine', platform, home: other, uid: 501 });
+    r = installWatch(borrowed, { run, realHome: home, platform });
+    assert.deepEqual([r.ok, r.started], [true, false]);
+    assert.match(r.lines[0], /written \(.+\) and not started/);
+    assert.equal(uninstallWatch(borrowed, { run, realHome: home, platform }).removed, true);
+    assert.deepEqual(calls, [], 'never asked of launchd or systemd');
+    const failing = installWatch(own, { run: () => ({ status: 5, stderr: 'Bootstrap failed: 5' }), realHome: home, platform });
+    assert.equal(failing.ok, false);
+    assert.match(failing.lines[0], /did not start: Bootstrap failed: 5/);
+    uninstallWatch(own, { run: () => ({ status: 0 }), realHome: home, platform });
+  }
+});
+
 test('the commands: the job written and taken away again, and a watch that sees a save and builds', { timeout: budget(240000) }, async () => {
   const dir = tempDir('watch-cli-');
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true });
@@ -144,8 +176,9 @@ test('the commands: the job written and taken away again, and a watch that sees 
     const job = jobFor({ ROOT: realpathSync(dir), engineDir: ENGINE, home, minutes: 7 });   // the folder as the run sees it (a temporary folder on a Mac is a link)
     assert.ok(existsSync(job.file), 'the job is written');
     assert.match(readFileSync(job.file, 'utf8'), /--watch/);
-    // Whether the system took it depends on the machine (a CI runner has no user session): either way, said plainly.
-    assert.match(r.stdout, /✅ The style guide now builds itself on every change|❌ The background watch was written \(.+\) but did not start/);
+    // A home of its own: the job is written there, and launchd or systemd is never asked to start it.
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /The background watch was written \(.+\) and not started: that folder is not where this computer's own jobs live/);
     assert.doesNotMatch(r.stdout + r.stderr, /\n\s+at .+\.mjs:\d+|is not defined/);
     r = run('--watch-uninstall');
     assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -159,7 +192,7 @@ test('the commands: the job written and taken away again, and a watch that sees 
   p.stderr.on('data', (d) => { out += d; });
   const until = async (re, ms) => { const t = Date.now(); while (!re.test(out) && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 200)); return re.test(out); };
   try {
-    assert.ok(await until(/👀 Watching .*: the code every few seconds, Figma and the intent layer every 5 min, and the engine/, 30000), out);
+    assert.ok(await until(/👀 Watching .*: the code every few seconds, Figma, the intent layer and the stores every 5 min, and the engine/, 30000), out);
     assert.ok(await until(/Figma not watched: no Figma file in ds-config\.json/, 30000), out);   // the demo names no Figma file
     await new Promise((r) => setTimeout(r, 2500));
     writeFileSync(join(dir, 'notes.md'), '# A note\n');
