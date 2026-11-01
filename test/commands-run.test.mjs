@@ -17,12 +17,13 @@
 // token and a browser; their offline refusal is covered by their own tests).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { availableParallelism } from 'node:os';
+import { availableParallelism, homedir } from 'node:os';
 import { budget, tempDir } from './helpers.mjs';
+import { axeCachePath } from '../lib/a11y-check.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -48,11 +49,17 @@ const COMMANDS = [
   '--figma-motion', '--figma-examples', '--figma-brands', '--brands-css', '--refresh-snapshots', '--lessons',
 ];
 
+// A home of their own: --update links the /rms-design-system-engine command in ~/.claude/commands, and run with the
+// person's home it pointed their command at whichever checkout ran the tests. The pinned axe-core is copied in, so
+// --update does not fetch it again.
+const HOME = tempDir('cmd-home-');
+if (existsSync(axeCachePath(homedir()))) { mkdirSync(dirname(axeCachePath(HOME)), { recursive: true }); cpSync(axeCachePath(homedir()), axeCachePath(HOME)); }
+
 // Each in a project of its own, so one that writes something cannot make the next one read it.
 const runOne = (command) => new Promise((done) => {
   const dir = tempDir('cmd-run-');
   cpSync(DEMO, dir, { recursive: true });
-  execFile(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26, env: { ...process.env, DESIGN_SYSTEM_ENGINE_FIGMA_CLI: 'none' } },
+  execFile(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26, env: { ...process.env, HOME, DESIGN_SYSTEM_ENGINE_FIGMA_CLI: 'none' } },
     (err, stdout, stderr) => done({ command, out: `${stdout ?? ''}${stderr ?? ''}`, timedOut: err?.killed === true }));
 });
 
@@ -70,4 +77,5 @@ test('no command of the engine ever answers with a stack trace', { timeout: budg
   const stuck = results.filter((r) => r.timedOut);
   assert.deepEqual(stuck.map((r) => r.command), [], 'a command never came back');
   assert.equal(results.length, COMMANDS.length);
+  assert.ok(lstatSync(join(HOME, '.claude', 'commands', 'rms-design-system-engine.md')).isSymbolicLink(), '--update linked the command in the test\'s own home, not the person\'s');
 });

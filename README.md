@@ -5,10 +5,28 @@
   <a href="https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine"><img src="https://img.shields.io/ossf-scorecard/github.com/rafaelmatosdasilva/rms-design-system-engine?label=OpenSSF%20security%20score" alt="OpenSSF security score"></a>
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#security-and-data"><img src="https://img.shields.io/badge/privacy-local--first-2b8a3e" alt="Privacy: local-first"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/dependencies-0-2b8a3e" alt="No npm dependencies"></a>
-  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#code-on-gitlab"><img src="https://img.shields.io/badge/company%20GitLab-supported-fc6d26?logo=gitlab&logoColor=white" alt="Company GitLab supported"></a>
-  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20·%20Figma-a259ff?logo=figma&logoColor=white" alt="Works with Claude Code and Figma">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <a href="https://www.bestpractices.dev/projects/16082"><img src="https://img.shields.io/cii/level/16082?label=OpenSSF%20security%20practices" alt="OpenSSF security practices"></a>
+  <br>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/commands.md"><img src="https://img.shields.io/badge/Claude%20Code-skill-D97757?logo=claude&logoColor=white" alt="Claude Code skill"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#fit-your-teams-setup"><img src="https://img.shields.io/badge/Figma-API%20%C2%B7%20CLI%20%C2%B7%20MCP-A259FF?logo=figma&logoColor=white" alt="Figma through its API, figma-cli or MCP"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#accessibility-never-gets-worse"><img src="https://img.shields.io/badge/GitHub-CI%20%C2%B7%20docs-181717?logo=github&logoColor=white" alt="GitHub CI and docs"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#code-on-gitlab"><img src="https://img.shields.io/badge/GitLab-code%20%C2%B7%20CI%20%C2%B7%20docs-FC6D26?logo=gitlab&logoColor=white" alt="GitLab code, CI and docs"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#write-the-intent-layer"><img src="https://img.shields.io/badge/Notion-docs%20source-000000?logo=notion&logoColor=white" alt="Notion as a docs source"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#write-the-intent-layer"><img src="https://img.shields.io/badge/Confluence-docs%20source-172B4D?logo=confluence&logoColor=white" alt="Confluence as a docs source"></a>
+  <br>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#what-the-engine-needs-on-your-machine"><img src="https://img.shields.io/badge/Node.js-22%2B-5FA04E?logo=nodedotjs&logoColor=white" alt="Node.js 22 or newer"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#in-the-browser"><img src="https://img.shields.io/badge/Chrome-DevTools%20Protocol-4285F4?logo=googlechrome&logoColor=white" alt="Chrome DevTools Protocol"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#what-the-engine-needs-on-your-machine"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5"></a>
+  <br>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#test-accessibility"><img src="https://img.shields.io/badge/WCAG-2.2%20A%20%C2%B7%20AA-005A9C?logo=w3c&logoColor=white" alt="WCAG 2.2 A and AA"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#test-accessibility"><img src="https://img.shields.io/badge/axe--core-accessibility-663399" alt="axe-core accessibility rules"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/reference/usage.md#the-standard-contract-layer-emitted-automatically-each-run"><img src="https://img.shields.io/badge/W3C%20DTCG-design%20tokens-005A9C?logo=w3c&logoColor=white" alt="W3C DTCG design tokens"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#code-connect-drafts"><img src="https://img.shields.io/badge/Figma-Code%20Connect-A259FF?logo=figma&logoColor=white" alt="Figma Code Connect"></a>
+  <br>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#compare-figma-and-code"><img src="https://img.shields.io/badge/React-supported-149ECA?logo=react&logoColor=white" alt="React supported"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/features.md#compare-figma-and-code"><img src="https://img.shields.io/badge/Vue.js-supported-4FC08D?logo=vuedotjs&logoColor=white" alt="Vue.js supported"></a>
+  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#tailwind"><img src="https://img.shields.io/badge/Tailwind%20CSS-checked-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS checked"></a>
 </p>
 
 AI agents can build interfaces in minutes. But scattered tools and specialised skills aren't enough. They work in isolation, repeat work and rarely share knowledge.
