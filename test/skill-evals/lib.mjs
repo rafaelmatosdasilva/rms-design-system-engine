@@ -239,6 +239,14 @@ function viaCli(args, { cwd, env }, timeoutMs) {
     });
   });
 }
+// What continuous.mjs does after a run.mjs pass ends: 0 is done; 3 (the API refused a run) waits for the limit to
+// reset; 4 (runs failed in the harness) tries them once more at once, then stops, since waiting would not fix them.
+export function afterPass(status, harnessRetried = false) {
+  if (status === 0) return 'done';
+  if (status === 3) return 'wait';
+  if (status === 4 && !harnessRetried) return 'retry';
+  return 'stop';
+}
 // The SDK's messages are the CLI's stream-json events, so everything that reads a run reads them unchanged.
 async function viaSdk(prompt, options, timeoutMs) {
   if (!existsSync(SDK)) throw new Error('An API key is set (ANTHROPIC_API_KEY or the key file), so runs go through the Agent SDK, which is not installed: npm ci --prefix test/.eval-tools');

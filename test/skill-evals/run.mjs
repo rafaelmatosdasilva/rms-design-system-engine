@@ -145,4 +145,5 @@ if (refused && /credit balance (is )?too low/i.test(refused)) { console.log('✗
 if (refused && /not logged in/i.test(refused)) { console.log('✗ a run is not logged in: its fresh HOME holds no login (macOS keeps it in the keychain). Run `claude setup-token` and set CLAUDE_CODE_OAUTH_TOKEN (billed to the plan), or put an API key in ~/.config/rms-engine/anthropic-key (chmod 600) or ANTHROPIC_API_KEY (its API credits, through the Agent SDK: npm ci --prefix test/.eval-tools).'); process.exit(2); }
 if (refused) console.log(`⏸ stopped: the API refused a run (${refused}). ${left} runs not measured; run the same command with --resume after the limit resets.`);
 else if (left) console.log(`⚠ ${left} runs failed in the harness; run the same command with --resume to retry them.`);
-process.exit(refused || left ? 3 : 0);
+// 3: the API refused a run, so waiting helps; 4: runs failed in the harness, which waiting for a limit never fixes.
+process.exit(refused ? 3 : left ? 4 : 0);

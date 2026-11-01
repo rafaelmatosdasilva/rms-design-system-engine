@@ -11,6 +11,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { afterPass } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENGINE = dirname(dirname(HERE));
@@ -48,10 +49,13 @@ if (existsSync(file)) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function step(args) {
+  let retried = false;
   for (let attempt = 1; attempt <= 60; attempt++) {
     const r = spawnSync(process.execPath, [join(HERE, 'run.mjs'), '--variant', 'cookbook', '--model', MODEL, ...args, '--resume'], { cwd: ENGINE, stdio: 'inherit' });
-    if (r.status === 0) return;
-    if (r.status !== 3) { console.log(`✗ run.mjs stopped (exit ${r.status})`); process.exit(r.status ?? 2); }
+    const next = afterPass(r.status, retried);
+    if (next === 'done') return;
+    if (next === 'retry') { retried = true; console.log('… trying the runs that failed in the harness once more'); continue; }
+    if (next === 'stop') { console.log(r.status === 4 ? '✗ runs still fail in the harness: the error is on each line above' : `✗ run.mjs stopped (exit ${r.status})`); process.exit(r.status ?? 2); }
     console.log(`… paused by a usage limit, carrying on in ${WAIT_MIN} min`);
     await sleep(WAIT_MIN * 60 * 1000);
   }
