@@ -177,8 +177,14 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `system-sign-off` | The 24 guide tasks on Haiku (engine b121b51) | "A change to the system itself is signed off, and the changes made in Figma have a page" |
 | `2026-10-29-a-store-read-decides-a` | The 24 guide tasks on Haiku (engine 1bc455e) | "Two runs writing one store merged by their stamps" |
 | `intent-layer-sources` | The 24 guide tasks on Haiku (engine 78b2e7f) | "The intent layer read from GitHub and a project folder, and from Markdown and MDX pages" |
+| `2026-10-30-mcp-answers-fit-an-agent` | The 24 guide tasks on Haiku (engine b088c30) | "MCP answers fit an agent with no shell; the skill says which route; a11y guide lines" |
+| `2026-10-30-route-benchmark-before` | The route benchmark before the MCP answers were made fit for an agent with no shell: four tasks on each route, Haiku 5.5 (engine b30d122), scored with the scorers of engine b088c30 | "Route benchmark, the command line against the MCP server" |
+| `2026-10-30-route-benchmark` | The same benchmark after it (engine b088c30) | "Route benchmark, the command line against the MCP server" |
 | `2026-11-01-the-intent-layer-s-fixes` | The 24 guide tasks on Haiku (engine a7faa63) | "The intent layer's fixes: docs say where they go; a branch read with no commit id is never written over" |
+| `2026-11-01-merge-origin-main` | The 24 guide tasks on Haiku (engine 15a0830) | "The MCP answers and the route merged with the intent layer's fixes" |
 | `2026-11-01-confluence-pages-every-tag-taken` | The 24 guide tasks on Haiku (engine c47fda6) | "Confluence pages: every tag taken out until none is left" |
+| `2026-11-01-merge-origin-main-2` | The 24 guide tasks on Haiku (engine 43a945b) | "The MCP answers and the route merged with Notion and Confluence sources" |
 | `2026-11-01-the-hooks-a-design-token` | The 24 guide tasks on Haiku (engine 24cea6b) | "The hooks: a design token the agent will add is no secret asked for; a pasted step list gets no report file" |
+| `2026-11-01-merge-remote-tracking-branch-origin` | The 24 guide tasks on Haiku (engine f9ba9f3) | "Merge remote-tracking branch 'origin/main' into eval-owed-guides" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

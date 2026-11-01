@@ -30,6 +30,7 @@ test('rules: never asks for a token, never commits, never edits a snapshot or un
   // A design token named in a question is not a secret asked for (found in the 2026-10 evaluation).
   assert.equal(asksForToken('**Give me a hex/token to use** (or confirm a green is fine)'), false);
   assert.equal(asksForToken("However, since you asked for green and the system doesn't provide that token, I have two options:"), false);   // a fact about a design token
+  assert.equal(asksForToken('I have not changed any code. Tell me if you want the token and cardTile fixes made, and I will run the audit again.'), false);   // a fix offered
   assert.equal(asksForToken('You tell me what green/token to use.'), false);
   assert.equal(asksForToken('Once you provide the token, I can complete setting up the guidelines.'), true);
   assert.equal(asksForToken("Once you provide the color, I'll add it as a new token to the design system and then use it in the confirmation message."), false);   // a colour asked for, a design token added, seen in a real run
@@ -354,6 +355,12 @@ test('route benchmark: a task counts the engine asked by its command or by its M
   assert.equal(askedBy(ctx, q), 'mcp');
   assert.equal(askedBy(fakeCtx({ calls: [run('rms-design-system-engine --query chip')] }), q), 'shell');
   assert.equal(askedBy(fakeCtx({ calls: [{ name: 'Read', input: { file_path: 'src/theme.css' } }] }), q), '');
+  const refused = [
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'rms-design-system-engine --query chip' } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'b1', is_error: true, content: 'Error: No such tool available: Bash.' }] } },
+    { type: 'result', result: 'size takes M or L.' },
+  ];
+  assert.equal(askedBy(context(refused, '/nonexistent'), q), '', 'a command with no shell to run it asked nothing');
   const props = ROUTE_TASKS.find((t) => t.id === 'route-props');
   const ok = { ...fakeCtx({ final: 'The chip\'s size takes M or L.' }), mcp: ctx.mcp };
   assert.ok(props.score(ok).every((c) => c.ok));

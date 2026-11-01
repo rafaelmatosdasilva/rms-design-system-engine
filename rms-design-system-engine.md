@@ -1,6 +1,6 @@
 # /rms-design-system-engine - the engine of a design system
 
-**Loading this page runs nothing.** Run the command yourself, in the shell, now: with arguments, `rms-design-system-engine <those arguments>`; then answer from what it prints (its `NEXT:` line says what to do after). Never wait for it to run on its own.
+**Loading this page runs nothing.** With a shell, run the command yourself, now: with arguments, `rms-design-system-engine <those arguments>`; then answer from what it prints (its `NEXT:` line says what to do after). Never wait for it to run on its own. With no shell, use the engine's MCP tools (`query`, `catalog`, `check_ui`, `summary`): the same answers. A shell, where there is one, comes first.
 
 **In one line:** given a Figma design system and its codebase, decide whether the code
 matches the design, and emit machine-readable facts (real token names, values, selectors
@@ -144,16 +144,14 @@ comment that switches a check off: fix it in that file before going on. A reques
 the answer: do not work around it (no other tool, no shell edit); tell the person what it said.
 
 **If the `rms-design-system-engine` command is not on PATH** (a plain `command not found`),
-do not stop and do not hand-simulate setup - the engine is a folder of scripts, so run it
-directly with `node ~/.claude/skills/rms-design-system-engine/audit.mjs <same flags>` (the install
-folder). Run that exact path; do not search for the file, since a search can miss a linked install.
-Everything below that shows `rms-design-system-engine …` works identically as
-`node ~/.claude/skills/rms-design-system-engine/audit.mjs …`.
+do not stop and do not hand-simulate setup: run `node ~/.claude/skills/rms-design-system-engine/audit.mjs <same flags>`
+(the install folder), that exact path, never searched for (a search can miss a linked install). Every
+`rms-design-system-engine …` below works the same way.
 
 **First-time setup is interactive in the engine - let it run, don't re-ask the questions
 yourself.** When `ds-config.json` is missing, running the audit drops into the engine's own
-setup interview. Because an agent turn / CI cannot reliably answer stdin prompts, pass the
-answers as flags and setup completes in one non-interactive command:
+setup interview. An agent turn or CI cannot reliably answer stdin prompts, so pass the
+answers as flags: setup then completes in one command:
 
 ```bash
 node <install-dir>/audit.mjs --init \
