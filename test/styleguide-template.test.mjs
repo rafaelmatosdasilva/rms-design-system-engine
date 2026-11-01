@@ -666,6 +666,14 @@ test('in the browser: no script error, a control changes the real component, the
     const btn = await until(ROWS_FULL('#c-button .pg-a11y-rows'), (v) => /Tab reaches/.test(v));
     assert.match(btn, /Tab reaches it once: "Save now"/, 'measured once the system\'s script has named it');
     assert.doesNotMatch(btn, /shows no change when it takes the focus/, 'a ring drawn on ::after is a focus that shows');
+    // Tried again while a person is in the page's search field: the check waits for them, then tries every variant (one
+    // left untried while it waited once never showed its keyboard row).
+    await run(`(() => { window.__tried = false; document.querySelector('#sg-search input').focus(); document.getElementById('c-button')._a11yRun(() => { window.__tried = true; }); })()`);
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.deepEqual(await run(`[window.__tried, document.activeElement === document.querySelector('#sg-search input')]`), [false, true], 'nothing is tried while they are there');
+    await run(`document.activeElement.blur()`);
+    await until(`window.__tried`, (v) => v === true, 'the check once they leave');
+    assert.match(await run(ROWS_FULL('#c-button .pg-a11y-rows')), /Tab reaches it once: "Save now"/, 'and every variant is tried');
     // A Figma note no check reads is a row of its own on the chip's Accessibility area, with what to do about it.
     await run(`location.hash = '#c-chip/accessibility'`); await shownIs('c-chip');
     assert.match(await until(ROWS_FULL('#c-chip .pg-a11y-rows'), (v) => /Screen readers/.test(v)), /What to do.*Write it as Role: button.*What the Figma notes say.*Screen readers announce the hint after the label/s, 'what to do first, then what Figma says');
