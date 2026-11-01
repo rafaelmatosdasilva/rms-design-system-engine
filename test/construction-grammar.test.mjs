@@ -1,5 +1,6 @@
 // How a system builds a component in Figma, mined from its own components (construction-grammar.mjs).
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { grammarOf, grammarLines, fixOf, caseOf, caseFits, isAutoNamed, wordsOf } from '../construction-grammar.mjs';
@@ -177,7 +178,7 @@ test('a yes/no is named by one case rule whether Figma makes it a boolean or a v
 });
 
 test('on the Construction page each row is a rule, a decision included: never a question', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   const page = tpl.slice(tpl.indexOf('if (DATA.construction)'), tpl.indexOf('if (DATA.construction)') + 12000);
   assert.doesNotMatch(page, /shared, or made for each component\?/);
   assert.match(page, /'Confirm it, or take the other way: '/);

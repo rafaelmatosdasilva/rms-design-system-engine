@@ -1,10 +1,11 @@
 // Every side panel and every filter has its own address in the style guide (templates/styleguide.template.html).
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+const tpl = templateText();
 
 test('the address is written in place, a filter at All and a closed panel leaving nothing', () => {
   const src = /function setHashQuery\(o\) \{[\s\S]*?\n  \}/.exec(tpl)[0];

@@ -873,6 +873,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
+- **The template comes in parts.** Its file is the page's frame; its styles and its script are parts of their own under `templates/styleguide/` (`css/` and `js/`, one area of the page each, such as the Overview, the Tokens page or the Status page), joined in order when the page is built. A change is reviewed and tested one area at a time, and the page they make is the same. A project's own template can be one file, or use parts the same way (a line `/*@part …*/` in its styles, `//@part …` in its script).
 
 ### What's in it
 

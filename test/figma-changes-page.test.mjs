@@ -2,6 +2,7 @@
 // Changes in Figma page and each component's History), and where a component is used in every team file (Figma's library
 // analytics, figma-analytics.mjs), or why those files were not seen.
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -40,7 +41,7 @@ test('instances in every team file from Figma\'s library analytics, a set\'s var
 });
 
 test('the style guide has the Changes in Figma page, and each component\'s History links each change', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /section\('changes-in-Figma', 'Changes', 'Changes in Figma'/);
   assert.match(tpl, /card\('What the change said it does'[\s\S]*card\('What Figma shows once it was made'/);
   assert.match(tpl, /#changes-in-Figma\?panel=' \+ esc\(encodeURIComponent\('doc:fc:'/);

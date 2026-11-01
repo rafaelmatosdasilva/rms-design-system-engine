@@ -1,0 +1,91 @@
+/* ── Style guide chrome: the template is the layout only. Every colour, font, text size, radius, space and shadow
+   is a role variable the engine fills with the design system's own tokens (CHROME below); what the system has no
+   token for falls back to the template's defaults: the browser's own colours (Canvas, CanvasText; near black and near
+   white in a dark mode, never pure) and font, and a small
+   type scale of its own (12, 13, 14 and 15px); the style guide check lists it. ──────────────────────────────────── */
+:root {
+  color-scheme: light dark;
+  --sg-stick-gap: var(--sg-card-gap);   /* every page: the room between its stuck bars and a card's or table's stuck head, painted with the page so what scrolls under it is hidden (one value, set here) */
+  /* The page's own colours for a system with no token for a role: neutral greys that pass WCAG 2.2 AA in both modes
+     (body text over 12:1, the muted text over 4.5:1 even on a tinted tag, the accent over 4.5:1 as text). Never the
+     browser's system colours: inside a link Chrome resolves them in the light scheme, black text on a dark menu. In a
+     dark mode, never pure black behind it nor pure white on it: a near black and a near white instead. */
+  --sg-bg: #ffffff; --sg-bg-2: #f7f7f8; --sg-surface: #ffffff; --sg-stage: var(--sg-bg);
+  --sg-text: #1c1c1e; --sg-text-2: #3a3a3c; --sg-muted: #5f5f64; --sg-border: #8e8e93; --sg-accent: #0a5fb4;
+  --sg-danger: #c62828; --sg-on-danger: #ffffff;   /* the page's own red for what cannot be undone (a delete): never the system's nor a theme's */
+  --sg-warning: var(--sg-accent); --sg-positive: var(--sg-text); --sg-negative: var(--sg-accent); --sg-line: var(--sg-line-width, 1px) solid var(--sg-line-colour);
+  /* The page's lines: the system's border in light; in dark the text's colour, faint and see-through, so a line keeps
+     its edge and blends with whatever background a brand gives the page. */
+  --sg-line-colour: color-mix(in srgb, var(--sg-border), var(--sg-text) 10%);
+  --sg-line-solid: var(--sg-line-colour);   /* in light, the system's border a tenth of the way to the text, so lines read; in dark, see-through */
+  --sg-chevron-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m4 6 4 4 4-4'/%3E%3C/svg%3E");   /* a select's chevron */
+  --sg-info-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.25'/%3E%3Cpath d='M8 7.5V11M8 4.75h.01'/%3E%3C/svg%3E");   /* the info box's mark */
+  /* The page's see-through fills: the text's colour at five strengths, and nothing between them. 1: a resting field or
+     button, a picture's ground. 2: under the pointer. 3: chosen. 4: a line under the pointer, a pressed button. 5: a
+     scrim, a bar that must read. (A panel's ground is --sg-tint, fainter still; the lines are --sg-line-colour.) */
+  --sg-a1: color-mix(in srgb, var(--sg-text) 4%, transparent);
+  --sg-a2: color-mix(in srgb, var(--sg-text) 7%, transparent);
+  --sg-a3: color-mix(in srgb, var(--sg-text) 10%, transparent);
+  --sg-a4: color-mix(in srgb, var(--sg-text) 22%, transparent);
+  --sg-a5: color-mix(in srgb, var(--sg-text) 40%, transparent);
+  --sg-nav-on: var(--sg-a3);   /* the menu's chosen item: see-through, over any background */
+  --sg-nav-hover: var(--sg-a2);   /* a menu item under the pointer: lighter than the chosen one's */
+  --sg-line-soft: color-mix(in srgb, var(--sg-line-colour) 60%, transparent);   /* a quieter line: under the menu's stuck head or group name */
+  /* The warning colour where it is read (a label, an icon, a sign): in light, the system's yellow darkened with the text's
+     colour so it keeps its contrast on a light page; in dark, the yellow itself. */
+  --sg-warning-ink: color-mix(in srgb, var(--sg-warning) 45%, var(--sg-text));
+  --sg-seg-on: var(--sg-a3);
+  /* One hover for every control (a button, a field, a select, a switch's option, a card): its line a step brighter and
+     one step of fill, the text's colour a little, see-through. */
+  --sg-hover-fill: var(--sg-a2);
+  --sg-seg-hover: var(--sg-hover-fill);   /* a switch's option under the pointer, a step under the chosen one */   /* a switch's choice: the text's colour a little, over whatever background the brand gives */
+  --sg-border-hover: var(--sg-a4);   /* a line under the pointer: a step brighter, never a heavy one, over any background */
+  /* The default type: its text a step above the browser's (500), its headings 800, its lines 1.4 apart. The page has
+     two weights only: the text weight (--sg-m-weight) for every word, the heading weight for titles, tabs and names. */
+  --sg-xs: 0.75rem; --sg-s: 0.8125rem; --sg-s-weight: 500; --sg-m: 0.875rem; --sg-m-weight: 500; --sg-l: 0.9375rem; --sg-l-weight: 800;
+  --sg-h1: var(--sg-l); --sg-h2: var(--sg-l); --sg-heading-weight: 800; --sg-lh: 1.4; --sg-lh-read: 1.6;
+  /* The page's two weights: every word a step above the system's text weight (readable on a screen), titles, tabs and
+     names in its heading weight. */
+  --sg-text-weight: calc(var(--sg-m-weight) + 100);
+  /* A page's title: the system's largest text style, scaled up, so the guide has its own hierarchy above any system's
+     text styles while every size still comes from the system ("title-scale" in styleguide.chrome, ds-config.json, changes it). */
+  --sg-title-scale: 3.125; --sg-title: calc(var(--sg-h1) * var(--sg-title-scale));
+  --sg-space-xxs: 0.125rem; --sg-space-xs: 0.25rem; --sg-space-s: 0.5rem; --sg-space-m: 0.75rem; --sg-space-l: 1rem; --sg-space-xl: 1.5rem; --sg-space-xxl: 2rem;
+  --sg-row-h: calc(var(--sg-space-xxl) + var(--sg-space-m));
+  /* A panel's fill inside the page (a card's name, a table's head, a bar, a note): the text's colour a little, see-through,
+     so it sits on whatever is under it (the page, a card, a brand's background) with the menu's lightness. */
+  --sg-tint: color-mix(in srgb, var(--sg-text) 2%, transparent);
+  /* The page's two timings: a colour or a line that changes (fast), and something that moves (a card, a panel, a mark). */
+  --sg-fast: 0.15s ease;
+  --sg-move: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --sg-cell-x: var(--sg-space-m);   /* the side padding of a card's head, rows and columns (twice that on a wider window) */
+  --sg-mark: 1rem;   /* every mark the page draws itself (the menu's, a button's, the search's, the way back): one size, so their 1.5 lines read one weight */
+  --sg-card-gap: calc(var(--sg-space-xl) + var(--sg-space-s));   /* the room between any two cards or tables, side by side or one under another (32px on an 8px system) */
+  --sg-control-h: calc(var(--sg-space-xxl) + var(--sg-space-s));   /* every capsule control's height: a switch, a select, a search, a button (40px on an 8px system) */   /* every table row at least this tall, from the system's spacing */
+  --sg-radius-s: 12px; --sg-radius: 16px; --sg-radius-l: 20px; --sg-radius-pill: 999px;   /* the template's own corners, whatever the system's */
+  /* A control's corners (a button, a chip, a field), and a count's inside one: the control's less the room around it,
+     so the two curves run side by side. Every count is drawn so, in a chip or not. */
+  --sg-control-radius: calc(var(--sg-radius) - var(--sg-space-xs));
+  --sg-count-radius: calc(var(--sg-control-radius) - var(--sg-space-xs) * 2);
+  --sg-shadow: none; --sg-shadow-lift: none; --sg-icon: 1em;
+  --sg-ease: 0s;
+}
+/* The dark scheme, by the page's own attribute (data-sg-scheme, set from the device and on every switch): a change of
+   attribute makes the browser work every colour out again, where light-dark() left some (a link, a line) in the old
+   scheme. As light as the light roles above, so the system's own (CHROME, next) still win. */
+:where(:root)[data-sg-scheme="dark"] {
+  --sg-bg: #161618; --sg-bg-2: #1e1e21; --sg-surface: #161618;
+  --sg-text: #e6e6e8; --sg-text-2: #d4d4d8; --sg-muted: #a1a1aa; --sg-border: #52525b; --sg-accent: #6cb4ff;
+  --sg-danger: #f47174; --sg-on-danger: #1b0a0a;
+  --sg-line-colour: color-mix(in srgb, var(--sg-text) 18%, transparent);
+  --sg-line-solid: color-mix(in srgb, var(--sg-text) 18%, var(--sg-bg));   /* the same line, solid: where pieces of it meet, nothing doubles or shows through */
+  --sg-warning-ink: var(--sg-warning);
+  --sg-tint: color-mix(in srgb, var(--sg-text) 2.5%, transparent);
+}
+/*{{CHROME}}*/
+/* The page's panels (the menu, a table's head, a card's name, a list over the page) are its background with a faint
+   layer of its text's colour, as every fill on the page is: one family of greys in any brand, never a surface colour
+   of the brand's beside a see-through fill. A colour the team names for them by hand (ds-config.json →
+   styleguide.chrome, written as --sg-bg-2-own and --sg-surface-own) wins, each brand's own value in each brand. */
+:root, :root[data-sg-scheme] { --sg-bg-2: var(--sg-bg-2-own, color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg))); --sg-surface: var(--sg-surface-own, color-mix(in srgb, var(--sg-text) 3%, var(--sg-bg))); }
+

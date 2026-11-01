@@ -1,12 +1,13 @@
 // The drafts of an intent layer page, in the Documentation panel: under the task that asks for them, each with the
 // command for each decision (templates/styleguide.template.html), and that one decision on the command line.
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+const tpl = templateText();
 
 const loadChanges = () => {
   const src = /var ilChanges = (function \(p, write, notes, task\) \{[\s\S]*?\n    \});/.exec(tpl)[1];

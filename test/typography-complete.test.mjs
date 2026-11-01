@@ -5,6 +5,7 @@
 // entry feed a whole scale, compares a field that changes with a breakpoint in every breakpoint, and compares the family
 // once. The style guide draws a style only when every field Figma gives it agrees. Every name here is invented.
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -206,7 +207,7 @@ test('style guide: a style shows only when every field Figma gives it agrees, in
 });
 
 test('style guide page: a style lists only its own fields, the family once, the styles left off named', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   const block = tpl.slice(tpl.indexOf('/* ── Typography ─'), tpl.indexOf('/* ── Spacing, radii, other sizes ─'));
   assert.match(block, /TYPE_PROPS\.filter\(function \(k\) \{ return t\[k\[0\]\]; \}\)/, 'a field the style does not have is not listed');
   assert.doesNotMatch(block, /\['family', val\('family'/, 'no family line per style');

@@ -1,5 +1,6 @@
 // Decisions written in the intent layer (decisions.mjs, doc-source-dsds.mjs, intent-changes.mjs decisionPlan).
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { parseDecision, decisionLine, layerDecisionsOf, decisionsFrom, decisionView, ruledOutLines } from '../decisions.mjs';
 import { entityView } from '../doc-source-dsds.mjs';
@@ -58,7 +59,7 @@ test('a decision asked for in words goes to --decision with what was ruled out a
 
 test('History: one table of the code\'s changes, Figma\'s, the intent layer\'s and the decisions, each tagged, a chip each; a release with nothing chosen hides', async () => {
   const { readFileSync } = await import('node:fs');
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /<tr data-chip="figma"><td>/);
   assert.match(tpl, /<tr data-chip="code"><td>/);
   assert.match(tpl, /\[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['decisions', 'Decisions'\]\]/);

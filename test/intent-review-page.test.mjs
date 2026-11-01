@@ -2,11 +2,12 @@
 // evidence, who it waits on and who answered it; a page whose component changed reviewed as that; rows counted by who
 // they wait on. An invented system (Acme).
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+const tpl = templateText();
 const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 const capital = (x) => String(x).charAt(0).toUpperCase() + String(x).slice(1);
 const grab = (name, args) => new RegExp(`var ${name} = (function \\(${args}\\) \\{[\\s\\S]*?\\n    \\});`).exec(tpl)[1];

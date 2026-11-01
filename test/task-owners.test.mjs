@@ -1,11 +1,12 @@
 // The Tasks list names the team that owns what a task is about (ds-config.json owners).
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'templates', 'styleguide.template.html'), 'utf8');
+const page = templateText();
 const teamNoteWith = (owners) => { const i = page.indexOf('function teamNote'), j = page.indexOf('\n  }', i) + 4; return new Function('OWNERS', `${page.slice(i, j)}; return teamNote;`)(owners); };
 
 test('a task names its owning team: the component\'s, else the layer of a token it names, else the default', () => {

@@ -3,6 +3,7 @@
 // one rewritten as a sentence a reviewer can check. The same rules written in English and in Portuguese are read alike.
 // An invented system (Acme): Tile, Button, Card.
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -212,7 +213,7 @@ test('--check-intent says each page\'s rules; a yes writes the guard and the rul
 });
 
 test('the Documentation page shows each page\'s rules in a card of their own', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /card\('Rules', ilRules\(p\)\)/);
   assert.match(tpl, /' checked, ' \+ r\.checkable \+ ' checkable, ' \+ r\.judgment \+ ' judgment'/);
 });

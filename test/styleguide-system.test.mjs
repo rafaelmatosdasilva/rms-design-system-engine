@@ -1,6 +1,7 @@
 // The style guide is the system's own: its controls come from what the code realizes, its look from the system's
 // tokens and components, and the page is checked against the system it shows.
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { modeAxes, realizedControls, chromeRoles, segmentedUi, tabsUi, fieldUi, hiddenAtRest, holdsPart, modeRootCSS, ruleLines, entryLines, buttonUi, cardUi, motionUi, primitiveColours, iconButtonUi, tipUi } from '../styleguide-data.mjs';
 import { checkStyleguidePage, failures, missingRoles, controlClasses } from '../styleguide-check.mjs';
@@ -280,7 +281,7 @@ test('a panel colour set by hand (styleguide.chrome bg-2, surface) wins over the
   const none = chromeRoles({ tokens }).roles;
   assert.equal(none['bg-2-own'], undefined, 'not set by hand: the template\'s own faint layer');
   const { readFileSync } = await import('node:fs');
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /--sg-bg-2: var\(--sg-bg-2-own, color-mix\(in srgb, var\(--sg-text\) 3%, var\(--sg-bg\)\)\); --sg-surface: var\(--sg-surface-own, /, 'the page\'s rule takes the colour set by hand first');
   assert.match(tpl, /decl\[k\] = 'var\(' \+ k \+ '-own, color-mix/, 'and a brand\'s, resolved with the brand\'s own tokens');
   assert.match(tpl, /var LOOK = \/\^--sg-\(bg\|bg-2\|surface\|bg-2-own\|surface-own\|/, 'declared again under each brand');

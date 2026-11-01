@@ -34,10 +34,12 @@ import { homedir } from 'os';
 import { OUT_DIR } from './names.mjs';
 import { storesOf, THEMES_DIR } from './stores.mjs';
 import { writeStyleguide } from './styleguide-files.mjs';
+import { ENGINE_TEMPLATE, readTemplate } from './styleguide-template.mjs';
 
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
-// The engine's own template, used when the project has none (ds-config.json → styleguide.template wins).
-export const ENGINE_TEMPLATE = join(ENGINE_DIR, 'templates', 'styleguide.template.html');
+// The engine's own template, used when the project has none (ds-config.json → styleguide.template wins): its frame, with
+// its parts under templates/styleguide/ (styleguide-template.mjs joins them).
+export { ENGINE_TEMPLATE } from './styleguide-template.mjs';
 // Each component's own code, read for what it says of its stage (a status, @deprecated and what replaces it): kept beside
 // the component, never written into the page.
 const CODE_TEXT = new WeakMap();
@@ -190,7 +192,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
   // A page for some components only (opts.only) goes beside the whole system's, named after them, so neither replaces the other.
   const outPath = opts.out ? resolve(ROOT, opts.out) : opts.only?.length ? join(dirname(projectOut), `${opts.only.map((n) => String(n).replace(/[^\w-]+/g, '-')).join('+')}.html`) : projectOut;
   if (!existsSync(templatePath)) throw new Error('styleguide template not found: ' + templatePath);
-  let html = readFileSync(templatePath, 'utf8');
+  let html = readTemplate(templatePath);   // the template whole, its parts joined (styleguide-template.mjs)
   if (opts.out && outPath !== projectOut) {
     const base = `<base href="${pathToFileURL(dirname(projectOut)).href}/">`;
     html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + base) : base + html;

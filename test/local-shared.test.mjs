@@ -2,6 +2,7 @@
 // no one; what changes what other products get (a shared component, a token, a contract, a Figma component) is shared,
 // says why in one line, and waits on the one who decides for it. An invented system (Acme, cardTile, Northwind).
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
@@ -124,7 +125,7 @@ test('the guard holds an addition with why it is shared and who decides it, and 
 });
 
 test('the style guide shows local or shared beside who acts, counts them on the Tasks page, and says it on a change in Figma', () => {
-  const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+  const tpl = templateText();
   const fn = (name) => new RegExp(`function ${name}\\(x\\) \\{[^\\n]*\\}`).exec(tpl)[0];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const scopeHTML = new Function('esc', `${fn('scopeWords')}\n${fn('scopeHTML')}\nreturn scopeHTML;`)(esc);
@@ -164,7 +165,7 @@ test('a component only in Figma is shared; one only in one product\'s code is lo
   assert.equal(sideScope({ name: 'cardTile', file: 'src/CardTile.vue' }, { usage, owners }).scope, 'shared', 'several products use it');
   assert.equal(sideScope({ name: 'loneTile' }, {}).scope, 'shared', 'unknown use: the system\'s until someone says');
   // The Tasks page counts them: their rows carry the scope the page reads.
-  const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /codeOnly: k\.name, codeFile: k\.file,[^\n]*scope: k\.scope \|\| null \}/);
   assert.match(tpl, /figmaOnly: n,[^\n]*scope: \(DATA\.notAgreed\.scopes \|\| \{\}\)\[n\] \|\| null \}/);
 });

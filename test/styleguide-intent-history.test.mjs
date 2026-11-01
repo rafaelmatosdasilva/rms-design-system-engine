@@ -2,6 +2,7 @@
 // style guide's History as an Intent layer card: the pages it changed, the commit that made it, and the components those
 // pages document; each component's own History lists the changes to its page.
 import { test } from 'node:test';
+import { templateText } from '../styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -56,7 +57,7 @@ test('the layer\'s changes on History: a card each, linked to the components the
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href^="https://github.com/acme/guidelines/commit/"]') !== null`), true, 'its commit linked');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href="#c-button/documentation"]') !== null`), true, 'the component its page documents');
     // A chip of its own when History has another kind beside it (one kind alone needs none).
-    assert.match(readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8'), /var kinds = \[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['decisions', 'Decisions'\]\]/);
+    assert.match(templateText(), /var kinds = \[\['code', 'Code'\], \['figma', 'Figma'\], \['intent', 'Intent layer'\], \['decisions', 'Decisions'\]\]/);
     assert.equal(await run(`document.querySelectorAll('#history .sg-chip').length`), 0, 'one kind alone: no chips');
     // The button's own History: the change to its page.
     await run(`location.hash = '#c-button/history'`);
