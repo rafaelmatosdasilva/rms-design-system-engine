@@ -22,7 +22,7 @@ Each section says why it matters, then what it does not do well today. A line ma
 | [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Early development |
 | [Update Figma from the code](#update-figma-from-the-code) | Sends what developers learn back to designers in Figma: accessibility notes, screen issues and links to the code, only after you approve. | Compare, accessibility | Coming soon |
 | [Keep products on the system](#keep-products-on-the-system) | Helps every product move to the next system version: which version each one runs, a ready-made fix per product, one ticket per difference. | Catch drift, health | Coming soon |
-| [Generate components in Figma](#generate-components-in-figma) | Describe a component in plain words and get it built in Figma with your own styles, names and structure, ready for sign-off. | Contracts, intent, Figma library | Coming soon |
+| [Generate components in Figma and code](#generate-components-in-figma-and-code) | Describe a component in plain words and get it built with your own styles, names and structure, where you choose: in Figma, in code, or both. Ready for sign-off. | Contracts, intent, Figma library | Coming soon |
 | [Build code from Figma](#build-code-from-figma) | For a system that exists only in Figma: the order to build it in, exact names and values, and a check after each piece. | Contracts, Compare | Coming soon |
 
 **Compare or Catch drift?** Compare asks "does the code match the design?"; Catch drift asks "do products use the system?". **Catch drift or Build with AI?** Catch drift finds problems after the fact; Build with AI prevents them as things are built.
@@ -234,10 +234,13 @@ How it checks the agent's work, in a loop, before you see it:
 - Reviews the screens a product builds with the system as pages, and scores each out of 10.
 - Reads products kept in their own repositories.
 
-## Generate components in Figma
+## Generate components in Figma and code
 
-**Coming soon** · **Why it matters:** New components follow the system's rules from the start.
+**Coming soon** · **Why it matters:** New components follow the system's rules from the start, in the design and in the code.
 
+- You choose where it is built: in Figma and in code, only in Figma, or only in code, from the same description.
+- In code, it is written the way your components already are: your framework, file layout, props, tokens and names, with nothing the system does not have.
+- Built in both, the two are checked against each other before anyone signs off, so they start out matching.
 - The AI builds a new component from your description ("a tag like the chip"), starting from the one it is most like.
 - Reads the rest of the same sentence ("with a size XL like L", "without the icon"), and asks about any part it could not read instead of dropping it.
 - Changes an existing one ("add a size XL to the chip"), with where it is used and what the change breaks.
