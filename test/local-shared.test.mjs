@@ -2,6 +2,7 @@
 // no one; what changes what other products get (a shared component, a token, a contract, a Figma component) is shared,
 // says why in one line, and waits on the one who decides for it. An invented system (Acme, cardTile, Northwind).
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
@@ -123,15 +124,15 @@ test('the guard holds an addition with why it is shared and who decides it, and 
   assert.equal(judge({ tool_name: 'Write', cwd: root, tool_input: { file_path: join(root, '.design-system-engine-out/held-for-sign-off.json'), content: '{}' } }, { cfg, userText: 'yes' }).decision, 'deny');
 });
 
-test('the style guide shows local or shared beside who acts, counts them on the Tasks page, and says it on a change in Figma', () => {
-  const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+test('the style guide shows local or shared beside who acts, never counts them in a line of its own, and says it on a change in Figma', () => {
+  const tpl = templateText();
   const fn = (name) => new RegExp(`function ${name}\\(x\\) \\{[^\\n]*\\}`).exec(tpl)[0];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const scopeHTML = new Function('esc', `${fn('scopeWords')}\n${fn('scopeHTML')}\nreturn scopeHTML;`)(esc);
   assert.equal(scopeHTML({ scope: 'shared', reason: 'Shared: why.', decider: { name: 'Cards lead' } }), '<span class="sg-todo-scope" data-scope="shared" title="Shared: why.">Shared, waits on Cards lead</span>');
   assert.equal(scopeHTML({ scope: 'local', reason: 'Local: why.' }), '<span class="sg-todo-scope" data-scope="local" title="Local: why.">Local, waits on no one</span>');
   assert.match(tpl, /\(r\.who \? '<span class="sg-todo-who">' \+ esc\(r\.who\) \+ '<\/span>' : ''\) \+ \(isOpen\(r\) \? scopeHTML\(rowScope\(r\)\) : ''\)/, 'beside who acts, on every open task');
-  assert.match(tpl, /sc\.shared \+ ' shared' \+ \(onList\.length \? ', waiting on ' \+ onList\.join\(', '\) : ''\)/, 'the Tasks page counts them, with who the shared ones wait on');
+  assert.doesNotMatch(tpl, /sg-todo-scope-line|' shared' \+ \(onList/, 'no line on the Tasks page counting them: each task says it beside who acts');
   assert.match(tpl, /card\('Local or shared', x\.scope \? lines\(\[x\.scope\.reason\]\) : ''\)/, 'a change in Figma says it');
   assert.match(tpl, /scope: \{ scope: 'local', reason: 'Local: ' \+ x\.product/, 'a product\'s near copy is that product\'s');
 });
@@ -164,7 +165,7 @@ test('a component only in Figma is shared; one only in one product\'s code is lo
   assert.equal(sideScope({ name: 'cardTile', file: 'src/CardTile.vue' }, { usage, owners }).scope, 'shared', 'several products use it');
   assert.equal(sideScope({ name: 'loneTile' }, {}).scope, 'shared', 'unknown use: the system\'s until someone says');
   // The Tasks page counts them: their rows carry the scope the page reads.
-  const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /codeOnly: k\.name, codeFile: k\.file,[^\n]*scope: k\.scope \|\| null \}/);
   assert.match(tpl, /figmaOnly: n,[^\n]*scope: \(DATA\.notAgreed\.scopes \|\| \{\}\)\[n\] \|\| null \}/);
 });

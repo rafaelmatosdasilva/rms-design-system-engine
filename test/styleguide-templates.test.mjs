@@ -2,6 +2,7 @@
 // snapshot), what it is made of in Figma's order, whether its code uses each one, and the frame it comes from. The
 // template composition gate reads the same answer (template-composition.mjs), so the page and the gate agree.
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -100,6 +101,6 @@ test('the style guide carries each template with its parts, its Figma link and i
 });
 
 test('a project with no templates has no Templates page', () => {
-  const page = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const page = templateText();
   assert.match(page, /if \(\(DATA\.templates \|\| \[\]\)\.length\) \{\n\s+hr\(\); navLink\('templates', 'templates'\);/);
 });

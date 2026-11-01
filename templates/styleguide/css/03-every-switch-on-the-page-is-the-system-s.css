@@ -1,0 +1,51 @@
+/* ── Every switch on the page is the system's segmented control. With none (or none read yet), the page's default one:
+   its options in a track, the chosen one raised, all in the system's roles (or the template's defaults). ───────────── */
+.sg-seg { display: inline-flex; flex-wrap: nowrap; width: auto; max-width: 100%; gap: var(--sg-space-xxs); }   /* every switch on the page as wide as its choices, on one line */
+.sg-seg > * { flex: none; }
+.pg-ctl .sg-seg { display: flex; flex-wrap: wrap; width: 100%; }   /* a component's properties: the panel's width, its choices wrapping */
+.pg-ctl .sg-seg > * { flex: 1 1 auto; }
+@media (min-width: 721px) { :root { --sg-cell-x: calc(var(--sg-space-m) * 2); } }
+@media (min-width: 1280px) { .sg-seg.sg-seg-default > button { padding-left: calc(var(--sg-space-m) + var(--sg-space-s)); padding-right: calc(var(--sg-space-m) + var(--sg-space-s)); } .sg-showroom-filter .sg-seg.sg-seg-default > button { padding-left: var(--sg-space-m); padding-right: var(--sg-space-m); } }   /* a large window: 8px more room each side of a switch's words */
+@media (max-width: 720px) { .sg-seg { flex-wrap: wrap; } }   /* a narrow window: the choices wrap rather than spill */
+.sg-seg button { font: inherit; font-weight: var(--sg-text-weight); }
+.sg-count { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: calc(var(--sg-space-l) + var(--sg-space-xs)); height: calc(var(--sg-space-l) + var(--sg-space-xs)); margin-left: var(--sg-space-s); padding: 0 var(--sg-space-xs); border-radius: var(--sg-count-radius); background: var(--sg-a2); color: var(--sg-text); font-size: var(--sg-xs); font-weight: var(--sg-text-weight); line-height: normal; }   /* a count in its own small round badge, apart from the name before it */
+[aria-pressed="true"] > .sg-count, .selected > .sg-count { background: color-mix(in srgb, var(--sg-surface) 50%, transparent); color: var(--sg-text); }   /* the chosen option's number on half the surface, never a bright white disc */
+[data-sg-scheme="dark"] .sg-count { background: var(--sg-a3); color: var(--sg-muted); }   /* quieter than the words beside it, still 4.5:1 on its disc */
+[data-sg-scheme="dark"] [aria-pressed="true"] > .sg-count, [data-sg-scheme="dark"] .selected > .sg-count { background: var(--sg-a3); color: var(--sg-text-2); }   /* grey at rest, light on the chosen option in light mode; a step brighter in dark */   /* a switch's words in the page's text weight, chosen or not */
+/* The page's default button, where the system has no text button of its own: a soft fill of the page's text colour
+   (lighter on a dark page, darker on a light one), the tables' line and corners, its words in the page's text colour. */
+.sg-btn { display: inline-flex; align-items: center; gap: var(--sg-space-xs); padding: var(--sg-space-xs) calc(var(--sg-space-m) + var(--sg-space-xxs) + var(--sg-space-s)); border: var(--sg-line); border-radius: var(--sg-control-radius); --sg-btn-step: 4%; --sg-btn-fill: color-mix(in srgb, var(--sg-text) var(--sg-btn-step), var(--sg-bg)); background: var(--sg-btn-fill); color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-decoration: none; cursor: pointer; white-space: nowrap; box-sizing: border-box; min-height: var(--sg-control-h); justify-content: center; }
+.sg-link-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; }
+.pg-code-import { display: flex; flex-direction: column; gap: var(--sg-space-s); }   /* its import and file, first in its Code area */
+.sg-overlay-host { position: fixed; inset: 0; z-index: 1000; }   /* a dialog opened over the whole window, as its app's own layer holds it */
+/* The shared hover: a button, a typed field and a select alike (a switch's options take the fill alone, a card the line). */
+.sg-btn, .sg-input { transition: background-color var(--sg-fast), border-color var(--sg-fast); }
+.sg-btn { font-weight: var(--sg-text-weight); }   /* every button the page draws at the controls' weight, wherever it sits (a modal outside the page's main area too) */
+.sg-input:hover, #sg-search .sg-input:hover { background-color: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
+/* A button is solid: the same steps as the see-through fills, mixed into the background it sits on, so no line or
+   picture behind it shows through. */
+.sg-btn:hover { --sg-btn-step: 7%; border-color: var(--sg-border-hover); }
+.sg-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-btn[aria-pressed="true"] { --sg-btn-step: 10%; }   /* a switch's words keep the browser's weight, whatever the text around it takes */
+.sg-seg-default { box-sizing: border-box; min-height: var(--sg-control-h); padding: var(--sg-space-xxs); border: var(--sg-line); border-radius: var(--sg-radius); background: transparent; }   /* see-through: on the page, a card or a bar alike */   /* the track on the page's own background */
+.sg-seg-default > button { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: var(--sg-space-xs); min-height: 1.5rem; margin: 0; padding: var(--sg-space-xs) var(--sg-space-m); border: 0; border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); background: transparent; color: var(--sg-text-2); font-size: var(--sg-s); line-height: var(--sg-lh); cursor: pointer; white-space: nowrap; }   /* each option at least 24px tall (WCAG 2.5.8) */
+.sg-seg-default > button { height: auto; align-self: stretch; }
+.sg-tabs > .sg-tab { height: auto; min-height: calc(var(--sg-space-xxl) * 1.5); }   /* a tab as tall as its words and padding make it, whatever height a system gives its own buttons */   /* each option fills the control's height, whatever height a system gives its own buttons */
+.sg-seg-default > button:hover { color: var(--sg-text); }
+.sg-seg-default > button[aria-pressed="true"], .sg-seg-default > button.selected { background: var(--sg-seg-on); color: var(--sg-text); }   /* the choice by its fill alone, no ring */
+.sg-seg-default > button:not([aria-pressed="true"]):not(.selected):not(:disabled):hover { background: var(--sg-seg-hover); }   /* an option under the pointer, a step under the chosen one */   /* the choice a clear step lighter than its track */
+.sg-seg-default > button:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-seg-default > button:disabled { cursor: not-allowed; opacity: 0.5; }
+/* The page's own tabs, when the system has none: words in a row, the chosen one in the text colour with a line under it. */
+.sg-tabs { display: flex; gap: var(--sg-space-xs); }   /* tabs 4px apart: each its own button, with its own line under it, so the line breaks between them */
+.sg-tabs::after { content: ''; flex: 1 1 auto; box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-a5); }   /* the tabs' line, clearer than a table's */   /* the line goes on after the last tab, to the row's end */
+.sg-tab { display: inline-flex; align-items: center; background: none; border: 0; margin: 0; padding: calc(var(--sg-space-s) * 2) var(--sg-cell-x); border-radius: var(--sg-radius-s) var(--sg-radius-s) 0 0; font: inherit; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-muted); white-space: nowrap; cursor: pointer; }
+.sg-tab:hover, .sg-tab.is-on { color: var(--sg-text); }
+.sg-tab { box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-a5); }   /* the tabs' line, clearer than a table's */
+.sg-tab:hover { background: var(--sg-hover-fill); }   /* under the pointer, the shared hover: a button of its own */
+.sg-tab { position: relative; }
+.sg-tab-state { display: inline-flex; margin-left: var(--sg-space-s); }
+.sg-area-na { margin-bottom: var(--sg-space-m); }
+.sg-tab.is-on::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: var(--sg-radius-pill); background: var(--sg-text); pointer-events: none; }   /* the chosen tab's line, its ends rounded */
+/* The chosen one is shown by its fill and line, never a heavier weight: the words of a switch never change weight. */
+

@@ -1,6 +1,7 @@
 // The Documentation page's rows a system with no intent layer can clear: its Do and don't written in Figma, the code or
 // the contract; its properties in the engine's own contract; a text style's description.
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -105,6 +106,6 @@ test('with no intent layer, a component\'s Do and don\'t and its properties in t
     const role = await run(`(() => { const tr = [...document.querySelectorAll('#c-badge .pg-knowledge tbody tr')].find((x) => x.cells[1].textContent.trim() === 'Role'); return tr ? tr.dataset.status + '|' + tr.cells[2].textContent.trim() : 'none'; })()`);
     assert.equal(role, 'done|Code', 'its root a plain span: no role, read from the code');
   } finally { close(); c.kill(); }
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /'Do and don\\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\\'t:[^']*' \+ \(DATA\.intentLayer \? [^)]*\) \+ 'its description in Figma; the comment above its rule in the code; or contract\.authored\.json under guidance\.doDont\./);
 });

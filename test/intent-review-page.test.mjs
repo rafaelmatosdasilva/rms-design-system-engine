@@ -2,11 +2,12 @@
 // evidence, who it waits on and who answered it; a page whose component changed reviewed as that; rows counted by who
 // they wait on. An invented system (Acme).
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+const tpl = templateText();
 const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 const capital = (x) => String(x).charAt(0).toUpperCase() + String(x).slice(1);
 const grab = (name, args) => new RegExp(`var ${name} = (function \\(${args}\\) \\{[\\s\\S]*?\\n    \\});`).exec(tpl)[1];
@@ -16,6 +17,7 @@ const loadProposal = (IL = {}) => new Function('esc', 'capital', 'IL', `var IL_S
   var ilOwn = ${line('ilOwn')}; var ilCandidates = ${grab('ilCandidates', 'x')}; var ilAnsweredBy = ${grab('ilAnsweredBy', 'x')}; return (${grab('ilProposal', 'p')});`)(esc, capital, IL);
 // What to do on a row: each answer to its open proposals with the command that gives it.
 const loadIfNot = (IL = {}) => new Function('esc', 'IL', `var ENGINE = 'acme-ds'; var decideMark = function () { return ''; }; var sysButton = function (t, l, a) { return '<button' + a + '>' + l + '</button>'; };
+  ${/function plainText\(.*/.exec(tpl)[0]}
   var ilOn = ${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]};
   var ilOwn = ${line('ilOwn')}; var ilOpen = ${line('ilOpen')}; var ilAnswer = ${line('ilAnswer')}; return (${grab('ilIfNot', 'p, html')});`)(esc, IL);
 

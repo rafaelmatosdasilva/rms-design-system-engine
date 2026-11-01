@@ -1,6 +1,7 @@
 // A model judges each Showroom screen against its brief, only when asked (page-judgment.mjs). The model is never
 // called here: every answer comes from a stand-in for the person's command.
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -190,7 +191,7 @@ test('asked in Claude Code, judging the screens routes to --judge-pages; a proto
 });
 
 test('in the style guide: the page review under each screen, then the model\'s judgment, said to be one', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /'<h3>Page review<\/h3><p class="sg-showroom-kind">Read from its code: '/);
   assert.match(tpl, /'<h3>Judged by a model<\/h3><p class="sg-showroom-kind">A model read its screenshot and its code against '/);
   assert.match(tpl, /Advisory: a person checks each one\./);
