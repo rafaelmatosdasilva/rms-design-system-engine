@@ -8,7 +8,7 @@ import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText,
 import { entityView, dropBoilerplate, DRAFT } from '../lib/doc-source-dsds.mjs';
 import { factsFrom } from '../lib/intent-truth.mjs';
 import { useReport } from '../lib/intent-layer.mjs';
-import { tempDir } from './helpers.mjs';
+import { tempDir, makeFixture } from './helpers.mjs';
 
 const SPEC = `# Tile One
 
@@ -351,4 +351,92 @@ test('the reader keeps what a generated definitions section names, and whether i
     { kind: 'definitions', title: 'Properties', items: [{ term: 'size (chipSize)', definition: 'Vue prop `chipSize`. String; default `m`.' }] },
   ] }, 'specs/dsds/chip-one.dsds.json');
   assert.deepEqual(v.defined, { events: [{ term: 'picked', codeTerm: null, said: false }, { term: 'removed', codeTerm: null, said: true }], props: [{ term: 'size', codeTerm: 'chipSize', said: true }] });
+});
+
+test('a line led by its section\'s title, as the reader gives it, is found where its file keeps it without', () => {
+  const md = '# Tile One\n\n## Overflow\n\n- Keep `tileOne` to one line.\n\n## When to use\n\n- Overflow: Keep it short.\n';
+  const t = mdReplace(md, 'Overflow: Keep `tileOne` to one line.', 'Overflow: Keep `tileOne` to two lines.');
+  assert.match(t, /## Overflow\n\n- \*\*Draft:\*\* Keep `tileOne` to two lines\.\n/, 'the title it is led by is not written twice');
+  assert.match(mdRemove(md, 'Overflow: Keep `tileOne` to one line.'), /^# Tile One\n\n## When to use\n\n- Overflow: Keep it short\.\n$/);
+  assert.equal(mdRemove(md, 'Limits: Keep `tileOne` to one line.'), md, 'only under a heading of that title');
+  assert.match(mdRemove(md, 'Overflow: Keep it short.'), /- Keep `tileOne` to one line\.\n$/, 'a line written led by it is matched as it is');
+  const doc = { kind: 'component', name: 'Tile One', sections: [{ kind: 'section', title: 'Specification', freeform: [{ title: 'Overflow', body: '- Keep `tileOne` to one line.' }] }] };
+  assert.equal(jsonReplace(doc, 'Overflow: Keep `tileOne` to one line.', 'Keep `tileOne` to two lines.'), 1);
+  assert.equal(doc.sections[0].freeform[0].body, '- **Draft:** Keep `tileOne` to two lines.');
+  assert.equal(jsonRemove(doc, 'Overflow: **Draft:** Keep `tileOne` to two lines.'), 1);
+  assert.equal(doc.sections[0].freeform[0].body, '');
+});
+
+test('a change none of the page\'s files holds is never said as made: the summary and CHANGES.md say it could not be found', () => {
+  const e = { kind: 'component', layer: 'components', name: 'Tile One', id: 'component-tile-one', file: 'specs/dsds/tile-one.dsds.json', code: 'src/tiles/TileOne.vue' };
+  const plan = [{ entity: e, page: { name: 'Tile One', component: 'tileOne' }, remove: [], rewrite: [], need: [], rewritten: [{ line: 'Set `tone="bright"` for alerts.', text: 'Set `tone="loud"` for alerts.' }], drafted: [] }];
+  const files = new Map([['specs/tile-one.md', SPEC], ['specs/dsds/tile-one.dsds.json', JSON.stringify(PAGE, null, 2) + '\n']]);
+  const r = applyPlan(plan, files);
+  assert.equal(r.files.size, 0);
+  assert.deepEqual(r.pages, []);
+  assert.deepEqual(r.missed, [{ name: 'Tile One', line: 'Set `tone="bright"` for alerts.', to: 'Set `tone="loud"` for alerts.' }]);
+  const said = describeChanges(r);
+  assert.match(said.split('\n')[0], /^0 pages changed: .*0 sentences the system contradicts written again as drafts, 0 lines drafted\. 1 line could not be found in its page: "Set `tone="bright"` for alerts\." \(Tile One\)\.$/);
+  assert.match(said, /### Not found in the page\n.*\n\n- Tile One: "Set `tone="bright"` for alerts\." \(to be written again as "Set `tone="loud"` for alerts\."\)/);
+  // A line to take out that is not there either.
+  const out = applyPlan([{ ...plan[0], rewritten: [], remove: ['A line no file has.'] }], files);
+  assert.deepEqual(out.missed, [{ name: 'Tile One', line: 'A line no file has.' }]);
+  assert.match(describeChanges(out), /- Tile One: "A line no file has\." \(to be taken out\)/);
+});
+
+test('a line the engine wrote from the code that the system now contradicts is written again from the code, never drafted', () => {
+  const facts = factsFrom({ components: { tileCard: { file: 'src/TileCard.vue', props: { tileData: { type: 'Array' } } } } });
+  const e = { kind: 'component', layer: 'components', name: 'Tile Card', id: 'component-tile-card', file: 'specs/dsds/tile-card.dsds.json', code: 'src/TileCard.vue', purpose: ['A card for one subject.'], whenToUse: ['Use it for one subject.'], whenNotToUse: ['x'], mistakes: ['x'], limitations: ['x'], rules: ['Role: none', 'Do: keep it short.', 'Example: `<TileCard />`', 'Data: `tileData` holds a list of items, each with `title`, `statusLabel`, `icon`.'], sections: [] };
+  const snap = { _source: {}, entities: [e] };
+  const wrong = [{ kind: 'name', where: 'Rules', line: 'Data: `tileData` holds a list of items, each with `title`, `statusLabel`, `icon`.', says: '`statusLabel`', truth: 'No component, prop or name in the code or Figma is called that.' }];
+  const report = useReport(snap, new Map([['tileCard', e]]), { names: ['tileCard'], wrongOf: () => wrong });
+  const code = { events: [], payloads: {}, slots: [], props: [], propFacts: {}, data: { tileData: ['title', 'badgeText', 'icon'] }, listy: { tileData: true } };
+  const [it] = planOf(snap, report, { code: () => code });
+  assert.deepEqual(it.rewrite, [], 'not a sentence for a person to review');
+  assert.deepEqual(it.stale, ['`tileData` holds a list of items, each with `title`, `statusLabel`, `icon`.']);
+  assert.deepEqual(it.need.find((n) => n?.write).write, [{ where: 'Data', text: '`tileData` holds a list of items, each with `title`, `badgeText`, `icon`.' }]);
+  // As the code still says it: nothing to change. With the code not read this run: kept as it is, and said why.
+  assert.equal(planOf(snap, report, { code: () => ({ ...code, data: { tileData: ['title', 'statusLabel', 'icon'] } }) }).length, 0);
+  const unread = planOf(snap, report);
+  assert.deepEqual(unread[0].rewrite, []);
+  draftPlan(unread, facts, () => '{}');
+  const r = applyPlan(unread, new Map());
+  assert.equal(r.files.size, 0);
+  assert.match(r.held[0].why, /^"Data: `tileData` holds [^"]+" was written by the engine from the code and the system now says otherwise \(No component, prop or name in the code or Figma is called that\); the code was not read this run/);
+});
+
+test('a DSDS layer whose code\'s item fields changed: the engine\'s Data line is written again in its Markdown spec and its DSDS page', async () => {
+  const { syncIntentLayer } = await import('../lib/intent-layer.mjs');
+  const { prepareLayerFix } = await import('../lib/intent-changes.mjs');
+  const old = '`tileData` holds a list of items, each with `title`, `statusLabel`, `icon`.', now = '`tileData` holds a list of items, each with `title`, `badgeText`, `icon`.';
+  const example = '```vue\n<TileCard :tile-data="items" />\n```';
+  const dir = makeFixture({
+    'package.json': { name: 'acme' },
+    'struct.json': { components: { tileCard: {} } },
+    'src/TileCard.vue': '<template><div><slot /></div></template>\n<script setup>\ndefineProps({ tileData: Array })\n</script>\n',
+    '.design-system-engine-out/code.snapshot.json': { api: { tileCard: { file: 'src/TileCard.vue', props: { tileData: { type: 'Array' } } } } },
+    // What the code says each item holds now: statusLabel is gone, badgeText is new.
+    '.design-system-engine-out/prototypes/page-system.json': { components: { TileCard: { file: 'src/TileCard.vue', props: { tileData: { type: 'Array' } }, fields: { tileData: { title: {}, badgeText: {}, icon: {} } } } }, uses: {} },
+    'specs/dsds/index.dsds.json': { schemaVersion: '0.23.0', entries: [{ kind: 'system', id: 'acme', name: 'Acme' }], refs: [{ href: 'components/cards/tile-card.dsds.json' }] },
+    'specs/dsds/components/cards/tile-card.dsds.json': { kind: 'component', id: 'component-tile-card', name: 'Tile Card', description: 'A card for one subject.', sourceFiles: [{ platform: 'vue', file: 'src/TileCard.vue' }], sections: [
+      { kind: 'guidelines', for: 'all', framing: 'when-to-use', title: 'When to use', items: [{ level: 'should', statement: 'Use it to show one subject at a glance.' }] },
+      { kind: 'section', for: 'all', title: 'Specification', freeform: [{ title: 'Data', body: `- ${old}` }, { title: 'Examples', body: example }] }] },
+    'specs/components/tile-card.md': `# Tile Card\n\n## Metadata\n\n- Name: Tile Card\n- Source: \`src/TileCard.vue\`\n\n## Purpose\n\nA card for one subject.\n\n## When to use\n\n- Use it to show one subject at a glance.\n\n## Examples\n\n${example}\n\n## Data\n\n- ${old}\n`,
+  });
+  const cfg = { paths: { snapshotStructure: 'struct.json' }, componentFiles: { tileCard: 'src/TileCard.vue' }, intentLayer: { folder: 'specs', format: 'dsds', entry: 'specs/dsds/index.dsds.json' } };
+  assert.equal((await syncIntentLayer(dir, cfg, {})).ok, true);
+  // The content check finds statusLabel nowhere in the code; a drafter would write the line again if asked.
+  const p = await prepareLayerFix(dir, cfg, { answers: { '0.r0': { text: 'Data: `tileData` holds the list of items the tile shows.' } } });
+  assert.equal(p.error, undefined);
+  assert.deepEqual(p.plan[0].rewrite, [], 'the engine\'s own line is not asked to be written again');
+  assert.deepEqual([...p.result.files.keys()].sort(), ['specs/components/tile-card.md', 'specs/dsds/components/cards/tile-card.dsds.json']);
+  const md = p.result.files.get('specs/components/tile-card.md');
+  assert.ok(md.endsWith(`## Data\n\n- ${now}\n`), md);
+  assert.ok(!md.includes('statusLabel') && !md.includes('**Draft:**'));
+  const page = JSON.parse(p.result.files.get('specs/dsds/components/cards/tile-card.dsds.json'));
+  assert.deepEqual(page.sections[1].freeform.map((b) => [b.title, b.body]), [['Data', `- ${now}`], ['Examples', example]], 'in the same block, written as sure');
+  assert.deepEqual(p.result.missed, []);
+  const first = p.summary.split('\n')[0];
+  assert.match(first, /^1 page changed: 0 lines written on every page alike taken out, 0 sentences the system contradicts written again as drafts, 1 line drafted, 1 line the code no longer says taken out\.$/);
+  assert.match(p.summary, new RegExp(`- Written from the code, Data: "${now.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\n- Taken out, the code no longer says it: "${old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
 });
