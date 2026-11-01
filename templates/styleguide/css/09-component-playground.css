@@ -228,7 +228,6 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-cx-table col.sg-cx-rule { width: 34%; } .sg-cx-table col.sg-cx-col { width: 15%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 .sg-todo-scope { display: block; color: var(--sg-muted); margin-bottom: var(--sg-space-xxs); }   /* local or shared, and on whom a shared one waits: its reason on hover and in the row's panel */
-.sg-todo-scope-line { margin: var(--sg-space-xxs) 0 0; color: var(--sg-muted); }   /* the Tasks page's count of shared and local */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
 .sg-issues th, .sg-issues td { padding-left: var(--sg-space-s); padding-right: var(--sg-space-s); }
 .sg-issues td { overflow-wrap: break-word; }

@@ -309,13 +309,7 @@
     // under the components', its rows numbered as before. A component only one side has is a row of the table above.
     var inTable = function (r) { return r.from && (r.from.figmaOnly || r.from.codeOnly || r.from.pairing); };
     var sysHTML = byKind.map(function (k) { var g = k.groups.filter(function (x) { return !x.name; })[0], rows = g ? g.rows.filter(function (r) { return !inTable(r); }) : []; return rows.length ? issueTableHTML(rows, '', esc(k.area === 'Style guide' ? 'Missing components' : k.area === 'System' ? 'Tokens' : k.area), k.area) : ''; }).filter(Boolean).join('');
-    // How many open tasks are shared (they change what other products get, and wait on the one who decides) and how
-    // many local (one product's own, waiting on no one): one line under the filters.
-    var sc = { shared: 0, local: 0, on: {} };
-    byKind.forEach(function (k) { k.groups.forEach(function (g) { g.rows.forEach(function (r) { var x = rowScope(r); if (!x || !isOpen(r)) return; sc[x.scope === 'shared' ? 'shared' : 'local']++; if (x.scope === 'shared' && x.decider && x.decider.name) sc.on[x.decider.name] = (sc.on[x.decider.name] || 0) + 1; }); }); });
-    var onList = Object.keys(sc.on).sort(function (a, b) { return sc.on[b] - sc.on[a] || a.localeCompare(b); }).map(function (n) { return n + ' (' + sc.on[n] + ')'; });
-    var scopeLine = sc.shared || sc.local ? '<p class="sg-todo-scope-line">' + esc([sc.shared ? sc.shared + ' shared' + (onList.length ? ', waiting on ' + onList.join(', ') : '') : '', sc.local ? sc.local + ' local, each product team\'s own' : ''].filter(Boolean).join('; ') + '.') + tipHTML('Shared: it changes what other products get (a shared component, a token, a contract), so it waits on the one who decides for it (ds-config.json owners). Local: it stays in one product (its own screen, its own CSS), so its team acts and waits on no one.', 'What shared and local mean') + '</p>' : '';
-    var html = '<div class="sg-todo-head"><p class="pg-par-sum sg-todo-sum">' + chipsRow + '</p>' + scopeLine + '</div>' +
+    var html = '<div class="sg-todo-head"><p class="pg-par-sum sg-todo-sum">' + chipsRow + '</p></div>' +
       table +
       (sysHTML ? '<h3 class="sg-mx-sys-head">Not tied to one component</h3><div class="sg-mx-sys">' + sysHTML + '</div>' : '');
     if (box._drawn === html) return;
