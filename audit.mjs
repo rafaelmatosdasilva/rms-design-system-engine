@@ -566,8 +566,12 @@ if (process.argv.includes('--intent-decide')) {
   const at = process.argv.indexOf('--intent-decide'), keysArg = process.argv[at + 1], ans = String(process.argv[at + 2] ?? '').toLowerCase();
   if (!keysArg || keysArg.startsWith('--')) {
     if (!open.length) { console.log('✅ No proposal waits for an answer.'); console.log('NEXT: none'); process.exit(0); }
-    console.log(`📝 ${open.length} proposal${open.length === 1 ? '' : 's'} wait for the team's answer:`);
-    for (const [k, v] of open) console.log(`\n${k}\n  → ${v.proposal}\n${v.evidence.map((e) => '    · ' + e).join('\n')}\n${pr.optionsOf(v).map((o) => `    ${o.answer}: ${o.does}`).join('\n')}`);
+    const { waitingOn, waitingLine } = await import('./decided-by.mjs');
+    const on = waitingOn(open.map(([, v]) => v));
+    console.log(`📝 ${open.length} proposal${open.length === 1 ? '' : 's'} wait for the team's answer${on.length ? ` (${waitingLine(on)})` : ''}:`);
+    // Evidence first: every answer it could take, with what speaks for it, where from and how strongly.
+    const cands = (v) => (v.candidates ?? []).map((c) => `    ${c.answer === v.recommends ? '▸' : ' '} ${c.answer}: ${c.says}${c.evidence.length ? '' : ' (nothing speaks for it)'}\n${c.evidence.map((e) => `        · ${e.from}, ${e.strength}: ${e.says}`).join('\n')}`).join('\n');
+    for (const [k, v] of open) console.log(`\n${k}${v.decider ? `  (waits on ${v.decider.name})` : ''}\n  → ${v.proposal}${v.split ? ' The evidence is split: a person decides.' : ''}\n${v.candidates?.length ? cands(v) : v.evidence.map((e) => '    · ' + e).join('\n')}\n${pr.optionsOf(v).map((o) => `    ${o.answer}: ${o.does}`).join('\n')}`);
     console.log('\nNEXT: ask the person which answer for each (or for all), saying what each does; record it with --intent-decide "<key>[,<key>…]" <answer>; never answer for them.');
     process.exit(0);
   }
@@ -579,8 +583,13 @@ if (process.argv.includes('--intent-decide')) {
   // Each proposal's own answers (yes and no, or the options it lists).
   const offMenu = keys.filter((k) => !pr.optionsOf(d.proposals.get(k)).some((o) => o.answer === ans));
   if (!ans || offMenu.length) { console.log(`Answer with one of its options: ${[...new Set((offMenu.length ? offMenu : keys).flatMap((k) => pr.optionsOf(d.proposals.get(k)).map((o) => o.answer)))].join(', ')} (rms-design-system-engine --intent-decide "<key>" <answer>)`); process.exit(2); }
-  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals), { by: (await import('./decided-by.mjs')).decidedBy(ROOT), said: _argValue('--said') });
+  const db = await import('./decided-by.mjs');
+  const by = db.decidedBy(ROOT);
+  pr.decide(ROOT, keys, ans, Object.fromEntries(d.proposals), { by, said: _argValue('--said') });
   console.log(`✅ ${keys.length} proposal${keys.length === 1 ? '' : 's'} answered ${ans} (${projectPath(ROOT, 'intentDecisions')}): ${keys.map((k) => pr.optionsOf(d.proposals.get(k)).find((o) => o.answer === ans)?.does).filter(Boolean).join(' ') || 'the Documentation page no longer asks it of the team.'}`);
+  // Answered by someone else than its owner: kept as given, and said, so the owner hears of it.
+  const others = [...new Set(keys.map((k) => d.proposals.get(k)?.decider).filter((o) => db.notTheOwner(by, o)).map((o) => o.name))];
+  if (others.length) console.log(`ℹ️  Answered by ${by}, and ${others.join(' and ')} ${others.length === 1 ? 'is' : 'are'} who decides ${keys.length === 1 ? 'it' : 'these'} (ds-config.json → owners): the answer stands; tell ${others.join(' and ')}.`);
   await sendDecisions();
   // What the answer changes in the layer, made now: on the pages it was about (a page to start is found by its answer).
   const only = new Set(keys.map((k) => d.proposals.get(k)?.page).filter(Boolean));
@@ -1976,6 +1985,16 @@ if (process.argv.includes('--styleguide')) {
         if (next !== html) writeFileSync(page, next);
         console.log(`   Accessibility from the saved results (${RESULTS_FILE}): a component changed since is tried by the browser that opens the page.`);
       }
+    }
+    // The page's own pages pictured in the browser and compared with the last build's (styleguide-shots.mjs): a layout
+    // that moved shows before anyone opens it. A whole guide built with the browser only; it never fails the build. Not
+    // in CI: its folder is thrown away after the run, so a picture there has nothing to be compared with, ever.
+    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false && !r.scope && !SCOPE_COMPONENTS.length && existsSync(r.out) && !process.env.CI) {
+      try {
+        const { guideShots, shotLines } = await import('./styleguide-shots.mjs');
+        const shotsDir = join(ROOT, OUT_DIR, 'styleguide-shots');
+        for (const line of shotLines(await guideShots(resolve(ROOT, r.out), shotsDir), shotsDir, ROOT)) console.log(line);
+      } catch (e) { console.log(`   The style guide's own pages not pictured (${String(e.message).split('\n')[0]}).`); }
     }
     // Each open task's age in the page (how long since an audit first found it), from the record a build with the browser
     // keeps: also in a page built without it, as of that build.
@@ -6406,6 +6425,12 @@ function reportFull(label, items, shown) {
           const rep = il.useReport(snap, il.matchComponents(Object.keys(r.intent.components), snap.entities, il.codeFilesOf(ROOT, cfg)), { names: Object.keys(r.intent.components), codeExists: (f) => existsSync(resolve(ROOT, f)), from: il.namesFrom(ROOT, cfg), wrongOf: (await import('./intent-truth.mjs')).checkedLayer(ROOT, cfg, snap) });
           const todo = il.ACTIONS.filter(([k]) => !['keep', 'improve'].includes(k) && rep.actions[k]).map(([k, label]) => `${rep.actions[k]} ${label.toLowerCase()}`);
           console.log(`🧭 Intent layer for agents: ${rep.counts.used} pages used, ${rep.counts.thin} thin, ${rep.counts.notUsed} not used · ${r.components - r.withIntentLayer} components with no page${todo.length ? `\n   To do in the intent layer: ${todo.join(', ')} (each page with why and what to change: the style guide's Intent layer page, --docs)` : ''}${rep.actions.fix ? `\n   ${rep.actions.fix} page${rep.actions.fix === 1 ? ' says' : 's say'} something the system contradicts: those sentences are left out of what the agents get until fixed (--check-intent lists each)` : ''}`);
+          // What waits on a person, by who it waits on (ds-config.json → owners).
+          try {
+            const pr = await import('./intent-proposals.mjs'), db = await import('./decided-by.mjs');
+            const on = db.waitingOn(pr.pendingOf(await pr.decidedLayer(ROOT, cfg), cfg));
+            if (on.length) console.log(`   Waiting on a person: ${db.waitingLine(on)} (the Documentation page names each, --intent-decide lists the proposals)`);
+          } catch { /* said on the Documentation page */ }
         } catch { /* the line above already says how many pages */ }
       }
     } catch (e) {

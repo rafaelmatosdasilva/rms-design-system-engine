@@ -7,7 +7,9 @@
 //   claim: what it says of a component agrees with it: a prop it sets is one the component has, with a value the prop
 //          takes; the code file it names is the component's; a status it gives is the component's; what it says the
 //          component does for accessibility, the accessibility check did not find broken.
-//   stale: the component changed (its props, in the code or Figma, or its code file) after the page was last edited.
+//   stale: the component changed (its props, the values they take, its tokens, in the code or Figma, or its code file)
+//          after the page was last edited or a person last confirmed it still holds (a yes to review:<page>,
+//          intent-proposals.mjs). The page is not taken out: it is marked to review again, with what changed and since when.
 //   twin:  it says what another component's page says, so it does not help an agent choose between the two.
 //   copy:  a list it writes out by hand that the engine generates (a prop table, a token family, a catalog of
 //          components): right today, stale tomorrow, and taken for the whole list (copied-lists.mjs).
@@ -22,6 +24,7 @@ import { resolveStatus } from './decision-status.mjs';
 import { matchComponents, systemNames, codeFilesOf } from './intent-layer.mjs';
 import { readDecisions } from './intent-proposals.mjs';
 import { copiedLists } from './copied-lists.mjs';
+import { storeFigmaChangelogs } from './snapshot-history.mjs';
 
 export const KINDS = { name: 'Not in the system', claim: 'Disagrees with the system', stale: 'Out of date', twin: 'Same as another page', copy: 'Copies a generated list' };
 // What the engine keeps of each component's props between runs, to tell when one changed.
@@ -104,6 +107,8 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
     if (st) c.status = st.state;
   }
   for (const [n, a] of Object.entries(authored)) { const st = resolveStatus(a, null); if (st && components[n]) components[n].status = st.state; }
+  // Its tokens: those its contract says it uses, and Figma's variables named after it (tileOne/background).
+  for (const [n, t] of Object.entries(componentTokens(ROOT, cfg, Object.keys(components)))) components[n].tokens = t;
   // The names a page may use for a component: its code file's name too (TileOne for TileOne.vue).
   const aliases = {};
   for (const [n, c] of Object.entries(components)) if (c.file) aliases[String(c.file).split('/').pop().replace(/\.[^.]+$/, '')] = n;
@@ -130,32 +135,75 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
     const n = String(i.component ?? '').replace(/^\./, ''); if (!n || !i.wcag) continue;
     (a11y[n] ??= []).push({ wcag: String(i.wcag), fix: i.fix ?? null, issue: i.issue ?? null });
   }
-  const changed = componentChanges(ROOT, components, { record, now });
+  let figma = null; try { figma = storeFigmaChangelogs(ROOT, Object.keys(components)); } catch { /* no store history */ }
+  const changed = componentChanges(ROOT, components, { record, now, figma });
   // The intent layer's own files, when its snapshot lists them (a page may point at another page of the layer).
   const il = readJson(resolve(ROOT, (typeof cfg.intentLayer === 'object' && cfg.intentLayer?.out) || 'intent-layer.snapshot.json'));
   return factsFrom({ components, tokens: Object.keys(code.tokens ?? {}), text: texts.join('\n'), files: files.map((f) => f.path), layerFiles: il?.layerFiles ?? null, a11y, changed, aliases });
 }
 
-// When each component last changed: the engine keeps each component's props (names, and the values each takes) from
-// run to run, and dates the run that first saw them differ; the code's own history dates its file when the project is
-// a git repository. → { name: { at, added: [props], removed: [props], how } }; a component never seen to change has none.
-export function componentChanges(ROOT, components, { record = true, now = new Date().toISOString() } = {}) {
+// Each component's tokens, from what the engine already wrote: its contract's tokens.used (contracts/), and the Figma
+// variables named after it in the variables snapshot. → { name: [token] } (sorted), only for the components that have any.
+export function componentTokens(ROOT, cfg = {}, names = []) {
+  const out = {};
+  const add = (n, t) => { if (!names.includes(n) || !t) return; (out[n] ??= new Set()).add(String(t)); };
+  const walkDir = (d) => { let es = []; try { es = readdirSync(d, { withFileTypes: true }); } catch { return; } for (const x of es) { const p = join(d, x.name); if (x.isDirectory()) walkDir(p); else if (x.name.endsWith('.contract.json')) { const c = readJson(p); const n = c?.name ?? String(c?.id ?? '').replace(/^[^.]+\./, ''); for (const t of c?.tokens?.used ?? []) add(n, t); } } };
+  walkDir(resolve(ROOT, cfg.contracts?.out ?? 'contracts'));
+  const vars = cfg.paths?.snapshotVars ? readJson(resolve(ROOT, cfg.paths.snapshotVars)) : null;
+  for (const [mode, map] of Object.entries(vars ?? {})) {
+    if (!map || typeof map !== 'object' || Array.isArray(map) || mode.startsWith('_')) continue;
+    for (const k of Object.keys(map)) { const n = k.split('/')[0]; if (k.includes('/')) add(n, k); }
+  }
+  return Object.fromEntries(Object.entries(out).map(([n, t]) => [n, [...t].sort()]));
+}
+
+// When each component last changed, and what: the engine keeps each component's props (names, and the values each
+// takes) and its tokens from run to run, and dates the run that first saw them differ; the code's own history dates its
+// file when the project is a git repository; the snapshots store's history (snapshot-history.mjs, read from its kept
+// digest, never fetched here) dates each read of Figma that changed it. → { name: { at, added, removed, how, log } }:
+// at, added, removed and how are the latest change's; log is every change kept, newest last, each
+// { at, how, added?, removed?, values?: [{ prop, added, removed }], tokensAdded?, tokensRemoved?, file?, figma? }.
+// A component never seen to change has none.
+const LOG_KEPT = 12;
+export function componentChanges(ROOT, components, { record = true, now = new Date().toISOString(), figma = null } = {}) {
   const path = resolve(ROOT, CHANGES_FILE);
   const kept = readJson(path) ?? {};
   const next = {}, out = {};
+  const less = (a, b) => (a ?? []).filter((x) => !(b ?? []).includes(x));
   for (const [n, c] of Object.entries(components)) {
     const props = Object.keys(c.props ?? {}).sort();
     const sig = props.map((p) => `${p}:${(c.props[p].options ?? []).join('|')}`).join(',');
+    const options = Object.fromEntries(props.filter((p) => c.props[p].options?.length).map((p) => [p, c.props[p].options.map(String)]));
+    const tokens = c.tokens ?? [];
     const was = kept[n];
-    if (!was) next[n] = { sig, props, since: null };
-    else if (was.sig !== sig) {
-      next[n] = { sig, props, since: now, added: props.filter((p) => !was.props.includes(p)), removed: was.props.filter((p) => !props.includes(p)) };
-      if (!next[n].added.length && !next[n].removed.length) next[n].values = true;
-    } else next[n] = was;
+    // A record from before tokens were kept takes today's as where they start: never a change of its own.
+    const wasTokens = was?.tokens ?? tokens;
+    const tokensAdded = less(tokens, wasTokens), tokensRemoved = less(wasTokens, tokens);
+    if (!was) next[n] = { sig, props, options, tokens, since: null, log: [] };
+    else if (was.sig !== sig || tokensAdded.length || tokensRemoved.length) {
+      const ev = { at: now, how: 'props', added: less(props, was.props), removed: less(was.props, props) };
+      if (was.sig !== sig && was.options) {
+        const values = props.filter((p) => was.props.includes(p)).map((p) => ({ prop: p, added: less(options[p], was.options[p]), removed: less(was.options[p], options[p]) })).filter((v) => v.added.length || v.removed.length);
+        if (values.length) ev.values = values;
+      }
+      if (tokensAdded.length) ev.tokensAdded = tokensAdded;
+      if (tokensRemoved.length) ev.tokensRemoved = tokensRemoved;
+      if (was.sig === sig) ev.how = 'tokens';
+      else if (!ev.added.length && !ev.removed.length && !ev.values) ev.how = 'the values its props take changed';
+      next[n] = { sig, props, options, tokens, since: now, added: ev.added, removed: ev.removed, ...(ev.how !== 'props' && ev.how !== 'tokens' ? { values: true } : {}), log: [...(was.log ?? []), ev].slice(-LOG_KEPT) };
+    } else next[n] = { ...was, options, tokens };
     const r = next[n];
-    if (r.since) out[n] = { at: r.since, added: r.added ?? [], removed: r.removed ?? [], how: r.values ? 'the values its props take changed' : 'props' };
+    // A record from before the log was kept: its one change, as it was said.
+    const log = r.log?.length ? r.log : r.since ? [{ at: r.since, how: r.values ? 'the values its props take changed' : 'props', added: r.added ?? [], removed: r.removed ?? [] }] : [];
+    if (log.length) { const last = log[log.length - 1]; out[n] = { at: last.at, added: last.added ?? [], removed: last.removed ?? [], how: last.how, log }; }
   }
   if (record) { try { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, JSON.stringify(next, null, 1) + '\n'); } catch { /* not kept */ } }
+  const addEvent = (n, ev) => {
+    const o = out[n] ?? { at: ev.at, added: [], removed: [], how: ev.how, log: [] };
+    o.log = [...o.log, ev].sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    if (!out[n] || ev.at > o.at) Object.assign(o, { at: ev.at, added: [], removed: [], how: ev.how, ...(ev.file ? { file: ev.file } : {}) });
+    out[n] = o;
+  };
   // The code's history, when there is one: the last commit of each component's file.
   try {
     const filesOf = Object.entries(components).filter(([, c]) => c.file).map(([n, c]) => [n, String(c.file).replace(/^\.?\//, '')]);
@@ -163,14 +211,44 @@ export function componentChanges(ROOT, components, { record = true, now = new Da
       const log = execFileSync('git', ['-C', ROOT, 'log', '--format=@%cI', '--name-only', '-n', '3000', '--', ...new Set(filesOf.map(([, f]) => f.split('/')[0]))], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64e6 });
       const last = new Map(); let at = null;
       for (const l of log.split('\n')) { if (l.startsWith('@')) at = l.slice(1); else if (l && at && !last.has(l)) last.set(l, at); }
-      for (const [n, f] of filesOf) {
-        const d = last.get(f); if (!d) continue;
-        if (!out[n] || d > out[n].at) out[n] = { at: d, added: [], removed: [], how: 'file', file: f };
-      }
+      for (const [n, f] of filesOf) { const d = last.get(f); if (d) addEvent(n, { at: d, how: 'file', file: f }); }
     }
   } catch { /* no history */ }
+  // Figma's history: each read of Figma that changed what it says of the component (its properties, its variables).
+  for (const [n, list] of Object.entries(figma ?? {})) {
+    if (!components[n]) continue;
+    for (const r of (list ?? []).slice(0, 5)) if (r?.date && r.changed?.length) addEvent(n, { at: r.date, how: 'figma', figma: r.changed });
+  }
   return out;
 }
+
+// The changes of a component made after a date (the page's last edit, or its last confirmation), oldest first.
+// ch: componentChanges' entry for it, or one as the tests write it ({ at, added, removed, how, file? }).
+export function changesSince(ch, since) {
+  if (!ch) return [];
+  const t = Date.parse(since);
+  const log = ch.log?.length ? ch.log : [{ at: ch.at, how: ch.how, added: ch.added ?? [], removed: ch.removed ?? [], ...(ch.file ? { file: ch.file } : {}) }];
+  return log.filter((e) => isNaN(t) || Date.parse(e.at) > t);
+}
+
+// What changed, in a few words a change: new props, props removed, a prop's values, tokens, its file, a read of Figma.
+// → [string], newest last, each a sentence part ("new props `glow`; props removed `dense`").
+export function changeWords(events) {
+  return events.map((e) => {
+    if (e.how === 'file') return `${String(e.file).split('/').pop()} changed in the code`;
+    if (e.how === 'figma') return `Figma: ${e.figma.slice(0, 3).join(', ')}${e.figma.length > 3 ? `, … (${e.figma.length})` : ''}`;
+    const parts = [];
+    if (e.added?.length) parts.push(`new props ${list(e.added)}`);
+    if (e.removed?.length) parts.push(`props removed ${list(e.removed)}`);
+    for (const v of e.values ?? []) parts.push(`\`${v.prop}\` ${[v.added.length ? `takes ${list(v.added)} now` : '', v.removed.length ? `no longer takes ${list(v.removed)}` : ''].filter(Boolean).join(' and ')}`);
+    if (e.tokensAdded?.length) parts.push(`new tokens ${list(e.tokensAdded, 4)}`);
+    if (e.tokensRemoved?.length) parts.push(`tokens removed ${list(e.tokensRemoved, 4)}`);
+    return parts.length ? parts.join('; ') : e.how;
+  });
+}
+
+// The names a change took away (props, values, tokens): a page that still writes one of them says what is no longer so.
+export const removedBy = (events) => [...new Set(events.flatMap((e) => [...(e.removed ?? []), ...(e.tokensRemoved ?? []), ...(e.values ?? []).flatMap((v) => v.removed)]))];
 
 // ── One page, against the system ────────────────────────────────────────────────────────────────────────────────────
 // Each line a page says, with where it is (the section it is under), code blocks left out: they are examples.
@@ -254,7 +332,8 @@ export function inSystem(facts, n) {
 
 // → [finding]. component: the system's component this page documents (null for a page of another layer).
 // strict: no leniency for a name the line warns against or says is Figma's (a drafted line names only what there is).
-export function checkPage(e, facts, { component = null, strict = false } = {}) {
+// reviewedAt: when a person last confirmed the page still holds (a yes to review:<page>): a change before it is settled.
+export function checkPage(e, facts, { component = null, strict = false, reviewedAt = null } = {}) {
   const out = [];
   const seen = new Set();
   // One finding per sentence: the same wrong name in two sentences is two places to fix.
@@ -346,12 +425,21 @@ export function checkPage(e, facts, { component = null, strict = false } = {}) {
     if (c.status === 'deprecated' && e.status && !/deprecat|retir|legacy/i.test(e.status)) {
       push({ kind: 'claim', where: 'Status', line: `status: ${e.status}`, says: `it is ${e.status}`, truth: `${own} is deprecated.`, source: 'Figma or contract.authored.json', fix: 'Mark the page deprecated, and say what to use instead.' });
     }
-    // Changed after the page was last edited.
+    // Changed after the page was last edited, or last confirmed by a person: to review again, never taken out.
     const ch = facts.changed[own];
-    if (ch && e.updatedAt && Date.parse(ch.at) > Date.parse(e.updatedAt)) {
-      const what = ch.how === 'file' ? `${String(ch.file).split('/').pop()} changed on ${day(ch.at)}`
-        : `${own} changed on ${day(ch.at)}${ch.added.length ? `: new props ${list(ch.added)}` : ''}${ch.removed.length ? `${ch.added.length ? ';' : ':'} props removed ${list(ch.removed)}` : ''}${!ch.added.length && !ch.removed.length ? `: ${ch.how}` : ''}`;
-      push({ kind: 'stale', where: 'The whole page', line: null, says: `last edited on ${day(e.updatedAt)}`, truth: `${what}, after this page was last edited.`, source: ch.how === 'file' ? 'the code\'s history' : 'the engine\'s record of the component', fix: 'Check the page against the component as it is today and update anything that is no longer true. This goes away once the page is edited.' });
+    const confirmed = reviewedAt && (!e.updatedAt || Date.parse(reviewedAt) > Date.parse(e.updatedAt));
+    const since = confirmed ? reviewedAt : e.updatedAt;
+    const events = ch && since ? changesSince(ch, since) : [];
+    if (events.length) {
+      const at = events[events.length - 1].at;
+      const words = changeWords(events);
+      const one = events.length === 1 && events[0].how === 'file' ? `${String(events[0].file).split('/').pop()} changed on ${day(at)}` : `${own} changed on ${day(at)}: ${words.join('; ')}`;
+      const said = (x) => new RegExp(`(^|[^\\w-])${x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`);
+      const gone = removedBy(events).filter((x) => linesOf(e).some((l) => said(x).test(l.text)));
+      const from = [...new Set(events.map((x) => x.how === 'file' ? 'the code\'s history' : x.how === 'figma' ? 'Figma\'s history' : 'the engine\'s record of the component'))].join(' and ');
+      push({ kind: 'stale', where: 'The whole page', line: null, says: confirmed ? `confirmed on ${day(reviewedAt)}` : `last edited on ${day(e.updatedAt)}`, truth: `${one}, after this page was ${confirmed ? 'last confirmed' : 'last edited'}.${gone.length ? ` The page still names ${list(gone)}.` : ''}`, source: from,
+        fix: `Check the page against the component as it is today and update anything that is no longer true. This goes away once the page is edited, or once a person confirms it still holds.`,
+        at, since, changed: words, ...(gone.length ? { gone } : {}) });
     }
   }
   return out;
@@ -389,7 +477,8 @@ export function twins(pages) {
 
 // Every page of the layer that documents a component, checked. matched: Map(component → entity) (matchComponents).
 // → Map(entity → [finding])
-export function checkLayer(snap, matched, facts) {
+// reviewedOf(entity): when a person last confirmed that page still holds, or null.
+export function checkLayer(snap, matched, facts, { reviewedOf = () => null } = {}) {
   const out = new Map();
   const forEntity = new Map([...matched].map(([n, e]) => [e, n]));
   const contracts = new Map((snap?.contracts ?? []).map((c) => [c.name, c.file]));
@@ -406,7 +495,7 @@ export function checkLayer(snap, matched, facts) {
     const component = forEntity.get(e) ?? null;
     if (e.layer === 'components' && !component) continue;
     // And the lists it copies from what the engine generates (copied-lists.mjs): right today, stale tomorrow.
-    const f = [...checkPage(e, facts, { component }), ...copiedLists(e, facts, { component, contractOf: (c) => contracts.get(c) ?? null, tokensFile, tokenFileOf: (n) => tokenFile.get(norm(n)) ?? null, catalog })];
+    const f = [...checkPage(e, facts, { component, reviewedAt: reviewedOf(e) }), ...copiedLists(e, facts, { component, contractOf: (c) => contracts.get(c) ?? null, tokensFile, tokenFileOf: (n) => tokenFile.get(norm(n)) ?? null, catalog })];
     if (f.length) out.set(e, f);
   }
   for (const [e, f] of twins([...matched].map(([n, e]) => [e, n]))) out.set(e, [...(out.get(e) ?? []), ...f]);
@@ -425,9 +514,11 @@ export function checkedLayer(ROOT, cfg, snap) {
     try {
       const facts = systemFacts(ROOT, cfg);
       const names = [...new Set([...systemNames(ROOT, cfg), ...Object.keys(facts.components)])];
-      const found = checkLayer(snap, matchComponents(names, snap.entities, codeFilesOf(ROOT, cfg)), facts);
-      // A name the team said to keep (intent-proposals.mjs → a yes to fix:<page>:<name>) is no longer a finding.
+      // A page a person confirmed still holds (a yes to review:<page>) counts its changes from then.
       const decisions = readDecisions(ROOT);
+      const reviewedOf = (e) => (decisions[`review:${e.name}`]?.answer === 'yes' ? decisions[`review:${e.name}`].at ?? null : null);
+      const found = checkLayer(snap, matchComponents(names, snap.entities, codeFilesOf(ROOT, cfg)), facts, { reviewedOf });
+      // A name the team said to keep (intent-proposals.mjs → a yes to fix:<page>:<name>) is no longer a finding.
       const kept = (e, f) => f.kind === 'name' && decisions[`fix:${e.name}:${String(f.says).replace(/`/g, '')}`]?.answer === 'yes';
       byKey = new Map([...found].map(([e, f]) => [pageKey(e), f.filter((x) => !kept(e, x))]).filter(([, f]) => f.length));
     } catch { /* not checked: nothing said, nothing left out */ }

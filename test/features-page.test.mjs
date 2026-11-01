@@ -22,9 +22,14 @@ test('every part has one stage, the same in the table and in its section', () =>
   }
 });
 
-test('parts you can use come first, and headings carry no stage', () => {
-  const stages = [...rows.values()];
-  assert.equal(stages.findIndex((s) => s === 'Coming soon'), stages.filter((s) => s !== 'Coming soon').length);
+// Ready to use, then Actively improving, Early development and Coming soon, in the table and in the sections alike,
+// so the page reads as the status it is.
+const ORDER = ['Ready to use', 'Actively improving', 'Early development', 'Coming soon'];
+const inOrder = (stages) => stages.every((s, i) => i === 0 || ORDER.indexOf(stages[i - 1]) <= ORDER.indexOf(s));
+
+test('parts are listed by stage, most ready first, and headings carry no stage', () => {
+  assert.ok(inOrder([...rows.values()]), `table: ${[...rows.values()].join(', ')}`);
+  assert.deepEqual([...sections.keys()], [...rows.keys()], 'sections follow the table');
   assert.deepEqual([...PAGE.matchAll(/^## .+ · \w+$/gm)].map((m) => m[0]), []);
 });
 

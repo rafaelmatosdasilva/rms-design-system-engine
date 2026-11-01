@@ -30,11 +30,10 @@
 // Exit 0 = every composed component is used by its template code (or advisory-only / inert).
 // Exit 1 = a composed component is missing from the template code AND templateCompositionStrict.
 
-import { readFileSync, existsSync, readdirSync } from 'fs';
-import { codeRoots } from './code-roots.mjs';
-import { join, extname, basename, relative } from 'path';
+import { readFileSync } from 'fs';
+import { join, relative } from 'path';
 import { inProgressNames } from './in-progress.mjs';   // work in progress is not drift
-import { ENGINE_DIRS } from './names.mjs';
+import { templatesSnapshot, templateComposition } from './template-composition.mjs';
 
 const ROOT = process.cwd();
 let cfg = {};
@@ -51,133 +50,40 @@ if (!TEMPLATES_CFG.length) {
 
 // ── Inert until the snapshot is captured (mirrors screen-element-check) ──────────
 const SNAP_PATH = 'figma-templates.snapshot.json';
-if (!existsSync(join(ROOT, SNAP_PATH))) {
+const found = templatesSnapshot(ROOT, cfg);
+if (!found) {
   console.log(`⚠️  [template-composition] ${SNAP_PATH} not found — run /rms-design-system-engine to capture it`);
   console.log('   (it records, per template frame, the DS components it composes; captured via REST /nodes,');
   console.log('    any plan). Inert until then — never a false failure.');
   process.exit(0);
 }
-let SNAP = {};
-try { SNAP = JSON.parse(readFileSync(join(ROOT, SNAP_PATH), 'utf8')).templates ?? {}; } catch {
-  console.log(`⚠️  [template-composition] ${SNAP_PATH} unreadable — skipped`);
+if (!found.templates) {
+  console.log(`⚠️  [template-composition] ${relative(ROOT, found.file)} unreadable — skipped`);
   process.exit(0);
 }
 
-const STRICT              = cfg.templateCompositionStrict === true;
-const KNOWN_UNIMPLEMENTED = await inProgressNames(ROOT, cfg);
-const KNOWN_EXCEPTIONS    = new Set(cfg.knownTemplateExceptions ?? []);   // "Template/Component"
-const COMPONENT_FILES     = cfg.componentFiles ?? {};
-const COMPONENT_SELECTORS = cfg.componentSelectors ?? {};
-const TEMPLATE_FILES      = Object.fromEntries(TEMPLATES_CFG.filter(t => t.file).map(t => [t.name, t.file]));
-
-const norm    = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
-const esc     = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const selNorm = (name) => norm(COMPONENT_SELECTORS[name] ?? ('.' + name.charAt(0).toLowerCase() + name.slice(1)));
-
-// ── Universe of DS component names (to detect usage in template code) ────────────
-const universe = new Set(Object.keys(COMPONENT_SELECTORS));
-for (const t of Object.values(SNAP)) for (const c of (t.components ?? [])) universe.add(c);
-const uni = [...universe].map(n => ({ name: n, nameNorm: norm(n), selNorm: selNorm(n) }));
-
-// ── Discover source files ─────────────────────────────────────────────────────
-const SRC_DIRS = (cfg.templateSrcDirs ?? cfg.componentSrcDirs ?? ['src', 'components', 'app', 'lib', 'packages'])
-  .map(d => join(ROOT, d));
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.git', '.next', 'coverage', ...ENGINE_DIRS]);
-const CODE_EXT = new Set(['.vue', '.tsx', '.jsx', '.ts', '.js', '.svelte']);
-function walk(dir, out) {
-  let entries = [];
-  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
-  for (const e of entries) {
-    if (e.name.startsWith('.') && e.name !== '.') continue;
-    const p = join(dir, e.name);
-    if (e.isDirectory()) { if (!SKIP_DIR.has(e.name)) walk(p, out); }
-    else if (CODE_EXT.has(extname(e.name)) && !/\.(test|spec|stories)\./.test(e.name)) out.push(p);
-  }
-}
-const files = [];
-for (const d of SRC_DIRS) if (existsSync(d)) walk(d, files);
-if (!files.length) walk(ROOT, files);
-for (const root of codeRoots(ROOT).slice(1)) walk(root, files);   // sibling folders the config names
-const _txt = new Map();
-const read = (f) => { if (!_txt.has(f)) { try { _txt.set(f, readFileSync(f, 'utf8')); } catch { _txt.set(f, ''); } } return _txt.get(f); };
-
-// ── Resolve a template to its code file (explicit map, base selector, name, basename) ──
-function declaredNames(text) {
-  const out = [];
-  for (const m of text.matchAll(/\bname\s*:\s*['"`]([A-Za-z0-9_-]+)['"`]/g)) out.push(m[1]);
-  for (const m of text.matchAll(/(?:function|class)\s+([A-Z][\w$]*)/g)) out.push(m[1]);
-  return out;
-}
-function resolveFile(name) {
-  const explicit = TEMPLATE_FILES[name] ?? COMPONENT_FILES[name];
-  if (explicit) { const p = join(ROOT, explicit); return existsSync(p) ? p : null; }
-  const nn = norm(name), sn = selNorm(name);
-  const bySel = [], byName = [], byBase = [];
-  for (const f of files) {
-    const t = read(f), tn = norm(t);
-    if (sn.length >= 4 && tn.includes(sn)) bySel.push(f);
-    if (declaredNames(t).some(d => norm(d) === nn)) byName.push(f);
-    if (norm(basename(f, extname(f))) === nn) byBase.push(f);
-  }
-  const pick = byBase.length === 1 ? byBase : byName.length === 1 ? byName : bySel;
-  return pick.length === 1 ? pick[0] : null;
-}
-
-// Which DS components does a file use? Same detection as the sub-component gate:
-// a component is "used" when its base selector, its JSX tag, or its import name appears.
-function usedComponents(file) {
-  const t = read(file), tn = norm(t);
-  const used = new Set();
-  for (const u of uni) {
-    if (u.selNorm.length >= 4 && tn.includes(u.selNorm)) { used.add(u.name); continue; }
-    if (new RegExp(`<${esc(u.name)}\\b|\\b${esc(u.name)}\\b\\s*(?:from|,|})`).test(t)) used.add(u.name);
-  }
-  return used;
-}
+const STRICT = cfg.templateCompositionStrict === true;
+const rows = templateComposition(ROOT, cfg, { inProgress: await inProgressNames(ROOT, cfg), snapshot: found.templates });
 
 // ── Compare ───────────────────────────────────────────────────────────────────
 const MISSING = [], NOFILE = [], ORDER = [], OK = [];
 let templatesChecked = 0;
-for (const [name, entry] of Object.entries(SNAP)) {
-  if (name.startsWith('_')) continue;
-  if (KNOWN_UNIMPLEMENTED.has(name)) continue;
-  const composed = (entry.components ?? []).filter(c => c !== name && !KNOWN_UNIMPLEMENTED.has(c));
+for (const t of rows) {
+  if (t.inProgress) continue;
+  const composed = t.parts.filter(p => p.state !== 'in-progress');
   if (!composed.length) continue;
   templatesChecked++;
-
-  const file = resolveFile(name);
-  if (!file) {
-    NOFILE.push(`${name}: Figma composes [${composed.join(', ')}] but no template code file found — set ds-config.json → templates[].file for "${name}"`);
+  if (!t.file) {
+    NOFILE.push(`${t.name}: Figma composes [${composed.map(p => p.name).join(', ')}] but no template code file found — set ds-config.json → templates[].file for "${t.name}"`);
     continue;
   }
-  const used = usedComponents(file);
-  const rel = relative(ROOT, file);
-
-  const usedInOrder = [];
-  for (const comp of composed) {
-    if (KNOWN_EXCEPTIONS.has(`${name}/${comp}`)) { OK.push(`${name} → ${comp} (exempt)`); continue; }
-    if (used.has(comp)) { OK.push(`${name} → ${comp}`); usedInOrder.push(comp); }
-    else MISSING.push(`${name}: Figma composes "${comp}" but the template code doesn't use it  (${rel})`);
+  for (const p of composed) {
+    if (p.state === 'exempt') OK.push(`${t.name} → ${p.name} (exempt)`);
+    else if (p.state === 'used') OK.push(`${t.name} → ${p.name}`);
+    else MISSING.push(`${t.name}: Figma composes "${p.name}" but the template code doesn't use it  (${t.file})`);
   }
-
-  // Order advisory (never fails): the components the code DOES use, in first-appearance order
-  // in the file, vs the order Figma composes them. A different order can be a real layout drift
-  // or a harmless import order, so it is surfaced, not enforced.
-  if (usedInOrder.length >= 2) {
-    const t = read(file);
-    // Compute code order by first index of each component's selector/name token.
-    const firstIdx = (comp) => {
-      const sel = COMPONENT_SELECTORS[comp] ?? ('.' + comp.charAt(0).toLowerCase() + comp.slice(1));
-      const idxSel = sel.length >= 3 ? t.toLowerCase().indexOf(sel.toLowerCase()) : -1;
-      const idxTag = t.indexOf(comp);
-      const cand = [idxSel, idxTag].filter(i => i >= 0);
-      return cand.length ? Math.min(...cand) : Number.MAX_SAFE_INTEGER;
-    };
-    const byCode = [...usedInOrder].sort((a, b) => firstIdx(a) - firstIdx(b));
-    if (byCode.join('>') !== usedInOrder.join('>')) {
-      ORDER.push(`${name}: Figma order [${usedInOrder.join(' → ')}] vs code order [${byCode.join(' → ')}]  (${rel})`);
-    }
-  }
+  // Order advisory (never fails): a different order can be a real layout drift or a harmless import order.
+  if (t.order) ORDER.push(`${t.name}: Figma order [${t.order.figma.join(' → ')}] vs code order [${t.order.code.join(' → ')}]  (${t.file})`);
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────

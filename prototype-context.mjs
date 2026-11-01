@@ -342,7 +342,7 @@ export function intentLayerOf(il) {
   }
   // A section of its page that is code (an example written as a block) is an example too.
   for (const x of il.sections ?? []) if (/```|<[A-Za-z][\w-]*[\s/>]/.test(x?.text ?? '')) examples.push(String(x.text).trim());
-  return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null, defined: il.defined ?? null, open: il.open ?? [] };
+  return { purpose, role, ...lists, rules, examples, file: il.url ?? il.file ?? null, defined: il.defined ?? null, open: il.open ?? [], review: il.review?.note ?? null };
 }
 
 // Where a component may go, read from the documentation as written: "`searchField` only inside the toolbar", "Do not
@@ -487,6 +487,7 @@ export function purposeLines(ctx, names, { width = 400, full = null, decided = n
       for (const l of il.limitations) more('intent: limit', l);
       for (const r of il.rules) more('intent: rule', r);
       for (const x of il.examples ?? []) more('intent: example', x);
+      if (il.review) more('intent: review again', il.review);
     }
   }
   return out;

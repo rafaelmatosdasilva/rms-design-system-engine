@@ -630,6 +630,18 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
 .sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); border-top: var(--sg-line); }
+/* Templates: each page frame, its Figma picture beside the components it is made of, in Figma's order. */
+.sg-templates { display: grid; gap: calc(var(--sg-space-xl) + var(--sg-space-s)); }
+.sg-template > h3 { margin: 0; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-template-meta { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xxs) 0 0; }
+.sg-template-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: calc(var(--sg-space-l) + var(--sg-space-s)); align-items: start; margin-top: var(--sg-space-m); }
+.sg-template-body.sg-template-body--parts { grid-template-columns: minmax(0, 1fr); }   /* no picture: the list alone */
+.sg-template-body > figure { margin: 0; }   /* the frame fills its column */
+@media (max-width: 900px) { .sg-template-body { grid-template-columns: minmax(0, 1fr); } }
+.sg-template-parts { list-style: none; margin: 0; padding: 0; border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-surface); }
+.sg-template-parts > li { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); color: var(--sg-text); }
+.sg-template-parts > li + li { border-top: var(--sg-line); }
+.sg-template-note { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-s) 0 0; }
 
 /* ── Foundations ─────────────────────────────────────────────────────────── */
 /* Every box on the page is drawn alike: the system card's border and corners, no fill of its own. */
@@ -1945,6 +1957,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     motion: '<path d="M2 11c3 0 3-6 6-6s3 6 6 6"/><circle cx="8" cy="5" r="1.2"/>',
     icons: '<path d="M8 2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.2 4.4 13.1l.7-4L2.2 6.3l4-.6z"/>',
     showroom: '<rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M5.5 14h5M8 11.5V14"/>',
+    templates: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 6v8"/>',   // a page frame: its header, a side column and the content
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
   };
   NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
@@ -2452,15 +2465,19 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // The team that owns what a task is about (ds-config.json owners: a component, a layer or a token prefix to a team),
   // said after who acts: the longest key that is the component's name, or a token prefix the task names ("primitives/");
   // "*" for everything else. None set: nothing said. A task that already knows its team (a product's own) says that one.
+  // A key may be a glob ("tile*"), and a value a name or { team, decides } (the team is said here; who decides is said
+  // beside what waits on them, decided-by.mjs).
   var OWNERS = (typeof DATA !== 'undefined' && DATA.owners) || {};
   function teamNote(about, team) {
     if (team) return ' · ' + team;
+    var teamName = function (v) { return v && typeof v === 'object' ? (v.team || v.decides || '') : (v || ''); };
     var a = String(about || ''), keys = Object.keys(OWNERS).sort(function (x, y) { return y.length - x.length; });
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i], kl = k.toLowerCase(), al = a.toLowerCase();
-      if (k !== '*' && (al === kl || (k.indexOf('/') >= 0 && al.indexOf(kl) >= 0))) return ' · ' + OWNERS[k];
+      var glob = k !== '*' && k.indexOf('*') >= 0 && new RegExp('^' + kl.split('*').map(function (x) { return x.replace(/[.+?^${}()|[\]\\]/g, '\\$&'); }).join('.*') + '$').test(al);
+      if (k !== '*' && teamName(OWNERS[k]) && (al === kl || glob || (k.indexOf('/') >= 0 && al.indexOf(kl) >= 0))) return ' · ' + teamName(OWNERS[k]);
     }
-    return OWNERS['*'] ? ' · ' + OWNERS['*'] : '';
+    return teamName(OWNERS['*']) ? ' · ' + teamName(OWNERS['*']) : '';
   }
   // Whether the system has a Figma file at all: with none, every fix is the code's.
   var HAS_FIGMA = typeof COMPONENTS === 'undefined' || COMPONENTS.some(function (c) { return !c.codeOnly; });
@@ -3172,7 +3189,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         + card('Where it is used', used)
         + card('What it breaks', lines(x.breaking.map(function (b) { return b.what; })))
         + card('What it adds to the system', lines(x.held.map(function (h) { return h.what; })))
-        + card('Signed off', x.signedOff ? lines([x.signedOff.by + ', ' + String(x.signedOff.at || '').slice(0, 10)]) : '')
+        + card('Signed off', x.signedOff ? lines([x.signedOff.by + ', ' + String(x.signedOff.at || '').slice(0, 10)].concat(x.signedOff.notOwner && x.decider ? [x.decider.name + ' decides it: the sign-off stands, and they should hear of it.'] : [])) : x.decider ? lines(['Waits on ' + x.decider.name + '.']) : '')
         + card('Faults it already had, not fixed by this change', lines(x.faults.map(function (f) { return f.says + (f.value ? ': ' + f.value : ''); })));
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Changes in Figma', x.component], title: x.asked || x.steps[0] || x.component, body: body });
       panelShow(m, from);
@@ -3416,16 +3433,33 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + '<span class="sg-il-text">' + (f.line ? '\u201c' + esc(f.line) + '\u201d' : esc(f.says)) + '</span><span class="sg-il-label">What the system has</span><span class="sg-il-text">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
     // The engine's proposed answer to a decision that is the team's (Fix, Add, Move), what it rests on, and how to say
     // yes or no to it is said in What to do (intent-proposals.mjs). A no keeps the decision on the page as it was.
+    // Evidence first: each answer it could take, the one it proposes marked, with what speaks for each, where that comes
+    // from and how strongly (intent-proposals.mjs → candidatesFor). Who it waits on, and who answered it.
+    var IL_STRENGTH = { strong: 'Strong', some: 'Some', weak: 'Weak' };
+    var ilCandidates = function (x) {
+      return (x.candidates || []).map(function (c) {
+        return '<div class="sg-il-group"><p class="sg-il-head">' + esc((c.answer === x.recommends ? 'Proposed · ' : '') + capital(c.says)) + '</p>'
+          + (c.evidence.length ? c.evidence.map(function (e) { return '<p class="sg-il-item">' + esc(e.says) + '<span class="pg-par-val">' + esc(e.from + ' · ' + (IL_STRENGTH[e.strength] || e.strength)) + '</span></p>'; }).join('') : '<p class="sg-il-item pg-missing">Nothing the engine read speaks for it.</p>') + '</div>';
+      }).join('');
+    };
+    var ilAnsweredBy = function (x) {
+      var who = x.by || x.at ? ' by ' + esc(x.by || 'someone') + (x.at ? ' on ' + esc(String(x.at).slice(0, 10)) : '') : '';
+      var other = x.notOwner && x.decider ? ' ' + esc(x.decider.name) + ' decides it: the answer stands, and they should hear of it.' : '';
+      return x.answer === 'no' && x.kind !== 'review' ? '<p class="sg-il-line"><span class="pg-par-val">Declined' + who + ': it stays for the team to settle another way.' + other + '</span></p>'
+        : x.answer ? '<p class="sg-il-line"><span class="pg-par-val">Answered ' + esc(x.answer) + who + '.' + other + '</span></p>'
+        : x.decider ? '<p class="sg-il-line"><span class="pg-par-val">Waits on ' + esc(x.decider.name) + '.</span></p>' : '';
+    };
     var ilProposal = function (p) {
       var list = p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || []);
       return list.map(function (x) {
         return '<p class="sg-il-line"><strong>' + esc(x.kind === 'fix' ? x.subject + ': ' : '') + esc(x.proposal) + '</strong></p>'
-          + (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join('')
-          + (x.answer === 'no' ? '<p class="sg-il-line"><span class="pg-par-val">Declined' + (x.by || x.at ? ' by ' + esc(x.by || 'someone') + (x.at ? ' on ' + esc(String(x.at).slice(0, 10)) : '') : '') + ': it stays for the team to settle another way.</span></p>' : '');   // how to answer: in What to do
+          + (x.split ? '<p class="sg-il-line"><span class="pg-par-val">The evidence is split: a person decides.</span></p>' : '')
+          + ((x.candidates || []).length ? ilCandidates(x) : (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join(''))
+          + ilAnsweredBy(x);   // how to answer: in What to do
       }).join('');
     };
     // What the agents read from it, word for word, by kind: the one place to see what reaches them.
-    var IL_READ = [['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
+    var IL_READ = [['review', 'Note beside it'], ['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
     // Each source with where it is written (the intent layer's spec, else its page), then what else the agents read
     // about the component: Figma's description and annotations, the code's note.
     var ilSourceHead = function (name, where) { return '<p class="sg-il-line"><strong>' + esc(name) + '</strong>' + (where ? '<span class="pg-par-val">' + esc(where) + '</span>' : '') + '</p>'; };
@@ -3557,7 +3591,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var needsReview = function (p) { if (p.absent) return !!(p.drafts || []).length; return !p.tokens && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
     var needsWrite = function (p) { if (p.absent) return !(p.drafts || []).length; return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p) && !needsRemove(p); };
-    var reviewTopic = function (p) { return p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
+    // A page whose component changed since it was written: its review is that, whatever else it waits on.
+    var isStale = function (p) { return (p.wrong || []).some(function (f) { return f.kind === 'stale'; }); };
+    var reviewTopic = function (p) { return isStale(p) && p.action === 'review' ? 'Changed since written' : p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
+    // Who a row waits on (ds-config.json owners, decided-by.mjs): its page's, else its component's, else the system's.
+    var deciderOf = function (p) { var d = p.decider || (docComp(p) || {}).decider || (p.absent ? IL.systemDecider : null); return d && d.name ? d.name : null; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
     var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', review: 'figma', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
@@ -3590,7 +3628,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A row with notes no agent reads says Remove under its status, and is found by the Remove chip whatever its status.
     var removeUnder = function (p) { return needsRemove(p) ? ['Remove ' + removeTopic(p)] : []; };
     var decisionCell = function (k, p) { var st = statusOf(p); return st === 'keep' ? statusPill(IL_DOT.keep, labelOf('keep'))
-      : st === 'review' ? statusPill('figma', 'Review', [reviewTopic(p)].concat(needsWrite(p) ? ['Missing ' + docTopic(p).charAt(0).toLowerCase() + docTopic(p).slice(1)] : [], removeUnder(p)).join(' · '))
+      : st === 'review' ? statusPill('figma', 'Review', [reviewTopic(p)].concat(needsWrite(p) ? ['Missing ' + docTopic(p).charAt(0).toLowerCase() + docTopic(p).slice(1)] : [], removeUnder(p), deciderOf(p) ? ['Waits on ' + deciderOf(p)] : []).join(' · '))
       : st === 'write' ? statusPill('differs', 'Missing', [docTopic(p)].concat(removeUnder(p)).join(' · ')) : statusPill('differs', 'Remove', removeTopic(p)); };
     // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
@@ -3616,9 +3654,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
       return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
+    var waitsKey = function (d) { return 'waits-' + String(d).toLowerCase().replace(/[^a-z0-9]+/g, '-'); };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
     var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || p.name || i); };
@@ -3640,8 +3679,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A link to a page's panel (panel=doc:<file>) opens it.
     ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
+    // The rows to review, by who they wait on: one chip each ("Waiting on Cards team 3"), most first.
+    var waits = {}; rows.forEach(function (p) { var d = statusOf(p) === 'review' && deciderOf(p); if (d) waits[d] = (waits[d] || 0) + 1; });
+    var waitChips = Object.keys(waits).sort(function (a, b) { return waits[b] - waits[a] || a.localeCompare(b); }).map(function (d) { return { key: waitsKey(d), label: 'Waiting on ' + d, n: waits[d], dot: 'figma' }; });
     pageBar(ilSec, { links: sourceLinks(ilSrc.url), chips: (function () { var toReview = rows.filter(needsReview).length;
-      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
+      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(waitChips).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });
@@ -3962,8 +4004,40 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var sc = document.createElement('div'); sc.className = 'sg-screens'; iu.appendChild(sc);
     DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
   }
+  // Templates: each page frame Figma composes of the system's components (DATA.templates), what it is made of in Figma's
+  // order, whether its code uses each one, and the frame it comes from. A component with a page of its own is linked.
+  if ((DATA.templates || []).length) {
+    hr(); navLink('templates', 'templates');
+    var tp = section('templates', 'System', 'Templates', '');
+    var tl = document.createElement('div'); tl.className = 'sg-templates'; tp.appendChild(tl);
+    var TPL_STATE = { used: ['In the code', 'connected'], missing: ['Not in the code', 'deprecated'], exempt: ['Kept out on purpose', ''], 'in-progress': ['In progress', 'beta'], 'not-compared': ['Not compared', ''] };
+    DATA.templates.forEach(function (t) {
+      var a = document.createElement('article'); a.className = 'sg-template'; a.id = 'template-' + String(t.name).replace(/[^\w-]+/g, '-');
+      var parts = t.parts || [], inCode = parts.filter(function (p) { return p.state === 'used'; }).length, compared = parts.filter(function (p) { return p.state === 'used' || p.state === 'missing'; }).length;
+      var meta = [];
+      if (t.inProgress) meta.push('In progress: its code is not compared yet');
+      else if (t.file) meta.push('Built in <code>' + esc(t.file) + '</code>' + (compared ? ', ' + inCode + ' of ' + plural(compared, 'component', 'components') + ' in the code' : ''));
+      else if (parts.length) meta.push('No code file found. A developer names it in <code>templates[].file</code> in <code>ds-config.json</code>');
+      if (t.figma) meta.push('<a href="' + esc(t.figma) + '" target="_blank" rel="noopener">See in Figma</a>');
+      var list = parts.length ? '<ol class="sg-template-parts" aria-label="What ' + esc(t.name) + ' is made of">' + parts.map(function (p) {
+        var st = TPL_STATE[p.state] || [p.state, ''];
+        var name = HAS_PAGE[p.name] ? '<a href="#' + cid(p.name) + '">' + esc(p.name) + '</a>' : esc(p.name);
+        return '<li><span>' + name + '</span><span class="sg-status' + (st[1] ? ' sg-status--' + st[1] : '') + '">' + esc(st[0]) + '</span></li>';
+      }).join('') + '</ol>' : '<p class="sg-template-note">Figma places none of the system\'s components in it.</p>';
+      var notes = [];
+      if (t.order) notes.push('The code places them in another order: ' + t.order.code.map(esc).join(', ') + '.');
+      if (parts.some(function (p) { return p.state === 'missing'; })) notes.push('A developer uses each component marked Not in the code, or the team keeps it out on purpose with its reason.');
+      if (!t.picture && t.pictureWhy) notes.push('No picture of the frame: ' + esc(t.pictureWhy) + '.');
+      a.innerHTML = '<h3>' + esc(t.name) + '</h3>' + (meta.length ? '<p class="sg-template-meta">' + meta.join(' · ') + '</p>' : '') +
+        '<div class="sg-template-body' + (t.picture ? '' : ' sg-template-body--parts') + '">' +
+          (t.picture ? '<figure class="sg-screen"><img alt="' + esc(t.name) + ' in Figma" src="' + esc(t.picture.src) + '"' + (t.picture.w ? ' width="' + Math.round(t.picture.w) + '" height="' + Math.round(t.picture.h) + '"' : '') + '><figcaption>The frame in Figma</figcaption></figure>' : '') +
+          '<div>' + list + notes.map(function (n) { return '<p class="sg-template-note">' + n + '</p>'; }).join('') + '</div>' +
+        '</div>';
+      tl.appendChild(a);
+    });
+  }
   // The History last in the System group: first the pages about the system as it is, then what changed in it and why.
-  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#in-use"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
+  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#in-use"], a[href="#templates"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
 
   /* ── Every mode at once: a foundation's values in one column per mode (Phone, Tablet, Laptop, Desktop; Light, Dark) ── */
   // Each mode is the attributes that put it on an element (data-size="phone"), the system's own mode CSS reads them on

@@ -476,6 +476,33 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     view.screens = (cfg.frames ?? []).filter((f) => f?.nodeId).map((f) => ({ f, file: join(refsDir, `${String(f.nodeId).replace(/[:\/]/g, '-')}.png`) }))
       .filter(({ file }) => existsSync(file) && readFileSync(file).length <= 2_000_000).slice(0, 6)
       .map(({ f, file }) => ({ src: `data:image/png;base64,${readFileSync(file).toString('base64')}`, caption: f.name ?? f.nodeId }));
+    // Templates: each page frame Figma composes of the system's components (templates[] and its snapshot), what it is made
+    // of in Figma's order, whether its code uses each, and the frame it comes from, pictured (refs, else the Figma API).
+    if (!opts.only?.length && (cfg.templates ?? []).some((t) => t?.name)) {
+      try {
+        const { templatesSnapshot, templateComposition } = await import('./template-composition.mjs');
+        const found = templatesSnapshot(ROOT, cfg);
+        if (found?.templates) {
+          const { inProgressNames } = await import('./in-progress.mjs');
+          const { figmaLink } = await import('./figma-link.mjs');
+          const rows = templateComposition(ROOT, cfg, { inProgress: await inProgressNames(ROOT, cfg), snapshot: found.templates });
+          const version = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?._figmaVersion ?? null;
+          let budget = (Number(cfg.styleguide?.figmaImagesMB) || 8) * 1024 * 1024;
+          const { figmaImage } = await import('./visual-diff.mjs');
+          for (const t of rows) {
+            t.figma = cfg.figmaFileKey && t.nodeId ? figmaLink(cfg.figmaFileKey, t.nodeId) : null;
+            if (cfg.styleguide?.figmaImages === false || !t.nodeId) continue;
+            const im = await figmaImage(ROOT, cfg, t.name, { nodeId: t.nodeId, version, folder: 'templates' });
+            if (!im.file) { t.pictureWhy = im.why; continue; }
+            const b = readFileSync(im.file);
+            if (b.length > 2_000_000 || b.length > budget || b.length < 24) { t.pictureWhy = 'its picture is too large to embed'; continue; }
+            budget -= b.length;
+            t.picture = { src: `data:image/png;base64,${b.toString('base64')}`, w: b.readUInt32BE(16) / 2, h: b.readUInt32BE(20) / 2 };
+          }
+          if (rows.length) view.templates = rows;
+        }
+      } catch { /* the page builds without it */ }
+    }
     // The one list of differences the last full audit wrote: each component shows its own open ones.
     try {
       const { OUT_DIR } = await import('./names.mjs');
@@ -748,6 +775,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         absent.entry = src.entry ?? null; absent.entryUrl = (await import('./doc-host.mjs')).fileUrl(src, src.entry);
         view.intentLayer = { absent, ...(snap.system?.drafts?.length ? { systemDrafts: snap.system.drafts } : {}), source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
           noPage: decided.noPage, addProposals: decided.addProposals };
+        // Who each page waits on when it waits on a person (ds-config.json → owners): the page counts its rows by it.
+        const { ownerOf } = await import('./decided-by.mjs');
+        for (const p of view.intentLayer.pages) { const o = ownerOf(cfg.owners, p.component ?? p.about?.partOf ?? p.about?.is ?? p.name, `${p.layer}/${p.name}`); if (o) p.decider = o; }
+        const sys = ownerOf(cfg.owners, 'system'); if (sys) view.intentLayer.systemDecider = sys;
         // What else the agents read about each component, beside its intent-layer page, each with where it comes
         // from: Figma's description and annotations, the code's own note. And the spec a page is written from, when
         // the layer has one by its name (the page's own file else), so a line can be changed where it is written.
@@ -953,7 +984,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // What uses each token, for the page's "What uses it" view.
     // When the page was built: a row read then (its code, the team's notes, a stand-in) says so in its Updated column.
     // Who owns each layer or component (ds-config.json owners), for the Tasks list to name the team after who acts.
-    if (cfg.owners && typeof cfg.owners === 'object') view.owners = cfg.owners;
+    if (cfg.owners && typeof cfg.owners === 'object') {
+      view.owners = cfg.owners;
+      // Who decides what waits on a person about each component (decided-by.mjs → ownerOf): its Documentation row says it.
+      const { ownerOf } = await import('./decided-by.mjs');
+      for (const c of view.components) { const o = ownerOf(cfg.owners, c.name); if (o) c.decider = o; }
+    }
     view.builtAt = new Date().toISOString();
     // What it was built from: the code commit, the Figma version and the engine, also in the page's <head>.
     view.built = buildStamp(ROOT, { vars: readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json'), at: view.builtAt });
@@ -1442,6 +1478,10 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     try {
       const { changesView } = await import('./component-change.mjs');
       const fc = changesView(ROOT, { outDir: OUT_DIR, readdirSync, readFileSync, join });
+      // What it adds to the system waits on a named person's sign-off (ds-config.json → owners): said beside it, and
+      // when someone else signed it off, said too.
+      const { ownerOf, notTheOwner } = await import('./decided-by.mjs');
+      for (const x of fc) { const o = ownerOf(cfg.owners, x.component); if (o && ((x.held ?? []).length || (x.breaking ?? []).length)) { x.decider = o; if (x.signedOff && notTheOwner(x.signedOff.by, o)) x.signedOff.notOwner = true; } }
       if (fc.length) view.figmaChanges = fc;
     } catch { /* no changes */ }
     // How much each area weighs in the Health page's one number (styleguide.health.weights); the page's own otherwise.

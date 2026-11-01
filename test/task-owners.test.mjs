@@ -18,6 +18,13 @@ test('a task names its owning team: the component\'s, else the layer of a token 
   assert.equal(note('Acme shop is still on 1.2.0', 'Checkout team'), ' · Checkout team', 'a task that knows its team (a late product\'s) says it');
 });
 
+test('an owner\'s key may be a glob, and its value a team with the person who decides', () => {
+  const note = teamNoteWith({ 'tile*': 'Tiles team', listMain: { team: 'Lists team', decides: 'QA lead' }, '*': { decides: 'Design lead' } });
+  assert.equal(note('tileCard'), ' · Tiles team');
+  assert.equal(note('listMain'), ' · Lists team', 'the team is said, not the person');
+  assert.equal(note('badgeNote'), ' · Design lead', 'a default with only who decides');
+});
+
 test('every who-acts label on the Tasks list carries the owning team', () => {
   assert.equal((page.match(/\+ teamNote\(/g) ?? []).length, 4);
   assert.doesNotMatch(page, /WHO\[[tx]\.who\] \|\| WHO\.both(?!\) \+ teamNote)/, 'no label left without it');

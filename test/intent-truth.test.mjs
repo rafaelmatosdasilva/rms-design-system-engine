@@ -7,8 +7,9 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { factsFrom, checkPage, twins, checkLayer, componentChanges, report, CHANGES_FILE } from '../intent-truth.mjs';
-import { useReport, componentIntent, matchComponents, ACTIONS } from '../intent-layer.mjs';
+import { factsFrom, checkPage, twins, checkLayer, componentChanges, report, CHANGES_FILE, changesSince, changeWords } from '../intent-truth.mjs';
+import { useReport, componentIntent, agentText, matchComponents, ACTIONS } from '../intent-layer.mjs';
+import { intentLayerOf } from '../prototype-context.mjs';
 import { tempDir } from './helpers.mjs';
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
 
@@ -94,10 +95,76 @@ test('the engine keeps each component\'s props between runs and dates the run th
   assert.deepEqual(componentChanges(root, v1, { now: '2026-01-01T00:00:00Z' }), {});
   assert.deepEqual(componentChanges(root, v1, { now: '2026-01-02T00:00:00Z' }), {});
   const v2 = { tileOne: { props: { tone: { options: ['calm', 'loud'] }, glow: {} } } };
-  assert.deepEqual(componentChanges(root, v2, { now: '2026-01-03T00:00:00Z' }).tileOne, { at: '2026-01-03T00:00:00Z', added: ['glow'], removed: ['dense'], how: 'props' });
+  const { log, ...last } = componentChanges(root, v2, { now: '2026-01-03T00:00:00Z' }).tileOne;
+  assert.deepEqual(last, { at: '2026-01-03T00:00:00Z', added: ['glow'], removed: ['dense'], how: 'props' });
+  assert.deepEqual(log[0].values, [{ prop: 'tone', added: ['loud'], removed: [] }]);
   // Unchanged since: the date of the change is kept.
   assert.equal(componentChanges(root, v2, { now: '2026-01-04T00:00:00Z' }).tileOne.at, '2026-01-03T00:00:00Z');
   assert.ok(JSON.parse(readFileSync(join(root, CHANGES_FILE), 'utf8')).tileOne.sig);
+});
+
+test('the engine keeps each component\'s tokens and the values its props take, and says which changed', () => {
+  const root = tempDir('truth-tokens-');
+  // A record kept before tokens were: today's tokens are where they start, never a change of their own.
+  mkdirSync(join(root, CHANGES_FILE, '..'), { recursive: true });
+  writeFileSync(join(root, CHANGES_FILE), JSON.stringify({ tileOne: { sig: 'tone:calm', props: ['tone'], since: null } }));
+  const v1 = { tileOne: { props: { tone: { options: ['calm'] } }, tokens: ['--acme-tile-bg'] } };
+  assert.deepEqual(componentChanges(root, v1, { now: '2026-02-01T00:00:00Z' }), {});
+  const v2 = { tileOne: { props: { tone: { options: ['calm'] } }, tokens: ['--acme-tile-ink'] } };
+  const ch = componentChanges(root, v2, { now: '2026-02-02T00:00:00Z' }).tileOne;
+  assert.equal(ch.how, 'tokens');
+  assert.deepEqual([ch.log[0].tokensAdded, ch.log[0].tokensRemoved], [['--acme-tile-ink'], ['--acme-tile-bg']]);
+  const v3 = { tileOne: { props: { tone: { options: ['loud'] } }, tokens: ['--acme-tile-ink'] } };
+  const ch3 = componentChanges(root, v3, { now: '2026-02-03T00:00:00Z' }).tileOne;
+  assert.equal(ch3.log.length, 2, 'every change is kept, not only the last');
+  assert.deepEqual(changeWords(ch3.log), ['new tokens `--acme-tile-ink`; tokens removed `--acme-tile-bg`', '`tone` takes `loud` now and no longer takes `calm`']);
+  assert.deepEqual(changesSince(ch3, '2026-02-02T12:00:00Z').map((e) => e.at), ['2026-02-03T00:00:00Z']);
+});
+
+test('a read of Figma that changed the component is dated from the snapshots store\'s history, never fetched', () => {
+  const root = tempDir('truth-figma-');
+  const ch = componentChanges(root, { tileOne: { props: {} } }, { now: '2026-02-01T00:00:00Z', figma: { tileOne: [{ date: '2026-02-05T09:00:00Z', changed: ['property size added'] }], gone: [{ date: '2026-02-05T09:00:00Z', changed: ['x'] }] } });
+  assert.deepEqual(Object.keys(ch), ['tileOne']);
+  assert.equal(ch.tileOne.how, 'figma');
+  assert.deepEqual(changeWords(ch.tileOne.log), ['Figma: property size added']);
+});
+
+test('a page whose component changed is marked to review again, with what changed and since when, until a person confirms it', () => {
+  const facts = FACTS();
+  facts.changed.tileOne = { at: '2026-03-05T10:00:00Z', added: [], removed: [], how: 'props', log: [
+    { at: '2026-03-02T10:00:00Z', how: 'props', added: ['glow'], removed: ['dense'] },
+    { at: '2026-03-05T10:00:00Z', how: 'tokens', added: [], removed: [], tokensRemoved: ['--acme-tile-bg'] },
+  ] };
+  const e = page('tileOne', { whenToUse: ['Set `dense` in tables.'] }, { updatedAt: '2026-03-01T10:00:00Z' });
+  const [f] = checkPage(e, facts, { component: 'tileOne' }).filter((x) => x.kind === 'stale');
+  assert.match(f.truth, /^tileOne changed on 5 Mar 2026: new props `glow`; props removed `dense`; tokens removed `--acme-tile-bg`, after this page was last edited\. The page still names `dense`\.$/);
+  assert.deepEqual([f.at, f.since, f.gone], ['2026-03-05T10:00:00Z', '2026-03-01T10:00:00Z', ['dense']]);
+  // Confirmed after the first change: only the later one is said.
+  const [g] = checkPage(e, facts, { component: 'tileOne', reviewedAt: '2026-03-03T10:00:00Z' }).filter((x) => x.kind === 'stale');
+  assert.match(g.truth, /changed on 5 Mar 2026: tokens removed `--acme-tile-bg`, after this page was last confirmed\.$/);
+  assert.match(g.says, /^confirmed on 3 Mar 2026/);
+  // Confirmed after both: nothing to review until it changes again.
+  assert.equal(checkPage(e, facts, { component: 'tileOne', reviewedAt: '2026-03-06T10:00:00Z' }).filter((x) => x.kind === 'stale').length, 0);
+  // The layer's check takes the confirmation for each page.
+  const snap = { _source: {}, entities: [e] };
+  const found = checkLayer(snap, matchComponents(['tileOne'], snap.entities, {}), facts, { reviewedOf: () => '2026-03-06T10:00:00Z' });
+  assert.ok(!(found.get(e) ?? []).some((x) => x.kind === 'stale'));
+});
+
+test('a page to review again is a note beside it for agents, never taken out, and its decision is Review', () => {
+  const facts = FACTS();
+  facts.changed.tileOne = { at: '2026-03-02T10:00:00Z', added: ['glow'], removed: [], how: 'props' };
+  const e = page('tileOne', { purpose: ['A tile for one subject.'], whenToUse: ['Use it for one subject.'] }, { updatedAt: '2026-03-01T10:00:00Z' });
+  const wrong = checkPage(e, facts, { component: 'tileOne' });
+  const ci = componentIntent(e, {}, wrong);
+  assert.deepEqual(ci.whenToUse, ['Use it for one subject.'], 'every line still reaches the agents');
+  assert.match(ci.review.note, /^To review again: tileOne changed on 2 Mar 2026: new props `glow`.*follow the contract\.$/);
+  assert.deepEqual(agentText(e, {}, wrong).review, [ci.review.note]);
+  assert.equal(intentLayerOf(ci).review, ci.review.note);
+  const snap = { _source: {}, entities: [e] };
+  const rep = useReport(snap, matchComponents(['tileOne'], snap.entities, {}), { names: ['tileOne'], wrongOf: () => wrong });
+  assert.equal(rep.pages[0].action, 'review');
+  assert.match(rep.pages[0].todo[0], /^Review it again: tileOne changed on 2 Mar 2026/);
 });
 
 test('two components\' pages that say the same are twins; lines a template writes everywhere are not counted', () => {
