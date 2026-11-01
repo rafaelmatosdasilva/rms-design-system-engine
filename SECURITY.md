@@ -12,6 +12,16 @@ Worth reporting:
 - A command built from what a project, Figma file or page contains that runs something else.
 - Anything sent to a host the [Security and data](docs/details.md#security-and-data) page does not list.
 
+## How a report is handled
+
+1. **Acknowledged** within a week, in the private advisory, with a first read of how serious it is.
+2. **Confirmed** by reproducing it. If it is not a vulnerability, the reporter is told why, and the advisory is closed.
+3. **Fixed in private.** The fix is prepared in the advisory's private fork, with a test that fails without it, and passes the same gate as every change: the privacy check, the full test suite and CodeQL.
+4. **Released.** The fix ships in a release, and the self-update brings it to every install within a day.
+5. **Disclosed.** The advisory is published with what was affected, which versions, and how to update, with a CVE requested through GitHub when it qualifies. The reporter is credited, if they want to be.
+
+The aim is a fix or a plan within thirty days of the report. A report about a dependency of the test tools, which nothing the engine ships uses, is fixed in the open.
+
 ## Supported versions
 
 Only the latest `main` is supported. The engine updates itself once a day, so a fix reaches every install without anyone acting. An install with the self-update turned off takes it with `rms-design-system-engine --update`.
@@ -31,3 +41,4 @@ gh attestation verify rms-design-system-engine-v1.0.0.tar.gz --repo rafaelmatosd
 - **Workflows hold read-only tokens.** Only the release job writes, and only tags and releases. Every action is pinned to a commit.
 - **[OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine)** scores how the repository is kept, on every change to main and every week.
 - **What it reads, sends and may change** is on the [Security and data](docs/details.md#security-and-data) page.
+- **The threat model,** its trust boundaries and the weaknesses it counters are in the [assurance case](docs/assurance-case.md).
