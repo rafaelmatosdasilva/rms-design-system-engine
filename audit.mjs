@@ -729,7 +729,7 @@ if (process.argv.includes('--intent-changes')) {
     { const may = await ch.mayWrite(ROOT, pcfg, 'commit'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
     const done = await ch.commitToBranch(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, message: 'Intent layer review: ' + summary.split('\n')[0] + '\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
-    console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
+    console.log(`✅ ${done.said ?? `Committed on ${snap._source.ref}: ${done.url ?? done.sha}`}`);
     console.log('NEXT: the Documentation page lists each draft under Review until its marker is removed.');
     process.exit(0);
   }
@@ -741,7 +741,7 @@ if (process.argv.includes('--intent-changes')) {
     description: summary + '\n\nMade by rms-design-system-engine from its review of the intent layer. Nothing marked **Draft:** reaches an agent until a person removes the marker.',
     message: 'Intent layer review: repeated lines taken out, contradicted sentences written again as drafts\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
   if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
-  console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
+  console.log(mr.said ? `🔀 ${mr.said}` : `🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
   console.log('NEXT: the team reviews and merges it; then the Documentation page lists each draft under Review until its marker is removed.');
   process.exit(0);
 }
@@ -800,7 +800,7 @@ if (process.argv.includes('--review-drafts')) {
     { const may = await ch.mayWrite(ROOT, pcfg, 'commit'); if (!may.ok) { console.log(`ℹ️  Not sent: ${may.why}.${may.mergeRequest ? ' It can go as a merge request: --merge-request.' : ' Whoever may write the layer sends it; the changes are in .design-system-engine-out/intent-changes/.'}`); console.log('NEXT: tell the person what the line above says; change nothing.'); process.exit(1); } }
     const done = await ch.commitToBranch(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
-    console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
+    console.log(`✅ ${done.said ?? `Committed on ${snap._source.ref}: ${done.url ?? done.sha}`}`);
     console.log('NEXT: the approved lines reach the agents on the next run; the style guide shows them in each component\'s Documentation.');
     process.exit(0);
   }
@@ -809,7 +809,7 @@ if (process.argv.includes('--review-drafts')) {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     const mr = await ch.openMergeRequest(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-reviewed-${stamp}`, title: 'Intent layer: drafts reviewed', description: summary, message });
     if (mr.error) { console.log(`❌ ${mr.error}`); process.exit(1); }
-    console.log(`🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
+    console.log(mr.said ? `🔀 ${mr.said}` : `🔀 Merge request: ${mr.url}  (branch ${mr.branch})`);
     process.exit(0);
   }
   console.log(`NEXT: read the changes; to send them: the same command with --commit (straight on the layer's branch) or --merge-request${inline ? '' : ' (rms-design-system-engine --review-drafts <file> --commit)'}, only when the person asks`);
@@ -853,7 +853,7 @@ if (process.argv.includes('--part')) {
       ? await ch.commitToBranch(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, message })
       : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/part-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: ${said}`, description: `${said}, on ${plan.page}, in ${plan.file}.`, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
-    console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
+    console.log(done.said ? `${how === 'commit' ? '✅' : '🔀'} ${done.said}` : how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
     console.log('NEXT: the next style guide build shows it, and agents get it on the run after.');
     process.exit(0);
   }
@@ -892,7 +892,7 @@ if (process.argv.includes('--draft')) {
       ? await ch.commitToBranch(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, message })
       : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: drafts on ${plan.page}`, description: summary, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
-    console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
+    console.log(done.said ? `${how === 'commit' ? '✅' : '🔀'} ${done.said}` : how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
     console.log('NEXT: rebuild the style guide (--styleguide): the page\'s Documentation shows the drafts with one decision for them, to copy into Claude Code.');
     process.exit(0);
   }
@@ -935,7 +935,7 @@ if (process.argv.includes('--decision') || process.argv.includes('--decisions'))
       ? await ch.commitToBranch(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, message })
       : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/decision-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: a decision on ${plan.page}`, description: summary, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
-    console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
+    console.log(done.said ? `${how === 'commit' ? '✅' : '🔀'} ${done.said}` : how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
     console.log('NEXT: the decision reaches agents on the next run; the style guide shows it in History.');
     process.exit(0);
   }

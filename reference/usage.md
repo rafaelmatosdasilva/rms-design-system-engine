@@ -348,8 +348,10 @@ sent only to GitHub, needed for a private repository, and to date every page pas
 one). The only file it writes is its own snapshot in your project. Every run reads it again when the branch's commit
 moved (a folder: when a page in it changed), with the same token rules as above, into `intent-layer.snapshot.json`;
 a host not reachable keeps the snapshot and says from which commit. The fixes the engine makes in the layer
-(`intentLayer.autoFix`, `--intent-changes`) are committed only to a DSDS layer on GitLab; for any other, the
-Documentation page lists each change for a person to make. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
+(`intentLayer.autoFix`, `--intent-changes`) go back where it lives, DSDS or Markdown alike: on GitLab a commit or a
+merge request; on GitHub a commit (only while the branch has not moved) or a pull request, with a `GITHUB_TOKEN`
+that may write to it; in a folder of the project the pages are written there, never committed, for a person to read
+and commit (a page changed since it was read is never overwritten). Each page's sections are read by title (Intent or Overview → what it is for; When to use or
 Usage rules; When not to use or What not to do; Common mistakes; Limitations; a numbered title is read by its
 words), with its use cases (recommended, discouraged) and checklists (rules). Facts the engine reads from Figma
 and the code (anatomy, API, states, tokens, source) are left out, and so is a line written on every page of a

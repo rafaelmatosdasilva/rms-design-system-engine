@@ -12,7 +12,7 @@ import { intentLayerConfig, syncIntentLayer, describeSync, readIntentLayer, matc
 import { frontMatter, plainText, mdSections, readMarkdown, metaTitle, resolveLinks, decodeEntities } from '../doc-source-markdown.mjs';
 import { entityView } from '../doc-source-dsds.mjs';
 import { parseGithub, hostOf, fileUrl } from '../doc-host.mjs';
-import { layerAccess } from '../intent-changes.mjs';
+import { layerAccess, layerFiles, commitToBranch, openMergeRequest, mayWrite, mdAdd } from '../intent-changes.mjs';
 import { generateIntent } from '../intent-gen.mjs';
 
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
@@ -285,9 +285,93 @@ test('GitHub refusing keeps the copy already there and says what to do; a cut tr
 });
 
 // ── Writing and setting it ──────────────────────────────────────────────────────────────────────────────────────────
-test('changes are written to a GitLab layer only; a GitHub or folder layer says so', () => {
-  assert.match(layerAccess('.', { intentLayer: GH }).error, /GitLab only.*on GitHub.*Documentation page/);
-  assert.match(layerAccess('.', { intentLayer: 'docs' }).error, /the folder docs/);
+test('a folder layer\'s changes are written in the folder for a person to commit; a page changed since is never overwritten', async () => {
+  const dir = makeFixture(files());
+  const cfg = { intentLayer: 'docs' };
+  await syncIntentLayer(dir, cfg, {});
+  const access = layerAccess(dir, cfg);
+  assert.equal(access.kind, 'folder');
+  assert.deepEqual(await mayWrite(dir, cfg), { ok: true });
+  const got = await layerFiles(access, 'x');
+  assert.ok(got.has('docs/components/button-main.md'));
+  const page = 'docs/components/button-main.md';
+  const next = new Map([[page, mdAdd(got.get(page), 'Common mistakes', 'Two main buttons side by side.')], ['docs/components/new-tile.md', '---\ntitle: New tile\n---\n']]);
+  const done = await commitToBranch(access, { files: next, sha: 'x', target: 'HEAD', message: 'm', created: new Set(['docs/components/new-tile.md']) });
+  assert.match(done.said, /written in the folder docs \(2 files\), not committed/);
+  assert.match(readFileSync(join(dir, page), 'utf8'), /## Common mistakes\n\n- \*\*Draft:\*\* Two main buttons side by side\./);
+  assert.ok(readFileSync(join(dir, 'docs/components/new-tile.md'), 'utf8').startsWith('---\ntitle: New tile'));
+  // Read again, then changed on disk by a person before the changes are written: refused, nothing written.
+  const again = layerAccess(dir, cfg); const read = await layerFiles(again, 'x');
+  writeFileSync(join(dir, page), read.get(page) + '\n- A person\'s line.\n');
+  const refused = await commitToBranch(again, { files: new Map([[page, 'gone']]), sha: 'x', target: 'HEAD', message: 'm' });
+  assert.match(refused.error, /changed in the folder since the layer was read/);
+  assert.match(readFileSync(join(dir, page), 'utf8'), /A person's line/);
+});
+
+test('a Markdown page is its own source: the plan\'s lines are written in it, and a new page starts beside its siblings', async () => {
+  const { applyPlan } = await import('../intent-changes.mjs');
+  const { startPage } = await import('../intent-answers.mjs');
+  const files = new Map([['docs/components/button-main.md', MD['docs/components/button-main.md']], ['docs/components/chip-filter/usage.mdx', MD['docs/components/chip-filter/usage.mdx']]]);
+  const e = { name: 'Button Main', file: 'docs/components/button-main.md', code: 'src/ButtonMain.vue' };
+  const r = applyPlan([{ entity: e, remove: ['To submit a form.'], drafted: [{ where: 'Limitations', text: 'One label line only.' }] }], files);
+  const out = r.files.get('docs/components/button-main.md');
+  assert.ok(out.startsWith('---\ntitle: Button Main'), 'the front matter is kept');
+  assert.doesNotMatch(out, /To submit a form\./);
+  assert.match(out, /## Limitations\n\n- \*\*Draft:\*\* One label line only\./);
+  const snap = { entities: [{ kind: 'component', layer: 'components', name: 'Button Main', file: 'docs/components/button-main.md', code: 'src/ButtonMain.vue' }] };
+  const s = startPage({ name: 'tileMedia', code: 'src/TileMedia.vue' }, snap, files);
+  assert.equal(s.file, 'docs/components/tile-media.md');
+  assert.equal(s.files.get(s.file), '---\ntitle: Tile Media\nkind: component\ncomponent: src/TileMedia.vue\nstatus: draft\n---\n');
+  const tabs = startPage({ name: 'tileMedia', code: 'src/TileMedia.vue' }, { entities: [{ kind: 'component', layer: 'components', name: 'Filter chip', file: 'docs/components/chip-filter/usage.mdx', files: ['docs/components/chip-filter/usage.mdx', 'docs/components/chip-filter/accessibility.mdx'], code: 'src/Chip.vue' }] }, files);
+  assert.equal(tabs.file, 'docs/components/tile-media/usage.mdx');
+});
+
+function fakeGithubWrite({ head = 'abc1234def5678', status = {} } = {}) {
+  const calls = [];
+  const reply = (code, j) => ({ ok: code >= 200 && code < 300, status: code, json: async () => j });
+  const fetchImpl = async (url, o = {}) => {
+    calls.push({ method: 'GET', url, headers: o.headers ?? {} });
+    const u = new URL(url);
+    if (/\/git\/ref\/heads\//.test(u.pathname)) return reply(status.ref ?? 200, { object: { sha: head } });
+    if (/\/git\/commits\//.test(u.pathname)) return reply(200, { tree: { sha: 'tree0' } });
+    return reply(200, {});
+  };
+  const sendImpl = async (url, o = {}) => {
+    calls.push({ method: o.method, url, headers: o.headers ?? {}, body: o.body });
+    const u = new URL(url);
+    if (/\/git\/trees$/.test(u.pathname)) return reply(201, { sha: 'tree1' });
+    if (/\/git\/commits$/.test(u.pathname)) return reply(201, { sha: 'new0001' });
+    if (/\/git\/refs\/heads\//.test(u.pathname)) return reply(status.patch ?? 200, {});
+    if (/\/git\/refs$/.test(u.pathname)) return reply(201, {});
+    if (/\/pulls$/.test(u.pathname)) return reply(201, { html_url: `${GH}/pull/7` });
+    return reply(404, {});
+  };
+  return { fetchImpl, sendImpl, calls };
+}
+test('a GitHub layer\'s changes: one commit on its branch while it has not moved, or a branch and a pull request; the token only to GitHub', async () => {
+  const cfg = { intentLayer: GH };
+  const env = { GITHUB_TOKEN: 'gh1' };
+  const files = new Map([['docs/a.md', '# A\n'], ['docs/old.md', null]]);
+  const f = fakeGithubWrite();
+  const a = layerAccess('.', cfg, { env, fetchImpl: f.fetchImpl, sendImpl: f.sendImpl });
+  const done = await commitToBranch(a, { files, sha: 'abc1234def5678', target: 'main', message: 'Intent layer: fixed' });
+  assert.equal(done.said, `committed on main: ${GH}/commit/new0001`);
+  const tree = f.calls.find((c) => /\/git\/trees$/.test(c.url)).body;
+  assert.deepEqual(tree, { base_tree: 'tree0', tree: [{ path: 'docs/a.md', mode: '100644', type: 'blob', content: '# A\n' }, { path: 'docs/old.md', mode: '100644', type: 'blob', sha: null }] });
+  assert.deepEqual(f.calls.find((c) => c.method === 'PATCH').body, { sha: 'new0001', force: false });
+  assert.ok(f.calls.every((c) => new URL(c.url).host === 'api.github.com' && c.headers.Authorization === 'Bearer gh1'));
+  const moved = fakeGithubWrite({ head: 'fff9999' });
+  assert.match((await commitToBranch(layerAccess('.', cfg, { env, fetchImpl: moved.fetchImpl, sendImpl: moved.sendImpl }), { files, sha: 'abc1234def5678', target: 'main', message: 'm' })).error, /main moved since the layer was read/);
+  assert.ok(!moved.calls.some((c) => c.method !== 'GET'), 'nothing sent when the branch moved');
+  const r = fakeGithubWrite();
+  const pr = await openMergeRequest(layerAccess('.', cfg, { env, fetchImpl: r.fetchImpl, sendImpl: r.sendImpl }), { files, sha: 'abc1234def5678', target: 'main', branch: 'design-system-engine/review-1', title: 'T', description: 'D', message: 'm' });
+  assert.equal(pr.url, `${GH}/pull/7`);
+  assert.deepEqual(r.calls.find((c) => /\/git\/refs$/.test(c.url)).body, { ref: 'refs/heads/design-system-engine/review-1', sha: 'abc1234def5678' });
+  assert.deepEqual(r.calls.find((c) => /\/pulls$/.test(c.url)).body, { title: 'T', head: 'design-system-engine/review-1', base: 'main', body: 'D' });
+  const p = fakeGithubWrite({ status: { patch: 422 } });
+  assert.match((await commitToBranch(layerAccess('.', cfg, { env, fetchImpl: p.fetchImpl, sendImpl: p.sendImpl }), { files, sha: 'abc1234def5678', target: 'main', message: 'm' })).error, /422/);
+  assert.match((await mayWrite('.', cfg, 'commit', { env: {} })).why, /no GITHUB_TOKEN/);
+  assert.match((await commitToBranch(layerAccess('.', cfg, { env: {} }), { files, sha: 'abc', target: 'main', message: 'm' })).error, /no GITHUB_TOKEN/);
 });
 
 test('--intent-layer takes a folder of the project or a GitHub link; a folder that is not there is not set', () => {

@@ -46,7 +46,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 **Ready to use** · **Why it matters:** What designers know becomes something teammates and agents can read.
 
-*Today: it reads DSDS or Markdown and MDX pages, from GitLab, GitHub or a folder in your project. Its own fixes are committed only to a DSDS layer on GitLab; anywhere else, each one is listed for a person to make. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
+*Today: it reads DSDS or Markdown and MDX pages, from GitLab, GitHub or a folder in your project. Its own fixes go back where the layer lives, in its own format: a commit or a merge request on GitLab, a commit or a pull request on GitHub, or the pages in your folder rewritten for you to commit. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
 
 - Reads your documentation where it already lives: a docs folder, a documentation site's pages, or the `.mdx` beside each component. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
 - Shows why each component exists, when to use it and when not, beside Figma and the code.
