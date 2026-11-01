@@ -94,7 +94,9 @@ export function usesIn(name, cls, file, text, counts = null) {
 // screen components snapshot ({ screens: { id: { name, components: { name: count } } } }).
 // → { <name>: { products: [{ name, files, uses, own? }], files: [{ file, uses, product }], inside: [], holds: [], screens: [{ screen, count }] } }
 //   own: the files outside every product, named this project.
-export function usageMap(names, { files = [], classFor = null, composition = {}, codeNesting = {}, screens = {} } = {}) {
+// definedIn: { <name>: its own code file }, so a file named with a prefix (HbButton.vue for button) is still its definition.
+const sameFile = (a, b) => !!b && String(a).replace(/\\/g, '/').replace(/^\.\//, '').endsWith(String(b).replace(/\\/g, '/').replace(/^\.\//, ''));
+export function usageMap(names, { files = [], classFor = null, composition = {}, codeNesting = {}, screens = {}, definedIn = {} } = {}) {
   const known = new Set(names);
   const counts = new Map();
   const out = Object.fromEntries(names.map((n) => [n, { products: [], files: [], inside: [], holds: [], screens: [] }]));
@@ -102,7 +104,7 @@ export function usageMap(names, { files = [], classFor = null, composition = {},
     const cls = classFor ? classFor(name) : null;
     const byProduct = new Map();
     for (const f of files) {
-      if (squash(f.file.split('/').pop().replace(/\.[^.]+$/, '')) === squash(name)) continue;   // its own definition
+      if (squash(f.file.split('/').pop().replace(/\.[^.]+$/, '')) === squash(name) || sameFile(f.file, definedIn[name])) continue;   // its own definition
       if (!counts.has(f.file)) counts.set(f.file, classUseCounts(f.text));
       const uses = usesIn(name, cls, f.file, f.text, counts.get(f.file));
       if (!uses) continue;

@@ -84,3 +84,12 @@ test('every product has a name: ds-config.json products, else its folder, else t
     assert.ok(u.cardTile.products.every((p) => typeof p.name === 'string' && p.name), 'never null');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a component defined in a file with a prefix (HbButton.vue for button) is not a use of itself', () => {
+  const files = [
+    { file: 'src/components/HbButton.vue', text: '<template><button class="hb-button"><slot /></button></template>' },
+    { file: 'apps/shop/Cart.vue', text: '<template><HbButton>Pay</HbButton></template>' },
+  ];
+  const map = usageMap(['button'], { files, classFor: () => '.hb-button', definedIn: { button: 'src/components/HbButton.vue' } });
+  assert.deepEqual(map.button.files.map((f) => f.file).includes('src/components/HbButton.vue'), false);
+});
