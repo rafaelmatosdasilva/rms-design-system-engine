@@ -1,5 +1,6 @@
 // The engine's default style guide: only what Figma and the code agree on, controls labelled with Figma's names.
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -143,7 +144,7 @@ test('a token\'s description in Figma travels to the token panel; one with none 
   assert.equal(t.colors[0].items[0].description, 'The page behind everything');
   assert.equal(t.spacing[0].description, 'Between small items');
   assert.equal('description' in agreedTokens(check, { color: vars.color }).colors[0].items[0], false);
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /'<div><dt>What it is for<\/dt><dd><p>' \+ esc\(t\.description\)/);
   assert.match(tpl, /t\.figma && !t\.primitive \? '<div><dt>What it is for<\/dt><dd><p class="pg-missing">Not written yet\.<\/p>/);
 });
@@ -378,7 +379,6 @@ test('in the browser: no script error, a control changes the real component, the
     const a11yFull = () => run(ROWS_FULL('#c-chip .pg-a11y-rows'));
     const a11yRead = await a11yFull();
     assert.match(a11yRead, /a <button type="button"> with aria-pressed/);
-    assert.match(a11yRead, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
     assert.match(a11y, /The audit has not run in a browser yet/);
     assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Pass \(\d+\)/, 'its chips count what passes, in the Status page\'s word');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
@@ -392,6 +392,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
     assert.match(live, /Tested now/, 'each finding says where it comes from');
+    // The text contrast is measured on the same pass, as each variant is drawn, and joins the table with these results:
+    // read with them, never from the table as first drawn.
+    assert.match(live, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
     // What a person checks names the component and the part it is about.
     assert.match(live, /On chip, its (\w+ part|text)[^.]*, a person checks that/);
     // Each area has its own address, to send someone to it.
@@ -464,7 +467,7 @@ test('in the browser: no script error, a control changes the real component, the
     await run(`document.querySelector('#c-chip .pg-anatomy').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
     assert.equal(await run(`document.querySelectorAll('#c-chip .pg-anat-marks .is-picked').length + '|' + document.querySelector('#c-chip .pg-anat-marks').classList.contains('has-pick')`), '0|false');
     // A mode switched while inspecting reaches the drawing: the inspector carries the Playground's modes.
-    const tplSrc = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+    const tplSrc = templateText();
     assert.match(tplSrc, /SGModes\.controls\(preview, function \(\) \{ refresh\(\); if \(inspecting\) requestAnimationFrame\(drawAnatomy\); \}/);
     assert.match(tplSrc, /else if \(preview\.hasAttribute\(a\.attr\)\) anatBox\.setAttribute\(a\.attr, preview\.getAttribute\(a\.attr\)\)/);
     // A control changed in the Playground redraws the specs under it.
@@ -652,7 +655,7 @@ test('in the browser: no script error, a control changes the real component, the
     // Over tables the lowest stuck bar paints the page's gap under its line (where a table's head will stick); a page
     // with no table (Identity) never has its content cut short under the line.
     // (read from the template: the lowest stuck bar is marked on a scroll frame, which a headless page times freely)
-    const sgTpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+    const sgTpl = templateText();
     assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, \.sg-token-card thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over tables, the gap under the line');
     // It stops a line short of the gap: a table's head sticks a pixel under the bars' bottom plus the gap (at.th, -1,
     // above), so its top line is two under; a band a line longer is drawn over that line (the bar is above the table).
@@ -725,7 +728,7 @@ test('"In use" shows the approved pictures of the system\'s own frames', { timeo
 });
 
 test('the template\'s heading and paragraph rules reach only its own chrome, never a component in a preview', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   // The last <style> tag itself (a word that only starts like one, as a workbook's styleSheet the page writes, is not).
   const css = tpl.slice([...tpl.matchAll(/<style[\s>]/g)].pop().index, tpl.lastIndexOf('</style>')).replace(/\/\*[\s\S]*?\*\//g, '');
   const top = (sel) => { const out = ['']; let depth = 0; for (const ch of sel) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && !depth) out.push(''); else out[out.length - 1] += ch; } return out.map((x) => x.trim()); };
@@ -736,14 +739,14 @@ test('the template\'s heading and paragraph rules reach only its own chrome, nev
 });
 
 test('the measuring page (?all) draws no card thumbnails; icons follow Figma, with no made-up size switch', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /function thumbOf\(c, src\) \{\n[^\n]*\|\| ALL\) return;/);
   assert.doesNotMatch(tpl, /Own size|iconSizes/);
   assert.match(tpl, /DATA\.iconFigma/);
 });
 
 test('a text part no text prop writes is drawn with its name, so its switch shows something', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /A text part no text prop writes \(Show Description alone\) gets its own name/);
   assert.match(tpl, /replace\(\/\^show\[\\s-\]\+\/i, ''\)/);
 });
@@ -751,12 +754,12 @@ test('a text part no text prop writes is drawn with its name, so its switch show
 test('a state set on an earlier part is set there: the checkbox input is ticked, the box class is never added to the whole', async () => {
   const { optionEffect } = await import('../lib/styleguide-data.mjs');
   assert.deepEqual(optionEffect('.checkbox', '.checkbox-input:checked + .checkbox-box'), { add: [], attrs: { checked: '' }, target: '.checkbox-input' });
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /if \(!effect\.target && e\.querySelector\(clsSel\(k\)\)\) return;/);
 });
 
 test('choosing the option already set does nothing, and a slot is documented with how Figma lets it be filled', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /if \(next === state\[p\.label\]\) return;/);
   assert.match(tpl, /if \(\/true\/\.test\(b\.getAttribute\('aria-pressed'\) \|\| b\.getAttribute\('aria-checked'\) \|\| b\.getAttribute\('aria-selected'\) \|\| ''\) \|\| b\.dataset\.on === '1'\) return;/);
   // A new selection tells the system's own script, so what follows the selection (a sliding pill) moves with it.
@@ -766,7 +769,7 @@ test('choosing the option already set does nothing, and a slot is documented wit
 });
 
 test('using the component in the playground sets its props: a box ticked, a switch flipped, a value typed', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('function effectHolds'), tpl.indexOf('function partsOf'));
   const clsSel = /function clsSel\(cls\) \{[^\n]*\}/.exec(tpl)[0];
   const effectHolds = new Function('window', clsSel + src + 'return effectHolds;')({});
@@ -784,7 +787,7 @@ test('using the component in the playground sets its props: a box ticked, a swit
 });
 
 test('on a phone the documentation is one column, each name above its text', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const phone = tpl.slice(tpl.indexOf('@media (max-width: 720px)'));
   const block = phone.slice(0, phone.indexOf('</style>'));
   assert.match(block, /\.pg-updated > div \{ grid-template-columns: 1fr;/);
@@ -795,12 +798,12 @@ test('the controls follow Figma\'s panel: variants first, then the rest in Figma
   const rows = [row('card', 'Title', 'title', 'match'), row('card', 'Show Icon', 'showIcon', 'match'), row('card', 'Size', 'size', 'match')];
   const v = agreedView({ propsSnap: snap, rows, classFor: () => '.card', cssText: '.card{}' });
   assert.deepEqual(v.components[0].controls.map((c) => [c.label, c.at]), [['Size', 0], ['Title', 1], ['Show Icon', 2]]);
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /if \(u\.at != null\) ctl\.dataset\.at = u\.at;/);   // a prop not built yet takes its Figma place too
 });
 
 test('a text goes to the part whose own words they are; a shape part stays empty and leads; an overlay opens over the whole window; the documentation sections stand apart', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /var named = parts\.find\(function \(k\) \{ return k\.tagName !== 'INPUT' && own\(k\); \}\)/);
   assert.match(tpl, /if \(box\.width > 0 && box\.height > 0\) \{/);
   assert.match(tpl, /wrap\.appendChild\(card\); document\.body\.appendChild\(wrap\);/);
@@ -809,7 +812,7 @@ test('a text goes to the part whose own words they are; a shape part stays empty
 });
 
 test('a title in the style guide has no line under it; each type style lists its size, weight, line height, letter spacing and case, the family once', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const h3 = /\.sg-subsection > h3 \{[^}]*\}/.exec(tpl)[0];
   assert.doesNotMatch(h3, /border-bottom/);
   for (const [k, word] of [['size', 'size'], ['weight', 'weight'], ['lh', 'line height'], ['ls', 'letter spacing'], ['textTransform', 'case']]) assert.ok(tpl.includes(`['${k}', `) && tpl.includes(`'${word}']`), k);
@@ -818,7 +821,7 @@ test('a title in the style guide has no line under it; each type style lists its
 });
 
 test('the Playground has the tokens behind what is drawn, no Computed box and no Its tokens table: Parity lists every token', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.doesNotMatch(tpl, /pg-computed|>Computed</);
   assert.match(tpl, /<div class="pg-inspect-head">Tokens<\/div><table class="pg-tokens">/);
   assert.doesNotMatch(tpl, /class="pg-own"|>Its tokens</);
@@ -845,7 +848,7 @@ test('a text style named in full (s/regular) keeps its name: each value is after
 });
 
 test('the search covers every part of the page and, while it has words, shows what matches in a flyout under the field, by kind', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   for (const kind of ['Component', 'Colour', 'Type style', 'Icon']) assert.match(tpl, new RegExp("add\\('" + kind));
   // Only components, tokens and icons are searched: no page, no prop, no task.
   for (const kind of ['Section', 'Prop of', 'Status']) assert.doesNotMatch(tpl, new RegExp("add\\('" + kind));
@@ -865,7 +868,7 @@ test('a component\'s API: a * on each prop the code says must be given, callback
 });
 
 test('the code shown: the tag with every prop the Playground sets, in its framework\'s syntax; a required prop never left out', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('var low = function'), tpl.indexOf('// The classes and data attributes the system'));
   const callCode = new Function(src + 'return callCode;')();
   const props = [{ label: 'Size', prop: 'size', type: 'VARIANT', default: 'Medium' }, { label: 'Disabled', prop: 'disabled', type: 'BOOLEAN', default: false }, { label: 'Label', prop: 'label', type: 'TEXT', default: 'Save' }];
@@ -916,7 +919,7 @@ test('parity per component: what agrees (since when), its props and tokens, what
 });
 
 test('To do: a role the code fails or has still to be tried on is the code\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('var WHO = {'), tpl.indexOf('function doWhat('));
   const a11yWho = new Function(src + 'return a11yWho;')();
   const audit = { st: 'todo', from: 'Tested on 5 Oct' };
@@ -938,7 +941,7 @@ test('To do: a role the code fails or has still to be tried on is the code\'s ev
 });
 
 test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   // A comfortable 44px target or a 2px ring (AAA) found short is advice: checked, and yours to decide, as its size is the design's.
   assert.match(tpl, /if \(its\.some\(function \(it\) \{ return it\.st === 'todo'; \}\)\) st = k\.extra \? 'check' : 'todo';/);
   assert.match(tpl, /who: r\.st === 'todo' \|\| r\.st === 'check' \? \(r\.k\.extra \? WHO\.both : own \|\| a11yWho\(/);
@@ -951,7 +954,7 @@ test('To do: AAA advice is to check and to decide, never a must-fix; a component
 });
 
 test('a control with no name only where an on/off prop hides its words fails, with what the product does about it', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const named = new Function(tpl.slice(tpl.indexOf('function showsText('), tpl.indexOf('function showFirst(')) + 'return namedWhereUsed;')();
   const props = [{ label: 'Show Label', type: 'BOOLEAN', default: true }, { label: 'Label Content', type: 'TEXT' }, { label: 'Show Icon', type: 'BOOLEAN', default: true }];
   // Unnamed only with its label off: what to do is said, naming the prop.
@@ -967,7 +970,7 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
   const { parity, a11y } = splitFindings([{ check: 'State contrast', what: 'badge [Type=Warning · light]: 2.04:1 (needs 4.5:1)' }, { check: 'Structure', what: 'badge · height: Figma 20, code 22' }, { check: 'Token layering', what: 'x' }]);
   assert.deepEqual(parity.map((x) => x.check), ['Structure', 'Token layering']);
   assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
-  const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const html = templateText();
   assert.match(html, /add\(x\.wcag \|\| \(contrast \? 'WCAG 1\.4\.3 Contrast \(Minimum\) \(AA\)' : ''\), 'todo'/, 'the Accessibility area lists what to fix, under its criterion');
   assert.match(html, /if \(AREA_STATE\[a\[0\]\]\) return \{ v: a\[0\], label: a\[1\], state: states\[AREA_STATE\[a\[0\]\]\] \};/, 'Parity, Accessibility and Documentation tabs carry their Status state, from componentStates');
   assert.match(html, /if \(o\.icon\) text = WARN_SVG \+ text;/, 'the page\'s own warning mark before the label');
@@ -1037,7 +1040,7 @@ test('a Figma slot the code holds in a part of its own is paired with that part,
   const { parityRows } = await import('../lib/styleguide-data.mjs');
   const rows = parityRows({ name: 'modal', propsSnap: { modal: { properties: { 'Slot#1:0': { type: 'SLOT' } } } }, slotParts: [{ name: 'Slot', selector: '.modal-slot', slot: true }] });
   assert.deepEqual(rows.map((r) => [r.figma.name, r.code.name, r.status, r.slot]), [['Slot', '.modal-slot', 'match', true]]);
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.doesNotMatch(tpl, /function slotsHTML\(c\)/, 'no line of slots under its name: Parity lists them');
 });
 
@@ -1098,7 +1101,7 @@ test('a control the system lacks: the page draws its default (segmented control,
   ]);
   assert.deepEqual(standInGaps({ segmented: {}, field: {}, button: {}, card: {}, iconButton: {}, tip: {} }), [], 'a system with them all: no note');
   // In the page: the default switch, a named group of plain buttons in the page's own track.
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('var SEG = DATA.ui'), tpl.indexOf('function segItems'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   const doc = { addEventListener() {}, querySelectorAll: () => [] };
@@ -1159,7 +1162,7 @@ test('usage on every component, from Figma, the code or the authored contract; t
 });
 
 test('built with: its own area, each component the overview\'s card with its preview, linked to its page', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /\['built', 'Built with'\], \['parts', 'Parts'\], \['used', 'Used in'\]/, 'its parts beside what it is built with');
   const src = tpl.slice(tpl.indexOf('function builtWithHTML'), tpl.indexOf('function builtThumbs'));
   const html = new Function('DATA', 'esc', 'cid', src + 'return builtWithHTML;')({ ui: { card: { cls: 'card' } } }, (x) => String(x), (n) => 'c-' + n)({ uses: ['buttonPrimary', 'buttonSecondary'] });
@@ -1181,7 +1184,7 @@ test('the playground and the preview stay linked: a part\'s state set on the par
     propertyMap: { State: { Default: '.step-item', Selected: '.step-item.done', Unselected: '.step-item.unavailable' } },
     cssText: '.radioButton { display: flex } .radioButton-input:checked + .radioButton-circle { border-color: red }' });
   assert.deepEqual(r.controls[0].options, [{ label: 'Default' }, { label: 'Selected', add: [], attrs: { checked: '' }, target: '.radioButton-input' }, { label: 'Unselected', unbuilt: true }]);
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /if \(!field\.value \|\| !leaf \|\| !cur \|\| !cur\.isConnected \|\| !cur\.contains\(leaf\)\) \{ refresh\(\); return; \}/, 'a label edit writes into its part, the rest as it is');
   assert.match(tpl, /o\.unbuilt \? 'Figma has this option; the code does not build it yet'/);
 });
@@ -1205,7 +1208,7 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   git('checkout', '-q', 'main'); git('merge', '-q', '--no-ff', 'feature', '-m', 'Merge pull request #4 from o/feature');
   const logs = changelogs(dir, [{ name: 'badge', files: ['theme.css'], pattern: '\\.badge[^a-zA-Z0-9_-]' }]);
   assert.deepEqual(logs.badge.map((r) => [r.subject, r.release, r.pr]), [['Badge colour', null, '4'], ['Badge and chip', 'v1.0.0', null]]);
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /\['log', 'History'\]/);
   assert.match(tpl, /'<div class="pg-head"><h2>' \+ esc\(c\.name\) \+ '<\/h2>' \+ headLinksHTML\(c\.links\)/, 'its links at the top right, beside its name');
   assert.doesNotMatch(tpl, /<dt>Code last changed<\/dt>/, 'the dates live in the changelog, not the documentation');
@@ -1236,7 +1239,7 @@ test('status and coverage: only what the team said (Figma, the code, the authore
   assert.equal(statusView({ description: 'A chip used for status pills.' }), null, 'never guessed from words that only mention it');
   assert.deepEqual(coverageOf({ total: {}, '/repo/src/components/Chip.jsx': { lines: { pct: 87.5 } } }, 'src/components/Chip.jsx'), { lines: 87.5 });
   assert.equal(coverageOf({ total: {} }, 'src/components/Chip.jsx'), null);
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /card\(cGrid, cid\(c\.name\), 'Components', c\.name, about\(c\), '', c\.status\)/);
   assert.match(tpl, /Tests cover ' \+ esc\(String\(Math\.round\(c\.coverage\.lines\)\)\) \+ '% of its lines/);
   assert.match(tpl, /group\('Foundations', GROUPS\.foundations \|\| /);
@@ -1308,7 +1311,7 @@ test('Figma images of each variant: the reference folder first, never the networ
 });
 
 test('a text prop comes right after the boolean that shows it; the rest keep Figma\'s order and nothing is dropped', () => {
-  const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const src = /  function showsText\(b, t\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0] + /  function showFirst\(list, propOf\) \{[\s\S]*?\n  \}\n/.exec(tpl)[0];
   const showFirst = new Function(`${src}; return showFirst;`)();
   const order = (props) => showFirst(props, (p) => p).map((p) => p.label).join(' | ');
@@ -1372,7 +1375,7 @@ test('in the browser: with a width chosen, a link to another component opens it'
 });
 
 test('a Tokens page as Figma keeps them: collections, a tree of groups, the collection\'s modes as columns; the foundations as a filter; all in one file', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /var tk = section\('tokens', 'Foundations', 'Tokens', null\);/);
   assert.match(tpl, /if \(\(DATA\.allVars \|\| \[\]\)\.length\) return DATA\.allVars\.map/, 'every token Figma has, when the snapshot is there');
   assert.match(tpl, /var tkCollOf = function \(t\) \{ return t\.collection \|\| ''; \};/, 'only the collections Figma has, never one made up');
@@ -1391,7 +1394,7 @@ test('a Tokens page as Figma keeps them: collections, a tree of groups, the coll
 });
 
 test('a foundation shows every mode at once: a column per mode, no switch, the columns lined up from table to table', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /function modesOf\(pick\)/);
   assert.doesNotMatch(tpl, /sizeSwitch\(|colourSwitch\(|modeSwitch\(/, 'no switch on a foundation');
   assert.match(tpl, /\.pg-inspect\.sg-token-card table \{ table-layout: fixed; \}/);
@@ -1402,7 +1405,7 @@ test('a foundation shows every mode at once: a column per mode, no switch, the c
 // A style guide rule: every component with variants has the Variants area, and on/off props count as variants (a
 // modal with Show Close Button and Show Actions has variants as much as a button with a Size).
 test('Variants: a component with a variant prop or an on/off prop has the area; text, slots and swaps alone do not', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const fn = (name) => tpl.slice(tpl.indexOf(`function ${name}(c)`), tpl.indexOf('\n  }', tpl.indexOf(`function ${name}(c)`)) + 4).replace(/^(function \w+\(c\) \{ return [^\n]*\})[\s\S]*$/, '$1');
   const variantRows = new Function(`${fn('variantProps')}\n${fn('variantRows')}\nreturn variantRows;`)();
   const rows = (controls) => variantRows({ controls }).map((r) => r.label);
@@ -1426,13 +1429,13 @@ test('a page title: the system\'s own heading when it has a large one, else its 
   const type = (sizes) => ({ typography: sizes.map((px, i) => ({ scale: ['s', 'm', 'l', 'xl'][i], size: { var: `--t${i}`, value: `${px}px` } })) });
   assert.equal(chromeRoles({ tokens: type([10, 11, 13]) }).roles.title, undefined, 'no large heading: the template scales the largest');
   assert.equal(chromeRoles({ tokens: type([12, 14, 16, 28]) }).roles.title, 'var(--t3)', 'its own heading, as it is');
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /--sg-title: calc\(var\(--sg-h1\) \* var\(--sg-title-scale\)\)/);
   assert.match(tpl, /\.sg-section > h2, \.pg-head > h2 \{ font-size: calc\(var\(--sg-title\) \+ var\(--sg-space-xxs\) \* 3\.5\);/);
 });
 
 test('Status: four cards at the top (Parity, Implementation, Accessibility, Documentation), each a count of components with its next step, the tasks under them, second in the side panel; #health and #tasks open it', { timeout: budget(300000) }, async (t) => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   // An item done counts whole, one to check half, one to fix nothing; the weights are the team's when it gives them.
   assert.match(tpl, /var HEALTH_PART = \{ done: 1, kept: 1, check: 0\.5, todo: 0 \};/);
   // Parity and accessibility count the component, so the many values that match never hide the one that does not:
@@ -1508,7 +1511,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
 });
 
 test('room around the Playground\'s component, what follows each title as close on every page, no feedback link', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   // 100px above and below the component on a wide screen, 64px on a tablet or a narrow laptop, 40px on a phone.
   assert.match(tpl, /\.pg-preview-card \{ --pg-stage-room: 100px; \}/);
   assert.match(tpl, /@media \(max-width: 1100px\) \{ \.pg-preview-card \{ --pg-stage-room: 64px; \} \}/);
@@ -1533,7 +1536,7 @@ test("the guide's spacing roles come from the system's spacing only, never an op
 });
 
 test('the Showroom lists its screens as a grid of cards, each opening on a page of its own (#showroom/<Screen>)', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   // One card a screen, linking to the screen's own address, its thumbnail the screen's own drawing kept out of reach.
   assert.match(tpl, /a\.href = '#showroom\/' \+ encodeURIComponent\(s\.key\)/);
   assert.match(tpl, /small\.setAttribute\('inert', ''\)/);
@@ -1550,7 +1553,7 @@ test('the Showroom lists its screens as a grid of cards, each opening on a page 
 });
 
 test('a Showroom screen opens clean: its differences, pinned over it and listed beside it, only when asked for', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   // The button opens the panel and shows the pins; both start hidden.
   assert.match(tpl, /sysButton\('button', 'Differences', ' data-differences aria-pressed="false"/);
   assert.match(tpl, /<div class="sg-pins" aria-hidden="true" hidden><\/div>/);
@@ -1563,7 +1566,7 @@ test('a Showroom screen opens clean: its differences, pinned over it and listed 
 });
 
 test('a Showroom screen is liquid: it fills the room it has (no breakpoint switch), full browser on request', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.doesNotMatch(tpl, /'Breakpoint'\)/, 'no breakpoint switch');
   assert.match(tpl, /var frameChoice = function \(\) \{ return window\.__dseShowroomFrame \|\| 'auto'; \};/);
   // Auto takes the room there is (Desktop from 1440px, never under 1024px); the build's measurement asks for Laptop.
@@ -1576,7 +1579,7 @@ test('a Showroom screen is liquid: it fills the room it has (no breakpoint switc
 });
 
 test('the page\'s switches hug their choices (a component\'s properties keep the panel\'s width); bars stick as they are', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /\.sg-seg \{ display: inline-flex; flex-wrap: nowrap; width: auto;/);
   assert.match(tpl, /\.pg-ctl \.sg-seg \{ display: flex; flex-wrap: wrap; width: 100%; \}/);
   // A component's title row sticks with its links, the areas under it; nothing is revealed (no bar grows) on scroll.
@@ -1590,7 +1593,7 @@ test('the page\'s switches hug their choices (a component\'s properties keep the
 });
 
 test('a Showroom screen: Full browser and Differences under its title; Differences shows Figma\'s Laptop frame', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /srSwitch\.querySelector\('\.sg-showroom-tools'\)\.innerHTML = \(s\.markup \? sysButton\('button', 'Full browser'/);
   // While the differences show: Figma's Laptop frame, fitted to the room left.
   assert.match(tpl, /frameOf\(s, diffOn \? 'laptop' : choice, room\)/);
@@ -1599,7 +1602,7 @@ test('a Showroom screen: Full browser and Differences under its title; Differenc
 });
 
 test('Variants open with a component\'s combinations: every mix of the parts it shows or hides, as its code draws them', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   // The props that show or hide a part (an icon, a label), the ones read from the code (showsPart) too.
   assert.match(tpl, /p\.type === 'BOOLEAN' && !!\(p\.on \|\| p\.off \|\| p\.part \|\| p\.showsPart\) && \/\^\(show\|has\)\/i\.test\(p\.label\)/);
   // A mix the code draws the same as another, or draws empty, is left out: the code's own logic decides.
@@ -1618,7 +1621,7 @@ test('a property Figma and the code name differently is a difference to fix, not
   const size = rows.find((r) => r.figma?.name === 'size'), disabled = rows.find((r) => r.figma?.name === 'disabled');
   assert.equal(size.status, 'differs'); assert.equal(size.renamed, true); assert.equal(size.code.name, 'buttonSize');
   assert.equal(disabled.status, 'match', 'the same name in both is a match');
-  const tpl = (await import('node:fs')).readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /else if \(r\.renamed \|\| r\.defaultDiffers\) \{/);
   assert.deepEqual(size.defaultDiffers, { figma: 's', code: 'm' }, 'its default differs too');
   assert.equal(disabled.defaultDiffers, undefined);
@@ -1639,7 +1642,7 @@ test('a default Figma and the code set differently is a difference: on or off, a
 });
 
 test('the Playground\'s controls are resized from the line beside them: a separator, by pointer or keys, hidden when stacked', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /<div class="pg-panel-grip" role="separator" aria-orientation="vertical" aria-label="Controls width" tabindex="0"/);
   assert.match(tpl, /:root\.sg-panel-sized \.pg-preview-card \{ grid-template-columns: [^}]*min\(var\(--pg-panel-w\), 100% - var\(--sg-stage-min\)\)/, 'never so wide the stage drops under its least');
   assert.match(tpl, /@container \(max-width: 720px\) \{[^\n]*\.pg-panel-grip \{ display: none; \}/, 'no handle when the controls sit under the stage');
@@ -1647,7 +1650,7 @@ test('the Playground\'s controls are resized from the line beside them: a separa
 });
 
 test('a saved accessibility result holds wherever the page is built: a Vue scoped id (where the file sat) is no part of a signature', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const fn = (name) => tpl.match(new RegExp(`function ${name}\\((?:text|css)\\) \\{[^\\n]*\\}`))[0];
   const { noScopeIds, cssSigText } = new Function(`${fn('noScopeIds')}\n${fn('cssSigText')}\nreturn { noScopeIds, cssSigText };`)();
   const here = '.cardTile[data-v-1a2b3c4d] { color: var(--text); }\n.cardTile .tip[data-v-1a2b3c4d] { opacity: .7; }';
@@ -1658,13 +1661,13 @@ test('a saved accessibility result holds wherever the page is built: a Vue scope
 });
 
 test('a page opens at its top, reloaded too: the browser never puts back an earlier scroll after the page opened', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /history\.scrollRestoration = 'manual'/);
   assert.ok(tpl.indexOf("history.scrollRestoration = 'manual'") < tpl.indexOf('function route()'), 'set before the page routes');
 });
 
 test('History: each card dated as what it holds is: the code by its release, a read of Figma by its day, the decisions of a day by that day; rows newest first', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('    var cardHead = function (g) {'), tpl.indexOf('    box.innerHTML = order.map(function (g) {'));
   const releaseHead = (g) => (g.k || 'Merged, no release tag yet') + '  ·  ' + (g.k ? 'released ' + g.on : g.at);
   const byTicket = (cs) => cs.map((c) => ({ items: [c] })), figmaHead = (g) => 'Figma read ' + g.read;
@@ -1683,8 +1686,8 @@ test('History: each card dated as what it holds is: the code by its release, a r
 });
 
 test('History: a read of Figma is a card of its own, dated: a row a changed component with what changed, then the ones read for the first time, named, the pills only under Affects', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
-  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 12;'), tpl.indexOf('    var decisionRow = function (d) {'));
+  const tpl = templateText();
+  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 10;'), tpl.indexOf('    var decisionRow = function (d) {'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const fns = new Function('esc', 'cid', 'sysButton', src + 'return { figmaRows, figmaHead, figmaChange, pillsHTML };')(esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`);
   assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
@@ -1696,17 +1699,18 @@ test('History: a read of Figma is a card of its own, dated: a row a changed comp
   assert.deepEqual(rows, [
     ['showLabel added; labelContent added', ['c-buttonFloat/history']],
     ['tileSlot added', ['c-navTab/history']],
-    ['Read for the first timecardRow, chipRowSaved in 9878c3f', ['c-cardRow/history', 'c-chipRow/history']],
-  ], 'what changed on the left, the component it changed as its pill; the new ones named in plain words, each its pill; the commit that saved the read under the last');
+    ['Read for the first timeSaved in 9878c3f', ['c-cardRow/history', 'c-chipRow/history']],
+  ], 'what changed on the left, the component it changed as its pill; the new ones named once, as their pills under Affects; the commit that saved the read under the last');
   assert.doesNotMatch(fns.figmaRows(read).split('<td>').filter((_, i) => i % 2).join(''), /href="#/, 'no pill in What: the components are pills only under Affects');
   assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'Figma2026-10-27', 'Figma and its day, nothing else');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
-  assert.equal((many.match(/ hidden>/g) ?? []).length, 2, 'the first twelve shown');
-  assert.match(many, /<button data-pills-more>2 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.equal((many.match(/ hidden>/g) ?? []).length, 4, 'the first ten shown');
+  assert.match(many, /<button data-pills-more>4 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.match(tpl, /\.sg-link-pill\[hidden\] \{ display: none; \}/, 'a pill kept back stays hidden, its pill style never showing it');
   assert.match(tpl, /order\.sort\(function \(a, b\) \{ return dayOf\(b\) - dayOf\(a\) \|\| releaseOrder\(a, b\); \}\);/, 'the code\'s releases and the reads of Figma in one order, newest first');
 });
 
 test('a table filtered by a chip closes on the card\'s own edge: the last row shown has no line under it', () => {
-  const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
+  const tpl = templateText();
   for (const box of ['.pg-inspect', '.pg-par-card .pg-par-table', '.sg-tk-facts']) assert.ok(tpl.includes(`${box} tbody tr:not([hidden]):not(:has(~ tr:not([hidden])))`), box);
 });

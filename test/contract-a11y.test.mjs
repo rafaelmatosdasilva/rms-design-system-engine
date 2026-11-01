@@ -3,7 +3,7 @@
 // a11y-facts.json), each fact with where it came from, and each state whose facts differ. Browser cases need Chrome.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -11,6 +11,7 @@ import { markupFacts, measuredFacts, withA11yFacts, factsFile, writeA11yFacts, r
 import { WCAG_PAGE_SOURCE } from '../lib/wcag21.mjs';
 import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { makeFixture, fixtureProject, budget } from './helpers.mjs';
+import { OUT_DIR } from '../lib/names.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -140,6 +141,33 @@ test('demo system: the style guide\'s build measures each component, and its con
   assert.match(chip.measuredAt, /^\d{4}-\d{2}-\d{2}$/);
   // The field: a text box named by its label.
   assert.deepEqual([acc('field').role, acc('field').name], [{ value: 'textbox', from: 'measured' }, { value: 'label', from: 'measured' }]);
+});
+
+// The sweep starts a moment after the Status page shows; a page still loading then (a web font, an image) had each
+// component's check wait for the load while the sweep passed it untried, so its facts were never measured.
+test('demo system: a page that is still loading when its sweep starts still has every component measured', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(240000) }, async () => {
+  const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'a11y-slow-');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(200000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const { createServer } = await import('node:http');
+  const gif = Buffer.from('R0lGODlhAQABAAAAACw=', 'base64');
+  const server = createServer((q, res) => setTimeout(() => { res.writeHead(200, { 'content-type': 'image/gif' }); res.end(gif); }, 2500));
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  try {
+    const page = join(dir, OUT_DIR, 'styleguide', 'index.html');
+    writeFileSync(page, readFileSync(page, 'utf8').replace('</body>', `<img src="http://127.0.0.1:${server.address().port}/slow.gif" alt="">\n</body>`));
+    const { bakeA11y } = await import('../lib/styleguide-bake.mjs');
+    const b = await bakeA11y(page, { chromePath: CHROME, jobs: 3 });
+    assert.deepEqual(b.unmeasured, []);
+    const facts = factsFile(b.themes).components;
+    assert.deepEqual(Object.keys(facts).sort(), ['button', 'chip', 'field'], 'every component measured');
+    assert.deepEqual([facts.field.role, facts.field.name], ['textbox', 'label']);
+  } finally { server.close(); }
+});
+
+test('bake: each page tries every jobs-th component by name, as the page shares them out', async () => {
+  const { shareOf } = await import('../lib/styleguide-bake.mjs');
+  assert.deepEqual([0, 1].map((i) => shareOf(['field', 'button', 'chip'], i, 2)), [['button', 'field'], ['chip']]);
 });
 
 test('code: a JSX or TSX component gives its element, its role and its ARIA from what it returns, as a Vue template does', async () => {

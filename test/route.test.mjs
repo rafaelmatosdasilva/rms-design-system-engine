@@ -307,3 +307,13 @@ test('Code Connect files drafted from the contracts, for the components that hav
   assert.notDeepEqual(r('check the Code Connect mappings').run, ['rms-design-system-engine --code-connect-draft']);
   assert.notDeepEqual(r('how do I write a Code Connect file?').run, ['rms-design-system-engine --code-connect-draft']);
 });
+
+test('the style guide kept up to date by itself: the background watch added, or taken away; publishing for the team stays the publish job', () => {
+  for (const t of ['update the style guide automatically every time there is a change', 'keep the style guide up to date by itself', 'it should update automatically every time the style guide changes', 'atualiza o guia de estilos automaticamente']) {
+    assert.deepEqual([r(t).recipe, r(t).run], ['publish-styleguide', ['rms-design-system-engine --watch-install']], t);
+  }
+  assert.deepEqual(r('stop updating the style guide automatically').run, ['rms-design-system-engine --watch-uninstall']);
+  assert.deepEqual(r('publish the style guide for the team').run, ['rms-design-system-engine --publish-styleguide']);
+  assert.deepEqual(r('build the style guide').run, ['rms-design-system-engine --styleguide']);
+  assert.notDeepEqual(r('how does the style guide update automatically?').run, ['rms-design-system-engine --watch-install'], 'a question about it is answered');
+});

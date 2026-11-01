@@ -1,10 +1,11 @@
 // The style guide builds selectors from the system's own class names: a name with a bracket, a space or a date in it
 // (an invented "card (2026)") must never become an invalid selector that stops the page's accessibility pass.
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const html = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+const html = templateText();
 const src = /function clsSel\(cls\) \{[^\n]*\}/.exec(html)[0];
 const clsSel = new Function('window', `${src}; return clsSel;`)({});
 

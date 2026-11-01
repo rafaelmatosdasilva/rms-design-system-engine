@@ -2,6 +2,7 @@
 // [data-size="phone"] on <html>), and whose components' API says more than Figma does: each preview and section in a
 // mode of its own, the page on Auto, and a Playground control for each prop only the code takes.
 import { test } from 'node:test';
+import { templateText } from '../lib/styleguide-template.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { attrModeCSS, colourAttrMode, modeAxes, modeScopes, codeControls, apiView } from '../lib/styleguide-data.mjs';
@@ -27,7 +28,7 @@ test('a colour mode set by an attribute on the root nests: each preview in its o
 });
 
 test('the page\'s colour switch has Light and Dark only, starts in the device\'s mode and follows it, even with no media query of the code\'s', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.doesNotMatch(tpl, /label: 'Auto', title: 'Follows this device/);
   assert.match(tpl, /var c = effective\(axis, scope\), on = c;/);
   assert.match(tpl, /AXES\.forEach\(function \(a\) \{ if \(darkOf\(a\) && !html\.hasAttribute\(a\.attr\) && !fixed\[a\.attr\]\) AUTO\[a\.attr\] = true; \}\);/);
@@ -69,7 +70,7 @@ test('each prop only the code\'s API takes is a Playground control and a case dr
 });
 
 test('each prop is independent: props set together show together, and an option its build drew is never greyed out', () => {
-  const tpl = readFileSync(new URL('../templates/styleguide.template.html', import.meta.url), 'utf8');
+  const tpl = templateText();
   assert.match(tpl, /function rootChange\(a, b\)/);
   assert.match(tpl, /off: !p\.on && !p\.off && !p\.part && !renderedWith\(c, p, true\)/);
 });

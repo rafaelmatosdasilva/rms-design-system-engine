@@ -1,0 +1,84 @@
+/* ── Modes ───────────────────────────────────────────────────────────────── */
+.sg-modes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
+.sg-mode-ctl { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
+.sg-sidebar .sg-mode-ctl { align-items: stretch; }   /* the page's own switch fills the sidebar; a section's is as wide as its options */
+.sg-mode-label { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
+/* A page's own switch (a foundation's sizes, its colour modes) as wide as its words, the same padding around each as
+   anywhere on the page, never stretched across it. */
+.sg-size-switch { margin-bottom: calc(var(--sg-card-gap) - var(--sg-space-s) * 2); position: sticky; top: 0; z-index: 15; background: var(--sg-bg); padding: var(--sg-space-s) 0; }   /* a foundation's size switch, well apart from what it changes, kept in view as the page scrolls */
+.sg-size-switch .sg-mode-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* named for a screen reader only */
+.pg-footer { display: flex; flex-direction: column; gap: var(--sg-space-m); margin-top: var(--sg-space-xl); }
+/* No title under the areas' tabs: the chosen tab names the area. Its content one card gap under them, the stuck bar's
+   own 16px counted. */
+.pg-area { padding-top: var(--sg-space-s); }   /* the tabs bar 24px over it, 8px more: one card gap */
+.pg-area > :first-child, .pg-area > [hidden] + * { margin-top: 0; }
+.pg-updated { display: grid; gap: var(--sg-space-l); margin: 0; font-size: var(--sg-s); color: var(--sg-muted); }   /* each section of the documentation clearly apart */
+.pg-updated > div { display: grid; grid-template-columns: 140px 1fr; gap: var(--sg-space-s); }
+.pg-updated dt { font-weight: var(--sg-heading-weight); color: var(--sg-text-2); }
+.pg-updated dd { margin: 0; }
+.pg-updated dd > p { margin: 0 0 var(--sg-space-xxs); }
+.pg-doc > h3 { margin: 0 0 var(--sg-space-xs); color: var(--sg-text); font-size: var(--sg-l); font-weight: var(--sg-heading-weight); }   /* the size of every other card heading, never the browser's */
+/* One font on the page, the system's: names of props, variables and classes are set in it too, never the browser's monospace. */
+/* Bold words in the heading weight, never a third one (the browser's bolder would give 900). */
+:where(.sg-main, .sg-sidebar, .sg-token-pop) :where(b, strong):not(.pg-preview *, .pg-frame *, .sg-thumb *) { font-weight: var(--sg-heading-weight); }
+:where(.sg-main, .sg-sidebar, .sg-token-pop) :where(code, pre, kbd, samp):not(.pg-preview *, .pg-frame *, .pg-variants .pg-preview *) { font-family: inherit; font-size: inherit; }
+.sg-mode-diff { font-size: var(--sg-s); color: var(--sg-text-2); line-height: var(--sg-lh); margin: 0; }
+/* The page's top bar: what applies to every preview (the brand, the mode) and the search, sticky above the pinned
+   titles and areas, which sit under it (--sg-sticky-top). */
+.sg-controlbar { position: sticky; top: 0; z-index: 25; display: flex; align-items: center; gap: var(--sg-space-s); margin: calc(-1 * var(--sg-space-xxl)) calc(-1 * var(--sg-main-pad, var(--sg-space-xxl))) var(--sg-space-xxl); padding: var(--sg-space-s) var(--sg-main-pad, var(--sg-space-xxl)); background: var(--sg-bg); border-bottom: var(--sg-line); }
+@media (min-width: 1280px) { .sg-controlbar { padding-top: calc(var(--sg-space-s) * 2); padding-bottom: calc(var(--sg-space-s) * 2); } }   /* a large window: 8px more above and below its switches */
+.sg-controlbar-label { flex: none; font-size: var(--sg-s); color: var(--sg-muted); margin-right: var(--sg-space-xs); }   /* 12px to its switch, as the Brand label to its select */
+#mode-controls { display: flex; align-items: center; gap: var(--sg-space-xl); }   /* 24px between the mode switch and the brand dropdown */
+.sg-controlbar .sg-mode-ctl { flex-direction: row; align-items: center; }
+.sg-controlbar .sg-mode-diff { display: none; }
+/* The page's own select: as tall as its fields, its chevron drawn by the page with room on its right. */
+.sg-select { position: relative; display: block; }
+.sg-select > select { -webkit-appearance: none; appearance: none; cursor: pointer; box-sizing: border-box; min-height: var(--sg-control-h); padding-inline-start: calc(var(--sg-space-m) + var(--sg-space-xs)); padding-inline-end: calc(var(--sg-space-m) * 2 + 1em + var(--sg-space-xs)); }   /* every select alike: its words 4px further in than a field's, room for the chevron */
+.sg-select::after { content: ""; position: absolute; right: calc(var(--sg-space-m) + var(--sg-space-xs)); top: 50%; width: 1em; height: 1em; transform: translateY(-50%); background: var(--sg-muted); -webkit-mask: var(--sg-chevron-mark) center / contain no-repeat; mask: var(--sg-chevron-mark) center / contain no-repeat; pointer-events: none; }
+.sg-brand-ctl { display: flex; align-items: center; gap: calc(var(--sg-space-s) + var(--sg-space-xs)); }   /* the brand the previews are in, beside the page's mode */
+.sg-brand-ctl .sg-select, .sg-brand-ctl .sg-dd { width: 220px; }
+/* The page's own dropdown: a field-like button with the choice and a list mark, the list under it on the page's surface. */
+.sg-dd { position: relative; display: block; }
+.sg-select-native { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sg-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); width: 100%; min-height: var(--sg-control-h); box-sizing: border-box; margin: 0; padding: 0 calc(var(--sg-space-m) + var(--sg-space-xs)); border: var(--sg-line); border-radius: var(--sg-control-radius); background: transparent; color: var(--sg-text); font: inherit; font-size: var(--sg-s); font-weight: var(--sg-text-weight); text-align: left; cursor: pointer; transition: background-color var(--sg-fast), border-color var(--sg-fast); }
+.sg-select-trigger:hover { background-color: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
+/* Chosen, open or typed in: the page's own background, outlined in the text's colour, as a chosen filter chip is. */
+.sg-select-trigger[aria-expanded="true"], .sg-select-trigger[aria-expanded="true"]:hover { background-color: var(--sg-bg); border-color: var(--sg-text); }
+.sg-select-trigger:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-dd-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-dd-label { flex: none; color: var(--sg-muted); }   /* the dropdown's name inside it, quieter than its choice */
+.sg-dd-label + .sg-dd-value { margin-right: auto; }
+.sg-select-trigger[aria-expanded="true"] > .sg-dd-label { display: none; }   /* named at rest; open, only the choice */
+.sg-mode-label.sg-dd-named { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* said for a screen reader; seen inside the dropdown */
+.sg-dd-mark { flex: none; width: var(--sg-mark); height: var(--sg-mark); color: var(--sg-muted); }
+.sg-select-list { position: absolute; top: calc(100% + var(--sg-space-xs)); left: 0; right: 0; z-index: 30; box-sizing: border-box; max-height: 60vh; overflow: auto; padding: var(--sg-space-xs); background: var(--sg-surface); border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow-lift); outline: none; }
+.sg-select-list[hidden] { display: none; }
+/* A button's tone, on the system's own button (its shape, size and padding kept): primary inverts it, danger is the
+   page's own red, whatever the system or a theme makes of its colours. */
+[data-tone="primary"] { background: var(--sg-text) !important; border-color: var(--sg-text) !important; color: var(--sg-bg) !important; }
+/* A small square button (an icon alone in a list's row): the system's button, as tall as a line of the list. */
+[data-size="s"] { width: calc(var(--sg-control-h) * 0.7) !important; height: calc(var(--sg-control-h) * 0.7) !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; gap: 0 !important; }
+[data-size="s"] svg { width: calc(var(--sg-control-h) * 0.35); height: calc(var(--sg-control-h) * 0.35); }
+[data-tone="danger"] { background: var(--sg-danger) !important; border-color: var(--sg-danger) !important; color: var(--sg-on-danger) !important; }
+/* A modal (a confirmation): the page's card, its title and words at the page's sizes, entering with a short ease. */
+.sg-dialog { font-weight: var(--sg-text-weight); line-height: var(--sg-lh); width: min(30rem, calc(100vw - 2 * var(--sg-space-l))); margin: auto; padding: var(--sg-space-xl); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-bg); color: var(--sg-text); box-shadow: var(--sg-shadow-lift); }
+.sg-dialog::backdrop { background: color-mix(in srgb, var(--sg-bg) 55%, transparent); backdrop-filter: blur(2px); }
+.sg-dialog[open] { animation: sg-dialog-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.sg-dialog[open]::backdrop { animation: sg-fade-in 0.24s ease-out; }
+.sg-dialog.is-closing { animation: sg-dialog-out 0.16s ease-in forwards; }
+.sg-dialog.is-closing::backdrop { animation: sg-fade-out 0.16s ease-in forwards; }
+@keyframes sg-dialog-in { from { opacity: 0; transform: translateY(var(--sg-space-s)) scale(0.97); } }
+@keyframes sg-dialog-out { to { opacity: 0; transform: translateY(var(--sg-space-xs)) scale(0.98); } }
+@keyframes sg-fade-in { from { opacity: 0; } }
+@keyframes sg-fade-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sg-dialog[open], .sg-dialog[open]::backdrop, .sg-dialog.is-closing, .sg-dialog.is-closing::backdrop { animation: none; } }
+.sg-dialog-title { margin: 0 0 var(--sg-space-s); font-size: var(--sg-title); font-weight: var(--sg-heading-weight); line-height: normal; color: var(--sg-text); }
+.sg-dialog-title.is-danger { color: var(--sg-danger); }
+.sg-dialog-text { margin: 0 0 var(--sg-space-xl); font-size: var(--sg-m); line-height: var(--sg-lh); color: var(--sg-text-2); }
+.sg-dialog-acts { display: flex; justify-content: flex-end; gap: var(--sg-space-s); }
+.sg-dd-option { padding: var(--sg-space-s) var(--sg-space-m); border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); font-size: var(--sg-s); color: var(--sg-text); cursor: pointer; }
+.sg-dd-option.is-active { background: var(--sg-hover-fill); }
+.sg-dd-option + .sg-dd-option { margin-top: var(--sg-space-xxs); }   /* each option a little apart, so two marked ones never touch */
+.sg-dd-option[aria-selected="true"] { background: var(--sg-seg-on); color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.sg-brand-ctl > .sg-mode-diff { position: absolute; top: 100%; margin-top: var(--sg-space-xxs); }
+

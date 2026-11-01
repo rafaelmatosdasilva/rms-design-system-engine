@@ -1,0 +1,30 @@
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.sg-layout { display: flex; min-height: 100vh; --sg-bg-page: var(--sg-bg); }
+.sg-main { --sg-bg: color-mix(in srgb, var(--sg-bg-page), var(--sg-surface) 60%); background: var(--sg-bg); }
+[data-sg-scheme="dark"] .sg-main { --sg-bg: var(--sg-bg-page); }   /* in light, the page a step lighter than its menu (towards the cards' colour), so the two read apart */
+.sg-sidebar { width: 280px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: var(--sg-line); background: var(--sg-bg-2); display: flex; flex-direction: column; scrollbar-gutter: stable; }
+.sg-sidebar-header { padding: calc(var(--sg-space-l) + var(--sg-space-s)) calc(var(--sg-space-l) + var(--sg-space-s)) var(--sg-space-m); }
+.sg-sidebar-header.sg-sticky-edge, .sg-nav-label.sg-sticky-edge { box-shadow: 0 1px 0 0 var(--sg-line-soft); }
+.sg-nav-label.sg-sticky-edge { padding-bottom: calc(var(--sg-space-xs) + var(--sg-space-xs)); }   /* stuck, 4px more between its name and its line */
+.sg-nav { padding-bottom: var(--sg-space-s); }   /* room under the menu's last item */   /* once the menu scrolls, the line under what stays at its top, as on the page */
+.sg-sidebar-header .sg-title { font-size: var(--sg-h2); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); }   /* the system's name in the h2 style */
+.sg-sidebar-header > p { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); margin-top: var(--sg-space-xxs); }
+.sg-logo { display: inline-flex; color: var(--sg-text); text-decoration: none; }   /* the system's logo, in the page's text colour */
+.sg-logo > svg { display: block; width: 145px; max-width: 100%; height: auto; }
+.sg-logo-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sg-space-s); }   /* the logo, its version at its right */
+.sg-logo-version { flex: none; text-decoration: none; }
+.sg-logo:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 4px; }
+.sg-nav { padding: var(--sg-space-s) 0; flex: 1; }
+.sg-nav a { display: flex; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-s) calc(var(--sg-space-l) + var(--sg-space-s)); font-size: var(--sg-m); font-weight: var(--sg-heading-weight);   /* the system's m text size, a step under l, in its strong weight as the tabs are */ color: var(--sg-text-2); text-decoration: none; transition: background var(--sg-fast), color var(--sg-fast); line-height: var(--sg-lh); }
+.sg-nav a:hover { color: var(--sg-text); background: var(--sg-nav-hover); }   /* the item under the pointer, a step under the chosen one */
+/* Each item inset from the menu's sides with rounded corners, as a dropdown's options are; its words where they were. */
+.sg-nav a { margin: 0 var(--sg-space-s); padding-left: var(--sg-space-l); padding-right: var(--sg-space-l); border-radius: calc(var(--sg-radius) - var(--sg-space-xxs)); }
+.sg-nav a + a { margin-top: 0; }   /* the items' own height makes the room between them: the chosen one 8px taller, the list as long */
+.sg-nav a.active { color: var(--sg-text); background: var(--sg-nav-on); }   /* the page shown by its fill alone, never a stripe at its side */
+.sg-nav-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); opacity: 0.4; }   /* well behind the words beside it: there to scan by, never to read first */
+.sg-nav a span.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sg-muted); flex-shrink: 0; }
+.sg-nav-label { font-size: var(--sg-xs); color: var(--sg-muted); padding: var(--sg-space-m) calc(var(--sg-space-l) + var(--sg-space-s)) var(--sg-space-xs); margin-top: var(--sg-space-xl); position: sticky; top: var(--sg-sidebar-head-h, 0px); z-index: 2; background: var(--sg-bg-2); }   /* each group's name stays at the top while its list scrolls under it */   /* each group of the menu 24px apart from the one before */
+.sg-nav-label:first-child { margin-top: 0; }   /* the first group starts at the menu's top */
+.sg-main { flex: 1; min-width: 0; --sg-main-pad: calc(var(--sg-space-xxl) + var(--sg-space-s)); padding: var(--sg-space-xxl) var(--sg-main-pad); }   /* the page's side margins: 8px more than its top on a mid window */
+@media (min-width: 1280px) { .sg-main { --sg-main-pad: calc(var(--sg-space-xxl) + var(--sg-space-l)); } }   /* 16px more on a large one */   /* the whole width a screen gives */
+

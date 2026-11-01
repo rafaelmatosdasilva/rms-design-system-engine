@@ -118,3 +118,18 @@ test('an answer whose component changed since is to review again: it still stand
   assert.deepEqual(ruledOutLines(view, 'tileTwo'), [], 'withdrawn: nothing ruled out');
   assert.match(decisionsMarkdown(view), /\*\*No: Write its page\.\*\* — ruled out: Write its page\.  \n  To review again: cardTile changed/);
 });
+
+test('an answer about a page of the intent layer names the page, in its words and as what it affects', async () => {
+  const { decisionsFrom, pageOf } = await import('../lib/decisions.mjs');
+  assert.equal(pageOf('move:pickerRow'), 'pickerRow');
+  assert.equal(pageOf('fix:cardTile:primaryAction'), 'cardTile');
+  assert.equal(pageOf('review:Saving'), 'Saving');
+  assert.equal(pageOf('recheck:move:pickerRow'), 'pickerRow');
+  assert.equal(pageOf('add:chip'), null);
+  const [d] = decisionsFrom({ answered: { 'move:pickerRow': { answer: 'yes', proposal: 'Keep its page: it documents an internal part, and the layer writes the page from its own code file.', at: '2026-10-25T10:00:00Z', by: 'QA' } } });
+  assert.equal(d.page, 'pickerRow');
+  assert.equal(d.component, null);
+  assert.equal(d.what, "Yes: Keep pickerRow's page: it documents an internal part, and the layer writes the page from its own code file.");
+  const [r] = decisionsFrom({ answered: { 'review:Saving': { answer: 'yes', at: '2026-10-25T10:00:00Z' } } });
+  assert.equal(r.page, 'Saving');
+});

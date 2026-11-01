@@ -1,0 +1,94 @@
+/* ── Health: the dashboard ───────────────────────────────────────────────── */
+/* Tiles for each area's number, then cards for where what is left gathers. Every box is the system's card (its line,
+   corners and shadow), every bar a track and a fill in the system's own colours. */
+:where(.sg-health-tile, .sg-health-top, .sg-health-card, .sg-health-list > li, .sg-health) > :where(p, h3, ol) { margin: 0; }
+/* Each card's label, and at its top right the system's own tip trigger saying how its number is counted. Its fill is the
+   index cards' (the text's colour, faintly). */
+.sg-health-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }
+.sg-health-top > :last-child:not(:first-child) { flex-shrink: 0; }
+/* The page's default tooltip, where the system has none (or none read yet): a round trigger and its words in a bubble,
+   shown on hover and focus, kept while the pointer is on it and closed with Escape (WCAG 1.4.13). */
+.sg-tip { position: relative; display: inline-flex; }
+.sg-tip-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; margin: 0; padding: 0; border: var(--sg-line); border-radius: var(--sg-control-radius); background: transparent; transition: background-color var(--sg-fast), border-color var(--sg-fast); color: var(--sg-text-2); font: inherit; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); line-height: normal; cursor: help; }
+.sg-tip-btn:hover, .sg-tip-btn:focus-visible { color: var(--sg-text); }
+.sg-tip-btn:hover { background-color: var(--sg-hover-fill); border-color: var(--sg-border-hover); }   /* the shared hover */
+.sg-tip-btn:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-tip-bubble { position: absolute; top: calc(100% + var(--sg-space-xs)); right: 0; z-index: 20; width: max-content; max-width: min(18rem, 70vw); padding: var(--sg-space-s) var(--sg-space-m); border-radius: calc(var(--sg-radius-s) - var(--sg-space-xs)); background: var(--sg-text); color: var(--sg-bg); font-size: var(--sg-s); font-weight: var(--sg-text-weight); line-height: var(--sg-lh); text-align: left; box-shadow: var(--sg-shadow-lift); visibility: hidden; }
+.sg-mx-why { display: inline-flex; align-items: center; gap: var(--sg-space-s); }   /* a word and the ? that says why */
+.sg-mx-why .sg-tip-btn { width: calc(var(--sg-space-l) + var(--sg-space-xxs)); height: calc(var(--sg-space-l) + var(--sg-space-xxs)); font-size: var(--sg-xs); }
+:is(.sg-mx-why, td) .sg-tip-bubble { position: fixed; right: auto; white-space: normal; }   /* placed by script over the table, never cut by its scroll */
+.sg-tip-bubble > .sg-tip-title, .sg-tip-bubble > .sg-tip-part { display: block; }
+.sg-tip-bubble > .sg-tip-part { margin-top: var(--sg-space-s); }
+.sg-tip--wide > .sg-tip-bubble { max-width: min(24rem, 80vw); }   /* room for what a criterion means and how it is checked */
+.sg-tip-part > b { display: block; }
+.sg-tip-bubble::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: var(--sg-space-xs); }   /* the gap to the trigger: the pointer crosses it without closing the bubble */
+.sg-tip:hover > .sg-tip-bubble, .sg-tip:focus-within > .sg-tip-bubble { visibility: visible; }
+.sg-tip.is-dismissed > .sg-tip-bubble { visibility: hidden; }
+.sg-health-count { display: flex; flex-direction: column; gap: 0; }
+.sg-health-count > .sg-health-desc { margin-top: calc(-1 * var(--sg-space-xs)); }   /* the label close under the count, into its line's own space */
+.sg-health-num { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--sg-space-s); }
+.sg-health-out { font-size: calc(var(--sg-s) + var(--sg-space-s)); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }   /* of 133, 8px over the text size */
+.sg-health-desc { font-size: calc(var(--sg-s) + var(--sg-space-xxs) / 2); color: var(--sg-text-2); }   /* what the count counts, under it, 1px over the text size */
+.sg-health-num, .sg-health-num.sg-health-num { line-height: normal; }
+.sg-health-count + .sg-health-bar { margin-top: calc(-1 * var(--sg-space-l)); }   /* the bar half as far under the big number: its line keeps room below the digits (and a wrapped word) that they never use */   /* the big count's own line, so a wrapped "of" line never runs into it */   /* the count, then what it is out of on its baseline; wrapped, under it */
+.sg-health-num > .sg-health-out { margin-bottom: var(--sg-space-l); }   /* a word wrapped under the number takes back the room the bar is pulled up by (on the number's own line it changes nothing: the digits are taller) */
+.sg-health-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--sg-space-l) + var(--sg-space-s)); margin-bottom: calc(var(--sg-space-l) + var(--sg-space-s)); }
+@media (max-width: 1200px) { .sg-health-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .sg-health-tiles { grid-template-columns: minmax(0, 1fr); } }
+.sg-health-tile, .sg-health-card { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-a1); padding: calc(var(--sg-space-l) + var(--sg-space-xs)); display: flex; flex-direction: column; gap: var(--sg-space-l); min-width: 0; }
+:root[data-sg-scheme="light"] :is(.sg-health-tile, .sg-health-card) { background: var(--sg-bg); }   /* in light mode a raised card is lighter than the page, never a shade darker */
+.sg-health-card > h3 { font-size: var(--sg-s); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }
+.sg-health-card + .sg-health-card { margin-top: var(--sg-space-l); }
+.sg-health-label { font-size: calc(var(--sg-s) + var(--sg-space-xxs)); color: var(--sg-muted); }
+.sg-health-num { font-size: calc(var(--sg-h1) * 4); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: var(--sg-lh); font-variant-numeric: tabular-nums; }
+.sg-health-num small { font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); }
+.sg-health-sub { font-size: var(--sg-s); color: var(--sg-text-2); }
+.sg-health-bar { display: flex; height: calc(var(--sg-space-xs) * 2); border-radius: var(--sg-radius-pill); background: color-mix(in srgb, var(--sg-border) 30%, transparent); overflow: hidden; }
+.sg-health-bar > span { display: block; height: 100%; background: var(--sg-text); }
+.sg-health-bar { gap: var(--sg-space-xxs); }
+.sg-health-bar > .is-none { background: none; }   /* N/A: no colour, the bar's empty track; its legend word has no dot */
+/* Untested is for now only (the browser is still trying it): diagonal stripes, in the bar, its legend, the table and a tab alike. */
+.sg-health-bar > .is-untested, .is-untested > .pg-par-sign { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--sg-muted) 55%, transparent) 0 1px, transparent 1px 2.5px), color-mix(in srgb, var(--sg-muted) 22%, transparent); }   /* dim fill, tight lines */
+.sg-health-bar > .is-done { background: var(--sg-positive); } .sg-health-bar > .is-check { background: var(--sg-warning-ink); } .sg-health-bar > .is-fix { background: var(--sg-negative); }   /* done, to check, to fix: the status dots' colours */
+.sg-matrix th[data-sort] .sg-mx-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }   /* a column head sorts by its area */
+.sg-matrix th[data-sort] .sg-mx-sort { display: inline-flex; align-items: center; gap: var(--sg-space-xs); }
+.sg-mx-tri { flex: none; width: calc(0.6em + var(--sg-space-xs)); height: calc(0.6em + var(--sg-space-xs)); opacity: 0; transition: opacity var(--sg-fast), transform var(--sg-fast); }   /* the sorted column: a triangle, down or up */
+.sg-matrix th[data-sort] .sg-mx-sort:hover .sg-mx-tri { opacity: 0.5; }
+.sg-matrix th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-sort { color: var(--sg-text); }
+.sg-matrix th:is([aria-sort="descending"], [aria-sort="ascending"]) .sg-mx-tri { opacity: 1; }
+.sg-matrix th[aria-sort="ascending"] .sg-mx-tri { transform: rotate(180deg); }
+.sg-mx-cell, .sg-todo td > a.sg-mx-cell[href] { color: inherit; text-decoration: none; display: inline-flex; border-radius: var(--sg-radius-s); }   /* a status that opens its area, not underlined until pointed at */
+.sg-mx-cell:hover .pg-par-status { text-decoration: underline; text-underline-offset: 3px; }
+.sg-matrix tr[hidden] { display: none; }
+.sg-mx-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--sg-space-xl) + var(--sg-space-s)); height: calc(var(--sg-space-xl) + var(--sg-space-s)); margin: 0; padding: 0; border: 0; border-radius: var(--sg-control-radius); background: transparent; color: var(--sg-text-2); cursor: pointer; transition: background-color var(--sg-fast), color var(--sg-fast); }   /* close: an X alone, rounded as the page's buttons are */
+.sg-mx-close:hover { background-color: var(--sg-hover-fill); color: var(--sg-text); }
+.sg-mx-close:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
+.sg-mx-close > svg { width: calc(var(--sg-space-l) + var(--sg-space-xs)); height: calc(var(--sg-space-l) + var(--sg-space-xs)); }
+.sg-mx-at { white-space: nowrap; color: var(--sg-text-2); }
+.sg-matrix { table-layout: fixed; width: 100%; }   /* the columns keep their width whatever is sorted or shown */
+.sg-matrix th:first-child { width: 22%; }
+.sg-matrix td:first-child { overflow: hidden; }
+.sg-mx-sys-head { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: var(--sg-card-gap) 0 var(--sg-space-l); }
+.sg-mx-sys { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
+.sg-todo > .pg-par-card { margin-bottom: 0; }
+.sg-health-go { margin-top: auto; padding-top: calc(var(--sg-space-l) + var(--sg-space-xs)); border-top: var(--sg-line); }   /* the same space above its words as the card leaves below them */   /* the card's next step at its foot, under a line */
+.sg-health-anchor { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-m); cursor: pointer; }   /* a link down to the table: its words and an arrow pointing down */
+.sg-health-anchor > svg { width: var(--sg-mark); height: var(--sg-mark); transition: transform var(--sg-fast); }
+.sg-health-anchor:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sg-health-anchor:hover > svg { transform: translateY(var(--sg-space-xxs)); }
+.sg-health-anchor:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
+.sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) calc(var(--sg-card-gap) - var(--sg-space-s) - var(--sg-space-xs)); font-size: var(--sg-s); color: var(--sg-text-2); }   /* 20px between items on an 8px system */
+.sg-health-bar + .sg-health-legend { margin-top: calc(-1 * var(--sg-space-s)); }   /* the legend 8px closer to its bar */
+.sg-health-legend .pg-par-status { font-weight: var(--sg-text-weight); color: var(--sg-text-2); }
+.sg-health-lead { color: var(--sg-muted); }   /* what the legend counts (Components), quieter than its counts */
+.sg-health-bar > span + span { background: var(--sg-a5); }
+.sg-health-bar > span + span + span { background: repeating-linear-gradient(135deg, var(--sg-a5) 0 2px, transparent 2px 4px); }
+.sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
+.sg-health-list > li { display: flex; flex-direction: column; gap: var(--sg-space-xs); }
+.sg-health-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sg-space-s); font-size: var(--sg-m); color: var(--sg-text); }
+.sg-health-row > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--sg-text-2); }
+.sg-health-note { margin-top: var(--sg-space-l); font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); }   /* the page's note size, never the body's 16px */
+.sg-health .sg-health-head { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: var(--sg-space-xl) 0 var(--sg-space-s); }
+.sg-health-cell { display: flex; flex-direction: column; gap: var(--sg-space-xxs); min-width: calc(var(--sg-space-xxl) * 2); font-variant-numeric: tabular-nums; }
+.sg-health-comps td { font-variant-numeric: tabular-nums; }
+

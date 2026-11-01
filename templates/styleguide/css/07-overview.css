@@ -1,0 +1,239 @@
+/* ── Overview ────────────────────────────────────────────────────────────── */
+.sg-hero { display: contents; }   /* its title sticks for the whole page, as every page's does */
+.sg-hero > :last-child { margin-bottom: var(--sg-space-s); }   /* what follows the overview's title sits as close as under every page's title */
+#index > .pg-links { margin: 0 0 var(--sg-space-xl); }   /* its links as a page's lead: as far from the groups as a lead from its content */
+.sg-hero > h1 { font-size: calc(var(--sg-title) + var(--sg-space-xxs) * 3.5); font-weight: var(--sg-heading-weight); color: var(--sg-text); line-height: normal; position: sticky; top: var(--sg-sticky-top, 0px); z-index: 15; background: var(--sg-bg); margin: calc(-2 * var(--sg-space-s)) 0 0; padding: calc(var(--sg-space-s) * 2) 0; }   /* the overview's title as every page's: it sticks */
+.sg-hero > p { font-size: var(--sg-m); color: var(--sg-text-2); line-height: var(--sg-lh); max-width: 500px; }
+/* The page's own info box, for every note it gives (an audit not run yet, a family that differs, what is left off): small
+   words beside an info mark, on a quiet surface. A note that asks for something (sg-pending) carries the warning colour
+   on its mark and its edge only. */
+.sg-info, .sg-pending { position: relative; display: block; font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); background: var(--sg-tint); border: var(--sg-line); border-radius: var(--sg-radius); padding: var(--sg-cell-x); padding-inline-start: calc(var(--sg-cell-x) + 1.15em + var(--sg-space-s)); margin: 0 0 var(--sg-space-l); max-width: none; }   /* a table row's room: the same padding as its cells; one line while the page has the room */
+.sg-info::before, .sg-pending::before { content: ""; position: absolute; left: var(--sg-cell-x); top: calc(var(--sg-cell-x) + 0.15em); width: 1.15em; height: 1.15em; background: currentColor; -webkit-mask: var(--sg-info-mark) center / contain no-repeat; mask: var(--sg-info-mark) center / contain no-repeat; opacity: 0.8; }
+.sg-pending { border-color: color-mix(in srgb, var(--sg-warning) 45%, var(--sg-bg)); background: color-mix(in srgb, var(--sg-warning) 6%, var(--sg-bg-2)); }   /* a warning: the whole box a touch warm, never a side bar */
+.sg-pending::before { background: var(--sg-warning-ink); opacity: 1; }
+.sg-info b, .sg-pending b { color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.sg-save-note { position: fixed; right: var(--sg-space-l); bottom: var(--sg-space-l); z-index: 60; margin: 0; max-width: min(28rem, calc(100vw - 2 * var(--sg-space-l))); background: var(--sg-bg); }   /* a file this viewer may not have handed over: how else to get it, over the page */
+.sg-save-line { margin: 0 0 var(--sg-space-s); }
+.sg-save-acts { display: flex; flex-wrap: wrap; gap: var(--sg-space-s); }
+.sg-info[hidden], .sg-pending[hidden] { display: none; }
+.sg-usage-count { font-size: var(--sg-m); color: var(--sg-text-2); margin: 0 0 var(--sg-space-l); max-width: 720px; }
+.sg-gap ul { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
+/* Four to a row, with room around each; fewer on a narrower window. */
+.sg-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sg-card-gap); margin-bottom: var(--sg-space-xxl); }
+@media (max-width: 1100px) { .sg-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .sg-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--sg-space-l) + var(--sg-space-s)); } }
+/* On a phone two cards side by side, each shorter, so more of the system fits the screen; what a picture holds is scaled
+   to fit it (fitThumb), and the foundations' samples shrink with it. */
+@media (max-width: 480px) {
+  .sg-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--sg-space-m) + var(--sg-space-s)); margin-bottom: var(--sg-space-xl); }
+  .sg-card-grid .sg-thumb { height: 104px; gap: var(--sg-space-xs); }
+  .sg-card-grid .sg-card > h3 { font-size: var(--sg-m); padding: var(--sg-space-s) var(--sg-space-m); }
+  .sg-card-grid .sg-card > h3 + p { padding: 0 var(--sg-space-m) var(--sg-space-s); }   /* the line under the name starts where the name does */
+  .sg-card-grid .sg-thumb-dot { width: 20px; height: 20px; }
+  .sg-card-grid .sg-thumb-box { width: 24px; height: 24px; }
+  /* The other grids of cards two side by side too: the icons, the products a component is used in, its pictures in use. */
+  .sg-card-grid.pg-usedin, .sg-main .sg-icon-grid, .sg-main .sg-screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Each overview link is the system's own card (DATA.ui.card); with none (or none read yet), the page's default card: the
+   tables' border, corners and shadow, on the page's own cards only (sg-card--own), so neither the system's card nor its
+   reset (div { border: 0 }) takes them away. */
+.sg-card { display: flex; flex-direction: column; gap: var(--sg-space-m); text-decoration: none; color: inherit; min-width: 0; }
+.sg-card.sg-card--own { border: var(--sg-line); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow); background: var(--sg-bg); overflow: hidden; }
+/* A card that opens a page answers the pointer: it rises on hover and settles back, a step smaller, while pressed;
+   still for a person who asks for less motion, the border alone answering. */
+a.sg-card { transition: transform var(--sg-move), border-color var(--sg-move); }
+a.sg-card:hover { transform: translateY(-2px); }
+a.sg-card.sg-card--own:hover { border-color: var(--sg-border-hover); }   /* a step brighter than its line, never a heavy one */
+a.sg-card:active { transform: translateY(0) scale(0.985); transition-duration: 0.15s; }
+a.sg-card:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { a.sg-card, a.sg-card:hover, a.sg-card:active { transform: none; transition: border-color var(--sg-fast); } }
+/* A card that opens a page says so: an arrow at its bottom right that moves on toward it under the pointer. */
+a.sg-card { position: relative; }
+a.sg-card::after { content: ''; position: absolute; right: var(--sg-space-l); bottom: calc(var(--sg-space-m) + var(--sg-space-s)); width: 16px; height: 16px; background: var(--sg-muted); opacity: 0.4; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h10M9 4l4 4-4 4'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform var(--sg-move), background-color var(--sg-fast), opacity var(--sg-fast); pointer-events: none; }
+a.sg-card:hover::after, a.sg-card:focus-visible::after { transform: translateX(4px); background: var(--sg-text); opacity: 1; }   /* quiet at rest, full under the pointer */
+a.sg-card > h3, a.sg-card > h3 + p { padding-right: calc(var(--sg-space-l) * 2 + var(--sg-space-s)); }   /* its words never under the arrow */
+@media (prefers-reduced-motion: reduce) { a.sg-card:hover::after { transform: none; } }
+.sg-card[hidden], .sg-section[hidden], .sg-hr[hidden], .sg-nav a[hidden] { display: none; }
+.sg-hero > h1[tabindex="-1"]:focus, .pg-head > h2[tabindex="-1"]:focus, .sg-section > h2[tabindex="-1"]:focus { outline: none; }   /* the heading a new view moves focus to, for a screen reader */
+/* The Showroom: a grid of its screens, each in small; a screen's own page shows it at Figma's size, scaled to fit,
+   beside what it still lacks (stacked on a narrower window). */
+.pg-usedin-title { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-m); }
+.pg-usedin + .pg-usedin-title { margin-top: var(--sg-card-gap); }   /* the Showroom's screens a card's gap under the products */
+.sg-card-grid.sg-showroom-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .sg-card-grid.sg-showroom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .sg-card-grid.sg-showroom-grid { grid-template-columns: minmax(0, 1fr); } }
+.sg-showroom-thumb { display: block; padding: 0; }   /* the screen from its top left corner, its whole width in the card */
+.sg-showroom-thumb > .sg-showroom-screen { pointer-events: none; }
+.sg-card > h3 + .sg-showroom-meta { margin: 0; }
+.sg-crumb { margin-left: var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-muted); text-decoration: none; }   /* the tag's page beside it, back to the grid */
+.sg-crumb::before { content: '›'; margin-right: var(--sg-space-s); }
+.sg-crumb:hover { color: var(--sg-text); text-decoration: underline; }
+.sg-crumb[hidden], .sg-section-actions[hidden], .sg-size-switch[hidden] { display: none; }
+.sg-screen-title { display: flex; align-items: center; gap: var(--sg-space-m); }   /* the back button, then the screen's name */
+.sg-screen-title > a { flex: none; box-sizing: border-box; width: var(--sg-control-h); height: var(--sg-control-h); padding: 0; justify-content: center; }   /* a square back beside the title */
+.sg-screen-title > a .sg-showroom-back-mark { width: var(--sg-mark); height: var(--sg-mark); }
+#showroom > .sg-showroom-detail > .sg-showroom-meta { margin: 0 0 var(--sg-space-l); }
+.sg-showroom-back-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; }
+.sg-showroom-grid[hidden], .sg-showroom-detail[hidden], .sg-section > p[hidden] { display: none; }
+.sg-showroom-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sg-space-m); margin: 0 0 var(--sg-space-m); }
+.sg-showroom-head > div > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; }
+.sg-showroom-meta { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xxs) 0 0; }
+.sg-showroom-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: calc(var(--sg-space-l) + var(--sg-space-s)); align-items: start; }   /* the screen alone, as wide as the page */
+.sg-showroom-body.is-open { grid-template-columns: minmax(0, 1fr) minmax(340px, auto); }   /* its differences beside it, asked for: at least 340px, wider when its filter needs it to stay on one line */
+.sg-showroom-gaps > .sg-notes, .sg-showroom-gaps > p { contain: inline-size; }   /* the notes wrap to the panel; only the filter and its legend set its width */
+.sg-showroom-actions { display: flex; align-items: center; gap: var(--sg-space-s); flex: none; }
+#showroom .sg-section-actions:not([hidden]) { display: flex; align-items: center; gap: calc(var(--sg-space-s) * 2); }
+.sg-showroom-frames:not([hidden]) { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sg-space-s) var(--sg-space-l); }   /* the breakpoint, and beside it the screen's own buttons */
+.sg-showroom-tools { display: inline-flex; align-items: center; gap: var(--sg-space-s); }   /* a screen's page only: never on the grid */
+/* A screen full browser: the product alone over the whole window, the way out at its bottom left corner. */
+.sg-showroom-full { position: fixed; inset: 0; z-index: 1000; background: var(--sg-bg); overflow: hidden; }
+.sg-showroom-full > .sg-showroom-screen { position: absolute; top: 0; left: 0; z-index: 0; isolation: isolate; }   /* its own layer: nothing in the product (its menu, a panel) ever covers the way out */
+.sg-showroom-full-exit { position: absolute; left: var(--sg-space-l); bottom: var(--sg-space-l); z-index: 2; line-height: var(--sg-lh); font-weight: var(--sg-text-weight); }   /* the page's buttons' own weight and height, not the screen's */
+.sg-showroom-full-exit > .sg-btn { box-shadow: var(--sg-shadow-lift); }   /* the button is solid already: lifted over the product */
+html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never scrolls, nor shows its scroll bar */
+.sg-showroom-notes[hidden], .sg-pins[hidden] { display: none; }
+/* Beside the screen it stays in view, under the title and switch that stick, and fills the window's height down to its
+   foot (fitNotes sets the height as the page scrolls): its filter stays, only its notes scroll. Under the screen, on a
+   narrow page, it runs its own length with the page. */
+@media (min-width: 901px) {
+  .sg-showroom-notes { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--sr-head-h, 0px) + var(--sg-space-m)); max-height: calc(100vh - var(--sg-sticky-top, 0px) - var(--sr-head-h, 0px) - var(--sg-space-m) - var(--sg-space-xl)); overflow: hidden; }
+  .sg-showroom-notes > .sg-showroom-gaps { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .sg-showroom-gaps > .sg-notes { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+}
+@media (max-width: 900px) { .sg-showroom-body.is-open { grid-template-columns: minmax(0, 1fr); } }   /* a narrow window: the notes under the screen, never over it */
+.sg-showroom-room { min-width: 0; }   /* the column a screen is drawn in */
+.sg-showroom-stage { position: relative; overflow: hidden; border: var(--sg-line); border-radius: var(--sg-radius); box-sizing: content-box; max-width: 100%; }
+.sg-showroom-screen { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.sg-showroom-gaps { font-size: var(--sg-s); line-height: var(--sg-lh); color: var(--sg-text-2); border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-tint); padding: var(--sg-space-m); }
+.sg-showroom-notes { display: flex; flex-direction: column; gap: var(--sg-space-l); }
+.sg-showroom-gaps > h4 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }   /* two steps over its notes */
+.sg-acc-title { display: flex; flex-direction: column; gap: var(--sg-space-xxs); min-width: 0; }   /* the name, its kind under it */
+.sg-showroom-gaps ul { list-style: none; margin: 0 0 var(--sg-space-m); padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-s); }
+.sg-showroom-gaps li b { color: var(--sg-text); font-weight: var(--sg-heading-weight); }
+.sg-showroom-gaps .sg-acc > p { margin: var(--sg-space-xs) 0 0; }
+.sg-showroom-gaps ul { gap: 0; }
+.sg-showroom-gaps li + li { border-top: var(--sg-line); }
+/* The page's own accordion: a row that opens on a click (or Enter), a plus that turns into a minus. */
+.sg-acc > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-s) 0; cursor: pointer; list-style: none; }
+.sg-acc > summary::-webkit-details-marker { display: none; }
+.sg-acc > summary:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; border-radius: var(--sg-radius-s); }
+.sg-acc > p { padding: 0 0 var(--sg-space-s); }
+.sg-acc-mark { position: relative; flex: none; width: 0.75em; height: 0.75em; }
+.sg-acc-mark::before, .sg-acc-mark::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1.5px; margin-top: -0.75px; background: var(--sg-muted); }
+.sg-acc-mark::after { transform: rotate(90deg); transition: transform var(--sg-move); }
+.sg-acc[open] .sg-acc-mark::after { transform: rotate(0deg); }
+.sg-showroom-kind { color: var(--sg-muted); }
+/* A screen's differences: numbered pins over its parts, the same numbers in the list beside it, one colour a kind. */
+.sg-showroom-filter { margin: 0 0 var(--sg-space-s); }
+/* A screen's page review, under the screen: what its code shows, then what a model judged on its screenshot, said so. */
+.sg-showroom-room > .sg-showroom-review { margin-top: var(--sg-space-l); }
+.sg-showroom-review > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }   /* under the page's title, as its notes are */
+.sg-showroom-review > h3 ~ h3 { margin-top: var(--sg-space-l); }
+.sg-showroom-review li.sg-showroom-review-row { padding: var(--sg-space-s) 0; }
+.sg-showroom-review > p { margin: 0 0 var(--sg-space-s); }
+.sg-showroom-review .sg-acc > p + p { margin-top: var(--sg-space-xs); }
+.sg-notes-top { position: sticky; top: 0; z-index: 2; border-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)) calc(var(--sg-radius) - var(--sg-line-width, 1px)) 0 0; margin: calc(-1 * var(--sg-space-m)) calc(-1 * var(--sg-space-m)) 0; padding: var(--sg-space-m) var(--sg-space-m) var(--sg-space-xs); background: var(--sg-bg-2); border-bottom: var(--sg-line); }   /* the filter and its key stay at the panel's top as its notes scroll */
+.sg-chip-dot { flex: none; width: calc(var(--sg-space-xs) * 1.5); height: calc(var(--sg-space-xs) * 1.5); border-radius: var(--sg-radius-pill); }   /* a chip's dot in its pins' colour, 8px from its words as every dot is */
+.sg-pins { position: absolute; inset: 0; pointer-events: none; }
+.sg-pin { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 var(--sg-space-xxs); border-radius: var(--sg-radius-pill); border: 2px solid var(--sg-bg); box-shadow: var(--sg-shadow); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-bg); transition: transform 0.15s var(--sg-ease, ease); }
+.sg-pin.is-on { transform: translate(-50%, -50%) scale(1.2); z-index: 2; }
+.sg-pin--missing { background: var(--sg-accent); }
+.sg-pin--fixed { background: var(--sg-warning-ink); }
+.sg-pin--code { background: var(--sg-negative); }
+.sg-pin-box { position: absolute; pointer-events: none; border: 2px solid var(--sg-text); border-radius: var(--sg-radius-s); }
+.sg-pin-box--missing { border-color: var(--sg-accent); }
+.sg-pin-box--fixed { border-color: var(--sg-warning-ink); }
+.sg-pin-box--code { border-color: var(--sg-negative); }
+/* A pin's note on the screen: dark on the light page (the page's own colours turned round), so it reads over any screen. */
+.sg-pin-card { position: absolute; z-index: 3; width: 260px; pointer-events: auto; display: flex; flex-direction: column; gap: var(--sg-space-xxs); padding: var(--sg-space-m); background: var(--sg-text); color: var(--sg-bg); border-radius: var(--sg-radius); box-shadow: var(--sg-shadow-lift); font-size: var(--sg-s); line-height: var(--sg-lh); }
+.sg-pin-card > b { font-weight: var(--sg-heading-weight); }
+.sg-pin-card-kind { font-size: var(--sg-xs); color: color-mix(in srgb, var(--sg-bg) 72%, transparent); }
+.sg-pin-card > p { margin: var(--sg-space-xxs) 0 0; }
+.sg-notes { list-style: none; margin: 0; padding: 0; }
+.sg-notes > li + li { border-top: var(--sg-line); }
+.sg-note > .sg-acc > summary { justify-content: flex-start; }
+.sg-note .sg-acc-title { flex: 1; }
+.sg-note-no { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-bg); }
+.sg-note.is-on > .sg-acc > summary .sg-acc-title > b { text-decoration: underline; text-underline-offset: 3px; }
+.sg-note--away .sg-note-no { background: transparent; color: var(--sg-muted); box-shadow: inset 0 0 0 1px var(--sg-line-colour); }   /* not on the screen: no pin for it */
+.sg-note[hidden] { display: none; }
+.sg-overview-group { margin-bottom: var(--sg-space-xl); }
+.sg-status { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-text-weight); color: var(--sg-text); background: color-mix(in srgb, var(--sg-muted) 14%, transparent); vertical-align: middle; }
+.sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
+.sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
+.sg-status--stable { background: color-mix(in srgb, var(--sg-positive) 20%, transparent); }
+.sg-status--suggested { background: transparent; box-shadow: inset 0 0 0 1px var(--sg-line-colour); }   /* the stage the page suggests, outlined: the team's own is filled */
+.pg-stage { display: contents; }   /* its pill and words sit in the status line as its other items do */
+.pg-stage-sug { color: var(--sg-muted); }
+.sg-status--code-only { background: color-mix(in srgb, var(--sg-text-2) 16%, transparent); }
+.sg-status--connected { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); gap: var(--sg-space-xxs); }
+.sg-status-mark { width: 14px; height: 14px; flex: none; }   /* the project's Code Connect pairs it with Figma */
+.pg-status { display: flex; align-items: center; gap: var(--sg-space-s); flex-wrap: wrap; margin: var(--sg-space-xs) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
+/* What a component's page says first, and its overview card under its name: its version, when it last changed, how it
+   stands with Figma and with accessibility, and where it is used. A fact that needs work is marked, never coloured alone. */
+.pg-facts { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs) var(--sg-space-l); margin: var(--sg-space-s) 0 0; font-size: var(--sg-s); color: var(--sg-text-2); }
+.pg-facts > div { display: flex; gap: var(--sg-space-xs); align-items: baseline; }
+.pg-facts dt { color: var(--sg-muted); }
+.pg-facts dd { margin: 0; color: var(--sg-text); }
+.sg-fact-todo { font-weight: var(--sg-heading-weight); }
+.sg-fact-todo::before { content: "! "; }
+.sg-overview-group > h3 { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px)); z-index: 14; background: var(--sg-bg); padding: 0 0 var(--sg-space-s); }   /* each group's name stays in view under the title while its cards scroll */
+.sg-overview-group > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 calc(var(--sg-space-l) - var(--sg-space-s)); }   /* 16px to its cards, its own 8px padding counted */
+/* Each card's thumbnail: a few of the real tokens, or the component itself, drawn small on the system's own surface. */
+.sg-thumb { position: relative; height: 180px; overflow: hidden; contain: layout paint; display: flex; align-items: center; justify-content: center; gap: var(--sg-space-s); background: var(--sg-a1); border-radius: var(--sg-radius); pointer-events: none; }
+.sg-thumb-dot { width: 32px; height: 32px; border: var(--sg-line); flex-shrink: 0; }   /* square, as each colour is on its page */
+.sg-thumb-bar { height: var(--sg-space-s); background: var(--sg-text-2); border-radius: var(--sg-radius-s); }
+.sg-thumb-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sg-space-xs); }
+.sg-thumb-box { width: 36px; height: 36px; border: var(--sg-line); background: var(--sg-bg); flex-shrink: 0; }
+.sg-thumb-live { transform-origin: center; flex-shrink: 0; align-self: center; margin: 0; }   /* centred in its card, whatever its own rule says of where it sits in a row */
+#sg-search { margin-left: auto; width: 280px; flex: none; }   /* at the bar's right end */
+#sg-search > input { font: inherit; width: 100%; }
+#sg-search { position: relative; }   /* the search mark inside the field, before its words */
+.sg-search-mark { position: absolute; left: var(--sg-space-m); top: 50%; transform: translateY(-50%); width: var(--sg-mark); height: var(--sg-mark); color: var(--sg-muted); pointer-events: none; }
+#sg-search input.sg-input, #sg-search input { padding-inline-start: calc(var(--sg-space-m) * 2 + var(--sg-mark)); padding-inline-end: var(--sg-control-h); }
+#sg-search input::-webkit-search-cancel-button, #sg-search input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }   /* the page's own clear button instead */
+.sg-search-clear { position: absolute; right: var(--sg-space-xs); top: 50%; transform: translateY(-50%); box-sizing: border-box; width: calc(var(--sg-control-h) - var(--sg-space-s)); height: calc(var(--sg-control-h) - var(--sg-space-s)); min-height: 0; padding: 0; }   /* a button of the page's, 32px square in the 40px field */
+.sg-search-clear[hidden] { display: none; }
+.sg-search-none { font-size: var(--sg-s); color: var(--sg-muted); padding: var(--sg-space-xs) var(--sg-space-l); }
+.sg-results { padding-bottom: 0; }
+/* The search's flyout: under the field, over the page, what to look in, then what matches. */
+#sg-search { position: relative; }
+.sg-search-flyout { position: absolute; top: calc(100% + var(--sg-space-xs)); right: 0; z-index: 30; width: min(480px, calc(100vw - 2 * var(--sg-space-l))); max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sg-space-s); padding: var(--sg-space-s); background: var(--sg-bg); border: var(--sg-line); border-radius: var(--sg-radius); }
+.sg-search-flyout[hidden] { display: none; }
+.sg-searching .sg-main *:not(#sg-search *) { animation-play-state: paused !important; }
+.sg-searching .sg-main > *:not(.sg-controlbar) { pointer-events: none; }   /* the page under the search holds still and does not react */
+.sg-search-flyout > .sg-chips { position: sticky; top: calc(-1 * var(--sg-space-s)); z-index: 1; margin: calc(-1 * var(--sg-space-s)) calc(-1 * var(--sg-space-s)) 0; padding: var(--sg-space-s); background: var(--sg-bg); }   /* what to search in stays in view as the results scroll */
+.sg-search-flyout > .sg-chips.sg-sticky-edge::after { left: 0; right: 0; }
+.sg-search-flyout > .sg-chips { flex: none; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .sg-search-flyout > .sg-chips > * { flex: none; } .sg-search-flyout > .sg-chips::-webkit-scrollbar { display: none; }   /* one row always; on a narrow screen it scrolls sideways */   /* its line the flyout's whole width */
+.sg-search-flyout .sg-results { margin: 0 calc(-1 * var(--sg-space-s)); }
+.sg-results > a { position: relative; }
+.sg-results > a + a { margin-top: var(--sg-space-l); }
+.sg-results > a + a::before { content: ''; position: absolute; left: var(--sg-space-l); right: var(--sg-space-l); top: calc(var(--sg-space-l) / -2 - var(--sg-line-width, 1px) / 2); border-top: var(--sg-line); pointer-events: none; }   /* a result, a line, a result: the line apart from each, so each keeps its rounded highlight as the other lists do */
+.sg-result { display: flex; flex-direction: column; min-width: 0; }
+.sg-result > span:first-child { overflow-wrap: anywhere; }
+.sg-result-kind { font-size: var(--sg-xs); color: var(--sg-muted); }
+.sg-found { outline: var(--sg-line); outline-color: var(--sg-accent); outline-offset: var(--sg-space-xxs); }
+/* A card: its picture on the stage above, its name below on the table heads' background, a line between them. */
+.sg-card.sg-card { padding: 0; gap: 0; overflow: hidden; }
+.sg-card > .sg-thumb, .sg-card > .pg-shot { border-radius: 0; border: 0; }   /* the card rounds the picture's top; its bottom stays square */
+.sg-card > h3:not(:last-child) { padding-bottom: var(--sg-space-xxs); }
+.sg-card > h3 + p { margin: 0; padding: 0 var(--sg-space-l) calc(var(--sg-space-m) + var(--sg-space-s)); background: var(--sg-tint); }   /* the line under the name, aligned with it, on its background */
+.sg-card > :last-child:not(.sg-thumb):not(.pg-shot) { flex-grow: 1; }   /* that background down to the card's edge */
+.sg-card > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0; padding: calc(var(--sg-space-m) + var(--sg-space-s)) var(--sg-space-l); background: var(--sg-tint); border-top: var(--sg-line); overflow-wrap: anywhere; }   /* a long name wraps, never spills, with wider text spacing too (WCAG 1.4.12) */
+.sg-screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: calc(var(--sg-space-l) + var(--sg-space-s)); }
+.sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
+.sg-screen img { display: block; width: 100%; height: auto; }
+.sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); border-top: var(--sg-line); }
+/* Templates: each page frame, its Figma picture beside the components it is made of, in Figma's order. */
+.sg-templates { display: grid; gap: calc(var(--sg-space-xl) + var(--sg-space-s)); }
+.sg-template > h3 { margin: 0; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-template-meta { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xxs) 0 0; }
+.sg-template-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: calc(var(--sg-space-l) + var(--sg-space-s)); align-items: start; margin-top: var(--sg-space-m); }
+.sg-template-body.sg-template-body--parts { grid-template-columns: minmax(0, 1fr); }   /* no picture: the list alone */
+.sg-template-body > figure { margin: 0; }   /* the frame fills its column */
+@media (max-width: 900px) { .sg-template-body { grid-template-columns: minmax(0, 1fr); } }
+.sg-template-parts { list-style: none; margin: 0; padding: 0; border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-surface); }
+.sg-template-parts > li { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); color: var(--sg-text); }
+.sg-template-parts > li + li { border-top: var(--sg-line); }
+.sg-template-note { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-s) 0 0; }
+

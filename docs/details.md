@@ -845,7 +845,9 @@ Now they come together in one log, written to `DECISIONS.md` in the output folde
 
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#write-the-intent-layer) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
-The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma and what was decided, each row tagged Code, Figma or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
+The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided, each row tagged Code, Figma, Intent layer or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
+
+- **An intent layer change** is a card of its own: the pages it changed, the commit that made it, and the components those pages document. The engine keeps the last 50 changes it read, in the layer's snapshot.
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 
@@ -917,9 +919,16 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - it runs every hour when something moved, and at once when the intent layer's job starts it;
   - it never runs on a push to the store, since the page it sends is one;
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
+- **Your own copy updates on its own too.** On your computer, the style guide can build itself again whenever something changes ([ask for it](commands.md#publish-a-living-style-guide)):
+  - your design system's code, a few seconds after you save, commit or switch branch;
+  - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set;
+  - the intent layer, checked every 5 minutes;
+  - the engine itself, after it updates.
+  - It runs in the background from login on, with no terminal open: a LaunchAgent on a Mac, a user service on Linux. What it does goes to `.design-system-engine-out/watch.log`, and one request turns it off.
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
+- **The template comes in parts.** Its file is the page's frame; its styles and its script are parts of their own under `templates/styleguide/` (`css/` and `js/`, one area of the page each, such as the Overview, the Tokens page or the Status page), joined in order when the page is built. A change is reviewed and tested one area at a time, and the page they make is the same. A project's own template can be one file, or use parts the same way (a line `/*@part …*/` in its styles, `//@part …` in its script).
 
 ### What's in it
 
@@ -986,7 +995,11 @@ Also on each component.
 - **A token's panel.** Click any token to see its value in each mode, the components that use it, and a button to copy it.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
-- **Status and coverage.** Stable, beta or deprecated when your team says so, and how much of its file your tests cover.
+- **Status and coverage.** Stable, beta or deprecated, and how much of its file your tests cover.
+  - Your team's own stage always wins. Set it as `status` in `contract.authored.json`, or as `Status: beta` in its Figma description, or with `@deprecated` in its code.
+  - Without one, the page suggests a stage from what it measures, in the Status table's words. Stable when Parity is Match, Accessibility Pass and Documentation Ready, with at least 80% of its lines covered when your tests report coverage. Beta otherwise, with what is left.
+  - With one that differs from what the page measures, the page says what it would be beside it.
+  - A component being retired names what replaces it, from the release that retired it or from a line such as "use button instead" in Figma or its code.
 
 ### Templates
 
@@ -1151,7 +1164,7 @@ The last three set its risk (high, medium or low), which the reason says. For ex
 
 Where you see it:
 
-- **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's. A line under the filters counts them: "4 shared, waiting on Cards lead (3), Design system team (1); 2 local, each product team's own."
+- **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
   - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
 - **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
 - **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.

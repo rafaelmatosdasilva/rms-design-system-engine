@@ -188,5 +188,7 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-01-merge-remote-tracking-branch-origin` | The 24 guide tasks on Haiku (engine f9ba9f3) | "Merge remote-tracking branch 'origin/main' into eval-owed-guides" |
 | `2026-11-01-point-the-hooks-workflows-install` | The 24 guide tasks on Haiku (engine 36f540e) | "Point the hooks, workflows, install, docs and tests at lib/; keep four root entries" |
 | `2026-11-01-the-build-and-change-guides` | The 24 guide tasks on Haiku (engine e1ebb2c) | "Build and change guides, library keys" |
+| `2026-11-01-usage-and-config-reference-pages` | The 24 guide tasks on Haiku (engine aa621b1) | "Usage and config reference: pages to write, suggested prop pairs, and where a contract's description and rules come from" |
+| `2026-11-01-skill-evaluation-pages-to-write` | The 24 guide tasks on Haiku (engine 5497b03) | "Skill evaluation: pages to write, suggested prop pairs, where a contract's description and rules come from; every run passed" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

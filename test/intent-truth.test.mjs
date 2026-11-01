@@ -275,3 +275,63 @@ test('a decision is dated like a page: its component is found from its key, and 
   assert.deepEqual(decisionsToReview({ ...d, 'recheck:move:Picker': { answer: 'yes', at: '2026-04-03T00:00:00Z' } }, changed, { pageComponent: pc }), {}, 'confirmed after the change');
   assert.deepEqual(decisionsToReview(d, changed, { pageComponent: pc, only: (k) => k !== 'move:Picker' }), {});
 });
+
+// The engine writes a component's Data line from its code facts, which take a list prop's item fields from its doc
+// comment; the content check reads the code without its comments. It now knows those fields too, so the engine's own
+// line is never called wrong, in a Vue file or a TS one, and a field no one wrote is still flagged.
+test('a list prop\'s item fields that only its doc comment names are in the system, as the Data line the engine writes says', async () => {
+  const { systemFacts } = await import('../lib/intent-truth.mjs');
+  const { factLines } = await import('../lib/intent-changes.mjs');
+  const { codeSnapshotPath, OUT_DIR } = await import('../lib/names.mjs');
+  const { docFields } = await import('../lib/prop-shapes.mjs');
+  const dir = tempDir('truth-item-fields-');
+  mkdirSync(join(dir, 'src', 'tiles'), { recursive: true });
+  mkdirSync(join(dir, 'src', 'cards'), { recursive: true });
+  const vue = `<template><ul class="acme-tiles"><li v-for="t in tileData" :key="t.id">{{ t.id }}</li></ul></template>
+<script setup>
+/**
+ * @tileData {Array} the tiles it shows
+ *   - tileHeading {String} what each tile says
+ *   - tileState {Object} how it is, with:
+ *     - stateTone {String} its colour
+ */
+defineProps({ tileData: Array })
+</script>`;
+  const ts = `import React from 'react';
+interface CardListProps {
+  /**
+   * @cardRows {Array} the rows
+   *   - rowCaption {String} what the row says
+   *   - rowWeight [Number]: how much it counts
+   */
+  cardRows: Array<Record<string, unknown>>;
+}
+export function CardList({ cardRows }: CardListProps) { return <ol className="acme-cards">{cardRows.length}</ol>; }`;
+  writeFileSync(join(dir, 'src', 'tiles', 'TileGrid.vue'), vue);
+  writeFileSync(join(dir, 'src', 'cards', 'CardList.tsx'), ts);
+  const api = {
+    tileGrid: { file: 'src/tiles/TileGrid.vue', props: { tileData: { type: 'array' } } },
+    cardList: { file: 'src/cards/CardList.tsx', props: { cardRows: { type: 'array' } } },
+  };
+  mkdirSync(join(dir, codeSnapshotPath({}), '..'), { recursive: true });
+  writeFileSync(join(dir, codeSnapshotPath({})), JSON.stringify({ api, tokens: {} }));
+  const page = (name, text) => ({ kind: 'component', layer: 'components', name, file: `components/${name}.dsds.json`, rules: [{ text }] });
+  const says = (facts, name, text) => checkPage(page(name, text), facts, { component: name }).filter((f) => f.kind === 'name').map((f) => f.says);
+  // Before any prototype check kept the code facts: read from the doc comment itself.
+  let facts = systemFacts(dir, {}, { record: false });
+  assert.deepEqual(says(facts, 'tileGrid', 'Data: `tileData` holds a list of items, each with `tileHeading`, `tileState`. Its `stateTone` sets the colour.'), []);
+  assert.deepEqual(says(facts, 'cardList', 'Data: `cardRows` holds a list of items, each with `rowCaption`, `rowWeight`.'), []);
+  assert.deepEqual(says(facts, 'tileGrid', 'Each item has a `tileHeadline`.'), ['`tileHeadline`'], 'a field no comment or code names is still not in the system');
+  // With the code facts the prototype check keeps (the same the Data line is written from), and a key only the
+  // product's own use gives: the line the engine writes from them passes its own check.
+  const comps = Object.fromEntries(Object.entries(api).map(([n, a]) => [n, { name: n, file: a.file, props: a.props, fields: docFields(n === 'tileGrid' ? vue : ts) }]));
+  mkdirSync(join(dir, OUT_DIR, 'prototypes'), { recursive: true });
+  writeFileSync(join(dir, OUT_DIR, 'prototypes', 'page-system.json'), JSON.stringify({ components: comps, uses: { 'tileGrid\u0000tileData': { values: [[{ tileHeading: 'A', tileBadge: 'new' }]] } } }));
+  facts = systemFacts(dir, {}, { record: false });
+  const { codeFactsFor } = await import('../lib/intent-changes.mjs');
+  const k = codeFactsFor(dir, facts).get('src/tiles/TileGrid.vue');
+  const [line] = factLines(k);
+  assert.equal(line.text, '`tileData` holds a list of items, each with `tileHeading`, `tileState`, `tileBadge`.');
+  assert.deepEqual(says(facts, 'tileGrid', `Data: ${line.text}`), [], 'the engine\'s own Data line is true of the system');
+  assert.deepEqual(says(facts, 'cardList', `Data: ${factLines(codeFactsFor(dir, facts).get('src/cards/CardList.tsx'))[0].text}`), []);
+});
