@@ -119,6 +119,22 @@
           : mk('props', 'Properties', '<p>Its ' + k.props.length + (k.props.length === 1 ? ' property is' : ' properties are') + ' in its contract in the intent layer, ' + where + ', which the engine generates from Figma and the code: ' + listed + '. Agents read them there; nothing to write.</p>', 'done', '');
       rows.push(Object.assign(row, { src: ['Its contract (' + k.file + ')'] }));
     }
+    // What each of its props is for: how many say it, each one that says nothing with where its description goes (the
+    // comment above it in its code file, or contract.authored.json), and the sentences drafted for its code props, to
+    // approve. The patch that writes them where the engine reads them next run is applied only when the person asks.
+    var pd = c.propDocs;
+    if (pd && pd.total) {
+      var pmiss = pd.missing || [], pdrafts = pmiss.filter(function (m) { return m.draft; }), inPatch = pdrafts.filter(function (m) { return m.inPatch; });
+      var pname = function (m) { return '<code>' + esc(m.prop) + '</code>' + (m.figma ? ' <span class="pg-dim">(Figma ' + esc(m.figma) + ')</span>' : ''); };
+      var pwritten = '<p>' + pd.described + ' of ' + pd.total + (pd.total === 1 ? ' prop says what it is' : ' props say what they are') + ' for.</p>' +
+        (pmiss.length ? '<p class="pg-missing">No description:</p><ul>' + pmiss.map(function (m) { return '<li>' + pname(m) + ': <code>' + esc(m.where) + '</code></li>'; }).join('') + '</ul>' : '') +
+        (pdrafts.length ? '<p class="pg-par-val">Drafted, to approve</p><ul>' + pdrafts.map(function (m) { return '<li>' + pname(m) + ': ' + esc(m.draft) + (m.inPatch ? '' : ' <span class="pg-dim">(write it by hand)</span>') + '</li>'; }).join('') + '</ul>' : '');
+      var ptodo = !pmiss.length ? '' : [inPatch.length && pd.patch ? 'Read each drafted line. To write them in the code, where the engine reads them on the next run, copy the request and paste it into Claude Code: it applies ' + pd.patch + '. A line that says it wrong: write the right words in the code instead.' : '',
+        pmiss.length > inPatch.length ? 'Write the others where each line says: the comment above the prop in its code file, or contract.authored.json under propDescriptions.' : ''].filter(Boolean).join(' ');
+      var prow = { key: c.name + '\u0000doc:propdesc', area: 'Documentation', kind: 'What each prop is for', written: pwritten, todo: esc(ptodo), who: !pmiss.length ? '' : inPatch.length ? WHO.both : WHO.code, st: pmiss.length ? 'todo' : 'done', rel: '', at: DATA.builtAt || null, src: ['Its contract' + (k ? ' (' + k.file + ')' : '')] };
+      if (inPatch.length && pd.patch && pd.apply) prow.decide = '<div class="sg-decide-grid"><div class="sg-decide sg-decide--approve" title="' + esc('Applies the patch: each drafted line goes above its prop in the code.') + '"><strong class="sg-decide-head">' + decideMark('approve') + esc('Apply the ' + inPatch.length + (inPatch.length === 1 ? ' draft' : ' drafts')) + '</strong>' + sysButton('button', 'Copy request', ' data-pair-copy="' + esc(pd.apply) + '"') + '<span class="sg-decide-said" role="status"></span></div></div>';
+      rows.push(prow);
+    }
     // What agents got wrong with it in prototypes, and why: what its documentation lacked (to write), or what is written
     // and was not followed (to review: say it more plainly, or higher on its page).
     var inv = c.inventions;

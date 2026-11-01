@@ -584,6 +584,17 @@ Each prop says what it is for the same way. A Figma property paired with a code 
 
 A prop only the code has (`codeOnly`) carries the code's description too.
 
+### Props that say nothing, and drafts to approve
+
+A prop none of those sources describes is listed, with where its description goes.
+
+- **Where it is listed.** On the component's Documentation area in the style guide (What each prop is for), and in the audit's contract completeness line. `--contract-completeness` lists each one.
+- **Where it goes.** The comment above the prop in its code file, with the file and line. A Figma property no code prop is goes in `contract.authored.json` (`propDescriptions`).
+- **A draft for each code prop.** One plain sentence from what the engine knows for sure: its type and values, its default, the Figma property it pairs with, the Figma properties that set it, and how often its uses set it. Nothing more: "Size of the chip: s, m or l. Default m."
+- **As a patch.** The drafts are written to `.design-system-engine-out/handback/prop-descriptions.diff`. Each one goes above its prop in the file's own style: a doc comment in a Vue props object, a `defineProps` type or a TypeScript interface, or a line in the component's own comment when that is where its props are described (`@size {String} …`).
+- **You approve.** The Documentation area shows the drafts as Drafted, to approve, with the request to copy into Claude Code. The patch is applied only when you ask. The next run reads the comments back into the contract.
+- **From the terminal.** `rms-design-system-engine --prop-descriptions` lists every prop that says nothing, with its draft, and writes the patch. Add component names to list only those.
+
 ### Its element, said once
 
 `semantics.element` and `accessibility.element` always name the same element: yours from `contract.authored.json`, else the one the code's markup starts with. Where it was read is in `accessibility.element.from`. A role you write as `semantics.aria.role` is `accessibility.role` too.
@@ -792,6 +803,11 @@ These go into `contract.authored.json` — the engine's own file and no other �
 Two lines are never crossed. What is certain is written as final and what is judgement is written as a **Draft:**, never read as your team's word. And nothing a person wrote is ever overwritten: the engine fills what is empty and removes what repeats, and a sentence somebody chose stays as they chose it.
 
 A component's role in the intent layer follows the same line: written as final when its code renders an element that has one (`<button>` is a button), drafted from what the component does when it renders a plain `div` or `span`, and only ever one of the ARIA roles.
+
+What each list holds (a page's Data lines) is the engine's own, written from the code:
+
+- **It follows the code.** When the code changes what a list's items hold, the old line comes out and the code's new one goes in, as final, in the Markdown spec and the DSDS page alike. It is never drafted for a person.
+- **The changes say only what was made.** A line planned for a page that none of its files holds is listed as not found, in the run's summary and in `CHANGES.md`, never counted as changed.
 
 ### An example on every page
 
