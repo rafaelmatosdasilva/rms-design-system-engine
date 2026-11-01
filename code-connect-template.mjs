@@ -12,7 +12,10 @@
 // another component inside the example belongs to that component, never to this one. What is written between the
 // component's tags fills a slot (role value, slot: true): its default slot ('default'), or the one an element names
 // (<span slot="icon">${icon}</span>, <template #icon>); a property that decides whether it is written decides that slot.
-// Content inside another component it holds is that component's. A property used only inside an
+// Content inside another component it holds is that component's. A Figma slot property (getSlot) is read like any
+// other; a swapped instance written as it renders (icon?.executeTemplate().example) is that instance's own value; a
+// nested figma.html`…` is part of the example; React's figma.helpers.react.renderProp('icon', x) and icon={x} fill
+// icon. A property used only inside an
 // expression the reader cannot follow (a call, an array joined) has code null: it is not one Figma property.
 // No dependency: a tokenizer and a small expression parser for what these templates use.
 
@@ -90,8 +93,19 @@ function parse(tokens) {
     return l;
   };
   const unary = () => { if (peek('!')) { p++; return { k: 'not', e: unary() }; } return postfix(); };
+  const at = (k, ...vals) => vals.every((v, j) => { const tk = tokens[p + k + j]; return v === 'tpl' ? tk?.t === 'tpl' : v === 'str' ? tk?.t === 'str' : v instanceof RegExp ? tk && v.test(tk.v) : tk?.v === v; });
   const postfix = () => {
     let e = primary();
+    // Code Connect's own forms, read as what they write: figma.html`…` (or code, tsx, vue) nested in the example is a
+    // part of it; figma.helpers.react.renderProp('icon', x) writes icon={x}; x?.executeTemplate().example is what the
+    // instance x renders, so x's own value.
+    if (e.k === 'id' && e.v === 'figma' && at(0, '.', /^(html|code|tsx|vue)$/, 'tpl')) { p += 2; e = primary(); }
+    else if (e.k === 'id' && e.v === 'figma' && at(0, '.', 'helpers', '.', 'react', '.', 'renderProp', '(', 'str', ',')) {
+      p += 7; const name = tokens[p].v; p += 2;
+      const value = ternary(); if (peek(')')) p++;
+      e = { k: 'tpl', parts: [{ text: ` ${name}={` }, { expr: value }, { text: '}' }] };
+    }
+    if (e.k === 'id' && (at(0, '?.', 'executeTemplate', '(', ')', '.', 'example') || at(0, '.', 'executeTemplate', '(', ')', '.', 'example'))) p += 6;
     // [a, b ? `x` : ''].filter(Boolean).join(', '): a list written as one text, each item on its own.
     if (e.k === 'arr') {
       while (peek('.') && tokens[p + 1]?.v === 'filter') { p += 2; if (peek('(')) { p++; collectUntil(')'); } }
@@ -232,10 +246,11 @@ function openTag(html) {
 function openAttribute(html) {
   const tagStart = html.lastIndexOf('<');
   const inTag = html.slice(tagStart);
-  const re = /([:@]?[A-Za-z_][\w:.-]*)\s*=\s*(["'])/g;
+  // A quoted value, or a JSX one in braces (header={…}).
+  const re = /([:@]?[A-Za-z_][\w:.-]*)\s*=\s*(["'{])/g;
   let m, last = null;
   while ((m = re.exec(inTag))) {
-    const close = inTag.indexOf(m[2], m.index + m[0].length);
+    const close = inTag.indexOf(m[2] === '{' ? '}' : m[2], m.index + m[0].length);
     if (close < 0) last = { name: m[1], value: inTag.slice(m.index + m[0].length) };
     else re.lastIndex = close + 1;
   }
@@ -283,7 +298,7 @@ export function readTemplateForm(src) {
   while ((m = decl.exec(src))) {
     const name = m[1], from = m.index + m[0].length;
     const init = readStatement(src, from);
-    const getter = /^figma\.(?:selectedInstance|currentLayer)\.get(Enum|Boolean|String|InstanceSwap|PropertyValue)\(\s*(['"])([^'"]+)\2/.exec(init);
+    const getter = /^figma\.(?:selectedInstance|currentLayer)\.get(Enum|Boolean|String|InstanceSwap|Slot|PropertyValue)\(\s*(['"])([^'"]+)\2/.exec(init);
     const helper = /^[\w$.]+\(\s*figma\.(?:selectedInstance|currentLayer)\s*,\s*(['"])([^'"]+)\1/.exec(init);
     if (getter) {
       const kind = getter[1].toLowerCase();
@@ -376,12 +391,12 @@ export function readTemplateForm(src) {
     }
     // Attributes the branch writes itself: name="…${v}…" (its value), name="fixed" (written when its conditions hold:
     // they decide it), a bare one (the property that switches it on), or an event listener (@name: never a prop).
-    const re = /((?:v-on:|@|v-bind:|:)?[A-Za-z_][\w:.-]*)(?:\s*=\s*(["'])([\s\S]*?)\2)?/g;
+    const re = /((?:v-on:|@|v-bind:|:)?[A-Za-z_][\w:.-]*)(?:\s*=\s*(?:(["'])([\s\S]*?)\2|\{([^{}]*)\}))?/g;
     const flags = (c) => ({ ...(c.negated ? { negated: true } : {}), ...(c.equals != null ? { equals: c.equals } : {}), ...(c.unclear ? { unclear: true } : {}) });
     let a;
     while ((a = re.exec(text))) {
       const event = /^(?:@|v-on:)/.test(a[1]);
-      const name = attrName(a[1].replace(/^v-on:/, '@')); const value = a[3];
+      const name = attrName(a[1].replace(/^v-on:/, '@')); const value = a[3] ?? a[4];
       const extra = event ? { event: true } : {};
       if (value != null) {
         const found = [...value.matchAll(/\u0001([^\u0002]+)\u0002/g)];

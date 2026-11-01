@@ -590,9 +590,11 @@ The engine reads the Figma Code Connect files your project commits: each code pr
 
 - **From what the contract pairs.** Each Figma property's code prop, an enum's values as Figma and the code write them, the booleans, the texts, the instances it swaps, and a switch that decides whether another prop is written.
 - **Slots filled.** In the template form, what fills a slot is written between the component's tags: the default slot's content as it is, a named slot's in the element its framework uses (`slot="icon"` for a web component, `<template #icon>` for Vue), guarded by the property that decides whether it is filled.
+- **React's named slots are props.** In a React draft, a named slot is written as the prop it is (`<Card header={…}>`), in either form, and the property that decides it wraps it or guards it.
+- **Swapped instances and Figma slots, the documented way.** A swapped instance is `figma.instance('Icon')` in the classic form, and in the template form `getInstanceSwap('Icon')`, written as what its own Code Connect renders (`icon?.executeTemplate().example`; `renderProp` for a React prop). A Figma slot property is `figma.slot('Body')` or `getSlot('Body')`. Both need a recent Code Connect CLI.
 - **Conditions in the classic form too.** A property that decides whether a prop is written wraps the call that fills it: `figma.boolean('Show caption', { true: figma.string('Caption'), false: undefined })`, the other way round when it decides it off, or an enum on the option it decides it under.
 - **In the form you already use.** The classic `figma.connect` form or the template form, whichever your own files are in. With none yet, React gets the classic form and Vue, Svelte and web components the template form. `--form=classic` or `--form=template` picks one.
-- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, a Figma slot property, how a swapped instance is written, the import.
+- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, the import.
 - **Never in your code.** The drafts go to `.design-system-engine-out/code-connect-drafts/`, in the same folders as each component's file. A person checks each one, moves it beside its component and publishes it with their own Code Connect tooling.
 - **Read back before it is written.** Each draft reads back through the same reader the engine uses for your Code Connect files, to the same pairs it was written from (a test holds it to that).
 
@@ -1366,6 +1368,7 @@ Nobody copies a value by hand. The engine writes a read-only script for one chun
 - Answers saved before this compact form still read. When new checksums no longer match them, the import says which to read again.
 - `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshots: the structure, the props, the raw values, and the state tokens and bindings.
 - A component's facts the capture does not read are kept. A component no longer in Figma is taken out, and the import names it.
+- Each component's Figma page comes from the checksums. When the answers name none (answers saved before the checksums did), the page the file already held is kept, and the import names once the components left with none, whose specs then name no page.
 - On a refresh only the checksums are asked, and only the components that changed are read again.
 - No script switches Figma's page: switching it is saved with the file, so a capture that only reads would still change it.
 - With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshots.

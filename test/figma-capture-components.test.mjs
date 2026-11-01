@@ -552,3 +552,29 @@ test('the capture keeps the primitives as Figma has them in each colour mode, th
   const p = primitivesFromItems(items, { figma: { colorCollection: 'Theme', modes: [{ name: 'Light', snapshotKey: 'light' }, { name: 'Dark', snapshotKey: 'dark' }] } });
   assert.deepEqual(p, { light: { 'primitives/neutral000': '#ffffff', 'primitives/paper': '#ffffff' }, dark: { 'primitives/neutral000': '#000000', 'primitives/paper': '#000000' } });
 });
+
+// Answers that carry no page (the form before the checksums named each one's page): the import keeps the page the file
+// held for a component, and says once which components have none, so the specs view's metadata is not silently missing.
+test('components: a page the answers do not name is kept from the file, and the ones with none are named once', async () => {
+  const TP = join(ENGINE, 'test', 'fixtures', 'tidepool-figma');
+  const root = tempDir('capture-pages-');
+  cpSync(join(TP, 'ds-config.json'), join(root, 'ds-config.json'));
+  const tpCfg = JSON.parse(readFileSync(join(root, 'ds-config.json'), 'utf8'));
+  const dir = tempDir('capture-pages-answers-');
+  for (const f of readdirSync(join(TP, 'figma-capture')).filter((x) => x.startsWith('components-'))) cpSync(join(TP, 'figma-capture', f), join(dir, f));
+  const hand = JSON.parse(readFileSync(join(TP, tpCfg.paths.compPropsSnapshot), 'utf8'));
+  const names = Object.keys(hand).filter((n) => !n.startsWith('_'));
+  const [kept, ...rest] = names;
+  mkdirSync(join(root, tpCfg.paths.compPropsSnapshot, '..'), { recursive: true });
+  writeFileSync(join(root, tpCfg.paths.compPropsSnapshot), JSON.stringify({ [kept]: { ...hand[kept], pageId: '7-1' }, [rest[0]]: { ...hand[rest[0]], pageId: 'Components' } }));
+  const r = await importComponents(root, tpCfg, { dir });
+  assert.equal(r.ok, true, JSON.stringify(r).slice(0, 300));
+  const props = json(root, tpCfg.paths.compPropsSnapshot);
+  assert.equal(props[kept].pageId, '7:1', 'the page the file held, as a node id');
+  assert.equal(props[rest[0]].pageId, undefined, 'a page\'s name is not its id');
+  assert.deepEqual(r.noPage, rest);
+  const said = importLines(r, 'cap').filter((l) => /no Figma page/.test(l));
+  assert.equal(said.length, 1);
+  assert.match(said[0], new RegExp(`^ℹ️  ${rest.length} components? with no Figma page in what was read, so (its spec names|their specs name) no page in metadata\\.source: ${rest[0]}`));
+  assert.match(said[0], /--capture-script components sums new records each one's page\.$/);
+});
