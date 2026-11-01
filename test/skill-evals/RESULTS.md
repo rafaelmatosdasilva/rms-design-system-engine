@@ -1,5 +1,24 @@
 # Skill evaluation results
 
+## 2026-11: Guide: the style guide's jobs, parts and watch (continuous evaluation)
+
+What changed since the entry below (engine 3f8cfb4): the publish recipe names the intent layer's job, the hourly run, the store's job and the watch; usage lists --watch, --watch-install, --watch-uninstall and the template's parts; personality points at the brand kit's part.
+
+Guide set measured: `687fa729c968` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 597032e7` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 99e2f8b4` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 9accc65b` `cookbook/refresh-figma.md 3d4c5584` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 8738ac48` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 7f1584bf` `reference/usage.md 40496b3b` `rms-design-system-engine.md 0f804311`
+
+**The agent's command line changed.** The agent's command line bundles other skills than in the runs before (2.1.301 → 2.1.316; added schedule): a change in the results may come from them, not from the guide.
+
+| Haiku, engine 879dd98 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.035 | $0.057 |
+| Input a run | 78k | 98k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 98k a run against 78k. no task changed state, and no run moved: the same result. Records: `records/2026-11-01-the-guide-names-the-style`.
+
 ## 2026-11: Build and change guides, library keys, merged with main (continuous evaluation)
 
 What changed since the entry below (engine 5497b03): Intent changes: the engine's Data lines follow the code, and only changes made are said (#224); Props that say nothing of what they are for: flagged, with drafted descriptions to approve (#227); The guide on building and changing components in Figma, with --shared; The build and change guides: a library's variables by key (--keys); The guide names pages to write, suggested prop pairs, and where a contract's description and rules come from (#226); Measured accessibility facts no longer go missing, and the content check knows a list's item fields (#230); README: tech stack badges, each linked to its proof (#231); Tests: the commands test runs in its own home; a module at the root fails the layout test (#228); Style guide: each component's stage, intent layer changes on History, the template in parts, and a local copy that builds itself (#223); Browser test: read the contrast row after the live accessibility pass, not before (#233). The guide changed in `cookbook/build-component-figma.md`, `cookbook/change-component-figma.md`, `reference/usage.md`.
