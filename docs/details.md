@@ -335,10 +335,11 @@ The check is against WCAG 2.2 at level A and AA. axe-core's rules run in the sam
 - **What your app gives them.** A Vue component that reads a Pinia store or links with Vue Router gets your project's own, when your `package.json` lists it and it is installed.
 - **What your entry installs.** Whatever your `main.js` puts on the app goes on each component too, however it does it: `app.use`, a property set on every component (a translation function), `app.provide`, a mixin, or a setup function handed the app.
 - **The data a page would pass.** A component drawn alone gets what a page would give it. A value it hands on to a child takes the child's type: a number for an amount the child does sums on, an icon for the child's icon. One the child has its own fallback for is left unset.
-- **Lists inside its data.** The items of a list inside an object get the fields the code reads of them, and those a child it hands each item to reads. A list inside an item is given empty.
-- **The route it reads.** A component that reads the current route is drawn at a path its code expects, such as a name of the table it looks the path up in. When none can be read, its reason says so.
+- **Lists inside its data.** The items of a list inside an object get the fields the code reads of them, and those a child it hands each item to reads. A list inside an item gets items too, three levels down, so a tree ends.
+- **A field it only tests.** A field the code only checks (`v-if="item.badge"`) is off, so it does not turn on for every item.
+- **The route it reads.** A component that reads the current route is drawn at a path its code expects, such as a name of the table it looks the path up in. The params, query and route name it reads are given too, and a router of the project's own that it imports is moved to the same place. When none can be read, its reason says so.
 - **An icon of its own folder.** An icon that loads from a folder its code lists gets the name of a file in that folder.
-- **One that cannot draw says why.** Its reason is given once, with how many of its cases it hits, such as a method called on an element it does not draw in that case, or the input that was missing when it read a field of nothing. It is reported as not checked, and the rest of the page is still kept for the next run.
+- **One that cannot draw says why.** Its reason is given once, with how many of its cases it hits, such as a method called on an element it does not draw in that case, the input that was missing when it read a field of nothing, a list method called on what is not a list, or a date that is not one. The raw error follows it. It is reported as not checked, and the rest of the page is still kept for the next run.
 
 ### What it tries
 
@@ -1159,7 +1160,7 @@ bash ~/.claude/skills/rms-design-system-engine/install.sh
 
 - **Figma stays as it is.** It only reads Figma. It tells you what to change there, and a person makes that change.
 - **Reading Figma, the best way available.** [Refreshing the Figma data](commands.md#set-up) picks it for you. A `design.json` newer than the saved data first, then [figma-cli](https://github.com/silships/figma-cli) when Figma Desktop is connected to it (no API key, no rate limit, every mode), then the Figma tool of your Claude session, then the Figma API with a token. After you run `figma-cli snapshot`, the next check reads its `design.json` on its own.
-- **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own. `DESIGN_SYSTEM_ENGINE_CHROME=none` reads the code with no browser, even where Chrome is installed.
+- **Which TypeScript reads your components.** Your project's own, else one installed for the whole machine (a global npm folder, `NODE_PATH`, `tsc` on the PATH). The global folder is found even when `npm` is not on the PATH, as in an agent's shell that skips the profile setting up nvm or Volta. Set `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` to use only the project's own. `DESIGN_SYSTEM_ENGINE_CHROME=none` reads the code with no browser, even where Chrome is installed.
 
 ## Environment variables
 
@@ -1172,6 +1173,7 @@ bash ~/.claude/skills/rms-design-system-engine/install.sh
 | `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` | Turns off the daily self-update |
 | `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` | Uses only the project's own TypeScript |
 | `DESIGN_SYSTEM_ENGINE_CHROME=none` | Reads the code with no browser, even where Chrome is installed |
+| `DESIGN_SYSTEM_ENGINE_FIGMA_CLI=none` | Never asks figma-cli, even where it is installed and Figma answers |
 | `DESIGN_SYSTEM_ENGINE_MIRRORS=<folder>` | Keeps every project mirror in one folder on this computer (for example `~/.cache/rms-engine/mirrors`), per host and project, instead of beside the work |
 | `DESIGN_SYSTEM_ENGINE_WORKSPACE=<folder>` | Keeps the engine's own files of a GitLab project (setup, snapshots, contracts, history, hand-back, output) in that folder, per host and project, apart from the mirror of its code |
 | `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` | Records which recipes and commands ran, locally |

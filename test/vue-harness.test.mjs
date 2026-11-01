@@ -487,11 +487,11 @@ const pick = (path) => {
   assert.deepEqual(routeFor(menu.replace("ref('parts')", 'ref(null)')), { path: '/guides' }, 'else the table\'s first');
   assert.deepEqual(routeFor("const r = useRoute()\nconst section = r.path.split('/')[2]\nif (section === 'cards') x()"), { path: '/page/cards' }, 'a word it compares the part with, at that part');
   assert.deepEqual(routeFor("<template><b v-if=\"$route.path.startsWith('/docs')\" /></template>"), { path: '/docs' });
-  assert.match(routeFor('const r = useRoute(); r.params.slug.split("-")').why, /no path it expects could be read from its code/);
+  assert.match(routeFor('const r = useRoute(); r.path.split("-")').why, /no path it expects could be read from its code/);
   assert.equal(routeFor('const x = 1'), null, 'a component that reads no route is drawn as before');
 });
 
-test('the items of a list inside an object get the fields the code reads of them, and those a child it hands each to reads; a list inside an item is empty', async () => {
+test('the items of a list inside an object get the fields the code reads of them, and those a child it hands each to reads; a list inside an item has items too', async () => {
   const { objectSamples, childFacing } = await import('../vue-harness.mjs');
   const code = `<template><row-line v-for="(row, index) in shown" :info="row" /><i v-for="e in props.docs.events">{{ e.name }} {{ e.link.path }}</i></template>
 <script setup>
@@ -506,7 +506,7 @@ const shown = computed(() => {
 </script>`;
   const child = '<template><b>{{ info.kind.split(", ") }} {{ info.title }}</b></template>';
   const got = objectSamples(code, ['docs'], {}, {}, { items: { row: [{ text: child, prop: 'info' }] } });
-  assert.deepEqual(got.docs.rows[1], { kind: 'Kind 2', title: 'Title 2', subRows: [] }, 'what the child reads of each, and a list inside an item given empty');
+  assert.deepEqual(got.docs.rows[1], { kind: 'Kind 2', title: 'Title 2', subRows: [{ label: 'Label 1' }, { label: 'Label 2' }, { label: 'Label 3' }] }, 'what the child reads of each, and the items of a list inside an item');
   assert.deepEqual(got.docs.events[0], { name: 'Name 1', link: { path: 'Path 1' } }, 'a list it loops over in its template, with the fields it reads');
   assert.deepEqual(objectSamples(code, ['docs'], {}, {}, { flat: true }).docs.rows, ['Row 1', 'Row 2', 'Row 3'], 'a page drawn as a whole is given what it always was');
   const dir = tempDir('vue-items-');
@@ -529,7 +529,7 @@ test('an icon that loads from a folder its code globs is given a name of a file 
   assert.deepEqual(asyncChoices(dir, file, deep, {}, ['glyph'], { globs: false }), [], 'a page drawn as a whole: as before');
 });
 
-test('components drawn alone get the route they read, nested items and an icon of their own folder; an error that names no input is said as the input that was missing', { skip: STORES, timeout: budget(300000) }, async () => {
+test('components drawn alone get the route they read (its params, query and a router of their own too), nested items and an icon of their own folder; an error that names no input is said as the input that was missing', { skip: STORES, timeout: budget(300000) }, async () => {
   const dir = tempDir('vue-last-');
   const C = join(dir, 'src', 'components');
   mkdirSync(join(C, 'glyphs'), { recursive: true });
@@ -565,13 +565,64 @@ const part = computed(() => (all[\`./glyphs/\${props.glyph}.vue\`] ? defineAsync
 </script><template><component :is="part" v-if="part" /></template>`);
   writeFileSync(join(C, 'OddCard.vue'), '<script setup>defineProps({ entry: [Object, Array] })</script><template><b class="odd">{{ entry.title }}</b></template>');
   writeFileSync(join(C, 'SummaryBox.vue'), "<script setup>\nimport RowLine from './RowLine.vue'\nconst summary = {}\n</script><template><row-line :info=\"summary\" /></template>");
-  const names = ['NavMenu', 'DocsTable', 'AcGlyph', 'OddCard', 'SummaryBox'];
+  writeFileSync(join(C, 'TabView.vue'), `<script setup>
+import { useRoute } from 'vue-router'
+const route = useRoute()
+if (route.params.tab !== 'notes') throw new Error('not a tab it has')
+</script><template><p class="tab">{{ route.params.tab }} {{ route.query.q }} {{ route.name }}</p></template>`);
+  writeFileSync(join(C, 'app-router.js'), "import { createRouter, createMemoryHistory } from 'vue-router'\nexport default createRouter({ history: createMemoryHistory(), routes: [{ path: '/:any(.*)*', component: { render: () => null } }] })");
+  writeFileSync(join(C, 'ShopCrumb.vue'), `<script setup>
+import router from './app-router.js'
+const at = router.currentRoute.value.path
+if (!router.currentRoute.value.path.startsWith('/shop')) throw new Error('not in the shop')
+</script><template><p class="crumb">{{ at }}</p></template>`);
+  const names = ['NavMenu', 'DocsTable', 'AcGlyph', 'OddCard', 'SummaryBox', 'TabView', 'ShopCrumb'];
   const r = await renderedVue(dir, {}, names, { locate: (n) => join(C, `${n}.vue`), chromePath: CHROME });
   const failed = (n) => r.failed.filter((f) => f.component === n);
-  for (const n of ['NavMenu', 'DocsTable', 'AcGlyph']) assert.deepEqual(failed(n), [], `${n}: ${JSON.stringify(r.failed)}`);
+  for (const n of ['NavMenu', 'DocsTable', 'AcGlyph', 'TabView', 'ShopCrumb']) assert.deepEqual(failed(n), [], `${n}: ${JSON.stringify(r.failed)}`);
+  assert.match(r.markup.TabView, /<p class="tab">notes q-1 <\/p>/, 'at the param it compares, with the query it reads');
+  assert.match(r.markup.ShopCrumb, /<p class="crumb">\/shop<\/p>/, 'the project\'s own router moved to the path it expects');
   assert.match(r.markup.NavMenu, /<li>Parts<\/li>|<li>Guides<\/li>/, 'drawn at a path its menu table has');
   assert.match(r.markup.DocsTable, /<p class="row">Kind 1<\/p>/, 'each item has the fields the child it is handed to reads');
   assert.match(r.markup.AcGlyph, /<svg class="star"/, 'an icon of its own folder');
   assert.match(failed('OddCard')[0]?.why ?? '', /the input entry was missing: it was not given, and OddCard\.vue reads entry\.title as it draws/, JSON.stringify(r.failed));
   assert.match(failed('SummaryBox')[0]?.why ?? '', /the input info\.kind was missing in RowLine\.vue, a part it draws with what it hands it, which reads info\.kind\.split/, JSON.stringify(r.failed));
+});
+
+test('a list inside an item inside an item has items too, down to a depth that ends a tree; a field only tested is an on/off', async () => {
+  const { objectSamples, listSamples } = await import('../vue-harness.mjs');
+  const code = `<template><i v-for="g in props.menu.groups"><b v-for="it in g.items"><s v-if="it.badge">!</s>{{ it.label }}<u v-for="c in it.children">{{ c.name }}<em v-for="d in c.leaves">{{ d.x }}</em></u></b></i></template>`;
+  const item = objectSamples(code, ['menu']).menu.groups[0].items[1];
+  assert.equal(item.label, 'Label 2');
+  assert.equal(item.badge, false, 'a field only tested (v-if) is off, never words that turn it on for every item');
+  assert.deepEqual(item.children[0], { name: 'Name 1', leaves: [] }, 'three lists down; a fourth is empty, so a tree that holds itself ends');
+  const tabs = listSamples('<template><li v-for="t in tabs"><b v-if="t.isNew || t.hot">n</b>{{ t.label }}<span v-show="!t.hot"></span><i v-if="t.note">{{ t.note }}</i></li></template>', ['tabs']).tabs;
+  assert.deepEqual(tabs[0], { isNew: false, hot: false, label: 'Label 1', note: 'Note 1' }, 'a field also shown keeps its words');
+});
+
+test('a component that reads the route\'s params, query or name, or a router of the project\'s own, is drawn on a route that has them', async () => {
+  const { routeFor } = await import('../vue-harness.mjs');
+  assert.deepEqual(routeFor('const r = useRoute(); r.params.slug.split("-")'), { path: '/slug-1', pattern: '/:slug' }, 'a param, its own name and 1');
+  assert.deepEqual(routeFor("const route = useRoute(); const id = Number(route.params.id); if (route.query.tab === 'notes') x()"), { path: '/1', pattern: '/:id', query: { tab: 'notes' } }, 'a number where it makes one, a word it compares');
+  assert.deepEqual(routeFor('const route = useRoute(); const views = { overview: A, settings: B }; const V = views[route.name]'), { path: '/overview', pattern: '/overview', name: 'overview' }, 'a name it looks up in a table');
+  assert.deepEqual(routeFor('<template><b v-if="$route.name === \'cart\'" /></template>'), { path: '/cart', pattern: '/cart', name: 'cart' });
+  assert.deepEqual(routeFor("const route = useRoute(); if (route.path.startsWith('/docs')) x(route.params.page)"), { path: '/docs/1', pattern: '/docs/:page' }, 'a param after the path it compares');
+  assert.deepEqual(routeFor("const route = useRoute(); const label = props.amount.params.label; if (item.name === 'x') y()").path, '/', 'another object\'s params or name are not the route\'s');
+  assert.deepEqual(routeFor("import { appRouter as r } from '../app-router'\nconst x = r.currentRoute.value.params.slug").via, { spec: '../app-router', named: 'appRouter' }, 'a router of its own, moved there too');
+  assert.equal(routeFor("import router from 'vue-router'\nconst x = 1"), null);
+});
+
+test('an error a component throws as it draws is said in its terms, the message after it', async () => {
+  const { harnessModule } = await import('../vue-harness.mjs');
+  const mod = harnessModule([{ name: 'x', file: '/x.vue', cases: [], role: '' }]);
+  const plain = new Function(`${mod.slice(mod.indexOf('const plain'), mod.indexOf('// A raw error that names'))};return plain`)();
+  assert.match(plain('_ctx.items.map is not a function'), /^it calls map\(\) on items as on a list, and what it was given there is not one \(_ctx/);
+  assert.match(plain('props.rows is not iterable'), /^it loops over rows, and what it was given there is not a list/);
+  assert.match(plain('props.format is not a function'), /^it calls format\(\) as it draws/);
+  assert.match(plain("Cannot destructure property 'id' of 'undefined' as it is undefined."), /^it takes id out of a value that was undefined: an input it needs was not given/);
+  assert.match(plain('Acme is not defined'), /^its code uses Acme, which nothing on the page defines/);
+  assert.match(plain('Invalid time value'), /^a date it formats was not a valid date/);
+  assert.match(plain('Maximum call stack size exceeded'), /^it draws or calls itself without end/);
+  assert.match(plain('Failed to fetch dynamically imported module: http://localhost/a.js'), /^a file it loads as it draws did not load/);
+  assert.equal(plain('something else'), null, 'one it does not know stays as it was');
 });
