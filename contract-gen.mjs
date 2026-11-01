@@ -344,6 +344,8 @@ function buildContract(name, { contract, structure, props, authored, composition
   else if (intentPage) {
     const it = { source: intentPage.url ?? intentPage.file };
     for (const k of ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'rules']) if (intentPage[k]) it[k] = intentPage[k];
+    // Its component changed after the page was written: said beside it, never in its place.
+    if (intentPage.review?.note) it.review = intentPage.review.note;
     if (Object.keys(it).length > 1) out.intent = it;
   }
 
@@ -550,7 +552,7 @@ const CONTRACT_SCHEMA = {
     intent: {
       type: 'object',
       required: ['source'],
-      properties: { source: str, purpose: str, whenToUse: strs, whenNotToUse: strs, mistakes: strs, limitations: strs, rules: strs },
+      properties: { source: str, purpose: str, whenToUse: strs, whenNotToUse: strs, mistakes: strs, limitations: strs, rules: strs, review: { type: 'string', description: 'Its component changed after the page was written: what changed and since when. Check the page against this contract.' } },
     },
     intentPage: { type: 'string', description: 'Its page in the intent layer, linked (a published contract never copies it).' },
     partOf: { type: 'string', description: 'The component this one is a part of: placed only inside it, never on its own.' },

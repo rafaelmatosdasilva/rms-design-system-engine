@@ -600,6 +600,37 @@ The style guide shows them in **History** (it was the Changelog): one table, by 
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 
+### Pages to review again
+
+A page is right when it is written. Then its component changes: a prop is added, a value is dropped, a token is renamed. The page still says what was true before.
+
+- **The engine notices.** It keeps each component's props, the values they take and its tokens from run to run. It also reads the code's history and the history of your Figma snapshots. It never asks Figma or GitLab again for this.
+- **The page is marked, not removed.** On the Documentation page its status is Review, Changed since written, with what changed and since when. Agents still read every line, with a note beside it: check it against the contract.
+- **A removed name is said.** When the page still names a prop or token the component no longer has, the page says which.
+- **A person settles it.** Edit the page, or say it still holds. The answer is kept with who gave it and when. The page is not marked again until the component changes again.
+
+### Evidence first
+
+When the engine proposes an answer to a decision (a page to write, a part to document in its parent's page, a name to keep, a page to review), it lists every answer it could take, each with what speaks for it:
+
+| Where it comes from | For example |
+|---|---|
+| Figma | Its name sits under another component's |
+| The code | Only one other file uses it |
+| Products | Two products place it on its own, from the usage map |
+| Your pages | The layer already documents other parts in their parent's page |
+| Past decisions | The team kept the same name on another page |
+
+Each piece is strong, some or weak. The answer with the most behind it is proposed. When another answer has as much, the proposal says the evidence is split and a person decides.
+
+### Who decides
+
+Everything that waits on a person names the person: from `owners` in `ds-config.json`, by component or by area, with `*` for the rest ([Who owns what](#who-owns-what)).
+
+- **On the Documentation page,** each row to review says "Waits on" and the name. A chip for each person shows only theirs: "Waiting on Cards team 3".
+- **In the audit,** one line counts them: "3 waiting on Cards team, 1 waiting on QA lead".
+- **An answer records who gave it.** When that is not the owner, the page and the command say so. The answer still stands; nothing is blocked.
+
 ### Your rules, read against each other
 
 Everything written for an agent reaches it at once: your guidelines, each layer of your intent, every component's page and your project's `AGENTS.md`. Written at different times by different people, they start to disagree. The engine reads them side by side and hands you three lists:
@@ -926,6 +957,12 @@ The collections that switch (a colour mode by media, class or attribute, a sizin
 ### Who owns what
 
 `owners` in `ds-config.json` names the team that owns each component, token layer or token prefix: `{ "primitives/": "Brand team", "semantic/": "Design system team", "tileCard": "Cards team", "*": "Product teams" }`. The Tasks list then says the team after who acts ("You in Figma · Brand team"), the longest key that fits first: a component's own name, else a token prefix the task names, else `*`.
+
+- A key can be a pattern: `"tile*"` covers every tile, `"patterns/"` every pattern page.
+- The owner is also who decides what waits on a person about it: a proposal, a page's drafts, a page to review again, a change held for sign-off.
+- When the person who decides is not the team's name, give both: `"tileCard": { "team": "Cards team", "decides": "QA lead" }`.
+
+See [Who decides](#who-decides) for what the Documentation page does with it.
 
 ### Brands that pin what they inherit
 

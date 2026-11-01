@@ -85,3 +85,15 @@ test('gathered from where each decision is kept, and a project with none says so
   assert.equal(view.byComponent.chip.length, 3);
   assert.match(ruledOutLines(view, 'chip').join('\n'), /a small chip/);
 });
+
+test('the intent layer\'s own answers: an Add is its component\'s, and a page reviewed again is never an option ruled out', () => {
+  const all = decisionsFrom({ answered: {
+    'add:tileTwo': { answer: 'no', proposal: 'Its page is Tile One: no page of its own.', by: 'QA', at: '2026-03-01' },
+    'review:Tile One': { answer: 'yes', proposal: 'Does Tile One\'s page still hold for tileOne as it is now?', by: 'QA', at: '2026-03-02' },
+    'move:Picker': { answer: 'yes', proposal: 'Keep its page.', at: '2026-03-03' },
+  } });
+  const by = (k) => all.find((d) => d.at === k);
+  assert.equal(by('2026-03-01').component, 'tileTwo');
+  assert.equal(by('2026-03-03').component, null, 'a page\'s name, not a component\'s');
+  assert.deepEqual([by('2026-03-02').what, by('2026-03-02').ruledOut], ['Tile One\'s page confirmed: it still holds after its component changed', []]);
+});
