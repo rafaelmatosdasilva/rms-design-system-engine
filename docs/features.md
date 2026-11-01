@@ -147,6 +147,10 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Gives agents the real component names, what each token is for and the decisions already made.
 - Remembers names agents invent, and tells the next agent the right one.
 - Stops the AI from making a check pass on its own.
+- Keeps each correction you make to what an AI made as a lesson, with your reason, and turns it into the strongest guard that holds it once you say yes: a check, a step agents read, or a rule for your guidelines.
+- Notices a line an AI wrote that a person changed since, and asks whether it was a correction.
+- Proposes a rule when the same finding comes back on three screens or in three edits.
+- Says when a lesson comes back, and which guard did not hold.
 - Measures whether your guidance actually helps agents build better.
 - Adds the same rules to the instruction files of Cursor, Copilot and other agents. *(Coming soon)*
 

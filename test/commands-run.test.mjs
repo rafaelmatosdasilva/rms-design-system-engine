@@ -44,7 +44,7 @@ const COMMANDS = [
   '--prototype --consistency', '--prototype --flow', '--baseline', '--checked', '--ci-changed', '--a11y-no-worse', '--code-connect',
   '--contracts-out', '--docs', '--extract', '--intent', '--profile-export', '--rename-sweep', '--review-drafts',
   '--showroom-compare', '--update', '--check-update', '--from-figma-cli', '--figma-screens', '--figma-effects',
-  '--figma-motion', '--figma-examples', '--figma-brands', '--brands-css', '--refresh-snapshots',
+  '--figma-motion', '--figma-examples', '--figma-brands', '--brands-css', '--refresh-snapshots', '--lessons',
 ];
 
 // Each in a project of its own, so one that writes something cannot make the next one read it.

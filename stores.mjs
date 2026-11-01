@@ -52,8 +52,9 @@ export const THEMES_DIR = `${OUT_DIR}/themes`;
 // them), so a person opens and edits one exactly as they do today.
 export const PROTOTYPES_DIR = 'prototypes';
 // The team's decisions: the files people write by deciding (answers to proposals, accepted differences, checks made
-// by hand). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it, nobody decides it.
-export const DECISION_FILES = ['intentDecisions', 'baseline', 'checked'].map((k) => PROJECT[k].now);
+// by hand, the lessons people taught). Not what Figma and the code last agreed on (agreed.mjs): every run rewrites it,
+// nobody decides it.
+export const DECISION_FILES = ['intentDecisions', 'baseline', 'checked', 'lessons'].map((k) => PROJECT[k].now);
 // The differences kept on purpose are a part of their own: a design rule agents follow (which side is right, and why),
 // so a team keeps them with what agents read (its intent layer); the contracts carry each one (contract-gen.mjs).
 // A setup that names no place for them keeps them with the decisions.
