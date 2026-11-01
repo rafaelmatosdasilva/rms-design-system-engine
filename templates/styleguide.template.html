@@ -542,6 +542,13 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-showroom-kind { color: var(--sg-muted); }
 /* A screen's differences: numbered pins over its parts, the same numbers in the list beside it, one colour a kind. */
 .sg-showroom-filter { margin: 0 0 var(--sg-space-s); }
+/* A screen's page review, under the screen: what its code shows, then what a model judged on its screenshot, said so. */
+.sg-showroom-room > .sg-showroom-review { margin-top: var(--sg-space-l); }
+.sg-showroom-review > h3 { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: 0 0 var(--sg-space-xs); }   /* under the page's title, as its notes are */
+.sg-showroom-review > h3 ~ h3 { margin-top: var(--sg-space-l); }
+.sg-showroom-review li.sg-showroom-review-row { padding: var(--sg-space-s) 0; }
+.sg-showroom-review > p { margin: 0 0 var(--sg-space-s); }
+.sg-showroom-review .sg-acc > p + p { margin-top: var(--sg-space-xs); }
 .sg-notes-top { position: sticky; top: 0; z-index: 2; border-radius: calc(var(--sg-radius) - var(--sg-line-width, 1px)) calc(var(--sg-radius) - var(--sg-line-width, 1px)) 0 0; margin: calc(-1 * var(--sg-space-m)) calc(-1 * var(--sg-space-m)) 0; padding: var(--sg-space-m) var(--sg-space-m) var(--sg-space-xs); background: var(--sg-bg-2); border-bottom: var(--sg-line); }   /* the filter and its key stay at the panel's top as its notes scroll */
 .sg-chip-dot { flex: none; width: calc(var(--sg-space-xs) * 1.5); height: calc(var(--sg-space-xs) * 1.5); border-radius: var(--sg-radius-pill); }   /* a chip's dot in its pins' colour, 8px from its words as every dot is */
 .sg-pins { position: absolute; inset: 0; pointer-events: none; }
@@ -2863,6 +2870,35 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Its part and what differs in a line (say); the whole of it under it, opened.
       return '<li class="sg-note" data-note="' + x.no + '" data-kind="' + x.kind + '"><details class="sg-acc"><summary><span class="sg-note-no sg-pin--' + x.kind + '" aria-hidden="true">' + x.no + '</span><span class="sg-acc-title"><b>' + esc(x.n.name) + '</b><span class="sg-showroom-kind">' + esc(x.n.say || x.sub) + '</span></span><span class="sg-acc-mark" aria-hidden="true"></span></summary><p>' + esc(x.n.what || '') + '</p></details></li>';
     };
+    // A screen's page review, under it: the review read from its code (one main action, nothing destructive in front,
+    // no card in a card, headings in order), its score and each finding with its line; then, when a model judged it on
+    // its screenshot (--judge-pages), each decision named with its verdict, what it saw and the sentence to check,
+    // said plainly to be a model's judgment and advisory. The build writes the last judgment in (srJudged).
+    var srJudged = window.__dseShowroomJudged || null;
+    var VERDICT = { holds: 'Holds', breaks: 'Breaks', unclear: 'Unclear' };
+    var reviewHTML = function (s) {
+      var rv = s.review, j = (srJudged && srJudged[s.key]) || s.judged;
+      if (!rv && !j) return '';
+      var acc = function (title, kind, body) { return '<li><details class="sg-acc"><summary><span class="sg-acc-title"><b>' + esc(title) + '</b>' + (kind ? '<span class="sg-showroom-kind">' + esc(kind) + '</span>' : '') + '</span><span class="sg-acc-mark" aria-hidden="true"></span></summary>' + body + '</details></li>'; };
+      var out = '<section class="sg-showroom-gaps sg-showroom-review" aria-label="Page review" data-review-for="' + esc(s.key) + '">';
+      if (rv) {
+        var fs = rv.findings || [];
+        out += '<h3>Page review</h3><p class="sg-showroom-kind">Read from its code: ' + esc(String(rv.score)) + '/10. ' + (fs.length ? fs.length + ' thing' + (fs.length === 1 ? '' : 's') + ' a page should not do.' : 'Nothing a page should not do.') + ' Advisory.</p>' +
+          (fs.length ? '<ul>' + fs.map(function (f) { return '<li class="sg-showroom-review-row"><span class="sg-acc-title"><b>' + esc(f.message) + '</b>' + (f.line != null ? '<span class="sg-showroom-kind">Line ' + esc(String(f.line)) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>' : '');
+      }
+      if (j) {
+        var jf = j.findings || [], un = j.unjudged || [], when = j.at ? new Date(j.at) : null;
+        out += '<h3>Judged by a model</h3><p class="sg-showroom-kind">A model read its screenshot and its code against ' + jf.length + ' named decision' + (jf.length === 1 ? '' : 's') + (when && !isNaN(when) ? ' on ' + when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '') + '. Advisory: a person checks each one.</p>' +
+          '<ul>' + jf.map(function (f) { return acc(f.label || f.decision, (VERDICT[f.verdict] || f.verdict) + (f.verdict === 'holds' ? '' : ' · ' + f.severity), (f.evidence ? '<p>' + esc(f.evidence) + '</p>' : '') + (f.check ? '<p>Check: ' + esc(f.check) + '</p>' : '')); }).join('') + '</ul>' +
+          (un.length ? '<p class="sg-showroom-kind">Not judged: ' + un.map(function (u) { return esc((u.label || u.decision) + ' (' + u.why + ')'); }).join(', ') + '.</p>' : '');
+      }
+      return out + '</section>';
+    };
+    window.__dseShowroomJudge = function (j) {
+      srJudged = j;
+      var box = srDetail.querySelector('[data-review-for]'), s = box && SCREENS[box.getAttribute('data-review-for')];
+      if (s) box.outerHTML = reviewHTML(s);
+    };
     // A screen's page heads the section as a component's does: the group's tag with Showroom beside it (back to the
     // grid), a back button and the screen's name as the title, its actions at the right level with it.
     var srTitle = sr.querySelector(':scope > h2'), srBadge = sr.querySelector(':scope > .sg-section-badge'), srName = null;
@@ -2903,7 +2939,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var dBtn = srSwitch.querySelector('[data-differences]'); if (dBtn) dBtn.insertAdjacentHTML('beforeend', countHTML(notes.length));
       srActions.innerHTML = (s.figma ? sysButton('a', 'Figma', ' href="' + esc(s.figma) + '" target="_blank" rel="noopener"', '', null, FIGMA_SVG) : '');
       srDetail.innerHTML = '<div class="sg-showroom-body">' +
-          (s.markup ? '<div class="sg-showroom-room"><div class="sg-showroom-stage"><div class="sg-showroom sg-showroom-screen" data-screen="' + esc(s.key) + '">' + s.markup + '</div><div class="sg-pins" aria-hidden="true" hidden></div></div></div>' : '<p class="sg-info"><span class="sg-mx-why">' + esc('It could not be drawn: ' + plainWhy(s.why) + '.') + whyTip(s.why) + '</span></p>') +
+          '<div class="sg-showroom-room">' + (s.markup ? '<div class="sg-showroom-stage"><div class="sg-showroom sg-showroom-screen" data-screen="' + esc(s.key) + '">' + s.markup + '</div><div class="sg-pins" aria-hidden="true" hidden></div></div>' : '<p class="sg-info"><span class="sg-mx-why">' + esc('It could not be drawn: ' + plainWhy(s.why) + '.') + whyTip(s.why) + '</span></p>') + reviewHTML(s) + '</div>' +
           '<div class="sg-showroom-notes" id="sg-notes-' + esc(s.key) + '" hidden>' +
             '<section class="sg-showroom-gaps" aria-label="Where this screen differs from Figma">' +
               (notes.length ? '<div class="sg-notes-top"><div class="sg-showroom-filter"><span class="sg-chips" role="group" aria-label="Show">' + kinds.map(function (k) {

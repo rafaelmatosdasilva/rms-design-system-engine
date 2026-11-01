@@ -203,6 +203,9 @@ const USE_FIGMA_FILE = /\b(use|using|switch\w*|point\w*|scan\w*|read\w*|change\w
 const FIGMA_BRANCH = /\bfigma\b[\s\S]{0,30}\b(branch|ramo)\b|\b(branch|ramo)\b[\s\S]{0,30}\bfigma\b/i;
 // The team's guidance rated for what agents can take from it; the extraction test only when they ask for it.
 const RATE_GUIDANCE = /\b(rate|grade|score|classif\w*|evaluate|assess|review|avalia\w*|classifica\w*)\b[\s\S]{0,60}\b(guidance|guidelines?|documentation|docs|intent|diretrizes|documenta[çc][ãa]o)\b|\b(guidance|guidelines?|documentation|docs)\b[\s\S]{0,40}\b(for|para)\s+(agents?|ai|llms?|agentes)\b/i;
+// The product's screens judged by a model ("judge the Showroom screens with a model"): --judge-pages, which spends the
+// person's model tokens, so only when they ask for it by name.
+const JUDGE_PAGES = /\bjudg\w*\b[^.\n]{0,60}\b(pages?|screens?|showroom)\b|\b(pages?|screens?|showroom)\b[^.\n]{0,40}\bjudg\w*|\bjulg\w*\b[^.\n]{0,60}\b(p[aá]ginas?|ecr[ãa]s?|telas?|showroom)\b/i;
 const EXTRACT_ASKED = /\bextract\w*|\bwith a model\b|\bmodel test\b|\bteste?\b[\s\S]{0,20}\bmodelo\b/i;
 // The team's intent layer, named with "intent layer" and where it is: its link (a GitLab project on any host, a GitHub
 // repository) or a folder of the project.
@@ -251,6 +254,7 @@ const UI_FILE_SAID = /(?<![\w.-])((?:\.{1,2}\/|~\/|\/)?[\w.-]+(?:\/[\w.-]+)*\.(?
 const CODE_CONNECT_DRAFT = /\b(draft|write|create|generate|make|scaffold|start|rascunh\w*|escrev\w*|cria\w*|gera\w*|fa[zç]\w*)\b[^.\n]{0,60}\bcode[\s-]?connect\b|\bcode[\s-]?connect\b[^.\n]{0,20}\b(drafts?|rascunhos?)\b|--code-connect-draft/i;
 const RULES = [
   ['full-audit', (t) => lastResult(t), 'last-result'],
+  ['full-audit', (t) => JUDGE_PAGES.test(t) && !PROTOTYPE.test(t), 'judge-pages'],
   ['ask-the-system', (t) => generatedUi(t), 'check-ui'],
   ['ask-the-system', (t) => CODE_CONNECT_DRAFT.test(t) && !/\bhow (do|does|to|can|should)\b|\bcomo\b/i.test(t), 'code-connect-draft'],
   ['figma-edits', (t) => CONSTRUCTION_FIX.test(t), 'construction-fix'],
@@ -514,6 +518,10 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
       const { figma } = codeAndFigma(t);
       notes.push('Only the Figma file the engine reads changes (a branch link names the branch, which stays as it is while the main file changes); everything else in ds-config.json stays. Then refresh the Figma data from that file with the recipe below, and run the audit.');
       return { recipe, question: false, run: [`${cmd} --init --figma-url='${figma ?? '<the Figma link>'}'`], notes, kind, ...(figma ? {} : { ask: 'the link to the Figma branch or file to read (in Figma, open the branch and copy its link)', askHow: 'the link in --figma-url' }) };
+    }
+    if (kind === 'judge-pages') {
+      notes.push('A model judges each Showroom screen on its screenshot and its code against a fixed list of named decisions (the right component, one main action, nothing destructive in front, arranged as its brief says). It spends the person\'s model tokens, and the run says what it cost; an unchanged screen is answered from the cache. Relay each decision judged broken with its evidence and its sentence to check, said as a model\'s judgment: advisory, never a failure. When it says to build the style guide first, build it, then run it again.');
+      return { recipe, question: false, run: [`${cmd} --judge-pages`], notes, kind };
     }
     if (kind === 'guidance-rating') {
       notes.push('Rates the guidance for what an agent can take from it: a class for the whole and for each component (ready, partial, thin) and what to add. --extract also asks a model questions answered from the guidance alone, which spends the person\'s model tokens: only when they ask for it. Each component\'s rating is also in its Documentation area of the style guide.');

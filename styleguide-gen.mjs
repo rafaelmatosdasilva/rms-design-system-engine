@@ -1123,6 +1123,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // the template's, at the template's sizes, never the system's components: the page is the frame, the system what it
     // shows. Every pick is the template's default (view.ui empty).
     view.ui = { segmented: null, tabs: null, field: null, button: null, card: null, iconButton: null, tip: null, overlay: null, gaps: [] };
+    // Each screen's page review (read from its code, showroom-quality.mjs) and, when a model judged it, that judgment
+    // (page-judgment.mjs, the last --judge-pages run; nothing is asked here), shown under the screen on its page.
+    if (showroom.length) {
+      try { const rv = await (await import('./page-judgment.mjs')).showroomReviews(ROOT, cfg); for (const s of showroom) if (rv[s.key]) Object.assign(s, rv[s.key]); } catch { /* no review: the screens alone */ }
+    }
     if (showroom.length) view.showroom = showroom;
     // The system's logo at the top of the menu (styleguide.logo, an SVG in the project), in place of its name: its white
     // or black drawn in the page's text colour, so it follows the page's light and dark; its other colours kept.

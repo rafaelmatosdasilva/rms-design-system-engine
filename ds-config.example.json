@@ -54,6 +54,8 @@
 
   "_guidelines_note": "Optional. Written guidelines for the design intent. sources = committed md/json files. source.notion = one page link (NOTION_TOKEN in .env). source.gitlab = wiki page or Markdown file links, gitlab.com or your own GitLab (GITLAB_TOKEN with read_api in .env for private projects, GITLAB_HOST for a company server).",
   "guidelines": { "sources": [], "source": { "gitlab": [] } },
+  "_pageJudgment_note": "Optional. rms-design-system-engine --judge-pages has a model judge each Showroom screen on its screenshot and code (it spends your model tokens). decisions = which named decisions to judge (component, primary, destructive, layout; all by default). cmd = the command that reads the prompt on stdin and prints the answer (default claude -p --output-format json --tools Read --allowedTools Read --strict-mcp-config).",
+  "pageJudgment": { "decisions": ["component", "primary", "destructive", "layout"] },
 
   "knownUnusedVars": [],
   "knownHardcodedExceptions": [],

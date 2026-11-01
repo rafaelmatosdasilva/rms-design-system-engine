@@ -1159,9 +1159,10 @@ Answer with `--lesson-answer <id> yes` or `no`. A no is kept too, so the same gu
 - **A line you changed.** The hook remembers the lines an AI writes. A line that is gone without an AI edit taking it was changed by a person. `--lessons` lists it, with what it reads now, and `--lesson --edit <n> --why "<reason>"` makes it a lesson. It is never one until you give why, and `--unlesson --edit <n>` takes it off the list when it was no correction. A file rewritten or reformatted as a whole is not read as corrections.
 - **A finding marked wrong.** A [finding you mark wrong](#when-a-check-is-wrong), a page review's among them, is a correction of the engine. Its guard is already written: the case its check must pass.
 
-**Findings that repeat become proposed rules.** The same page-review finding on three Showroom screens, or the same edit-check finding in three edits, is proposed as one sentence (`R-page-primary`, `R-edit-colour`):
+**Findings that repeat become proposed rules.** The same page-review finding on three Showroom screens, the same decision [a model judged](#a-model-judges-each-screen-when-you-ask) broken on three screens, or the same edit-check finding in three edits, is proposed as one sentence (`R-page-primary`, `R-judge-primary`, `R-edit-colour`):
 
 - A page review's becomes a rule for your guidelines, such as "Each screen has one primary action in view".
+- A model's judgment becomes one too, such as "A destructive action never looks more prominent than the main decision".
 - An edit check's becomes a step agents read, such as "Write every colour as one of the system's colour tokens". The check already catches it; the step tells the agent before it writes.
 - Only decisions that should be the same every time are named. A judgement, such as which section of a page matters most, never is.
 - A finding that stays on one screen is counted once. Fixed and made again, it counts again.
@@ -1175,7 +1176,43 @@ Answer with `--lesson-answer <id> yes` or `no`. A no is kept too, so the same gu
 - The style guide shows them with the decisions, on the History page and on each component's History, with what each became.
 - Agents are told what a lesson ruled out, the same way they are told every other decision.
 
-The engine does not look at screenshots to judge a page. The page review reads each screen's structure, so a lesson about how a page looks, rather than how it is built, is kept as a rule for your guidelines.
+The page review reads each screen's structure. How a page looks, rather than how it is built, is judged only when you ask a model to (below), and a lesson about it is kept as a rule for your guidelines.
+
+### A model judges each screen, when you ask
+
+The page review measures what it can: one main action, nothing destructive in front, no card in a card, headings in order. Some decisions can't be measured. Is this the right component for what the part does? Does one action really read first, as the screen is drawn? `--judge-pages` asks a model, and only when you run it.
+
+**What the model gets, for each Showroom screen.**
+
+- Its screenshot. A picture kept beside the screen (`showroom/<Screen>.png`) is used as it is; otherwise it is taken from the built style guide, at Figma's size, in the screen's brand and mode.
+- Its code, as a short outline: each component and element, the props that decide how it looks, its words and its line.
+- The components it uses, each with what your intent layer (or Figma's description) says it is for.
+- Its brief, when one is known: `"brief"` in its `<Screen>.json`, or a `<Screen>.brief.md` beside it.
+
+**What it judges.** A short, fixed list of named decisions, the same on every screen and every run:
+
+| Decision | What holds |
+|---|---|
+| `component` | Each part uses the component made for what it does |
+| `primary` | One action reads first; every other looks secondary |
+| `destructive` | A destructive action never looks louder than the main decision |
+| `layout` | The screen is arranged as its brief says. Not judged when the screen has no brief |
+
+- `pageJudgment.decisions` in `ds-config.json` judges fewer of them. A name the engine doesn't know is said and left out.
+- Anything not on the list is left unjudged, so pages keep room to differ.
+
+**What comes back.** For each decision: holds, breaks or unclear, how much it matters (high, medium, low), what the model saw, and one sentence a reviewer can check on the screen.
+
+- It is advisory. It never fails a run.
+- The style guide shows it under each screen in the Showroom, beside the page review, headed "Judged by a model".
+- The run ends with one line: what broke, and what it cost. Each full run repeats the last judgment's line, with what it cost then. Nothing is asked again.
+- A decision judged broken on three screens becomes a [proposed rule](#lessons-a-correction-becomes-a-guard), like the page review's.
+
+**What it costs.** It spends your model tokens: one request per screen, through your own command.
+
+- The default is `claude -p`, allowed to read only the screenshot, with its answer and its price printed as JSON. `pageJudgment.cmd` changes it: any command that reads the prompt on stdin and prints the answer. A command that doesn't print a price is said to.
+- Each answer is kept by the screenshot's hash and the rubric's (the decisions asked, their words and the brief). A screen that didn't change is never paid for twice; change the screen, the brief or the decisions, and it is asked again.
+- Everything stays in the engine's own folder: `.design-system-engine-out/page-judgment.json` (the last run), `page-judgment-cache.json` and the screenshots it took.
 
 ### Does your guidance help your AI tools?
 
@@ -1315,7 +1352,7 @@ What a security review asks, in one place.
 - **On your computer, or your CI runner.** The engine is a set of Node scripts. There is no engine server and no engine account, and nothing it reads is sent to its author.
 - **No npm dependencies.** `package.json` lists none, so there is no third-party package to trust. What it uses beside Node is yours: Chrome, TypeScript, and axe-core, which the installer fetches.
 - **Your own sign-ins.** It reaches Figma, your code host and Notion with your own access, so your company's single sign-on and permissions on those tools apply as they are.
-- **The AI model is your Claude account's.** In Claude Code, what the agent reads (files, command output) goes to Anthropic under your account and its terms. The checks themselves are measured, not asked of a model. Two steps ask one, through your own `claude` command: rating your written guidance (the command can be changed, `guidelines.extract.cmd`) and drafting changes to the intent layer.
+- **The AI model is your Claude account's.** In Claude Code, what the agent reads (files, command output) goes to Anthropic under your account and its terms. The checks themselves are measured, not asked of a model. Three steps ask one, each only when you ask, through your own `claude` command: rating your written guidance (the command can be changed, `guidelines.extract.cmd`), judging your Showroom screens on their screenshots (`pageJudgment.cmd`) and drafting changes to the intent layer.
 
 ### What goes over the network
 

@@ -5,6 +5,8 @@
 // screen a score out of 10. It reads the screens' code only; nothing is drawn and nothing is changed.
 //
 //   showroomQuality(ROOT, cfg) → [{ screen, file, score, findings: [{ kind, message, line }] }] (none: [])
+//     { withPage: true } also gives each row its page as read (page: the tree the review read), for the model's
+//     judgment of it (page-judgment.mjs)
 //   showroomQualityLines(rows) → the report's lines
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
@@ -30,7 +32,7 @@ export function titledHeadings(root) {
   return root;
 }
 
-export async function showroomQuality(ROOT, cfg = {}, { system = null } = {}) {
+export async function showroomQuality(ROOT, cfg = {}, { system = null, withPage = false } = {}) {
   const dir = resolve(ROOT, cfg.paths?.showroom ?? 'showroom');
   let files = [];
   try { files = readdirSync(dir).filter((f) => /\.(vue|svelte|jsx|tsx|html)$/i.test(f)).sort(); } catch { return []; }
@@ -45,8 +47,9 @@ export async function showroomQuality(ROOT, cfg = {}, { system = null } = {}) {
     let text = ''; try { text = readFileSync(abs, 'utf8'); } catch { continue; }
     let r; try { r = pc.checkPage(rel, text, { ...sys, ROOT }); } catch { continue; }
     if (!r?.tree) continue;
-    const q = habitReview(titledHeadings(fromPageTree(r.tree, r.markup ?? '')), { templates });
-    out.push({ screen: f.replace(/\.[^.]+$/, ''), file: rel, score: q.score, findings: q.findings.map((x) => ({ kind: x.kind, message: x.message, ...(x.line != null ? { line: x.line } : {}) })) });
+    const page = titledHeadings(fromPageTree(r.tree, r.markup ?? ''));
+    const q = habitReview(page, { templates });
+    out.push({ screen: f.replace(/\.[^.]+$/, ''), file: rel, score: q.score, findings: q.findings.map((x) => ({ kind: x.kind, message: x.message, ...(x.line != null ? { line: x.line } : {}) })), ...(withPage ? { page } : {}) });
   }
   return out;
 }
