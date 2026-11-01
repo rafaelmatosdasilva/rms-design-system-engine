@@ -1409,8 +1409,10 @@ returns what it changed, skipped and could not find. A variant copied for a new 
 were wired to (Figma drops the property references of a variant cloned in its set, and the script puts them back), and
 a set grows to hold its variants (one with auto layout and a fixed size on an axis grows on that axis, keeping how each
 axis is sized, so none is clipped); a
-property whose layer is not there is not made; a variable is the file's own, else one of the libraries the file uses,
-imported by key. Then the Figma snapshots are refreshed and `--construction-check` and `--hygiene` say what they find on
+property whose layer is not there is not made; a variable is the file's own, else a library's, imported by its key.
+Through the Figma MCP the script cannot list a library's variables, so `--keys <file>` gives them (`{ "name": "key" }`,
+each key read with the MCP's `search_design_system`); when what the script returns names a variable missing, find its
+key, run the command again with `--keys` and run the new script. `--figma-change` takes `--keys` too. Then the Figma snapshots are refreshed and `--construction-check` and `--hygiene` say what they find on
 it.
 
 **--figma-change.** `--figma-change <component> "<change>" [--ops <file.json>] [--task <issue link>] [--signed-off "<who>"]`
