@@ -284,6 +284,10 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 - **Renders correctly in a browser.** Checked on the real result, not just the code on paper. A component the page holds but does not draw on load (in a closed panel) is measured from its sample markup, the rule's `probe`.
 - **What this audit covered.** So you can see nothing slipped through.
 
+### Brands change values, not structure
+
+For a system with brands, each component is read in every brand as the browser draws it: the elements it draws, how each is laid out and which show. A brand should change only values, such as colours, fonts, corners and sizes. When a rule for one brand hides a part, adds one or lays one out another way, the audit names the component, the brand and what changed, against the first brand. A fix made for one brand then cannot quietly break another. Advice, never a failure: whoever keeps the brand decides.
+
 ### Every difference in one list
 
 A full audit writes `.design-system-engine-out/differences.md` and `differences.json`.

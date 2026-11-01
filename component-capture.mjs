@@ -19,6 +19,7 @@
 
 import { walkCss, rootTokens, resolveVars } from './css-source.mjs';
 import { parseColor, lengthPx } from './css-values.mjs';
+import { SHAPE_JS, shapesOf } from './brand-shape.mjs';
 
 // The measured properties, and the declarations (longhand, logical, shorthand) that can set each.
 export const TRACE = {
@@ -280,7 +281,9 @@ function measureExpression(selector) {
     if (host) host.style.pointerEvents = 'auto';
     const pointerEvents = getComputedStyle(el).pointerEvents;
     if (host) host.style.pointerEvents = hostPe;
-    return { rect: { height: r.height, width: r.width }, cs: pick(cs, ${JSON.stringify(MEASURED)}), before, behind, pointerEvents, nativeDisabled: el.matches(':disabled') };
+    // Its shape (brand-shape.mjs): the elements it draws and how each is laid out, compared between brands.
+    const shape = ${SHAPE_JS};
+    return { rect: { height: r.height, width: r.width }, cs: pick(cs, ${JSON.stringify(MEASURED)}), before, behind, pointerEvents, nativeDisabled: el.matches(':disabled'), shape };
   })()`;
 }
 
@@ -765,6 +768,8 @@ export async function captureComponents(ctx) {
         props, fill: bg && bg[3] > 0 ? 'direct' : beforeBg && beforeBg[3] > 0 && coversBox(base) ? 'before' : 'none', colors: colorsOf(perMode),
       };
       if (base?.before) entry.before = base.before;
+      const shapes = shapesOf(perMode);
+      if (shapes) entry.shapes = shapes;
       if (ctx.visual) {
         try {
           const shot = await P.screenshot(capSel(loc.i));

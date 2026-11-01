@@ -6492,6 +6492,15 @@ function reportFull(label, items, shown) {
           } else if (tokenUniverse) {
             console.log(`\nℹ️  Multi-brand coverage${via}: all ${tokenUniverse} tokens are defined across every brand (${brands.join(', ')}).`);
           }
+          // A brand changes values, never structure (brand-shape.mjs): each component's shape in each brand, from the
+          // code capture, against the first brand's.
+          try {
+            const { brandShapeDiffs, brandShapeLines } = await import('./brand-shape.mjs');
+            const { codeSnapshotPath } = await import('./names.mjs');
+            const code = JSON.parse(readFileSync(resolve(ROOT, codeSnapshotPath(cfg)), 'utf8'));
+            const lines = brandShapeLines(brandShapeDiffs(code.components ?? {}, brands));
+            if (lines.length) { console.log(C.yellow(`\n⚠️  ${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(`   ${l}`)); }
+          } catch { /* no code capture yet */ }
         } else if (suggest && suggest.length) {
           // Detected candidate multi-mode collections in the capture but no declared brands: nudge,
           // never assume (modes may be theme/density/locale, not brands).
