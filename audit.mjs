@@ -1977,6 +1977,16 @@ if (process.argv.includes('--styleguide')) {
         console.log(`   Accessibility from the saved results (${RESULTS_FILE}): a component changed since is tried by the browser that opens the page.`);
       }
     }
+    // The page's own pages pictured in the browser and compared with the last build's (styleguide-shots.mjs): a layout
+    // that moved shows before anyone opens it. A whole guide built with the browser only; it never fails the build. Not
+    // in CI: its folder is thrown away after the run, so a picture there has nothing to be compared with, ever.
+    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false && !r.scope && !SCOPE_COMPONENTS.length && existsSync(r.out) && !process.env.CI) {
+      try {
+        const { guideShots, shotLines } = await import('./styleguide-shots.mjs');
+        const shotsDir = join(ROOT, OUT_DIR, 'styleguide-shots');
+        for (const line of shotLines(await guideShots(resolve(ROOT, r.out), shotsDir), shotsDir, ROOT)) console.log(line);
+      } catch (e) { console.log(`   The style guide's own pages not pictured (${String(e.message).split('\n')[0]}).`); }
+    }
     // Each open task's age in the page (how long since an audit first found it), from the record a build with the browser
     // keeps: also in a page built without it, as of that build.
     {

@@ -630,6 +630,18 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-screen { border: var(--sg-line); border-radius: var(--sg-radius); overflow: hidden; background: var(--sg-surface); box-shadow: var(--sg-shadow); }
 .sg-screen img { display: block; width: 100%; height: auto; }
 .sg-screen figcaption { padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); border-top: var(--sg-line); }
+/* Templates: each page frame, its Figma picture beside the components it is made of, in Figma's order. */
+.sg-templates { display: grid; gap: calc(var(--sg-space-xl) + var(--sg-space-s)); }
+.sg-template > h3 { margin: 0; font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); }
+.sg-template-meta { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-xxs) 0 0; }
+.sg-template-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: calc(var(--sg-space-l) + var(--sg-space-s)); align-items: start; margin-top: var(--sg-space-m); }
+.sg-template-body.sg-template-body--parts { grid-template-columns: minmax(0, 1fr); }   /* no picture: the list alone */
+.sg-template-body > figure { margin: 0; }   /* the frame fills its column */
+@media (max-width: 900px) { .sg-template-body { grid-template-columns: minmax(0, 1fr); } }
+.sg-template-parts { list-style: none; margin: 0; padding: 0; border: var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-surface); }
+.sg-template-parts > li { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); padding: var(--sg-space-s) var(--sg-space-m); font-size: var(--sg-s); color: var(--sg-text); }
+.sg-template-parts > li + li { border-top: var(--sg-line); }
+.sg-template-note { font-size: var(--sg-s); color: var(--sg-muted); margin: var(--sg-space-s) 0 0; }
 
 /* ── Foundations ─────────────────────────────────────────────────────────── */
 /* Every box on the page is drawn alike: the system card's border and corners, no fill of its own. */
@@ -1945,6 +1957,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     motion: '<path d="M2 11c3 0 3-6 6-6s3 6 6 6"/><circle cx="8" cy="5" r="1.2"/>',
     icons: '<path d="M8 2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.2 4.4 13.1l.7-4L2.2 6.3l4-.6z"/>',
     showroom: '<rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M5.5 14h5M8 11.5V14"/>',
+    templates: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M2 6h12M6 6v8"/>',   // a page frame: its header, a side column and the content
     component: '<path d="M8 1.6l2.2 2.2L8 6 5.8 3.8zM3.8 5.8 6 8l-2.2 2.2L1.6 8zM12.2 5.8 14.4 8l-2.2 2.2L10 8zM8 10l2.2 2.2L8 14.4l-2.2-2.2z"/>',   // four diamonds, as Figma marks a component
   };
   NAV_MARK['changes-in-Figma'] = NAV_MARK.history;   // the changes made in Figma: History's mark
@@ -3962,8 +3975,40 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var sc = document.createElement('div'); sc.className = 'sg-screens'; iu.appendChild(sc);
     DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
   }
+  // Templates: each page frame Figma composes of the system's components (DATA.templates), what it is made of in Figma's
+  // order, whether its code uses each one, and the frame it comes from. A component with a page of its own is linked.
+  if ((DATA.templates || []).length) {
+    hr(); navLink('templates', 'templates');
+    var tp = section('templates', 'System', 'Templates', '');
+    var tl = document.createElement('div'); tl.className = 'sg-templates'; tp.appendChild(tl);
+    var TPL_STATE = { used: ['In the code', 'connected'], missing: ['Not in the code', 'deprecated'], exempt: ['Kept out on purpose', ''], 'in-progress': ['In progress', 'beta'], 'not-compared': ['Not compared', ''] };
+    DATA.templates.forEach(function (t) {
+      var a = document.createElement('article'); a.className = 'sg-template'; a.id = 'template-' + String(t.name).replace(/[^\w-]+/g, '-');
+      var parts = t.parts || [], inCode = parts.filter(function (p) { return p.state === 'used'; }).length, compared = parts.filter(function (p) { return p.state === 'used' || p.state === 'missing'; }).length;
+      var meta = [];
+      if (t.inProgress) meta.push('In progress: its code is not compared yet');
+      else if (t.file) meta.push('Built in <code>' + esc(t.file) + '</code>' + (compared ? ', ' + inCode + ' of ' + plural(compared, 'component', 'components') + ' in the code' : ''));
+      else if (parts.length) meta.push('No code file found. A developer names it in <code>templates[].file</code> in <code>ds-config.json</code>');
+      if (t.figma) meta.push('<a href="' + esc(t.figma) + '" target="_blank" rel="noopener">See in Figma</a>');
+      var list = parts.length ? '<ol class="sg-template-parts" aria-label="What ' + esc(t.name) + ' is made of">' + parts.map(function (p) {
+        var st = TPL_STATE[p.state] || [p.state, ''];
+        var name = HAS_PAGE[p.name] ? '<a href="#' + cid(p.name) + '">' + esc(p.name) + '</a>' : esc(p.name);
+        return '<li><span>' + name + '</span><span class="sg-status' + (st[1] ? ' sg-status--' + st[1] : '') + '">' + esc(st[0]) + '</span></li>';
+      }).join('') + '</ol>' : '<p class="sg-template-note">Figma places none of the system\'s components in it.</p>';
+      var notes = [];
+      if (t.order) notes.push('The code places them in another order: ' + t.order.code.map(esc).join(', ') + '.');
+      if (parts.some(function (p) { return p.state === 'missing'; })) notes.push('A developer uses each component marked Not in the code, or the team keeps it out on purpose with its reason.');
+      if (!t.picture && t.pictureWhy) notes.push('No picture of the frame: ' + esc(t.pictureWhy) + '.');
+      a.innerHTML = '<h3>' + esc(t.name) + '</h3>' + (meta.length ? '<p class="sg-template-meta">' + meta.join(' · ') + '</p>' : '') +
+        '<div class="sg-template-body' + (t.picture ? '' : ' sg-template-body--parts') + '">' +
+          (t.picture ? '<figure class="sg-screen"><img alt="' + esc(t.name) + ' in Figma" src="' + esc(t.picture.src) + '"' + (t.picture.w ? ' width="' + Math.round(t.picture.w) + '" height="' + Math.round(t.picture.h) + '"' : '') + '><figcaption>The frame in Figma</figcaption></figure>' : '') +
+          '<div>' + list + notes.map(function (n) { return '<p class="sg-template-note">' + n + '</p>'; }).join('') + '</div>' +
+        '</div>';
+      tl.appendChild(a);
+    });
+  }
   // The History last in the System group: first the pages about the system as it is, then what changed in it and why.
-  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#in-use"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
+  (function () { var a = nav.querySelector('a[href="#history"]'), last = Array.prototype.slice.call(nav.querySelectorAll('a[href="#status"], a[href="#showroom"], a[href="#documentation"], a[href="#in-use"], a[href="#templates"]')).pop(); if (a && last && (a.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) last.insertAdjacentElement('afterend', a); })();
 
   /* ── Every mode at once: a foundation's values in one column per mode (Phone, Tablet, Laptop, Desktop; Light, Dark) ── */
   // Each mode is the attributes that put it on an element (data-size="phone"), the system's own mode CSS reads them on

@@ -476,6 +476,33 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     view.screens = (cfg.frames ?? []).filter((f) => f?.nodeId).map((f) => ({ f, file: join(refsDir, `${String(f.nodeId).replace(/[:\/]/g, '-')}.png`) }))
       .filter(({ file }) => existsSync(file) && readFileSync(file).length <= 2_000_000).slice(0, 6)
       .map(({ f, file }) => ({ src: `data:image/png;base64,${readFileSync(file).toString('base64')}`, caption: f.name ?? f.nodeId }));
+    // Templates: each page frame Figma composes of the system's components (templates[] and its snapshot), what it is made
+    // of in Figma's order, whether its code uses each, and the frame it comes from, pictured (refs, else the Figma API).
+    if (!opts.only?.length && (cfg.templates ?? []).some((t) => t?.name)) {
+      try {
+        const { templatesSnapshot, templateComposition } = await import('./template-composition.mjs');
+        const found = templatesSnapshot(ROOT, cfg);
+        if (found?.templates) {
+          const { inProgressNames } = await import('./in-progress.mjs');
+          const { figmaLink } = await import('./figma-link.mjs');
+          const rows = templateComposition(ROOT, cfg, { inProgress: await inProgressNames(ROOT, cfg), snapshot: found.templates });
+          const version = readJson(cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json')?._figmaVersion ?? null;
+          let budget = (Number(cfg.styleguide?.figmaImagesMB) || 8) * 1024 * 1024;
+          const { figmaImage } = await import('./visual-diff.mjs');
+          for (const t of rows) {
+            t.figma = cfg.figmaFileKey && t.nodeId ? figmaLink(cfg.figmaFileKey, t.nodeId) : null;
+            if (cfg.styleguide?.figmaImages === false || !t.nodeId) continue;
+            const im = await figmaImage(ROOT, cfg, t.name, { nodeId: t.nodeId, version, folder: 'templates' });
+            if (!im.file) { t.pictureWhy = im.why; continue; }
+            const b = readFileSync(im.file);
+            if (b.length > 2_000_000 || b.length > budget || b.length < 24) { t.pictureWhy = 'its picture is too large to embed'; continue; }
+            budget -= b.length;
+            t.picture = { src: `data:image/png;base64,${b.toString('base64')}`, w: b.readUInt32BE(16) / 2, h: b.readUInt32BE(20) / 2 };
+          }
+          if (rows.length) view.templates = rows;
+        }
+      } catch { /* the page builds without it */ }
+    }
     // The one list of differences the last full audit wrote: each component shows its own open ones.
     try {
       const { OUT_DIR } = await import('./names.mjs');
