@@ -282,6 +282,23 @@ function buildStatesVariants(contract, props) {
   return { states, variants };
 }
 
+// What a component is for, from the best source that says it: the team's own words (contract.authored.json), its intent
+// layer page's purpose (the first paragraph), the comment its code file writes on it, Figma's description, then a note
+// in the structure contract. → { text, from } (from: authored, intent, code, figma), or null when none says (the contract
+// then carries the placeholder below and no descriptionFrom). full: the whole Figma description, never cut at 300.
+export const placeholderDescription = (name) => `${name} — captured from Figma by rms-design-system-engine.`;
+export const isPlaceholderDescription = (text) => /— captured from Figma by rms-design-system-engine\.$/.test(String(text ?? ''));
+export function descriptionOf({ authored = null, intent = null, code = null, figma = null, note = null, full = false } = {}) {
+  const said = (t) => typeof t === 'string' && t.trim() !== '';
+  const para = (t) => { const first = String(t).trim().split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim(); return first.length > 300 ? short(first, 300) : first; };
+  if (said(authored)) return { text: authored, from: 'authored' };
+  if (said(intent)) return { text: para(intent), from: 'intent' };
+  if (said(code)) return { text: para(code), from: 'code' };
+  if (said(figma)) return { text: full ? String(figma).trim() : String(figma).slice(0, 300), from: 'figma' };
+  if (said(note)) return { text: String(note).slice(0, 300), from: 'authored' };
+  return null;
+}
+
 // code (optional): { api (structure-capture.mjs apiEntry), text (its source), aliases, stateBindings, publish, idPrefix,
 // schemaRef, figmaFile } - the code half of the contract (contract-code.mjs). publish: the contract is written for others to
 // read (an intent layer): it links the intent page instead of copying it, and leaves out where it is used locally.
@@ -291,6 +308,8 @@ function buildContract(name, { contract, structure, props, authored, composition
   const p = props?.[name];
   const a = authored || {};
   const { states, variants } = buildStatesVariants(c, p);
+  // Published into the intent layer, the contract never copies the page back as its description.
+  const described = descriptionOf({ authored: a.description, intent: code?.publish ? null : intentPage?.purpose, code: code?.api?.description, figma: p?.description, note: c?._note, full: !!code?.publish });
 
   const out = {
     $schema: code?.schemaRef ?? './contract.schema.json',
@@ -298,10 +317,8 @@ function buildContract(name, { contract, structure, props, authored, composition
     id: (code?.idPrefix ?? 'rms.') + name,
     name,
     version: a.version || '0.1.0',                                                  // AUTHORED (from contract.authored.json)
-    description: a.description                                                       // AUTHORED, else CAPTURED Figma component description
-                 || (p?.description ? String(p.description).slice(0, 300)
-                 : (c?._note ? String(c._note).slice(0, 300)
-                 : `${name} — captured from Figma by rms-design-system-engine.`)),
+    description: described?.text ?? placeholderDescription(name),                  // AUTHORED, intent layer, code or Figma (descriptionOf)
+    ...(described ? { descriptionFrom: described.from } : {}),
     figmaNodeId: p?.nodeId || s?.nodeId || null,                                    // CAPTURED
     props: buildProps(p, a.propDescriptions),                                        // CAPTURED (+ bindings.code + authored descriptions)
     anatomy: buildAnatomy(c, s, vars),                                               // CAPTURED
@@ -395,7 +412,6 @@ function buildContract(name, { contract, structure, props, authored, composition
     if (acc) out.accessibility = acc;
     // Published, a contract says what is known: the whole description, and no empty placeholder for what nobody wrote.
     if (code.publish) {
-      if (!a.description && p?.description) out.description = String(p.description).trim();
       if (!a.semantics) delete out.semantics;
       if (!a.notes) delete out.notes;
     }
@@ -484,6 +500,7 @@ const CONTRACT_SCHEMA = {
     name: str,
     version: str,
     description: str,
+    descriptionFrom: { enum: ['authored', 'intent', 'code', 'figma'], description: 'Where the description was read: contract.authored.json, the intent layer page\'s purpose, the code\'s own comment on the component, or Figma\'s description. Absent: nothing says what it is for, and the description is a placeholder.' },
     figmaNodeId: { type: ['string', 'null'] },
     source: {
       type: 'object', additionalProperties: false,
@@ -1144,7 +1161,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     const keptHere = keptAll.filter((d) => d.component === name);
     if (keptHere.length) contract.kept = keptHere.map((d) => ({ check: d.check, what: d.what, ...(d.truth ? { truth: d.truth } : {}), reason: d.reason, ...(d.at ? { at: String(d.at).slice(0, 10) } : {}) }));
     // From the code alone, no description is a placeholder saying it came from Figma.
-    if ((codeOnly || !(props[name] || structure[name])) && /— captured from Figma by rms-design-system-engine\.$/.test(contract.description)) contract.description = '';
+    if ((codeOnly || !(props[name] || structure[name])) && isPlaceholderDescription(contract.description)) contract.description = '';
     if (lives[name] && !publish) contract.livesIn = lives[name];
     // What the team decided against for it, and why (decisions.mjs). Local only: published into the intent layer, the
     // layer already holds these words.

@@ -398,8 +398,35 @@ export function extractEvents(file, text, propNames = []) {
   return [...out.values()];
 }
 
+// A comment's words: the comment marks and a doc comment's stars taken off, up to its first tag line (@param …) or the
+// end of its first paragraph, on one line. '' for a comment that only switches a tool off or names a licence.
+export function commentWords(raw) {
+  const body = String(raw ?? '').replace(/^\s*(?:\/\*\*?|<!--)/, '').replace(/(?:\*\/|-->)\s*$/, '').replace(/^\s*@component\b/, '');
+  const lines = [];
+  for (const line of body.split('\n').map((l) => l.replace(/^\s*(?:\*|\/\/\/?)\s?/, '').trim())) {
+    if (/^@\w/.test(line)) break;
+    if (!line && lines.length) break;
+    if (line) lines.push(line);
+  }
+  const words = lines.join(' ').replace(/\s+/g, ' ').trim();
+  return /^(eslint|prettier|@ts-|tslint|istanbul|c8 |global |jshint|#region|#endregion)|licen[cs]e|copyright|spdx-/i.test(words) ? '' : words;
+}
+
+// What the component's own source says it is for: Svelte's <!-- @component … -->, the comment a Vue file opens with
+// (before its first block) or the doc comment before its export default, and in a React, TypeScript or JavaScript file
+// the doc comment right before the component's declaration (a decorator between the two is fine). '' when it says none.
+const DOC = String.raw`(\/\*\*(?:(?!\*\/)[\s\S])*\*\/)`;
+export function componentComment(file, text) {
+  const t = String(text ?? '');
+  const ext = extname(String(file)).toLowerCase();
+  const first = (...res) => { for (const re of res) { const m = re.exec(t); const w = m ? commentWords(m[1]) : ''; if (w) return w; } return ''; };
+  if (ext === '.svelte') return first(/<!--\s*(@component[\s\S]*?)-->/);
+  if (ext === '.vue') return first(/^\s*(<!--[\s\S]*?-->)\s*</, new RegExp(DOC + String.raw`\s*(?:export\s+default\b|(?:defineOptions|defineComponent)\s*\()`));
+  return first(new RegExp(DOC + String.raw`\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*(?:export\s+default\s+(?:function|class)\b|(?:export\s+)?(?:function\s+[A-Z]|(?:const|let|var)\s+[A-Z][\w$]*\s*[:=]|class\s+[A-Z]))`));
+}
+
 // The text reading of one component file, in the shape component-api.mjs merges.
-//   { props: { name: { default?, options?, required? } }, slots: { named: [...], default: bool }, events: [names] }
+//   { props: { name: { default?, options?, required? } }, slots: { named: [...], default: bool }, events: [names], description? }
 export function textComponentApi(file, text) {
   // A Vue file's props are read from its scripts only: its template's bindings (:icon="icon") are never a default.
   const code = /\.vue$/i.test(String(file)) ? [...String(text).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n') || text : text;
@@ -419,7 +446,8 @@ export function textComponentApi(file, text) {
     props[p] = e;
   }
   const s = extractSlots(text);
-  return { props, slots: { named: [...s.named], default: s.hasDefault }, events: extractEvents(file, text, Object.keys(props)) };
+  const description = componentComment(file, text);
+  return { props, slots: { named: [...s.named], default: s.hasDefault }, events: extractEvents(file, text, Object.keys(props)), ...(description ? { description } : {}) };
 }
 
 // ── Nesting (text patterns) ───────────────────────────────────────────────────

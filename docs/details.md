@@ -561,6 +561,21 @@ An automated check finds many failures, but it cannot show that a product meets 
 
 Each component gets a contract, rewritten from Figma and the code on every run: its props, variants, states, tokens and the components it nests. `contracts/llms.txt` is the one file AI tools read.
 
+### What a contract says it is for
+
+A contract's `description` comes from the first source that says what the component is for:
+
+1. Your own words in `contract.authored.json`.
+2. Its page in your intent layer: the first paragraph of what it is for.
+3. Its code: the comment on the component in its own file. That is a Vue file's opening `<!-- … -->` or the doc comment above its `export default`, Svelte's `<!-- @component … -->`, or the doc comment right above a React or TypeScript component.
+4. Its description in Figma.
+
+`descriptionFrom` says which one it was: `authored`, `intent`, `code` or `figma`.
+
+- **Nothing says?** The description is a placeholder ("captured from Figma") and there is no `descriptionFrom`. The audit counts it as a component with no description and lists it.
+- **Published into the intent layer?** The page is linked, never copied back as the description.
+- **Licences and lint switches** at the top of a file are not a description.
+
 ### Colour pairs, not a shortlist
 
 For every text and icon colour, the engine works out the one surface it was made for, reading the names (`content/on-interactive` goes with `surface/interactive`) and confirming it against the values. The pair goes into the contract, into `llms.txt` and into `--query`, so an agent is given the answer instead of every surface that would work: given only a shortlist, it picks a different grey on every card. An edit that puts a colour on another surface is told so at once, with the contrast the two actually give. And a pair whose names promise what its values break (white on a warning yellow) is reported as what it is: the system's own words against its own numbers.

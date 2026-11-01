@@ -95,6 +95,7 @@ export function docgenComponents(doc, ROOT = '') {
     const slotList = Array.isArray(d.slots) ? d.slots : [];
     return {
       names: [d.displayName, d.exportName].filter(Boolean),
+      ...(typeof d.description === 'string' && d.description.trim() ? { description: d.description.trim() } : {}),
       file: file ? resolve(ROOT, file) : null,
       props,
       slots: { named: slotList.map((s) => s.name).filter((n) => n && n !== 'default'), default: slotList.some((s) => !s.name || s.name === 'default') },
@@ -302,7 +303,9 @@ export function mergeApiReadings(readings) {
   for (const r of readings) sources.push(r.source);
   const events = new Map();
   for (const r of readings) for (const e of r.events ?? []) if (!events.has(norm(e))) events.set(norm(e), e);
-  return { props, slots: { named: [...named.values()], default: hasDefault }, events: [...events.values()], readBy: sources };
+  // What the component is for, as the best source that says writes it (docgen's description, its file's own comment).
+  const description = readings.find((r) => typeof r.description === 'string' && r.description.trim())?.description.trim();
+  return { props, slots: { named: [...named.values()], default: hasDefault }, events: [...events.values()], readBy: sources, ...(description ? { description } : {}) };
 }
 
 // How a product writes the component: its tag (a custom element's, else the name the file exports) and the syntax
@@ -375,7 +378,7 @@ export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {}, pairin
     const e = cem.find((x) => matches(x.names, name));
     if (e) readings.push({ source: 'custom-elements', props: e.props, slots: e.slots, events: e.events });
     const d = docgen.find((x) => matches(x.names, name) || (file && x.file === file));
-    if (d) readings.push({ source: 'docgen', props: d.props, slots: d.slots, events: d.events });
+    if (d) readings.push({ source: 'docgen', props: d.props, slots: d.slots, events: d.events, description: d.description });
     if (file) {
       const text = read(file);
       const t = typescriptComponentApi(ts, file, text, name);

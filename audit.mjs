@@ -6914,7 +6914,8 @@ function reportFull(label, items, shown) {
             parts.some((p) => p && typeof p === 'object' && (p.whenNotToUse || p.useInstead));
           rowsC.push({
             name: j.id || f.replace(/\.contract\.json$/, ''),
-            desc: !!(j.description && String(j.description).trim()),
+            // The engine's own placeholder says nothing: a component with only that has no description.
+            desc: !!(j.description && String(j.description).trim() && !/— captured from Figma by rms-design-system-engine\.$/.test(j.description)),
             sem: !!(j.semantics && typeof j.semantics === 'object' && Object.keys(j.semantics).length),
             guidance,
           });
