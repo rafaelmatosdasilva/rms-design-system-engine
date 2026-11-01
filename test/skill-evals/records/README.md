@@ -190,5 +190,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-01-the-build-and-change-guides` | The 24 guide tasks on Haiku (engine e1ebb2c) | "Build and change guides, library keys" |
 | `2026-11-01-usage-and-config-reference-pages` | The 24 guide tasks on Haiku (engine aa621b1) | "Usage and config reference: pages to write, suggested prop pairs, and where a contract's description and rules come from" |
 | `2026-11-01-skill-evaluation-pages-to-write` | The 24 guide tasks on Haiku (engine 5497b03) | "Skill evaluation: pages to write, suggested prop pairs, where a contract's description and rules come from; every run passed" |
+| `2026-11-01-merge-main-into-the-guide` | The 24 guide tasks on Haiku (engine 3f8cfb4) | "Build and change guides, library keys, merged with main" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
