@@ -50,6 +50,18 @@
       else { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Figma and the code differ here. Decide which one is right, then change the other, or keep it as a known exception.'); }
       out.push(row);
     });
+    // A pair its contract suggests (a Figma property and a code prop only the code has, one name holding the other): a
+    // yes or a no for a person, on the Figma property's row, or a row of its own. The panel has the two decisions to copy.
+    (c.pairAsks || []).forEach(function (x) {
+      var cmd = function (t) { return String(t).replace(/^rms-design-system-engine\b/, ENGINE); };
+      var decide = '<div class="sg-decide-grid">' + [['approve', 'Yes, the same prop', x.yes, x.yesDoes], ['drop', 'No, two props', x.no, x.noDoes]].map(function (d) {
+        return '<div class="sg-decide sg-decide--' + d[0] + '" title="' + esc(d[3]) + '"><strong class="sg-decide-head">' + decideMark(d[0]) + esc(d[1]) + '</strong>' + sysButton('button', 'Copy decision', ' data-pair-copy="' + esc(cmd(d[2])) + '"') + '<span class="sg-decide-said" role="status"></span></div>';
+      }).join('') + '</div>';
+      var todo = esc(x.ask + ' The engine suggests the pair from their names and never takes it on its own: say yes or no.');
+      var at = out.filter(function (r) { return r.type === 'Prop' && r.rel === PAR_REL.figma && r.figma.indexOf('>' + esc(x.figma) + '<') >= 0; })[0];
+      if (at) { at.st = 'check'; at.who = WHO.both; at.todo = todo; at.decide = decide; }
+      else out.push({ key: c.name + '\u0000pair:' + x.figma, area: 'Parity', kind: 'Prop', type: 'Prop', figma: side({ name: x.figma, value: '' }), code: side({ name: x.code, value: '' }), todo: todo, decide: decide, who: WHO.both, st: 'check', rel: PAR_REL.paired, at: at0 });
+    });
     // What the audit found that is not one of the rows above: a row of its own, under the check that found it.
     diffs.forEach(function (x, j) {
       if (used[j]) return;

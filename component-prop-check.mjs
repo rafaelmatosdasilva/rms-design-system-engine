@@ -404,10 +404,11 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
   for (const fp of missingHere) {
     const fn = norm(fp);
     const def = figDefs.get(fp);
-    const hit = extraHere.find(([cn]) => !pairedCode.has(cn) && cn.length >= 3 && fn.length >= 3 && (cn.includes(fn) || fn.includes(cn)));
+    // A pair a person said no to (contract.authored.json declinedPairs, --prop-pair … no) is never offered again.
+    const hit = extraHere.find(([cn, cp]) => !pairedCode.has(cn) && cn.length >= 3 && fn.length >= 3 && (cn.includes(fn) || fn.includes(cn)) && AUTHORED_DOC?.components?.[figmaName]?.declinedPairs?.[fp] !== cp);
     if (hit) {
       pairedCode.add(hit[0]);
-      SUGGEST.push(`${figmaName}: Figma "${fp}" might be code "${hit[1]}" - if so add componentPropAliases["${figmaName}"]["${fp}"] = "${hit[1]}"`);
+      SUGGEST.push(`${figmaName}: Figma "${fp}" might be code "${hit[1]}" - say yes or no: rms-design-system-engine --prop-pair ${figmaName} "${fp}" yes|no`);
       rows.push({ component: figmaName, figmaProp: fp, figmaValue: figmaValueOf(def), codeProp: hit[1], codeValue: '(rename?)', status: 'rename' });
     } else {
       rows.push({ component: figmaName, figmaProp: fp, figmaValue: figmaValueOf(def), codeProp: 'not in code', codeValue: !ccProps.length ? '-' : ccProps.some((p) => p.figma === fp) ? '(Code Connect reads it, writes no attribute)' : '(Code Connect does not read it)', status: 'missing' });

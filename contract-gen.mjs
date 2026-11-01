@@ -39,6 +39,7 @@ import { readIntentLayer, matchComponents, codeFilesOf, componentIntent, layerPa
 import { checkedLayer } from './intent-truth.mjs';
 import { codeHalf, codeSlots, figmaStatesVariants, stateTokens, accessibilityOf } from './contract-code.mjs';
 import { roleWord } from './role-markup.mjs';
+import { withA11yFacts, markupFacts, readA11yFacts, ACCESSIBILITY_SCHEMA } from './contract-a11y.mjs';
 import { execFileSync } from 'node:child_process';
 import { mirrorState, ensureHistory, commitsOf } from './gitlab-history.mjs';
 import { markedRules, readRuleContext } from './rule-checks.mjs';
@@ -474,7 +475,6 @@ function buildContract(name, { contract, structure, props, authored, composition
 // ── Schema + minimal validator (no external deps) ─────────────────────────────
 // Every field a contract can carry is declared, so a reader knows the whole shape and an unknown field is an error.
 const str = { type: 'string' }, strs = { type: 'array', items: { type: 'string' } };
-const sourced = (value) => ({ type: 'object', required: ['value', 'from'], properties: { value, from: { enum: ['figma', 'code', 'authored'] } }, additionalProperties: false });
 const CODE_SIDE = {
   type: ['object', 'null'],
   description: 'The code prop or slot this Figma property is, with the code\'s own facts (null: none found).',
@@ -486,7 +486,7 @@ const CODE_SIDE = {
     source: { enum: ['authored', 'alias', 'codeConnect', 'name', 'convention'], description: 'Who decided the pairing: a binding written by hand, a documented alias, Code Connect, the same name, or the naming convention (labelContent and label).' },
     type: str, options: { type: 'array' }, default: {}, defaultExpression: { type: 'string', description: 'A default the code builds (an object, a list), as the code writes it.' }, required: { type: 'boolean' }, description: str,
     confidence: { enum: ['verified', 'single-source', 'uncertain'] },
-    valueMap: { type: 'object', description: 'Figma value → code value, from Code Connect.' },
+    valueMap: { type: 'object', description: 'Figma value → code value, from Code Connect, or, for a pair a person agreed, the values both sides write with the same letters.' },
     inverted: { const: true, description: 'The code prop holds the opposite of the Figma value (Figma showClose on = code hideClose false).' },
   },
 };
@@ -564,10 +564,7 @@ const CONTRACT_SCHEMA = {
         },
       },
     },
-    accessibility: {
-      type: 'object', additionalProperties: false,
-      properties: { element: sourced(str), role: sourced(str), aria: sourced(strs), keyboard: sourced(strs) },
-    },
+    accessibility: ACCESSIBILITY_SCHEMA,
     semantics: { type: 'object', description: 'The authored semantics (contract.authored.json). Its element is always accessibility.element\'s value, null when neither says one.', properties: { element: { type: ['string', 'null'] }, aria: { type: 'object' } } },
     notes: str,
     whenNotToUse: str,
@@ -922,7 +919,7 @@ export function publishedReadme(built, skipped = [], { schema = 'contract.schema
     '| `slots[]` | Each Figma instance swap: a place another component goes, and which ones it accepts | Figma |',
     '| `states[]`, `variants` | Its states (Figma\'s state axis and the code\'s pseudo-classes) and other variants | Figma, code |',
     '| `anatomy`, `tokens` | Its root and inner frames (padding, gap, radius, height, text style; `borderInset` where Figma\'s padding is the room for a border) and the tokens each state uses | Figma |',
-    '| `accessibility` | Its element, role, ARIA and keyboard, each value with where it was read | Figma annotations, code, authored |',
+    '| `accessibility` | What a screen reader is given: its element, role, how its name is given, the states it announces, whether Tab reaches it and the keys it answers, and each state where these differ (`byState`); each value with where it was read | measured in a browser, code, Figma annotations, authored |',
     '| `intentPage` | The component\'s page in the intent layer (what it is for, when to use it) | intent layer |',
     '| `kept[]` | Differences between Figma and the code the team kept on purpose: what differs, which side is right (`truth`) and why. Follow that side; never change it back | the team\'s decisions |', '',
     '## Coverage', '',
@@ -1161,6 +1158,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   if (publish && mirrorState(ROOT)) { try { ensureHistory(ROOT, { paths: [...new Set(targets.map((n) => apiEntryOf(n)?.file).filter(Boolean))].map((path) => ({ path })) }); } catch { /* the commits stay unknown */ } }
   let invented = null;   // readInvented, once, with the first component
   let ruleCtx = null;    // readRuleContext, once, with the first page that has rules
+  const a11yFacts = readA11yFacts(ROOT);   // what the style guide's last build measured in a browser, per component
   for (const name of targets) {
     const api = apiEntryOf(name);
     const relFile = placeOf.get(name);
@@ -1179,6 +1177,9 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     if (wrote.length) contract.invented = wrote;
     const keptHere = keptAll.filter((d) => d.component === name);
     if (keptHere.length) contract.kept = keptHere.map((d) => ({ check: d.check, what: d.what, ...(d.truth ? { truth: d.truth } : {}), reason: d.reason, ...(d.at ? { at: String(d.at).slice(0, 10) } : {}) }));
+    // What a screen reader is given (contract-a11y.mjs): measured by the style guide's last build, else read from its markup.
+    const acc = withA11yFacts(contract.accessibility, { code: text ? markupFacts(text, { props: Object.keys(api?.props ?? {}) }) : null, measured: a11yFacts?.components?.[name] ?? null, at: a11yFacts?.at, figmaRole: roleWord(props[name]?.annotations) });
+    if (acc) contract.accessibility = acc; else delete contract.accessibility;
     // From the code alone, no description is a placeholder saying it came from Figma.
     if ((codeOnly || !(props[name] || structure[name])) && isPlaceholderDescription(contract.description)) contract.description = '';
     if (lives[name] && !publish) contract.livesIn = lives[name];

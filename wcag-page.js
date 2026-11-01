@@ -5,6 +5,9 @@
 //   check(root, opts)    → { findings: [{ kind, sc, desc }], ran: [kind], spoken: [{ desc, role, name, says }] }
 //                          what the markup and the CSS show, and what a screen reader says on each control
 //   interact(root, opts) → Promise of { findings, ran }    what it does when used (hover, focus, input, press, keys)
+//   facts(root)          → { role, name, states, focusable, keys }   its control as a screen reader is given it, for
+//                          the contract: the role, where its name comes from, the states it announces, whether Tab
+//                          reaches it and the keys a native control answers
 // `ran` names each check that had something to look at (a component with no link never runs the link check), so a
 // criterion with nothing failing is said to be met only where it was tried. `desc` locates the element as the audit
 // does (tag#id.class), so a finding names the component it sits in. opts: { name } (the component's name, for the
@@ -401,6 +404,43 @@
     var more = byIds(a('describedby')).filter(Boolean).map(function (d) { return d.textContent; }).join(' ').replace(/\s+/g, ' ').trim();
     return parts.join(', ') + (more ? '. ' + more : '');
   }
+  // ── What a screen reader is given, as facts for the contract ──
+  // The component's control (its root when it is one, else its first control), as the browser has it: its role, where
+  // its name comes from, the states it announces, whether Tab reaches it and the keys a native control answers by
+  // itself. Nothing in it is a guess: what it cannot see is left out. → { role, name, states, focusable, keys }
+  function nameFrom(el) {
+    if ((el.getAttribute('aria-labelledby') || '').trim() && labelled(el)) return 'labelledby';
+    if ((el.getAttribute('aria-label') || '').trim()) return 'aria-label';
+    if (el.labels && el.labels.length && Array.prototype.some.call(el.labels, function (l) { return text(l); })) return 'label';
+    if (el.tagName === 'IMG' || (el.tagName === 'INPUT' && el.type === 'image')) return (el.getAttribute('alt') || '').trim() ? 'alt' : null;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !/^(button|submit|reset)$/i.test(el.type)) return (el.getAttribute('title') || '').trim() ? 'title' : null;
+    if (text(el) || el.querySelector('img[alt]:not([alt=""]), svg title')) return 'content';
+    return (el.getAttribute('title') || '').trim() ? 'title' : null;
+  }
+  var STATE_ATTRS = ['expanded', 'pressed', 'checked', 'selected', 'current', 'invalid', 'disabled', 'required', 'busy', 'haspopup'];
+  function facts(root) {
+    var all = scope(root).filter(function (el) { return el.nodeType === 1; });
+    var tabbable = function (el) { return el.matches(FOCUSABLE) && el.tabIndex >= 0 && !el.disabled && vis(el) && !el.closest('[inert]'); };
+    var ctl = root.matches(CONTROL) ? root : all.filter(function (el) { return el.matches(CONTROL) && vis(el); })[0] || null;
+    if (!ctl) {
+      var r0 = roleOf(root);
+      return { role: r0 && r0 !== 'generic' ? r0 : null, name: null, states: [], focusable: all.some(tabbable), keys: [] };
+    }
+    var states = [];
+    STATE_ATTRS.forEach(function (k) { if (ctl.hasAttribute('aria-' + k)) states.push('aria-' + k); });
+    if (ctl.disabled) states.push('disabled');
+    if (ctl.required) states.push('required');
+    if (ctl.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(ctl.type)) states.push('checked');
+    var t = ctl.tagName, type = String(ctl.type || '').toLowerCase(), keys = [];
+    if (t === 'BUTTON' || t === 'SUMMARY' || (t === 'INPUT' && /^(button|submit|reset|image)$/.test(type))) keys = ['Enter', 'Space'];
+    else if (t === 'A' && ctl.hasAttribute('href')) keys = ['Enter'];
+    else if (t === 'INPUT' && /^(checkbox|radio)$/.test(type)) keys = ['Space'];
+    else if (t === 'INPUT' && type === 'range') keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+    else if (t === 'INPUT' && type === 'number') keys = ['ArrowUp', 'ArrowDown'];
+    var on = tabbable(ctl);
+    return { role: roleOf(ctl) || null, name: nameFrom(ctl), states: states, focusable: on, keys: on ? keys : [] };
+  }
+
   // A name that tells nothing of what the control does: a placeholder word, a role, a file or an icon's own name.
   // Only words that show the name is missing (an icon's or an image's stand-in, a verb alone, a placeholder): a plain noun
   // ("Field", "Label", "Title") is a specimen's sample text as often as a weak name, and is left to a person.
@@ -693,5 +733,5 @@
     return { findings: out, ran: [] };
   }
 
-  g.__wcag21 = { check: check, interact: interact, edges: edges };
+  g.__wcag21 = { check: check, interact: interact, edges: edges, facts: facts };
 })(typeof window !== 'undefined' ? window : globalThis);

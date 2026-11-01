@@ -112,7 +112,9 @@ test('states from Figma\'s state axis and the code\'s pseudo-classes, tokens per
   assert.deepEqual(c.tokens, { used: ['tileOne/hover/color', 'tileOne/radius', 'tileOne/surface/color'], byState: { 'state=hover': ['tileOne/hover/color'] } });
   assert.deepEqual(c.accessibility, {
     element: { value: 'button', from: 'code' }, role: { value: 'button', from: 'figma' },
-    aria: { value: ['aria-pressed'], from: 'code' }, keyboard: { value: ['enter'], from: 'code' },
+    aria: { value: ['aria-pressed'], from: 'code' }, keyboard: { value: ['Enter', 'Space'], from: 'code' },
+    // Its name is the words of its caption prop, it announces aria-pressed and disabled, and Tab reaches it.
+    name: { value: 'prop:caption', from: 'code' }, states: { value: ['aria-pressed', 'disabled'], from: 'code' }, focusable: { value: true, from: 'code' },
   });
 });
 

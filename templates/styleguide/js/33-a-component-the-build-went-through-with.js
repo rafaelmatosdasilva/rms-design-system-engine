@@ -849,7 +849,7 @@
       colours.forEach(function (a) { var next = []; modeSets.forEach(function (ms) { a.values.forEach(function (v) { if (v.value) next.push(ms.concat([[a, v]])); }); }); if (next.length) modeSets = next; });
       // Colours read as they settle in each mode, never halfway through a component's own transition.
       play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false; preview.classList.add('pg-still');
-      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {}, spoken = {}, spokenOrder = [];
+      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {}, spoken = {}, spokenOrder = [], facts = [], factsBy = {};
       // Each variant is drawn, then measured once the system's own scripts have answered the change: their observers add
       // roles, Tab stops, names and wiring a moment after it is drawn, as in a product, so it is never measured in the
       // same step it is drawn in. A message to the page itself is the next task without a timer's wait.
@@ -881,6 +881,16 @@
         if (all0.some(function (el) { return el.matches('a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex]:not([tabindex="-1"]),[contenteditable=""],[contenteditable=true],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=slider],[role=spinbutton],[role=combobox],[role=textbox],[role=searchbox]'); })) wran.control = 1;
         if (all0.some(function (el) { return el.matches('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]),select,textarea,[role=textbox],[role=searchbox],[role=combobox],[role=spinbutton],[contenteditable=""],[contenteditable=true]'); })) wran.field = 1;
         try { tb.innerHTML = liveA11yHTML(root, c.a11y); } catch (e) { tb.innerHTML = a11yRow('check', 'In the browser', 'It could not be tried here.', '', FROM_PAGE); }
+        // Its control as a screen reader is given it in this variant (its role, where its name comes from, the states it
+        // announces, whether Tab reaches it, the keys it answers), kept with the results for its contract: the same facts
+        // once, with the variants they hold in.
+        if (window.__wcag21 && window.__wcag21.facts) try {
+          var fx = window.__wcag21.facts(root), kd = liveA11yHTML.keys || [];
+          fx.keys = fx.keys.concat(kd.filter(function (k, i) { return fx.keys.indexOf(k) < 0 && kd.indexOf(k) === i; }));
+          var fk = JSON.stringify(fx);
+          if (!factsBy[fk]) { factsBy[fk] = { f: fx, when: [] }; facts.push(factsBy[fk]); }
+          factsBy[fk].when.push(cb.set);
+        } catch (e) { /* the other variants' facts stand */ }
         // WCAG 2.1 (wcag-page.js): what its markup and its CSS show in this variant.
         if (window.__wcag21) try {
           var w = window.__wcag21.check(root, { name: c.name }), byKind = {};
@@ -938,6 +948,7 @@
           ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
           : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
         var live = { ran: wran, tried: n };
+        if (facts.length) live.facts = facts;
         a11yRender(live);
         wcagUse(plan, live);
         if (!checking && bgRun) { var f = bgRun; bgRun = null; f(); }   // nothing left to try after it (no in-page checks)

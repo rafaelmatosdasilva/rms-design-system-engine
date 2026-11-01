@@ -918,6 +918,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const local = readJson(file); if (!local || !Array.isArray(local.props)) continue;
         c.contract = { file: relative(ROOT, file), props: local.props.map((p) => p?.name).filter(Boolean) };
       }
+      // The pairs its contract suggests and nobody decided yet (prop-pairs.mjs): a yes or a no for a person, on its page.
+      const pp = await import('./prop-pairs.mjs');
+      for (const c of view.components) {
+        const asks = pp.pairProposals([readJson(join(dir, c.name + '.contract.json'))].filter(Boolean));
+        if (asks.length) c.pairAsks = asks.map((x) => ({ figma: x.figma, code: x.code, ask: pp.askOf(x), yes: pp.commandFor(x, 'yes'), no: pp.commandFor(x, 'no'), yesDoes: pp.doesOf(x, 'yes'), noDoes: pp.doesOf(x, 'no') }));
+      }
       // The copies an older build put beside the guide are gone: the Contract button opens the shared file.
       const beside = join(dirname(projectOut), 'contracts');
       try { if (existsSync(beside) && readdirSync(beside).every((f) => f.endsWith('.contract.json'))) rmSync(beside, { recursive: true }); } catch { /* kept */ }

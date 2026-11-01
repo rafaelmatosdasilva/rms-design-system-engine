@@ -108,6 +108,7 @@
   function liveA11yHTML(root, a) {
     var line = function (ok, text, wcag) { return a11yRow(ok ? 'done' : 'todo', 'In the browser', esc(text), wcag, FROM_PAGE); };
     var out = [], stops = tabStops(root), had = document.activeElement;
+    liveA11yHTML.keys = [];
     var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
     var wants = a && a.key && INTERACTIVE.test(a.key);
     // Disabled as set: Tab passes it by, as it should, and its behaviours are not tried.
@@ -135,6 +136,8 @@
     if (stops.length && !out.some(function (h) { return /Focus Visible|Non-text|Name, Role/.test(h); })) out.push(line(true, (stops.length === 1 ? 'It shows its focus' : 'Each stop shows its focus') + ' and has a name.', 'WCAG 2.4.7 Focus Visible (AA)'));
     ((a && a.behaviours) || []).forEach(function (row) {
       var r = tryBehaviour(root, row, a.key);
+      // The keys that did what its role asks, pressed here (or a native control's own): its contract says them.
+      if (row.act.keys && (r.ok || r.given)) row.act.keys.forEach(function (k) { liveA11yHTML.keys.push(k === ' ' ? 'Space' : k); });
       out.push(r.given ? a11yRow('done', 'In the browser', 'Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').', row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)', FROM_PAGE) : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
     });
     if (had && had.focus && document.activeElement !== had) had.focus({ preventScroll: true, focusVisible: false });
