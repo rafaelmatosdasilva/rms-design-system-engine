@@ -632,6 +632,14 @@ Each fact says where it came from, and none is guessed:
 - **Where it is kept.** The build writes what it measured to `.design-system-engine-out/a11y-facts.json`, and the next contract build reads it. `measuredAt` says the day.
 - **Without a browser.** The facts come from the markup alone, marked `code`. What the markup cannot say (a root that is another component, a role set by an expression) is left out.
 
+### Pairs the engine suggests, for you to confirm
+
+A Figma property that no code prop is paired with may still have a near name in the code: Figma's `Content` and the code's `contentList`. The engine never pairs them on its own. It asks.
+
+- **Where it asks.** `rms-design-system-engine --prop-pairs` lists each pair, and the component's Parity area shows it on the Figma property's row, with a yes and a no to copy.
+- **A yes.** `--prop-pair <component> "<Figma property>" yes` writes the pair into `contract.authored.json` (the component's `bindings`). The next contract pairs them, with the code prop's type, description and default, and its values mapped where both sides write them with the same letters (`Large` and `large`).
+- **A no.** `--prop-pair <component> "<Figma property>" no` keeps the answer there too (`declinedPairs`), so the same pair is never asked again, in the contract or by the props check.
+
 ### The contracts in DSDS too
 
 Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](https://designsystemdocspec.org) 0.23, for a team that documents its system in that format: one file per component and an index. Each says what the engine reads from Figma and the code (the variants and states, what it nests, what to use instead, its status) and links the rest, as DSDS asks: the contract as its spec, the code file as its source, the Figma component, and your own page, whose guidance is never copied back.

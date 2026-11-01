@@ -486,7 +486,7 @@ const CODE_SIDE = {
     source: { enum: ['authored', 'alias', 'codeConnect', 'name', 'convention'], description: 'Who decided the pairing: a binding written by hand, a documented alias, Code Connect, the same name, or the naming convention (labelContent and label).' },
     type: str, options: { type: 'array' }, default: {}, defaultExpression: { type: 'string', description: 'A default the code builds (an object, a list), as the code writes it.' }, required: { type: 'boolean' }, description: str,
     confidence: { enum: ['verified', 'single-source', 'uncertain'] },
-    valueMap: { type: 'object', description: 'Figma value → code value, from Code Connect.' },
+    valueMap: { type: 'object', description: 'Figma value → code value, from Code Connect, or, for a pair a person agreed, the values both sides write with the same letters.' },
     inverted: { const: true, description: 'The code prop holds the opposite of the Figma value (Figma showClose on = code hideClose false).' },
   },
 };
