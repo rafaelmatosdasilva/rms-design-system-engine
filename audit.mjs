@@ -186,6 +186,15 @@ if (ONLY && process.argv.includes('--baseline')) {
 // need Figma wait until it is added. Any of these flags (or a project remembered from
 // before), or a stdin that is not a terminal, makes setup non-interactive.
 function _argValue(flag) { const v = _argValues(flag); return v.length ? v[v.length - 1] : null; }
+// --keys <file>: a library's variables the Figma build script imports by key ({ "name": "key" }), read with the Figma
+// MCP's search_design_system. A run through the MCP cannot list a library's variables, so it is told them.
+function libraryKeys() {
+  const f = _argValue('--keys');
+  if (!f) return {};
+  try { const k = JSON.parse(readFileSync(resolve(f), 'utf8')); return Object.fromEntries(Object.entries(k && typeof k === 'object' ? k : {}).filter(([n, v]) => n && typeof v === 'string' && v)); }
+  catch (e) { console.log(`❌ --keys ${f}: ${e.message}`); process.exit(2); }
+}
+const KEYS_NEXT = (again) => `When missing names a variable the file does not have, it is a library's: find each one's key with the Figma MCP's search_design_system (a variable, by its name), write them in a file ({ "name": "key" }) and run ${again} --keys <file>, then the script again. `;
 const flatWords = (s) => String(s ?? '').toLowerCase().replace(/[\u201c\u201d"'`.]/g, '').replace(/\s+/g, ' ').trim();
 const INIT_FIGMA_URL      = _argValue('--figma-url') ?? _argValue('--figma-key');
 const INIT_THEME_CSS      = _argValue('--theme-css');
@@ -2493,9 +2502,9 @@ if (process.argv.includes('--figma-change') || process.argv.includes('--change-r
   const dir = join(ROOT, OUT_DIR, 'handback');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'figma-change.json'), JSON.stringify({ component, change: relative(ROOT, changeFile), ops: ch.ops, signedOff: ch.signedOff ?? null }, null, 2) + '\n');
-  writeFileSync(join(dir, 'figma-apply.js'), opsScript(ch.ops, { target: ch.nodeId, nodes, what: 'figma-change' }));
+  writeFileSync(join(dir, 'figma-apply.js'), opsScript(ch.ops, { target: ch.nodeId, nodes, what: 'figma-change', keys: libraryKeys() }));
   console.log(`   (${relative(ROOT, join(dir, 'figma-change.json'))} · ${relative(ROOT, join(dir, 'figma-apply.js'))})`);
-  console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the change above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${ccfg.figmaFileKey ? ` (fileKey ${ccfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --change-report ${component}.`);
+  console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the change above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${ccfg.figmaFileKey ? ` (fileKey ${ccfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). ${KEYS_NEXT(`${cmd} --figma-change ${component}${opsFile ? ` --ops ${opsFile}` : ` ${JSON.stringify(asked)}`}`)}Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --change-report ${component}.`);
   process.exit(0);
 }
 // ── A component built in Figma the system's way (component-spec.mjs, figma-ops.mjs) ──
@@ -2590,9 +2599,9 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   const dir = join(ROOT, OUT_DIR, 'handback');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'figma-build.json'), JSON.stringify({ component: spec.name, spec: relative(ROOT, specFile(spec.name)), ops: sx.ops, nodes, signedOff: sx.signedOff ?? null }, null, 2) + '\n');
-  writeFileSync(join(dir, 'figma-apply.js'), opsScript(sx.ops, { nodes, what: 'figma-build' }));
+  writeFileSync(join(dir, 'figma-apply.js'), opsScript(sx.ops, { nodes, what: 'figma-build', keys: libraryKeys() }));
   console.log(`   (${relative(ROOT, join(dir, 'figma-build.json'))} · ${relative(ROOT, join(dir, 'figma-apply.js'))})`);
-  console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the steps above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${scfg.figmaFileKey ? ` (fileKey ${scfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --construction-check and ${cmd} --hygiene: say what they find on ${spec.name}.`);
+  console.log(`NEXT: ${fig.answer === 'yes' ? 'run' : 'show the person the steps above and ask; only when they say yes, run'} the script in ${OUT_DIR}/handback/figma-apply.js with the Figma MCP's use_figma${scfg.figmaFileKey ? ` (fileKey ${scfg.figmaFileKey})` : ''} as written, and report what it returns (changed, skipped, missing). ${KEYS_NEXT(`${cmd} --figma-build ${spec.name}`)}Then refresh the Figma snapshots (${cmd} --refresh-figma) and run ${cmd} --construction-check and ${cmd} --hygiene: say what they find on ${spec.name}.`);
   process.exit(0);
 }
 // ── A change to the system itself, signed off (sign-off.mjs) ──
@@ -7441,7 +7450,10 @@ function reportFull(label, items, shown) {
         let plainNames = []; try { plainNames = GATE_PLAIN; } catch { /* not in reach */ }
         const gr = gateRecords(gates, plainNames);
         const rules = Object.fromEntries(gr.filter((g) => g.rule).map((g) => [g.check, g.rule]));
-        const records = findingRecords(now, names, { prev: prev?.findings ?? null, rules, failing: gr.filter((g) => g.verdict === 'fails').map((g) => g.check) });
+        // Each finding says which product it is about, when every file it names is one product's (the usage map's own reading).
+        const { productResolver } = await import('./usage-map.mjs');
+        const resolveProduct = productResolver(ROOT, cfg);
+        const records = findingRecords(now, names, { prev: prev?.findings ?? null, rules, failing: gr.filter((g) => g.verdict === 'fails').map((g) => g.check), productOf: (f) => resolveProduct(resolve(ROOT, f)) });
         writeFileSync(join(ROOT, OUT_DIR, 'findings.json'), JSON.stringify({ at: new Date().toISOString(), gates: gr, findings: records }, null, 1) + '\n');
         // Each finding a person marked wrong, tried as a case: still raised by its check, or passed now.
         const wr = await import('./wrong.mjs');
@@ -7470,7 +7482,9 @@ function reportFull(label, items, shown) {
       const found = (() => { try { return JSON.parse(readFileSync(join(ROOT, OUT_DIR, 'findings.json'), 'utf8')).findings ?? []; } catch { return []; } })();
       // Each says whether it is local or shared, and who a shared one waits on (local-shared.mjs, ds-config.json owners).
       const { usageFrom } = await import('./local-shared.mjs');
-      const scopeCtx = { usage: usageFrom(ROOT, cfg), owners: cfg.owners };
+      const { productResolver } = await import('./usage-map.mjs');
+      const resolveProduct = productResolver(ROOT, cfg);
+      const scopeCtx = { usage: usageFrom(ROOT, cfg), owners: cfg.owners, productOf: (f) => resolveProduct(resolve(ROOT, f)) };
       const wanted = issuesFor(found, { kept: readKept(ROOT), who: cfg.issues?.who ?? null, ctx: scopeCtx });
       const { answer: may, why: whyNot } = mayWrite(cfg, 'issues');
       const { openIssues, gitlabSender, issuesProject } = await import('./issues-gitlab.mjs');

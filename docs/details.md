@@ -1027,10 +1027,10 @@ The last three set its risk (high, medium or low), which the reason says. For ex
 
 Where you see it:
 
-- **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A line under the filters counts them: "4 shared, waiting on Cards lead (3), Design system team (1); 2 local, each product team's own."
+- **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's. A line under the filters counts them: "4 shared, waiting on Cards lead (3), Design system team (1); 2 local, each product team's own."
   - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
 - **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
-- **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A control a product's screen builds by hand is local; any other difference is the system's. The list of open issues by the fix each needs counts them too.
+- **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.
 - **The edit check.** After an AI edit, its message ends with whether the file is the product's own or the system's, and on whom a shared one waits.
 - **A change held for sign-off.** The guard says why it is shared and who decides it.
 - **A change in Figma.** `--figma-change` prints it, and the Changes in Figma page shows it.

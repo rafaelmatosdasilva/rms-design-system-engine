@@ -175,3 +175,25 @@ test('a finding is local when it is a product\'s own screen, else shared; the is
   assert.equal(issueScopeLine(findingScope({ check: 'Markup', product: 'Northwind' })), "Local: the product team's own — Northwind's own screen stays in Northwind: no other product gets it; easy to undo, low risk.");
   assert.equal(issueScopeLine(null), '');
 });
+
+// A finding or a task says which product it is about when every file it names is that product's.
+test('a finding names its product by the files it names; a system file or two products leave it shared', async () => {
+  const { productIn } = await import('../local-shared.mjs');
+  const { findingRecords } = await import('../run-diff.mjs');
+  const productOf = (f) => (/^apps\/northwind\//.test(f) ? 'Northwind' : /^apps\/acme\//.test(f) ? 'Acme shop' : null);
+  assert.equal(productIn('hex written by hand (apps/northwind/src/Cart.vue:12)', productOf), 'Northwind');
+  assert.equal(productIn('apps/northwind/a.css and src/theme.css', productOf), null, 'a system file too: no one product');
+  assert.equal(productIn('apps/northwind/a.css and apps/acme/b.css', productOf), null, 'two products');
+  assert.equal(productIn('see https://example.com/apps/northwind/a.css', productOf), null, 'a link is not a file');
+  assert.equal(productIn('apps/northwind/a.css', null), null);
+  const [own, sys] = findingRecords(['Clean CSS :: ⚠️  cardTile override (apps/northwind/src/Cart.vue:12)', 'Clean CSS :: ⚠️  cardTile override (src/CardTile.vue:3)'], ['cardTile'], { productOf });
+  assert.equal(own.product, 'Northwind');
+  assert.equal('product' in sys, false);
+  assert.equal(findingScope(own, { usage, owners }).scope, 'local');
+  assert.equal(findingScope(sys, { usage, owners }).scope, 'shared');
+  // An older record with no product is placed the same way, from its evidence.
+  assert.equal(issueScopeLine(findingScope({ check: 'Clean CSS', evidence: 'x (apps/northwind/a.css:1)' }, { productOf })), "Local: the product team's own — Northwind's own screen stays in Northwind: no other product gets it; easy to undo, low risk.");
+  // A task whose file is one product's is that product's.
+  assert.equal(todoScope({ kind: 'Token', area: 'Tokens', file: 'apps/acme/src/x.css' }, { productOf }).scope, 'local');
+  assert.equal(todoScope({ kind: 'Token', area: 'Tokens', file: 'src/theme.css' }, { productOf }).scope, 'shared');
+});

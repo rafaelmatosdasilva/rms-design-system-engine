@@ -248,6 +248,24 @@ test('a property whose layer is not there is not made', async () => {
   assert.deepEqual(Object.keys(set.componentPropertyDefinitions), ['size', 'showIcon#1:2']);
 });
 
+// A product file uses the system's variables from its published library. Run through the Figma MCP, figma.teamLibrary
+// lists none of them, so each is imported by the key search_design_system gives (--keys).
+test('a library\'s variable is imported by its key; with no key and a library that lists none, it is named missing', async () => {
+  const { figma, set } = fakeFigma();
+  const imported = [];
+  figma.teamLibrary = { getAvailableLibraryVariableCollectionsAsync: async () => [], getVariablesInLibraryCollectionAsync: async () => [] };
+  figma.variables.importVariableByKeyAsync = async (key) => { imported.push(key); return { id: `VariableID:${key}/1:2`, name: 'Background/Brand/Default', remote: true }; };
+  const ops = [{ op: 'bind', layer: '', field: 'fill', variable: 'Background/Brand/Default' }, { op: 'bind', layer: '', field: 'stroke', variable: 'Border/Brand/Default' }];
+  const out = await run(opsScript(ops, { target: set.id, what: 'figma-change', keys: { 'Background/Brand/Default': 'k1' } }), figma);
+  assert.deepEqual(imported, ['k1']);
+  assert.deepEqual(out.missing, ['variable Border/Brand/Default']);
+  for (const v of set.children) assert.equal(v.fills[0].boundVariables.color.id, 'VariableID:k1/1:2');
+  // The file's own variable comes first, whatever key is given.
+  imported.length = 0;
+  const own = await run(opsScript([{ op: 'bind', layer: '', field: 'fill', variable: 'text/default' }], { target: set.id, what: 'figma-change', keys: { 'text/default': 'k2' } }), figma);
+  assert.deepEqual([own.missing, imported], [[], []]);
+});
+
 test('a change script names what it could not find, and changes nothing else', async () => {
   const { figma, set } = fakeFigma();
   const out = await run(opsScript([{ op: 'rename', what: 'layer', from: 'Content/Nope', to: 'Text' }, { op: 'removeOption', axis: 'size', option: 's' }], { target: set.id, what: 'figma-change' }), figma);
@@ -282,6 +300,14 @@ test('--spec and --figma-build: asked, held for sign-off, then the script the gu
   assert.match(built, /only when they say yes, run the script .*use_figma \(fileKey KEY\)/);
   const script = readFileSync(join(root, '.design-system-engine-out/handback/figma-apply.js'), 'utf8');
   assert.match(script, /"op": "clone"/);
+  // A variable the file does not have is a library's: its key, from search_design_system, is given with --keys.
+  assert.match(built, /search_design_system .*--figma-build tag --keys <file>/);
+  const keysFile = join(root, 'keys.json');
+  writeFileSync(keysFile, JSON.stringify({ 'Background/Brand/Default': 'abc123' }));
+  cli('--figma-build', 'tag', '--keys', keysFile);
+  assert.match(readFileSync(join(root, '.design-system-engine-out/handback/figma-apply.js'), 'utf8'), /"Background\/Brand\/Default": "abc123"/);
+  writeFileSync(keysFile, '{ not json');
+  assert.match(cli('--figma-build', 'tag', '--keys', keysFile), /❌ --keys /);
   const spec = JSON.parse(readFileSync(join(root, '.design-system-engine-out/specs/tag.spec.json'), 'utf8'));
   assert.equal(spec[EXT].signedOff.by, 'the system owner');
 });
