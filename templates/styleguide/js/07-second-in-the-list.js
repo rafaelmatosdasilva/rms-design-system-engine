@@ -1,13 +1,6 @@
   // Second in the list, under the index: where someone looks first after the system itself.
   (function () { var a = nav.querySelector('a[href="#status"]'), o = nav.querySelector('a[href="#index"]'); if (a && o) o.insertAdjacentElement('afterend', a); })();
   var td = section('status', 'Status', 'How the system is doing', '');   // no line under its title: the cards say it
-  // When this page was built and with which engine, by its title: a page the team opens days after a change shows it.
-  (function () {
-    var b = DATA.built || {}, at = b.at || DATA.builtAt; if (!at) return;
-    var d = new Date(at), when = isNaN(d) ? String(at).slice(0, 10) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    var eng = b.engine ? String(b.engine).slice(0, 7) : '';
-    pageBar(td, { links: [{ label: 'Built ' + when + (eng ? ' · engine ' + eng : ''), url: eng && DATA.engineRepo ? DATA.engineRepo + '/commit/' + b.engine : '#status' }] });
-  })();
   var hl = td, hlBox = document.createElement('div'); hlBox.className = 'sg-health-box'; td.appendChild(hlBox);
   // Construction: how the system builds a component in Figma (DATA.construction, construction-grammar.mjs). One table, a
   // row a rule: its status (a rule only once every component follows it; to fix when most do or the team decided it; to

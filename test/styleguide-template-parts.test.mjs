@@ -50,3 +50,7 @@ test('the page\'s text helpers: tags stripped until none is left, entities unesc
   const part = readFileSync(join(ENGINE, 'templates', 'styleguide', 'js', '19-the-code-a-product-writes.js'), 'utf8');
   assert.match(part, /v\.replace\(\/\\\\\/g, '\\\\\\\\'\)\.replace\(\/'\/g, "\\\\'"\)/, 'a backslash escaped before the quote');
 });
+
+test('the Status page has no line saying when it was built and with which engine', () => {
+  assert.doesNotMatch(templateText(), /'Built ' \+ when|' · engine ' \+/);
+});
