@@ -213,8 +213,9 @@
 ℹ️  Prune candidates: 6 (leaner library = cheaper agent context). Advisory - decide keep or drop.
      1 group(s) of tokens with the same value written by hand · 5 token(s) only one component uses
      Run with --prune to list them.
-ℹ️  Contract completeness: 1/4 have a description · 3/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance. Advisory only.
+ℹ️  Contract completeness: 1/4 have a description · 3/4 have semantics · 0/4 carry whenNotToUse/useInstead guidance · 0/11 props say what they are for. Advisory only.
      3 without a description (run with --contract-completeness to list)
+     11 props without a description (run with --contract-completeness to list)
 
 ♿ Accessibility from the code (no browser needed): 1 finding in 3 markup and 1 style file (1 focus outline removed and not put back). Advisory.
      src/theme.css:70  .tp-field__input removes the focus outline and no focus style puts one back
@@ -227,15 +228,16 @@
   ● Coverage         3/3 components modelled (100%)  ·  exemption debt 0
   ● Documentation    1/4 contracts have a description (25%)
   ● AI guidance      0/4 carry whenNotToUse/useInstead (0%)
+  ● Props described  0/11 props say what they are for (0%)
 
 ℹ️  Agreed values: 25 of 26 compared facts agree (recorded in design-system-engine-agreed.json, updated). Of the 1 that differ: 0 Figma moved · 0 code moved · 0 both moved · 1 with no earlier agreement.
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: chip 5 · button 2 · field 1 · 2 not tied to a component
+📉 Burndown, open findings per component: chip 5 · button 2 · field 1 · 3 not tied to a component
    next up: chip. Run with --component chip, fix, run again.
 
-📋 Differences between Figma and the code: 8 open, in one list → .design-system-engine-out/differences.md
+📋 Differences between Figma and the code: 9 open, in one list → .design-system-engine-out/differences.md
 
 ─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
 
@@ -268,10 +270,10 @@
 - No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
 - and 16 more
 
-Burndown, open findings per component: chip 5 · button 2 · field 1 · 2 not tied to a component
+Burndown, open findings per component: chip 5 · button 2 · field 1 · 3 not tied to a component
 Fix first: chip. Run with --component chip, fix, run again.
 
-Every difference between Figma and the code, 8 open, in one list: .design-system-engine-out/differences.md
+Every difference between Figma and the code, 9 open, in one list: .design-system-engine-out/differences.md
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix (a request to fix it is that ask: make the change, do not ask again), then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 
