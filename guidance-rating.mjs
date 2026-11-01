@@ -142,9 +142,10 @@ export function scoreExtraction(qs, out) {
   return { score: all[1] ? all[0] / all[1] : 0, byComponent: Object.fromEntries(Object.entries(byComponent).map(([k, v]) => [k, v.of ? v.found / v.of : 0])), answers };
 }
 // Ask the model through the person's own command (guidelines.extract.cmd, default `claude -p`): the prompt on stdin,
-// the answer on stdout. → { out, ok, why }
-export function askModel(prompt, cmd = 'claude -p', { timeout = 300000, env = process.env } = {}) {
-  const r = spawnSync(cmd, { shell: true, input: prompt, encoding: 'utf8', timeout, env, maxBuffer: 16 * 1024 * 1024 });
+// the answer on stdout. cwd: the folder it runs in (a file the prompt names, a screenshot, is read from there).
+// → { out, ok, why }
+export function askModel(prompt, cmd = 'claude -p', { timeout = 300000, env = process.env, cwd = undefined } = {}) {
+  const r = spawnSync(cmd, { shell: true, input: prompt, encoding: 'utf8', timeout, env, cwd, maxBuffer: 16 * 1024 * 1024 });
   if (r.error || r.status !== 0) return { out: '', ok: false, why: String(r.error?.message ?? r.stderr ?? `exit ${r.status}`).trim().split('\n')[0] };
   return { out: r.stdout ?? '', ok: true };
 }

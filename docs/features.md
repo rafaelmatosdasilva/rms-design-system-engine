@@ -154,6 +154,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Keeps each correction you make to what an AI made as a lesson, with your reason, and turns it into the strongest guard that holds it once you say yes: a check, a step agents read, or a rule for your guidelines.
 - Notices a line an AI wrote that a person changed since, and asks whether it was a correction.
 - Proposes a rule when the same finding comes back on three screens or in three edits.
+- Has a model judge each Showroom screen on its screenshot and its code, when you ask: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, shown beside the page review, with what it cost.
 - Says when a lesson comes back, and which guard did not hold.
 - Measures whether your guidance actually helps agents build better.
 - Adds the same rules to the instruction files of Cursor, Copilot and other agents. *(Coming soon)*
