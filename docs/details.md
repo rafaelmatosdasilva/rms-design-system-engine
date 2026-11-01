@@ -747,6 +747,7 @@ A page is right when it is written. Then its component changes: a prop is added,
 - **A removed name is said.** When the page still names a prop or token the component no longer has, the page says which.
 - **A person settles it.** Edit the page, or say it still holds. The answer is kept with who gave it and when. The page is not marked again until the component changes again.
 - **Decisions too.** An answer the team gave (a part documented in its parent's page, a name kept, a page kept where it is) is dated the same way. When its component changes after it, the decision is marked to review again on its page and in History, and agents read it with the same note. It still stands until a person says. Say it still holds, and it is kept with who and when; withdraw it, and its question is asked again.
+- **A component with no page is reviewed too.** When the team answered that a component needs no page of its own, and it changes, the Documentation page gives it a row: Review, Decision to review again, with the same answers. One documented in another page is reviewed on that page's row.
 
 ### Evidence first
 

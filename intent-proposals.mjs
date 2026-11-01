@@ -237,7 +237,8 @@ export function withEvidence(key, x, ctx = {}) {
 
 // The report as the team's decisions leave it: a yes to "documented" takes the component off the pages to write, a
 // yes to "keep" takes the finding off its page (and a page with nothing else wrong to Keep), a yes to keep a page in
-// place takes off its Move. → { noPage, pages } with each page's proposal attached (proposal: { key, …, answer }).
+// place takes off its Move. → { noPage, pages, addProposals, noPageRechecks } with each page's proposal attached
+// (proposal: { key, …, answer }); noPageRechecks: { component: recheck } for each Add answered with no page to show it on.
 export function applyDecisions({ report, noPage, proposals, decisions }) {
   const answer = (k) => decisions[k]?.answer ?? null;
   // Who answered it and when, beside the answer: the page says it.
@@ -258,7 +259,16 @@ export function applyDecisions({ report, noPage, proposals, decisions }) {
     return q;
   });
   const addProposals = Object.fromEntries(left.map((n) => [n, proposals.has(`add:${n}`) ? { ...proposals.get(`add:${n}`), key: `add:${n}`, answer: answer(`add:${n}`), ...said(`add:${n}`) } : null]));
-  return { noPage: left, pages, addProposals };
+  // An Add answered with no page (none of its own, or one the layer no longer has) has no row to show its recheck on:
+  // it gets one of its own, for its component. One whose answer names a page still there is on that page's row.
+  const onPage = new Set(report.pages.map((p) => p.name));
+  const noPageRechecks = {};
+  for (const [k, x] of proposals) {
+    if (x.kind !== 'recheck' || !/^add:/.test(x.decision ?? '') || (x.page && onPage.has(x.page)) || answer(k)) continue;
+    const was = decisions[x.decision] ?? {};
+    noPageRechecks[x.subject] = { ...x, key: k, answer: null, was: { answer: was.answer ?? null, proposal: was.proposal ?? null, by: was.by ?? null, at: was.at ?? null } };
+  }
+  return { noPage: left, pages, addProposals, noPageRechecks };
 }
 
 // Who a proposal waits on (ds-config.json → owners): one about a page, its component's owner, else its area's
@@ -331,5 +341,5 @@ export async function decidedLayer(ROOT, cfg) {
   const usage = usageOf(ROOT, cfg);
   const proposals = new Map([...found].map(([k, x]) => [k, { ...withEvidence(k, x, { usage, decisions, report }), decider: deciderFor(x, report, cfg.owners) }]));
   const done = applyDecisions({ report, noPage, proposals, decisions });
-  return { snap, report: { ...report, pages: done.pages }, noPage: done.noPage, addProposals: done.addProposals, proposals, decisions, wrongOf, names };
+  return { snap, report: { ...report, pages: done.pages }, noPage: done.noPage, addProposals: done.addProposals, noPageRechecks: done.noPageRechecks, proposals, decisions, wrongOf, names };
 }

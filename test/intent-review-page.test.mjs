@@ -11,8 +11,13 @@ const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').repl
 const capital = (x) => String(x).charAt(0).toUpperCase() + String(x).slice(1);
 const grab = (name, args) => new RegExp(`var ${name} = (function \\(${args}\\) \\{[\\s\\S]*?\\n    \\});`).exec(tpl)[1];
 
+const line = (name) => new RegExp(`var ${name} = (function \\([^)]*\\) \\{[^\\n]*\\});`).exec(tpl)[1];
 const loadProposal = (IL = {}) => new Function('esc', 'capital', 'IL', `var IL_STRENGTH = ${/var IL_STRENGTH = (\{[^\n]*\});/.exec(tpl)[1]};
-  var ilCandidates = ${grab('ilCandidates', 'x')}; var ilAnsweredBy = ${grab('ilAnsweredBy', 'x')}; return (${grab('ilProposal', 'p')});`)(esc, capital, IL);
+  var ilOwn = ${line('ilOwn')}; var ilCandidates = ${grab('ilCandidates', 'x')}; var ilAnsweredBy = ${grab('ilAnsweredBy', 'x')}; return (${grab('ilProposal', 'p')});`)(esc, capital, IL);
+// What to do on a row: each answer to its open proposals with the command that gives it.
+const loadIfNot = (IL = {}) => new Function('esc', 'IL', `var ENGINE = 'acme-ds'; var decideMark = function () { return ''; }; var sysButton = function (t, l, a) { return '<button' + a + '>' + l + '</button>'; };
+  var ilOn = ${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]};
+  var ilOwn = ${line('ilOwn')}; var ilOpen = ${line('ilOpen')}; var ilAnswer = ${line('ilAnswer')}; return (${grab('ilIfNot', 'p, html')});`)(esc, IL);
 
 test('a proposal shows each answer it could take, the proposed one first, each with where its evidence comes from and how strong', () => {
   const html = loadProposal()({ proposals: [{ kind: 'add', subject: 'listMain/Row', proposal: 'Document it in List Main\'s page.', recommends: 'yes', split: true, decider: { name: 'Tiles team' },
@@ -47,4 +52,24 @@ test('a decision to review again: its page says so, a withdrawal says its questi
   assert.match(tpl, /p\.recheck && p\.action === 'review' \? 'Decision to review again'/);
   assert.match(tpl, /\(d\.review \? '<p class="sg-il-line"><span class="pg-par-val">' \+ esc\(d\.review\)/, 'the History page shows the note');
   assert.match(tpl, /\(d\.review \? '<br>' \+ esc\(d\.review\) : ''\)/, 'and so does the component\'s own History');
+});
+
+// An Add answered with no page has no page row to show its recheck on: it gets a row of its own, for its component,
+// reviewed as a decision to review again, with the same answers and the commands that give them.
+test('an Add answered with no page, its component changed since, has its own row to review the decision again', () => {
+  const x = { kind: 'recheck', subject: 'newThing', decision: 'add:newThing', key: 'recheck:add:newThing', answer: null, proposal: 'Does the answer no to "Write its page." still hold for newThing as it is now?', evidence: ['newThing changed on 5 Mar 2026: new props `glow`, after this decision was recorded.'], decider: { name: 'Tiles team' },
+    options: [{ answer: 'yes', label: 'It still holds', does: 'Recorded as confirmed.' }, { answer: 'no', label: 'Withdraw it', does: 'The decision is withdrawn and its question asked again.' }] };
+  const IL = { noPageRechecks: { newThing: x } };
+  const row = { action: 'review', decision: 'Review', recheckFor: 'newThing', recheck: 1 };
+  const html = loadProposal(IL)(row);
+  assert.match(html, /<strong>Does the answer no to &quot;Write its page\.&quot; still hold for newThing as it is now\?<\/strong>/);
+  assert.match(html, /Waits on Tiles team\./);
+  const todo = loadIfNot(IL)(row, '<p>Review it.</p>');
+  assert.match(todo, /<strong>It still holds<\/strong><span class="pg-par-val">Recorded as confirmed\.<\/span>/);
+  assert.match(todo, /acme-ds on Component newThing, Yes to &quot;Does the answer no to/);
+  assert.match(todo, /acme-ds on Component newThing, No to &quot;/);
+  // The rows: one a component, reviewed as a decision to review again, with its own address and title.
+  assert.match(tpl, /Object\.keys\(IL\.noPageRechecks \|\| \{\}\)\.sort\(\)\.map\(function \(n\) \{ var x = IL\.noPageRechecks\[n\]; return \{ action: 'review', decision: 'Review', recheckFor: n, recheck: 1, decider: x\.decider \|\| null \}; \}\)/);
+  assert.match(tpl, /p\.recheckFor \? 'recheck:' \+ p\.recheckFor/);
+  assert.match(tpl, /if \(p\.recheckFor\) return 'Component ' \+ p\.recheckFor;/);
 });

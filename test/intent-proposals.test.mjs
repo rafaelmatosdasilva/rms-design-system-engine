@@ -211,3 +211,32 @@ test('a decision withdrawn once its component changed is asked again; a kept nam
   assert.equal(fix.evidence[0], 'Search.vue changed on 4 Mar 2026, after this decision was recorded.');
   assert.equal(withEvidence('recheck:fix:Search:searchRow', fix, { decisions: readDecisions(root) }).recommends, 'yes', 'only its code file changed');
 });
+
+// An Add answered with no page (no to writing it, or a yes to a page the layer no longer has): its recheck has no page
+// row to show on, so it is kept for a row of its own; one whose answer names a page still there stays on that page.
+test('a recheck of an Add answered with no page is kept for its component\'s own row', () => {
+  const root = tempDir('recheck-nopage-');
+  const noPage = ['listMain/Row', 'tileTwo', 'newThing'];
+  const found = proposalsFor({ ROOT: root, report, snap, names: ['listMain', 'tileOne', 'tileTwo', 'listMain/Row', 'newThing'], codeFiles, facts, noPage });
+  decide(root, ['add:newThing'], 'no', Object.fromEntries(found), { by: 'QA', now: '2026-03-01T09:00:00Z' });
+  decide(root, ['add:tileTwo', 'add:listMain/Row'], 'yes', Object.fromEntries(found), { by: 'QA', now: '2026-03-01T09:00:00Z' });
+  const changed = { newThing: change('2026-03-05T10:00:00Z'), tileTwo: change('2026-03-05T10:00:00Z'), 'listMain/Row': change('2026-03-05T10:00:00Z') };
+  // The layer no longer has List Main's page: listMain/Row's answer named it.
+  const shown = { pages: report.pages.filter((p) => p.name !== 'List Main') };
+  const R = rechecksFor({ found, decisions: readDecisions(root), changed, report: shown, truth });
+  assert.equal(R.get('recheck:add:newThing').page, undefined, 'no page of its own');
+  const P = new Map([...found, ...R]);
+  const done = applyDecisions({ report: shown, noPage, proposals: P, decisions: currentAnswers(P, readDecisions(root)) });
+  assert.ok(!done.noPage.includes('newThing'), 'its answer stands until a person says otherwise');
+  assert.deepEqual(Object.keys(done.noPageRechecks).sort(), ['listMain/Row', 'newThing']);
+  const x = done.noPageRechecks.newThing;
+  assert.equal(x.key, 'recheck:add:newThing');
+  assert.equal(x.answer, null);
+  assert.deepEqual(x.was, { answer: 'no', proposal: 'Write its page.', by: 'QA', at: '2026-03-01T09:00:00Z' });
+  assert.match(x.proposal, /^Does the answer no to "Write its page\." still hold for newThing/);
+  assert.equal(done.pages.find((p) => p.name === 'Tile One').recheck, 1, 'one whose page is still there is on that page');
+  // Answered: no row is left.
+  decide(root, ['recheck:add:newThing'], 'yes', Object.fromEntries(R), { now: '2026-03-06T09:00:00Z' });
+  const again = applyDecisions({ report: shown, noPage, proposals: P, decisions: currentAnswers(P, readDecisions(root)) });
+  assert.equal(again.noPageRechecks.newThing, undefined);
+});
