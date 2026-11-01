@@ -186,5 +186,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-01-merge-origin-main-2` | The 24 guide tasks on Haiku (engine 43a945b) | "The MCP answers and the route merged with Notion and Confluence sources" |
 | `2026-11-01-the-hooks-a-design-token` | The 24 guide tasks on Haiku (engine 24cea6b) | "The hooks: a design token the agent will add is no secret asked for; a pasted step list gets no report file" |
 | `2026-11-01-merge-remote-tracking-branch-origin` | The 24 guide tasks on Haiku (engine f9ba9f3) | "Merge remote-tracking branch 'origin/main' into eval-owed-guides" |
+| `2026-11-01-point-the-hooks-workflows-install` | The 24 guide tasks on Haiku (engine 36f540e) | "Point the hooks, workflows, install, docs and tests at lib/; keep four root entries" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
