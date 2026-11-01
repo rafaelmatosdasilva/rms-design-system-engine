@@ -3,11 +3,21 @@
 // is; what the project's Code Connect file says it decides beyond its value; where Figma and the code differ; the props
 // only the code has; its events and slots as the code declares them; its states, the tokens each state paints with,
 // and what the code says about its accessibility. Every fact names where it came from; nothing is guessed.
+import { jsxRoot } from './contract-a11y.mjs';
 import { bindingSources, bindFigmaProp, readingsOf, valuesOf, suggestionFor, invertsValue, flipBoolean, conventionFor, connectSlotsOf } from './prop-binding.mjs';
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const strip = (k) => String(k).split('#')[0].trim();
 const same = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+// A pair a person agreed (an authored binding) with no Code Connect file: each Figma value that the code writes with the
+// same letters (Large and large, Extra Small and extra-small) is mapped; values written otherwise stay unmapped, said as
+// a difference. → { figma: code } | null
+function sameLetters(figma, code) {
+  if (!Array.isArray(figma) || !Array.isArray(code) || figma.every((o) => /^(true|false)$/i.test(String(o)))) return null;
+  const out = {};
+  for (const f of figma) { const c = code.filter((x) => norm(x) === norm(f)); if (c.length === 1) out[f] = c[0]; }
+  return Object.keys(out).length ? out : null;
+}
 // A Figma state axis (its name is a state's, or every value is one) and a plain variant axis.
 const STATE_AXES = new Set(['state', 'states', 'status', 'disabled', 'hover', 'focus', 'focused', 'active', 'selected', 'pressed', 'loading', 'checked', 'filled', 'error', 'open', 'expanded']);
 const STATE_VALUES = new Set(['default', 'rest', 'hover', 'hovered', 'focus', 'focused', 'active', 'pressed', 'disabled', 'selected', 'loading', 'error', 'checked', 'open', 'closed', 'expanded', 'collapsed']);
@@ -68,7 +78,7 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
         [b.as === 'prop' ? 'prop' : 'slot']: b.code, ...(b.key ? { key: b.key } : {}), as: b.as, source: b.source,
         ...(c.type ? { type: c.type } : {}), ...(c.options ? { options: c.options } : {}), ...(c.default != null ? { default: c.default } : {}), ...(c.defaultExpression ? { defaultExpression: c.defaultExpression } : {}),
         ...(typeof c.required === 'boolean' ? { required: c.required } : {}), ...(c.description ? { description: c.description } : {}),
-        ...(c.confidence ? { confidence: c.confidence } : {}), ...(ccValues.get(p.name) ? { valueMap: ccValues.get(p.name) } : {}),
+        ...(c.confidence ? { confidence: c.confidence } : {}), ...(ccValues.get(p.name) ? { valueMap: ccValues.get(p.name) } : b.source === 'authored' && sameLetters(def.variantOptions, c.options) ? { valueMap: sameLetters(def.variantOptions, c.options) } : {}),
         ...(inverted ? { inverted: true } : {}),
         ...((api?.codeConnectProps ?? []).some((x) => x.figma === p.name && x.role === 'value' && x.derived && x.code === (b.key ? `${b.code}.${b.key}` : b.code)) ? { derived: true } : {}),
       };
@@ -104,7 +114,8 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
   });
   // A Figma property no code prop is: a near name is suggested, never taken.
   const unusedNames = Object.keys(codeProps).filter((n) => !used.has(norm(n)));
-  for (const p of props) if (!p.bindings.code && !p.conditions && api) { const s = suggestionFor(p.name, unusedNames); if (s) p.suggestion = s; }
+  // One a person said no to (contract.authored.json declinedPairs, prop-pairs.mjs) is not suggested again.
+  for (const p of props) if (!p.bindings.code && !p.conditions && api) { const s = suggestionFor(p.name, unusedNames); if (s && authored?.declinedPairs?.[p.name] !== s) p.suggestion = s; }
   // A code prop no Figma property fills, with the Figma properties that only decide whether it is written (showIcon
   // decides icon). Every declared prop is listed: id and the like are part of what the component accepts.
   const decided = new Map();
@@ -196,8 +207,11 @@ function paintsOf(variants, figmaProps = {}) {
 // What the code says about its accessibility: the element its markup starts with, an explicit role, the aria attributes
 // it sets and the keys it listens to; a role Figma's annotation states and authored semantics come first.
 export function accessibilityOf(codeText = '', { figmaRole = null, authored = null } = {}) {
-  const tpl = /<template>([\s\S]*)<\/template>/.exec(String(codeText))?.[1] ?? '';
-  const root = /<\s*([a-z][\w-]*)/.exec(tpl)?.[1] ?? null;
+  // A Vue template, else the element a JSX or TSX component returns (its root another component: no element of its own).
+  const vue = /<template>([\s\S]*)<\/template>/.exec(String(codeText))?.[1];
+  const jsx = vue == null ? jsxRoot(codeText) : null;
+  const tpl = vue ?? jsx?.markup ?? '';
+  const root = vue != null ? /<\s*([a-z][\w-]*)/.exec(tpl)?.[1] ?? null : jsx && /^[a-z][\w-]*$/.test(jsx.tag) ? jsx.tag : null;
   const role = /\srole\s*=\s*["']([\w-]+)["']/.exec(tpl)?.[1] ?? null;
   const aria = [...new Set([...tpl.matchAll(/\s:?(aria-[\w-]+)\s*=/g)].map((m) => m[1]))];
   const keys = [...new Set([...String(codeText).matchAll(/@key(?:down|up|press)\.([\w.]+)/g)].map((m) => m[1]))];

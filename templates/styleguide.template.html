@@ -7162,6 +7162,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function liveA11yHTML(root, a) {
     var line = function (ok, text, wcag) { return a11yRow(ok ? 'done' : 'todo', 'In the browser', esc(text), wcag, FROM_PAGE); };
     var out = [], stops = tabStops(root), had = document.activeElement;
+    liveA11yHTML.keys = [];
     var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
     var wants = a && a.key && INTERACTIVE.test(a.key);
     // Disabled as set: Tab passes it by, as it should, and its behaviours are not tried.
@@ -7189,6 +7190,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     if (stops.length && !out.some(function (h) { return /Focus Visible|Non-text|Name, Role/.test(h); })) out.push(line(true, (stops.length === 1 ? 'It shows its focus' : 'Each stop shows its focus') + ' and has a name.', 'WCAG 2.4.7 Focus Visible (AA)'));
     ((a && a.behaviours) || []).forEach(function (row) {
       var r = tryBehaviour(root, row, a.key);
+      // The keys that did what its role asks, pressed here (or a native control's own): its contract says them.
+      if (row.act.keys && (r.ok || r.given)) row.act.keys.forEach(function (k) { liveA11yHTML.keys.push(k === ' ' ? 'Space' : k); });
       out.push(r.given ? a11yRow('done', 'In the browser', 'Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').', row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)', FROM_PAGE) : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
     });
     if (had && had.focus && document.activeElement !== had) had.focus({ preventScroll: true, focusVisible: false });
@@ -7318,7 +7321,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (k === 'source') return r.writeTo ? '' : card(col[0], srcLines() || '<p class="pg-missing">Nothing.</p>');   // still to write: where is in What to do
       // Written in two places: what each says, apart, under where it was read.
       if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
-      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (isOpen(r) && rowScope(r) ? '<p class="sg-il-line">' + esc(rowScope(r).reason) + (rowScope(r).scope === 'shared' && rowScope(r).decider ? ' It waits on ' + esc(rowScope(r).decider.name) + '.' : '') + '</p>' : '') + (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' : ''));   // nothing to do: no card
+      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (isOpen(r) && rowScope(r) ? '<p class="sg-il-line">' + esc(rowScope(r).reason) + (rowScope(r).scope === 'shared' && rowScope(r).decider ? ' It waits on ' + esc(rowScope(r).decider.name) + '.' : '') + '</p>' : '') + (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
       if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
@@ -7348,6 +7351,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var trail = trailHere(from);
     if (comp && trail.indexOf(comp) < 0) trail.push(comp);
     det.innerHTML = sidePanelPage({ crumbs: trail.concat([d.area || 'Task', nr ? 'Task ' + nr : '']), title: title, titleTip: tipNode ? tipNode.outerHTML : '', body: body });
+    det.onclick = function (e) { var cp = e.target.closest('[data-pair-copy]'); if (cp) copyText(cp.getAttribute('data-pair-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), 'Paste it in Claude Code'); };
     panelShow(m, from);
   }
   // The side panel from the right a row opens in (and a module's, window.SG.openPanel): its scrim, its close button,
@@ -7491,6 +7495,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       else if (r.why) { row.st = 'todo'; row.who = WHO.figma; row.todo = esc(capital(r.why) + '. Take the library update in this Figma file.'); }
       else { row.st = 'todo'; row.who = WHO.both; row.todo = esc('Figma and the code differ here. Decide which one is right, then change the other, or keep it as a known exception.'); }
       out.push(row);
+    });
+    // A pair its contract suggests (a Figma property and a code prop only the code has, one name holding the other): a
+    // yes or a no for a person, on the Figma property's row, or a row of its own. The panel has the two decisions to copy.
+    (c.pairAsks || []).forEach(function (x) {
+      var cmd = function (t) { return String(t).replace(/^rms-design-system-engine\b/, ENGINE); };
+      var decide = '<div class="sg-decide-grid">' + [['approve', 'Yes, the same prop', x.yes, x.yesDoes], ['drop', 'No, two props', x.no, x.noDoes]].map(function (d) {
+        return '<div class="sg-decide sg-decide--' + d[0] + '" title="' + esc(d[3]) + '"><strong class="sg-decide-head">' + decideMark(d[0]) + esc(d[1]) + '</strong>' + sysButton('button', 'Copy decision', ' data-pair-copy="' + esc(cmd(d[2])) + '"') + '<span class="sg-decide-said" role="status"></span></div>';
+      }).join('') + '</div>';
+      var todo = esc(x.ask + ' The engine suggests the pair from their names and never takes it on its own: say yes or no.');
+      var at = out.filter(function (r) { return r.type === 'Prop' && r.rel === PAR_REL.figma && r.figma.indexOf('>' + esc(x.figma) + '<') >= 0; })[0];
+      if (at) { at.st = 'check'; at.who = WHO.both; at.todo = todo; at.decide = decide; }
+      else out.push({ key: c.name + '\u0000pair:' + x.figma, area: 'Parity', kind: 'Prop', type: 'Prop', figma: side({ name: x.figma, value: '' }), code: side({ name: x.code, value: '' }), todo: todo, decide: decide, who: WHO.both, st: 'check', rel: PAR_REL.paired, at: at0 });
     });
     // What the audit found that is not one of the rows above: a row of its own, under the check that found it.
     diffs.forEach(function (x, j) {
@@ -9448,7 +9464,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       colours.forEach(function (a) { var next = []; modeSets.forEach(function (ms) { a.values.forEach(function (v) { if (v.value) next.push(ms.concat([[a, v]])); }); }); if (next.length) modeSets = next; });
       // Colours read as they settle in each mode, never halfway through a component's own transition.
       play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false; preview.classList.add('pg-still');
-      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {}, spoken = {}, spokenOrder = [];
+      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {}, spoken = {}, spokenOrder = [], facts = [], factsBy = {};
       // Each variant is drawn, then measured once the system's own scripts have answered the change: their observers add
       // roles, Tab stops, names and wiring a moment after it is drawn, as in a product, so it is never measured in the
       // same step it is drawn in. A message to the page itself is the next task without a timer's wait.
@@ -9480,6 +9496,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         if (all0.some(function (el) { return el.matches('a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex]:not([tabindex="-1"]),[contenteditable=""],[contenteditable=true],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=slider],[role=spinbutton],[role=combobox],[role=textbox],[role=searchbox]'); })) wran.control = 1;
         if (all0.some(function (el) { return el.matches('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]),select,textarea,[role=textbox],[role=searchbox],[role=combobox],[role=spinbutton],[contenteditable=""],[contenteditable=true]'); })) wran.field = 1;
         try { tb.innerHTML = liveA11yHTML(root, c.a11y); } catch (e) { tb.innerHTML = a11yRow('check', 'In the browser', 'It could not be tried here.', '', FROM_PAGE); }
+        // Its control as a screen reader is given it in this variant (its role, where its name comes from, the states it
+        // announces, whether Tab reaches it, the keys it answers), kept with the results for its contract: the same facts
+        // once, with the variants they hold in.
+        if (window.__wcag21 && window.__wcag21.facts) try {
+          var fx = window.__wcag21.facts(root), kd = liveA11yHTML.keys || [];
+          fx.keys = fx.keys.concat(kd.filter(function (k, i) { return fx.keys.indexOf(k) < 0 && kd.indexOf(k) === i; }));
+          var fk = JSON.stringify(fx);
+          if (!factsBy[fk]) { factsBy[fk] = { f: fx, when: [] }; facts.push(factsBy[fk]); }
+          factsBy[fk].when.push(cb.set);
+        } catch (e) { /* the other variants' facts stand */ }
         // WCAG 2.1 (wcag-page.js): what its markup and its CSS show in this variant.
         if (window.__wcag21) try {
           var w = window.__wcag21.check(root, { name: c.name }), byKind = {};
@@ -9537,6 +9563,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
           : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
         var live = { ran: wran, tried: n };
+        if (facts.length) live.facts = facts;
         a11yRender(live);
         wcagUse(plan, live);
         if (!checking && bgRun) { var f = bgRun; bgRun = null; f(); }   // nothing left to try after it (no in-page checks)

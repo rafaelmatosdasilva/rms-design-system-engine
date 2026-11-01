@@ -2267,6 +2267,8 @@ if (process.argv.includes('--styleguide')) {
           } else console.log(`   Saved in ${RESULTS_FILE}: the next build here tries only what changes (ds-config.json → stores.snapshots shares it with the team).`);
         }
       }
+      // What each component gives a screen reader, measured on every variant: kept in the output folder for its contract.
+      if (!b.skipped && !b.dead && b.themes) { const fa = await import('./contract-a11y.mjs'); fa.writeA11yFacts(ROOT, fa.factsFile(b.themes, new Date().toISOString())); }
       for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
       // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
       if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
@@ -2293,6 +2295,8 @@ if (process.argv.includes('--styleguide')) {
         const html = readFileSync(page, 'utf8'), next = withBaked(html, { at: savedAt(join(ROOT, RESULTS_FILE)), themes: saved });
         if (next !== html) writeFileSync(page, next);
         console.log(`   Accessibility from the saved results (${RESULTS_FILE}): a component changed since is tried by the browser that opens the page.`);
+        const fa = await import('./contract-a11y.mjs');
+        fa.writeA11yFacts(ROOT, fa.factsFile(saved, savedAt(join(ROOT, RESULTS_FILE))));
       }
     }
     // The page's own pages pictured in the browser and compared with the last build's (styleguide-shots.mjs): a layout
@@ -2718,6 +2722,47 @@ if (process.argv.includes('--sign-off') || process.argv.includes('--second-revie
   so.recordSignOff(ROOT, { what, by: by.trim(), author, reviewer, review: held?.review ?? null, component: held?.component ?? null });
   console.log(`✅ Signed off by ${by.trim()}: ${what} (${so.SIGN_OFFS})${author ? `, made by ${so.whoSaid(author)}` : ''}.`);
   console.log('NEXT: make the edit that adds it; the guard lets it through now. Say who signed it off in your answer.');
+  process.exit(0);
+}
+// ── --prop-pairs, --prop-pair <component> <Figma property> yes|no: the pairs the engine suggests, for a person (prop-pairs.mjs) ──
+// A Figma property no code prop is paired with, whose contract suggests a code prop only the code has: listed as a
+// question. A yes writes the pair into the authored contract's bindings, and the contracts are built again with it; a no
+// is kept there too (declinedPairs), so it is never asked again.
+if (process.argv.includes('--prop-pairs') || process.argv.includes('--prop-pair')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const pp = await import('./prop-pairs.mjs');
+  const { generateContracts } = await import('./contract-gen.mjs');
+  const { contractsIn } = await import('./contract-changes.mjs');
+  const built = await generateContracts(ROOT, pcfg, {});
+  const asked = pp.pairProposals(contractsIn(built.outDir));
+  if (process.argv.includes('--prop-pairs')) {
+    if (!asked.length) { console.log('No pair to decide: every Figma property the engine has a code prop to suggest for is paired, or a person said no to it.'); console.log('NEXT: none'); process.exit(0); }
+    console.log(`🔗 ${asked.length} pair${asked.length === 1 ? '' : 's'} the engine suggests, each for a person to say yes or no:`);
+    for (const x of asked) console.log(`  ${x.component}: ${pp.askOf(x)}\n     yes: ${pp.commandFor(x, 'yes')}\n     no:  ${pp.commandFor(x, 'no')}`);
+    console.log('NEXT: ask the person about each pair, saying what a yes and a no do; record each answer with --prop-pair; never answer for them.');
+    process.exit(0);
+  }
+  const at = process.argv.indexOf('--prop-pair'), [component, figma, word] = process.argv.slice(at + 1, at + 4);
+  const answer = String(word ?? '').toLowerCase();
+  const x = asked.find((y) => y.component === component && y.figma === figma);
+  if (!x || !['yes', 'no'].includes(answer)) {
+    console.log(`❌ --prop-pair takes a component, its Figma property and the answer: rms-design-system-engine --prop-pair <component> "<Figma property>" yes|no.${!x && component ? ` No pair is asked for ${component} "${figma ?? ''}" (--prop-pairs lists them).` : ''}`);
+    process.exit(2);
+  }
+  const { mayWrite } = await import('./writes.mjs');
+  const authoredPath = resolve(ROOT, pcfg.contracts?.authored ?? 'contract.authored.json');
+  const may = mayWrite(pcfg, 'engine');
+  if (may.answer === 'no') {
+    console.log(`ℹ️  This project does not let the engine write its own files${may.why ? ` (${may.why})` : ''}: add ${answer === 'yes' ? `"bindings": { "${x.figma}": { "attribute": "${x.code}" } }` : `"declinedPairs": { "${x.figma}": "${x.code}" }`} under components.${x.component} in ${relative(ROOT, authoredPath)} by hand.`);
+    process.exit(1);
+  }
+  let authored = {};
+  try { authored = JSON.parse(readFileSync(authoredPath, 'utf8')); } catch { /* none yet */ }
+  writeFileSync(authoredPath, JSON.stringify(pp.decidePair(authored, x, answer), null, 2) + '\n');
+  await generateContracts(ROOT, pcfg, { force: true });
+  console.log(`✅ ${x.component}: ${answer === 'yes' ? `Figma's ${x.figma} is the code's ${x.code}` : `Figma's ${x.figma} is not the code's ${x.code}`}. ${pp.doesOf(x, answer)} (${relative(ROOT, authoredPath)})`);
+  console.log('NEXT: tell the person the line above.');
   process.exit(0);
 }
 // ── The construction grammar's decisions and fixes (construction-grammar.mjs) ──
