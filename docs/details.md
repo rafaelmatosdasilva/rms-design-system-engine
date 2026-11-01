@@ -788,6 +788,16 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 
 - **One component at a time.** A page for one component checks it first, against Figma and for accessibility, then shows it and the components it nests, `styleguide/modal.html`.
 - **One link for the team.** Publishing writes the CI job that publishes it on every push, to GitHub Pages or GitLab Pages, so everyone opens the same page built from what is merged. A local run stays a preview.
+- **It updates on its own.** The job builds again in three cases, so a change anywhere reaches the page:
+  - On every push to the design system's default branch.
+  - At once, when the intent layer's own repository says it changed. Publishing writes that repository's small job to `.design-system-engine-out/intent-layer-job.yml`, with the token to add once.
+  - Every hour, when the intent layer, a store, the Figma file or the engine moved since the last build. An hour with nothing new stops in seconds. On GitLab, add the hourly schedule once (Build → Pipeline schedules).
+- **A guide published to your team's store** updates by itself too. Publishing to the store also writes a job for the store's own project (`.design-system-engine-out/style-guide-store-job.yml`), for teams whose code is in a repository they may only read:
+  - it builds from your company's profile, which says where the code, the intent layer, the stores and Figma are;
+  - it runs every hour when something moved, and at once when the intent layer's job starts it;
+  - it never runs on a push to the store, since the page it sends is one;
+  - it sends the page with the project's own access token, and GitLab decides what that token may do.
+- **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 
@@ -872,6 +882,16 @@ A template is a page frame in Figma made of your system's components, such as a 
 
 Your intent layer (why each piece exists and how to use it) is read on every run: DSDS or Markdown (MDX) pages, in a GitLab project, a GitHub repository or a folder of your project. On a Markdown page, written for people, only a line that tells what to do is one of its rules; a line that only describes (what the variants are, how it is laid out) stays on its documentation for people, so agents are not handed every paragraph. Links between its pages lead to those pages where the layer lives, and images, lines of links and HTML entities are left out. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown. A note in the code that only says how the component is built, or repeats another, is left alone: it is there for developers.
 
+When the layer changes, the style guide follows.
+
+- **A change the engine makes is published at once.** A fix copied from the style guide and run in Claude Code (an answer to a proposal, drafts approved, changed or dropped, a part named, lines drafted), or one the engine makes on its own (`intentLayer.autoFix`), is committed to the layer. The same command then:
+  - builds the style guide again from the layer as it is now;
+  - checks the new page: built from that commit, with the pages the change was about;
+  - publishes it where your team's guide lives: its store (set in `ds-config.json` or your company's profile), else your publish job on GitHub or GitLab, started with your token (`GITHUB_TOKEN`, or `GITLAB_WRITE_TOKEN`). Without one, it gives the link to start the job by hand.
+- **A change made in the layer by hand** builds the page again on its own too. See It updates on its own, above.
+- **Each build says what moved.** It names the pages that changed since the layer was last read, and checks the whole layer again: names that do not exist, the guidance rating and rules that contradict Figma or the code.
+- **A private layer needs a token.** The job reads it with `INTENT_LAYER_TOKEN` (GitHub) or `GITLAB_TOKEN` (GitLab). Without one it cannot read the layer: it builds from the copy kept in the project, if there is one, and says so in its log.
+
 With no intent layer, every row can still be finished.
 
 - **Do and don't.** Write lines that start with `Do:` or `Don't:` in its Figma description, in the comment above its CSS rule, or in `contract.authored.json` under `guidance.doDont`. Agents get them with its pictures.
@@ -930,7 +950,7 @@ The style guide is held to what a page owes the people who read it, as a product
 - **Every file it links to is there.** A script, a style sheet or a picture the page names that is missing fails the check, so a page with a hole is never published.
 - **Its size is shown.** Every build says how much the page and its files weigh, with the largest files. Past 25 MB it warns, since the page is slow to open on a phone.
 - **Its own pages are compared between builds.** A build that opens the page in a browser takes a picture of each page in the menu: Status, the foundations and each component, 40 at most. It compares each one with the picture from the last build.
-  - Only on a computer that keeps its builds. A CI run throws its folder away, so it takes no pictures.
+  - Only in a folder that keeps its builds: the first build there takes none, and a CI run, which throws its folder away, takes none either.
   - Words are hidden in the pictures, so a date or a count that changes every build is not a change.
   - A page that changed is named, with how much of it changed, and a picture marking what changed is in `.design-system-engine-out/styleguide-shots/diff`.
   - It never fails the build. A change you meant is fine; one nobody meant is a fault in the page.

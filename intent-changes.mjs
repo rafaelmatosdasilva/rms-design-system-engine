@@ -796,8 +796,17 @@ export async function openMergeRequest(access, { files, sha, target, title, desc
 // than in a merge request: only when the branch is still at the commit the changes were made on, so nothing written
 // since is overwritten. Drafted lines keep their marker either way. → { url, sha } | { error }
 // files: Map(path → text, or null for a file taken out); created: the paths that are new.
+// Every commit this run made on the layer's branch, so what follows (guide-follow.mjs) builds and publishes the style
+// guide from it. → [{ sha, ref }]
+const committed = [];
+export const committedThisRun = () => [...committed];
 export async function commitToBranch(access, { files, sha, target, message, created = new Set() }) {
-  if (access.commit) return access.commit({ files, sha, target, message, created });
+  if (access.commit) {
+    // GitHub, or a folder (written there, not committed: local, so the published guide waits for a push).
+    const r = await access.commit({ files, sha, target, message, created });
+    if (!r?.error) committed.push({ sha: r?.sha ? String(r.sha) : null, ref: target, ...(r?.sha ? {} : { local: true }) });
+    return r;
+  }
   const h = await access.get(`/repository/commits/${encodeURIComponent(target)}`);
   if (!h.ok) return { error: `GitLab answered ${h.status} for ${target}` };
   const head = String((await h.json())?.id ?? '');
@@ -819,6 +828,7 @@ export async function commitToBranch(access, { files, sha, target, message, crea
     if (!c.ok) return { error: c.status === 403 || c.status === 401 ? `GitLab refused (${c.status}) a commit on ${target} with the token in ${access.writesWith}: it is a protected branch, or the token may not create commits there` : `GitLab answered ${c.status} to the commit` };
     out = await c.json(); base = String(out?.id ?? '');
   }
+  if (out?.id) committed.push({ sha: String(out.id), ref: target });
   return { url: out?.web_url ?? null, sha: out?.id ?? null, parts: parts.length };
 }
 

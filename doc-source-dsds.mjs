@@ -550,12 +550,19 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     // page made of several files (a component's tabs) takes the latest of theirs.
     const fileDates = { ...(prev?._reader >= 6 && c.host !== 'folder' ? prev.fileDates ?? {} : {}) };
     const previous = prev?._reader >= 6 ? prev?._source?.sha : null;
+    const filesOf = (e) => e.files ?? [e.file];
+    // The pages a new commit changed since the layer was last read, named by their component or foundation: said by the
+    // build, and kept in the snapshot (lastChange) for whatever shows what moved.
+    let lastChange = null;
     if (previous && previous !== sha && c.host !== 'folder') {
       const d = await h.changed(previous, sha);
       if (d) { for (const f of d.changed) fileDates[f] = source.committedAt; for (const f of d.removed) delete fileDates[f]; }
       else for (const k of Object.keys(fileDates)) delete fileDates[k];
+      if (d) {
+        const moved = new Set([...d.changed, ...d.removed]);
+        lastChange = { from: previous, to: sha, at: source.committedAt || null, files: [...moved].sort(), pages: entities.filter((e) => filesOf(e).some((f) => moved.has(f))).map((e) => e.name).filter(Boolean) };
+      }
     }
-    const filesOf = (e) => e.files ?? [e.file];
     const undated = [...new Set(entities.flatMap(filesOf).filter(Boolean))].filter((f) => !fileDates[f]);
     for (let i = 0; i < undated.length; i += 8) {
       await Promise.all(undated.slice(i, i + 8).map(async (f) => { const at = await h.lastChange(f, sha); if (at) fileDates[f] = at; }));
@@ -567,12 +574,13 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
       _source: source, _reader: READER, system, boilerplate, entities,
       contracts: contractSummaries(files, (f) => fileUrl(source, f)),
       fileDates,
+      ...(lastChange ? { lastChange } : {}),
       layerFiles: [...new Set(layerFiles)].sort(),
       ...(got.note ? { note: got.note } : {}),
     };
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(snap, null, 2) + '\n');
-    return { ok: true, changed: true, out: c.out, source, entities: entities.length, boilerplate, previous: prev?._source?.sha ?? null, ...(got.note ? { note: got.note } : {}) };
+    return { ok: true, changed: true, out: c.out, source, entities: entities.length, boilerplate, previous: prev?._source?.sha ?? null, ...(lastChange ? { lastChange } : {}), ...(got.note ? { note: got.note } : {}) };
   } catch (e) {
     return kept(`could not read ${h.name ?? c.url}: ${e.message}`);
   }
@@ -584,7 +592,10 @@ export function describeSync(r) {
   const at = (s) => (!s?.sha ? '' : s.host === 'folder' ? `the folder ${s.folder ?? s.url}${s.ref && s.ref !== 'HEAD' ? ` (${s.ref})` : ''}` : `${s.url.replace(/^https?:\/\//, '')} @ ${s.ref} ${s.sha.slice(0, 8)}${s.committedAt ? ` (${s.committedAt.slice(0, 10)})` : ''}`);
   if (r.error) return r.stale ? `⚠️  Intent layer: ${r.error} - using the copy of ${at(r.source)}` : `❌ Intent layer: ${r.error}`;
   const fmt = r.source?.format === 'markdown' ? 'Markdown pages' : 'pages';
-  return `🧭 Intent layer: ${at(r.source)} - ${r.entities} ${fmt}${r.boilerplate ? ` (${r.boilerplate} repeated lines left out)` : ''}, ${r.changed ? 'read' : 'up to date'} → ${r.out}${r.note ? `\n   ⚠️  ${r.note}` : ''}`;
+  const lc = r.lastChange;
+  const moved = !lc ? '' : lc.pages.length ? `\n   Changed since the last read: ${lc.pages.length} page${lc.pages.length === 1 ? '' : 's'} (${lc.pages.slice(0, 8).join(', ')}${lc.pages.length > 8 ? ', …' : ''}), checked again in this build`
+    : lc.files.length ? `\n   Changed since the last read: ${lc.files.length} file${lc.files.length === 1 ? '' : 's'}, none of them a page` : '';
+  return `🧭 Intent layer: ${at(r.source)} - ${r.entities} ${fmt}${r.boilerplate ? ` (${r.boilerplate} repeated lines left out)` : ''}, ${r.changed ? 'read' : 'up to date'} → ${r.out}${moved}${r.note ? `\n   ⚠️  ${r.note}` : ''}`;
 }
 
 
