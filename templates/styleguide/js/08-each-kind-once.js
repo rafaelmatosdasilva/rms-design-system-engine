@@ -223,7 +223,7 @@
   };
   // Written, but too thin to say anything: under four words, or a line that only names its section ("Overview
   // section."). Such a row is never Ready: it is to check, with why.
-  var WEAK = function (html) { var t = String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); return !!t && (t.split(' ').filter(function (w) { return /[a-z]{2}/i.test(w); }).length < 4 || /^[\w\s\/'’&-]{1,40}\bsection\.?$/i.test(t)); };
+  var WEAK = function (html) { var t = plainText(html || '').replace(/\s+/g, ' ').trim(); return !!t && (t.split(' ').filter(function (w) { return /[a-z]{2}/i.test(w); }).length < 4 || /^[\w\s\/'’&-]{1,40}\bsection\.?$/i.test(t)); };
   // Where each kind belongs, for a row still to write: its Source is that place (one, the team's own), never where the
   // engine happened to look. A written row's Source stays where it was read.
   var DOC_HOME = function () { return DATA.intentLayer ? 'Its page in the intent layer' : 'Its description in Figma'; };

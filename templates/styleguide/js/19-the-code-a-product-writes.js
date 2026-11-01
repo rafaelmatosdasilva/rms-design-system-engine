@@ -42,7 +42,7 @@
       var lit = function (v) {
         if (Array.isArray(v)) return '[' + v.map(lit).join(', ') + ']';
         if (v && typeof v === 'object') return '{ ' + Object.keys(v).map(function (f) { return f + ': ' + lit(v[f]); }).join(', ') + ' }';
-        return typeof v === 'string' ? "'" + v.replace(/'/g, "\\'") + "'" : String(v);
+        return typeof v === 'string' ? "'" + v.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'" : String(v);
       };
       var list = lit(c.codeLists[k]);
       attrs.push(syn === 'vue' ? ':' + k + '="' + list.replace(/"/g, '&quot;') + '"' : syn === 'html' ? null : k + '={' + list + '}');

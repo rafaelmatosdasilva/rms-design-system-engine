@@ -36,5 +36,5 @@
   // Each component's checks that did not run, with why: for whoever asks what Checked leaves out.
   // Every open task's key, for the build to record when each was first found (styleguide-bake.mjs).
   window.__sgOpenKeys = function () { var out = []; COMPONENTS.forEach(function (c) { healthAllRows(c, ALL || !!c.__a11y).forEach(function (r) { if (isOpen(r) && r.key) out.push(r.key); }); }); return out; };
-  window.__sgNotRun = function () { var o = {}; COMPONENTS.forEach(function (c) { var rows = healthAllRows(c, true).filter(notRun); if (rows.length) o[c.name] = rows.map(function (r) { return [r.area, r.kind, r.st, String(r.rel || r.note || '').replace(/<[^>]+>/g, '').slice(0, 120)]; }); }); return o; };
+  window.__sgNotRun = function () { var o = {}; COMPONENTS.forEach(function (c) { var rows = healthAllRows(c, true).filter(notRun); if (rows.length) o[c.name] = rows.map(function (r) { return [r.area, r.kind, r.st, plainText(r.rel || r.note || '', '').slice(0, 120)]; }); }); return o; };
   function healthRowsOf(all) { return all.filter(function (r) { return r.st in HEALTH_PART; }); }

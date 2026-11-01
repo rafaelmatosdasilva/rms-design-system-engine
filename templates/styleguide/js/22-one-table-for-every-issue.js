@@ -76,7 +76,7 @@
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
   // opens in the side panel (openRowPanel).
   function firstLine(html) { var d = document.createElement('div'); d.innerHTML = html || ''; Array.prototype.forEach.call(d.querySelectorAll('.sg-panel-only'), function (n) { n.remove(); }); return d.innerHTML; }
-  function clip(html) { html = html || ''; return /<(p|div|details|table|ul)\b/i.test(html) || html.replace(/<[^>]+>/g, '').length > 180 ? '<div class="sg-cell-clip">' + html + '</div>' : html; }
+  function clip(html) { html = html || ''; return /<(p|div|details|table|ul)\b/i.test(html) || plainText(html, '').length > 180 ? '<div class="sg-cell-clip">' + html + '</div>' : html; }
   var ROW_DETAIL = [];   // every row drawn, by its index: what its side panel shows
   // A row's own address in a link (panel=row:<area>:<component>|<what>), the same however many times it is drawn.
   function rowKey(d) { return 'row:' + (d.area || '') + ':' + String(d.r.key || d.r.kind || '').replace(/\u0000/g, '|'); }

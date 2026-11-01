@@ -33,7 +33,7 @@ test('in the browser: a stage suggested from what the page measures, the team\'s
   cpSync(HARBOR, dir, { recursive: true });
   // The icon button retired in its own code, naming the button; the button given a stage by the team.
   const ib = join(dir, 'components', 'HbIconButton.vue');
-  writeFileSync(ib, readFileSync(ib, 'utf8').replace(/^<!--.*-->/, '<!-- Harbor icon button (fictional). @deprecated Use button instead. -->'));
+  writeFileSync(ib, readFileSync(ib, 'utf8').replace(/^<!--[\s\S]*?-->/, '<!-- Harbor icon button (fictional). @deprecated Use button instead. -->'));
   const authored = JSON.parse(readFileSync(join(dir, 'contract.authored.json'), 'utf8'));
   authored.components.button.status = 'stable';
   writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify(authored, null, 1));

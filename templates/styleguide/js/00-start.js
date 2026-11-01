@@ -64,6 +64,11 @@
   // Opened in the Status page's panel (?embed): the component's page alone, no menu and no bar.
   if (/[?&]embed\b/.test(location.search)) html.classList.add('sg-embed');
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  // A text's words, its tags taken out (sep in their place) until none is left, and any < or > a broken tag left
+  // behind with them: for measuring a cell, a plain line or a copied task, never markup to put in the page.
+  function plainText(html, sep) { var s = String(html == null ? '' : html), was; sep = sep == null ? ' ' : sep; do { was = s; s = s.replace(/<[^<>]*>/g, sep); } while (s !== was); return s.replace(/[<>]/g, ''); }
+  // Its entities as characters, &amp; last, so a text that says &amp;lt; reads &lt;, never <.
+  function unescapeHTML(s) { return String(s == null ? '' : s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&'); }
   // A component's place on the page: its name, any character an address reads (a slash, a space) as a dash.
   function cid(n) { return 'c-' + String(n).replace(/[^\w-]+/g, '-'); }
   // How far down a bar that sticks under this one sits: this one's real height (its fraction of a pixel too, which a

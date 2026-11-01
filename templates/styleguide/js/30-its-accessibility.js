@@ -249,7 +249,7 @@
       mxRows.push(mxRow({ name: name, figma: f, code: !f ? 'found' : unsure ? 'unsure' : 'missing',
         par: unsure ? C('none', 'N/A', 0, 0, 'Its file in the code is still to confirm (Code: Unsure): nothing is compared until it is.') : C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnly : NA_WHY.codeOnly), acc: C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnlyA11y : NA_WHY.codeOnly), doc: f && !unsure ? C('differs', 'Missing', 1, 0) : C('none', 'N/A', 0, 0, f ? NA_WHY.figmaOnly : NA_WHY.codeOnly),
         fix: unsure ? 0 : 1, dec: unsure ? 1 : 0, nocode: f && !unsure, unsure: unsure, at: r.at,
-        codeWhy: (SR_MISSING[name] ? 'The Showroom found it missing from the code. ' : '') + String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim() }));
+        codeWhy: (SR_MISSING[name] ? 'The Showroom found it missing from the code. ' : '') + unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim() }));
     });
     // A part (chartBars/bar) is no row of its own: it joins its parent's row, what it has left counted there, and is
     // listed in the parent's details (its Parts tab). A family with no component of its own name (navigation/LinkCompact,

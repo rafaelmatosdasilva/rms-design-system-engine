@@ -394,7 +394,7 @@
     var ilAnswer = function (head, does, cmd, mark) { return '<div class="sg-il-line"><strong' + (mark ? ' class="sg-decide-head"' : '') + '>' + decideMark(mark) + esc(head) + '</strong>' + (does ? '<span class="pg-par-val">' + does + '</span>' : '') + '<span class="sg-tk-code-line sg-il-cmd"><code>' + esc(cmd) + '</code>' + sysButton('button', 'Copy', ' data-il-copy="' + esc(cmd) + '"') + '</span></div>'; };
     var ilIfNot = function (p, html) {
       var open = ilOpen(p); if (!open.length) return html;
-      var todo = html ? html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+      var todo = html ? plainText(html).replace(/\s+/g, ' ').trim() : '';
       // Its own options when it lists them (three or more), else yes and no.
       return open.map(function (x) {
         // The answer in the person's words, for the page by its kind and name: the system's command, then "Yes to "…"".
@@ -548,7 +548,7 @@
       var drafted = {}; (p.drafts || []).forEach(function (d) { var w = String(d.where || '').toLowerCase(), t = String(d.text || ''); drafted[/^\s*(do|don'?t|do not)\s*:/i.test(t) || /do\b.*don/.test(w) ? 'Do and don\'t' : /limit/.test(w) ? 'Limitations' : /mistake/.test(w) ? 'Common mistakes' : /example/.test(w) ? 'Example' : /role/.test(w) ? 'Role' : /not to use/.test(w) ? 'When not to use' : /when to use/.test(w) ? 'When to use' : /purpose|intent/.test(w) ? 'What it is' : w] = 1; });
       // A "when to use" line drafted is also the line of its own the "which component?" test asks for, once approved.
       if (drafted['When to use']) drafted['When to use it, not a sibling'] = 1;
-      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: srcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: String(r.todo || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
+      if (c) try { docIssueRows(c).forEach(function (r) { if ((r.st === 'todo' || r.st === 'check') && r.kind !== 'Intent layer' && r.kind !== 'Its tokens' && r.kind !== 'Not given to agents' && !drafted[r.kind]) out.push({ kind: r.kind, st: r.st, part: r.part, where: srcNames(r.src || []).join(' · '), notes: r.notes || [], how: r.how || '', todo: unescapeHTML(plainText(r.todo || '')).replace(/\s+/g, ' ').trim() }); }); } catch (e) { /* its own area says it */ }
       return (p._left = out);
     };
     // Its tokens' descriptions are written once a token, not once a component (many share them): they are one row of
