@@ -3,7 +3,7 @@
 // job that keeps it running from login on (a LaunchAgent on a Mac, a user service on Linux).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, readFileSync, existsSync, cpSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync, cpSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -108,7 +108,7 @@ test('a watch: a burst of saves built once it settles, the remote sources asked 
   fx = 'b';
   await failing.tick(0);
   assert.equal((await failing.tick(1)).ok, false);
-  assert.equal(lines.at(-1), '❌ the build failed (exit 1); tried again on the next change');
+  assert.equal(lines.at(-1), '❌ the build failed (exit 1); tried again at the next check');
 });
 
 test('the background job: a LaunchAgent on a Mac, a user service on Linux, each project its own; elsewhere, said why', () => {
@@ -141,7 +141,7 @@ test('the commands: the job written and taken away again, and a watch that sees 
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /No background watch for this folder: nothing to take away\./);
     r = run('--watch-install', '7');
-    const job = jobFor({ ROOT: dir, engineDir: ENGINE, home, minutes: 7 });
+    const job = jobFor({ ROOT: realpathSync(dir), engineDir: ENGINE, home, minutes: 7 });   // the folder as the run sees it (a temporary folder on a Mac is a link)
     assert.ok(existsSync(job.file), 'the job is written');
     assert.match(readFileSync(job.file, 'utf8'), /--watch/);
     // Whether the system took it depends on the machine (a CI runner has no user session): either way, said plainly.

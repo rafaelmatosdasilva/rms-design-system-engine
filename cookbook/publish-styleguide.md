@@ -9,7 +9,7 @@
 3. Tell the person what the printed lines say to do once: turn Pages on (GitHub: Settings, Pages, Source: GitHub Actions), and who can open the page. A GitHub Pages site is public even from a private repository (only GitHub Enterprise Cloud keeps it private); GitLab Pages can be kept to project members (Settings, General, Visibility, Pages).
 4. A job already there is never overwritten; commit the new one only when the person asks. A local `--styleguide` stays a preview.
 5. A team that keeps the page in a store of its own (`stores.styleguide` in `ds-config.json`, often from the company's profile): `--publish-styleguide` sends the page built last there (with what it links to, never the rest of its folder) instead of writing a job, as a commit or a merge request, only when GitLab lets this person write it; relay its line. It also writes `.design-system-engine-out/style-guide-store-job.yml`, the job for the store's own project that rebuilds the page every hour when something moved: relay where to add it.
-6. A person who wants their own copy rebuilt on every change, not a link for the team: `rms-design-system-engine --watch-install` (from login on, no terminal open; `--watch-uninstall` takes it away).
+6. A person who wants their own copy rebuilt on every change, or a team with no CI runner (its job never runs): `rms-design-system-engine --watch-install` keeps the guide built from this computer from login on, with no terminal open, only the steps each change feeds, and sends it to the team's store when there is one and the page changed (`--watch-uninstall` takes it away).
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
 
