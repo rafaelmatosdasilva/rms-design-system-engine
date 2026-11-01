@@ -31,7 +31,9 @@
 //     the person whether the new one belongs in the system;
 //   • what a lesson ruled out (lessons.mjs): a prop combination on a component, or a value, that a person corrected
 //     once and said yes to holding as a check (the authored contract's guards), and a component a lesson keeps out
-//     of another (neverCombineWith), read straight from the authored contract so it holds before the next build.
+//     of another (neverCombineWith), read straight from the authored contract so it holds before the next build. A
+//     rule of an intent-layer page a person said yes to holding as a check is a guard the same way (rule-checks.mjs),
+//     with two more kinds: a prop or slot a component always has, and at most so many of a component on one screen.
 // Silent when the edit added none of these. Precise before complete: component tags the catalog does not know
 // are the app's own components, never flagged; a custom-property declaration is a token being defined, and
 // the theme file's own literals are its values.
@@ -473,7 +475,7 @@ export function editFindings(added, fullText, { truth, tokenByValue, figmaRaw = 
   // What a lesson ruled out, where the edit added it: a person corrected it once and said yes to holding it as a check.
   if (guards.length && !isTheme) {
     const addedAt = new Set(added.map(lineOf).filter(Boolean));
-    for (const f of guardFindings(fullText, addedAt, guards, { file })) push(f.line, f.text, { kind: 'lesson', lesson: f.lesson });
+    for (const f of guardFindings(fullText, addedAt, guards, { file })) push(f.line, f.text, { kind: 'lesson', lesson: f.lesson, ...(f.rule ? { rule: f.rule } : {}) });
   }
   return out;
 }
@@ -533,7 +535,7 @@ function editReason(run) {
     ? `Take ${them} out and fix what the check reports. When that cannot be done, ask the person before switching a check off.`
     : count('copy') === n
     ? `Use the system's component instead, or ask the person whether the new one belongs in the system. Never keep a copy without asking.`
-    : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${count('lesson') ? ' What a lesson ruled out was corrected by a person before: write it another way, or ask them.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}${count('copy') ? ' A rule that nearly copies a system component: use the component, or ask the person whether to add the new one to the system.' : ''}`;
+    : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${found.some((f) => f.kind === 'lesson' && !f.rule) ? ' What a lesson ruled out was corrected by a person before: write it another way, or ask them.' : ''}${found.some((f) => f.kind === 'lesson' && f.rule) ? ' What a rule of the team rules out was written on its page and held as a check by a person\'s yes: follow it, or ask them.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}${count('copy') ? ' A rule that nearly copies a system component: use the component, or ask the person whether to add the new one to the system.' : ''}`;
   return `${title}\n${lines.join('\n')}${n > 12 ? `\n  and ${n - 12} more` : ''}\n${next}${run.scope ? `\n${scopeSay(run.scope, found)}` : ''}`;
 }
 

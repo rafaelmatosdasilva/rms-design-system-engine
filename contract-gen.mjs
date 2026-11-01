@@ -41,6 +41,7 @@ import { codeHalf, codeSlots, figmaStatesVariants, stateTokens, accessibilityOf 
 import { roleWord } from './role-markup.mjs';
 import { execFileSync } from 'node:child_process';
 import { mirrorState, ensureHistory, commitsOf } from './gitlab-history.mjs';
+import { markedRules, readRuleContext } from './rule-checks.mjs';
 
 // The last commit that changed a file: from git where the project is a checkout, else from the GitLab mirror's history
 // (gitlab-history.mjs). Per file, so a component whose file did not change keeps the same contract. null: not known.
@@ -561,7 +562,9 @@ const CONTRACT_SCHEMA = {
     intent: {
       type: 'object',
       required: ['source'],
-      properties: { source: str, purpose: str, whenToUse: strs, whenNotToUse: strs, mistakes: strs, limitations: strs, rules: strs, review: { type: 'string', description: 'Its component changed after the page was written: what changed and since when. Check the page against this contract.' } },
+      properties: { source: str, purpose: str, whenToUse: strs, whenNotToUse: strs, mistakes: strs, limitations: strs,
+        rules: { type: 'array', description: 'The page\'s rules, each with what holds it (rule-checks.mjs): checked (a check enforces it, named), checkable (a guard could; its guard is said) or judgment (a person judges it). Follow checked and checkable rules as hard constraints.', items: { type: 'object', required: ['text', 'status'], properties: { text: str, status: { enum: ['checked', 'checkable', 'judgment'] }, check: str, guard: str } } },
+        review: { type: 'string', description: 'Its component changed after the page was written: what changed and since when. Check the page against this contract.' } },
     },
     intentPage: { type: 'string', description: 'Its page in the intent layer, linked (a published contract never copies it).' },
     partOf: { type: 'string', description: 'The component this one is a part of: placed only inside it, never on its own.' },
@@ -1127,6 +1130,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   // Published, each contract names the last commit that changed its file: a mirror's history is fetched once for all.
   if (publish && mirrorState(ROOT)) { try { ensureHistory(ROOT, { paths: [...new Set(targets.map((n) => apiEntryOf(n)?.file).filter(Boolean))].map((path) => ({ path })) }); } catch { /* the commits stay unknown */ } }
   let invented = null;   // readInvented, once, with the first component
+  let ruleCtx = null;    // readRuleContext, once, with the first page that has rules
   for (const name of targets) {
     const api = apiEntryOf(name);
     const relFile = placeOf.get(name);
@@ -1138,6 +1142,8 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     let text = ''; try { if (api?.file) text = readFileSync(resolve(ROOT, api.file), 'utf8'); } catch { /* unreadable */ }
     const codePart = apiReader ? { api, text, aliases: cfg.componentPropAliases?.[name] ?? null, stateBindings: stateBindings[name] ?? null, componentTokens: stateTokensFile[name]?.tokens ?? null, publish, idPrefix: cc.idPrefix, schemaRef: relative(dirname(file), schemaOut).split(/[\\/]+/).join('/').replace(/^(?!\.)/, './'), figmaFile: cfg.figmaFileKey || undefined, commit: publish ? lastCommitOf(ROOT, api?.file) : null } : null;
     const contract = buildContract(name, { contract: CONTRACT, structure, props, authored: authoredDoc.components?.[name], composition, componentNames, vars, intentPage: intentPages.has(name) ? componentIntent(intentPages.get(name), IL._source, wrongOf(intentPages.get(name))) : null, code: codePart });
+    // Each of its page's rules with what holds it: a check, a guard that could, or a person (rule-checks.mjs).
+    if (contract.intent?.rules?.length) contract.intent.rules = markedRules(contract.intent.rules, name, ruleCtx ??= readRuleContext(ROOT, cfg), { entity: intentPages.get(name) });
     // What agents here wrote for it instead of its own names, each with the right one (invented.mjs).
     const wrote = inventedFor(invented ??= readInvented(ROOT), name);
     if (wrote.length) contract.invented = wrote;

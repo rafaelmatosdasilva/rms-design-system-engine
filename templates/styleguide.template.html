@@ -3523,6 +3523,22 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var own = IL_READ.filter(function (k) { return (r[k[0]] || []).length; }).map(function (k) { return '<div class="sg-il-group"><p class="sg-il-head">' + esc(k[1]) + '</p>' + r[k[0]].map(function (t) { return '<p class="sg-il-item">' + esc(t) + '</p>'; }).join('') + '</div>'; }).join('');
       return (own ? ilSourceHead('Intent layer', p.spec || p.file) + own : '') + ilOthersOf(p).map(function (o) { return ilSourceHead(o.source) + o.lines.map(function (t) { return '<p class="sg-il-line">' + esc(t) + '</p>'; }).join(''); }).join('');
     };
+    // Its rules, each said as what holds it (rule-checks.mjs): checked, with the check that enforces it; checkable, with
+    // the guard it becomes (its yes or no is under Proposal and What to do); judgment; a vague one with the sentence
+    // proposed in its place. The count first.
+    var IL_RULE = { checked: 'Checked', checkable: 'Checkable', judgment: 'Judgment' };
+    var ilRules = function (p) {
+      var r = p.ruleCheck; if (!r || !r.n) return '';
+      var head = '<p class="sg-il-line"><strong>' + esc(r.n + ' rule' + (r.n === 1 ? '' : 's') + ': ' + r.checked + ' checked, ' + r.checkable + ' checkable, ' + r.judgment + ' judgment' + (r.vague ? ' (' + r.vague + ' vague)' : '')) + '</strong></p>';
+      return head + r.rules.map(function (x) {
+        var no = x.answer === 'no' ? ' Declined.' : '';
+        var said = x.status === 'checked' ? 'Held by ' + x.check + '.'
+          : x.status === 'checkable' ? (x.proposal ? 'A check could hold it: ' + x.proposal.text + no : capital(x.check || '') + '.')
+          : x.vague ? (x.rewrite ? 'Too vague to check. Proposed instead: ' + x.rewrite + no : 'Too vague to check: say the component, prop, token or count it means.')
+          : 'A person judges it, or a model judging the page.';
+        return '<div class="sg-il-group"><p class="sg-il-head">' + esc(IL_RULE[x.status] + (x.vague ? ' · Vague' : '')) + '</p><p class="sg-il-item">' + esc(x.text) + '<span class="pg-par-val">' + esc(said) + '</span></p></div>';
+      }).join('');
+    };
     // A component with no intent layer: what the agents read about it is its own documentation, as written, grouped by
     // where each piece is written (Figma's description or annotation, the code, the contract, the guidelines), each under
     // its kind, as an intent-layer page's reads are.
@@ -3730,7 +3746,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // page is and why.
       var own = !(p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo), task = own ? ilTodo(own) : c.todo;
-      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
+      var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said')); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.recheckFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);

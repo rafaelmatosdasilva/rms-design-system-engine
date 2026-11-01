@@ -416,7 +416,9 @@ export function proposalFor(ROOT, id, { components = [], authored } = {}) {
 }
 
 // Write a check's guard where it belongs. Pure: given the files as read, → { authored?, config? } as they become.
-export function withGuard(guard, { authored = {}, config = {}, id = null, say = null } = {}) {
+// rule: the team's rule the guard holds (rule-checks.mjs), kept with it so the guard says which rule it is; its id is
+// then the rule's own key, never a lesson's.
+export function withGuard(guard, { authored = {}, config = {}, id = null, say = null, rule = null } = {}) {
   if (guard.kind === 'pairing') {
     const comps = { ...(authored.components ?? {}) };
     const at = Object.keys(comps).find((n) => norm(n) === norm(guard.parent)) ?? guard.parent;
@@ -427,9 +429,9 @@ export function withGuard(guard, { authored = {}, config = {}, id = null, say = 
     return { authored: { ...authored, components: comps } };
   }
   if (guard.kind === 'import') return { config: { ...config, imports: { ...(config.imports ?? {}), replaced: { ...(config.imports?.replaced ?? {}), [guard.from]: guard.to } } } };
-  const guards = (Array.isArray(authored.guards) ? authored.guards : []).filter((g) => g?.lesson !== id);
+  const guards = (Array.isArray(authored.guards) ? authored.guards : []).filter((g) => (rule ? g?.key !== id : g?.lesson !== id));
   const { kind, ...rest } = guard;
-  return { authored: { ...authored, guards: [...guards, { lesson: id, kind, ...rest, ...(say ? { say } : {}) }] } };
+  return { authored: { ...authored, guards: [...guards, rule ? { key: id, rule: flat(rule), kind, ...rest } : { lesson: id, kind, ...rest, ...(say ? { say } : {}) }] } };
 }
 
 // A person's answer to a proposal, recorded with who and when. A yes to a check writes its guard here, into the
@@ -473,11 +475,16 @@ export function agentSteps(ROOT) {
   return Object.entries(readLessonsFile(ROOT).answers).filter(([, a]) => a.answer === 'yes' && a.form === 'agent').sort(([, a], [, b]) => String(a.at).localeCompare(String(b.at))).map(([, a]) => a.text);
 }
 // The guards a yes wrote into the authored contract, as the edit check reads them.
-export const guardsOf = (authored = {}) => (Array.isArray(authored?.guards) ? authored.guards.filter((g) => g && (g.kind === 'props' || g.kind === 'value')) : []);
+// A team's rule held as a check adds two kinds (rule-checks.mjs): a prop or slot a component always has (requires), and
+// how many of a component one screen holds at most (max).
+export const GUARD_KINDS = ['props', 'value', 'requires', 'max'];
+export const guardsOf = (authored = {}) => (Array.isArray(authored?.guards) ? authored.guards.filter((g) => g && GUARD_KINDS.includes(g.kind)) : []);
 
 // ── The edit check reads the guards ─────────────────────────────────────────────────────────────────────────────
 // Each opening tag of a component, with the lines it spans and its props as written. Props across several lines
-// count: a tag written one prop per line is the same tag.
+// count: a tag written one prop per line is the same tag. attrs: every attribute it writes, with a value or without
+// (dense, :rows, label={x}); spread: it passes props it does not name ({...rest}, v-bind="x"); body: what is between it
+// and its closing tag ('' when it closes itself).
 function tagsOf(text, component) {
   const k = norm(component);
   const out = [];
@@ -489,10 +496,28 @@ function tagsOf(text, component) {
     const from = text.slice(0, m.index).split('\n').length;
     const to = from + m[0].split('\n').length - 1;
     const props = Object.fromEntries([...m[2].matchAll(/(?:^|\s)[:@]?(?:v-bind:)?([\w-]+)\s*=\s*\{?\s*["'`]([^"'`]*)["'`]/g)].map((x) => [x[1].toLowerCase(), x[2]]));
-    out.push({ from, to, props });
+    const bare = m[2].replace(/"[^"]*"|'[^']*'|\{[^{}]*\}/g, ' ');
+    const attrs = new Set([...bare.matchAll(/(?:^|\s)(?:[:@#]|v-bind:|v-slot:)?([\w-]+)/g)].map((x) => x[1].toLowerCase()));
+    const spread = /\{\s*\.\.\./.test(m[2]) || /(?:^|\s)v-bind\s*=/.test(m[2]);
+    let body = '';
+    if (!m[0].endsWith('/>')) {
+      // Its closing tag, past any of the same component inside it.
+      const close = new RegExp(`<(/?)${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s>/])`, 'g');
+      close.lastIndex = m.index + m[0].length;
+      let depth = 1, c;
+      while ((c = close.exec(text))) { depth += c[1] ? -1 : 1; if (!depth) { body = text.slice(m.index + m[0].length, c.index); break; } }
+      if (depth) body = text.slice(m.index + m[0].length);
+    }
+    out.push({ from, to, props, attrs, spread, body });
   }
   return out;
 }
+// Whether a tag gives a slot its content: a named template (#header, v-slot:header), an element placed in it
+// (slot="header"), or a prop of that name (React passes a slot as a prop).
+const fillsSlot = (t, slot) => {
+  const s = String(slot).toLowerCase(), esc = s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return t.attrs.has(s) || new RegExp(`(?:#|v-slot:)${esc}\\b|\\bslot\\s*=\\s*["']${esc}["']`, 'i').test(t.body);
+};
 // Whether a line of a file is about a component: its tag, its class, or the component's own file.
 const about = (line, component, file) => {
   const k = norm(component);
@@ -503,14 +528,36 @@ const about = (line, component, file) => {
 export function guardFindings(fullText, added, guards = [], { file = null } = {}) {
   const out = [];
   const lines = String(fullText ?? '').split('\n');
-  const why = (g) => (g.say ? ` (a lesson: ${flat(g.say).replace(/\.$/, '')})` : ' (a lesson)');
+  const why = (g) => (g.rule ? ` (the team's rule: "${flat(g.rule).replace(/\.$/, '')}")` : g.say ? ` (a lesson: ${flat(g.say).replace(/\.$/, '')})` : ' (a lesson)');
+  const ruled = (g) => (g.rule ? 'is what a rule of the team rules out' : 'is what a lesson ruled out');
+  const source = (g) => (g.rule ? 'a rule of the team' : 'a lesson');
+  const quote = (g) => (g.rule ? ` ("${flat(g.rule).replace(/\.$/, '')}")` : g.say ? ` (${flat(g.say).replace(/\.$/, '')})` : '');
+  const touched = (t) => { for (let i = t.from; i <= t.to; i++) if (added.has(i)) return true; return false; };
+  const withProps = (g) => Object.entries(g.props ?? {}).map(([k, v]) => [k.toLowerCase(), String(v)]);
+  const said = (want) => want.map(([k, v]) => `${k}="${v}"`).join(' and ');
   for (const g of guards) {
+    // A prop or a slot the component always has: each tag the edit touched, with neither, and no props passed on unnamed.
+    if (g.kind === 'requires' && g.component && (g.prop || g.slot)) {
+      for (const t of tagsOf(String(fullText ?? ''), g.component)) {
+        if (!touched(t) || t.spread) continue;
+        const has = g.prop ? t.attrs.has(String(g.prop).toLowerCase()) : fillsSlot(t, g.slot);
+        if (has) continue;
+        out.push({ line: t.from, kind: 'lesson', lesson: g.lesson ?? null, ...(g.key ? { rule: g.key } : {}), text: `${g.component} without ${g.prop ? `\`${g.prop}\`` : `its ${g.slot} slot`}: ${source(g)} says it always has it${quote(g)}; ${g.prop ? `set ${g.prop}` : `give it the ${g.slot} slot`}` });
+      }
+    }
+    // How many of a component (with these props) one screen holds at most: the file is the screen.
+    if (g.kind === 'max' && g.component && Number.isFinite(Number(g.max))) {
+      const want = withProps(g);
+      const all = tagsOf(String(fullText ?? ''), g.component).filter((t) => want.every(([k, v]) => t.props[k] === v));
+      const mine = all.filter(touched);
+      if (all.length > Number(g.max) && mine.length) out.push({ line: mine[0].from, kind: 'lesson', lesson: g.lesson ?? null, ...(g.key ? { rule: g.key } : {}), text: `${all.length} ${g.component}${want.length ? ` with ${said(want)}` : ''} on one screen: ${source(g)} allows ${g.max} at most${quote(g)}; keep ${g.max}, and make the others another kind` });
+    }
     if (g.kind === 'props' && g.component && g.props && Object.keys(g.props).length) {
       const want = Object.entries(g.props).map(([k, v]) => [k.toLowerCase(), String(v)]);
       for (const t of tagsOf(String(fullText ?? ''), g.component)) {
         let touched = false; for (let i = t.from; i <= t.to; i++) if (added.has(i)) touched = true;
         if (!touched || !want.every(([k, v]) => t.props[k] === v)) continue;
-        out.push({ line: t.from, kind: 'lesson', lesson: g.lesson ?? null, text: `${g.component} with ${want.map(([k, v]) => `${k}="${v}"`).join(' and ')} is what a lesson ruled out${why(g)}: write it another way, or ask the person` });
+        out.push({ line: t.from, kind: 'lesson', lesson: g.lesson ?? null, ...(g.key ? { rule: g.key } : {}), text: `${g.component} with ${want.map(([k, v]) => `${k}="${v}"`).join(' and ')} ${ruled(g)}${why(g)}: write it another way, or ask the person` });
       }
     }
     if (g.kind === 'value' && g.value) {
@@ -518,7 +565,7 @@ export function guardFindings(fullText, added, guards = [], { file = null } = {}
       lines.forEach((l, i) => {
         if (!added.has(i + 1) || !l.toLowerCase().includes(v)) return;
         if (g.component && !about(l, g.component, file)) return;
-        out.push({ line: i + 1, kind: 'lesson', lesson: g.lesson ?? null, text: `${g.value} is what a lesson ruled out${g.component ? ` on ${g.component}` : ''}${why(g)}${g.use ? `; use ${g.use}` : ''}` });
+        out.push({ line: i + 1, kind: 'lesson', lesson: g.lesson ?? null, ...(g.key ? { rule: g.key } : {}), text: `${g.value} ${ruled(g)}${g.component ? ` on ${g.component}` : ''}${why(g)}${g.use ? `; use ${g.use}` : ''}` });
       });
     }
   }
