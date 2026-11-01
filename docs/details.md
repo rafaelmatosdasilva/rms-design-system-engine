@@ -919,6 +919,12 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - it runs every hour when something moved, and at once when the intent layer's job starts it;
   - it never runs on a push to the store, since the page it sends is one;
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
+- **Your own copy updates on its own too.** On your computer, the style guide can build itself again whenever something changes ([ask for it](commands.md#publish-a-living-style-guide)):
+  - your design system's code, a few seconds after you save, commit or switch branch;
+  - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set;
+  - the intent layer, checked every 5 minutes;
+  - the engine itself, after it updates.
+  - It runs in the background from login on, with no terminal open: a LaunchAgent on a Mac, a user service on Linux. What it does goes to `.design-system-engine-out/watch.log`, and one request turns it off.
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).

@@ -212,6 +212,7 @@ How it checks the agent's work, in a loop, before you see it:
 - Every colour and space on the page is one of your tokens, so it looks like your system.
 - Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
 - Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
+- Your own copy builds itself again whenever the code, Figma, the intent layer or the engine changes, in the background from login on.
 - The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
 
 ## Update Figma from the code
