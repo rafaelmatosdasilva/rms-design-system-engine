@@ -124,7 +124,7 @@ test('the guard holds an addition with why it is shared and who decides it, and 
   assert.equal(judge({ tool_name: 'Write', cwd: root, tool_input: { file_path: join(root, '.design-system-engine-out/held-for-sign-off.json'), content: '{}' } }, { cfg, userText: 'yes' }).decision, 'deny');
 });
 
-test('the style guide shows local or shared beside who acts, counts them on the Tasks page, and says it on a change in Figma', () => {
+test('the style guide shows local or shared beside who acts, never counts them in a line of its own, and says it on a change in Figma', () => {
   const tpl = templateText();
   const fn = (name) => new RegExp(`function ${name}\\(x\\) \\{[^\\n]*\\}`).exec(tpl)[0];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -132,7 +132,7 @@ test('the style guide shows local or shared beside who acts, counts them on the 
   assert.equal(scopeHTML({ scope: 'shared', reason: 'Shared: why.', decider: { name: 'Cards lead' } }), '<span class="sg-todo-scope" data-scope="shared" title="Shared: why.">Shared, waits on Cards lead</span>');
   assert.equal(scopeHTML({ scope: 'local', reason: 'Local: why.' }), '<span class="sg-todo-scope" data-scope="local" title="Local: why.">Local, waits on no one</span>');
   assert.match(tpl, /\(r\.who \? '<span class="sg-todo-who">' \+ esc\(r\.who\) \+ '<\/span>' : ''\) \+ \(isOpen\(r\) \? scopeHTML\(rowScope\(r\)\) : ''\)/, 'beside who acts, on every open task');
-  assert.match(tpl, /sc\.shared \+ ' shared' \+ \(onList\.length \? ', waiting on ' \+ onList\.join\(', '\) : ''\)/, 'the Tasks page counts them, with who the shared ones wait on');
+  assert.doesNotMatch(tpl, /sg-todo-scope-line|' shared' \+ \(onList/, 'no line on the Tasks page counting them: each task says it beside who acts');
   assert.match(tpl, /card\('Local or shared', x\.scope \? lines\(\[x\.scope\.reason\]\) : ''\)/, 'a change in Figma says it');
   assert.match(tpl, /scope: \{ scope: 'local', reason: 'Local: ' \+ x\.product/, 'a product\'s near copy is that product\'s');
 });
