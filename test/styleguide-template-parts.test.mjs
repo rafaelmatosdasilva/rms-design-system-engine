@@ -38,3 +38,15 @@ test('a template of one file is read as it is; parts of a project\'s own are joi
   assert.equal(joinTemplate('/*@part ../secret.css*/\n', join(dir, 'parts')), '/*@part ../secret.css*/\n', 'never a file outside the template\'s folder');
   assert.equal(joinTemplate('//@part parts/none.js\n', dir), '//@part parts/none.js\n', 'a part not there stays, so the page says what is missing');
 });
+
+test('the page\'s text helpers: tags stripped until none is left, entities unescaped once, a quoted name keeps its backslash', () => {
+  const start = readFileSync(join(ENGINE, 'templates', 'styleguide', 'js', '00-start.js'), 'utf8');
+  const fn = (name) => start.match(new RegExp(`function ${name}\\(.*`))[0];
+  const { plainText, unescapeHTML } = new Function(`${fn('plainText')}\n${fn('unescapeHTML')}\nreturn { plainText, unescapeHTML };`)();
+  assert.equal(plainText('<b>Save</b> a <i>draft</i>'), ' Save  a  draft ');
+  assert.equal(plainText('<scr<script>ipt>alert(1)</script>', ''), 'alert(1)', 'a tag hidden in a tag is gone too');
+  assert.doesNotMatch(plainText('a <<b>script> b'), /[<>]/);
+  assert.equal(unescapeHTML('&amp;lt;b&amp;gt; &lt;i&gt; &quot;x&quot; &#39;y&#39;'), '&lt;b&gt; <i> "x" \'y\'', 'an escaped entity stays one');
+  const part = readFileSync(join(ENGINE, 'templates', 'styleguide', 'js', '19-the-code-a-product-writes.js'), 'utf8');
+  assert.match(part, /v\.replace\(\/\\\\\/g, '\\\\\\\\'\)\.replace\(\/'\/g, "\\\\'"\)/, 'a backslash escaped before the quote');
+});
