@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { exportProfile, applyProfile, readProfile, refreshProfile, writeCommand, commandName, validate, PROFILE_FILE } from '../profile.mjs';
+import { exportProfile, applyProfile, readProfile, refreshProfile, writeCommand, commandName, validate, PROFILE_FILE } from '../lib/profile.mjs';
 import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';

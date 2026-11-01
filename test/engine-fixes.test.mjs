@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sureFixes, withFixes, applyFixes, fixLines, rootElement, DRAFT } from '../engine-fixes.mjs';
+import { sureFixes, withFixes, applyFixes, fixLines, rootElement, DRAFT } from '../lib/engine-fixes.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const system = () => ({

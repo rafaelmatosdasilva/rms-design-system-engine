@@ -6,9 +6,9 @@ import { readFileSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'node
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { tokenCss, modeBlock, buildOrder, buildLine, TOKENS_TO_BUILD } from '../build-list.mjs';
-import { inProgressList, inProgressNames } from '../in-progress.mjs';
-import { nextStep, buildSummary } from '../next-step.mjs';
+import { tokenCss, modeBlock, buildOrder, buildLine, TOKENS_TO_BUILD } from '../lib/build-list.mjs';
+import { inProgressList, inProgressNames } from '../lib/in-progress.mjs';
+import { nextStep, buildSummary } from '../lib/next-step.mjs';
 import { fixtureProject, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -56,7 +56,7 @@ test('in build mode a Figma component with no code is to build, and every gate s
 
 test('the token check lists the tokens to build, exactly, and does not fail; a wrong value still fails', () => {
   const dir = figmaOnly();
-  let r = spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  let r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /TO BUILD {2}17 token\(s\)/);
   const css = readFileSync(join(dir, TOKENS_TO_BUILD), 'utf8');
@@ -64,7 +64,7 @@ test('the token check lists the tokens to build, exactly, and does not fail; a w
   assert.match(css, /:root\[data-theme="dark"\] \{[^}]*--button-background: #5b8def;/);
   // Built as listed, every token matches; one value changed by hand fails as usual.
   writeFileSync(join(dir, 'src/theme.css'), css.replace(/^\/\*.*\*\/\n/, '').replace('--radii-chip: 16px;', '--radii-chip: 12px;'));
-  r = spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
   assert.equal(r.status, 1);
   assert.doesNotMatch(r.stdout, /TO BUILD/);
   assert.match(r.stdout, /--radii-chip/);
@@ -89,7 +89,7 @@ test('the next step builds the tokens first, then a component only when the pers
 test('setup asks where the code is before it writes anything; told it starts here from Figma, it is in build mode', { timeout: budget(120000) }, () => {
   const dir = tempDir('build-init-');
   execFileSync('git', ['init', '-q'], { cwd: dir });
-  const init = (...more) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks', ...more], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const init = (...more) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool', '--no-hooks', ...more], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   const asked = init();
   assert.equal(asked.status, 2, 'never set up by a guess');
   assert.match(asked.stdout, /Setup needs to know where the code is first\. Nothing was written\.\n.*has no code\.\nNEXT: ask the person where the design system's code is: this folder, another folder on this computer, or a link to its repository on GitHub or GitLab; and, if they have it, a link to its written documentation for agents: an intent layer in a GitLab or GitHub repository or a docs folder, a wiki or Notion page \(optional\)\. Then run rms-design-system-engine --init --project='<\. for this folder, or the folder or repository link>' --figma-url='https:\/\/www\.figma\.com\/design\/AbCdEf123456XyZ\/Tidepool' --documentation='<the documentation link, if they gave one>'/s);
@@ -108,9 +108,9 @@ test('setup asks where the code is before it writes anything; told it starts her
 });
 
 test('the edit check knows the tokens still to build, so a new component is checked against them', async () => {
-  const { editTruth } = await import('../edit-check.mjs');
+  const { editTruth } = await import('../lib/edit-check.mjs');
   const dir = figmaOnly();
-  spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
   const t = editTruth(dir, cfgOf(dir));
   assert.ok(t.tokenByValue.get('#1f5fd6')?.includes('--button-background'));
   const { build, ...plain } = cfgOf(dir);
@@ -119,14 +119,14 @@ test('the edit check knows the tokens still to build, so a new component is chec
 
 test('a component built by the convention is checked: its height, spacing variables, colours and states', async () => {
   const dir = figmaOnly();
-  spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
   const tokens = readFileSync(join(dir, TOKENS_TO_BUILD), 'utf8').replace(/^\/\*.*\*\/\n/, '');
   const button = (h, gap, hover = true) => `${tokens}
 .button { height: ${h}; padding: var(--padding-xs) var(--padding-m); gap: ${gap}; border-radius: var(--radii-button); background: var(--button-background); color: var(--button-text); }
 ${hover ? '.button:hover:not(:disabled) { background: var(--button-background-hover); }' : ''}
 .button:disabled { opacity: 0.5; }
 `;
-  const run = () => spawnSync(process.execPath, [join(ENGINE, 'structure-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'lib', 'structure-check.mjs')], { cwd: dir, encoding: 'utf8' });
   writeFileSync(join(dir, 'src/theme.css'), button('32px', 'var(--gap-s)'));
   let r = run();
   assert.equal(r.status, 0, r.stdout);
@@ -141,7 +141,7 @@ ${hover ? '.button:hover:not(:disabled) { background: var(--button-background-ho
 
 test('--query prints the build sheet for a component still to build', () => {
   const dir = figmaOnly();
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--query', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /to build\. Write it like this/);
   assert.match(r.stdout, /\.field \{ height: 36px; padding: var\(--padding-s\) var\(--padding-s\); border-radius: var\(--radii-field\); border-color: var\(--field-border\) \}/);
   assert.match(r.stdout, /State=Error → \.field\.field--error \{ border-color: var\(--field-border-error\) \}/);
@@ -150,26 +150,26 @@ test('--query prints the build sheet for a component still to build', () => {
 
 test('the Figma-only Tidepool project: the first run passes and lists the tokens, then the components, to build', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));
   assert.match(r.stdout, /TO BUILD {2}17 tokens .*; 5 components: button, chip, disclosure, field, stepper\./);
   assert.match(r.stdout, /NEXT: build the tokens: copy the declarations in .* into src\/styles\/tokens\.css/);
 });
 
 test('the build sheet says what markup a role asks for', async () => {
-  const { roleMarkup } = await import('../build-list.mjs');
+  const { roleMarkup } = await import('../lib/build-list.mjs');
   assert.match(roleMarkup('togglebutton'), /<button type="button"> with aria-pressed/);
   assert.match(roleMarkup('Toggle button'), /aria-pressed/);
   assert.match(roleMarkup('button'), /^a <button/);
   assert.equal(roleMarkup('treegrid'), 'an element with role="treegrid"');
   const dir = figmaOnly();
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /role: togglebutton, so write it as a <button type="button"> with aria-pressed/);
 });
 
 test('the build sheet lists a control\'s parts: each with its role, its wiring and where it is checked', () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-parts-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'stepper'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--query', 'stepper'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /its parts, each wired to the control:\n\s+the "Decrement" part \(role decrement\) is a button with a spoken name \("Decrease", "Remove one"\)\. Checked: tried in the browser/);
   assert.match(r.stdout, /the "Increment" part \(role increment\) is a button with a spoken name/);
 });
@@ -178,7 +178,7 @@ test('a component built into its own stylesheet is found, recorded as a theme fi
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-own-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
-  const run = () => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = run();
   assert.match(r.stdout, /Build mode: src\/components\/tag\.css holds a component's rules/);
   assert.deepEqual(cfgOf(dir).paths.themeCSS, ['src/styles/tokens.css', 'src/components/tag.css']);
@@ -197,7 +197,7 @@ test('a literal with no Figma value is named by its file, line and declaration, 
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
   writeFileSync(join(dir, 'src/components/tag.css'), readFileSync(join(dir, 'src/components/tag.css'), 'utf8').replace(/\.tag \{/, '.tag { width: 243px;'));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /❌ src\/components\/tag\.css:1 width: 243px \(no Figma value\)/);
   assert.match(readFileSync(join(dir, '.design-system-engine-out', 'summary.md'), 'utf8'), /- src\/components\/tag\.css:1 width: 243px \(no Figma value\)/);
 });
@@ -205,7 +205,7 @@ test('a literal with no Figma value is named by its file, line and declaration, 
 test('the build sheet asks for a variant selector only when the variant changes a style, and names raw colours', () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sheet-');
   execFileSync('git', ['init', '-q'], { cwd: dir });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'chip', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--query', 'chip', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /Size=L → \.chip\.chip--l/);
   assert.doesNotMatch(r.stdout, /chip--icon/, 'Icon=True only adds a layer, so it needs no CSS');
   // tag is experimental: off the build list, but it gets its sheet when asked for.
@@ -214,7 +214,7 @@ test('the build sheet asks for a variant selector only when the variant changes 
 });
 
 test('the edit check accepts a colour Figma paints with no variable, and still flags one Figma does not have', async () => {
-  const { editTruth, editFindings } = await import('../edit-check.mjs');
+  const { editTruth, editFindings } = await import('../lib/edit-check.mjs');
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-edit-');
   const t = editTruth(dir, cfgOf(dir));
   const css = '.tag.tag--positive { background-color: #d6f5e3; color: #136c3a; }\n.tag.tag--other { color: #123456; }';
@@ -228,7 +228,7 @@ test('a variant written as its modifier class alone (.tag--positive) meets .tag.
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
   const css = join(dir, 'src/components/tag.css');
-  const run = () => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   writeFileSync(css, readFileSync(css, 'utf8').replace('.tag.tag--positive', '.tag--positive'));
   let r = run();
   assert.equal(r.status, 0, r.stdout.split('\n').filter((l) => /❌/.test(l)).join('\n'));

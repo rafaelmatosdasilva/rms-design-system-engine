@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rawGapMatches } from '../raw-gap.mjs';
+import { rawGapMatches } from '../lib/raw-gap.mjs';
 
 test('flush (gap 0) accepts 0 and 0px, rejects a stray gap', () => {
   assert.equal(rawGapMatches('0', 0), true);

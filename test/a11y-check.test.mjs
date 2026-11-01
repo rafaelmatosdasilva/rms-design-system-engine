@@ -8,11 +8,11 @@ import {
   isLargeText, aaThreshold, contrastFindings, INTERACTIVE_ROLES,
   styleguideTarget, A11Y_GUIDE, a11yItemLine, a11yFindingRecord, summarizeAxe,
   iconContrastFindings, namedByTitleOnly, SETTLE_TRANSITIONS, STATE_CLASSES, stateHeard,
-} from '../a11y-check.mjs';
+} from '../lib/a11y-check.mjs';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -241,7 +241,7 @@ test('a project whose packages are not installed is told so, not "auto-discovery
   writeFileSync(j(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css' } }));
   writeFileSync(j(dir, 'theme.css'), ':root { --a: #fff; }');
   writeFileSync(j(dir, 'package.json'), JSON.stringify({ name: 'p', scripts: { serve: 'vite' } }));
-  const r = spawnSync(process.execPath, [j(d(d(f(import.meta.url))), 'a11y-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [j(d(d(f(import.meta.url))), 'lib', 'a11y-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0);
   assert.match(r.stdout, /the project's packages are not installed \(no node_modules\)|Chrome not found/, r.stdout);
 });
@@ -255,14 +255,14 @@ test('a style guide that draws no component is not the page checked: the project
 });
 
 test('on the style guide, the rules that a landmark sit at the top of the page are the page\'s, never the component\'s', async () => {
-  const { axeRules, AXE_PAGE_LANDMARKS } = await import('../a11y-check.mjs');
+  const { axeRules, AXE_PAGE_LANDMARKS } = await import('../lib/a11y-check.mjs');
   assert.ok(AXE_PAGE_LANDMARKS.includes('landmark-complementary-is-top-level'));
   for (const id of AXE_PAGE_LANDMARKS) assert.deepEqual(axeRules(true)[id], { enabled: false }, id);
   for (const id of AXE_PAGE_LANDMARKS) assert.equal(axeRules(false)[id], undefined, 'any other page is held to them');
 });
 
 test('a style guide with many components is checked in parts of a few components each, every part drawing only its own', async () => {
-  const { styleguideShares, SHARE_COMPONENTS } = await import('../a11y-check.mjs');
+  const { styleguideShares, SHARE_COMPONENTS } = await import('../lib/a11y-check.mjs');
   const sgPath = '/proj/.design-system-engine-out/styleguide/index.html';
   const names = Array.from({ length: SHARE_COMPONENTS * 2 + 1 }, (_, i) => `c${i}`).concat('table/row');
   const sg = styleguideTarget({}, '/proj', (p) => p === sgPath, () => `<script type="application/json" id="sg-data">${JSON.stringify({ components: names.map((name) => ({ name })) })}</script>`);
@@ -278,7 +278,7 @@ test('a style guide with many components is checked in parts of a few components
 });
 
 test('a dev server that prints its address in colour (Vite\'s bold port) is read without the colour codes', { timeout: budget(30000) }, async () => {
-  const { startDevServer } = await import('../a11y-check.mjs');
+  const { startDevServer } = await import('../lib/a11y-check.mjs');
   const { writeFileSync } = await import('node:fs');
   const { join: j } = await import('node:path');
   const dir = tempDir('a11y-serve-');
@@ -288,7 +288,7 @@ test('a dev server that prints its address in colour (Vite\'s bold port) is read
 });
 
 test('pages from a router in modules with hash history; scoped, the pages that use the component, its own first', async () => {
-  const { discoverRoutes } = await import('../a11y-check.mjs');
+  const { discoverRoutes } = await import('../lib/a11y-check.mjs');
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join: j, dirname: d } = await import('node:path');
   const dir = tempDir('routes-');
@@ -304,7 +304,7 @@ test('pages from a router in modules with hash history; scoped, the pages that u
 });
 
 test('a component looked for by a class the code never gives an element is said at once, with the classes that hold its name', async () => {
-  const { classInCode, classesLike } = await import('../a11y-check.mjs');
+  const { classInCode, classesLike } = await import('../lib/a11y-check.mjs');
   const code = '<!-- the modal opens here -->\n<div :class="{ \'modal-overlay\': open }"><div class="modal-wrapper x"><p class="modal-title"></p></div></div>\n<div class="modal-wrapper"></div>\n.card .button-primary { color: red }';
   assert.equal(classInCode(code, '.modal'), false, 'a word in a comment and a longer class are not .modal');
   assert.equal(classInCode(code, '.modal-overlay'), true, 'a quoted class a binding adds');
@@ -315,13 +315,13 @@ test('a component looked for by a class the code never gives an element is said 
 });
 
 test('[axe] the pinned copy is kept under the home cache and fetched by --fetch-axe, which the install and --update run', async () => {
-  const { axeCachePath, axeCached } = await import('../a11y-check.mjs');
+  const { axeCachePath, axeCached } = await import('../lib/a11y-check.mjs');
   const home = tempDir('axe-home-');
   assert.match(axeCachePath(home), /\.cache\/rms-design-system-engine\/axe-[\d.]+\.min\.js$/);
   assert.equal(axeCached(home), null, 'nothing kept yet');
   mkdirSync(dirname(axeCachePath(home)), { recursive: true });
   writeFileSync(axeCachePath(home), 'not axe');
   assert.equal(axeCached(home), null, 'a file that is not the pinned one does not count');
-  assert.match(readFileSync(join(ENGINE, 'install.sh'), 'utf8'), /node "\$CLONE_DIR\/a11y-check\.mjs" --fetch-axe \|\| true/);
-  assert.match(readFileSync(join(ENGINE, 'audit.mjs'), 'utf8'), /'a11y-check\.mjs'\), '--fetch-axe'\]/);
+  assert.match(readFileSync(join(ENGINE, 'install.sh'), 'utf8'), /node "\$CLONE_DIR\/lib\/a11y-check\.mjs" --fetch-axe \|\| true/);
+  assert.match(readFileSync(join(ENGINE, 'lib', 'audit.mjs'), 'utf8'), /'a11y-check\.mjs'\), '--fetch-axe'\]/);
 });

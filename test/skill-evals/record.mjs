@@ -133,7 +133,7 @@ if (process.argv[1] && process.argv[1].endsWith('record.mjs')) {
   if (ENTRY) {
     const ENGINE = dirname(dirname(HERE));
     const { readFolder } = await import('./summarize.mjs');
-    const { guideSetHash, guideFileHashes } = await import('../../skill-files.mjs');
+    const { guideSetHash, guideFileHashes } = await import('../../lib/skill-files.mjs');
     const sidesOf = (dir) => Object.fromEntries(readFolder(dir).filter((x) => x.set === 'guide').map((x) => [x.model, runStats(x.rows)]));
     const now = sidesOf(join(HERE, 'records', name));
     const engines = [...new Set(Object.values(now).flatMap((x) => x.engine.split(', ')))];

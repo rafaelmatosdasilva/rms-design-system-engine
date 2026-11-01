@@ -1,7 +1,7 @@
 // agent instruction files tell the truth. What is a wrong design-system name, and what is not.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findSteeringFiles, steeringTruth, steeringFindings, steeringLine } from '../steering-check.mjs';
+import { findSteeringFiles, steeringTruth, steeringFindings, steeringLine } from '../lib/steering-check.mjs';
 import { makeFixture, budget, tempDir } from './helpers.mjs';
 
 const truth = steeringTruth({
@@ -79,7 +79,7 @@ test('in a real run on the demo design system: wrong names are listed, a correct
     for (const [f, text] of Object.entries(files)) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), text); }
     const env = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@e', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@e' };
     execFileSync('git', ['init', '-q'], { cwd: dir }); execFileSync('git', ['add', '-A'], { cwd: dir }); execFileSync('git', ['commit', '-qm', 'x'], { cwd: dir, env: { ...process.env, ...env } });
-    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--static'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: budget(300000) });
+    const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--static'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: budget(300000) });
     return r.stdout + r.stderr;
   };
   const bad = run({ 'AGENTS.md': 'Use <Chip size="XL"> next to <Button />.\nRound it with var(--radii-chipp).\nThe radius token is radii/chipz.\nRun rms-design-system-engine --component chip.\n' });
@@ -92,7 +92,7 @@ test('in a real run on the demo design system: wrong names are listed, a correct
 });
 
 test('a file about the design system that only says what not to use', async () => {
-  const { mandateOf } = await import('../steering-check.mjs');
+  const { mandateOf } = await import('../lib/steering-check.mjs');
   const comps = ['chip', 'button', 'badge'];
   assert.equal(mandateOf('# Agents\nNever build your own chip. Avoid inline styles in the design system.', comps).onlyForbids, true);
   assert.equal(mandateOf('# Agents\nThe design system is installed: use its components (Chip, Button). Never build your own chip.', comps).onlyForbids, false);

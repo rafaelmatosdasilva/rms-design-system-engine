@@ -1,7 +1,7 @@
 // Gate [24]: a rendered assertion's expected colour taken from its Figma variable, never typed and left to go stale.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expandFigmaVars, renderedMatches, textStyleExpectations, schemeSwitch } from '../rendered-expect.mjs';
+import { expandFigmaVars, renderedMatches, textStyleExpectations, schemeSwitch } from '../lib/rendered-expect.mjs';
 
 const modes = [{ name: 'Light', snapshotKey: 'light' }, { name: 'Dark', snapshotKey: 'dark' }];
 const color = { light: { 'input/border/default/color': '#adadad', 'scrim/color': '#00000080' }, dark: { 'input/border/default/color': '#5e5e5e' } };
@@ -58,7 +58,7 @@ test('a mode is put on as the project puts it on: its class, its data attribute,
 
 // The gate itself: the colour follows the Figma snapshot, so a variable that moved fails on the new value.
 import { runGate } from './helpers.mjs';
-import { findChrome } from '../cdp.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 const CHROME = findChrome({ playwright: true });
 test('[rendered-check] a figmaVar assertion passes on the variable\'s value and fails when Figma moves it', { skip: CHROME && typeof WebSocket !== 'undefined' ? false : 'no Chrome available' }, () => {
   const files = (hex) => ({

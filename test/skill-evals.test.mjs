@@ -6,7 +6,7 @@ import { writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { context, decisionPoints } from './skill-evals/lib.mjs';
+import { context, decisionPoints, afterPass } from './skill-evals/lib.mjs';
 import { globalChecks, asksForToken } from './skill-evals/rules.mjs';
 import { DEV, COMBO, chipFixed, radiusAccepted, burndownTop, figmaRolesScore } from './skill-evals/tasks.mjs';
 import { HELDOUT } from './skill-evals/heldout.mjs';
@@ -234,7 +234,7 @@ export function guideMeasured(results, now, files) {
   return { ok: !!seen.size && !unmeasured.length, sets, unmeasured };
 }
 test('RESULTS.md records the guide set that is in the repository', async () => {
-  const { guideSetHash, guideFileHashes } = await import('../skill-files.mjs');
+  const { guideSetHash, guideFileHashes } = await import('../lib/skill-files.mjs');
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const results = readFileSync(join(root, 'test', 'skill-evals', 'RESULTS.md'), 'utf8');
   const now = guideSetHash(root);
@@ -380,4 +380,12 @@ test('route benchmark: the table says, per route, the passes, time, tokens, tool
   const table = routeTable({ shell: [row('shell', true, 1, [])], mcp: [row('mcp', true, 0, ['query'])] });
   assert.match(table, /\| shell only \(the command line\) \| 1\/1 \| 12 s \| 50k \| 300 \| 4\.0 \| \$0\.050 \| command 1 \|/);
   assert.match(table, /\| `route-props` \| 1\/1 \| 1\/1 \|/);
+});
+
+test('a run that failed in the harness is tried once more at once, never waited on as a usage limit', () => {
+  assert.equal(afterPass(0), 'done');
+  assert.equal(afterPass(3), 'wait');            // the API refused a run: its limit resets
+  assert.equal(afterPass(4), 'retry');           // runs failed in the harness (the Agent SDK not installed, say)
+  assert.equal(afterPass(4, true), 'stop');      // and still failed: waiting would not fix them
+  assert.equal(afterPass(2), 'stop');
 });

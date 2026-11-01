@@ -1,8 +1,8 @@
 // family-consistency.mjs — components of one type built the same way in Figma. Every name below is invented.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { familyFindings, familyLine } from '../family-consistency.mjs';
-import { plainAction, plainDifference } from '../run-diff.mjs';
+import { familyFindings, familyLine } from '../lib/family-consistency.mjs';
+import { plainAction, plainDifference } from '../lib/run-diff.mjs';
 
 const onOff = { type: 'VARIANT', variantOptions: ['false', 'true'] };
 const state = (...o) => ({ type: 'VARIANT', variantOptions: o });

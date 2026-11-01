@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { varsScript, readCapture, importCapture, captureWithFigmaCli, figmaCliEval, parseAnswer, cyrb53, recipeScripts, importLines, varsItems, encodeValue, decodeValue } from '../figma-capture.mjs';
-import { snapshotsFromDesign } from '../figma-cli-import.mjs';
+import { varsScript, readCapture, importCapture, captureWithFigmaCli, figmaCliEval, parseAnswer, cyrb53, recipeScripts, importLines, varsItems, encodeValue, decodeValue } from '../lib/figma-capture.mjs';
+import { snapshotsFromDesign } from '../lib/figma-cli-import.mjs';
 import { largeVarsFile, asFigma as asLargeFigma } from './figma-standin.mjs';
 import { tempDir } from './helpers.mjs';
 
@@ -165,7 +165,7 @@ test('the commands write the script for a chunk and import what was saved', asyn
 
   const ENGINE = join(fileURLToPath(new URL('.', import.meta.url)), '..');
   const root = project();
-  const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = cli('--capture-script', 'vars', '0');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const script = join(root, '.design-system-engine-out/figma-capture/vars-0.js');
@@ -180,7 +180,7 @@ test('the commands write the script for a chunk and import what was saved', asyn
 
 // On a real file: Tidepool's answer, saved as the Figma tool returned it (test/fixtures/tidepool-figma/figma-capture).
 test('on a real file: Figma\'s checksum holds, and the Figma tool, the recipe\'s capture and figma-cli agree', async () => {
-  const { varsFromItems } = await import('../figma-capture.mjs');
+  const { varsFromItems } = await import('../lib/figma-capture.mjs');
   const { tidepoolDesign } = await import('./figma-cli-design.mjs');
   const TP = join(fileURLToPath(new URL('.', import.meta.url)), 'fixtures', 'tidepool-figma');
   const answer = JSON.parse(readFileSync(join(TP, 'figma-capture', 'vars-0.json'), 'utf8'));

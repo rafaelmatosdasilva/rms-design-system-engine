@@ -6,6 +6,10 @@ Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). How deci
 
 Open an issue on GitHub. Say what you ran, what you expected and what happened instead, with the run's output. A security problem goes through the Security tab instead, never an issue ([SECURITY.md](SECURITY.md)).
 
+## Where things are
+
+The engine's modules are in `lib/`. Four files stay at the root because people's setups name them: `audit.mjs` (the `rms-design-system-engine` command), `guard.mjs` (the Claude Code hooks), `mcp.mjs` (the MCP server) and `styleguide-files.mjs` (the style guide publishing job). Each one only loads its module from `lib/`. The guide is `rms-design-system-engine.md`, with `cookbook/` and `reference/` beside it, and the tests are in `test/`.
+
 ## Send a change
 
 1. Fork the repository and branch from `main`.
@@ -15,7 +19,7 @@ Open an issue on GitHub. Say what you ran, what you expected and what happened i
    ```bash
    for d in .ci-tools .vue-tools .vue-cli-tools .nuxt-tools; do npm ci --prefix test/$d; done
    node --test test/*.test.mjs
-   node sync-docs.mjs --check
+   node lib/sync-docs.mjs --check
    ```
 
 4. Open a pull request against `main` with one release label: `release: patch` (a fix, docs or internal work), `release: minor` (a new capability) or `release: major` (something that works differently for people already using the engine).

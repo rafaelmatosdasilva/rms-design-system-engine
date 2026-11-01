@@ -10,13 +10,13 @@ import { cpSync, writeFileSync, readFileSync, symlinkSync, existsSync, mkdirSync
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { variantsFromCode, startHarness, loadTypeScript } from '../component-harness.mjs';
-import { globalStyles, renderedVue, appPlugins, appSetup, runtimeDeps, propSamples } from '../vue-harness.mjs';
-import { harnessCases } from '../component-harness.mjs';
-import { textComponentApi } from '../component-source.mjs';
-import { findChrome } from '../cdp.mjs';
+import { variantsFromCode, startHarness, loadTypeScript } from '../lib/component-harness.mjs';
+import { globalStyles, renderedVue, appPlugins, appSetup, runtimeDeps, propSamples } from '../lib/vue-harness.mjs';
+import { harnessCases } from '../lib/component-harness.mjs';
+import { textComponentApi } from '../lib/component-source.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -69,7 +69,7 @@ test('a React component with no Figma variants is rendered in its code\'s', { sk
 
 test('the browser check tries every variant of a Vue component, rendered by the project\'s own Vite', { skip: READY, timeout: budget(300000) }, () => {
   const dir = harbor('vue-a11y-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, CHROME_PATH: CHROME } });
   const out = r.stdout + r.stderr;
   assert.match(out, /ℹ️ {2}\[a11y\] target: 4 Vue component\(s\) rendered with the project's own Vite in each variant \(button: 3 from Figma, badge: 3 from Figma, iconButton: 1 from its props, HbChip: 4 from its props\)/, out);
   const d = JSON.parse(r.stdout.slice(r.stdout.indexOf('{\n')));
@@ -87,7 +87,7 @@ test('the style guide draws a Vue component as the project\'s own Vite renders i
   edit('figma/structure.snapshot.json', (c) => { c.chip = { h: 24, defaultVariant: 'Tone=Quiet', variants: { 'Tone=Quiet': { h: 24 } } }; });
   edit('figma/props.snapshot.json', (c) => { c.chip = { nodeId: '9:1', properties: { Tone: { type: 'VARIANT', defaultValue: 'Quiet', variantOptions: ['Quiet', 'Loud'] }, 'label#9:0': { type: 'TEXT', defaultValue: 'Filter' } }, annotations: [] }; });
   edit('ds-config.json', (c) => { c.componentFiles.chip = 'components/HbChip.vue'; });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /4 of 4 Vue components drawn as the project's own Vite renders them\./);
   const page = readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'));
@@ -97,7 +97,7 @@ test('the style guide draws a Vue component as the project\'s own Vite renders i
   // Without the packages, its template is read as before, and the summary says why.
   const bare = tempDir('vue-sg-bare-');
   cpSync(HARBOR, bare, { recursive: true });
-  const b = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: bare, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const b = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: bare, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.match(b.stdout, /Vue components drawn from their templates: the project has no vue package installed\./);
 });
 
@@ -110,7 +110,7 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
 </script>
 <template><button :class="['hb-button', { 'hb-button--secondary': variant === 'Secondary' }]" type="button"><span v-if="size === 'Large'" class="hb-button-icon" aria-hidden="true">→</span>{{ label }}<HbBadge /></button></template>
 `);
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(250000), env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   // The button and the badge it nests: the icon button and the chip are not rendered for this page.
   assert.match(r.stdout, /2 of 2 Vue components drawn as the project's own Vite renders them\./, r.stdout);
@@ -118,7 +118,7 @@ withDefaults(defineProps<{ variant?: 'Primary' | 'Secondary'; size?: 'Small' | '
   const data = JSON.parse(readPage(file).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   const button = data.components.find((c) => c.name === 'button');
   assert.ok(button.renders?.some((x) => x.props.size === 'Large' && /hb-button-icon/.test(x.markup)), JSON.stringify(button.renders));
-  const { launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const c = await launchChrome(CHROME);
   try {
     const { send, close } = await connectCDP(c.wsUrl);
@@ -222,7 +222,7 @@ test('a text with no default takes the value the project\'s own pages pass it mo
 });
 
 test('a part loaded by a name it is given gets the name of a file it can load, the one the code uses most first', async () => {
-  const { asyncChoices, keyedNames, withChoices, withCaseChoices } = await import('../vue-harness.mjs');
+  const { asyncChoices, keyedNames, withChoices, withCaseChoices } = await import('../lib/vue-harness.mjs');
   const dir = tempDir('vue-parts-'); mkdirSync(join(dir, 'src', 'tiles'), { recursive: true }); mkdirSync(join(dir, 'src', 'panel'));
   for (const n of ['Banner', 'Outline', 'Solid']) writeFileSync(join(dir, 'src', 'tiles', `${n}.vue`), '<template><button/></template>');
   writeFileSync(join(dir, 'src', 'Page.vue'), "<script setup>const a = [{ kind: 'Solid' }, { kind: 'Solid' }, { kind: 'Outline' }]\nconst b = { tileKind: 'Outline' }</script>");
@@ -248,7 +248,7 @@ test('a part loaded by a name it is given gets the name of a file it can load, t
 });
 
 test('a value no page writes takes what the project\'s other components declare that prop as, never its own name', async () => {
-  const { propKinds, listSamples } = await import('../vue-harness.mjs');
+  const { propKinds, listSamples } = await import('../lib/vue-harness.mjs');
   const apis = {
     'a/Solid.vue': { props: { tileSize: { type: 'string', options: ['s', 'm', 'l'], default: 'm' }, stretched: { type: 'boolean' }, count: { type: 'number' } } },
     'a/Ghost.vue': { props: { tileSize: { type: 'string', options: ['s', 'm'] }, stretched: { type: 'boolean' } } },
@@ -262,7 +262,7 @@ test('a value no page writes takes what the project\'s other components declare 
   const items = listSamples(tpl, ['tiles'], { align: 'center' }, null, {}, kinds).tiles;
   assert.deepEqual(items[1], { tileSize: 'm', stretched: false, count: 2, align: 'center 2', label: 'Label 2' }, 'its default option, off, a number; a sample of a field with no options and a text keep their words');
   assert.equal(listSamples(tpl, ['tiles'], { align: 'center' }, null, {}, { ...kinds, align: { type: 'string', options: ['left', 'center'] } }).tiles[0].align, 'center', 'a sample of a field with options is used as it is');
-  const { variantsFromCode } = await import('../component-harness.mjs');
+  const { variantsFromCode } = await import('../lib/component-harness.mjs');
   const labels = variantsFromCode({ props: { tileSize: { type: 'string' }, label: { type: 'string' } } }, "defineProps({ tileSize: String, label: String })", 16, kinds).map((c) => c.label);
   assert.deepEqual(labels.filter((l) => l.startsWith('tileSize')), ['tileSize=s', 'tileSize=l'], 'a bare prop drawn in the options the others declare, not as tileSize="tileSize"');
   assert.ok(labels.includes('label="label"'), 'a text still shows its own name as its words');
@@ -295,7 +295,7 @@ test('a Vue component drawn as the product draws it: Figma\'s names in the code\
 test('a component draws with the data its own documentation page gives it, read as plain data and never run', async () => {
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { pageSamples } = await import('../vue-harness.mjs');
+  const { pageSamples } = await import('../lib/vue-harness.mjs');
   const root = tempDir('page-samples-');
   mkdirSync(join(root, 'src', 'components', 'charts'), { recursive: true });
   mkdirSync(join(root, 'src', 'views'), { recursive: true });
@@ -315,7 +315,7 @@ const made = build([1, 2])
 });
 
 test('an object a part reads: a date it reads left out, a field it loops over through a name of its own a list', async () => {
-  const { objectSamples } = await import('../vue-harness.mjs');
+  const { objectSamples } = await import('../lib/vue-harness.mjs');
   const got = objectSamples('const names = props.words.shortNames\nreturn names.map((n) => n)\nprops.words.longNames; props.range.from; props.range.startDate; props.range.label', ['words', 'range']);
   assert.deepEqual(got.words.shortNames, ['ShortName 1', 'ShortName 2', 'ShortName 3']);
   assert.equal(typeof got.words.longNames, 'string', 'one it only passes on is a value');
@@ -323,7 +323,7 @@ test('an object a part reads: a date it reads left out, a field it loops over th
 });
 
 test('an object a part reads: a word method makes a field a text, a field read into an object, a compared word and a table name used', async () => {
-  const { objectSamples } = await import('../vue-harness.mjs');
+  const { objectSamples } = await import('../lib/vue-harness.mjs');
   const code = `const tint = props.option.tintColor
 if (tint.startsWith('--')) x(); else if (tint.includes('-')) y()
 const name = props.button.kind.charAt(0).toUpperCase() + props.button.kind.slice(1)
@@ -346,8 +346,8 @@ props.amount.params.label; props.amount.params.isQuantity; props.amount.params.f
 });
 
 test('a value passed on to a child takes what the child declares: a number, its icon, or unset where the child falls back', async () => {
-  const { childFacing } = await import('../vue-harness.mjs');
-  const { textComponentApi } = await import('../component-source.mjs');
+  const { childFacing } = await import('../lib/vue-harness.mjs');
+  const { textComponentApi } = await import('../lib/component-source.mjs');
   const dir = tempDir('vue-child-');
   mkdirSync(join(dir, 'src', 'parts'), { recursive: true });
   mkdirSync(join(dir, 'node_modules', 'acme-money-field'), { recursive: true });
@@ -372,11 +372,11 @@ defineProps({ language: Object, title: String, amount: Object, pin: String })
 });
 
 test('a text the code compares with words takes those words; a part never loads its own file by name', async () => {
-  const { comparedWords, variantsFromCode } = await import('../component-harness.mjs');
+  const { comparedWords, variantsFromCode } = await import('../lib/component-harness.mjs');
   const text = "<script setup>\nconst props = defineProps({ view: String })\nswitch (props.view) { case 'week': a(); break; case 'month': b() }\nif (props.view === 'day') c()\n</script>";
   assert.deepEqual(comparedWords(text, 'view'), ['day', 'week', 'month']);
   assert.deepEqual(variantsFromCode(textComponentApi('Planner.vue', text), text).map((c) => c.label), ['default', 'view=week', 'view=month'], 'never view="View", which it would refuse');
-  const { asyncChoices } = await import('../vue-harness.mjs');
+  const { asyncChoices } = await import('../lib/vue-harness.mjs');
   const dir = tempDir('vue-own-');
   mkdirSync(join(dir, 'src', 'tiles'), { recursive: true });
   for (const n of ['Group', 'Solid', 'Ghost']) writeFileSync(join(dir, 'src', 'tiles', `${n}.vue`), '<template><i /></template>');
@@ -414,7 +414,7 @@ app.mount('#app')`);
 });
 
 test('what the page of components could not draw is said once per component, with why; only what the page could not set up is tried again', async () => {
-  const { harnessNotDrawn } = await import('../vue-harness.mjs');
+  const { harnessNotDrawn } = await import('../lib/vue-harness.mjs');
   const got = harnessNotDrawn([
     { name: 'calendar (default)', component: 'calendar', case: 'default', of: 3, why: 'no month names' },
     { name: 'calendar (view=month)', component: 'calendar', case: 'view=month', of: 3, why: 'no month names' },
@@ -468,14 +468,14 @@ app.mount('#app')`);
 });
 
 test('a Code Connect file that writes a prop only while a property has a value never gives it that value', async () => {
-  const { harnessModule } = await import('../vue-harness.mjs');
+  const { harnessModule } = await import('../lib/vue-harness.mjs');
   const mod = harnessModule([{ name: 'x', file: '/x.vue', cases: [], role: '' }]);
   assert.match(mod, /x\.role !== 'condition' \|\| types\.includes\(Boolean\)/, 'a condition sets only an on/off');
   assert.match(mod, /x\.unclear \|\| x\.equals != null\) continue/, 'only a plain switch removes a part');
 });
 
 test('a component that reads the route is drawn at a path its code expects: a name of the table it looks the path up in, a word or a path it compares', async () => {
-  const { routeFor } = await import('../vue-harness.mjs');
+  const { routeFor } = await import('../lib/vue-harness.mjs');
   const menu = `const route = useRoute()
 const shown = ref('parts')
 const pick = (path) => {
@@ -492,7 +492,7 @@ const pick = (path) => {
 });
 
 test('the items of a list inside an object get the fields the code reads of them, and those a child it hands each to reads; a list inside an item has items too', async () => {
-  const { objectSamples, childFacing } = await import('../vue-harness.mjs');
+  const { objectSamples, childFacing } = await import('../lib/vue-harness.mjs');
   const code = `<template><row-line v-for="(row, index) in shown" :info="row" /><i v-for="e in props.docs.events">{{ e.name }} {{ e.link.path }}</i></template>
 <script setup>
 const props = defineProps({ docs: Object })
@@ -517,7 +517,7 @@ const shown = computed(() => {
 });
 
 test('an icon that loads from a folder its code globs is given a name of a file in that folder', async () => {
-  const { asyncChoices } = await import('../vue-harness.mjs');
+  const { asyncChoices } = await import('../lib/vue-harness.mjs');
   const dir = tempDir('vue-glob-');
   mkdirSync(join(dir, 'src', 'glyphs', 'arrows'), { recursive: true });
   writeFileSync(join(dir, 'src', 'glyphs', 'star.svg'), '<svg/>');
@@ -590,7 +590,7 @@ if (!router.currentRoute.value.path.startsWith('/shop')) throw new Error('not in
 });
 
 test('a list inside an item inside an item has items too, down to a depth that ends a tree; a field only tested is an on/off', async () => {
-  const { objectSamples, listSamples } = await import('../vue-harness.mjs');
+  const { objectSamples, listSamples } = await import('../lib/vue-harness.mjs');
   const code = `<template><i v-for="g in props.menu.groups"><b v-for="it in g.items"><s v-if="it.badge">!</s>{{ it.label }}<u v-for="c in it.children">{{ c.name }}<em v-for="d in c.leaves">{{ d.x }}</em></u></b></i></template>`;
   const item = objectSamples(code, ['menu']).menu.groups[0].items[1];
   assert.equal(item.label, 'Label 2');
@@ -601,7 +601,7 @@ test('a list inside an item inside an item has items too, down to a depth that e
 });
 
 test('a component that reads the route\'s params, query or name, or a router of the project\'s own, is drawn on a route that has them', async () => {
-  const { routeFor } = await import('../vue-harness.mjs');
+  const { routeFor } = await import('../lib/vue-harness.mjs');
   assert.deepEqual(routeFor('const r = useRoute(); r.params.slug.split("-")'), { path: '/slug-1', pattern: '/:slug' }, 'a param, its own name and 1');
   assert.deepEqual(routeFor("const route = useRoute(); const id = Number(route.params.id); if (route.query.tab === 'notes') x()"), { path: '/1', pattern: '/:id', query: { tab: 'notes' } }, 'a number where it makes one, a word it compares');
   assert.deepEqual(routeFor('const route = useRoute(); const views = { overview: A, settings: B }; const V = views[route.name]'), { path: '/overview', pattern: '/overview', name: 'overview' }, 'a name it looks up in a table');
@@ -613,7 +613,7 @@ test('a component that reads the route\'s params, query or name, or a router of 
 });
 
 test('an error a component throws as it draws is said in its terms, the message after it', async () => {
-  const { harnessModule } = await import('../vue-harness.mjs');
+  const { harnessModule } = await import('../lib/vue-harness.mjs');
   const mod = harnessModule([{ name: 'x', file: '/x.vue', cases: [], role: '' }]);
   const plain = new Function(`${mod.slice(mod.indexOf('const plain'), mod.indexOf('// A raw error that names'))};return plain`)();
   assert.match(plain('_ctx.items.map is not a function'), /^it calls map\(\) on items as on a list, and what it was given there is not one \(_ctx/);

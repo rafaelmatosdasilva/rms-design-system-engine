@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, utimesSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildFreshness } from '../build-freshness.mjs';
+import { buildFreshness } from '../lib/build-freshness.mjs';
 import { tempDir } from './helpers.mjs';
 
 const at = (file, minutes) => { const t = new Date(Date.UTC(2026, 0, 1, 12, minutes)); utimesSync(file, t, t); };

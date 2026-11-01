@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCatalog, catalogTable, checkUi } from '../ui-catalog.mjs';
+import { buildCatalog, catalogTable, checkUi } from '../lib/ui-catalog.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -85,7 +85,7 @@ test('check: nested trees, a missing root and a cycle', () => {
 test('ui-check command: reads contracts/catalog.json, prints findings, writes the log, exits 1 on errors', () => {
   const dir = makeFixture({ 'contracts/catalog.json': JSON.stringify(catalog), 'gen.json': JSON.stringify({ component: 'Badge', props: { Tone: 'nope' } }) });
   let out, code = 0;
-  try { out = execFileSync('node', [join(ENGINE, 'ui-check.mjs'), 'gen.json'], { cwd: dir, encoding: 'utf8' }); }
+  try { out = execFileSync('node', [join(ENGINE, 'lib', 'ui-check.mjs'), 'gen.json'], { cwd: dir, encoding: 'utf8' }); }
   catch (e) { out = e.stdout; code = e.status; }
   assert.equal(code, 1);
   assert.match(out, /❌ 1 error\(s\) · 0 warning\(s\)/);
@@ -112,7 +112,7 @@ test('catalog: the code\'s own values when it names them differently, and the wr
 });
 
 test('an experimental component may be used: its line says keep it; one inside a part that never holds it goes beside it', async () => {
-  const { checkUi } = await import('../ui-catalog.mjs');
+  const { checkUi } = await import('../lib/ui-catalog.mjs');
   const catalog = { components: { chip: { props: { Label: { type: 'text' } }, children: ['button'] }, tag: { props: { Label: { type: 'text' } }, status: 'experimental' }, button: { props: { Label: { type: 'text' } } } } };
   const r = checkUi({ component: 'chip', props: { Label: 'Today' }, children: [{ component: 'tag', props: { Label: 'New' } }] }, catalog);
   const msgs = r.findings.map((f) => f.message);
@@ -121,14 +121,14 @@ test('an experimental component may be used: its line says keep it; one inside a
 });
 
 test('an id written inside props says where it goes', async () => {
-  const { checkUi } = await import('../ui-catalog.mjs');
+  const { checkUi } = await import('../lib/ui-catalog.mjs');
   const r = checkUi({ component: 'chip', props: { id: 'x', Label: 'A' } }, { components: { chip: { props: { Label: { type: 'text' } } } } });
   assert.ok(r.findings.some((f) => f.message === 'chip has no prop "id": "id" goes beside "component", not inside "props"'), JSON.stringify(r.findings));
 });
 
 test('a real use of each component from the code, the products first, never its own definition', async () => {
-  const { realExample } = await import('../ui-catalog.mjs');
-  const { answer, answerLines } = await import('../query.mjs');
+  const { realExample } = await import('../lib/ui-catalog.mjs');
+  const { answer, answerLines } = await import('../lib/query.mjs');
   const files = [
     { file: 'src/components/Chip.jsx', text: 'export function Chip({ size }) { return <span className="chip">x</span>; }' },
     { file: 'docs/index.html', text: '<div class="card chip-row">\n<span class="x chip" data-on>Label</span>' },

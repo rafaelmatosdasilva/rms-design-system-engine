@@ -1,7 +1,7 @@
 // vocab-check.mjs - closed-vocabulary / raw-container advisory. Opt-in, project-declared.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scanBannedContainers } from '../vocab-check.mjs';
+import { scanBannedContainers } from '../lib/vocab-check.mjs';
 
 test('counts banned container tags but not lookalikes', () => {
   const html = '<div><span>x</span></div><div/>\n<divider></divider>\n<nav>';

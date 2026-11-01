@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { globalModuleDirs, machineTypeScript, machineTsc } from '../project-typescript.mjs';
+import { globalModuleDirs, machineTypeScript, machineTsc } from '../lib/project-typescript.mjs';
 
 const fakeTs = 'module.exports = { transpileModule() {}, createSourceFile() {}, JsxEmit: {}, ScriptTarget: {}, ModuleKind: {}, ScriptKind: {} };';
 function machine() {

@@ -5,8 +5,8 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { budget, tempDir } from './helpers.mjs';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
-import { SHAPE_JS, shapesOf, shapeChanges, brandShapeDiffs, brandShapeLines } from '../brand-shape.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
+import { SHAPE_JS, shapesOf, shapeChanges, brandShapeDiffs, brandShapeLines } from '../lib/brand-shape.mjs';
 
 const CHROME = findChrome();
 

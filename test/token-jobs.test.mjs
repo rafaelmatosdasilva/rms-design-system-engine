@@ -1,7 +1,7 @@
 // A colour token's job, read from the components that use it (token-jobs.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tokenJobs, tokenJobLines, cssOf, ratio, pageBackground } from '../token-jobs.mjs';
+import { tokenJobs, tokenJobLines, cssOf, ratio, pageBackground } from '../lib/token-jobs.mjs';
 
 const theme = { file: 'theme.css', text: `:root {
   --app-background: #ffffff;

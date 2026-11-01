@@ -2,8 +2,8 @@
 // the engine never needs a real project to know what it would send.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openIssues, gitlabSender, issuesProject } from '../issues-gitlab.mjs';
-import { issuesFor, issuePlan, sendIssues, keyLine } from '../issues.mjs';
+import { openIssues, gitlabSender, issuesProject } from '../lib/issues-gitlab.mjs';
+import { issuesFor, issuePlan, sendIssues, keyLine } from '../lib/issues.mjs';
 
 const answer = (json, ok = true, status = 200) => ({ ok, status, json: async () => json });
 

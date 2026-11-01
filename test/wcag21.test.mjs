@@ -9,11 +9,11 @@ import { join, dirname } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { WCAG21, WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from '../wcag21.mjs';
-import { A11Y_GUIDE, a11yFindingRecord } from '../a11y-check.mjs';
-import { scriptFindings, scriptOnly } from '../a11y-static.mjs';
-import { wcagStatics, A11Y_WCAG, wcagLabel } from '../styleguide-data.mjs';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { WCAG21, WCAG21_GUIDE, WCAG21_KIND, WCAG_PAGE_SOURCE } from '../lib/wcag21.mjs';
+import { A11Y_GUIDE, a11yFindingRecord } from '../lib/a11y-check.mjs';
+import { scriptFindings, scriptOnly } from '../lib/a11y-static.mjs';
+import { wcagStatics, A11Y_WCAG, wcagLabel } from '../lib/styleguide-data.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -159,7 +159,7 @@ test('page: each WCAG 2.1 problem the page breaks once is found, and the part th
 test('audit: the browser check runs the WCAG 2.1 checks and says which ran, each finding with its criterion', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(180000) }, () => {
   const dir = makeFixture({ 'page.html': readFileSync(FIXTURE, 'utf8') });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(170000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(170000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = JSON.parse(out.slice(out.indexOf('{')));
   assert.ok(d.ran.includes('wcag21'), out);
@@ -169,7 +169,7 @@ test('audit: the browser check runs the WCAG 2.1 checks and says which ran, each
 });
 
 test('style guide: each Figma annotation says what it feeds, and one no check reads says so', async () => {
-  const { annotationUses } = await import('../a11y-check.mjs');
+  const { annotationUses } = await import('../lib/a11y-check.mjs');
   const uses = annotationUses({
     annotations: [{ label: 'Role: button' }, { label: 'Escape closes the dialog' }, { label: 'Sizing: fill' }, { label: 'Heading level 2' }, { label: 'Alt: Company logo' }],
     layerAnnotations: [{ layer: 'Error', annotations: [{ label: 'Role: error' }] }],

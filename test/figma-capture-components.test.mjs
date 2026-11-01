@@ -11,16 +11,16 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { unpublished, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
-  COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip } from '../figma-capture.mjs';
+  COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip } from '../lib/figma-capture.mjs';
 import * as standin from './figma-standin.mjs';
-import { examplesCaptureScript } from '../figma-examples.mjs';
-import { brandsCaptureScript } from '../figma-brands.mjs';
-import { effectsCaptureScript } from '../effects-parity.mjs';
-import { motionCaptureScript } from '../motion-parity.mjs';
-import { screenCaptureScript } from '../screen-layout.mjs';
-import { screenA11yCaptureScript } from '../screen-a11y.mjs';
-import { captureScript as annotationScript } from '../annotation-categories.mjs';
-import { hygieneOf } from '../figma-hygiene.mjs';
+import { examplesCaptureScript } from '../lib/figma-examples.mjs';
+import { brandsCaptureScript } from '../lib/figma-brands.mjs';
+import { effectsCaptureScript } from '../lib/effects-parity.mjs';
+import { motionCaptureScript } from '../lib/motion-parity.mjs';
+import { screenCaptureScript } from '../lib/screen-layout.mjs';
+import { screenA11yCaptureScript } from '../lib/screen-a11y.mjs';
+import { captureScript as annotationScript } from '../lib/annotation-categories.mjs';
+import { hygieneOf } from '../lib/figma-hygiene.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = join(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -376,7 +376,7 @@ test('components: kept by component id, so a component added mid-capture shifts 
 
 test('components: the commands write each script and import the answers saved', async () => {
   const root = project();
-  const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = cli('--capture-script', 'components', '0');
   assert.equal(r.status, 2);
   assert.match(r.stdout, /❌ the checksums are not all read yet/);
@@ -542,7 +542,7 @@ test('a component Figma does not publish (a name starting with . or _, a status 
 });
 
 test('the capture keeps the primitives as Figma has them in each colour mode, their links followed', async () => {
-  const { primitivesFromItems } = await import('../figma-capture.mjs');
+  const { primitivesFromItems } = await import('../lib/figma-capture.mjs');
   const items = [
     { k: 'collection', v: { id: 'C', name: 'Theme', modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] } },
     { k: 'var', v: { id: 'a', name: 'primitives/neutral000', variableCollectionId: 'C', resolvedType: 'COLOR', valuesByMode: { l: { r: 1, g: 1, b: 1, a: 1 }, d: { r: 0, g: 0, b: 0, a: 1 } } } },

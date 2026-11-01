@@ -68,7 +68,7 @@ chmod +x "$BIN_DIR/rms-design-system-engine"
 
 # 4. The accessibility scanner (axe-core, pinned and checked), fetched now so the first check runs every rule even
 #    offline. A failure here is not an install failure: the check fetches it on its first run.
-node "$CLONE_DIR/a11y-check.mjs" --fetch-axe || true
+node "$CLONE_DIR/lib/a11y-check.mjs" --fetch-axe || true
 
 # 4b. The two optional ones. Chrome: without it nothing is measured as a browser draws it, so rendered parity, the
 #     accessibility check and every picture are skipped. TypeScript: without one the components' JSX and Props are not
@@ -92,7 +92,7 @@ TS=$(CLONE="$CLONE_DIR" node --input-type=module -e '
   import { createRequire } from "node:module";
   import { execFileSync } from "node:child_process";
   import { join } from "node:path";
-  const { usableTypeScript } = await import(join(process.env.CLONE, "project-typescript.mjs"));
+  const { usableTypeScript } = await import(join(process.env.CLONE, "lib", "project-typescript.mjs"));
   let ts = null;
   try { ts = createRequire(join(execFileSync("npm", ["root", "-g"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(), "n.js"))("typescript"); } catch { /* none installed */ }
   process.stdout.write(!ts ? "none" : usableTypeScript(ts) ? "ok" : "unusable " + (ts.version || "?"));

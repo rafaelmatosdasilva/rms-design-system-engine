@@ -7,12 +7,12 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { keptKey, recordKept, readKept, dropKept, pick, keepInGates, matchKept, keptState, keptReport, reviewDate, keptPath } from '../kept.mjs';
-import { collectFindings, differencesMarkdown } from '../run-diff.mjs';
-import { route } from '../route.mjs';
-import { judge } from '../guard.mjs';
+import { keptKey, recordKept, readKept, dropKept, pick, keepInGates, matchKept, keptState, keptReport, reviewDate, keptPath } from '../lib/kept.mjs';
+import { collectFindings, differencesMarkdown } from '../lib/run-diff.mjs';
+import { route } from '../lib/route.mjs';
+import { judge } from '../lib/guard.mjs';
 import { fixtureProject, bareEnv, budget, tempDir } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const dir = () => tempDir('kept-');
@@ -108,7 +108,7 @@ test('--keep keeps the open differences of the last full audit that match, with 
     { check: 'Structure', evidence: 'chip radius: Figma 16px, rendered 12px', component: 'chip', difference: true },
     { check: 'Accessibility', evidence: 'text contrast 3.1:1', component: 'chip', difference: false },
   ] }));
-  const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const cli = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = cli('--keep', '--match', 'height', '--component', 'chip');
   assert.equal(r.status, 2);
   assert.match(r.stdout, /needs its reason: add --reason "<why the team keeps it>"\. Ask the person for it; never write one for them\./);
@@ -134,7 +134,7 @@ test('--keep keeps the open differences of the last full audit that match, with 
 
 test('on the demo system: a kept difference no longer fails its gate and leaves the open list for the kept one', { timeout: budget(600000) }, () => {
   const root = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'kept-demo-');
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...a], { cwd: root, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
   let r = run();
   assert.match(r.stdout, /❌ \[sizing\/-\] radii\/chip → --radii-chip/);
   const before = JSON.parse(readFileSync(join(root, '.design-system-engine-out', 'differences.json'), 'utf8'));

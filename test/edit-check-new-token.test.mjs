@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { editCheck } from '../edit-check.mjs';
+import { editCheck } from '../lib/edit-check.mjs';
 import { fixtureProject } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -47,7 +47,7 @@ test('a Figma variable declared for the first time (tokens copied from Figma) is
 test('build mode: copying the tokens the engine wrote out gives no finding, sizing tokens included', () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'newtok-tp-');
   const cfg = cfgOf(dir);
-  spawnSync(process.execPath, [join(ENGINE, 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'parity-check.mjs')], { cwd: dir, encoding: 'utf8' });
   const tokens = readFileSync(join(dir, '.design-system-engine-out/handback/tokens-to-build.css'), 'utf8').replace(/^\/\*.*\*\/\n/, '');
   assert.match(tokens, /--stroke-default: 1px/);
   const r = editCheck({ tool_name: 'Write', tool_input: { file_path: join(dir, 'src/styles/tokens.css'), content: tokens } }, { root: dir, cfg, headOf: () => null });

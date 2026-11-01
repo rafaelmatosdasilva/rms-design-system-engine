@@ -2,7 +2,7 @@
 // keying, data: selector). These import the module directly - fast and exact.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadModes, buildResolver, allModes } from '../mode-resolver.mjs';
+import { loadModes, buildResolver, allModes } from '../lib/mode-resolver.mjs';
 
 // ── loadModes must derive snapshotKey (parity-check tolerates omitting it) ──
 test('[bugfix] loadModes derives snapshotKey from name when omitted', () => {

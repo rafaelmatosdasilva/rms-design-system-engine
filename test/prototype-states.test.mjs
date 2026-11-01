@@ -5,10 +5,10 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { splitStates, applyState, statesOwed, stateFindings, kindOf } from '../prototype-states.mjs';
-import { fitFindings, fitLines, screenWidths } from '../prototype-render.mjs';
+import { splitStates, applyState, statesOwed, stateFindings, kindOf } from '../lib/prototype-states.mjs';
+import { fitFindings, fitLines, screenWidths } from '../lib/prototype-render.mjs';
 import { fixtureProject, budget } from './helpers.mjs';
-import { findChrome } from '../cdp.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = findChrome({ playwright: true });
@@ -73,7 +73,7 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
   for (const p of ['src/styles/tokens.css', 'src/components/button.css', 'src/components/Button.jsx', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/field.css', 'src/components/Field.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) {
     mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8'));
   }
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: CHROME }, timeout: budget(300000) });
   mkdirSync(join(dir, 'prototypes'), { recursive: true });
   writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ component: 'Page', props: { padding: 'padding/m', gap: 'padding/m' }, children: [
     { component: 'Text', props: { as: 'h1', text: 'Filters' } },
@@ -109,7 +109,7 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
 });
 
 test('a value as the person writes it is read as the system writes it; a state that names no component changes the part', async () => {
-  const { normaliseValues, applyState } = await import('../prototype-states.mjs');
+  const { normaliseValues, applyState } = await import('../lib/prototype-states.mjs');
   const catalog = { components: { button: { props: { Disabled: { type: 'enum', values: ['False', 'True'] }, Label: { type: 'text' } } }, chip: { props: { Selected: { type: 'boolean' } } } } };
   const raw = { component: 'Page', children: [{ id: 'go', component: 'button', props: { Label: 'Save', Disabled: false } }, { component: 'chip', props: { Selected: 'true' } }], states: { busy: { go: { props: { Disabled: 'true' } } } } };
   const notes = normaliseValues(raw, catalog);
@@ -122,7 +122,7 @@ test('a value as the person writes it is read as the system writes it; a state t
 });
 
 test('a list owes an empty state: rows alike or the request saying list; fields, buttons and chips side by side are not one', async () => {
-  const { statesOwed } = await import('../prototype-states.mjs');
+  const { statesOwed } = await import('../lib/prototype-states.mjs');
   const catalog = { components: { tag: {}, button: {}, field: {}, chip: {} } };
   const context = { components: { chip: { role: 'togglebutton' }, button: { role: 'button' }, field: { role: 'textbox' }, tag: {} } };
   const row = (name, tone) => ({ component: 'Row', children: [{ component: 'Text', props: { text: name } }, { component: 'tag', props: { Label: tone } }] });

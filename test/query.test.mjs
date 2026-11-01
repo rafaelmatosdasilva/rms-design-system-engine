@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import { flattenTokens, answer, answerLines } from '../query.mjs';
+import { flattenTokens, answer, answerLines } from '../lib/query.mjs';
 import { makeFixture, budget } from './helpers.mjs';
 
 const catalog = { components: {
@@ -40,7 +40,7 @@ test('a token by its path or its CSS variable; anything else names the closest',
 });
 
 test('a term that matches nothing finds by spelling, by its words and by what the names are for, and says what to ask next', async () => {
-  const { nearest, nextFor } = await import('../query.mjs');
+  const { nearest, nextFor } = await import('../lib/query.mjs');
   const comps = Object.entries({
     badge: { selector: '.hb-badge', description: 'A short status label beside an item.' },
     buttonMain: { selector: '.hb-button-main', description: 'The single most important action on a screen.' },
@@ -62,7 +62,7 @@ test('a term that matches nothing finds by spelling, by its words and by what th
 
 test('the command: several terms in one call, exit 1 when one is not found, 2 before the first audit', () => {
   const dir = makeFixture({ 'ds-config.json': { figma: { namingConvention: { prefix: '--hb-' } } }, 'contracts/catalog.json': catalog, 'contracts/tokens.json': { radius: { control: { $type: 'dimension', $value: '6px' } } } });
-  const run = (...args) => spawnSync(process.execPath, [join(process.cwd(), 'query.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
+  const run = (...args) => spawnSync(process.execPath, [join(process.cwd(), 'lib', 'query.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
   const ok = run('badge', '--hb-radius-control');
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /tone: neutral \| danger/);
@@ -70,7 +70,7 @@ test('the command: several terms in one call, exit 1 when one is not found, 2 be
   assert.match(ok.stdout, /NEXT: write the UI with these components and names, building nothing by hand that one of them covers, then check it with rms-design-system-engine --check-ui <file>/);
   assert.equal(run('badge', 'nothing').status, 1);
   assert.equal(JSON.parse(run('badge', '--json').stdout)[0].kind, 'component');
-  const empty = spawnSync(process.execPath, [join(process.cwd(), 'query.mjs'), 'badge'], { cwd: makeFixture({ 'ds-config.json': {} }), encoding: 'utf8' });
+  const empty = spawnSync(process.execPath, [join(process.cwd(), 'lib', 'query.mjs'), 'badge'], { cwd: makeFixture({ 'ds-config.json': {} }), encoding: 'utf8' });
   assert.equal(empty.status, 2);
   assert.match(empty.stdout, /no contracts\/catalog\.json yet/);
 });
@@ -84,17 +84,17 @@ test('no catalog yet: --query runs the audit once to write it, then answers (nev
   const here = dirname(fileURLToPath(import.meta.url));
   const dir = fixtureProject(join(here, 'fixtures', 'demo-ds'), 'query-first-');
   rmSync(join(dir, 'contracts'), { recursive: true, force: true });
-  const r = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '1' } });
+  const r = spawnSync(process.execPath, [join(here, '..', 'lib', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /No catalog yet: ran the audit once to write it/);
   assert.match(r.stdout, /size: M \| L/);
   assert.ok(existsSync(join(dir, 'contracts', 'catalog.json')));
   // Only once: the next question answers from the catalog.
-  const again = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8' });
+  const again = spawnSync(process.execPath, [join(here, '..', 'lib', 'query.mjs'), '--query', 'chip'], { cwd: dir, encoding: 'utf8' });
   assert.doesNotMatch(again.stdout, /No catalog yet/);
   assert.doesNotMatch(again.stdout, /not in the code yet/, 'a component the code has');
   // One Figma has and the code does not: its class styles nothing, so the agent is told not to place it or write its CSS.
-  const tag = spawnSync(process.execPath, [join(here, '..', 'query.mjs'), '--query', 'tag'], { cwd: dir, encoding: 'utf8' });
+  const tag = spawnSync(process.execPath, [join(here, '..', 'lib', 'query.mjs'), '--query', 'tag'], { cwd: dir, encoding: 'utf8' });
   assert.match(tag.stdout, /not in the code yet: \.tag has no styles, so placing it draws nothing\. Do not write its CSS/);
   assert.match(tag.stdout, /NEXT: tag is not in the code: do not stop to ask which way\. Write the UI now with components and variables the code has/);
   assert.doesNotMatch(tag.stdout, /NEXT: write the UI with these components/);

@@ -5,9 +5,9 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { agreedView, modeAxes, optionEffect, instanceMarkup, componentTokens, agreedTokens } from '../styleguide-data.mjs';
+import { agreedView, modeAxes, optionEffect, instanceMarkup, componentTokens, agreedTokens } from '../lib/styleguide-data.mjs';
 import { fixtureProject, budget, tempDir } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 // A row of a component's table read whole: what the table shows and what only its side panel holds (what was found,
@@ -51,7 +51,7 @@ test('--styleguide with no template of the project\'s own builds the engine\'s, 
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Style guide → \.design-system-engine-out\/styleguide\/index\.html {2}\(2 components agreed · the engine's template\)/);
   assert.match(r.stdout, /components the code does not have yet \(button, field, disclosure and stepper\)/);
@@ -110,7 +110,7 @@ test('a component\'s real markup is the first instance in the project\'s own pag
 });
 
 test('every token a component is drawn with: its parts and states too, never another component\'s, colour first', async () => {
-  const { allComponentTokens } = await import('../styleguide-data.mjs');
+  const { allComponentTokens } = await import('../lib/styleguide-data.mjs');
   const css = '.badge { padding: var(--p) var(--q); border-radius: var(--r); background: var(--b-bg); --own: var(--no) } .badge-label { color: var(--b-fg); font-size: var(--fs) } .badge__icon { box-shadow: var(--sh) } .badge:hover { border: var(--line) solid var(--b-line) } .badge-list { gap: var(--g) } .badgeX { color: var(--nope) }';
   const got = allComponentTokens(css, 'badge', ['badge-list']);
   assert.deepEqual(got.map((t) => t.var), ['--b-bg', '--b-fg', '--fs', '--p', '--q', '--r', '--line', '--b-line', '--sh']);
@@ -150,7 +150,7 @@ test('a token\'s description in Figma travels to the token panel; one with none 
 
 test('--component with --styleguide: that component audited first, then its own page beside the whole one, its address printed', { timeout: budget(600000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sgc-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'button', '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const out = r.stdout + r.stderr;
   assert.match(out, /Auditing button, then building the style guide\./);
@@ -161,7 +161,7 @@ test('--component with --styleguide: that component audited first, then its own 
 
 test('the demo design system: its real markup from its page, and props named differently stay out', { timeout: budget(300000) }, () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'demo-sg-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const data = JSON.parse(readPage(join(dir, '.design-system-engine-out/styleguide/index.html')).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   const button = data.components.find((c) => c.name === 'button');
@@ -172,7 +172,7 @@ test('the demo design system: its real markup from its page, and props named dif
 });
 
 test('in the browser: no script error, a control changes the real component, the tokens behind it are named', { timeout: budget(300000) }, async (t) => {
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-sg-');
@@ -205,7 +205,7 @@ test('in the browser: no script error, a control changes the real component, the
   // Do and Don't pictures, each named for its caption.
   for (const [kind, cap] of [['do', 'One filter per chip'], ['dont', 'A sentence in a chip']]) { mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind), { recursive: true }); writeFileSync(join(dir, '.design-system-engine-refs', 'components', 'chip', kind, `${cap}.png`), shot); }
   // What a person checked by hand: one as chip is now, one recorded before chip changed.
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--checked', 'chip', '1.3.3', '--by', 'QA'], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--checked', 'chip', '1.3.3', '--by', 'QA'], { cwd: dir, encoding: 'utf8' });
   const ckFile = join(dir, 'design-system-engine-checked.json'), ck = JSON.parse(readFileSync(ckFile, 'utf8'));
   ck.checks.push({ component: 'chip', sc: '3.3.7', by: 'QA', at: '2026-09-01T10:00:00.000Z', signature: 'before' }); writeFileSync(ckFile, JSON.stringify(ck));
   // A component the team retired, still drawn in a page of the system, by its script and in its notes.
@@ -216,7 +216,7 @@ test('in the browser: no script error, a control changes the real component, the
   // it as with any other row (a row built in the wrong place once stopped the page's script, and its build with it).
   mkdirSync(join(dir, '.design-system-engine-out'), { recursive: true });
   writeFileSync(join(dir, '.design-system-engine-out', 'effects.json'), JSON.stringify({ findings: [{ component: 'chip', part: null, what: 'shadow offset', figma: 'draws a shadow 0 4', code: 'draws a shadow 0 2', at: 'src/components/chip.css:1', side: 'code', message: 'chip shadow offset' }] }));
-  const built = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
+  const built = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8' });
   assert.doesNotMatch(built.stdout + built.stderr, /script stopped|The page threw/, 'the page runs with an Effect row');
   const c = await launchChrome(chromePath);
   try {
@@ -718,7 +718,7 @@ test('"In use" shows the approved pictures of the system\'s own frames', { timeo
   mkdirSync(join(dir, '.design-system-engine-refs'), { recursive: true });
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   writeFileSync(join(dir, '.design-system-engine-refs', '5-1.png'), png);
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
   const data = JSON.parse(readPage(join(dir, '.design-system-engine-out/styleguide/index.html')).match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(data.screens.map((x) => x.caption), ['Settings']);
   assert.match(data.screens[0].src, /^data:image\/png;base64,iVBOR/);
@@ -749,7 +749,7 @@ test('a text part no text prop writes is drawn with its name, so its switch show
 });
 
 test('a state set on an earlier part is set there: the checkbox input is ticked, the box class is never added to the whole', async () => {
-  const { optionEffect } = await import('../styleguide-data.mjs');
+  const { optionEffect } = await import('../lib/styleguide-data.mjs');
   assert.deepEqual(optionEffect('.checkbox', '.checkbox-input:checked + .checkbox-box'), { add: [], attrs: { checked: '' }, target: '.checkbox-input' });
   const tpl = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'templates', 'styleguide.template.html'), 'utf8');
   assert.match(tpl, /if \(!effect\.target && e\.querySelector\(clsSel\(k\)\)\) return;/);
@@ -855,7 +855,7 @@ test('the search covers every part of the page and, while it has words, shows wh
 });
 
 test('a component\'s API: a * on each prop the code says must be given, callbacks listed as events, nothing guessed', async () => {
-  const { apiView } = await import('../styleguide-data.mjs');
+  const { apiView } = await import('../lib/styleguide-data.mjs');
   const v = apiView({ file: '/p/src/B.tsx', tag: 'Button', syntax: 'jsx', props: { label: { required: true }, size: { options: ['S', 'M'], default: 'M', required: false }, onClick: {}, tone: {} },
     events: ['onClick'], slots: { named: ['icon'], default: true } }, 'src/B.tsx');
   assert.deepEqual(v, { file: 'src/B.tsx', tag: 'Button', syntax: 'jsx', props: [{ name: 'label', required: true }, { name: 'size', values: ['S', 'M'], default: 'M', required: false }, { name: 'tone' }],
@@ -878,7 +878,7 @@ test('the code shown: the tag with every prop the Playground sets, in its framew
 });
 
 test('accessibility per component: its role\'s obligations and behaviours with WCAG, part roles, and what the last browser check found on it', async () => {
-  const { a11yView } = await import('../styleguide-data.mjs');
+  const { a11yView } = await import('../lib/styleguide-data.mjs');
   const result = { checkedAt: '2026-10-05T10:00:00Z', issues: [
     { issue: 'contrast', selector: 'span in .chip', contrast: 3.2, needs: 4.5, theme: 'dark', text: 'Filter', fix: 'Use a darker colour.' },
     { issue: 'contrast', selector: 'span in .chip', contrast: 2.9, needs: 4.5, theme: 'light', text: 'Off', fix: 'Use a darker colour.' },
@@ -904,7 +904,7 @@ test('accessibility per component: its role\'s obligations and behaviours with W
 });
 
 test('parity per component: what agrees (since when), its props and tokens, what differs, not built, not compared', async () => {
-  const { parityView } = await import('../styleguide-data.mjs');
+  const { parityView } = await import('../lib/styleguide-data.mjs');
   const v = parityView({ name: 'chip',
     agreed: { facts: { 'chip · height': { figma: '24', code: '24', at: '2026-10-04T12:00:00Z', commit: 'a1b2c3d' }, 'chip · radius': { figma: '16px', code: '16px' }, 'chip · gap': { figma: '4', code: '6' }, 'chips · height': { figma: '1', code: '1' } } },
     differences: [{ what: '· chip · radius: Figma 16px, code 12px' }], controls: [{ label: 'Size', prop: 'size' }], unbuilt: [{ label: 'Badge' }],
@@ -946,7 +946,7 @@ test('To do: AAA advice is to check and to decide, never a must-fix; a component
   assert.match(tpl, /\/no markup\/\.test\(why\) \? 'Build ' \+ c\.name \+ ' in the code: the audit tries this once the page draws it from the code\.'/);
   assert.match(tpl, /'The last audit could not try ' \+ c\.name \+ ': ' \+ plainWhy\(why\) \+ '\. Run it again once that is fixed\.'/, 'why it was not tried, in plain words');
   assert.match(tpl, /if \(\/cannot\|undefined\|not a function/, 'a script error is said plainly, its text kept for a developer in a tip');
-  const { a11yView } = await import('../styleguide-data.mjs');
+  const { a11yView } = await import('../lib/styleguide-data.mjs');
   assert.equal(a11yView({ name: 'overflow', result: { notRead: ['overflow (the code has no markup for it: the style guide draws a stand-in)'], issues: [] } }).checked.why, 'the code has no markup for it: the style guide draws a stand-in');
 });
 
@@ -963,7 +963,7 @@ test('a control with no name only where an on/off prop hides its words fails, wi
 });
 
 test('an accessibility finding goes to Accessibility, a difference from Figma to Parity', async () => {
-  const { splitFindings } = await import('../styleguide-data.mjs');
+  const { splitFindings } = await import('../lib/styleguide-data.mjs');
   const { parity, a11y } = splitFindings([{ check: 'State contrast', what: 'badge [Type=Warning · light]: 2.04:1 (needs 4.5:1)' }, { check: 'Structure', what: 'badge · height: Figma 20, code 22' }, { check: 'Token layering', what: 'x' }]);
   assert.deepEqual(parity.map((x) => x.check), ['Structure', 'Token layering']);
   assert.deepEqual(a11y.map((x) => x.check), ['State contrast']);
@@ -975,7 +975,7 @@ test('an accessibility finding goes to Accessibility, a difference from Figma to
 });
 
 test('parity, one table: every prop, variable and value, Figma beside code, with a status and when', async () => {
-  const { parityRows } = await import('../styleguide-data.mjs');
+  const { parityRows } = await import('../lib/styleguide-data.mjs');
   const rows = parityRows({ name: 'chip',
     propsSnap: { chip: { properties: { 'Size': { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] }, 'Label#1:0': { type: 'TEXT', defaultValue: 'Hi' }, 'Badge#2:0': { type: 'BOOLEAN', defaultValue: false } } } },
     controls: [{ label: 'Size', prop: 'size' }, { label: 'Label', prop: 'label' }], unbuilt: [{ label: 'Badge' }],
@@ -1006,7 +1006,7 @@ test('parity, one table: every prop, variable and value, Figma beside code, with
 
 // a Figma variable the token check found under another heading is paired with its CSS variable, never listed twice.
 test('parity: a variable the token check found but did not compare is one row with both names', async () => {
-  const { parityRows } = await import('../styleguide-data.mjs');
+  const { parityRows } = await import('../lib/styleguide-data.mjs');
   const rows = parityRows({ name: 'highlight',
     allTokens: [{ var: '--highlight-background', figma: null }, { var: '--highlight-text', figma: null }, { var: '--highlight-extra', figma: null }],
     check: { passVars: [], fail: [],
@@ -1024,7 +1024,7 @@ test('parity: a variable the token check found but did not compare is one row wi
 });
 
 test('parity, what goes inside: a slot or swap in an HTML and CSS system is the markup\'s content; the code\'s props as a list', async () => {
-  const { parityRows } = await import('../styleguide-data.mjs');
+  const { parityRows } = await import('../lib/styleguide-data.mjs');
   const props = { 'Main Content#1:0': { type: 'SLOT' }, 'Icon Content#2:0': { type: 'INSTANCE_SWAP' }, 'Badge#3:0': { type: 'BOOLEAN', defaultValue: false } };
   const html = parityRows({ name: 'panel', propsSnap: { panel: { properties: props } }, unbuilt: [{ label: 'Badge' }] });
   assert.deepEqual(html.map((r) => [r.figma?.name, r.code?.name ?? '-', r.status]), [['Main Content', 'its content', 'match'], ['Icon Content', 'its content', 'match'], ['Badge', '-', 'figma']], 'one not built stays only in Figma');
@@ -1034,7 +1034,7 @@ test('parity, what goes inside: a slot or swap in an HTML and CSS system is the 
 });
 
 test('a Figma slot the code holds in a part of its own is paired with that part, and Parity lists it', async () => {
-  const { parityRows } = await import('../styleguide-data.mjs');
+  const { parityRows } = await import('../lib/styleguide-data.mjs');
   const rows = parityRows({ name: 'modal', propsSnap: { modal: { properties: { 'Slot#1:0': { type: 'SLOT' } } } }, slotParts: [{ name: 'Slot', selector: '.modal-slot', slot: true }] });
   assert.deepEqual(rows.map((r) => [r.figma.name, r.code.name, r.status, r.slot]), [['Slot', '.modal-slot', 'match', true]]);
   const tpl = readFileSync(join(ENGINE, 'templates', 'styleguide.template.html'), 'utf8');
@@ -1042,7 +1042,7 @@ test('a Figma slot the code holds in a part of its own is paired with that part,
 });
 
 test('import line and nesting: as a product writes the import, and the system\'s components it is built with', async () => {
-  const { importOf, nestedComponents, stylesheetImport, scriptUses } = await import('../styleguide-data.mjs');
+  const { importOf, nestedComponents, stylesheetImport, scriptUses } = await import('../lib/styleguide-data.mjs');
   // Its own functions in the system's script: named after it and naming its class, never one that only uses it inside
   // something else; exported when the script is a module.
   const script = "function showToast(msg) { const t = document.createElement('div'); t.className = 'toast'; }\nfunction showProgress() { el.classList.add('toast'); }\nfunction esc(s) { return s; }\nexport function createChip() { return '<span class=\"chip\"></span>'; }";
@@ -1064,7 +1064,7 @@ test('import line and nesting: as a product writes the import, and the system\'s
 });
 
 test('product pictures: a product\'s own picture first, its window from its code, a picture of the page otherwise', async () => {
-  const { windowSize, productShots } = await import('../product-shots.mjs');
+  const { windowSize, productShots } = await import('../lib/product-shots.mjs');
   assert.deepEqual(windowSize('figma.showUI(__html__,{width:1e3,height:540,title:"Demo"})'), { w: 1000, h: 540 });
   assert.equal(windowSize('no window here'), null);
   const dir = tempDir('shots-');
@@ -1077,14 +1077,14 @@ test('product pictures: a product\'s own picture first, its window from its code
 });
 
 test('a control the system lacks: the page draws its default (segmented control, tooltip, card), and says so on the overview and in the To do list', async () => {
-  const { segmentedUi, fieldUi, standInGaps } = await import('../styleguide-data.mjs');
+  const { segmentedUi, fieldUi, standInGaps } = await import('../lib/styleguide-data.mjs');
   const css = '.tabs{} .seg{} .radio{} .radio-input{} .radio-label{} .search{} .search-input{}';
   const tabs = { name: 'tabs', markup: '<div class="tabs"><button class="active">A</button><button>B</button></div>' };
   const seg = { name: 'segmentedControl', markup: '<div class="seg"><button class="selected">A</button><button>B</button></div>' };
   // The system's segmented control is the switch; its tabs only stand in, and give way to the page's default.
   assert.equal(segmentedUi([tabs, seg]).standIn, null);
   assert.equal(segmentedUi([tabs]).standIn, 'tabs');
-  const gen = readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8');
+  const gen = readFileSync(join(ENGINE, 'lib', 'styleguide-gen.mjs'), 'utf8');
   assert.match(gen, /view\.ui = \{ segmented: null, tabs: null, field: null, button: null, card: null, iconButton: null, tip: null, overlay: null, gaps: \[\] \};/, 'the page\'s controls are the template\'s own, never the system\'s');
   assert.doesNotMatch(gen, /view\.ui = \{ segmented: seg && !seg\.standIn \? seg : null,/);
   assert.doesNotMatch(gen, /radioGroupUi|buttonsAsSegmentedUi/, 'no radio group or buttons stand in for a segmented control');
@@ -1138,8 +1138,8 @@ test('a control the system lacks: the page draws its default (segmented control,
 });
 
 test('usage on every component, from Figma, the code or the authored contract; the page\'s own contrast in every mode', async () => {
-  const { guidanceView, pageContrast } = await import('../styleguide-data.mjs');
-  const { checkStyleguidePage, failures } = await import('../styleguide-check.mjs');
+  const { guidanceView, pageContrast } = await import('../lib/styleguide-data.mjs');
+  const { checkStyleguidePage, failures } = await import('../lib/styleguide-check.mjs');
   const g = guidanceView({ description: 'A filter.\nWhen to use: to narrow a list.\nWhen not to use:\n- for navigation\n- for one choice', annotations: ['Role: button', 'Limitations: no icon on the right'], authored: { mistakes: 'Using it as a tag' } });
   assert.deepEqual(g.sections.map((x) => [x.key, x.text, x.from]), [
     ['whenToUse', ['to narrow a list.'], 'Figma'], ['whenNotToUse', ['for navigation', 'for one choice'], 'Figma'],
@@ -1169,7 +1169,7 @@ test('built with: its own area, each component the overview\'s card with its pre
 });
 
 test('the playground and the preview stay linked: a part\'s state set on the part, a product\'s selector ignored, a label edit changes only its words', async () => {
-  const { optionEffect, ownSelector, realizedControls } = await import('../styleguide-data.mjs');
+  const { optionEffect, ownSelector, realizedControls } = await import('../lib/styleguide-data.mjs');
   assert.deepEqual(optionEffect('.radioButton', '.radioButton-input:checked'), { add: [], attrs: { checked: '' }, target: '.radioButton-input' });
   assert.deepEqual(optionEffect('.badge', '.badge.high'), { add: ['high'], attrs: {} });
   assert.equal(ownSelector('radioButton', '.step-item.done'), false);
@@ -1187,7 +1187,7 @@ test('the playground and the preview stay linked: a part\'s state set on the par
 });
 
 test('links and changelog: Figma, the code and the team\'s pages; each commit that changed the component, by its release and pull request', async () => {
-  const { normalizeRepo, commitUrl, prUrl, fileUrl, changelogs } = await import('../component-changelog.mjs');
+  const { normalizeRepo, commitUrl, prUrl, fileUrl, changelogs } = await import('../lib/component-changelog.mjs');
   assert.equal(normalizeRepo('git+https://github.com/o/r.git'), 'https://github.com/o/r');
   assert.equal(normalizeRepo('git@gitlab.example.com:team/ds.git'), 'https://gitlab.example.com/team/ds');
   assert.equal(fileUrl('https://github.com/o/r', 'main', 'src/theme.css', 12), 'https://github.com/o/r/blob/main/src/theme.css#L12');
@@ -1228,7 +1228,7 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
 });
 
 test('status and coverage: only what the team said (Figma, the code, the authored contract), on the card and under the name; the overview counts them and says what each group holds', async () => {
-  const { statusView, coverageOf } = await import('../styleguide-data.mjs');
+  const { statusView, coverageOf } = await import('../lib/styleguide-data.mjs');
   assert.deepEqual(statusView({ description: 'A chip.\nStatus: beta' }), { status: 'Beta', kind: 'beta', from: 'Figma' });
   assert.deepEqual(statusView({ annotations: ['Maturity: Stable'] }), { status: 'Stable', kind: 'stable', from: 'Figma' });
   assert.deepEqual(statusView({ text: '/** @deprecated use Tag */' }), { status: 'Deprecated', kind: 'deprecated', from: 'the code' });
@@ -1284,7 +1284,7 @@ test('status and coverage: only what the team said (Figma, the code, the authore
 });
 
 test('what uses each token: in a component\'s own rules, or through another token, nearest first', async () => {
-  const { tokenUses, variantOf } = await import('../styleguide-data.mjs');
+  const { tokenUses, variantOf } = await import('../lib/styleguide-data.mjs');
   const u = tokenUses(':root { --n100: #000; --btn-bg: var(--n100); --x: var(--btn-bg) } [data-theme="dark"] { --btn-bg: var(--n900) } .btn { background: var(--btn-bg); padding: var(--pad) } .chip { color: var(--n100) }', [{ name: 'button', cls: 'btn' }, { name: 'chip', cls: 'chip' }, { name: 'tip', cls: '#tt' }]);
   assert.deepEqual(u['--n100'], { direct: ['chip'], via: [{ name: 'button', through: '--btn-bg' }] });
   assert.deepEqual(u['--n900'], { direct: [], via: [{ name: 'button', through: '--btn-bg' }] }, 'a value in another mode counts too');
@@ -1293,7 +1293,7 @@ test('what uses each token: in a component\'s own rules, or through another toke
 });
 
 test('Figma images of each variant: the reference folder first, never the network without a token', async () => {
-  const { figmaVariantImages } = await import('../visual-diff.mjs');
+  const { figmaVariantImages } = await import('../lib/visual-diff.mjs');
   const dir = tempDir('figma-variants-');
   try {
     mkdirSync(join(dir, 'refs', 'components', 'chip'), { recursive: true });
@@ -1318,7 +1318,7 @@ test('a text prop comes right after the boolean that shows it; the rest keep Fig
 });
 
 test('every box on the page looks like the system\'s own card: its border colour and width, radius and shadow', async () => {
-  const { cardLook, chromeRoles } = await import('../styleguide-data.mjs');
+  const { cardLook, chromeRoles } = await import('../lib/styleguide-data.mjs');
   const css = '.card-title { color: red } .card { display: flex; border: var(--general-thickness) solid var(--card-border); border-radius: var(--radii-card); }';
   assert.deepEqual(cardLook(css, 'card'), { border: 'var(--card-border)', width: 'var(--general-thickness)', radius: 'var(--radii-card)', shadow: null });
   assert.equal(cardLook(css, 'tile'), null);
@@ -1327,7 +1327,7 @@ test('every box on the page looks like the system\'s own card: its border colour
 });
 
 test('Do and Don\'t: pictures in the references, each named for its caption, do\'s first; a variant image can say its scale', async () => {
-  const { exampleImages, figmaVariantImages } = await import('../visual-diff.mjs');
+  const { exampleImages, figmaVariantImages } = await import('../lib/visual-diff.mjs');
   const dir = tempDir('figma-examples-');
   try {
     for (const [kind, f] of [['dont', '2 Two buttons.png'], ['do', '1 One button.png'], ['do', 'notes.txt']]) { mkdirSync(join(dir, 'refs', 'components', 'button', kind), { recursive: true }); writeFileSync(join(dir, 'refs', 'components', 'button', kind, f), 'x'); }
@@ -1340,13 +1340,13 @@ test('Do and Don\'t: pictures in the references, each named for its caption, do\
 });
 
 test('in the browser: with a width chosen, a link to another component opens it', { timeout: budget(300000) }, async (t) => {
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-nav-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p))); }
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
   const c = await launchChrome(chromePath);
   try {
     const { send, on, close } = await connectCDP(c.wsUrl);
@@ -1415,14 +1415,14 @@ test('Variants: a component with a variant prop or an on/off prop has the area; 
 });
 
 test('Width: the modes Figma gives a viewport width, narrowest first; none, none', async () => {
-  const { viewportWidths } = await import('../styleguide-data.mjs');
+  const { viewportWidths } = await import('../lib/styleguide-data.mjs');
   const vars = { modeVariants: { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/m': { values: { desktop: '12px', phone: '14px' } }, 'viewport/min-width': { values: { desktop: '1680px', phone: '350px' } } } } } };
   assert.deepEqual(viewportWidths(vars), [{ value: 'phone', label: 'Phone', px: 350 }, { value: 'desktop', label: 'Desktop', px: 1680 }]);
   assert.deepEqual(viewportWidths({ modeVariants: { Sizing: { modes: [], vars: { 'padding/m': {} } } } }), []);
 });
 
 test('a page title: the system\'s own heading when it has a large one, else its largest style scaled up', async () => {
-  const { chromeRoles } = await import('../styleguide-data.mjs');
+  const { chromeRoles } = await import('../lib/styleguide-data.mjs');
   const type = (sizes) => ({ typography: sizes.map((px, i) => ({ scale: ['s', 'm', 'l', 'xl'][i], size: { var: `--t${i}`, value: `${px}px` } })) });
   assert.equal(chromeRoles({ tokens: type([10, 11, 13]) }).roles.title, undefined, 'no large heading: the template scales the largest');
   assert.equal(chromeRoles({ tokens: type([12, 14, 16, 28]) }).roles.title, 'var(--t3)', 'its own heading, as it is');
@@ -1446,8 +1446,8 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
   assert.equal(standing(rows(2, 0, 5), 'Documentation'), 2 / 7, 'documentation counts each item');
   assert.equal(standing([], 'Motion'), null, 'nothing to measure');
   assert.match(tpl, /var w = DATA\.healthWeights && DATA\.healthWeights\[a\[0\]\]; return \[a\[0\], typeof w === 'number' && w >= 0 \? w : a\[1\]\];/);
-  assert.match(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /view\.healthWeights = cfg\.styleguide\.health\.weights;/);
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  assert.match(readFileSync(join(ENGINE, 'lib', 'styleguide-gen.mjs'), 'utf8'), /view\.healthWeights = cfg\.styleguide\.health\.weights;/);
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-health-');
@@ -1455,7 +1455,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
   for (const p of ['src/styles/tokens.css', 'src/components/chip.css', 'src/components/Chip.jsx', 'src/components/button.css', 'src/components/Button.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p))); }
   const cfgFile = join(dir, 'ds-config.json'), cfg = JSON.parse(readFileSync(cfgFile, 'utf8'));
   writeFileSync(cfgFile, JSON.stringify({ ...cfg, styleguide: { ...(cfg.styleguide ?? {}), health: { weights: { Motion: 0 } } } }, null, 2));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const c = await launchChrome(chromePath);
   try {
@@ -1519,11 +1519,11 @@ test('room around the Playground\'s component, what follows each title as close 
   assert.match(tpl, /\.sg-hero > :last-child \{ margin-bottom: var\(--sg-space-s\); \}/);
   assert.match(tpl, /ovActs\.className = 'sg-section-actions'/);
   assert.match(tpl, /\.sg-section > h2 ~ \.sg-size-switch \{ padding-top: 0; \}/);
-  assert.doesNotMatch(readFileSync(join(ENGINE, 'styleguide-gen.mjs'), 'utf8'), /Send feedback/);
+  assert.doesNotMatch(readFileSync(join(ENGINE, 'lib', 'styleguide-gen.mjs'), 'utf8'), /Send feedback/);
 });
 
 test("the guide's spacing roles come from the system's spacing only, never an opacity that has the same number", async () => {
-  const { chromeRoles } = await import('../styleguide-data.mjs');
+  const { chromeRoles } = await import('../lib/styleguide-data.mjs');
   const tokens = { spacing: [
     { figma: 'semantic/imagePlaceholder/border/appearance', var: '--semantic-imagePlaceholder-border-appearance', value: '12' },
     { figma: 'spacing/gap/m', var: '--spacing-gap-m', value: '8px' }, { figma: 'spacing/gap/l', var: '--spacing-gap-l', value: '16px' } ] };
@@ -1545,7 +1545,7 @@ test('the Showroom lists its screens as a grid of cards, each opening on a page 
   assert.match(tpl, /srCrumb\.href = '#showroom'; srCrumb\.textContent = 'Showroom'/);
   assert.match(tpl, /sysButton\('a', '', ' href="#showroom" aria-label="All screens"'/);
   assert.match(tpl, /srActions\.className = 'sg-section-actions'/);
-  const cmp = readFileSync(join(ENGINE, 'showroom-compare.mjs'), 'utf8');
+  const cmp = readFileSync(join(ENGINE, 'lib', 'showroom-compare.mjs'), 'utf8');
   assert.match(cmp, /location\.hash = '#showroom\/' \+ encodeURIComponent\(key\)/);
 });
 
@@ -1569,10 +1569,10 @@ test('a Showroom screen is liquid: it fills the room it has (no breakpoint switc
   // Auto takes the room there is (Desktop from 1440px, never under 1024px); the build's measurement asks for Laptop.
   assert.match(tpl, /Math\.max\(1024, Math\.round\(room\)\)/);
   assert.match(tpl, /w >= 1440 \? 'desktop' : 'laptop'/);
-  assert.match(readFileSync(join(ENGINE, 'showroom-compare.mjs'), 'utf8'), /window\.__dseShowroomFrame = 'laptop'/);
+  assert.match(readFileSync(join(ENGINE, 'lib', 'showroom-compare.mjs'), 'utf8'), /window\.__dseShowroomFrame = 'laptop'/);
   assert.match(tpl, /sysButton\('button', 'Full browser', ' data-full', '', null, FULL_SVG\)/, 'with the full screen mark');
   // The harness draws a screen in a frame of Figma's size, so its components settle to that room.
-  assert.match(readFileSync(join(ENGINE, 'vue-harness.mjs'), 'utf8'), /if \(g\.frame\) \{ box\.style\.width = g\.frame\[0\] \+ 'px'/);
+  assert.match(readFileSync(join(ENGINE, 'lib', 'vue-harness.mjs'), 'utf8'), /if \(g\.frame\) \{ box\.style\.width = g\.frame\[0\] \+ 'px'/);
 });
 
 test('the page\'s switches hug their choices (a component\'s properties keep the panel\'s width); bars stick as they are', () => {
@@ -1610,7 +1610,7 @@ test('Variants open with a component\'s combinations: every mix of the parts it 
 });
 
 test('a property Figma and the code name differently is a difference to fix, not a match', async () => {
-  const { parityRows } = await import('../styleguide-data.mjs');
+  const { parityRows } = await import('../lib/styleguide-data.mjs');
   const rows = parityRows({ name: 'button',
     propsSnap: { button: { properties: { size: { type: 'VARIANT', variantOptions: ['s', 'm'], defaultValue: 's' }, disabled: { type: 'BOOLEAN', defaultValue: false } } } },
     controls: [{ label: 'size', prop: 'buttonSize' }, { label: 'disabled', prop: 'disabled' }],
@@ -1625,7 +1625,7 @@ test('a property Figma and the code name differently is a difference to fix, not
 });
 
 test('a default Figma and the code set differently is a difference: on or off, a choice; never the sample words of a text', async () => {
-  const { parityRows } = await import('../styleguide-data.mjs');
+  const { parityRows } = await import('../lib/styleguide-data.mjs');
   const rows = parityRows({ name: 'proof',
     propsSnap: { proof: { properties: { showShare: { type: 'BOOLEAN', defaultValue: true }, display: { type: 'VARIANT', variantOptions: ['full', 'split'], defaultValue: 'full' }, label: { type: 'TEXT', defaultValue: 'Receipt' }, showIcon: { type: 'VARIANT', variantOptions: ['false', 'true'], defaultValue: 'false' } } } },
     controls: [{ label: 'showShare' }, { label: 'display' }, { label: 'label' }, { label: 'showIcon' }],

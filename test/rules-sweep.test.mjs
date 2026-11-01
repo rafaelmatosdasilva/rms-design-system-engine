@@ -3,7 +3,7 @@
 // here, so every test is about what a person is handed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rulesRead, forceOf, countOf, contradictions, saidTwice, namesNothing, sweepRules, sweepLines } from '../rules-sweep.mjs';
+import { rulesRead, forceOf, countOf, contradictions, saidTwice, namesNothing, sweepRules, sweepLines } from '../lib/rules-sweep.mjs';
 
 const ctx = () => ({
   rules: [

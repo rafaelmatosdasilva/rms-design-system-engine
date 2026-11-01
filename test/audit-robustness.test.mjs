@@ -6,8 +6,8 @@ import { writeFileSync, chmodSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseGateOutput, GATE_SUMMARY } from '../audit-parse.mjs';
-import { launchChrome } from '../cdp.mjs';
+import { parseGateOutput, GATE_SUMMARY } from '../lib/audit-parse.mjs';
+import { launchChrome } from '../lib/cdp.mjs';
 import { makeFixture, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -52,7 +52,7 @@ test('audit: runs its gates with its own Node, so a PATH without node does not c
     'ds-config.json': JSON.stringify({ paths: { themeCSS: 'theme.css' }, codeReading: { capture: 'off' } }),
     'theme.css': ':root { --a: 1px; }',
   });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent', CI: '1' }, timeout: budget(240000) });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent', CI: '1' }, timeout: budget(240000) });
   const out = (r.stdout ?? '') + (r.stderr ?? '');
   assert.doesNotMatch(out, /spawn node ENOENT|Unhandled 'error' event/, out.slice(-2000));
   assert.match(out, /PARITY AUDIT/, out.slice(-2000));
@@ -68,7 +68,7 @@ test('audit: a property written otherwise than the rest of the system reaches th
     'theme.css': ':root { --a: 1px; }',
     'props.json': JSON.stringify(props),
   });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1' }, timeout: budget(240000) });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1' }, timeout: budget(240000) });
   const out = (r.stdout ?? '') + (r.stderr ?? '');
   assert.match(out, /card property "show-footer" is named differently from the rest of the system: rename it "Show Footer"/, out.slice(-3000));
   assert.match(readFileSync(join(dir, '.design-system-engine-out', 'differences.md'), 'utf8'), /show-footer/);

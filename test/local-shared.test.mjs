@@ -7,11 +7,11 @@ import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
-import { scopeOf, todoScope, editScope, changeScope, scopeSummary, scopeLine, usageFrom, proposalScope, findingScope, issueScopeLine, sideScope } from '../local-shared.mjs';
-import { editCheck } from '../edit-check.mjs';
-import { judge } from '../guard.mjs';
-import { heldOf } from '../sign-off.mjs';
-import { changeLines } from '../component-change.mjs';
+import { scopeOf, todoScope, editScope, changeScope, scopeSummary, scopeLine, usageFrom, proposalScope, findingScope, issueScopeLine, sideScope } from '../lib/local-shared.mjs';
+import { editCheck } from '../lib/edit-check.mjs';
+import { judge } from '../lib/guard.mjs';
+import { heldOf } from '../lib/sign-off.mjs';
+import { changeLines } from '../lib/component-change.mjs';
 
 const owners = { cardTile: { team: 'Cards team', decides: 'Cards lead' }, '*': 'Design system team' };
 const usage = { cardTile: { products: [{ name: 'Northwind', files: 4, uses: 9 }, { name: 'Acme shop', files: 2, uses: 3 }, { name: 'Acme admin', files: 1, uses: 1 }, { name: null, files: 1, uses: 1 }] } };
@@ -178,8 +178,8 @@ test('a finding is local when it is a product\'s own screen, else shared; the is
 
 // A finding or a task says which product it is about when every file it names is that product's.
 test('a finding names its product by the files it names; a system file or two products leave it shared', async () => {
-  const { productIn } = await import('../local-shared.mjs');
-  const { findingRecords } = await import('../run-diff.mjs');
+  const { productIn } = await import('../lib/local-shared.mjs');
+  const { findingRecords } = await import('../lib/run-diff.mjs');
   const productOf = (f) => (/^apps\/northwind\//.test(f) ? 'Northwind' : /^apps\/acme\//.test(f) ? 'Acme shop' : null);
   assert.equal(productIn('hex written by hand (apps/northwind/src/Cart.vue:12)', productOf), 'Northwind');
   assert.equal(productIn('apps/northwind/a.css and src/theme.css', productOf), null, 'a system file too: no one product');

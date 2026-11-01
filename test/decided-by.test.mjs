@@ -2,7 +2,7 @@
 // the one it waits on. An invented system (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ownerOf, notTheOwner, waitingOn, waitingLine } from '../decided-by.mjs';
+import { ownerOf, notTheOwner, waitingOn, waitingLine } from '../lib/decided-by.mjs';
 
 const OWNERS = { 'tile*': 'Tiles team', tileCard: { team: 'Cards team', decides: 'QA lead' }, 'patterns/': 'Patterns team', '*': 'Design system team' };
 

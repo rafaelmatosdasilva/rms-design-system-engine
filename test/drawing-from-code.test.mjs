@@ -6,11 +6,11 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { scriptMarkups, instanceMarkups, fullestMarkup, agreedView } from '../styleguide-data.mjs';
-import { modifierFor, systemFamily, checkPrototype } from '../prototype-pieces.mjs';
-import { prototypePage, fontLoader, codeColours } from '../prototype.mjs';
-import { screenToPrototype } from '../screen-layout.mjs';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { scriptMarkups, instanceMarkups, fullestMarkup, agreedView } from '../lib/styleguide-data.mjs';
+import { modifierFor, systemFamily, checkPrototype } from '../lib/prototype-pieces.mjs';
+import { prototypePage, fontLoader, codeColours } from '../lib/prototype.mjs';
+import { screenToPrototype } from '../lib/screen-layout.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });

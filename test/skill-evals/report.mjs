@@ -14,7 +14,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { envVar } from '../../names.mjs';
+import { envVar } from '../../lib/names.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 

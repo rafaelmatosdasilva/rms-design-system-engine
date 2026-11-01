@@ -7,10 +7,10 @@ import { join, dirname } from 'node:path';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { figmaEasing, transitionsOf, codeMotion, motionFindings, motionSnapshot, MOTION_CAPTURE_JS, motionCaptureScript, prototypeTransitions } from '../motion-parity.mjs';
-import { motionTokens, motionTodos } from '../styleguide-data.mjs';
+import { figmaEasing, transitionsOf, codeMotion, motionFindings, motionSnapshot, MOTION_CAPTURE_JS, motionCaptureScript, prototypeTransitions } from '../lib/motion-parity.mjs';
+import { motionTokens, motionTodos } from '../lib/styleguide-data.mjs';
 import { fixtureProject, budget } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -88,7 +88,7 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
     writeFileSync(join(dir, 'src/styles/tokens.css'), readFileSync(join(dir, 'src/styles/tokens.css'), 'utf8') + '\n:root { --motion-quick: 150ms; --motion-ease: cubic-bezier(0.2, 0, 0, 1); }\n');
     // And how the button moves on its own: it fades in as it appears, which Figma does not animate.
     writeFileSync(join(dir, 'src/components/button.css'), readFileSync(join(dir, 'src/components/button.css'), 'utf8') + '\n.button { animation: button-in 200ms ease-out; }\n@keyframes button-in { from { opacity: 0; } to { opacity: 1; } }\n');
-    const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+    const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
     const a = run('--figma-motion');
     assert.match(a.stdout, /Motion capture script → \.design-system-engine-out\/figma-capture\/motion-capture\.js \(read-only/);
     assert.ok(existsSync(join(dir, '.design-system-engine-out/figma-capture/motion-capture.js')));
@@ -106,7 +106,7 @@ test('--figma-motion writes the capture script, keeps the answer as the snapshot
     const data = JSON.parse(html.match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
     const button = (data.allComponents ?? data.components).find((c) => c.name === 'button');
     assert.equal(button.motionDiffs?.[0]?.trigger, 'hover');
-    const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+    const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
     const chromePath = findChrome({ playwright: true });
     if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
     const c = await launchChrome(chromePath);

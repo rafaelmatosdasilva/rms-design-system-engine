@@ -9,10 +9,10 @@ import { join, dirname } from 'node:path';
 import { rmSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { pageCriteria, pageCriteriaTodos, fieldKey, orderBreak, groupsOf, LEGAL } from '../page-criteria.mjs';
-import { WCAG22, WCAG_KIND } from '../wcag21.mjs';
-import { A11Y_GUIDE, productA11yTodos } from '../a11y-check.mjs';
-import { findChrome } from '../cdp.mjs';
+import { pageCriteria, pageCriteriaTodos, fieldKey, orderBreak, groupsOf, LEGAL } from '../lib/page-criteria.mjs';
+import { WCAG22, WCAG_KIND } from '../lib/wcag21.mjs';
+import { A11Y_GUIDE, productA11yTodos } from '../lib/a11y-check.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -148,7 +148,7 @@ test('in the browser: three pages of one product, a flow through two, each crite
   try {
     const urls = ['home.html', 'details.html', 'pay.html'].flatMap((f) => ['--url', pathToFileURL(join(dir, f)).href]);
     let out = '';
-    try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), ...urls, '--json', '--no-axe', '--no-states'], { cwd: dir, encoding: 'utf8', timeout: budget(280000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
+    try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), ...urls, '--json', '--no-axe', '--no-states'], { cwd: dir, encoding: 'utf8', timeout: budget(280000), env: { ...process.env, CHROME_PATH: CHROME } }); } catch (e) { out = String(e.stdout ?? ''); }
     const d = JSON.parse(out.slice(out.indexOf('{')));
     const c = d.pages?.criteria ?? {};
     const label = (f) => pathToFileURL(join(dir, f)).href;

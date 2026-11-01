@@ -2,7 +2,7 @@
 // can state both (component-source.mjs extractEventPayloads, extractSlotProps).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractEventPayloads, extractSlotProps } from '../component-source.mjs';
+import { extractEventPayloads, extractSlotProps } from '../lib/component-source.mjs';
 
 test('each event with what the code passes it, once each; one sent with nothing has no payload', () => {
   const text = `<script setup>
@@ -29,7 +29,7 @@ test('each scoped slot with the props it hands its content; a slot with none is 
 });
 
 test('a default slot beside named ones, a slot named by an expression, and props behind comments are all read', async () => {
-  const { extractSlots, textComponentApi } = await import('../component-source.mjs');
+  const { extractSlots, textComponentApi } = await import('../lib/component-source.mjs');
   const both = extractSlots('<template><div v-if="$slots.default"><slot/></div><slot name="trailing"/><slot :name="`row-${item.id}`"/></template>');
   assert.deepEqual([...both.named], ['trailing', 'row-${item.id}']);
   assert.equal(both.hasDefault, true);
@@ -48,7 +48,7 @@ defineProps({
 });
 
 test('a default the code builds is kept as its expression; a comment describing a shape gives no options', async () => {
-  const { textComponentApi } = await import('../component-source.mjs');
+  const { textComponentApi } = await import('../lib/component-source.mjs');
   const vue = `<script setup>
 /** @ranges {Object} the ranges per kind; expects { kind: [min, max] }
 @size {String} the size, can be [s, m(default)] */

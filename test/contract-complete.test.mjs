@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { generateContracts, contractFileFor } from '../contract-gen.mjs';
+import { generateContracts, contractFileFor } from '../lib/contract-gen.mjs';
 
 const TILE = `<template>
   <button class="tile-one" :disabled="disabled" @keydown.enter="pick" aria-pressed="false" @click="pick">

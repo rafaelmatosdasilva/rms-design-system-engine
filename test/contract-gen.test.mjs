@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { generateContracts, usageCounts } from '../contract-gen.mjs';
+import { generateContracts, usageCounts } from '../lib/contract-gen.mjs';
 
 const cfg = {
   paths: {
@@ -300,7 +300,7 @@ test('a slot takes Figma\'s preferred components, and a boolean names the layers
 });
 
 test('llms.txt stays small enough for an agent to read whole: past the limit the catalog table stays in catalog.json', async () => {
-  const { buildLlms, LLMS_MAX_BYTES } = await import('../contract-gen.mjs');
+  const { buildLlms, LLMS_MAX_BYTES } = await import('../lib/contract-gen.mjs');
   const built = Array.from({ length: 400 }, (_, i) => ({ name: `component${i}`, contract: { description: 'A component with a long enough description to take some room in the index.', props: [{ name: 'size' }, { name: 'tone' }] } }));
   const catalog = { rules: ['Use only these components.'], components: Object.fromEntries(built.map((b) => [b.name, { selector: `.${b.name}`, props: { Size: { type: 'enum', values: ['S', 'M', 'L'] }, Tone: { type: 'enum', values: ['neutral', 'danger'] } } }])) };
   const text = buildLlms(built, {}, 0, catalog);
@@ -313,8 +313,8 @@ test('llms.txt stays small enough for an agent to read whole: past the limit the
 });
 
 test('llms.txt carries the owner\'s primitives table, and nothing when there is none', async () => {
-  const { primitiveGuideLines } = await import('../primitives.mjs');
-  const { buildLlms } = await import('../contract-gen.mjs');
+  const { primitiveGuideLines } = await import('../lib/primitives.mjs');
+  const { buildLlms } = await import('../lib/contract-gen.mjs');
   const primitives = primitiveGuideLines({ primitives: [{ component: 'Text', props: { size: 'small' }, when: { font: 'var(--body-small)' } }] });
   const text = buildLlms([], {}, 0, null, { primitives });
   assert.match(text, /## Primitives\n\nWrite the component, never a plain element \(div, span, p\) styled like it:\n- <Text size="small"> for an element styled with font: var\(--body-small\)\n/);
@@ -322,7 +322,7 @@ test('llms.txt carries the owner\'s primitives table, and nothing when there is 
 });
 
 test('llms.txt says what each token is for in the team\'s words, the brand\'s first, the same words once', async () => {
-  const { buildLlms } = await import('../contract-gen.mjs');
+  const { buildLlms } = await import('../lib/contract-gen.mjs');
   const tokens = {
     surface: { card: { color: { $value: '#fff', $description: 'Behind a card and its content' } }, sheet: { color: { $value: '#fafafa', $description: 'Behind a card and its content' } } },
     base: { accent: { color: { $value: '#05f', $description: 'The main brand colour' } }, weight: { $value: 400, $description: 'font-weight' }, old: { $value: 1, $description: '@deprecated' } },

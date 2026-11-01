@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compareVersions, changesOf, recordRelease, readReleases, productsOf, productImpact, impactLines, lateTodos, RELEASES_FILE } from '../releases.mjs';
+import { compareVersions, changesOf, recordRelease, readReleases, productsOf, productImpact, impactLines, lateTodos, RELEASES_FILE } from '../lib/releases.mjs';
 import { tempDir } from './helpers.mjs';
 
 test('a release with breaking changes is recorded once per version, with the day to move by', () => {
@@ -77,7 +77,7 @@ test('a product still on an older version past a release\'s day is a task on the
 });
 
 test('the style guide\'s Tasks list names a late product, with its team after who acts', async () => {
-  const { generateStyleguide } = await import('../styleguide-gen.mjs');
+  const { generateStyleguide } = await import('../lib/styleguide-gen.mjs');
   const sys = tempDir('releases-guide-'), app = join(sys, 'apps', 'shop');
   mkdirSync(join(app, 'src'), { recursive: true }); mkdirSync(join(sys, 'src'), { recursive: true });
   writeFileSync(join(sys, 'src', 'theme.css'), ':root { --a: 1px; }');

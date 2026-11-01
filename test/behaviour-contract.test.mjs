@@ -5,9 +5,9 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { findChrome } from '../cdp.mjs';
-import { partRoleOf, partRolesOf, partsFromNames, partsInMarkup, behavioursFor, annotatedBehaviours, behaviourSheetLines, partSheetLines, buildSheetParts, partBuildLines, partWiringNotYet } from '../behaviour-contract.mjs';
-import { annotationFacts } from '../a11y-check.mjs';
+import { findChrome } from '../lib/cdp.mjs';
+import { partRoleOf, partRolesOf, partsFromNames, partsInMarkup, behavioursFor, annotatedBehaviours, behaviourSheetLines, partSheetLines, buildSheetParts, partBuildLines, partWiringNotYet } from '../lib/behaviour-contract.mjs';
+import { annotationFacts } from '../lib/a11y-check.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -67,7 +67,7 @@ test('page: each part does what its role says, and each component does what its 
     'ds-config.json': { componentSelectors: { field: '.field', loose: '.loose', stepper: '.stepper', toggle: '.toggle', dead: '.dead', more: '.more', stuck: '.stuck', search: '.acme-search' } },
   });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { out = e.stdout ?? ''; }
   const d = JSON.parse(out.slice(out.indexOf('{')));
   const of = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector).sort();
@@ -86,7 +86,7 @@ test('page: each part does what its role says, and each component does what its 
 });
 
 test('a stepper is a spinbutton: its value and range in the markup, ArrowUp in the browser', async () => {
-  const { roleObligations } = await import('../role-markup.mjs');
+  const { roleObligations } = await import('../lib/role-markup.mjs');
   assert.deepEqual(behavioursFor('stepper').rows.map((r) => r.id), ['keys-step']);
   assert.deepEqual(roleObligations('<div><button aria-label="Decrease"/><span role="spinbutton" aria-valuenow={v} aria-valuemin={0} aria-valuemax={10} aria-label={label}>{v}</span></div>', 'stepper'), { missing: [], owed: [] });
   assert.deepEqual(roleObligations('<input type="number" min={0} max={10} aria-label="Guests" />', 'spinbutton'), { missing: [], owed: [] });
@@ -97,7 +97,7 @@ test('a stepper is a spinbutton: its value and range in the markup, ArrowUp in t
 // aria-current, never checked; an error on a message (a notice with role status) is announced (role="alert"), while an
 // error on a field is still aria-invalid.
 test('states: Current is aria-current; an error on a message is announced, on a field it is aria-invalid', async () => {
-  const { stateFindings } = await import('../behaviour-contract.mjs');
+  const { stateFindings } = await import('../lib/behaviour-contract.mjs');
   const comp = (name, role, label, effect) => ({ name, role, controls: [{ label: 'State', type: 'VARIANT', options: [{ label, ...effect }] }] });
   const want = (c) => stateFindings([c]).map((f) => f.want.join(' or '));
   assert.deepEqual(want(comp('step', 'radio', 'Current', { add: ['step--current'] })), ['aria-current']);
@@ -113,8 +113,8 @@ test('states: Current is aria-current; an error on a message is announced, on a 
 // field itself disabled): the contract's heardOn names the part and its state, the option sets both, and the state
 // check counts what the part says.
 test('states: an option heard on a part (heardOn) sets the part\'s state and counts as heard', async () => {
-  const { stateFindings } = await import('../behaviour-contract.mjs');
-  const { heardEffect, addHeard } = await import('../styleguide-data.mjs');
+  const { stateFindings } = await import('../lib/behaviour-contract.mjs');
+  const { heardEffect, addHeard } = await import('../lib/styleguide-data.mjs');
   assert.deepEqual(heardEffect('.field__input:disabled'), { target: '.field__input', attrs: { disabled: '' } });
   assert.deepEqual(heardEffect('.field__input[aria-invalid="true"]'), { target: '.field__input', attrs: { 'aria-invalid': 'true' } });
   const controls = [
@@ -142,7 +142,7 @@ test('a control nobody annotated: its parts read from its layers\' names and fro
 });
 
 test('a field\'s parts wired in its own source: its label tied, its error and hint joined, its indicator silent', async () => {
-  const { partWiringFindings } = await import('../behaviour-contract.mjs');
+  const { partWiringFindings } = await import('../lib/behaviour-contract.mjs');
   const loose = '<template><div><label>Name</label><input id="a"><span class="tile-field__hint">h</span><span class="tile-field-error">e</span><i class="icon-chevron"></i></div></template>';
   assert.deepEqual(partWiringFindings(loose, 'textbox').map((x) => x.split(' ')[x.startsWith('its') ? 1 : 0]), ['<label>', 'error', 'aria-invalid="true"', 'hint', 'indicator']);
   const wired = '<template><label :for="id">N</label><input :id="id" :aria-describedby="hintId" :aria-invalid="bad"><span class="tile-field-error">e</span><i class="chevron" aria-hidden="true"></i></template>';

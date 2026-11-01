@@ -9,11 +9,11 @@ import { cpSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { vueMarkup } from '../vue-markup.mjs';
-import { codeComponents, rootClassOf } from '../component-source.mjs';
-import { agreedView } from '../styleguide-data.mjs';
+import { vueMarkup } from '../lib/vue-markup.mjs';
+import { codeComponents, rootClassOf } from '../lib/component-source.mjs';
+import { agreedView } from '../lib/styleguide-data.mjs';
 import { budget, tempDir } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HARBOR = join(ENGINE, 'test', 'fixtures', 'harbor-ds');
@@ -67,7 +67,7 @@ test('with Figma\'s components a component only the code has is shown, marked so
 const chipVue = `<script setup lang="ts">\nwithDefaults(defineProps<{ tone?: 'quiet' | 'loud'; label?: string }>(), { tone: 'quiet', label: 'Filter' });\n</script>\n<template><button :class="['hb-chip', \`hb-chip--\${tone}\`]" type="button">{{ label }}</button></template>\n`;
 
 test('the style guide of a Vue system: Figma\'s components with Figma\'s data, the code\'s before it', { timeout: budget(300000) }, () => {
-  const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake', ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake', ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   // With Figma's data and styleguide.showCodeOnly: false: its three components; a chip only the code has is a task,
   // with its file.
   const withFigma = tempDir('sg-code-only-');
@@ -109,13 +109,13 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
 });
 
 test('in the browser: with Figma\'s data a component only the code has has its page and menu item, and its Status row says what to do', { timeout: budget(300000) }, async (t) => {
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = tempDir('sg-code-only-tasks-');
   cpSync(HARBOR, dir, { recursive: true });
   writeFileSync(join(dir, 'components', 'HbChip.vue'), chipVue);
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const c = await launchChrome(chromePath);
   try {

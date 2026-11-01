@@ -1,7 +1,7 @@
 // a raw element styled like a design-system primitive is the primitive written by hand.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { primitiveTable, primitiveTag, primitiveOf, primitiveFindings, classRulesOf, declsOf, jsxDeclsOf, normValue, primitiveLine, primitiveGuideLines, projectPrimitives } from '../primitives.mjs';
+import { primitiveTable, primitiveTag, primitiveOf, primitiveFindings, classRulesOf, declsOf, jsxDeclsOf, normValue, primitiveLine, primitiveGuideLines, projectPrimitives } from '../lib/primitives.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const CFG = { primitives: [

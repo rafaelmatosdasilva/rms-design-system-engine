@@ -4,10 +4,10 @@
 // reference is the system's, a line that differs only by the page's own name is repeated. An invented system (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText, layoutOf, specIndex, specOf, planOf, draftPlan, sureParts, applyPlan, describeChanges } from '../intent-changes.mjs';
-import { entityView, dropBoilerplate, DRAFT } from '../doc-source-dsds.mjs';
-import { factsFrom } from '../intent-truth.mjs';
-import { useReport } from '../intent-layer.mjs';
+import { mdRemove, mdReplace, mdAdd, jsonRemove, jsonReplace, jsonAdd, jsonText, layoutOf, specIndex, specOf, planOf, draftPlan, sureParts, applyPlan, describeChanges } from '../lib/intent-changes.mjs';
+import { entityView, dropBoilerplate, DRAFT } from '../lib/doc-source-dsds.mjs';
+import { factsFrom } from '../lib/intent-truth.mjs';
+import { useReport } from '../lib/intent-layer.mjs';
 import { tempDir } from './helpers.mjs';
 
 const SPEC = `# Tile One
@@ -156,7 +156,7 @@ test('the plan: repeated lines out, a wrong sentence written again (checked), a 
 });
 
 test('the merge request is written with GITLAB_WRITE_TOKEN when there is one; everything else reads with GITLAB_TOKEN', async () => {
-  const { layerAccess, writeTokenFrom } = await import('../intent-changes.mjs');
+  const { layerAccess, writeTokenFrom } = await import('../lib/intent-changes.mjs');
   const cfg = { intentLayer: 'https://gitlab.acme.test/ux/layer' };
   assert.equal(layerAccess('.', cfg, { env: { GITLAB_HOST: 'gitlab.acme.test', GITLAB_TOKEN: 'reads', GITLAB_WRITE_TOKEN: 'writes' } }).writesWith, 'GITLAB_WRITE_TOKEN');
   assert.equal(layerAccess('.', cfg, { env: { GITLAB_HOST: 'gitlab.acme.test', GITLAB_TOKEN: 'reads' } }).writesWith, 'GITLAB_TOKEN');
@@ -167,7 +167,7 @@ test('the merge request is written with GITLAB_WRITE_TOKEN when there is one; ev
 });
 
 test('a commit straight on the branch only while the branch is where the changes were made', async () => {
-  const { commitToBranch } = await import('../intent-changes.mjs');
+  const { commitToBranch } = await import('../lib/intent-changes.mjs');
   const sent = [];
   const access = (head) => ({ writesWith: 'GITLAB_WRITE_TOKEN', get: async () => ({ ok: true, json: async () => ({ id: head }) }), send: async (m, p, b) => { sent.push([m, p, b]); return { ok: true, json: async () => ({ id: 'c0ffee', web_url: 'https://gitlab.acme.test/c0ffee' }) }; } });
   const files = new Map([['specs/a.md', 'text']]);
@@ -179,7 +179,7 @@ test('a commit straight on the branch only while the branch is where the changes
 });
 
 test('reviewing drafts: approve takes the marker off, change writes the new text, drop deletes the line; in the spec and the page alike', async () => {
-  const { mdReview, jsonReview, reviewPlan, describeReview } = await import('../intent-changes.mjs');
+  const { mdReview, jsonReview, reviewPlan, describeReview } = await import('../lib/intent-changes.mjs');
   const md = '# Tile One\n\n- Source: `src/tiles/TileOne.vue`\n\n## When to use\n\n- **Draft:** Use it for one subject.\n- **Draft:** Use it on a dashboard.\n\n## When not to use\n\n- **Draft:** Not for a list.\n\n## Evidence\n\n- Seen.\n';
   assert.match(mdReview(md, 'Use it for one subject.'), /^- Use it for one subject\.$/m);
   assert.match(mdReview(md, 'Use it on a dashboard.', 'Use it on a home screen.'), /^- Use it on a home screen\.$/m);
@@ -208,7 +208,7 @@ test('reviewing drafts: approve takes the marker off, change writes the new text
 });
 
 test('each run fixes the layer only where intentLayer.autoFix is "commit", never offline; --intent-autofix turns it on and off, the file\'s indentation kept', async () => {
-  const { autoFix } = await import('../intent-changes.mjs');
+  const { autoFix } = await import('../lib/intent-changes.mjs');
   assert.equal(await autoFix('.', { intentLayer: 'https://gitlab.acme.test/ux/layer' }), null);
   assert.equal(await autoFix('.', { intentLayer: { gitlab: 'https://gitlab.acme.test/ux/layer', autoFix: 'commit' } }, { offline: true }), null);
   const { writeFileSync, readFileSync } = await import('node:fs');
@@ -216,7 +216,7 @@ test('each run fixes the layer only where intentLayer.autoFix is "commit", never
   const { spawnSync } = await import('node:child_process');
   const root = tempDir('autofix-');
   writeFileSync(join(root, 'ds-config.json'), '{\n    "name": "Acme",\n    "intentLayer": "https://gitlab.acme.test/ux/layer"\n}\n');
-  const engine = new URL('../audit.mjs', import.meta.url).pathname;
+  const engine = new URL('../lib/audit.mjs', import.meta.url).pathname;
   assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'on'], { cwd: root, encoding: 'utf8' }).status, 0);
   assert.equal(readFileSync(join(root, 'ds-config.json'), 'utf8'), '{\n    "name": "Acme",\n    "intentLayer": {\n        "gitlab": "https://gitlab.acme.test/ux/layer",\n        "autoFix": "commit"\n    }\n}\n');
   assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'off'], { cwd: root, encoding: 'utf8' }).status, 0);
@@ -270,7 +270,7 @@ test('a page with drafts waiting for review still gets drafted the parts it lack
 });
 
 test('a large change goes as several commits, each made on the one before, and stops when someone else committed between', async () => {
-  const { commitToBranch } = await import('../intent-changes.mjs');
+  const { commitToBranch } = await import('../lib/intent-changes.mjs');
   const files = new Map(Array.from({ length: 90 }, (_, i) => [`specs/page-${i}.md`, 'x'.repeat(100)]));
   let head = 'abc123', n = 0;
   const sent = [];

@@ -11,14 +11,14 @@ import {
   recordLesson, readLessonsFile, proposeGuard, ruleSentence, answerProposal, withGuard, guardFindings, guardsOf,
   noteAgentEdit, sweepCorrections, pendingCorrections, takeCorrection, noteReview, noteEdit, proposedRules, editKind,
   lessonsView, lessonsLine, lessonsLines, lessonDecisions, backSaid, agentSteps, LESSONS_FILE,
-} from '../lessons.mjs';
-import { editFindings, editTruth } from '../edit-check.mjs';
-import { steeringTruth } from '../steering-check.mjs';
-import { decisionsFrom, decisionView, ruledOutLines, gatherDecisions } from '../decisions.mjs';
-import { rulesSection, writeRules } from '../agent-rules.mjs';
-import { judge, routePrompt } from '../guard.mjs';
-import { route } from '../route.mjs';
-import { recordWrong } from '../wrong.mjs';
+} from '../lib/lessons.mjs';
+import { editFindings, editTruth } from '../lib/edit-check.mjs';
+import { steeringTruth } from '../lib/steering-check.mjs';
+import { decisionsFrom, decisionView, ruledOutLines, gatherDecisions } from '../lib/decisions.mjs';
+import { rulesSection, writeRules } from '../lib/agent-rules.mjs';
+import { judge, routePrompt } from '../lib/guard.mjs';
+import { route } from '../lib/route.mjs';
+import { recordWrong } from '../lib/wrong.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -275,7 +275,7 @@ test('--lesson keeps a correction and proposes its guard; --lesson-answer yes wr
   writeFileSync(join(d, 'ds-config.json'), JSON.stringify({ writes: { engine: 'ask' } }));
   mkdirSync(join(d, 'contracts'), { recursive: true });
   writeFileSync(join(d, 'contracts', 'catalog.json'), JSON.stringify({ components: { cardTile: {}, buttonClock: {} } }));
-  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, CI: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  const run = (...a) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, CI: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
   assert.match(run('--lesson', 'Put a buttonClock inside a cardTile').stdout, /needs why/);
   const kept = run('--lesson', 'Put a buttonClock inside a cardTile', '--why', 'a tile holds one action', '--by', 'QA');
   assert.equal(kept.status, 0, kept.stdout + kept.stderr);

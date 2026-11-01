@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { layoutCaptureScript, compareLayout, layoutLines } from '../showroom-compare.mjs';
+import { layoutCaptureScript, compareLayout, layoutLines } from '../lib/showroom-compare.mjs';
 
 test('the layout capture only reads, a part at a time', () => {
   const s = layoutCaptureScript('76:18817', { from: 80, count: 40 });

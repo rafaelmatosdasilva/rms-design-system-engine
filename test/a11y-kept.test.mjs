@@ -11,9 +11,9 @@ import { makeFixture, budget } from './helpers.mjs';
 import {
   stableJson, engineFiles, checkSignature, runSignature, styleguideSignatures, projectSignature,
   keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE,
-} from '../a11y-check.mjs';
-import { OUT_DIR } from '../names.mjs';
-import { findChrome } from '../cdp.mjs';
+} from '../lib/a11y-check.mjs';
+import { OUT_DIR } from '../lib/names.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -25,7 +25,7 @@ test('stableJson signs the same object the same, whatever the order of its keys'
 });
 
 test('the check is signed by the engine files its results rest on: never the template, the browser\'s plumbing or the report', () => {
-  const files = engineFiles(join(ENGINE, 'a11y-check.mjs')).map((f) => f.slice(ENGINE.length + 1));
+  const files = engineFiles(join(ENGINE, 'lib', 'a11y-check.mjs')).map((f) => f.slice(join(ENGINE, 'lib').length + 1));
   for (const f of ['a11y-check.mjs', 'cdp.mjs', 'mode-resolver.mjs', 'vue-harness.mjs']) assert.ok(files.includes(f), f);
   for (const f of ['figma-link.mjs', 'styleguide-gen.mjs', 'readmes.mjs']) assert.ok(!files.includes(f), f);
   const fake = { '/e/a11y-check.mjs': "import './x.mjs'; await import('./figma-link.mjs');", '/e/x.mjs': '1', '/e/templates/styleguide.template.html': 't', '/e/wcag-page.js': 'w' };
@@ -141,7 +141,7 @@ const PAGE = `<!doctype html><html lang="en"><head><title>T</title><style>
 const run = (dir, args = [], env = {}) => {
   const t0 = Date.now();
   let out;
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json-out', join(dir, 'a11y.json'), ...args], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1', ...env } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json-out', join(dir, 'a11y.json'), ...args], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1', ...env } }); }
   catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
   return { out, ms: Date.now() - t0, json: JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8')) };
 };

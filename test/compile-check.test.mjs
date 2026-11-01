@@ -3,8 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { compileShim, prepare, parseTscOutput, typeErrors, findTsc } from '../compile-check.mjs';
-import { score } from '../eval-run.mjs';
+import { compileShim, prepare, parseTscOutput, typeErrors, findTsc } from '../lib/compile-check.mjs';
+import { score } from '../lib/eval-run.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const catalog = { components: {

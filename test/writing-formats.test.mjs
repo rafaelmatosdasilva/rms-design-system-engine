@@ -2,7 +2,7 @@
 // system (Acme) with a dates helper file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { libraryFormat, ruleFormats, codeFormats, writingFindings } from '../writing-formats.mjs';
+import { libraryFormat, ruleFormats, codeFormats, writingFindings } from '../lib/writing-formats.mjs';
 
 const RULES = 'Dates. Use `d mmm yyyy, hh:mm` when date and time are both present. Use `d mmm yyyy` for a date. The day has no leading zero (`5 jun 2025`, not `05 jun 2025`). Examples: 26 jan 2025, 13:45';
 const DATES = `import moment from 'moment'

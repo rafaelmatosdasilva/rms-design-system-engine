@@ -5,13 +5,13 @@ import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { readGateLabels, parseOnly, onlyWords, onlyHelp } from '../only.mjs';
-import { route, onlyPart } from '../route.mjs';
-import { buildSummary } from '../next-step.mjs';
+import { readGateLabels, parseOnly, onlyWords, onlyHelp } from '../lib/only.mjs';
+import { route, onlyPart } from '../lib/route.mjs';
+import { buildSummary } from '../lib/next-step.mjs';
 import { fixtureProject, bareEnv, normalise, budget } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
-const LABELS = readGateLabels(join(ENGINE, 'audit.mjs'));
+const LABELS = readGateLabels(join(ENGINE, 'lib', 'audit.mjs'));
 const pick = (...v) => parseOnly(v, LABELS);
 
 test('the gates are read from the audit itself, in order', () => {
@@ -92,7 +92,7 @@ test('on the demo design system: one gate, the accessibility check alone, a word
   // With the primitive example laid over the demo, so the parity part shows the system's own advice too.
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'only-', { overlay: join(ENGINE, 'test', 'fixtures', 'demo-primitives') });
   const audit = (...args) => {
-    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
+    const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', FORCE_COLOR: '0', CI: '1' }, timeout: budget(300000) });
     const out = normalise((r.stdout ?? '') + (r.stderr ?? ''), dir);
     return { code: r.status, out, gates: [...out.matchAll(/^(?:✅|❌|⏭|⚠️)\s+\[(\d+)\]/gm)].map((m) => Number(m[1])) };
   };

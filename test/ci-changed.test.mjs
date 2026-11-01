@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sourcesOf, sourcesNow, changes } from '../ci-changed.mjs';
+import { sourcesOf, sourcesNow, changes } from '../lib/ci-changed.mjs';
 import { tempDir } from './helpers.mjs';
 
 test('the sources of a build: the code, each store read from GitLab, the intent layer, the profile and the Figma file; never what it only writes', () => {

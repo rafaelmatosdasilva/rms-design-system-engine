@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { switchFor, collectionSwitches, comboAxes, combinations, mergeSwitches, comboFindings, comboContrast, modeCombinations } from '../mode-combos.mjs';
+import { switchFor, collectionSwitches, comboAxes, combinations, mergeSwitches, comboFindings, comboContrast, modeCombinations } from '../lib/mode-combos.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 // Dark sets the text colour; the phone block sets it too, later, so Dark on a phone gets the light one.
@@ -46,7 +46,7 @@ test('only what goes wrong together is listed: the token and the pair, with the 
 });
 
 test('in the browser: the theme with every combination on, read as the browser resolves it', { timeout: budget(120000) }, async (t) => {
-  const { findChrome } = await import('../cdp.mjs');
+  const { findChrome } = await import('../lib/cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = tempDir('dse-combos-');
   try {
@@ -66,7 +66,7 @@ test('in the browser: the theme with every combination on, read as the browser r
 });
 
 test('the style guide\'s To do: one row for the values, one for the pairs, both Claude\'s in the code', async () => {
-  const { comboTodos } = await import('../mode-combos.mjs');
+  const { comboTodos } = await import('../lib/mode-combos.mjs');
   const rows = comboTodos({ findings: [{ token: 'text/body', cssVar: '--text-body', combo: 'Dark with Phone', got: '#111111', want: '#eeeeee' }], contrast: [{ name: '--text-body on --surface-base', combo: 'Dark with Phone', ratio: 1.19, need: 4.5 }] });
   assert.deepEqual(rows.map((r) => [r.kind, r.who]), [['Modes together', 'code'], ['Modes together', 'code']]);
   assert.match(rows[0].say, /^1 token takes a value Figma does not have only when two modes are on together, each mode alone being right \(--text-body in Dark with Phone is #111111, Figma #eeeeee\)\.$/);

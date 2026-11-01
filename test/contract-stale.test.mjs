@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { generateContracts } from '../contract-gen.mjs';
+import { generateContracts } from '../lib/contract-gen.mjs';
 
 // What the engine wrote before contract format 1: an id, no name, no schemaVersion.
 const OLD = { $schema: './contract.schema.json', id: 'rms.oldTile', version: '0.1.0', description: 'oldTile — captured from Figma by rms-design-system-engine.', props: [], anatomy: { root: {} }, 'x-design-system-engine': { note: 'Generated LOCAL view (rms-design-system-engine).' } };

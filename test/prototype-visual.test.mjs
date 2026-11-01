@@ -1,7 +1,7 @@
 // The design review of a drawn prototype: alignment, spacing rhythm, one main action, hierarchy, line length.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { visualFindings, visualLines } from '../prototype-visual.mjs';
+import { visualFindings, visualLines } from '../lib/prototype-visual.mjs';
 
 const box = (path, name, left, top, w = 100, h = 20) => ({ path, name, left, right: left + w, top, bottom: top + h });
 const clean = {

@@ -2,9 +2,9 @@
 // leaves out lines that report nothing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectFindings, diffFindings, diffReport, ZERO_FAIL } from '../run-diff.mjs';
-import { figmaLink, figmaLinker } from '../figma-link.mjs';
-import { stateContrastFindings } from '../contrast-check.mjs';
+import { collectFindings, diffFindings, diffReport, ZERO_FAIL } from '../lib/run-diff.mjs';
+import { figmaLink, figmaLinker } from '../lib/figma-link.mjs';
+import { stateContrastFindings } from '../lib/contrast-check.mjs';
 import { makeFixture } from './helpers.mjs';
 
 const report = (extra = []) => [
@@ -76,14 +76,14 @@ test('state contrast: each state in every mode, with the token names and the sou
 });
 
 test('right-to-left: one-sided and asymmetric physical properties, with the logical one to use', async () => {
-  const { rtlFindings } = await import('../rtl-check.mjs');
+  const { rtlFindings } = await import('../lib/rtl-check.mjs');
   const r = rtlFindings([{ file: 'a.css', text: '.ok { padding-left: 8px; padding-right: 8px; margin: 0 auto; }\n.pad { padding-left: 8px; }\n.four { padding: 1px 2px 3px 4px; text-align: left; }\n.pos { left: 4px; float: right; }' }]);
   assert.deepEqual(r.map((f) => `${f.selector} ${f.use}`), ['.pad padding-inline-start', '.four padding-block and padding-inline (or -inline-start / -inline-end)', '.four text-align: start', '.pos inset-inline-start', '.pos float: inline-end']);
   assert.equal(r[0].at, 'a.css:2');
 });
 
 test('burndown: open findings per component, most specific name, with what the last run had', async () => {
-  const { burndown, burndownLines, componentOf } = await import('../run-diff.mjs');
+  const { burndown, burndownLines, componentOf } = await import('../lib/run-diff.mjs');
   const names = ['button', 'buttonPrimary', 'chip', 'field'];
   assert.equal(componentOf('Structure :: ⚠️  button-primary radius', names), 'buttonPrimary');
   assert.equal(componentOf('Token values :: ❌ [sizing/-] radii/chip → --radii-chip', names), 'chip');
@@ -103,7 +103,7 @@ test('burndown: open findings per component, most specific name, with what the l
 });
 
 test('every finding as one record (rule, evidence, verdict, who acts), each gate with its verdict', async () => {
-  const { findingRecords, gateRecords, differences } = await import('../run-diff.mjs');
+  const { findingRecords, gateRecords, differences } = await import('../lib/run-diff.mjs');
   const findings = [
     'Token values :: gate fails',
     'Token values :: ❌ [sizing/-] radii/chip → --radii-chip',
@@ -139,7 +139,7 @@ test('every finding as one record (rule, evidence, verdict, who acts), each gate
 });
 
 test('a component only in code gets what to build in Figma, its props and the tokens its styles use', async () => {
-  const { figmaToBuild } = await import('../handback.mjs');
+  const { figmaToBuild } = await import('../lib/handback.mjs');
   assert.equal(figmaToBuild([]), '');
   const md = figmaToBuild([
     { name: 'StatusPill', file: 'src/components/StatusPill.tsx', props: [{ name: 'tone', options: ['info', 'warn'], default: 'info' }, { name: 'label', required: true }],
@@ -152,7 +152,7 @@ test('a component only in code gets what to build in Figma, its props and the to
 });
 
 test('advice on the system (prune candidates, system health) is neither an open finding nor a difference', async () => {
-  const { burndown, differences } = await import('../run-diff.mjs');
+  const { burndown, differences } = await import('../lib/run-diff.mjs');
   const f = ['Prune candidates :: 1 group(s) of tokens with the same value written by hand', 'System health :: 17 of 17 semantic tokens have no description in Figma', 'Token values :: ❌ [sizing/-] radii/chip → --radii-chip'];
   const b = burndown(f, ['chip']);
   assert.equal(b.loose, 0);

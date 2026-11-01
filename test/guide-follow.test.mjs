@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { guideFollow, publishTarget, startJob, guideLayer, GUIDE_OUT } from '../guide-follow.mjs';
-import { committedThisRun } from '../intent-changes.mjs';
+import { guideFollow, publishTarget, startJob, guideLayer, GUIDE_OUT } from '../lib/guide-follow.mjs';
+import { committedThisRun } from '../lib/intent-changes.mjs';
 
 function project(remote, files = {}) {
   const d = tempDir('follow-');

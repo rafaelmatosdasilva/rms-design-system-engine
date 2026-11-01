@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { componentSignature, recordCheck, removeCheck, readChecked, checksFor } from '../checked.mjs';
+import { componentSignature, recordCheck, removeCheck, readChecked, checksFor } from '../lib/checked.mjs';
 import { tempDir } from './helpers.mjs';
 
 test('a check stays current until the component changes, and only that component', () => {

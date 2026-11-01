@@ -6,10 +6,10 @@ import { cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { guidanceView, tokenDescriptions, staticRole } from '../styleguide-data.mjs';
-import { contextFrom } from '../prototype-context.mjs';
-import { varsFromItems } from '../figma-capture.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { guidanceView, tokenDescriptions, staticRole } from '../lib/styleguide-data.mjs';
+import { contextFrom } from '../lib/prototype-context.mjs';
+import { varsFromItems } from '../lib/figma-capture.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 import { bareEnv, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -71,7 +71,7 @@ test('a text style\'s description is kept from the capture and read as its token
 });
 
 test('with no intent layer, a component\'s Do and don\'t and its properties in the engine\'s contract are written, never to do', { timeout: budget(300000) }, async (t) => {
-  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+  const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
   const chromePath = findChrome({ playwright: true });
   if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = tempDir('doc-rows-');
@@ -81,7 +81,7 @@ test('with no intent layer, a component\'s Do and don\'t and its properties in t
   writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify(authored, null, 2));
   mkdirSync(join(dir, 'contracts'), { recursive: true });
   writeFileSync(join(dir, 'contracts', 'button.contract.json'), JSON.stringify({ id: 'button', props: [{ name: 'variant' }, { name: 'size' }] }));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: budget(250000) });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...bareEnv(), NO_COLOR: '1', CI: '1' }, timeout: budget(250000) });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const file = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
   const data = JSON.parse(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/.exec(readPage(file))[1]);

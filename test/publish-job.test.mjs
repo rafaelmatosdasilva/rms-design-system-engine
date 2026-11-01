@@ -7,8 +7,8 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { hostOf, githubJob, gitlabJob, writePublishJob, productRepos, ENGINE_REPO } from '../publish-job.mjs';
-import { route } from '../route.mjs';
+import { hostOf, githubJob, gitlabJob, writePublishJob, productRepos, ENGINE_REPO } from '../lib/publish-job.mjs';
+import { route } from '../lib/route.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -65,19 +65,19 @@ test('a request to share the style guide writes the job; building it stays a bui
 
 test('--publish-styleguide writes the job and says what to do next; --print only shows it', () => {
   const dir = project('https://github.com/acme/ds.git');
-  const p = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--publish-styleguide', '--print'], { cwd: dir, encoding: 'utf8' });
+  const p = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--publish-styleguide', '--print'], { cwd: dir, encoding: 'utf8' });
   assert.equal(p.status, 0, p.stderr);
   assert.match(p.stdout, /^name: style guide/);
   assert.ok(!existsSync(join(dir, '.github/workflows/style-guide.yml')), '--print writes nothing');
-  const w = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--publish-styleguide'], { cwd: dir, encoding: 'utf8' });
+  const w = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--publish-styleguide'], { cwd: dir, encoding: 'utf8' });
   assert.equal(w.status, 0, w.stderr);
   assert.match(w.stdout, /✅ Wrote \.github\/workflows\/style-guide\.yml[\s\S]*NEXT: tell the person the job is written/);
-  const gl = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--publish-styleguide', '--host', 'gitlab'], { cwd: project(null), encoding: 'utf8' });
+  const gl = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--publish-styleguide', '--host', 'gitlab'], { cwd: project(null), encoding: 'utf8' });
   assert.match(gl.stdout, /✅ Wrote \.gitlab-ci\.yml/);
 });
 
 test('a job that publishes the page alone (written before the page had files beside it, or by hand) is named, with the line to put instead', async () => {
-  const { pageOnlyCopies, pageOnlyLines, githubJob } = await import('../publish-job.mjs');
+  const { pageOnlyCopies, pageOnlyLines, githubJob } = await import('../lib/publish-job.mjs');
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const out = '.design-system-engine-out/styleguide/index.html';

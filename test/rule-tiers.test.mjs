@@ -2,9 +2,9 @@
 // which wins. A rule is placed by where it was written, never by what it says, so the tests are about sources.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TIERS, TIER_SAID, tierOf, byTier, beats, ladderLine } from '../rule-tiers.mjs';
-import { ruleLines } from '../prototype-context.mjs';
-import { ENGINE_RULES, rulesSection } from '../agent-rules.mjs';
+import { TIERS, TIER_SAID, tierOf, byTier, beats, ladderLine } from '../lib/rule-tiers.mjs';
+import { ruleLines } from '../lib/prototype-context.mjs';
+import { ENGINE_RULES, rulesSection } from '../lib/agent-rules.mjs';
 
 test('tierOf: by the layer it was written in, the file it came from, else the system that owns the words', () => {
   assert.deepEqual(TIERS, ['universal', 'system', 'product']);

@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-11: Point the hooks, workflows, install, docs and tests at lib/; keep four root entries (continuous evaluation)
+
+What changed since the entry below (engine f9ba9f3): MCP answers fit an agent with no shell; the skill says which route; accessibility guide lines (#189); Move the engine's modules into lib/; Point the hooks, workflows, install, docs and tests at lib/; keep four root entries. The guide changed in `cookbook/ci-and-hooks.md`, `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/usage.md`.
+
+Guide set measured: `0707c30569d6` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 597032e7` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 99e2f8b4` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 50abedb9` `cookbook/refresh-figma.md 3d4c5584` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 9b40545d` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md 430000a1` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 36f540e | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.035 | $0.036 |
+| Input a run | 81k | 80k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 80k a run against 81k. no task changed state, and no run moved: the same result. Records: `records/2026-11-01-point-the-hooks-workflows-install`.
+
 ## 2026-11: Merge remote-tracking branch 'origin/main' into eval-owed-guides (continuous evaluation)
 
 What changed since the entry below (engine 43a945b): Gaps sorted into local and shared, and a second reviewer before a change to the system is accepted (#211); A component's check asked for while one is under way waits for it, then tries every variant (#212); The guide names this week's options; two hook fixes the evaluation found (#214); Code Connect slots and swaps the documented way, no-page Adds reviewed again, local or shared on proposals, issues and one-sided components (#213). The guide changed in `reference/config.md`, `reference/usage.md`.

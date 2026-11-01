@@ -2,8 +2,8 @@
 // (Vue, React, Svelte) and from the engine's own compositions. An invented system (Acme).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMarkup, splitSource } from '../page-check.mjs';
-import { habitReview, owedStates, fromPageTree, fromComposition } from '../page-quality.mjs';
+import { parseMarkup, splitSource } from '../lib/page-check.mjs';
+import { habitReview, owedStates, fromPageTree, fromComposition } from '../lib/page-quality.mjs';
 
 const read = (file, text) => {
   const src = splitSource(file, text);

@@ -7,11 +7,11 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers.mjs';
-import { route, copiedDecision } from '../route.mjs';
-import { DRAFT, draftTask, readDsds } from '../doc-source-dsds.mjs';
-import { reviewPlan, draftLinesPlan, systemPage } from '../intent-changes.mjs';
-import { engineCommand, applyProfile, commandSkill } from '../profile.mjs';
-import { decisionsFrom, decisionLine } from '../decisions.mjs';
+import { route, copiedDecision } from '../lib/route.mjs';
+import { DRAFT, draftTask, readDsds } from '../lib/doc-source-dsds.mjs';
+import { reviewPlan, draftLinesPlan, systemPage } from '../lib/intent-changes.mjs';
+import { engineCommand, applyProfile, commandSkill } from '../lib/profile.mjs';
+import { decisionsFrom, decisionLine } from '../lib/decisions.mjs';
 
 const cmd = 'rms-design-system-engine';
 const routed = (t) => route(t, { hasConfig: true, cmd });

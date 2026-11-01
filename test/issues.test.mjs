@@ -2,7 +2,7 @@
 // a host: the plan is what a person reads and what a sender carries out.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { issuesFor, issuePlan, issueLines, sendIssues, keyLine, keyIn, MARK } from '../issues.mjs';
+import { issuesFor, issuePlan, issueLines, sendIssues, keyLine, keyIn, MARK } from '../lib/issues.mjs';
 
 const findings = () => [
   { check: 'Structure', evidence: 'chip height: Figma 32px, rendered 36px (.chip · theme.css:75)', component: 'chip', difference: true },

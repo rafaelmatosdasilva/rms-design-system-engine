@@ -7,8 +7,8 @@ import { cpSync, writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { localFiles, pageWeight, pageFindings, checkLines, failures } from '../styleguide-check.mjs';
-import { guideShots, shotLines, changedShare } from '../styleguide-shots.mjs';
+import { localFiles, pageWeight, pageFindings, checkLines, failures } from '../lib/styleguide-check.mjs';
+import { guideShots, shotLines, changedShare } from '../lib/styleguide-shots.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -57,11 +57,11 @@ test('what a build says of its own pages: pictured the first time, unchanged, or
 });
 
 test('in the browser: the same page twice is unchanged; a page whose layout moved is said, with a picture of what changed', { timeout: budget(300000) }, async (t) => {
-  const { findChrome } = await import('../cdp.mjs');
+  const { findChrome } = await import('../lib/cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = tempDir('sg-shots-');
   cpSync(HARBOR, dir, { recursive: true });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.doesNotMatch(r.stdout, /📸/, 'a build without the browser pictures nothing');
   const page = join(dir, '.design-system-engine-out', 'styleguide', 'index.html'), shots = join(dir, 'shots');
@@ -81,20 +81,20 @@ test('in the browser: the same page twice is unchanged; a page whose layout move
 });
 
 test('a build with the browser pictures the guide\'s own pages in a folder that keeps its builds, and says so; a first build and a CI build do not', { timeout: budget(300000) }, async (t) => {
-  const { findChrome } = await import('../cdp.mjs');
+  const { findChrome } = await import('../lib/cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = tempDir('sg-shots-build-');
   cpSync(HARBOR, dir, { recursive: true });
   // A first build in a folder: no guide before it, nothing pictured.
-  const first = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '' } });
+  const first = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '' } });
   assert.equal(first.status, 0, first.stdout + first.stderr);
   assert.doesNotMatch(first.stdout, /📸|own pages not pictured/, 'a first build pictures nothing');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /📸 The style guide's own pages pictured \(\d+\), for the next build to compare with: \.design-system-engine-out\/styleguide-shots\/last\./);
   assert.match(r.stdout, /ℹ️ {2}The page and its files weigh [\d.]+ MB \(the largest: assets\//);
   // In CI the folder is thrown away after the run: nothing to compare with, so nothing pictured.
-  const ci = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: 'true' } });
+  const ci = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: 'true' } });
   assert.equal(ci.status, 0, ci.stdout + ci.stderr);
   assert.doesNotMatch(ci.stdout, /📸|own pages not pictured/);
 });

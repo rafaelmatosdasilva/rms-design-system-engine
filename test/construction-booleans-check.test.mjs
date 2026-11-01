@@ -3,7 +3,7 @@
 // property; and the rules the team decided, which a run fails on beside the gates (decidedRules, constructionLines).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { grammarOf, fixOf, decidedRules, constructionLines } from '../construction-grammar.mjs';
+import { grammarOf, fixOf, decidedRules, constructionLines } from '../lib/construction-grammar.mjs';
 
 const rule = (g, id) => g.figma.rules.find((r) => r.id === id);
 const look = { paddingPx: [8, 8, 8, 8], gapPx: 4, radiusPx: [4, 4, 4, 4], fontSize: 14, colors: { fill: { token: 'surface' }, text: { token: 'text' }, stroke: null } };
