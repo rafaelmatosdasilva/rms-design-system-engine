@@ -774,7 +774,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const absent = (await import('./layer-questions.mjs')).absentComponent([...view.components.map((c) => c.name), ...Object.keys(readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {})], { layer: snap, more: agentFiles });
         absent.entry = src.entry ?? null; absent.entryUrl = (await import('./doc-host.mjs')).fileUrl(src, src.entry);
         view.intentLayer = { absent, ...(snap.system?.drafts?.length ? { systemDrafts: snap.system.drafts } : {}), source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
-          noPage: decided.noPage, addProposals: decided.addProposals };
+          noPage: decided.noPage, addProposals: decided.addProposals, ...(Object.keys(decided.noPageRechecks ?? {}).length ? { noPageRechecks: decided.noPageRechecks } : {}) };
         // Who each page waits on when it waits on a person (ds-config.json → owners): the page counts its rows by it.
         const { ownerOf } = await import('./decided-by.mjs');
         for (const p of view.intentLayer.pages) { const o = ownerOf(cfg.owners, p.component ?? p.about?.partOf ?? p.about?.is ?? p.name, `${p.layer}/${p.name}`); if (o) p.decider = o; }
@@ -1649,13 +1649,17 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // what it is about (a product's page or version is that product's; the system's tokens, text styles and modes are
     // the system's). The Tasks page counts them and says on whom the shared ones wait.
     try {
-      const { scopeOf, todoScope, usageFrom } = await import('./local-shared.mjs');
+      const { scopeOf, todoScope, usageFrom, sideScope } = await import('./local-shared.mjs');
       const usage = usageFrom(ROOT, cfg), sctx = { usage, owners: cfg.owners };
       for (const c of new Set([...(view.allComponents ?? []), ...view.components])) {
         const known = Object.keys(usage).some((n) => n.toLowerCase() === String(c.name).toLowerCase());
         c.scope = scopeOf({ home: 'system', kind: 'component', change: 'change', what: c.name, component: c.name, ...(known || !Array.isArray(c.usage) ? {} : { reach: c.usage.map((u) => u?.name ?? u?.key ?? u).filter(Boolean) }) }, sctx);
       }
       for (const t of view.systemTodo ?? []) t.scope = todoScope(t, sctx);
+      // A component only one side has: only in Figma, not built yet, is the system's to build; only in one product's
+      // code is that product's own. Counted with the rest on the Tasks page.
+      for (const k of view.notInFigma ?? []) k.scope = sideScope({ name: k.name, side: 'code', file: k.file }, sctx);
+      if (view.notAgreed?.waiting?.length) view.notAgreed.scopes = Object.fromEntries(view.notAgreed.waiting.map((w) => String(w).replace(/ \(not built yet\)$/, '')).map((n) => [n, sideScope({ name: n, side: 'figma' }, sctx)]));
     } catch { /* the page builds without it */ }
     lastView = view;
     agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, notInFigma: view.notInFigma?.length ?? 0, line: view.notAgreed.line, ...(view.scope ? { scope: view.scope } : {}) };

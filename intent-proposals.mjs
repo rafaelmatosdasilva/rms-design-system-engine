@@ -32,12 +32,16 @@
 //
 // Who decides: ds-config.json → owners (decided-by.mjs → ownerOf). Each proposal names the one it waits on (decider); an
 // answer given by someone else is kept, and said.
+//
+// Local or shared (local-shared.mjs → proposalScope): each proposal says which, with its reason in one line. One about a
+// product's flow or page stays in that product; one about a component's page (or a template's, a pattern's, a
+// foundation's) changes what every product reads.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { projectPath } from './names.mjs';
 import { ownerOf, notTheOwner } from './decided-by.mjs';
-import { usageFrom } from './local-shared.mjs';
+import { usageFrom, proposalScope } from './local-shared.mjs';
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const words = (n) => String(n ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -237,7 +241,8 @@ export function withEvidence(key, x, ctx = {}) {
 
 // The report as the team's decisions leave it: a yes to "documented" takes the component off the pages to write, a
 // yes to "keep" takes the finding off its page (and a page with nothing else wrong to Keep), a yes to keep a page in
-// place takes off its Move. → { noPage, pages } with each page's proposal attached (proposal: { key, …, answer }).
+// place takes off its Move. → { noPage, pages, addProposals, noPageRechecks } with each page's proposal attached
+// (proposal: { key, …, answer }); noPageRechecks: { component: recheck } for each Add answered with no page to show it on.
 export function applyDecisions({ report, noPage, proposals, decisions }) {
   const answer = (k) => decisions[k]?.answer ?? null;
   // Who answered it and when, beside the answer: the page says it.
@@ -258,7 +263,16 @@ export function applyDecisions({ report, noPage, proposals, decisions }) {
     return q;
   });
   const addProposals = Object.fromEntries(left.map((n) => [n, proposals.has(`add:${n}`) ? { ...proposals.get(`add:${n}`), key: `add:${n}`, answer: answer(`add:${n}`), ...said(`add:${n}`) } : null]));
-  return { noPage: left, pages, addProposals };
+  // An Add answered with no page (none of its own, or one the layer no longer has) has no row to show its recheck on:
+  // it gets one of its own, for its component. One whose answer names a page still there is on that page's row.
+  const onPage = new Set(report.pages.map((p) => p.name));
+  const noPageRechecks = {};
+  for (const [k, x] of proposals) {
+    if (x.kind !== 'recheck' || !/^add:/.test(x.decision ?? '') || (x.page && onPage.has(x.page)) || answer(k)) continue;
+    const was = decisions[x.decision] ?? {};
+    noPageRechecks[x.subject] = { ...x, key: k, answer: null, was: { answer: was.answer ?? null, proposal: was.proposal ?? null, by: was.by ?? null, at: was.at ?? null } };
+  }
+  return { noPage: left, pages, addProposals, noPageRechecks };
 }
 
 // Who a proposal waits on (ds-config.json → owners): one about a page, its component's owner, else its area's
@@ -329,7 +343,10 @@ export async function decidedLayer(ROOT, cfg) {
   const decisions = currentAnswers(found, kept);
   // Its evidence, and the one it waits on (ds-config.json → owners).
   const usage = usageOf(ROOT, cfg);
-  const proposals = new Map([...found].map(([k, x]) => [k, { ...withEvidence(k, x, { usage, decisions, report }), decider: deciderFor(x, report, cfg.owners) }]));
+  // Local or shared, with its reason (local-shared.mjs): a product's flow or page is its team's own; any other page, and
+  // a component with no page yet, is what every product reads.
+  const scopeCtx = { usage, owners: cfg.owners };
+  const proposals = new Map([...found].map(([k, x]) => [k, { ...withEvidence(k, x, { usage, decisions, report }), decider: deciderFor(x, report, cfg.owners), scope: proposalScope(x, { page: report.pages.find((q) => q.name === (x.page ?? x.host)) ?? null }, scopeCtx) }]));
   const done = applyDecisions({ report, noPage, proposals, decisions });
-  return { snap, report: { ...report, pages: done.pages }, noPage: done.noPage, addProposals: done.addProposals, proposals, decisions, wrongOf, names };
+  return { snap, report: { ...report, pages: done.pages }, noPage: done.noPage, addProposals: done.addProposals, noPageRechecks: done.noPageRechecks, proposals, decisions, wrongOf, names };
 }

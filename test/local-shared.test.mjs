@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { makeFixture } from './helpers.mjs';
-import { scopeOf, todoScope, editScope, changeScope, scopeSummary, scopeLine, usageFrom } from '../local-shared.mjs';
+import { scopeOf, todoScope, editScope, changeScope, scopeSummary, scopeLine, usageFrom, proposalScope, findingScope, issueScopeLine, sideScope } from '../local-shared.mjs';
 import { editCheck } from '../edit-check.mjs';
 import { judge } from '../guard.mjs';
 import { heldOf } from '../sign-off.mjs';
@@ -134,4 +134,44 @@ test('the style guide shows local or shared beside who acts, counts them on the 
   assert.match(tpl, /sc\.shared \+ ' shared' \+ \(onList\.length \? ', waiting on ' \+ onList\.join\(', '\) : ''\)/, 'the Tasks page counts them, with who the shared ones wait on');
   assert.match(tpl, /card\('Local or shared', x\.scope \? lines\(\[x\.scope\.reason\]\) : ''\)/, 'a change in Figma says it');
   assert.match(tpl, /scope: \{ scope: 'local', reason: 'Local: ' \+ x\.product/, 'a product\'s near copy is that product\'s');
+});
+
+// The intent layer's proposals: one about a component's page is what every product reads, one about a product's flow
+// or page stays in that product; an Add is a component with no page yet, the system's.
+test('an intent-layer proposal is shared for a component\'s page and local for a product\'s flow or page', () => {
+  const comp = proposalScope({ kind: 'fix', subject: 'tileRow', page: 'Card Tile' }, { page: { name: 'Card Tile', layer: 'components', component: 'cardTile' } }, { usage, owners });
+  assert.equal(comp.scope, 'shared');
+  assert.equal(comp.decider.name, 'Cards lead');
+  assert.equal(comp.reason, "Shared: Card Tile's page is the system's: 3 products use it (Northwind, Acme shop, Acme admin); easy to undo, medium risk.");
+  const flow = proposalScope({ kind: 'fix', subject: 'cardTile', page: 'Checkout' }, { page: { name: 'Checkout', layer: 'flows' } }, { usage, owners });
+  assert.deepEqual([flow.scope, flow.decider], ['local', null]);
+  assert.equal(flow.reason, "Local: Checkout's page stays in one product: no other product gets it; easy to undo, low risk.");
+  assert.equal(proposalScope({ kind: 'review', subject: 'x' }, { page: { name: 'Orders', layer: 'pages', product: 'Northwind' } }).reason, "Local: Orders's page stays in Northwind: no other product gets it; easy to undo, low risk.");
+  const add = proposalScope({ kind: 'add', subject: 'tileTwo' }, {}, { owners });
+  assert.equal(add.scope, 'shared');
+  assert.match(add.reason, /^Shared: tileTwo's page is the system's: /);
+  assert.equal(proposalScope({ kind: 'move', subject: 'Picker', split: true }, { page: { name: 'Picker', layer: 'components' } }).ambiguous, true, 'split evidence is a decision');
+});
+
+// A component only one side has: only in Figma, the system's to build; only in one product's code, that product's own.
+test('a component only in Figma is shared; one only in one product\'s code is local; one the system\'s code has is shared', () => {
+  const fig = sideScope({ name: 'tileTwo', side: 'figma' }, { usage, owners });
+  assert.equal(fig.scope, 'shared');
+  assert.equal(fig.reason, "Shared: tileTwo is the system's: no product's code uses it yet, every new one gets it; easy to undo, low risk.");
+  const one = sideScope({ name: 'promoBar', file: 'src/PromoBar.vue' }, { usage: { promoBar: { products: [{ name: 'Northwind', files: 1 }] } } });
+  assert.deepEqual([one.scope, one.decider], ['local', null]);
+  assert.equal(one.reason, 'Local: promoBar (src/PromoBar.vue) stays in Northwind: no other product gets it; can be undone, low risk.');
+  assert.equal(sideScope({ name: 'cardTile', file: 'src/CardTile.vue' }, { usage, owners }).scope, 'shared', 'several products use it');
+  assert.equal(sideScope({ name: 'loneTile' }, {}).scope, 'shared', 'unknown use: the system\'s until someone says');
+  // The Tasks page counts them: their rows carry the scope the page reads.
+  const tpl = readFileSync(fileURLToPath(new URL('../templates/styleguide.template.html', import.meta.url)), 'utf8');
+  assert.match(tpl, /codeOnly: k\.name, codeFile: k\.file,[^\n]*scope: k\.scope \|\| null \}/);
+  assert.match(tpl, /figmaOnly: n,[^\n]*scope: \(DATA\.notAgreed\.scopes \|\| \{\}\)\[n\] \|\| null \}/);
+});
+
+// What an issue's body says: a finding about a product's screen is local, any other the system's.
+test('a finding is local when it is a product\'s own screen, else shared; the issue line names who it waits on', () => {
+  assert.equal(issueScopeLine(findingScope({ check: 'Structure', component: 'cardTile' }, { usage, owners })), "Shared: waits on Cards lead — cardTile is the system's: 3 products use it (Northwind, Acme shop, Acme admin); easy to undo, medium risk.");
+  assert.equal(issueScopeLine(findingScope({ check: 'Markup', product: 'Northwind' })), "Local: the product team's own — Northwind's own screen stays in Northwind: no other product gets it; easy to undo, low risk.");
+  assert.equal(issueScopeLine(null), '');
 });

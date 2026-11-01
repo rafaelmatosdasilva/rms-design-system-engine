@@ -69,7 +69,7 @@ function entriesOf(body) {
 }
 // One figma.kind('Figma name', { … }) call: { kind, figma, map (the entries of its object, when it has one) } or null.
 function callOf(value) {
-  const m = /^figma\.(enum|boolean|string|instance|children|nestedProps|textContent)\(\s*(['"`])([^'"`]+)\2\s*(,?)/.exec(String(value).trim());
+  const m = /^figma\.(enum|boolean|string|instance|slot|children|nestedProps|textContent)\(\s*(['"`])([^'"`]+)\2\s*(,?)/.exec(String(value).trim());
   if (!m) return null;
   const rest = String(value).trim().slice(m[0].length);
   return { kind: m[1], figma: m[3], map: m[4] && /^\s*\{/.test(rest) ? entriesOf(objectAt(rest, 0)) : null, body: m[4] && /^\s*\{/.test(rest) ? objectAt(rest, 0) : '' };

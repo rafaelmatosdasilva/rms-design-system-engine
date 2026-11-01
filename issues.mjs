@@ -15,6 +15,7 @@
 // file, and sent only where the project says the engine may (writes.mjs → `issues`). What a person reads is the plan,
 // whether or not it is sent.
 import { keptKey } from './kept.mjs';
+import { findingScope, issueScopeLine } from './local-shared.mjs';
 
 // The mark an issue carries so the engine knows its own, and the key inside it. A person may edit an issue's title
 // and body freely; this line is how it is still found.
@@ -25,9 +26,10 @@ export const keyIn = (text) => new RegExp(`<!--\\s*${MARK}:\\s*(.+?)\\s*-->`).ex
 const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
 
-// One issue per difference a run found, with the evidence and who acts. Kept differences are left out: the team
-// already decided them. → [{ key, title, body, component, check, who }]
-export function issuesFor(findings = [], { kept = [], who = null } = {}) {
+// One issue per difference a run found, with the evidence, who acts, and whether it is local or shared, in one line
+// (local-shared.mjs: a shared one names who it waits on; ctx: { usage, owners }). Kept differences are left out: the
+// team already decided them. → [{ key, title, body, component, check, who, scope }]
+export function issuesFor(findings = [], { kept = [], who = null, ctx = {} } = {}) {
   const decided = new Set(kept.map((d) => d.key));
   const out = [], seen = new Set();
   for (const f of findings) {
@@ -36,11 +38,12 @@ export function issuesFor(findings = [], { kept = [], who = null } = {}) {
     if (decided.has(key) || seen.has(key)) continue;
     seen.add(key);
     const title = cut(`${f.component ? `${f.component}: ` : ''}${clean(f.evidence)}`, 120);
+    const scope = findingScope(f, ctx);
     out.push({
       key, title, component: f.component ?? null, check: f.check ?? null,
-      who: f.who ?? who ?? null,
+      who: f.who ?? who ?? null, scope,
       body: [`**${f.check}**`, '', clean(f.evidence), '',
-        f.component ? `Component: \`${f.component}\`` : '', f.who || who ? `Who acts: ${f.who ?? who}` : '',
+        f.component ? `Component: \`${f.component}\`` : '', f.who || who ? `Who acts: ${f.who ?? who}` : '', issueScopeLine(scope),
         '', 'Found by rms-design-system-engine. It closes itself when a run no longer finds this difference; a difference the team decides to keep is taken off this list rather than closed by hand.',
         '', keyLine(key)].filter((l) => l !== '').join('\n'),
     });

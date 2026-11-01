@@ -52,11 +52,24 @@ test('what a person reads: each kind together, with the command and what the pro
   const keyOf = (f) => `${f.check} :: ${f.evidence}`;
   const issues = findings.map((f, i) => ({ key: keyOf(f), iid: i + 1, title: f.evidence }));
   const lines = routeLines(routePlan(issues, findings, { keyOf, writes: { code: 'yes', figma: 'no' } })).join('\n');
-  assert.match(lines, /^🛠 {2}3 open issues, by the fix each one needs:/);
+  assert.match(lines, /^🛠 {2}3 open issues, by the fix each one needs \(3 shared, with no owner named \(ds-config\.json owners\)\):/);
   assert.match(lines, /2 for the code: a patch handed back for a person to apply, and the difference on its page in the style guide — rms-design-system-engine --component <name>$/m);
   assert.match(lines, /1 for the design file: .* \(this project does not let the engine write there: a task for whoever owns it\)/);
   assert.deepEqual(routeLines([]), []);
   // A long list is cut and says it was.
   const many = routePlan(Array.from({ length: 9 }, (_, i) => ({ key: `Structure :: x${i}`, iid: i, title: `x${i}` })), Array.from({ length: 9 }, (_, i) => ({ check: 'Structure', evidence: `x${i}`, difference: true })), { keyOf });
   assert.match(routeLines(many, { most: 2 }).join('\n'), /…and 7 more/);
+});
+
+// Each routed issue says whether it is local or shared, as its body does, and the head counts them.
+test('each routed issue is local or shared, and the list counts them with who the shared ones wait on', () => {
+  const findings = [
+    { check: 'Structure', evidence: 'cardTile height', component: 'cardTile', difference: true },
+    { check: 'No hand-built DS components', evidence: 'a button built by hand on a product screen', difference: true },
+  ];
+  const keyOf = (f) => `${f.check} :: ${f.evidence}`;
+  const issues = findings.map((f, i) => ({ key: keyOf(f), iid: i + 1, title: f.evidence }));
+  const plan = routePlan(issues, findings, { keyOf, ctx: { owners: { cardTile: 'Cards team' } } });
+  assert.deepEqual(plan.map((x) => [x.scope.scope, x.scope.decider?.name ?? null]), [['shared', 'Cards team'], ['local', null]]);
+  assert.match(routeLines(plan)[0], /by the fix each one needs \(1 shared, waiting on Cards team \(1\); 1 local, each product team's own\):$/);
 });
