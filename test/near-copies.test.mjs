@@ -52,7 +52,7 @@ test('the edit check: a rule the edit adds that nearly copies a system component
     mkdirSync(join(dir, 'src/pages'), { recursive: true }); writeFileSync(join(dir, 'src/pages/save.css'), rule);
     const r = editCheck(write, { root: dir, cfg: { paths: { themeCSS: 'src/theme.css' } }, headOf: () => null });
     assert.match(r, /\n  save\.css:1  \.saveButton nearly copies the system's button \(5 of 6 declarations alike\); a new component is a decision: use button, with a new option if it needs one, or ask the person whether to add \.saveButton to the system\n/);
-    assert.match(r, /\nUse the system's component instead, or ask the person whether the new one belongs in the system\. Never keep a copy without asking\.$/);
+    assert.match(r, /\nUse the system's component instead, or ask the person whether the new one belongs in the system\. Never keep a copy without asking\.\nLocal: [^\n]*Adding the copy to the system instead would be shared/);
     // A rule of the component's own, and one the edit did not add, stay silent; so does a project that turns advice off.
     const own = { tool_name: 'Edit', tool_input: { file_path: join(dir, 'src/pages/save.css'), old_string: '}', new_string: '}\n.note { margin: 0; }' } };
     writeFileSync(join(dir, 'src/pages/save.css'), `${rule}.note { margin: 0; }\n`);
@@ -95,7 +95,7 @@ test('the audit says it under System health, and the style guide puts it in the 
       const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
       let row = '';
       for (let n = 0; n < 100 && !row; n++) { if (n) await new Promise((r) => setTimeout(r, 100)); row = await run(`(document.querySelector('#c-button tr[data-area="Products"]') || {}).textContent || ''`); }
-      assert.match(row, /^\d+[\w-]+-shop\.shopButton shop\.css:2You decide[\w-]+-shop's \.shopButton is nearly button \(\d+ of \d+ declarations alike; it differs in background[^)]*\)\.Decide: use button in [\w-]+-shop, with a new option if it needs one, or add \.shopButton to the system on purpose\. Your team decides which\./);
+      assert.match(row, /^\d+[\w-]+-shop\.shopButton shop\.css:2You decideLocal, waits on no one[\w-]+-shop's \.shopButton is nearly button \(\d+ of \d+ declarations alike; it differs in background[^)]*\)\.Decide: use button in [\w-]+-shop, with a new option if it needs one, or add \.shopButton to the system on purpose\. Your team decides which\./);
       close();
     } finally { c.kill(); }
     const audit = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });

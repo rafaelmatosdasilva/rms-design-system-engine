@@ -2462,16 +2462,28 @@ if (process.argv.includes('--figma-change') || process.argv.includes('--change-r
   const figmaToken = process.env.FIGMA_TOKEN ?? (() => { for (const d of [ROOT, dirname(ROOT)]) { try { const m = /^\s*FIGMA_TOKEN\s*=\s*['"]?([^'"\n#]+)/m.exec(readFileSync(join(d, '.env'), 'utf8')); if (m) return m[1].trim(); } catch { /* none here */ } } return null; })();
   const library = await libraryUsage(component, { fileKey: ccfg.figmaFileKey ?? null, token: figmaToken });
   const ch = changeOf({ component, asked: asked || prev?.asked || '', ops, captures, grammar: grammarOf({ props, structure, values, varNames, skeleton }, { answers: authored.construction ?? {} }), livesIn: contract?.livesIn ?? null, library, at: new Date().toISOString() });
+  // Who made it, and who signed it off: never the same (sign-off.mjs). The same change asked again keeps its author and
+  // a sign-off it already has (a second review's included). Local or shared, and on whom it waits (local-shared.mjs).
+  const so = await import('./sign-off.mjs');
+  const sameOps = !!prev && JSON.stringify(prev.ops) === JSON.stringify(ch.ops);
+  const gitName = (await import('./decided-by.mjs')).decidedBy(ROOT, []);
+  ch.author = (sameOps && prev.author) || so.authorNow() || (gitName ? { kind: 'person', name: gitName } : null);
+  try { const { changeScope, usageFrom } = await import('./local-shared.mjs'); ch.scope = changeScope(ch, { usage: usageFrom(ROOT, ccfg), owners: ccfg.owners }); } catch { /* said without it */ }
   const who = _argValue('--signed-off');
-  if (who) ch.signedOff = { by: who, at: ch.at, what: [...ch.held, ...ch.breaking].map((h) => h.what) };
+  if (who) {
+    const reviewer = { kind: 'person', name: who.trim() }, no = so.refusal({ author: ch.author, reviewer });
+    if (no) { console.log(`❌ ${no}`); process.exit(1); }
+    ch.signedOff = { by: who.trim(), at: ch.at, what: [...ch.held, ...ch.breaking].map((h) => h.what), author: ch.author, reviewer };
+  } else if (sameOps && prev.signedOff) ch.signedOff = prev.signedOff;
   mkdirSync(changesDir, { recursive: true });
   writeFileSync(changeFile, JSON.stringify(ch, null, 2) + '\n');
   for (const l of changeLines(ch)) console.log(l);
   if (unread.length) console.log(`Not read (${unread.length}), left out: ${unread.join('; ')}. Write ${unread.length === 1 ? 'it' : 'them'} as operations (--ops) to add ${unread.length === 1 ? 'it' : 'them'}.`);
   console.log(`   (${relative(ROOT, changeFile)})`);
   if (ch.questions.length) { console.log(`NEXT: ask the person, with the system's own names (never a value of your own); write every step as operations in a file and run ${cmd} --figma-change ${component} --ops <file>.`); process.exit(0); }
-  if ((ch.held.length || ch.breaking.length) && !who) {
-    console.log(`NEXT: show the person the change above${ch.breaking.length ? ', and what it breaks' : ''}; it waits for someone to sign it off. Ask who (the system's owner, or themselves if they are), then run ${cmd} --figma-change ${component}${opsFile ? ` --ops ${opsFile}` : ` ${JSON.stringify(asked)}`} --signed-off "<who>".`);
+  if ((ch.held.length || ch.breaking.length) && !ch.signedOff) {
+    const owner = ch.scope?.decider?.name;
+    console.log(`NEXT: show the person the change above${ch.breaking.length ? ', and what it breaks' : ''}; it waits for someone to sign it off. Ask who (${owner ? `${owner} decides for it in ds-config.json owners` : "the system's owner, or themselves if they are"}; never your own name: the one who made a change never signs it off), then run ${cmd} --figma-change ${component}${opsFile ? ` --ops ${opsFile}` : ` ${JSON.stringify(asked)}`} --signed-off "<who>".${so.reviewMode(ccfg) === 'agent-or-person' && !ch.breaking.length ? ` Or a second agent session reviews it: ${cmd} --second-review ${component}.` : ''}`);
     process.exit(0);
   }
   const nodes = {};
@@ -2539,6 +2551,8 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
     if (process.argv.includes('--shared')) for (const o of specOf({ description, like: l.like, name, ops, captures, grammar }).spec[EXT].shared ?? []) if (!ops.some((x) => same(x, o))) ops.push(o);
     const { spec } = specOf({ description, like: l.like, name, ops, unread, captures, grammar, at: new Date().toISOString() });
     if (!spec.name) { console.log('❌ The spec has no component to build: give --like, or a create operation.'); process.exit(2); }
+    // Who wrote it, so whoever signs it off is someone else (sign-off.mjs).
+    { const so = await import('./sign-off.mjs'), gitName = (await import('./decided-by.mjs')).decidedBy(ROOT, []); spec[EXT].author = prev?.[EXT]?.author ?? so.authorNow() ?? (gitName ? { kind: 'person', name: gitName } : null); }
     mkdirSync(specDir, { recursive: true });
     writeFileSync(specFile(spec.name), JSON.stringify(spec, null, 2) + '\n');
     for (const line of specLines(spec, { file: relative(ROOT, specFile(spec.name)) })) console.log(line);
@@ -2555,13 +2569,17 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
   const { spec } = specOf({ description: x.asked, like: x.like, name: saved.name, ops: x.ops.filter((o) => o.op !== 'clone'), captures, grammar, at: x.at });
   const sx = spec[EXT];
   if (sx.questions.length) { console.log(`${spec.name} is not built while something is unanswered (${sx.questions.length}):`); for (const q of sx.questions) console.log(`   • ${q.ask}`); console.log(`NEXT: ask the person, then run ${cmd} --spec --name ${spec.name} --ops <file> with the answers as operations.`); process.exit(1); }
-  const who = _argValue('--signed-off') ?? x.signedOff?.by ?? null;
+  const given = _argValue('--signed-off'), who = given ?? x.signedOff?.by ?? null;
+  // The one who wrote the spec never signs it off (sign-off.mjs).
+  const so = await import('./sign-off.mjs');
+  if (given) { const no = so.refusal({ author: x.author ?? null, reviewer: { kind: 'person', name: given.trim() } }); if (no) { console.log(`❌ ${no}`); process.exit(1); } }
+  sx.author = x.author ?? null;
   if (sx.held.length && !who) {
     console.log(`${spec.name} adds to the system, so it waits for someone to sign it off: ${sx.held.map((h) => h.what).join('; ')}.`);
     console.log(`NEXT: ask the person who signs it off (a name: the system's owner, or themselves if they are), then run ${cmd} --figma-build ${spec.name} --signed-off "<who>".`);
     process.exit(0);
   }
-  if (who) sx.signedOff = { by: who, at: x.signedOff?.at ?? new Date().toISOString(), what: sx.held.map((h) => h.what) };
+  if (who) sx.signedOff = given ? { by: given.trim(), at: new Date().toISOString(), what: sx.held.map((h) => h.what), author: sx.author, reviewer: { kind: 'person', name: given.trim() } } : x.signedOff;
   writeFileSync(specFile(spec.name), JSON.stringify(spec, null, 2) + '\n');
   const nodes = {};
   for (const o of sx.ops) for (const n of [o.from, o.layer?.of, o.op === 'addProperty' && o.kind === 'swap' ? o.default : null]) if (n && props[n]?.nodeId) nodes[n] = props[n].nodeId;
@@ -2579,18 +2597,67 @@ if (process.argv.includes('--spec') || process.argv.includes('--figma-build')) {
 }
 // ── A change to the system itself, signed off (sign-off.mjs) ──
 // --sign-off "<what>" --by "<who>": a named person agreed to add it to the system (a token, a component's option), so the
-// guard lets the edit that adds it through. --sign-off alone lists what was signed off.
-if (process.argv.includes('--sign-off')) {
-  const { recordSignOff, readSignOffs, SIGN_OFFS } = await import('./sign-off.mjs');
-  const i = process.argv.indexOf('--sign-off'), what = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null, by = _argValue('--by');
-  if (!what) {
-    const all = readSignOffs(ROOT);
-    console.log(all.length ? `Signed off to add to the system (${all.length}, ${SIGN_OFFS}):\n${all.map((x) => `   • ${x.what}: ${x.by}, ${String(x.at).slice(0, 10)}`).join('\n')}` : 'Nothing signed off yet: an edit that adds to the system (a token, a component\'s option) waits for one.');
+// guard lets the edit that adds it through. Refused when the one named made the change (sign-off.mjs refusal): the
+// author never reviews their own change. --sign-off alone lists what was signed off, with who made and who reviewed each.
+// --second-review "<what>": another agent session's pass on what the guard held (or on a component's change waiting in
+// Figma): the engine's checks run again on it (second-review.mjs). Where ds-config.json review.second is
+// "agent-or-person" and they find nothing, it signs it off as its reviewer; otherwise its findings wait for the person.
+if (process.argv.includes('--sign-off') || process.argv.includes('--second-review')) {
+  let scfg = {}; try { scfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* the defaults */ }
+  const so = await import('./sign-off.mjs');
+  const flag = process.argv.includes('--second-review') ? '--second-review' : '--sign-off';
+  const i = process.argv.indexOf(flag), what = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null, by = _argValue('--by');
+  const cmd = 'rms-design-system-engine';
+  if (flag === '--second-review') {
+    if (!what) { console.log(`❌ --second-review takes what waits for a sign-off: ${cmd} --second-review "<what>" (as the guard named it), or a component whose change waits in Figma.`); process.exit(2); }
+    const { reviewHeld } = await import('./second-review.mjs');
+    const r = reviewHeld(ROOT, scfg, what);
+    if (!r.of) { console.log(`❌ Nothing waits for a sign-off as ${JSON.stringify(what)}: the guard names what it holds, and ${cmd} --figma-change writes a component's change.`); process.exit(2); }
+    if (r.refused) { console.log(`❌ ${r.refused}`); process.exit(1); }
+    const mode = so.reviewMode(scfg);
+    console.log(`Second review of ${what} (${so.whoSaid(r.reviewer)}), made by ${so.whoSaid(r.author) ?? 'someone the engine did not record'}:`);
+    if (r.scope) console.log(`   ${r.scope.reason}`);
+    console.log(`   Checked: ${r.checks.join('; ')}.`);
+    const review = { by: r.reviewer, at: new Date().toISOString(), checks: r.checks, findings: r.findings };
+    if (r.of === 'edit') so.recordReview(ROOT, what, review);
+    if (r.findings.length) {
+      console.log(`❌ Found ${r.findings.length}:`); for (const f of r.findings) console.log(`   • ${f}`);
+      console.log(`NEXT: tell the person what the review found; the change waits for them to sign it off (${cmd} --sign-off ${JSON.stringify(what)} --by "<who>"), or for the change to be made again without it.`);
+      process.exit(1);
+    }
+    if (mode !== 'agent-or-person') {
+      console.log('✅ The checks found nothing. This system has a person sign off every change to it (ds-config.json review.second is "person"), so it still waits for them.');
+      console.log(`NEXT: tell the person the second review found nothing, and ask who signs it off: ${cmd} --sign-off ${JSON.stringify(what)} --by "<who>".`);
+      process.exit(0);
+    }
+    if (r.of === 'edit') {
+      const h = so.heldOf(ROOT, what);
+      so.recordSignOff(ROOT, { what, by: so.whoSaid(r.reviewer), author: r.author, reviewer: r.reviewer, review, component: h?.component ?? null });
+      console.log(`✅ Signed off by ${so.whoSaid(r.reviewer)}, the second reviewer: ${what} (${so.SIGN_OFFS}).`);
+      console.log('NEXT: the agent that made the change makes the edit again; the guard lets it through now. Say in your answer that a second agent review signed it off, and what it checked.');
+    } else {
+      const file = join(ROOT, OUT_DIR, 'changes', `${what}.change.json`), ch = JSON.parse(readFileSync(file, 'utf8'));
+      ch.signedOff = { by: so.whoSaid(r.reviewer), at: review.at, what: [...(ch.held ?? []), ...(ch.breaking ?? [])].map((h) => h.what), author: r.author, reviewer: r.reviewer, review };
+      writeFileSync(file, JSON.stringify(ch, null, 2) + '\n');
+      console.log(`✅ Signed off by ${so.whoSaid(r.reviewer)}, the second reviewer: ${what}'s change in Figma (${relative(ROOT, file)}).`);
+      console.log(`NEXT: run ${cmd} --figma-change ${what} again with the same change; it writes the Figma script now.`);
+    }
     process.exit(0);
   }
-  if (!by || !by.trim()) { console.log(`❌ A sign-off names who gave it: rms-design-system-engine --sign-off ${JSON.stringify(what)} --by "<who>" (the name the person gives, never one you choose).`); process.exit(2); }
-  recordSignOff(ROOT, { what, by: by.trim() });
-  console.log(`✅ Signed off by ${by.trim()}: ${what} (${SIGN_OFFS}).`);
+  if (!what) {
+    const all = so.readSignOffs(ROOT);
+    const who = (x) => [x.author ? `made by ${so.whoSaid(x.author)}` : '', `reviewed by ${so.whoSaid(x.reviewer) ?? x.by}`].filter(Boolean).join(', ');
+    console.log(all.length ? `Signed off to add to the system (${all.length}, ${so.SIGN_OFFS}):\n${all.map((x) => `   • ${x.what}: ${x.by}, ${String(x.at).slice(0, 10)} (${who(x)})`).join('\n')}` : 'Nothing signed off yet: an edit that adds to the system (a token, a component\'s option) waits for one.');
+    process.exit(0);
+  }
+  if (!by || !by.trim()) { console.log(`❌ A sign-off names who gave it: ${cmd} --sign-off ${JSON.stringify(what)} --by "<who>" (the name the person gives, never one you choose).`); process.exit(2); }
+  // Who made it: as the guard held it, else the agent session running now. The reviewer is the person named.
+  const held = so.heldOf(ROOT, what);
+  const author = held?.author ?? so.authorNow(), reviewer = { kind: 'person', name: by.trim() };
+  const no = so.refusal({ author, reviewer });
+  if (no) { console.log(`❌ ${no}`); process.exit(1); }
+  so.recordSignOff(ROOT, { what, by: by.trim(), author, reviewer, review: held?.review ?? null, component: held?.component ?? null });
+  console.log(`✅ Signed off by ${by.trim()}: ${what} (${so.SIGN_OFFS})${author ? `, made by ${so.whoSaid(author)}` : ''}.`);
   console.log('NEXT: make the edit that adds it; the guard lets it through now. Say who signed it off in your answer.');
   process.exit(0);
 }

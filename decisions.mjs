@@ -19,6 +19,7 @@ import { projectPath } from './names.mjs';
 import { readIntentLayer, systemNames, matchComponents, codeFilesOf } from './intent-layer.mjs';
 import { projectLessons, lessonDecisions } from './lessons.mjs';
 import { systemFacts, decisionsToReview } from './intent-truth.mjs';
+import { readSignOffs, whoSaid } from './sign-off.mjs';
 
 // What each kind of decision is called where a person reads it, and whether it rules an option out for an agent.
 export const KINDS = {
@@ -32,6 +33,7 @@ export const KINDS = {
   lesson: { said: 'learned from a correction', rules: true },
   rule: { said: 'a rule from repeated findings', rules: false },
   proposed: { said: 'proposed from repeated findings', rules: false },
+  signed: { said: 'signed off', rules: false },
 };
 
 const trim = (s, n = 300) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : t; };
@@ -42,7 +44,7 @@ const capital = (s) => { const t = String(s ?? ''); return t ? t[0].toUpperCase(
 // → { component, kind, what, ruledOut: [string], why, by, at, from, said } (said: the decision as the person gave it)
 // stale: { key: { note } } for each answered proposal to review again (intent-truth.mjs → decisionsToReview): said
 // beside it, for a person and for agents.
-export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [], lessons = [], stale = {} } = {}) {
+export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [], lessons = [], stale = {}, signed = [] } = {}) {
   const out = [];
   const add = (d) => { if (d.what) out.push({ component: null, ruledOut: [], why: null, by: null, at: null, said: null, ...d, what: trim(d.what), why: d.why ? trim(d.why) : null, said: d.said ? trim(d.said, 600) : null }); };
 
@@ -79,6 +81,8 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
   // What people corrected in what agents made, and the rules repeated findings propose (lessons.mjs), each with what it
   // became: a correction rules out the mistake it corrected, so an agent is told it before it makes it again.
   for (const l of lessons) add({ ...l, kind: KINDS[l.kind] ? l.kind : 'lesson', from: l.from ?? 'the lessons' });
+  // A change to the system itself, signed off (sign-off.mjs): who made it and who reviewed it, never the same one.
+  for (const x of signed) add({ component: x.component ?? null, kind: 'signed', what: `Added to the system: ${x.what}`, by: whoSaid(x.reviewer) ?? x.by ?? null, at: x.at ?? null, author: whoSaid(x.author), reviewer: whoSaid(x.reviewer) ?? x.by ?? null, from: 'the sign-offs' });
 
   return out.sort((a, b) => String(b.at ?? '').localeCompare(String(a.at ?? '')));
 }
@@ -122,7 +126,8 @@ export function gatherDecisions(ROOT, { gaps = null, writtenFile = 'DECISIONS.md
   const written = existsSync(resolve(ROOT, writtenFile)) ? writtenDecisions(readFileSync(resolve(ROOT, writtenFile), 'utf8'), writtenFile) : [];
   let lessons = [];
   try { lessons = lessonDecisions(projectLessons(ROOT)); } catch { /* no lessons yet */ }
-  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written, layer: layerDecisions(ROOT), lessons, stale: stale ?? staleAnswers(ROOT, answered) }));
+  let signed = []; try { signed = readSignOffs(ROOT); } catch { /* none signed off */ }
+  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written, layer: layerDecisions(ROOT), lessons, stale: stale ?? staleAnswers(ROOT, answered), signed }));
 }
 
 // The answered proposals whose component changed since (intent-truth.mjs → decisionsToReview), read from the project:
@@ -172,10 +177,10 @@ export function ruledOutLines(view, name, { most = 4 } = {}) {
 // The log a person reads: the decisions about each component, then the ones about the system as a whole.
 export function decisionsMarkdown(view, { title = 'Decisions' } = {}) {
   const lines = [`# ${title}`, '',
-    `> Gathered by rms-design-system-engine from where each decision was made: the kept differences, the answered proposals, the accepted differences, the checks made by hand, the prototypes' gap list, the lessons, and a DECISIONS.md the team wrote. Nothing here is written by the engine, and nothing here is rewritten by it.`, ''];
+    `> Gathered by rms-design-system-engine from where each decision was made: the kept differences, the answered proposals, the accepted differences, the checks made by hand, the prototypes' gap list, the lessons, the sign-offs, and a DECISIONS.md the team wrote. Nothing here is written by the engine, and nothing here is rewritten by it.`, ''];
   if (!view.total) { lines.push('Nothing decided yet.'); return lines.join('\n') + '\n'; }
   lines.push(`${view.total} decision${view.total === 1 ? '' : 's'}, ${view.ruledOut} of them ruling an option out.`, '');
-  const one = (d) => `- **${d.what}**${d.ruledOut.length && d.kind !== 'lesson' ? ` — ruled out: ${d.ruledOut.join(', ')}` : ''}${d.review ? `  \n  ${d.review}` : ''}${d.why ? `  \n  Why: ${d.why}` : ''}${d.became ? `  \n  ${d.became}` : ''}${d.back ? `  \n  🔁 ${capital(d.back)}` : ''}  \n  *${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''}, from ${d.from}*`;
+  const one = (d) => `- **${d.what}**${d.ruledOut.length && d.kind !== 'lesson' ? ` — ruled out: ${d.ruledOut.join(', ')}` : ''}${d.review ? `  \n  ${d.review}` : ''}${d.why ? `  \n  Why: ${d.why}` : ''}${d.became ? `  \n  ${d.became}` : ''}${d.back ? `  \n  🔁 ${capital(d.back)}` : ''}${d.author ? `  \n  Made by ${d.author}, reviewed by ${d.reviewer ?? d.by}` : ''}  \n  *${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''}, from ${d.from}*`;
   for (const name of Object.keys(view.byComponent).sort()) {
     lines.push(`## ${name}`, '', ...view.byComponent[name].map(one), '');
   }

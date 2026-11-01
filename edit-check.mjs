@@ -50,6 +50,9 @@ import { codeSnapshotPath } from './names.mjs';
 import { colorHex, COLOUR_NAMES } from './css-values.mjs';
 import { classRules, nearCopies, systemRules } from './system-advice.mjs';
 import { guardsOf, guardFindings } from './lessons.mjs';
+import { editScope, usageFrom } from './local-shared.mjs';
+import { themeFiles, contractsByFile } from './sign-off.mjs';
+import { productResolver } from './usage-map.mjs';
 
 const UI = /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx)$/i;
 const SKIP = /(^|\/)(node_modules|dist|build|contracts|\.design-system-engine-out|\.design-system-engine-refs)\//;
@@ -498,7 +501,24 @@ export function editCheckRun(event, { root, cfg = {}, headOf = null } = {}) {
   const before = head ?? (event?.tool_name === 'Edit' ? String(event.tool_input?.old_string ?? '') : event?.tool_name === 'MultiEdit' ? (event.tool_input?.edits ?? []).map((e) => e.old_string).join('\n') : '');
   const declaredBefore = new Set([...String(before).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
   const found = editFindings(added, full || added.join('\n'), ctx, { isTheme: ctx.themeFiles.has(abs), sheet: /\.(css|scss|sass|less)$/i.test(abs), component: /\.(vue|svelte)$/i.test(abs), declaredBefore, file: rel });
-  return { rel, added, found };
+  // Local or shared (local-shared.mjs): whether what this edit changes stays in one product or every product gets it,
+  // and on whom a shared one waits. Read only when there is something to say.
+  let scope = null;
+  // Before the edit, whole: the committed file, else the file as it is with the edit taken back out.
+  const input = event?.tool_input ?? {}, undo = (t, e) => t.replace(String(e.new_string ?? ''), String(e.old_string ?? ''));
+  const whole = head ?? (full && event?.tool_name === 'Edit' ? undo(full, input) : full && event?.tool_name === 'MultiEdit' ? [...(input.edits ?? [])].reverse().reduce(undo, full) : before);
+  if (found.length) try { scope = editScope({ file: rel, before: whole ?? '', after: full || added.join('\n'), root, files: { theme: new Set(themeFiles(cfg)), components: contractsByFile(root, cfg) }, productOf: productResolver(root, cfg) }, { usage: usageFrom(root, cfg), owners: cfg.owners }); } catch { /* said without it */ }
+  return { rel, added, found, scope };
+}
+// The scope's line for the agent: a local edit is its product team's and waits on nobody; a shared one changes what
+// every product that uses it gets, and what it adds to the system waits on the one who decides.
+// A near copy of a component is the product's to swap for it; putting the copy into the system instead is shared.
+export function scopeSay(scope, found = []) {
+  if (!scope) return '';
+  const copy = found.some((f) => f.kind === 'copy');
+  return scope.scope === 'local'
+    ? `${scope.reason} It is this product team's to fix: nothing here waits on the system's owner${copy ? '. Adding the copy to the system instead would be shared, and waits on the one who decides for the system' : ''}.`
+    : `${scope.reason} Every product that uses it gets this edit${scope.decider ? `; what it adds to the system waits on ${scope.decider.name} to sign it off` : '; what it adds to the system waits on a named person to sign it off'}.`;
 }
 function editReason(run) {
   if (!run?.found?.length) return null;
@@ -514,7 +534,7 @@ function editReason(run) {
     : count('copy') === n
     ? `Use the system's component instead, or ask the person whether the new one belongs in the system. Never keep a copy without asking.`
     : `Fix ${them} in this file now.${system ? ' Not sure of a name? rms-design-system-engine --query <name>.' : ''}${count('lesson') ? ' What a lesson ruled out was corrected by a person before: write it another way, or ask them.' : ''}${count('silencer') ? ' A comment that switches a check off comes out; when what it hides cannot be fixed, ask the person.' : ''}${count('copy') ? ' A rule that nearly copies a system component: use the component, or ask the person whether to add the new one to the system.' : ''}`;
-  return `${title}\n${lines.join('\n')}${n > 12 ? `\n  and ${n - 12} more` : ''}\n${next}`;
+  return `${title}\n${lines.join('\n')}${n > 12 ? `\n  and ${n - 12} more` : ''}\n${next}${run.scope ? `\n${scopeSay(run.scope, found)}` : ''}`;
 }
 
 export function editHookOutput(reason) {

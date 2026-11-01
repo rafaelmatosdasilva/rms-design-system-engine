@@ -102,7 +102,7 @@ test('a comment that switches a check off goes back with the rules it names; pro
   const r = editCheck({ tool_name: 'Edit', tool_input: { file_path: join(dir, 'src/pages/Filters.jsx'), old_string: '<Chip size="M" />', new_string: '{/* @ts-expect-error the old size */}\n<Chip size="M" />' } }, { root: dir, cfg: { paths: { themeCSS: 'src/theme.css' } }, headOf: () => null });
   assert.match(r, /^rms-design-system-engine checked this edit: 1 thing to fix\.\n/);
   assert.match(r, /Filters\.jsx:1  @ts-expect-error switches a check off/);
-  assert.match(r, /\nTake it out and fix what the check reports\. When that cannot be done, ask the person before switching a check off\.$/);
+  assert.match(r, /\nTake it out and fix what the check reports\. When that cannot be done, ask the person before switching a check off\.\nLocal: /);
 });
 
 test('accessibility where the edit added the line: the static rules with their fix; lines it did not add stay silent', () => {
@@ -132,7 +132,7 @@ test('accessibility where the edit added the line: the static rules with their f
   const edit = { tool_name: 'Write', tool_input: { file_path: join(dir, 'src/pages/Filters.jsx'), content: '<button onClick={close}><CloseIcon /></button>\n' } };
   const r = editCheck(edit, { root: dir, cfg: { paths: { themeCSS: 'src/theme.css' } }, headOf: () => null });
   assert.match(r, /^rms-design-system-engine checked this edit: 1 thing to fix\.\n  Filters\.jsx:1  a button with only an icon inside/);
-  assert.match(r, /\nFix it in this file now\.$/);
+  assert.match(r, /\nFix it in this file now\.\nLocal: /);
   assert.equal(editCheck(edit, { root: dir, cfg: { paths: { themeCSS: 'src/theme.css' }, a11yStatic: false }, headOf: () => null }), null);
 });
 

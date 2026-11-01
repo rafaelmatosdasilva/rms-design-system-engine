@@ -122,6 +122,41 @@ test('--figma-change and --change-report: the report, held for sign-off, the scr
   assert.equal(readdirSync(join(root, '.design-system-engine-out/changes/done')).length, 1);
 });
 
+test('--figma-change: local or shared, who made it, never signed off by its author, and a second agent review where allowed', () => {
+  const root = tempDir('change-review-');
+  mkdirSync(join(root, 'src'), { recursive: true });
+  mkdirSync(join(root, 'contracts'), { recursive: true });
+  const write = (f, j) => writeFileSync(join(root, f), JSON.stringify(j));
+  const config = { figmaFileKey: 'KEY', writes: { figma: 'ask' }, owners: { chipFilter: 'Chips team' }, paths: { compPropsSnapshot: 'src/props.json', snapshotStructure: 'src/structure.json', snapshotVars: 'src/vars.json', snapshotSkeleton: 'src/skeleton.json' } };
+  write('ds-config.json', config);
+  write('src/props.json', { ...props, _updated: '2026-01-01T00:00:00Z' });
+  write('src/structure.json', { components: structure });
+  write('src/vars.json', { variableScopes: varNames });
+  write('src/skeleton.json', skeleton);
+  write('component-values.snapshot.json', values);
+  write('contracts/chipFilter.contract.json', { name: 'chipFilter', livesIn });
+  // A person runs it by hand (no agent session): the name their git uses is its author.
+  const person = { CLAUDE_CODE_SESSION_ID: '', DESIGN_SYSTEM_ENGINE_SESSION: '', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.name', GIT_CONFIG_VALUE_0: 'Design lead' };
+  const cli = (env, ...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', FIGMA_TOKEN: '', ...env } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
+  const asked = 'add xl to size like l, then rename Label layer to Text';
+  const first = cli(person, '--figma-change', 'chipFilter', asked);
+  assert.match(first, /\nShared: chipFilter's Figma component is the system's: 1 product uses it \(Checkout\); [^\n]*It waits on Chips team\./);
+  assert.match(first, /Ask who \(Chips team decides for it in ds-config\.json owners; never your own name/);
+  const file = join(root, '.design-system-engine-out/changes/chipFilter.change.json');
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')).author, { kind: 'person', name: 'Design lead' });
+  assert.match(cli(person, '--figma-change', 'chipFilter', asked, '--signed-off', 'Design lead'), /Design lead made this change, so Design lead cannot sign it off/);
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).signedOff, undefined);
+  // Another agent session reviews it, where the system lets one: then the same change is signed off and written.
+  write('ds-config.json', { ...config, review: { second: 'agent-or-person' } });
+  const review = cli({ ...person, CLAUDE_CODE_SESSION_ID: 'reviewer-session' }, '--second-review', 'chipFilter');
+  assert.match(review, /Signed off by a second agent review \(session reviewer\), the second reviewer: chipFilter's change in Figma/);
+  const again = cli(person, '--figma-change', 'chipFilter', asked);
+  assert.match(again, /Signed off by a second agent review \(session reviewer\); made by Design lead\./);
+  assert.match(again, /only when they say yes, run the script/);
+  const ch = JSON.parse(readFileSync(file, 'utf8'));
+  assert.deepEqual([ch.signedOff.author, ch.signedOff.reviewer.kind], [{ kind: 'person', name: 'Design lead' }, 'agent']);
+});
+
 test('a change to one component in Figma routes to its report; a new one, roles and values keep their own', () => {
   const c = { components: ['chip', 'button', 'tag'] };
   assert.deepEqual(route('add a size xl to the chip in Figma', c).run, ['rms-design-system-engine --figma-change chip "add a size xl to the chip in Figma"']);
