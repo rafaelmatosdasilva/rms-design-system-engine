@@ -177,5 +177,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `system-sign-off` | The 24 guide tasks on Haiku (engine b121b51) | "A change to the system itself is signed off, and the changes made in Figma have a page" |
 | `2026-10-29-a-store-read-decides-a` | The 24 guide tasks on Haiku (engine 1bc455e) | "Two runs writing one store merged by their stamps" |
 | `intent-layer-sources` | The 24 guide tasks on Haiku (engine 78b2e7f) | "The intent layer read from GitHub and a project folder, and from Markdown and MDX pages" |
+| `2026-11-01-the-intent-layer-s-fixes` | The 24 guide tasks on Haiku (engine a7faa63) | "The intent layer's fixes: docs say where they go; a branch read with no commit id is never written over" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
