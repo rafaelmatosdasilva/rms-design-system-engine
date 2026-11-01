@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-11: The hooks: a design token the agent will add is no secret asked for; a pasted step list gets no report file (continuous evaluation)
+
+What changed since the entry below (engine c47fda6): The style guide updates by itself when the intent layer changes (#205); A model judges each Showroom screen against its brief, on request (--judge-pages) (#209); Contracts: drafts write slots and classic conditions, specs carry their Figma page, publish and validate (#210); Intent layer: Notion and Confluence as sources, decisions that go stale, Figma history from git (#208); Gaps sorted into local and shared, and a second reviewer before a change to the system is accepted (#211); Usage and config reference: lessons, page judgment, Code Connect drafts, contract changes, owners, second review; The hooks: a design token the agent will add is no secret asked for; a pasted step list gets no report file. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `bc242ebbcafd` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md afcb4830` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 80c49112` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6c5a3936` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 50abedb9` `cookbook/refresh-figma.md cbd2b4d4` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 7401b55a` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md d1ece756` `rms-design-system-engine.md f85fd227`
+
+| Haiku, engine 24cea6b | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.036 | $0.036 |
+| Input a run | 76k | 79k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 79k a run against 76k. no task changed state, and no run moved: the same result. Records: `records/2026-11-01-the-hooks-a-design-token`.
+
 ## 2026-11: Confluence pages: every tag taken out until none is left (continuous evaluation)
 
 What changed since the entry below (engine a7faa63): README: badges aligned left, and the Scorecard badge reads OpenSSF security score (#203); Components drawn from their code get deeper lists, route params and plain reasons (#197); DESIGN_SYSTEM_ENGINE_FIGMA_CLI=none: figma-cli never asked, and the commands test never reads the Figma file open on the machine (#201); The machine's TypeScript is found without npm on the PATH (#200); Nuxt test tools on glob 14 and minimatch 11, past today's two advisories (#204); Lessons: a correction becomes the strongest guard that holds it (#196); The intent layer's fixes written where it lives: GitHub, a folder, Markdown pages (#193); A brand changes values, never structure (#199); Code of conduct, governance and roles, roadmap, assurance case, and how a vulnerability report is handled (#206); Contracts: Code Connect drafts, contract changes on a merge request, and the open component specs view (#198); The live accessibility check waits for a person on a control, and never for a hidden one (#207); Intent layer: Notion and Confluence pages as sources, and GitHub Enterprise; Intent layer: decisions go stale like pages, and Figma history read from git once per commit; Confluence pages: every tag taken out until none is left. The guide changed in `cookbook/guidelines-links.md`, `reference/config.md`, `reference/usage.md`.

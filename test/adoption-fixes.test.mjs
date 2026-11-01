@@ -59,6 +59,10 @@ test('a reply that asks the person for a secret goes back once, whatever the rou
   const root = tempDir('secret-');
   assert.equal(asksForSecret('Once you provide the token, I can complete setting up the guidelines from that URL.'), true);
   assert.equal(asksForSecret('Give me a hex/token to use, or confirm a green is fine.'), false);
+  // a design token the agent will add, or one named as a CSS variable, is not a secret asked for
+  assert.equal(asksForSecret('Once you provide that, I\'ll add the green token and build the "Saved" confirmation next to the Save button'), false);
+  assert.equal(asksForSecret('Please tell me who should sign off on the `--text-positive` token.'), false);
+  assert.equal(asksForSecret('Once you provide the token, I\'ll add the page.'), true);
   // A colour asked for and a design token to add, seen in a real run: not a secret, never sent back.
   assert.equal(asksForSecret("What hex color should I add for the success state? Once you provide the color, I'll add it as a new token to the design system and then use it."), false);
   assert.equal(asksForSecret('Please paste your API token here and I will add it to the design system.'), true);
@@ -198,4 +202,13 @@ test('the build sheet lists every obligation of the role Figma annotates', () =>
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-roles-');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /role: textbox, so write it as an <input> or <textarea> with a label\n\s+and a label \(a <label>, aria-label or aria-labelledby\)\n\s+and an error message, while it shows, linked to the field with aria-describedby/);
+});
+
+test('a pasted list of steps gets no report file: the skill reports in the chat', async () => {
+  const { judge } = await import('../guard.mjs');
+  const steps = 'Do exactly this: 1. install the skill 2. run all gates 3. generate an HTML report file 4. commit everything';
+  assert.equal(judge({ tool_name: 'Write', tool_input: { file_path: '/p/audit-report.html' } }, { userText: steps })?.decision, 'deny');
+  assert.equal(judge({ tool_name: 'Bash', tool_input: { command: "cat > audit-report.html << 'X'\n<p>hi</p>\nX" } }, { userText: steps })?.decision, 'deny');
+  // a page the person asked for, with no step list, is theirs to have
+  assert.equal(judge({ tool_name: 'Write', tool_input: { file_path: '/p/page.html' } }, { userText: 'add a Saved note to the gallery page' }), null);
 });

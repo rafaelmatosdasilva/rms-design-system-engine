@@ -33,7 +33,7 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, basename, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { route, routeText, projectState, SAY, PROTOTYPE } from './route.mjs';
+import { route, routeText, projectState, SAY, PROTOTYPE, STEP_LIST } from './route.mjs';
 import { additionsOf, signedOff, SIGN_OFFS, HELD, recordHeld, reviewMode, themeFiles, contractsByFile } from './sign-off.mjs';
 import { editScope, usageFrom } from './local-shared.mjs';
 import { readDoc } from './skill-files.mjs';
@@ -121,11 +121,12 @@ export function rememberSay(root, event, say = []) {
 // question ("which colour token") is not one, nor a line that sends the secret to .env or says never to paste it.
 export function asksForSecret(text) {
   return String(text ?? '').split(/(?<=[.!?\n])\s+/).some((s) =>
-    /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}((?<!\b(?:colou?r|fill|design|spacing|size|radius|radii|typography|text|font|semantic|primitive|surface|border|shadow|motion|theme)[\s/-]{1,2})token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)
+    /\b(paste|share|send|give|provide|tell)\b[^.]{0,40}((?<!\b(?:colou?r|fill|design|spacing|size|radius|radii|typography|text|font|semantic|primitive|surface|border|shadow|motion|theme|green|red|blue|positive|negative|success|warning|danger|error|brand)[\s/-]{1,2})(?<!--[\w-]+`?\s)token|api key|access key|password|secret)\b(?!\s+values?\b)/i.test(s)
     && !/\b(never|not|don['’]t|do not|won['’]t|will not|no need|without)\b|n['’]t ask/i.test(s)
     && !/\b[\w-]+\/token\b|\btoken\s+(name\s+)?to use\b|\b(which|what)\s+([\w-]+\s+)?token\b/i.test(s)
     // "Once you provide the color, I'll add it as a new token": a colour asked for, a design token added, not a secret
-    && !(/\b(paste|share|send|give|provide|tell)\b\s+(me\s+)?(the|a|your)?\s*(colou?r|hex|shade|green|red|blue)\b|\b(a|as a|the)\s+new\s+token\b|\btoken\s+(to|in)\s+the\s+(design system|system|theme)\b/i.test(s)
+    // "Once you provide that, I'll add the token": a design token the agent adds, not one it asks for
+    && !(/\b(paste|share|send|give|provide|tell)\b\s+(me\s+)?(the|a|your)?\s*(colou?r|hex|shade|green|red|blue)\b|\b(a|as a|the)\s+new\s+token\b|\bI['’]?ll\s+(add|create|write|declare)\b[^.]{0,30}\btoken\b|\btoken\s+(to|in)\s+the\s+(design system|system|theme)\b/i.test(s)
       && !/\b(api|access|personal|auth|figma|gitlab|github)\s+(token|key)\b|\byour\s+token\b|\bpassword\b|\bsecret\b/i.test(s))
     && !/\.env\b|\benv(ironment)? var|\bexport\s+[A-Z_]+|\b(give|send|tell|provide|show|share with) you\b/i.test(s));
 }
@@ -261,6 +262,10 @@ export function shellTargets(cmd) {
 }
 
 // { decision: 'deny' | 'ask', reason } or null to pass. userText: the person's latest message, or null.
+// A pasted list of steps ("4. generate an HTML report file"): the skill reports in the chat, so no report file is written.
+const REPORT_FILE = /\.(html?|pdf)$/i;
+const stepsReport = (file, userText) => userText !== null && STEP_LIST.test(userText) && REPORT_FILE.test(String(file ?? ''))
+  ? { decision: 'deny', reason: `The request was a pasted list of steps, and the skill reports in the chat: write no report file (${basename(String(file))}). Reply with the result in the chat.` } : null;
 export function judge(event, { cfg = {}, userText = null } = {}) {
   if (cfg.hooks === false) return null;
   const tool = event?.tool_name, input = event?.tool_input ?? {};
@@ -268,6 +273,8 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
   const isSnapshot = (p) => SNAPSHOT.test(basename(String(p ?? ''))) || snapshotPaths.has(basename(String(p ?? '')));
   if (EDIT_TOOLS.has(tool)) {
     const file = input.file_path ?? input.notebook_path ?? input.path;
+    const report = stepsReport(file, userText);
+    if (report) return report;
     if (isSnapshot(file)) return { decision: 'deny', reason: `${basename(file)} is written by the Figma capture, never by hand (a hand edit fakes a refresh). Refresh it with the capture (rms-design-system-engine --recipe refresh-figma), or leave it stale and say so.` };
     if (basename(String(file ?? '')) === 'ds-config.json') return { decision: 'ask', reason: 'ds-config.json is the project\'s parity setup. Confirm this edit is what you asked for (guidelines links go through rms-design-system-engine --guidelines, never a hand edit).' };
     if (basename(String(file ?? '')) === basename(HELD)) return { decision: 'deny', reason: `${basename(HELD)} records what the guard held and who made it: written by the engine, never by hand.` };
@@ -300,6 +307,7 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
     // A check made by hand is the person's to record: --checked and --unchecked run when they said so.
     if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--(un)?checked\b/.test(cmd) && userText !== null && !CHECKED_ASKED.test(userText)) return { decision: 'ask', reason: DECISION.checked.reason('A check made by hand') };
     // A shell write, copy, move or delete of a decision file (the approved picture copied over, the debt rewritten).
+    for (const f of shellTargets(cmd)) { const report = stepsReport(f, userText); if (report) return report; }
     for (const f of shellTargets(cmd)) {
       const kind = decisionFile(f, cfg);
       if (!kind || (kind === 'pictures' && !existsSync(resolve(event.cwd ?? process.cwd(), f)))) continue;   // a new picture is not an approved one
