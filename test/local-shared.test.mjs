@@ -178,8 +178,8 @@ test('a finding is local when it is a product\'s own screen, else shared; the is
 
 // A finding or a task says which product it is about when every file it names is that product's.
 test('a finding names its product by the files it names; a system file or two products leave it shared', async () => {
-  const { productIn } = await import('../local-shared.mjs');
-  const { findingRecords } = await import('../run-diff.mjs');
+  const { productIn } = await import('../lib/local-shared.mjs');
+  const { findingRecords } = await import('../lib/run-diff.mjs');
   const productOf = (f) => (/^apps\/northwind\//.test(f) ? 'Northwind' : /^apps\/acme\//.test(f) ? 'Acme shop' : null);
   assert.equal(productIn('hex written by hand (apps/northwind/src/Cart.vue:12)', productOf), 'Northwind');
   assert.equal(productIn('apps/northwind/a.css and src/theme.css', productOf), null, 'a system file too: no one product');

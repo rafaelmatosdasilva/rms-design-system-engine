@@ -9,8 +9,8 @@ import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { pairProposals, decidePair, askOf, commandFor } from '../prop-pairs.mjs';
-import { generateContracts } from '../contract-gen.mjs';
+import { pairProposals, decidePair, askOf, commandFor } from '../lib/prop-pairs.mjs';
+import { generateContracts } from '../lib/contract-gen.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const TILE = `<template>
@@ -40,7 +40,7 @@ const files = () => ({
   } } },
   'src/CardTile.vue': TILE,
 });
-const cli = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, NO_COLOR: '1' } });
+const cli = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, NO_COLOR: '1' } });
 const contractOf = (dir) => JSON.parse(readFileSync(join(dir, 'contracts', 'cardTile.contract.json'), 'utf8'));
 
 test('each suggestion that is a code prop only the code has is a question; an answer is written for that one pair', () => {
@@ -105,7 +105,7 @@ test('style guide: the component\'s page asks each pair, with the two decisions 
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg, styleguide: { bakeA11y: false } }));
   const r = cli(dir, '--styleguide', '--no-a11y-bake');
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  const { readPage } = await import('../styleguide-files.mjs');
+  const { readPage } = await import('../lib/styleguide-files.mjs');
   const html = readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html'));
   const data = JSON.parse(/<script[^>]*\bid="sg-data"[^>]*>([\s\S]*?)<\/script>/.exec(html)[1]);
   const tile = data.components.find((x) => x.name === 'cardTile');

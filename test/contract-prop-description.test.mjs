@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { generateContracts } from '../contract-gen.mjs';
-import { extractPropComments, textComponentApi } from '../component-source.mjs';
-import { docgenComponents, loadTypeScript, typescriptComponentApi } from '../component-api.mjs';
+import { generateContracts } from '../lib/contract-gen.mjs';
+import { extractPropComments, textComponentApi } from '../lib/component-source.mjs';
+import { docgenComponents, loadTypeScript, typescriptComponentApi } from '../lib/component-api.mjs';
 
 const TS = loadTypeScript(process.env.TS_FOR_TESTS ?? process.cwd());
 
