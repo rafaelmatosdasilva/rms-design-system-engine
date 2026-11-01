@@ -19,6 +19,9 @@
 //   Review a page whose component changed after it was written or last confirmed (intent-truth.mjs, stale): does it
 //         still hold? A yes records the confirmation (who and when), and the page is not marked again until the
 //         component changes again; a no leaves it marked until the page is edited.
+//   Guard  a rule on a page that a check could hold (rule-checks.mjs): hold it as one? A yes writes the guard where the
+//         edit check reads it (contract.authored.json, or ds-config.json for an import); a no keeps it a rule to read.
+//   Rewrite a rule too vague to check: write it again as the sentence proposed? A yes drafts it on the page, under Rules.
 //   Recheck a decision answered here (an Add, a Fix, a Move) whose component changed after it was recorded or last
 //         confirmed (intent-truth.mjs → decisionsToReview): does it still hold? A yes records the confirmation (who and
 //         when), and it is not marked again until the component changes again; a no withdraws it, and its question is
@@ -179,7 +182,10 @@ export function candidatesFor(key, x, { usage = {}, decisions = {}, report = { p
   // Past answers to proposals of the same kind and effect: how the team settled the same question before.
   const past = Object.entries(decisions).filter(([k]) => k !== key && k.split(':')[0] === x.kind);
   const pastSame = (pred) => past.filter(([k, d]) => pred(k, d));
-  if (x.kind === 'review') {
+  if (x.kind === 'guard' || x.kind === 'rewrite') {
+    // A rule held as a check, or written again: what it rests on is the rule itself and what the engine reads of it.
+    for (const e of x.evidence ?? []) yes.evidence.push({ from: 'The engine', says: e, strength: 'some' });
+  } else if (x.kind === 'review') {
     const f = x.stale ?? {};
     if (f.gone?.length) no.evidence.push({ from: 'The content check', says: `The page still names ${f.gone.map((g) => `\`${g}\``).join(', ')}, which ${x.subject} no longer has.`, strength: 'strong' });
     else yes.evidence.push({ from: 'The content check', says: `Nothing the page names was taken out of ${x.subject}.`, strength: 'some' });
@@ -338,6 +344,11 @@ export async function decidedLayer(ROOT, cfg) {
   const noPage = il.pagesToWrite(names, (n) => report.pages.some((p) => p.component === n), codeFiles);
   const found = proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPage });
   const kept = readDecisions(ROOT);
+  // Each page's rules, said as what holds them (rule-checks.mjs): a guard proposed for each one a check could hold, a
+  // rewrite for each one too vague to check.
+  const rc = await import('./rule-checks.mjs');
+  const rules = rc.layerRules(snap, il.matchComponents(names, snap.entities, codeFiles), rc.readRuleContext(ROOT, cfg, { components: facts.components }), { decisions: kept });
+  for (const [k, x] of rc.ruleProposals(rules)) found.set(k, x);
   // A decision whose component changed since it was recorded: asked again whether it still holds.
   for (const [k, x] of rechecksFor({ found, decisions: kept, changed: facts.changed, report, keptFix: wrongOf.kept, truth })) found.set(k, x);
   const decisions = currentAnswers(found, kept);
@@ -348,5 +359,5 @@ export async function decidedLayer(ROOT, cfg) {
   const scopeCtx = { usage, owners: cfg.owners };
   const proposals = new Map([...found].map(([k, x]) => [k, { ...withEvidence(k, x, { usage, decisions, report }), decider: deciderFor(x, report, cfg.owners), scope: proposalScope(x, { page: report.pages.find((q) => q.name === (x.page ?? x.host)) ?? null }, scopeCtx) }]));
   const done = applyDecisions({ report, noPage, proposals, decisions });
-  return { snap, report: { ...report, pages: done.pages }, noPage: done.noPage, addProposals: done.addProposals, noPageRechecks: done.noPageRechecks, proposals, decisions, wrongOf, names };
+  return { snap, report: { ...report, pages: done.pages }, noPage: done.noPage, addProposals: done.addProposals, noPageRechecks: done.noPageRechecks, proposals, decisions, wrongOf, names, rules };
 }

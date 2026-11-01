@@ -963,6 +963,19 @@ When the layer changes, the style guide follows.
 - **Each build says what moved.** It names the pages that changed since the layer was last read, and checks the whole layer again: names that do not exist, the guidance rating and rules that contradict Figma or the code.
 - **A private layer needs a token.** The job reads it with `INTENT_LAYER_TOKEN` (GitHub) or `GITLAB_TOKEN` (GitLab). Without one it cannot read the layer: it builds from the copy kept in the project, if there is one, and says so in its log.
 
+Each rule on a page is said as what holds it. The page's Documentation panel and `--check-intent` count them: how many rules, how many checked, checkable and judgment.
+
+| Status | What it means |
+| --- | --- |
+| Checked | A check the engine already runs enforces it, and the check is named: the edit check's colours, sizes, prop values or imports, the static accessibility check, the nesting rules, or a guard you said yes to before. |
+| Checkable | A guard could hold it on every edit: a component never inside another, a prop value or combination not allowed, a token never to write, a prop or slot always there, an import replaced, at most so many of a component on one screen. |
+| Judgment | A person judges it, or a model judging the page. |
+
+- **A checkable rule proposes its guard.** Say yes or no on the Documentation page, or with `--intent-decide <key> yes`. A yes writes the guard into `contract.authored.json` (an import into `ds-config.json`), and the rule is checked from then on, linked to it. A no is kept, and the rule stays one agents read.
+- **A vague rule gets a rewrite.** One that names no component, prop, value, token or count ("use it appropriately") is given one sentence a reviewer can check, from what the page says. A yes drafts it under Rules for your review.
+- **Agents are held to them.** Each rule in a contract carries its status. Checked and checkable rules are hard constraints.
+- **English and Portuguese.** The same rule, written in either, is read the same way.
+
 With no intent layer, every row can still be finished.
 
 - **Do and don't.** Write lines that start with `Do:` or `Don't:` in its Figma description, in the comment above its CSS rule, or in `contract.authored.json` under `guidance.doDont`. Agents get them with its pictures.
@@ -1381,6 +1394,7 @@ After the AI edits a style, markup or component file, the hook reads only what t
 - A component put inside another the way your system never does, with where it goes instead.
 - A class rule that nearly copies one of your components.
 - What a [lesson](#lessons-a-correction-becomes-a-guard) became a check for: a prop combination or a value a person corrected before.
+- What a rule of your intent layer became a check for, once you said yes: also a prop or slot a component always has, and at most so many of a component on one screen.
 
 The AI fixes it before moving on. The check is silent when the edit is clean, and never flags your own components, token definitions, comments or data. `"editCheck": false` turns it off.
 
