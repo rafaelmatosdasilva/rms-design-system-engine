@@ -186,6 +186,7 @@
 
 📐 Contracts → contracts  (3 components · 13 DTCG tokens)
 ℹ️  DSDS view → contracts/dsds: the 3 contracts in DSDS 0.23.0, for a team that documents its system in that format.
+ℹ️  Specs view → contracts/specs: the 3 contracts in the open component specs format 0.39.0, for a team that specifies its components that way.
 ℹ️  Figma prop types → contracts/figma-props.d.ts: type a component's props with its <Name>FigmaProps so tsc shows prop drift.
 ℹ️  Prune candidates: 4 (leaner library = cheaper agent context). Advisory - decide keep or drop.
      1 group(s) of tokens with the same value written by hand · 3 token(s) only one component uses

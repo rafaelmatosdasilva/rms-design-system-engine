@@ -9367,14 +9367,18 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         refresh();
         checking = false;
       };
-      var measure = function (cb) {
+      // again: how it is tried once the person leaves; it answers false then, and the variants wait for it.
+      var measure = function (cb, again) {
         // Never while a person is on a control of the page (the Brand choice, the search, a filter): the check moves the
         // focus to each control it tries, which would close their list or take their typing. It waits until they leave.
         // Any control of the page a person is on (a field, a list, the Status page's filter, a menu it opened), not only a
         // field: wherever the focus is outside what is being tried, it stays there.
         var busy = document.activeElement, inPage = busy && busy !== document.body && busy !== document.documentElement && !preview.contains(busy) && !(busy.closest && busy.closest('.pg-offstage'));
+        // One the person cannot see any more (a closed panel gave the focus back to a button on a page since hidden) is
+        // left until the browser's next frame takes it away: no one is on it, so nothing waits for it.
+        if (inPage && (!document.contains(busy) || !busy.getClientRects().length)) inPage = false;
         // The build's own run has no person on the page: nothing to wait for.
-        if (inPage && !BAKING) { busy.addEventListener('blur', function () { setTimeout(function () { measure(cb); }, 50); }, { once: true }); return; }
+        if (inPage && !BAKING) { busy.addEventListener('blur', function () { setTimeout(again, 50); }, { once: true }); return false; }
         var root = preview.firstElementChild || cur, tb = document.createElement('tbody');
         // Whether it holds anything a person acts on, or a field, in any variant: what asks of controls and fields only
         // applies then.
@@ -9419,7 +9423,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           Object.keys(cb.set).forEach(function (k) { state[k] = cb.set[k]; });
           refresh();
         } catch (e) { restore(); return finish(); }   // drawn no further: what was tried stands
-        settle(function () { try { measure(cb); } catch (e) { /* this variant could not be tried; the rest are */ } step(i + 1); });
+        // The next variant waits while this one waits for the person to leave a control, so none is left untried.
+        var tryIt = function () { var waits = false; try { waits = measure(cb, tryIt) === false; } catch (e) { /* this variant could not be tried; the rest are */ } if (!waits) step(i + 1); };
+        settle(tryIt);
       })(0);
       function finish() {
         var n = plan.combos.length, scope = function (where) {

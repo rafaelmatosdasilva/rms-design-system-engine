@@ -39,8 +39,11 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Writes the one file AI tools read, with what to use, what each token is for and what was already decided against.
 - Pairs each text colour with the surface it was made for, so nobody picks a different grey on every card.
 - Publishes the contracts to a shared repository, and in the DSDS format for teams that document their system that way.
+- Writes the contracts in the open component specs format too: each component's parts, props, slots and the tokens each part uses.
 - Records each breaking change as a release of the system, so products know what moved.
+- Shows on a merge request or pull request what it changes in each contract, what breaks and which products use the component.
 - Checks your Figma Code Connect mappings against the contracts.
+- Drafts a Figma Code Connect file for each component that has none, from what its contract pairs. A person checks it and publishes it.
 
 ## Write the intent layer
 

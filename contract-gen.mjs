@@ -532,7 +532,16 @@ const CONTRACT_SCHEMA = {
     anatomy: { type: 'object', required: ['root'] },
     states: { type: 'array', items: { type: 'object', properties: { name: str, when: { type: 'object' }, selector: str, from: { enum: ['figma', 'code'] } } } },
     variants: { type: 'array', items: { type: 'object', properties: { when: { type: 'object' }, selector: str, from: { enum: ['figma', 'code'] } } } },
-    tokens: { type: 'object', properties: { used: strs, byState: { type: 'object', additionalProperties: strs } }, additionalProperties: false },
+    tokens: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        used: strs, byState: { type: 'object', additionalProperties: strs },
+        byVariant: {
+          type: 'array', description: 'What each Figma variant paints with: its frame\'s fill and stroke, and its text\'s fill.',
+          items: { type: 'object', required: ['when', 'paints'], properties: { when: { type: 'object' }, paints: { type: 'array', items: { type: 'object', required: ['token', 'field'], properties: { token: str, field: { enum: ['fills', 'strokes'] }, text: { const: true } } } } } },
+        },
+      },
+    },
     accessibility: {
       type: 'object', additionalProperties: false,
       properties: { element: sourced(str), role: sourced(str), aria: sourced(strs), keyboard: sourced(strs) },
@@ -691,8 +700,9 @@ const semverMajor = (v) => { const n = parseInt(String(v ?? '0').split('.')[0], 
 
 // Classify the change between a component's previous emitted contract and the new one.
 // breaking = a consumer relying on the old shape breaks (prop/option/state removed, default
-// changed); additive = new prop/option/state. Advisory only — never fails the audit.
-function diffContract(prev, next, name) {
+// changed); additive = new prop/option/state. Advisory only — never fails the audit (contract-changes.mjs reads it
+// for a merge request).
+export function diffContract(prev, next, name) {
   const out = [];
   if (!prev) return out;   // first emit — nothing to compare
   const pmap = new Map((prev.props || []).map((p) => [p.name, p]));
@@ -1202,6 +1212,18 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     dsdsOut = dir;
   } catch { /* best-effort */ }
 
+  // And in the open component specs format (contract-spec.mjs): one spec a component, under specs/, with an index that
+  // links each one to its contract, its code file and its Figma component. Rewritten whole each build, like dsds/.
+  let specsOut = null;
+  try {
+    const { specDocuments } = await import('./contract-spec.mjs');
+    const dir = join(outDir, 'specs');
+    const docs = specDocuments(built.map((b) => ({ ...b, file: placeOf.get(b.name) })), { system: cfg.name || 'Design system', figmaFile: cfg.figmaFileKey || null });
+    try { rmSync(join(dir, 'components'), { recursive: true, force: true }); } catch { /* none yet */ }
+    for (const { rel, doc } of docs) { ensureDir(dirname(join(dir, rel))); writeFileSync(join(dir, rel), JSON.stringify(doc, null, 2) + '\n'); }
+    specsOut = dir;
+  } catch { /* best-effort */ }
+
   // How the system builds a component in Figma (construction-grammar.mjs): each rule most of its components follow,
   // with who does not, and the questions the team answers in the authored contract (construction). Rewritten each build.
   let constructionOut = null;
@@ -1238,5 +1260,5 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const statusCounts = built.reduce((acc, b) => { const st = b.contract.status?.state; if (st) acc[st] = (acc[st] || 0) + 1; return acc; }, {});
 
   try { ensureDir(outDir); writeFileSync(builtFile, JSON.stringify({ _built: stamp }, null, 2) + '\n'); } catch { /* best-effort */ }
-  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, dsdsOut, constructionOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
+  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, dsdsOut, specsOut, constructionOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
 }
