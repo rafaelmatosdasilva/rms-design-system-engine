@@ -389,3 +389,98 @@ test('--intent-layer takes a folder of the project or a GitHub link; a folder th
   assert.match(bad.stdout, /not a folder of this project/);
   assert.match(run('https://github.com/northwind').stdout, /not a GitHub repository link/);
 });
+
+// ── Documentation tools and GitHub Enterprise ───────────────────────────────────────────────────────────────────────
+const json = (j, status = 200) => ({ ok: status < 300, status, json: async () => j });
+test('Notion: the page\'s child pages as folders of pages, its database rows with their properties; the token only to Notion', async () => {
+  const root = '0123456789abcdef0123456789abcdef';
+  const kids = {
+    '01234567-89ab-cdef-0123-456789abcdef': [{ id: 'c1', type: 'child_page', child_page: { title: 'Components' }, has_children: true, last_edited_time: '2026-10-01T00:00:00Z' }, { id: 'db1', type: 'child_database', child_database: { title: 'Patterns' } }],
+    c1: [{ id: 'b1', type: 'child_page', child_page: { title: 'Button Main' }, has_children: true, last_edited_time: '2026-10-02T00:00:00Z' }],
+    b1: [{ type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'The next step the person is expected to take.' }] } }, { type: 'heading_2', heading_2: { rich_text: [{ plain_text: 'When not to use' }] } }, { type: 'bulleted_list_item', bulleted_list_item: { rich_text: [{ plain_text: 'For navigation; use a link.' }] } }],
+    p1: [{ type: 'paragraph', paragraph: { rich_text: [{ plain_text: 'Save a long form as a draft.' }] } }],
+  };
+  const calls = [];
+  const fetchImpl = async (url, o = {}) => { calls.push({ url, headers: o.headers }); const id = /blocks\/([^/]+)\/children/.exec(url)?.[1]; return json({ results: kids[id] ?? [], has_more: false }); };
+  const sendImpl = async (url, o = {}) => { calls.push({ url, headers: o.headers, method: o.method }); return json({ results: [{ id: 'p1', url: 'https://www.notion.so/Saving-p1', last_edited_time: '2026-10-03T00:00:00Z', properties: { Name: { type: 'title', title: [{ plain_text: 'Saving' }] }, Kind: { type: 'select', select: { name: 'pattern' } } } }], has_more: false }); };
+  const dir = makeFixture({ '.env': 'NOTION_TOKEN=nt0\n' });
+  const cfg = { intentLayer: `https://www.notion.so/acme/Intent-${root}` };
+  assert.equal(intentLayerConfig(cfg).host, 'notion');
+  const r = await syncIntentLayer(dir, cfg, { fetchImpl, sendImpl });
+  assert.equal(r.ok, true, r.error);
+  assert.match(describeSync(r), /🧭 Intent layer: Notion \(last edited 2026-10-03\) - 2 Markdown pages, read/);
+  const snap = readIntentLayer(dir, cfg);
+  const b = snap.entities.find((e) => e.name === 'Button Main');
+  assert.equal(b.layer, 'components');
+  assert.deepEqual(b.whenNotToUse, ['For navigation; use a link.']);
+  assert.equal(b.url, 'https://www.notion.so/b1');
+  const s = snap.entities.find((e) => e.name === 'Saving');
+  assert.equal(s.layer, 'patterns');
+  assert.equal(s.url, 'https://www.notion.so/Saving-p1');
+  assert.ok(calls.every((c) => new URL(c.url).host === 'api.notion.com' && c.headers.Authorization === 'Bearer nt0'));
+  assert.match((await syncIntentLayer(makeFixture({}), cfg, { fetchImpl, sendImpl, env: {} })).error, /no NOTION_TOKEN in \.env/);
+  // Read-only: the changes are made on the pages as read and listed for a person; sending them is refused, plainly.
+  const access = layerAccess(dir, cfg, { fetchImpl, sendImpl });
+  assert.equal((await layerFiles(access, 'latest')).get('Components/Button Main.md').includes('For navigation; use a link.'), true);
+  assert.match((await commitToBranch(access, { files: new Map([['Components/Button Main.md', 'x']]), sha: 'latest', target: 'latest', message: 'm' })).error, /reads the layer from Notion but never writes there: each change is listed for a person to make in Notion/);
+  assert.match((await openMergeRequest(access, { files: new Map(), sha: 'latest', target: 'latest', title: 't', description: 'd', branch: 'b', message: 'm' })).error, /never writes there/);
+  const may = await mayWrite(dir, cfg, 'commit');
+  assert.deepEqual([may.ok, may.readOnly], [false, true]);
+  assert.ok(calls.every((c) => !c.method || c.method === 'POST' && /\/databases\/[^/]+\/query$/.test(c.url)), 'only reads: GETs, and the database query');
+});
+
+test('Confluence: the page and its descendants, in folders by their ancestors, storage format as Markdown; basic auth on the cloud', async () => {
+  const { storageToMarkdown } = await import('../doc-tools.mjs');
+  assert.equal(storageToMarkdown('<h2>When to use</h2><ul><li><p>To submit a form.</p></li></ul><p>Plain &amp; <strong>bold</strong>.</p><table><tbody><tr><th>Size</th><th>Use</th></tr><tr><td>sm</td><td>Dense lists</td></tr></tbody></table><ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[<b>x</b>]]></ac:plain-text-body></ac:structured-macro><ac:image><ri:attachment ri:filename="a.png"/></ac:image>'),
+    '## When to use\n\n- To submit a form.\n\nPlain & **bold**.\n\n| Size | Use |\n| sm | Dense lists |\n\n```\n<b>x</b>\n```');
+  // A tag split by another is still taken out; an escaped one stays as text; a link in a list item stays a link.
+  assert.equal(storageToMarkdown('<ul><li><p>Use <a href="https://x.test/a">the link</a>.</p></li></ul><p>a <scr<script>ipt>b &lt;c&gt;</p>'), '- Use [the link](https://x.test/a).\n\na b <c>');
+  const link = 'https://acme.atlassian.net/wiki/spaces/DS/pages/100/Intent+layer';
+  const calls = [];
+  const fetchImpl = async (url, o = {}) => {
+    calls.push({ url, headers: o.headers });
+    if (/content\/100\?/.test(url)) return json({ id: '100', title: 'Intent layer', version: { number: 3, when: '2026-10-01T00:00:00Z' }, body: { storage: { value: '<p>Read before composing a screen.</p>' } }, _links: { webui: '/spaces/DS/pages/100' } });
+    return json({ results: [
+      { id: '101', title: 'Components', ancestors: [{ id: '1', title: 'DS home' }, { id: '100', title: 'Intent layer' }], version: { number: 1, when: '2026-10-02T00:00:00Z' }, body: { storage: { value: '<p>Every component.</p>' } } },
+      { id: '102', title: 'Button Main', ancestors: [{ id: '1', title: 'DS home' }, { id: '100', title: 'Intent layer' }, { id: '101', title: 'Components' }], version: { number: 7, when: '2026-10-04T00:00:00Z' }, body: { storage: { value: '<p>The next step.</p><h2>When not to use</h2><ul><li>For navigation.</li></ul>' } }, _links: { webui: '/spaces/DS/pages/102' } },
+    ] });
+  };
+  const dir = makeFixture({ '.env': 'CONFLUENCE_EMAIL=me@acme.test\nCONFLUENCE_TOKEN=ct0\n' });
+  const r = await syncIntentLayer(dir, { intentLayer: link }, { fetchImpl });
+  assert.equal(r.ok, true, r.error);
+  const b = readIntentLayer(dir, { intentLayer: link }).entities.find((e) => e.name === 'Button Main');
+  assert.equal(b.layer, 'components');
+  assert.deepEqual(b.whenNotToUse, ['For navigation.']);
+  assert.equal(b.url, 'https://acme.atlassian.net/wiki/spaces/DS/pages/102');
+  assert.ok(calls.every((c) => c.url.startsWith('https://acme.atlassian.net/wiki/rest/api/') && c.headers.Authorization === `Basic ${Buffer.from('me@acme.test:ct0').toString('base64')}`));
+});
+
+test('hostOf: a Notion or Confluence page is its tool\'s; a GitLab project that only looks like one stays GitLab', () => {
+  assert.equal(hostOf('https://www.notion.so/acme/Intent-0123456789abcdef0123456789abcdef'), 'notion');
+  assert.equal(hostOf('https://acme.atlassian.net/wiki/spaces/DS/pages/100/Intent'), 'confluence');
+  assert.equal(hostOf('https://wiki.acme.test/pages/viewpage.action?pageId=100'), 'confluence');
+  assert.equal(hostOf('https://git.acme.test/design/display/intent'), 'gitlab');
+  assert.equal(intentLayerConfig({ intentLayer: { confluence: 'https://wiki.acme.test/pages/viewpage.action?pageId=100' } }).host, 'confluence');
+});
+
+test('GitHub Enterprise: a host named in GITHUB_HOST, read through its own API, files through its contents; the token only to it', async () => {
+  const link = 'https://git.acme.test/design/docs/tree/main/intent';
+  assert.equal(hostOf(link, { GITHUB_HOST: 'git.acme.test' }), 'github');
+  assert.equal(hostOf(link, {}), 'gitlab', 'an unknown host stays a GitLab project');
+  const calls = [];
+  const fetchImpl = async (url, o = {}) => {
+    calls.push({ url, headers: o.headers });
+    const u = new URL(url);
+    if (/\/contents\//.test(u.pathname)) { const b = Buffer.from('# Saving\n\nSave a long form as a draft.\n'); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; }
+    if (/\/git\/trees\//.test(u.pathname)) return json({ tree: [{ path: 'intent/patterns/saving.md', type: 'blob', size: 40 }] });
+    if (/\/commits\/main$/.test(u.pathname)) return json({ sha: 'abc1234def5678', commit: { committer: { date: '2026-10-01T00:00:00Z' } } });
+    if (/\/commits$/.test(u.pathname)) return json([]);
+    return json({ default_branch: 'main' });
+  };
+  const dir = makeFixture({});
+  const r = await syncIntentLayer(dir, { intentLayer: { github: link } }, { env: { GITHUB_TOKEN: 'ghe0' }, fetchImpl });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(readIntentLayer(dir, { intentLayer: { github: link } }).entities[0].url, 'https://git.acme.test/design/docs/blob/main/intent/patterns/saving.md');
+  assert.ok(calls.every((c) => c.url.startsWith('https://git.acme.test/api/v3/repos/design/docs/') && c.headers.Authorization === 'Bearer ghe0'));
+  assert.ok(calls.some((c) => /\/contents\/intent\/patterns\/saving\.md\?ref=abc1234def5678$/.test(c.url) && c.headers.Accept === 'application/vnd.github.raw'));
+});

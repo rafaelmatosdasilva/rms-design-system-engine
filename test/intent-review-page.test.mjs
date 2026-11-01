@@ -39,3 +39,12 @@ test('a page whose component changed is reviewed as that, and every row to revie
   assert.match(tpl, /\['review', 'Note beside it'\]/, 'what the agents read shows the note beside the page');
   assert.match(tpl, /x\.decider \? lines\(\['Waits on ' \+ x\.decider\.name \+ '\.'\]\)/, 'a change in Figma held for sign-off says who it waits on');
 });
+
+test('a decision to review again: its page says so, a withdrawal says its question is asked again, and the History shows the note', () => {
+  const html = loadProposal()({ proposals: [{ kind: 'recheck', subject: 'tileTwo', proposal: 'Does the answer yes to "Its page is Tile One." still hold for tileTwo as it is now?', answer: 'no', by: 'QA', at: '2026-03-06T09:00:00Z', evidence: ['tileTwo changed.'] }] });
+  assert.match(html, /Withdrawn by QA on 2026-03-06: its question is asked again\./);
+  assert.doesNotMatch(html, /Declined/);
+  assert.match(tpl, /p\.recheck && p\.action === 'review' \? 'Decision to review again'/);
+  assert.match(tpl, /\(d\.review \? '<p class="sg-il-line"><span class="pg-par-val">' \+ esc\(d\.review\)/, 'the History page shows the note');
+  assert.match(tpl, /\(d\.review \? '<br>' \+ esc\(d\.review\) : ''\)/, 'and so does the component\'s own History');
+});

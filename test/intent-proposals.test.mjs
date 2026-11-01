@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf, candidatesFor, withEvidence, currentAnswers, pendingOf, usageOf, deciderFor } from '../intent-proposals.mjs';
+import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf, candidatesFor, withEvidence, currentAnswers, pendingOf, usageOf, deciderFor, rechecksFor, withdrawn } from '../intent-proposals.mjs';
+import * as truth from '../intent-truth.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ROOT = tempDir('proposals-');
@@ -149,4 +150,64 @@ test('where each component is used is read from what the audit wrote: the catalo
   assert.equal(usageOf(root).tileOne.products[0].name, 'Acme shop');
   writeFileSync(join(root, 'contracts', 'catalog.json'), JSON.stringify({ components: { listMain: { livesIn: { products: [] } } } }));
   assert.deepEqual(Object.keys(usageOf(root)), ['listMain']);
+});
+
+// A decision answered here whose component changed after it was recorded: asked again whether it still holds.
+const change = (at, extra = {}) => ({ at, how: 'props', added: ['glow'], removed: [], log: [{ at, how: 'props', added: ['glow'], removed: [], ...extra }] });
+test('a decision whose component changed after it was recorded is to review again; a yes is kept with who and when, a later change asks again', () => {
+  const root = tempDir('recheck-');
+  const noPage = ['listMain/Row', 'tileTwo', 'newThing'];
+  const found = proposalsFor({ ROOT: root, report, snap, names: ['listMain', 'tileOne', 'tileTwo', 'listMain/Row', 'newThing'], codeFiles, facts, noPage });
+  decide(root, ['add:tileTwo'], 'yes', Object.fromEntries(found), { by: 'QA', now: '2026-03-01T09:00:00Z' });
+  const changed = { tileTwo: change('2026-03-05T10:00:00Z') };
+  const R = rechecksFor({ found, decisions: readDecisions(root), changed, report, truth });
+  const x = R.get('recheck:add:tileTwo');
+  assert.equal(x.kind, 'recheck');
+  assert.equal(x.page, 'Tile One', 'shown on the page that documents it');
+  assert.equal(x.since, '2026-03-05T10:00:00Z');
+  assert.match(x.proposal, /^Does the answer yes to "Its page is Tile One: no page of its own\." still hold for tileTwo as it is now\?$/);
+  assert.equal(x.evidence[0], 'tileTwo changed on 5 Mar 2026: new props `glow`, after this decision was recorded.');
+  assert.deepEqual(optionsOf(x).map((o) => o.label), ['It still holds', 'Withdraw it']);
+  // The decision still stands; its page is to review, with the change said.
+  const P = new Map([...found, ...R]);
+  const done = applyDecisions({ report, noPage, proposals: P, decisions: currentAnswers(P, readDecisions(root)) });
+  assert.ok(!done.noPage.includes('tileTwo'), 'still documented in Tile One until a person says otherwise');
+  const tile = done.pages.find((p) => p.name === 'Tile One');
+  assert.deepEqual([tile.action, tile.recheck], ['review', 1]);
+  assert.match(tile.todo[0], /^Review a decision again: tileTwo changed on 5 Mar 2026/);
+  const ev = withEvidence('recheck:add:tileTwo', x, { decisions: readDecisions(root) });
+  assert.ok(ev.candidates.find((c) => c.answer === 'yes').evidence.some((e) => e.from === 'Past decisions' && /QA answered yes on 2026-03-01/.test(e.says)));
+  assert.ok(ev.candidates.find((c) => c.answer === 'no').evidence.some((e) => /New props `glow`: what the decision rested on may have changed/.test(e.says)));
+  // Confirmed: recorded with who and when, and not asked again until the component changes again.
+  decide(root, ['recheck:add:tileTwo'], 'yes', Object.fromEntries(R), { by: 'QA lead', now: '2026-03-06T09:00:00Z' });
+  const d = readDecisions(root);
+  assert.deepEqual([d['recheck:add:tileTwo'].by, d['recheck:add:tileTwo'].effect], ['QA lead', 'confirm']);
+  assert.equal(rechecksFor({ found, decisions: d, changed, report, truth }).size, 0);
+  const again = rechecksFor({ found, decisions: d, changed: { tileTwo: { ...change('2026-03-08T10:00:00Z'), log: [...change('2026-03-05T10:00:00Z').log, ...change('2026-03-08T10:00:00Z').log] } }, report, truth }).get('recheck:add:tileTwo');
+  assert.match(again.evidence[0], /changed on 8 Mar 2026: new props `glow`, after this decision was last confirmed\.$/);
+  assert.equal(currentAnswers(new Map([['recheck:add:tileTwo', again]]), d)['recheck:add:tileTwo'], undefined, 'the old yes no longer answers it');
+});
+
+test('a decision withdrawn once its component changed is asked again; a kept name the page still writes is reviewed on its page', () => {
+  const root = tempDir('recheck-no-');
+  const noPage = ['listMain/Row', 'tileTwo', 'newThing'];
+  const found = proposalsFor({ ROOT: root, report, snap, names: ['listMain', 'tileOne', 'tileTwo', 'listMain/Row', 'newThing'], codeFiles, facts, noPage });
+  decide(root, ['add:tileTwo'], 'yes', Object.fromEntries(found), { now: '2026-03-01T09:00:00Z' });
+  const R = rechecksFor({ found, decisions: readDecisions(root), changed: { tileTwo: change('2026-03-05T10:00:00Z') }, report, truth });
+  decide(root, ['recheck:add:tileTwo'], 'no', Object.fromEntries(R), { now: '2026-03-06T09:00:00Z' });
+  let d = readDecisions(root);
+  assert.equal(withdrawn(d, 'add:tileTwo'), true);
+  assert.equal(currentAnswers(found, d)['add:tileTwo'], undefined, 'no longer an answer');
+  assert.ok(applyDecisions({ report, noPage, proposals: found, decisions: currentAnswers(found, d) }).noPage.includes('tileTwo'), 'its question is asked again');
+  assert.equal(rechecksFor({ found, decisions: d, changed: { tileTwo: change('2026-03-05T10:00:00Z') }, report, truth }).size, 0, 'nothing to review: it waits for an answer');
+  // Answered again: it stands.
+  decide(root, ['add:tileTwo'], 'no', Object.fromEntries(found), { now: '2026-03-07T09:00:00Z' });
+  d = readDecisions(root);
+  assert.equal(withdrawn(d, 'add:tileTwo'), false);
+  // A name kept on a page (no finding left to propose on): its page's component changed, so it is reviewed there.
+  decide(root, ['fix:Search:searchRow'], 'yes', Object.fromEntries(found), { now: '2026-03-01T09:00:00Z' });
+  const fix = rechecksFor({ found: new Map(), decisions: readDecisions(root), changed: { searchMain: { at: '2026-03-04T00:00:00Z', how: 'file', file: 'src/search/Search.vue', added: [], removed: [] } }, report, keptFix: new Set(['fix:Search:searchRow']), truth }).get('recheck:fix:Search:searchRow');
+  assert.deepEqual([fix.page, fix.subject], ['Search', 'searchMain']);
+  assert.equal(fix.evidence[0], 'Search.vue changed on 4 Mar 2026, after this decision was recorded.');
+  assert.equal(withEvidence('recheck:fix:Search:searchRow', fix, { decisions: readDecisions(root) }).recommends, 'yes', 'only its code file changed');
 });

@@ -19,6 +19,10 @@
 //   Review a page whose component changed after it was written or last confirmed (intent-truth.mjs, stale): does it
 //         still hold? A yes records the confirmation (who and when), and the page is not marked again until the
 //         component changes again; a no leaves it marked until the page is edited.
+//   Recheck a decision answered here (an Add, a Fix, a Move) whose component changed after it was recorded or last
+//         confirmed (intent-truth.mjs → decisionsToReview): does it still hold? A yes records the confirmation (who and
+//         when), and it is not marked again until the component changes again; a no withdraws it, and its question is
+//         asked again. Until then the decision stands, with a note beside it for agents and on the History page.
 // A decision the engine has no ground to propose an answer for is shown as it is, for a person.
 //
 // Evidence first: each proposal also lists its candidates (candidatesFor), every answer it could take with what speaks
@@ -51,6 +55,8 @@ export function decide(ROOT, keys, answer, proposals = {}, { now = new Date().to
   return d;
 }
 export const accepted = (decisions, key) => decisions[key]?.answer === 'yes';
+// A decision a person withdrew once its component changed (a no to recheck:<key>, given after it): asked again.
+export const withdrawn = (decisions, key) => { const r = decisions?.[`recheck:${key}`], d = decisions?.[key]; return r?.answer === 'no' && !!r.at && !!d?.at && Date.parse(r.at) >= Date.parse(d.at); };
 
 // Who imports a code file: the project's code files that name its path (without extension) in an import.
 function importersOf(ROOT, file, codeFiles) {
@@ -95,7 +101,7 @@ export function proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPa
   for (const n of noPage) {
     const key = `add:${n}`, file = codeFiles[n];
     const same = file && documentedFiles.get(noExt(file));
-    if (same) { out.set(key, { kind: 'add', subject: n, proposal: `Its page is ${same.page.name}: no page of its own.`, evidence: [`${n} and ${same.name} are drawn from one code file, ${file}, and ${same.page.name} documents ${same.name}.`], effect: 'documented', yes: `No page of its own: ${same.page.name} documents it.`, no: 'It gets a page of its own, started from its code, its lines drafts to review.' }); continue; }
+    if (same) { out.set(key, { kind: 'add', subject: n, host: same.page.name, proposal: `Its page is ${same.page.name}: no page of its own.`, evidence: [`${n} and ${same.name} are drawn from one code file, ${file}, and ${same.page.name} documents ${same.name}.`], effect: 'documented', yes: `No page of its own: ${same.page.name} documents it.`, no: 'It gets a page of its own, started from its code, its lines drafts to review.' }); continue; }
     const parent = n.includes('/') ? n.split('/')[0] : null;
     const byName = parent && pageFor.get(parent);
     const beside = !byName && file && [...documentedFiles.values()].find((d) => dirOf(codeFiles[d.name]) === dirOf(file) && /^(row|item|chip|label|divider|header|cell|background|bar|line|option)s?$/i.test(base(file)));
@@ -103,7 +109,7 @@ export function proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPa
     if (host) {
       const ev = [byName ? `Its Figma name puts it inside ${parent}: ${n}.` : `Its code file, ${file}, is beside ${host.name}'s (${codeFiles[host.name]}).`];
       if (file) { const by = importersOf(ROOT, file, codeFiles); if (by.length) ev.push(`Only ${by.map((f) => base(f) + '.' + f.split('.').pop()).join(', ')} use${by.length === 1 ? 's' : ''} it in the code.`); }
-      out.set(key, { kind: 'add', subject: n, proposal: `Document it in ${host.page.name}'s page, as a part of ${host.name}: no page of its own.`, evidence: ev, effect: 'documented', yes: `No page of its own: ${host.page.name}'s page documents it, as a part of ${host.name}.`, no: 'It gets a page of its own, started from its code, its lines drafts to review.' });
+      out.set(key, { kind: 'add', subject: n, host: host.page.name, proposal: `Document it in ${host.page.name}'s page, as a part of ${host.name}: no page of its own.`, evidence: ev, effect: 'documented', yes: `No page of its own: ${host.page.name}'s page documents it, as a part of ${host.name}.`, no: 'It gets a page of its own, started from its code, its lines drafts to review.' });
       continue;
     }
     out.set(key, { kind: 'add', subject: n, proposal: `Write its page.`, evidence: [file ? `It is in the code (${file}) and no page documents it.` : 'No page documents it.'], effect: 'write', yes: 'Its page is started from its code, its lines drafts to review.', no: 'No page: it is taken off the pages to write.' });
@@ -159,8 +165,8 @@ const WEIGHT = { strong: 3, some: 2, weak: 1 };
 const FROM = [[/Figma name|Figma library|Figma marks|Figma's/i, 'Figma'], [/^The page says/i, "The team's pages"], [/code|\.vue|\.jsx?|\.tsx?|\.svelte|used only by|use[s]? it/i, 'The code'], [/./, 'The engine']];
 const fromOf = (says) => FROM.find(([re]) => re.test(says))[1];
 export function candidatesFor(key, x, { usage = {}, decisions = {}, report = { pages: [] } } = {}) {
-  const yes = { answer: 'yes', says: x.kind === 'review' ? 'It still holds: confirm it.' : x.proposal, evidence: [] };
-  const no = { answer: 'no', says: x.kind === 'review' ? 'It needs editing.' : x.no ?? 'Not as proposed.', evidence: [] };
+  const yes = { answer: 'yes', says: x.kind === 'review' || x.kind === 'recheck' ? 'It still holds: confirm it.' : x.proposal, evidence: [] };
+  const no = { answer: 'no', says: x.kind === 'review' ? 'It needs editing.' : x.kind === 'recheck' ? 'It no longer holds: withdraw it, and answer it again.' : x.no ?? 'Not as proposed.', evidence: [] };
   const lives = usage[x.subject] ?? null;
   const products = (lives?.products ?? []).filter((p) => p.name);
   const screens = lives?.screens ?? [];
@@ -175,6 +181,14 @@ export function candidatesFor(key, x, { usage = {}, decisions = {}, report = { p
     const added = (f.changed ?? []).filter((c) => /new props|new tokens|takes .* now/.test(c));
     if (added.length) no.evidence.push({ from: "The engine's record", says: `${capital(added.join('; '))}: the page may need a line about ${added.length === 1 ? 'it' : 'them'}.`, strength: 'weak' });
     if ((f.changed ?? []).every((c) => / changed in the code$/.test(c))) yes.evidence.push({ from: "The code's history", says: 'Only its code file changed: no prop, value or token did.', strength: 'weak' });
+    const before = decisions[key];
+    if (before?.answer === 'yes') yes.evidence.push({ from: 'Past decisions', says: `${before.by ?? 'Someone'} confirmed it before, on ${String(before.at ?? '').slice(0, 10)}.`, strength: 'weak' });
+  } else if (x.kind === 'recheck') {
+    const f = x.stale ?? {}, was = decisions[x.decision];
+    if (was) yes.evidence.push({ from: 'Past decisions', says: `${was.by ?? 'Someone'} answered ${was.answer} on ${String(was.at ?? '').slice(0, 10)}.`, strength: 'some' });
+    if ((f.changed ?? []).length && f.changed.every((c) => / changed in the code$/.test(c))) yes.evidence.push({ from: "The code's history", says: 'Only its code file changed: no prop, value or token did.', strength: 'weak' });
+    const moved = (f.changed ?? []).filter((c) => !/ changed in the code$/.test(c));
+    if (moved.length) no.evidence.push({ from: moved.every((c) => /^Figma: /.test(c)) ? 'Figma' : "The engine's record", says: `${capital(moved.join('; '))}: what the decision rested on may have changed.`, strength: 'some' });
     const before = decisions[key];
     if (before?.answer === 'yes') yes.evidence.push({ from: 'Past decisions', says: `${before.by ?? 'Someone'} confirmed it before, on ${String(before.at ?? '').slice(0, 10)}.`, strength: 'weak' });
   } else {
@@ -215,7 +229,7 @@ const capital = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
 export function withEvidence(key, x, ctx = {}) {
   const candidates = candidatesFor(key, x, ctx);
   // The engine's own answer stands; another with as much behind it makes it split, never swapped.
-  const own = x.kind === 'review' ? candidates[0] : candidates.find((c) => c.answer === 'yes');
+  const own = x.kind === 'review' || x.kind === 'recheck' ? candidates[0] : candidates.find((c) => c.answer === 'yes');
   const split = candidates.some((c) => c !== own && c.weight >= own.weight);
   return { ...x, candidates, recommends: own.answer, ...(split ? { split: true } : {}) };
 }
@@ -236,6 +250,9 @@ export function applyDecisions({ report, noPage, proposals, decisions }) {
       if (kept.length !== q.wrong.length) { q.wrong = kept; if (!kept.length && q.action === 'fix') { q.action = 'keep'; q.decision = 'Keep'; q.todo = []; } }
     }
     if (q.action === 'move' && accepted(decisions, `move:${p.name}`)) { q.action = 'keep'; q.decision = 'Keep'; q.todo = []; }
+    // A decision about it to review again, not answered yet: the page is to review, whatever else it waits on.
+    const again = [...proposals].filter(([k, x]) => x.kind === 'recheck' && x.page === p.name && !answer(k));
+    if (again.length) { q.todo = [...again.map(([, x]) => `Review a decision again: ${x.stale?.truth ?? ''} Confirm it still holds, or withdraw it.`), ...(q.action === 'keep' ? [] : q.todo ?? [])]; if (q.action === 'keep') { q.action = 'review'; q.decision = 'Review'; } q.recheck = again.length; }
     q.proposals = [...proposals.values()].filter((x) => x.page === p.name && (x.kind !== 'fix' || (p.wrong ?? []).some((f) => String(f.says).replace(/`/g, '') === x.subject))).map((x) => ({ ...x, key: [...proposals].find(([, v]) => v === x)[0], answer: answer([...proposals].find(([, v]) => v === x)[0]), ...said([...proposals].find(([, v]) => v === x)[0]) }));
     return q;
   });
@@ -251,10 +268,28 @@ export function deciderFor(x, report, owners) {
   return ownerOf(owners, ...(p ? [p.component ?? p.about?.partOf ?? p.about?.is, `${p.layer}/${p.name}`, x.subject] : [x.subject, String(x.subject).split('/')[0]]));
 }
 
-// The answers that still answer today's proposals: a confirmation (review:<page>) older than its component's latest change
-// is not an answer to this one, and the page is asked again. → decisions without them
+// The answers that still answer today's proposals: a confirmation (review:<page>, recheck:<key>) older than its
+// component's latest change is not an answer to this one, and it is asked again; a decision withdrawn since (a no to
+// recheck:<key>) is not an answer either, and its question is asked again. → decisions without them
 export function currentAnswers(proposals, decisions) {
-  return Object.fromEntries(Object.entries(decisions).filter(([k, d]) => { const x = proposals.get(k); return !(x?.kind === 'review' && x.since && d.at && Date.parse(d.at) < Date.parse(x.since)); }));
+  return Object.fromEntries(Object.entries(decisions).filter(([k, d]) => { const x = proposals.get(k); return !((x?.kind === 'review' || x?.kind === 'recheck') && x.since && d.at && Date.parse(d.at) < Date.parse(x.since)) && !withdrawn(decisions, k); }));
+}
+
+// Recheck: each decision answered here whose component changed after it was recorded or last confirmed, while its
+// question is still one the layer asks (an Add, a Move, or a Fix whose name the page still writes). found: proposalsFor's;
+// decisions: the file's; changed: facts.changed; keptFix: the fix: keys a yes keeps off a page (checkedLayer → kept).
+// → Map(recheck:<key> → proposal)
+export function rechecksFor({ found, decisions, changed, report, keptFix = new Set(), truth }) {
+  const out = new Map();
+  const pageComponent = (name) => { const p = report.pages.find((q) => q.name === name); return p ? p.component ?? p.about?.partOf ?? null : null; };
+  const only = (k) => !withdrawn(decisions, k) && (found.has(k) || keptFix.has(k));
+  for (const [k, r] of Object.entries(truth.decisionsToReview(decisions, changed, { pageComponent, only }))) {
+    const d = decisions[k], x = found.get(k);
+    const page = x?.page ?? x?.host ?? (/^(fix|move):/.test(k) ? (/^fix:(.+):[^:]*$/.exec(k) ?? /^move:(.+)$/.exec(k))[1] : null);
+    out.set(`recheck:${k}`, { kind: 'recheck', subject: r.component, decision: k, ...(page ? { page } : {}), since: r.at, proposal: `Does the answer ${d.answer} to "${d.proposal ?? k}" still hold for ${r.component} as it is now?`, evidence: [r.truth], effect: 'confirm', stale: r,
+      options: [{ answer: 'yes', label: 'It still holds', does: `Recorded as confirmed, with who and when: the decision is not marked again until ${r.component} changes again.` }, { answer: 'no', label: 'Withdraw it', does: 'The decision is withdrawn and its question asked again.' }] });
+  }
+  return out;
 }
 
 // What in the layer waits on a person, each with the one it waits on: every proposal not answered yet, and every page with
@@ -296,6 +331,8 @@ export async function decidedLayer(ROOT, cfg) {
   const noPage = il.pagesToWrite(names, (n) => report.pages.some((p) => p.component === n), codeFiles);
   const found = proposalsFor({ ROOT, report, snap, names, codeFiles, facts, noPage });
   const kept = readDecisions(ROOT);
+  // A decision whose component changed since it was recorded: asked again whether it still holds.
+  for (const [k, x] of rechecksFor({ found, decisions: kept, changed: facts.changed, report, keptFix: wrongOf.kept, truth })) found.set(k, x);
   const decisions = currentAnswers(found, kept);
   // Its evidence, and the one it waits on (ds-config.json → owners).
   const usage = usageOf(ROOT, cfg);

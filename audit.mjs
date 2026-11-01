@@ -2017,11 +2017,11 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
     const r = await il.syncIntentLayer(ROOT, conf, {});
     console.log('\n' + il.describeSync(r));
     if (r?.error) {
-      if (host === 'github') console.log('   If the repository is private, or GitHub limits requests without a token, put a GitHub token that can read it in this project\'s .env as GITHUB_TOKEN=... (never paste it into the chat).');
+      if (host === 'github') console.log('   If the repository is private, or GitHub limits requests without a token, put a GitHub token that can read it in this project\'s .env as GITHUB_TOKEN=... (never paste it into the chat). A GitHub Enterprise host is named in GITHUB_HOST.');
       console.log(`\nNEXT: make the fix named above, then run rms-design-system-engine --intent-layer ${link} again`);
       process.exit(1);
     }
-    console.log(`\nNEXT: rms-design-system-engine   (every run reads it again when ${host === 'folder' ? 'a page in it changed' : 'its commit moved'}, and folds it into the design intent, the contracts and the style guide)`);
+    console.log(`\nNEXT: rms-design-system-engine   (every run reads it again when ${host === 'folder' || ['notion', 'confluence'].includes(host) ? 'a page in it changed' : 'its commit moved'}, and folds it into the design intent, the contracts and the style guide)`);
     process.exit(0);
   }
   const envDirs = [ROOT, ...(existsSync(join(ROOT, '.gitlab-source.json')) ? [dirname(resolve(ROOT))] : [])];   // a mirror's .env is beside it
