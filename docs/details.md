@@ -768,6 +768,7 @@ The style guide is held to what a page owes the people who read it, as a product
 - **Every file it links to is there.** A script, a style sheet or a picture the page names that is missing fails the check, so a page with a hole is never published.
 - **Its size is shown.** Every build says how much the page and its files weigh, with the largest files. Past 25 MB it warns, since the page is slow to open on a phone.
 - **Its own pages are compared between builds.** A build that opens the page in a browser takes a picture of each page in the menu: Status, the foundations and each component, 40 at most. It compares each one with the picture from the last build.
+  - Only on a computer that keeps its builds. A CI run throws its folder away, so it takes no pictures.
   - Words are hidden in the pictures, so a date or a count that changes every build is not a change.
   - A page that changed is named, with how much of it changed, and a picture marking what changed is in `.design-system-engine-out/styleguide-shots/diff`.
   - It never fails the build. A change you meant is fine; one nobody meant is a fault in the page.

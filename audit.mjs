@@ -1978,8 +1978,9 @@ if (process.argv.includes('--styleguide')) {
       }
     }
     // The page's own pages pictured in the browser and compared with the last build's (styleguide-shots.mjs): a layout
-    // that moved shows before anyone opens it. A whole guide built with the browser only; it never fails the build.
-    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false && !r.scope && !SCOPE_COMPONENTS.length && existsSync(r.out)) {
+    // that moved shows before anyone opens it. A whole guide built with the browser only; it never fails the build. Not
+    // in CI: its folder is thrown away after the run, so a picture there has nothing to be compared with, ever.
+    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false && !r.scope && !SCOPE_COMPONENTS.length && existsSync(r.out) && !process.env.CI) {
       try {
         const { guideShots, shotLines } = await import('./styleguide-shots.mjs');
         const shotsDir = join(ROOT, OUT_DIR, 'styleguide-shots');
