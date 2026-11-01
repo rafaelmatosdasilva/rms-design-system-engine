@@ -823,6 +823,9 @@
     var bgRun = null;
     sec._a11yRun = function (cb) {
       if (ALL || !a11yEl || !cur) { cb(); return; }
+      // Tried once the page has loaded, as the area itself waits: before that the try would end at once with nothing
+      // measured, and the component would be kept as tried (a busy machine reaches here before the page's load).
+      if (document.readyState !== 'complete') { window.addEventListener('load', function () { setTimeout(function () { sec._a11yRun(cb); }, 50); }, { once: true }); return; }
       // A check already under way (the area was just opened) ends first; then every variant is tried again for this one.
       if (checking) { var before = bgRun; bgRun = function () { if (before) before(); sec._a11yRun(cb); }; return; }
       bgRun = cb; liveSig = null; checkLive();
