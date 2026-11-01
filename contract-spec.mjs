@@ -15,7 +15,8 @@
 //
 // A spec holds only what the format defines, so the links (the contract, the code file, the Figma component) are in the
 // index beside it, never copied in. Where a part sits inside the frame (its parent, its order) is not in the contract,
-// so no spec says it. Pure: no file is read or written here (contract-gen.mjs writes them).
+// so no spec says it. Its metadata says where Figma holds it (the page and the node, from the capture); a contract with
+// no page read has none. Pure: no file is read or written here (contract-gen.mjs writes them).
 import { isStateAxis } from './contract-code.mjs';
 
 export const SPEC_VERSION = '0.39.0';
@@ -47,9 +48,12 @@ function codeFacts(c) {
   return Object.keys(out).length ? out : null;
 }
 
+// The Figma property types the format names (a Figma slot is not one of them: its name alone is said).
+const FIGMA_TYPES = new Set(['BOOLEAN', 'TEXT', 'INSTANCE_SWAP', 'VARIANT']);
 function propOf(p, slots) {
   const kind = p.bindings?.figma?.kind;
-  const figma = { 'com.figma': { type: kind ?? p.type, name: p.name } };
+  const type = kind ?? p.type;
+  const figma = { 'com.figma': { ...(FIGMA_TYPES.has(type) ? { type } : {}), name: p.name } };
   const code = codeFacts(p.bindings?.code);
   const $extensions = { ...figma, ...(code ? { [EXT]: { code } } : {}) };
   const def = p.bindings?.figma?.default !== undefined ? p.bindings.figma.default : p.default;
@@ -59,7 +63,8 @@ function propOf(p, slots) {
     if (def == null) return { why: 'Figma gives it no default' };
     return { prop: { type: 'string', enum: p.options.map(String), default: String(def), $extensions } };
   }
-  if (p.type === 'text') return { prop: { type: 'string', ...(def != null && def !== '' ? { examples: [String(def)] } : {}), $extensions } };
+  // A text with no example says its default is none, so it never reads as a list of values with none listed.
+  if (p.type === 'text') return { prop: { type: 'string', ...(def != null && def !== '' ? { examples: [String(def)] } : { default: null }), $extensions } };
   if (p.type === 'instance' || p.type === 'children') {
     const accepts = slots.find((s) => s.name === p.name)?.accepts;
     const named = p.type === 'instance' ? (typeof def === 'string' && !/^\d+:\d+$/.test(def) ? def : null) : null;
@@ -74,7 +79,7 @@ function codeOnlyProp(c) {
   const t = String(c.type ?? '');
   if (/^boolean$/.test(t) && typeof c.default === 'boolean') return { type: 'boolean', default: c.default, $extensions };
   if (Array.isArray(c.options) && c.options.length && c.default != null) return { type: 'string', enum: c.options.map(String), default: String(c.default), $extensions };
-  if (/^string$/.test(t)) return { type: 'string', ...(c.default != null && c.default !== '' ? { examples: [String(c.default)] } : {}), $extensions };
+  if (/^string$/.test(t)) return { type: 'string', ...(c.default != null && c.default !== '' ? { examples: [String(c.default)] } : { default: null }), $extensions };
   if (/^number$/.test(t)) return { type: 'number', ...(typeof c.default === 'number' ? { default: c.default } : {}), $extensions };
   return null;
 }
@@ -184,7 +189,13 @@ export function specOf(c) {
   const states = (c.states ?? []).filter((s) => s.when && !drawn.has(JSON.stringify(whenOf(s.when))) && !isDefault(s.when) && isStateAxis(Object.keys(s.when)[0], []));
   if (states.length && paints.length) left.push(`states ${states.map((s) => s.name).join(', ')}: the contract holds no tokens of their own`);
 
-  const spec = { title: name, anatomy, ...(Object.keys(props).length ? { props } : {}), default: { ...(Object.keys(configuration).length ? { configuration } : {}), elements }, ...(variants.length ? { variants } : {}) };
+  // Where Figma holds it: its page and node, and whether it is a set of variants or one component.
+  const fig = c.source?.figma ?? {}, nodeId = fig.nodeId || c.figmaNodeId || null;
+  const set = (c.props ?? []).some((p) => (p.bindings?.figma?.kind ?? null) === 'VARIANT');
+  const metadata = fig.pageId && nodeId ? { source: { pageId: String(fig.pageId), nodeId: String(nodeId), nodeType: set ? 'COMPONENT_SET' : 'COMPONENT' } } : null;
+  if (!metadata && nodeId) left.push('metadata: the contract holds no Figma page for it (capture Figma again to read it)');
+
+  const spec = { ...(metadata ? { metadata } : {}), title: name, anatomy, ...(Object.keys(props).length ? { props } : {}), default: { ...(Object.keys(configuration).length ? { configuration } : {}), elements }, ...(variants.length ? { variants } : {}) };
   return { spec, left };
 }
 

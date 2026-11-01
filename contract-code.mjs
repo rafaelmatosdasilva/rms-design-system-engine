@@ -3,7 +3,7 @@
 // is; what the project's Code Connect file says it decides beyond its value; where Figma and the code differ; the props
 // only the code has; its events and slots as the code declares them; its states, the tokens each state paints with,
 // and what the code says about its accessibility. Every fact names where it came from; nothing is guessed.
-import { bindingSources, bindFigmaProp, readingsOf, valuesOf, suggestionFor, invertsValue, flipBoolean, conventionFor } from './prop-binding.mjs';
+import { bindingSources, bindFigmaProp, readingsOf, valuesOf, suggestionFor, invertsValue, flipBoolean, conventionFor, connectSlotsOf } from './prop-binding.mjs';
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const strip = (k) => String(k).split('#')[0].trim();
@@ -52,7 +52,7 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
     const authoredName = handWritten && typeof p.bindings.code.attribute === 'string' ? p.bindings.code.attribute : null;
     const found = handWritten
       ? (authoredName && codeProps[authoredName] ? { code: authoredName, as: 'prop', source: 'authored', exactName: true } : null)
-      : api ? bindFigmaProp(p.name, def, { codeProps, slots: api.slots ?? {}, recorded, authoredSlots, figmaSlots: [...defs].filter(([, d]) => d?.type === 'SLOT').map(([n]) => n) }) : null;
+      : api ? bindFigmaProp(p.name, def, { codeProps, slots: api.slots ?? {}, recorded, authoredSlots, figmaSlots: [...defs].filter(([, d]) => d?.type === 'SLOT').map(([n]) => n), connectSlots: connectSlotsOf(api.codeConnectProps) }) : null;
     // Nothing recorded and no same name: the design system's naming conventions, where the types agree (labelContent is
     // label; showLabel decides whether label is written). Never over what its Code Connect file says.
     const conv = !found && !handWritten && api && !readingsOf(p.name, api.codeConnectProps).length ? conventionFor(p.name, def, codeProps, { codeConnectProps: api.codeConnectProps }) : null;

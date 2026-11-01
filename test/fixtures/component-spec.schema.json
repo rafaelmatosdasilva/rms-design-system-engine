@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "One component spec, in the open component specs format (0.39)",
+  "description": "A minimal schema written for the engine's tests from the format's published types, covering what the engine writes: the root keys, the metadata's source, the anatomy, each kind of prop (exactly one kind matches), the default and the variants, each element, and token references in the styles. The format's own schema is not copied here: its licence asks for an attribution this public repository does not carry.",
+  "type": "object",
+  "required": ["title", "anatomy", "default"],
+  "additionalProperties": false,
+  "properties": {
+    "metadata": { "$ref": "#/definitions/Metadata" },
+    "title": { "type": "string" },
+    "anatomy": { "type": "object", "additionalProperties": { "$ref": "#/definitions/AnatomyElement" } },
+    "props": { "type": "object", "additionalProperties": { "$ref": "#/definitions/Prop" } },
+    "default": { "$ref": "#/definitions/Variant" },
+    "variants": { "type": "array", "items": { "$ref": "#/definitions/Variant" } },
+    "invalidPropCombinations": { "type": "array", "items": { "$ref": "#/definitions/Configuration" } },
+    "subcomponents": { "type": "object" },
+    "instanceExamples": {},
+    "slotContentExamples": { "type": "object" },
+    "images": { "type": "object" },
+    "source": { "type": "object" }
+  },
+  "definitions": {
+    "Metadata": {
+      "type": "object",
+      "required": ["source"],
+      "additionalProperties": false,
+      "properties": {
+        "author": { "type": "string" },
+        "lastUpdated": { "type": "string" },
+        "generator": { "type": "object", "required": ["url", "version", "name"] },
+        "schema": { "type": "object", "required": ["url", "version"] },
+        "conventions": { "type": "object" },
+        "settings": { "type": "object" },
+        "source": {
+          "type": "object",
+          "required": ["pageId", "nodeId", "nodeType"],
+          "additionalProperties": false,
+          "properties": {
+            "pageId": { "type": "string" },
+            "nodeId": { "type": "string" },
+            "nodeType": { "enum": ["COMPONENT", "COMPONENT_SET", "FRAME"] }
+          }
+        }
+      }
+    },
+    "AnatomyElement": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "oneOf": [
+          { "enum": ["text", "glyph", "vector", "container", "slot", "instance", "line", "ellipse", "rectangle", "polygon", "star"] },
+          { "type": "object", "required": ["$ref"], "additionalProperties": false, "properties": { "$ref": { "type": "string" } } }
+        ] },
+        "detectedIn": { "type": "string" },
+        "instanceOf": {},
+        "role": {},
+        "actions": { "type": "array" },
+        "$extensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "com.figma": { "type": "object", "additionalProperties": false, "properties": { "name": { "type": "string" }, "childRole": {} } } }
+        }
+      }
+    },
+    "PropExtensions": {
+      "type": "object",
+      "properties": {
+        "com.figma": {
+          "type": "object",
+          "properties": { "type": { "enum": ["BOOLEAN", "TEXT", "INSTANCE_SWAP", "VARIANT"] }, "name": { "type": "string" } }
+        }
+      }
+    },
+    "Prop": { "oneOf": [
+      { "$ref": "#/definitions/BooleanProp" },
+      { "$ref": "#/definitions/StringProp" },
+      { "$ref": "#/definitions/EnumProp" },
+      { "$ref": "#/definitions/SlotProp" },
+      { "$ref": "#/definitions/NumberProp" }
+    ] },
+    "BooleanProp": {
+      "type": "object",
+      "required": ["type", "default"],
+      "additionalProperties": false,
+      "patternProperties": { "^\\$": {} },
+      "properties": { "type": { "const": "boolean" }, "default": { "type": "boolean" }, "$extensions": { "$ref": "#/definitions/PropExtensions" } }
+    },
+    "StringProp": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "patternProperties": { "^\\$": {} },
+      "properties": {
+        "type": { "const": "string" }, "default": { "type": ["string", "null"] }, "nullable": { "type": "boolean" },
+        "examples": { "type": "array", "items": { "type": "string" } }, "$extensions": { "$ref": "#/definitions/PropExtensions" }
+      }
+    },
+    "EnumProp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "string" }, "default": { "type": "string" }, "enum": { "type": "array", "items": { "type": "string" } },
+        "nullable": { "type": "boolean" }, "$extensions": { "$ref": "#/definitions/PropExtensions" }
+      }
+    },
+    "SlotProp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "slot" }, "default": { "type": ["null", "string"] }, "nullable": { "type": "boolean" },
+        "minChildren": { "type": "integer", "minimum": 0 }, "maxChildren": { "type": "integer", "minimum": 0 },
+        "anyOf": { "type": "array", "items": { "type": "string" } }, "defaultSlot": { "type": "boolean" },
+        "$extensions": { "$ref": "#/definitions/PropExtensions" }
+      }
+    },
+    "NumberProp": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "patternProperties": { "^\\$": {} },
+      "properties": {
+        "type": { "const": "number" }, "default": { "type": "number" }, "enum": { "type": "array", "items": { "type": "number" } },
+        "nullable": { "type": "boolean" }, "examples": { "type": "array", "items": { "type": "number" } }, "$extensions": { "$ref": "#/definitions/PropExtensions" }
+      }
+    },
+    "Binding": { "type": "object", "required": ["$binding"], "additionalProperties": false, "properties": { "$binding": { "type": "string", "pattern": "^#/props/" } } },
+    "Configuration": {
+      "type": "object",
+      "properties": { "$nested": { "type": "array" } },
+      "additionalProperties": { "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }, { "type": "null" }, { "$ref": "#/definitions/Binding" }] }
+    },
+    "Variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "configuration": { "$ref": "#/definitions/Configuration" },
+        "invalid": { "type": "boolean" },
+        "layout": { "type": "array" },
+        "elements": { "type": "object", "additionalProperties": { "$ref": "#/definitions/Element" } }
+      }
+    },
+    "Element": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "children": { "oneOf": [{ "type": "array", "items": { "type": "string" } }, { "$ref": "#/definitions/Binding" }] },
+        "parent": { "type": ["string", "null"] },
+        "instanceOf": { "oneOf": [{ "type": "string" }, { "$ref": "#/definitions/Binding" }] },
+        "content": { "oneOf": [{ "type": "string" }, { "$ref": "#/definitions/Binding" }] },
+        "styles": { "$ref": "#/definitions/Styles" },
+        "contentStyles": { "type": "object" },
+        "propConfigurations": { "$ref": "#/definitions/Configuration" },
+        "$extensions": { "type": "object" }
+      }
+    },
+    "Token": {
+      "type": "object",
+      "required": ["$token", "$type"],
+      "additionalProperties": false,
+      "properties": {
+        "$token": { "type": "string", "pattern": "^[^{}]+$" },
+        "$type": { "enum": ["color", "dimension", "string", "number", "boolean", "shadow", "gradient", "typography", "effects", "image"] },
+        "$extensions": { "type": "object" }
+      }
+    },
+    "Value": { "oneOf": [{ "type": "number" }, { "type": "string" }, { "type": "boolean" }, { "type": "null" }, { "$ref": "#/definitions/Token" }] },
+    "Sides": {
+      "oneOf": [
+        { "type": ["number", "null"] },
+        { "$ref": "#/definitions/Token" },
+        { "type": "object", "additionalProperties": false, "properties": { "top": { "$ref": "#/definitions/Value" }, "end": { "$ref": "#/definitions/Value" }, "bottom": { "$ref": "#/definitions/Value" }, "start": { "$ref": "#/definitions/Value" } } }
+      ]
+    },
+    "Styles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "padding": { "$ref": "#/definitions/Sides" },
+        "strokeWeight": { "$ref": "#/definitions/Sides" },
+        "itemSpacing": { "oneOf": [{ "type": ["number", "null"] }, { "$ref": "#/definitions/Token" }, { "type": "object", "additionalProperties": false, "properties": { "horizontal": { "$ref": "#/definitions/Value" }, "vertical": { "$ref": "#/definitions/Value" } } }] },
+        "cornerRadius": { "oneOf": [{ "type": ["number", "null"] }, { "$ref": "#/definitions/Token" }, { "type": "object", "additionalProperties": false, "properties": { "topStart": { "$ref": "#/definitions/Value" }, "topEnd": { "$ref": "#/definitions/Value" }, "bottomEnd": { "$ref": "#/definitions/Value" }, "bottomStart": { "$ref": "#/definitions/Value" } } }] },
+        "backgroundColor": { "$ref": "#/definitions/Value" }, "fillColor": { "$ref": "#/definitions/Value" }, "textColor": { "$ref": "#/definitions/Value" }, "strokes": { "$ref": "#/definitions/Value" },
+        "typography": { "oneOf": [{ "$ref": "#/definitions/Token" }, { "type": "object", "not": { "required": ["$token"] } }, { "type": "null" }] },
+        "width": { "$ref": "#/definitions/Value" }, "height": { "$ref": "#/definitions/Value" }, "minWidth": { "$ref": "#/definitions/Value" }, "minHeight": { "$ref": "#/definitions/Value" },
+        "maxWidth": { "$ref": "#/definitions/Value" }, "maxHeight": { "$ref": "#/definitions/Value" }, "opacity": { "$ref": "#/definitions/Value" }, "rotation": { "$ref": "#/definitions/Value" },
+        "visible": {}, "locked": {}, "effects": {}, "backgroundImage": {}, "clipsContent": {}, "position": {}, "top": {}, "bottom": {}, "start": {}, "end": {},
+        "centerHorizontalOffset": {}, "centerVerticalOffset": {}, "layoutSizingHorizontal": {}, "layoutSizingVertical": {}, "strokeAlign": {}, "strokeDashPattern": {},
+        "textAlignHorizontal": {}, "textAlignVertical": {}, "textOverflow": {}, "maxLines": {}, "mainAxisAlignment": {}, "primaryAxisSizingMode": {}, "crossAxisAlignment": {},
+        "layoutMode": {}, "wrap": {}, "wrapAlignment": {}, "itemReverseZIndex": {}, "cornerSmoothing": {}, "aspectRatio": {}
+      }
+    }
+  }
+}

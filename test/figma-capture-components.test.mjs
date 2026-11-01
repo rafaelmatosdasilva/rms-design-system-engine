@@ -257,6 +257,8 @@ test('components: the import writes the five files, keeps what the capture does 
   assert.equal(p._note, 'props');
   assert.equal(p.button1.figmaDocs, 'kept');
   assert.equal(p.button1.description, 'Button number 1.');
+  assert.equal(p.button1.pageId, '0:1', 'the page it is on, from the checksums');
+  assert.equal(p.card.pageId, '0:1', 'a component outside a set too');
   assert.deepEqual(p.button1.annotations, [{ label: 'Role: button' }]);
   assert.deepEqual(Object.keys(p.button1.properties), ['State', 'Show Icon#1:1']);
   assert.equal(p.removedOne, undefined);

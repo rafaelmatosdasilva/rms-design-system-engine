@@ -571,23 +571,28 @@ Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](http
 
 ### The contracts in the open component specs format
 
-`contracts/specs/` holds the same components in the open component specs format (schema 0.39), for a team that specifies its components that way. One spec per component, and `index.json`.
+`contracts/specs/` holds the same components in the open component specs format (schema 0.39), for a team that specifies its components that way. One spec per component, and `index.json`. `--contracts-out` publishes it too, in `specs/` beside the contracts.
 
 Each spec says only what the contract knows:
 
+- **Where Figma holds it.** Its page and node, and whether it is a set of variants or one component. The page comes from the Figma capture; a component captured before the engine read pages gets it on the next capture.
 - **Its anatomy.** The frame, the frames inside it that Figma lays out, the text layer each text property writes, the instance each swap swaps, and each slot.
 - **Its props.** Each with its type, its values and its default. A variant of False and True is a boolean. What the code calls the prop, and how it writes Figma's values, sits beside it.
 - **Its styles, as tokens.** The frame's padding, gap, corner radius, height and type style. Its fill and stroke in the default, and what each variant paints differently. A text colour goes on the text only when the component has one text property.
 
 Anything else is left out, never guessed: where a part sits, a part whose kind the contract does not know, a text colour with several texts to choose from. The index says what each spec leaves out. It also links each spec to its contract, its code file and its Figma component, so nothing is copied twice.
 
+A test holds every spec the demo builds to a schema written from the format's published types, where each prop must read as exactly one kind.
+
 ### Code Connect drafts
 
-The engine reads the Figma Code Connect files your project commits. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](commands.md#write-component-contracts)).
+The engine reads the Figma Code Connect files your project commits: each code prop and the Figma property it reads, a property that only decides whether another is written (in either form), and, in the template form, what fills a slot between the component's tags. A text or a swapped instance written into a slot the code has pairs with that slot. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](commands.md#write-component-contracts)).
 
 - **From what the contract pairs.** Each Figma property's code prop, an enum's values as Figma and the code write them, the booleans, the texts, the instances it swaps, and a switch that decides whether another prop is written.
+- **Slots filled.** In the template form, what fills a slot is written between the component's tags: the default slot's content as it is, a named slot's in the element its framework uses (`slot="icon"` for a web component, `<template #icon>` for Vue), guarded by the property that decides whether it is filled.
+- **Conditions in the classic form too.** A property that decides whether a prop is written wraps the call that fills it: `figma.boolean('Show caption', { true: figma.string('Caption'), false: undefined })`, the other way round when it decides it off, or an enum on the option it decides it under.
 - **In the form you already use.** The classic `figma.connect` form or the template form, whichever your own files are in. With none yet, React gets the classic form and Vue, Svelte and web components the template form. `--form=classic` or `--form=template` picks one.
-- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, a slot, the import.
+- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, a Figma slot property, how a swapped instance is written, the import.
 - **Never in your code.** The drafts go to `.design-system-engine-out/code-connect-drafts/`, in the same folders as each component's file. A person checks each one, moves it beside its component and publishes it with their own Code Connect tooling.
 - **Read back before it is written.** Each draft reads back through the same reader the engine uses for your Code Connect files, to the same pairs it was written from (a test holds it to that).
 
