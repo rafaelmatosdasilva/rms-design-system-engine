@@ -320,7 +320,20 @@ export function entityView(entity, file, group = '', shared = null, { described 
   for (const x of view.sections) {
     const lines = x.text.split('\n'), keep = [];
     let fenced = false;
-    for (const l of lines) { if (/^\s*```/.test(l)) fenced = !fenced; const t = l.replace(/^\s*[-*]\s+/, ''); if (fenced || /^\s*```/.test(l)) { keep.push(l); continue; } if (DRAFT.test(t)) (view.drafts ??= []).push({ where: x.title, text: t.replace(DRAFT, '').trim(), ...draftTask(t) }); else if (isOpen(t)) (view.open ??= []).push({ where: x.title, text: openText(t) }); else keep.push(l); }
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (/^\s*```/.test(l)) fenced = !fenced; const t = l.replace(/^\s*[-*]\s+/, ''); if (fenced || /^\s*```/.test(l)) { keep.push(l); continue; }
+      if (DRAFT.test(t)) {
+        // A drafted example: its line, then its code in a fenced block, which goes with the draft (no agent and no reader
+        // of the page takes it as the team's until the draft is approved).
+        let j = i + 1; while (j < lines.length && !lines[j].trim()) j++;
+        const open = !/^\s*[-*]\s/.test(l) && /^\s*```\s*([\w-]*)\s*$/.exec(lines[j] ?? '');
+        let k = j + 1; if (open) while (k < lines.length && !/^\s*```\s*$/.test(lines[k])) k++;
+        const code = open && k < lines.length ? { code: lines.slice(j + 1, k).join('\n'), ...(open[1] ? { lang: open[1] } : {}) } : {};
+        (view.drafts ??= []).push({ where: x.title, text: t.replace(DRAFT, '').trim(), ...draftTask(t), ...code });
+        if (code.code != null) i = k;
+      } else if (isOpen(t)) (view.open ??= []).push({ where: x.title, text: openText(t) }); else keep.push(l);
+    }
     x.text = keep.join('\n').trim();
   }
   view.sections = view.sections.filter((x) => x.text);
