@@ -2046,6 +2046,8 @@ if (process.argv.includes('--styleguide')) {
   }
   try {
     const { generateStyleguide } = await import('./styleguide-gen.mjs');
+    // A guide here before this build: a folder that keeps its builds, where the page's own pictures can be compared.
+    const keptBefore = existsSync(resolve(ROOT, sgConfig.styleguide?.out ?? join(OUT_DIR, 'styleguide', 'index.html')));
     const r = await generateStyleguide(ROOT, sgConfig, SCOPE_COMPONENTS.length ? { only: SCOPE_COMPONENTS } : {});
     if (r.kept) { console.log(`🖼  ${r.kept}`); process.exit(0); }
     // What agrees with Figma and what only the code has (shown and compared with nothing before Figma's data is
@@ -2138,9 +2140,10 @@ if (process.argv.includes('--styleguide')) {
       }
     }
     // The page's own pages pictured in the browser and compared with the last build's (styleguide-shots.mjs): a layout
-    // that moved shows before anyone opens it. A whole guide built with the browser only; it never fails the build. Not
-    // in CI: its folder is thrown away after the run, so a picture there has nothing to be compared with, ever.
-    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false && !r.scope && !SCOPE_COMPONENTS.length && existsSync(r.out) && !process.env.CI) {
+    // that moved shows before anyone opens it. A whole guide built with the browser only; it never fails the build. Only
+    // in a folder that keeps its builds (a guide was there before this one): a first build, and CI, whose folder is
+    // thrown away after the run, would picture what nothing is ever compared with.
+    if (!process.argv.includes('--no-a11y-bake') && sgConfig.styleguide?.bakeA11y !== false && !r.scope && !SCOPE_COMPONENTS.length && existsSync(r.out) && keptBefore && !process.env.CI) {
       try {
         const { guideShots, shotLines } = await import('./styleguide-shots.mjs');
         const shotsDir = join(ROOT, OUT_DIR, 'styleguide-shots');
