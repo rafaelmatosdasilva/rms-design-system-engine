@@ -54,6 +54,8 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Reads your documentation where it already lives: a docs folder, a documentation site's pages, the `.mdx` beside each component, or a Notion or Confluence page and the pages under it. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
 - Shows why each component exists, when to use it and when not, beside Figma and the code.
 - Writes what it is sure of, such as the element a component renders, and drafts the rest, such as an example, for a person to approve.
+- Drafts an example on each page that shows none: the call the products write most, in the code's own syntax, with only what the contract has and where it came from.
+- Lists the components with no page, most used first, and starts pages for the first ones, with what they are for and when to use them drafted from their contracts.
 - Keeps every decision in one history: differences kept on purpose, proposals answered, what was ruled out and why.
 - Marks a page to review again when its component changes after the page was written: what changed and since when. Agents still read the page, with a note beside it. A person confirms it, or edits it.
 - Does the same for the team's answers: a decision whose component changed since is marked to review again, confirmed or withdrawn by a person.
