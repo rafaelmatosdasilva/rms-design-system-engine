@@ -429,6 +429,14 @@ async function closeGaps(ROOT, cfg) {
   const mode = typeof cfg.intentLayer === 'object' ? cfg.intentLayer.autoFix : null;
   if (mode !== 'commit') { console.log(`ℹ️  The intent layer is not fixed by itself (intentLayer.autoFix is not "commit"): ${CLI} --intent-changes shows what would be written.`); return; }
   try { const said = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg); if (said) console.log(said); } catch (e) { console.log(`⚠️  Intent layer not fixed this run: ${e.message}`); }
+  // Committed to the layer: the team's style guide follows now (guide-follow.mjs); in CI the pipeline builds it next.
+  try {
+    const made = (await import('./intent-changes.mjs')).committedThisRun();
+    if (made.length && !process.env.CI) {
+      const { guideFollow } = await import('./guide-follow.mjs');
+      for (const l of await guideFollow(ROOT, cfg, { sha: made[made.length - 1].sha, engine: dirname(fileURLToPath(import.meta.url)) })) console.log(l);
+    }
+  } catch (e) { console.log(`⚠️  The style guide was not built again: ${e.message}`); }
 }
 
 // The results of the documentation's stress tests, kept together: OUT_DIR/prototypes/stress.json.

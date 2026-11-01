@@ -80,11 +80,15 @@ test('in the browser: the same page twice is unchanged; a page whose layout move
   assert.deepEqual(readdirSync(join(shots, 'diff')).sort(), moved.changed.map((c) => c.diff.split('/').pop()).sort());
 });
 
-test('a build with the browser pictures the guide\'s own pages, and says so; a CI build does not', { timeout: budget(300000) }, async (t) => {
+test('a build with the browser pictures the guide\'s own pages in a folder that keeps its builds, and says so; a first build and a CI build do not', { timeout: budget(300000) }, async (t) => {
   const { findChrome } = await import('../cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const dir = tempDir('sg-shots-build-');
   cpSync(HARBOR, dir, { recursive: true });
+  // A first build in a folder: no guide before it, nothing pictured.
+  const first = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '' } });
+  assert.equal(first.status, 0, first.stdout + first.stderr);
+  assert.doesNotMatch(first.stdout, /📸|own pages not pictured/, 'a first build pictures nothing');
   const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CI: '' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /📸 The style guide's own pages pictured \(\d+\), for the next build to compare with: \.design-system-engine-out\/styleguide-shots\/last\./);

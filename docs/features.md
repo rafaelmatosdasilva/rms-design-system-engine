@@ -62,6 +62,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Flags lists copied into the layer that will go stale, and names the generated file to link instead.
 - Rates how ready your guidance is for AI agents, component by component.
 - Never overwrites a sentence a person wrote.
+- A change to the layer reaches the published style guide on its own, checked on the pages it was about.
 
 ## Review the Figma library
 
@@ -191,6 +192,7 @@ How it checks the agent's work, in a loop, before you see it:
 - A Templates page: each page template, the components it is made of in Figma's order, whether its code uses each one, and its frame from Figma.
 - Every colour and space on the page is one of your tokens, so it looks like your system.
 - Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
+- Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
 - The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
 
 ## Fit your team's setup
