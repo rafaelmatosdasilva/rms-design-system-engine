@@ -517,8 +517,10 @@ ${JSON.stringify(asks, null, 1)}`;
 // the props no comment explains. Nothing in them is judged, so nothing to review. → plan, each item's drafted holding them
 export function sureParts(plan, facts) {
   for (const it of plan) {
-    it.drafted = (it.drafted ?? []).filter((d) => !d.sure && !d.example);
+    it.drafted = (it.drafted ?? []).filter((d) => !d.sure && !d.example && !d.seed);
     for (const x of it.need.find((n) => n?.write)?.write ?? []) it.drafted.push({ ...x, sure: true });
+    // Lines started from the component's contract for a page the engine started (pages-to-write.mjs): drafts.
+    for (const x of it.need.find((n) => n?.seed)?.seed ?? []) it.drafted.push({ ...x, seed: true });
     const name = it.page.component, b = name ? briefOf(name, facts) : null;
     if (!b) { if (it.need.includes('example') && it.example) it.drafted.push({ where: 'Examples', text: exampleText(it.example), code: it.example.code, lang: it.example.lang, example: true }); continue; }
     // Written "Role: button", not "button": a reader that keeps a section's lines as rules, and not its title, still says what it is.
@@ -825,7 +827,7 @@ export function describeChanges({ pages, held, merged = [], started = [], ownSpe
   for (const m of merged) out.push(`### ${m.name} → ${m.into}`, `The team said no to keeping its page: ${m.moved.length} line${m.moved.length === 1 ? '' : 's'} only it said drafted on ${m.into}'s page, \`${m.file}\` taken out, and it is noted as a part of ${m.into}.`, ...m.moved.map((d) => `- Drafted, ${d.where}: "${d.text}"`), '');
   if (regathered.length) out.push('### Specs of their own, completed', 'Each spec of its own nobody had written yet takes its family\'s sections the layer does not give it (as its page showed them before), and the drafts its family\'s spec held for it alone.', ...regathered.map((f) => `- \`${f}\``), '');
   if (ownSpecs.length) out.push('### Specs of their own', 'Each was written from a spec several pages share; it now has its own beside it (the family\'s shared sections still reach it), so what is written for it is its own.', ...ownSpecs.map((x) => `- ${x.name}: \`${x.spec}\` (family \`${x.family}\`)`), '');
-  for (const x of started) out.push(`### ${x.name} (new page)`, `Started from its code (\`${x.code}\`): \`${x.spec}\` and \`${x.file}\`; its lines are below.`, '');
+  for (const x of started) out.push(`### ${x.name} (new page)`, `Started from its code (\`${x.code}\`): \`${x.spec}\`${x.file !== x.spec ? ` and \`${x.file}\`` : ''}${x.rank ? `, number ${x.rank} of the pages to write, most used first (${x.reach.products.join(', ') || 'no product'}: ${x.reach.files} file${x.reach.files === 1 ? '' : 's'}, ${x.reach.uses} use${x.reach.uses === 1 ? '' : 's'})` : ''}; its lines are below, drafts to review.`, '');
   for (const p of pages) {
     out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
     for (const r of p.rewritten) out.push(`- Written again (draft): "${r.line}" → "${r.text}"`);
@@ -956,6 +958,23 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
     for (const [f, t] of s.files) { files.set(f, t); created.add(f); }
     started.push({ name: s.entity.name, codeName: c.name, code: c.code, spec: s.spec, file: s.file });
     plan.push({ entity: s.entity, page: { name: s.entity.name, file: s.file, component: c.name }, remove: [], rewrite: [], need: ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'example', 'role', 'doDont'] });
+  }
+  // The pages to write the products use most (pages-to-write.mjs): the first ones a run starts the same way, what they
+  // are for and when to use them drafted from their contracts, the rest drafted as any page with nothing written.
+  const ptw = await import('./pages-to-write.mjs'), limit = ptw.startLimit(cfg);
+  if (!only && decided && limit > 0) {
+    const contracts = new Map([...(await import('./sign-off.mjs')).contractsByFile(ROOT, cfg).values()].map((c) => [c.name, c]));
+    const usage = (await import('./local-shared.mjs')).usageFrom(ROOT, cfg);
+    const { ranked } = await ptw.pagesToWriteOf(ROOT, cfg, { decided });
+    const ok = (name, e) => (text) => !checkPage({ kind: 'component', layer: e.layer, name: e.name, file: e.file, purpose: [], whenToUse: [text], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [] }, facts, { component: name, strict: true }).some((f) => f.kind === 'name' || f.kind === 'claim');
+    for (const r of ptw.toStart(ranked.filter((x) => !started.some((s) => s.codeName === x.name)), limit)) {
+      const s = ia.startPage({ name: r.name, code: r.code }, snap, files, { api: ia.apiOf(ROOT, r.code) }); if (!s) continue;
+      for (const [f, t] of s.files) { files.set(f, t); created.add(f); }
+      started.push({ name: s.entity.name, codeName: r.name, code: r.code, spec: s.spec, file: s.file, rank: r.rank, reach: r.reach });
+      const seed = ptw.seedLines(contracts.get(r.name), r.reach, { check: ok(r.name, s.entity), lives: usage[r.name] ?? null });
+      const has = (w) => seed.some((x) => x.where === w);
+      plan.push({ entity: s.entity, page: { name: s.entity.name, file: s.file, component: r.name }, remove: [], rewrite: [], need: [...(seed.length ? [{ seed }] : []), ...(has('Purpose') ? [] : ['purpose']), ...(has('When to use') ? [] : ['whenToUse']), 'whenNotToUse', 'mistakes', 'limitations', 'example', 'role', 'doDont'] });
+    }
   }
   for (const it of plan) it.code = codeOf(it.entity);
   // An example for each page that shows none: the way the products use it most, from the files the usage map names

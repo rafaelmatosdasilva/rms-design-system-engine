@@ -798,6 +798,12 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         };
         for (const p of view.intentLayer.pages) { const sp = p.spec ? null : specOf(p); if (sp) { p.spec = sp; if (p.url && p.file && p.url.includes(p.file)) p.specUrl = p.url.replace(p.file, sp); } if (p.component) { const o = otherSources(p.component); if (o.length) p.others = o; } }
         view.intentLayer.noPageOthers = Object.fromEntries(decided.noPage.map((n) => [n, otherSources(n)]).filter(([, o]) => o.length));
+        // The pages to write, most used first (pages-to-write.mjs): each one's rank and reach, and the ones the next run
+        // that writes the layer starts.
+        try {
+          const ptw = await import('./pages-to-write.mjs'), got = await ptw.pagesToWriteOf(ROOT, cfg, { decided });
+          if (got?.ranked.length) { const next = new Set(ptw.toStart(got.ranked, got.limit).map((r) => r.name)); view.intentLayer.pagesToWrite = Object.fromEntries(got.ranked.map((r) => [r.name, { rank: r.rank, reach: r.reach, ...(next.has(r.name) ? { next: true } : {}) }])); }
+        } catch { /* no ranking: the rows keep their order */ }
       }
     } catch { /* no intent layer */ }
     // For agents: what an agent can take from the team's guidance for each component, its guidelines section and

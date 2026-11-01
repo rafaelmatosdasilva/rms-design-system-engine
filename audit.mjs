@@ -707,6 +707,22 @@ if (process.argv.includes('--intent-autofix')) {
   process.exit(0);
 }
 
+// ── --pages-to-write [N]: the components no intent page documents, most used first (pages-to-write.mjs) ──
+// Each with where the products use it (the usage map as the last audit wrote it); the ones documented in another page
+// listed apart; the first ones the products use marked, as the next run that writes the layer starts them
+// (intentLayer.startPages, 10 unless set). N: how many to show (30 unless given). Reads only; changes nothing.
+if (process.argv.includes('--pages-to-write')) {
+  let pcfg = {};
+  try { pcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const ptw = await import('./pages-to-write.mjs');
+  const got = await ptw.pagesToWriteOf(ROOT, pcfg);
+  if (!got) { console.log('❌ No intent layer read yet: ds-config.json → intentLayer, then run the audit.'); process.exit(2); }
+  const at = process.argv.indexOf('--pages-to-write'), most = Number(process.argv[at + 1]);
+  console.log(ptw.pagesToWriteLines(got.ranked, got.skipped, { limit: got.limit, ...(Number.isInteger(most) && most > 0 ? { most } : {}) }).join('\n'));
+  console.log(`NEXT: ${got.ranked.length ? 'none; the next run that writes the layer (--intent-changes, or each run with intentLayer.autoFix) starts the ones marked' : 'none'}`);
+  process.exit(0);
+}
+
 // ── --intent-changes: the changes the Intent layer review asks for, made in the layer's own files ──
 // The lines written on every page alike taken out, each sentence the system contradicts written again with only what it
 // has (as a draft), and what a component page lacks drafted (intent-changes.mjs). Written to

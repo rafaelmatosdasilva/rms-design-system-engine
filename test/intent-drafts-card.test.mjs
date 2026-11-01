@@ -137,3 +137,14 @@ test('a drafted example shows its code under its line', () => {
   assert.match(html, /<strong>Examples<\/strong><span class="pg-par-val">The most common way[^<]*<\/span><pre class="sg-il-example"><code>&lt;TileMedia size=&quot;small&quot; \/><\/code><\/pre>/);
   assert.match(html, /<strong>Limitations<\/strong><span class="pg-par-val">One picture only\.<\/span><\/div>/, 'a draft with no code shows none');
 });
+
+test('the pages to write are ordered most used first, with a chip and each one\'s reach', () => {
+  // The Documentation page: the rows with no page sorted by their rank, a chip for them, their reach in the panel.
+  assert.match(tpl, /\.concat\(\(IL\.noPage \|\| \[\]\)\.slice\(\)\.sort\(function \(a, b\) \{ var r = IL\.pagesToWrite \|\| \{\}/);
+  assert.match(tpl, /\{ key: 'pagesToWrite', label: 'Pages to write, most used first', n: toStart, dot: 'differs' \}/);
+  const src = /var ilReachOf = (function \(n\) \{[\s\S]*?'<\/span><\/p>'; \});/.exec(tpl)[1];
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const reach = (IL) => new Function('IL', 'esc', `return (${src})`)(IL, esc);
+  assert.equal(reach({ pagesToWrite: { tileMedia: { rank: 2, reach: { products: ['Shop', 'Admin'], files: 6, uses: 12 }, next: true } } })('tileMedia'), '<p class="sg-il-line"><strong>Number 2 of the pages to write, most used first</strong><span class="pg-par-val">Shop, Admin use it: 6 files, 12 uses. The next run that writes the layer starts its page, its lines drafts to review.</span></p>');
+  assert.equal(reach({})('tileMedia'), '');
+});
