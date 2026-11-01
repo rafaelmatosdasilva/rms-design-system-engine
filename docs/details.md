@@ -17,7 +17,7 @@ The complete lists live in the guide Claude reads. Every option is in `reference
 - [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits)
 - [Review the Figma library](#review-the-figma-library)
 - [Track system health](#track-system-health)
-- [Keep AI agents on the system](#keep-ai-agents-on-the-system)
+- [Build with AI, on the system](#build-with-ai-on-the-system)
 - [Inside Claude Code](#inside-claude-code)
 - [The files it creates](#the-files-it-creates)
 - [Security and data](#security-and-data)
@@ -908,7 +908,7 @@ The collections that switch (a colour mode by media, class or attribute, a sizin
 
 For a system with brands (Figma's extended collections), System health lists each value a brand sets exactly as it inherits it from the brand it extends. It changes nothing today, and pins the value: the brand no longer follows when its parent changes it. Keep each the brand must hold and remove the rest. A brand may set any variable, a component's own and ones nothing reads yet included; that is never listed. Advice, never a failure.
 
-## Keep AI agents on the system
+## Build with AI, on the system
 
 ### What it writes for agents
 
