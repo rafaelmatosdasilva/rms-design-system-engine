@@ -351,7 +351,7 @@ function githubWriter(ROOT, c, { env, fetchImpl, sendImpl }) {
       const r = await get(`/git/ref/heads/${encodeURIComponent(target)}`);
       if (!r.ok) return { error: refused(r, `reading ${target}`) };
       const head = String((await r.json())?.object?.sha ?? '');
-      if (!head.startsWith(sha) && !sha.startsWith(head)) return { error: `${target} moved since the layer was read (now ${head.slice(0, 8)}): run again, so the changes are made on what is there now` };
+      if (!head || !sha || (!head.startsWith(sha) && !sha.startsWith(head))) return { error: `${target} moved since the layer was read (now ${head.slice(0, 8)}): run again, so the changes are made on what is there now` };
       const done = await commitOn(target, head, files, message, created);
       return done.error ? done : { ...done, said: `committed on ${target}: ${done.url}` };
     },
