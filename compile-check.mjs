@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { OUT_DIR } from './names.mjs';
-import { projectTypeScriptOnly, withinProject } from './project-typescript.mjs';
+import { projectTypeScriptOnly, withinProject, machineTsc } from './project-typescript.mjs';
 
 const pascal = (s) => String(s).replace(/(^|[-_\s]+)(\w)/g, (_, __, c) => c.toUpperCase());
 const ident = (s) => /^[A-Za-z_$][\w$]*$/.test(s) ? s : JSON.stringify(s);
@@ -38,7 +38,7 @@ export function compileShim(catalog = {}) {
   return out.join('\n') + '\n';
 }
 
-// The compiler: the project's typescript first, then tsc on the PATH. → { cmd, args } or null.
+// The compiler: the project's typescript first, then tsc on the PATH, then one in a global npm folder. → { cmd, args } or null.
 export function findTsc(ROOT) {
   try {
     const req = createRequire(join(resolve(ROOT), 'package.json'));
@@ -48,7 +48,9 @@ export function findTsc(ROOT) {
   // The machine's tsc on the PATH, unless only the project's own is wanted (DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project).
   if (projectTypeScriptOnly()) return null;
   const which = spawnSync('/bin/sh', ['-c', 'command -v tsc'], { encoding: 'utf8' });
-  return which.status === 0 && which.stdout.trim() ? { cmd: which.stdout.trim(), args: [] } : null;
+  if (which.status === 0 && which.stdout.trim()) return { cmd: which.stdout.trim(), args: [] };
+  // Else one in a global npm folder, for a shell whose PATH does not reach it (nvm, Volta set up in a login profile).
+  return machineTsc();
 }
 
 // The candidate as the compiler reads it: imports and re-exports removed (their names are declared, so a
