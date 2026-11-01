@@ -432,7 +432,7 @@ export const AUDIT_FUNCTIONS = ['stateTokensOf', 'getBindings', 'stateBindingsOf
 export const STRUCTURE_KEYS = ['nodeId', 'h', 'paddingVar', 'gapVar', 'fontSizeVar', 'fontWeightVar', 'fillStructure', 'innerRadiusVar', 'strokeOnDefault', 'strokeOnAnyState',
   'sizingV', 'layout', 'slot', 'minH', 'iconSize', 'childFramePadding', 'childFrameGaps', 'variantStroke', 'variantHeight', 'restingState', 'restingStroke', 'variantOpacity',
   'box', 'paddingPx', 'radiusPx', 'gapPx', 'colors', 'inFlow', 'stroke', 'opacity', 'text', 'toggles', 'defaultVariant', 'variants', 'slots', 'fillOpacity', 'variantFillOpacity', 'drawnOn', 'fills'];
-export const PROPS_KEYS = ['nodeId', 'properties', 'annotations', 'layerAnnotations', 'description'];
+export const PROPS_KEYS = ['nodeId', 'pageId', 'properties', 'annotations', 'layerAnnotations', 'description'];
 export const TIME = 20000;   // ms a call spends reading components in Figma before it answers, well within the Figma tool's wait
 export const ANSWER = 19000;   // bytes of one answer of the components, all of it
 export const SCRIPT_MAX = 50000;   // characters the Figma tool takes in one script
@@ -502,7 +502,8 @@ for(const p of PAGES)await p.loadAsync();
 // The file's own variables, the same in every call, so a component reads alike whatever else the call reads.
 const LOCAL={},NAMES={};
 for(const v of await figma.variables.getLocalVariablesAsync()){LOCAL[v.id]=v;NAMES[v.id]=v.name;}
-const found=PAGES.flatMap((p)=>p.findAllWithCriteria({types:['COMPONENT_SET','COMPONENT']}));
+const PAGE_OF=new Map();
+const found=PAGES.flatMap((p)=>{const xs=p.findAllWithCriteria({types:['COMPONENT_SET','COMPONENT']});for(const x of xs)PAGE_OF.set(x.id,p.id);return xs;});
 // The components a slot prefers, named from these pages alone, for the same reason.
 deepFacts.byKey=new Map(found.filter((x)=>prop(x,'key')).map((x)=>[x.key,x.name]));
 // Each set, and each component outside a set; a name starting with _ or . is private to the file, not part of the system,
@@ -534,13 +535,14 @@ for(let i=0;i<2;i++){const b=await readOnce(r);if(JSON.stringify(b)===JSON.strin
 return a;
 }
 if(CALL==='sums'){
-// [id, checksum, place in the file], in the order of the id hash from AFTER on, until TIME or BUDGET.
+// [id, checksum, place in the file, its page], in the order of the id hash from AFTER on, until TIME or BUDGET. The page
+// is outside the checksum, so adding it changed no component's.
 const key=(x)=>cyrb53(x.id)+' '+x.id,pos=new Map(all.map((x,i)=>[x.id,i]));
 const todo=all.filter((x)=>AFTER==null||key(x)>AFTER).sort((a,b)=>(key(a)<key(b)?-1:1));
 const sums=[];let size=0,last=null,after=null;
 for(const r of todo){
 if(sums.length&&(Date.now()-T0>=TIME||size>BUDGET)){after=last;break;}
-const e=[r.id,cyrb53(JSON.stringify(await itemsOf(r))),pos.get(r.id)];
+const e=[r.id,cyrb53(JSON.stringify(await itemsOf(r))),pos.get(r.id),PAGE_OF.get(r.id)];
 sums.push(e);size+=bytes(JSON.stringify(e))+1;last=key(r);
 }
 return {capture:'components',v:3,kind:'sums',pass:PASS||Date.now().toString(36),from:AFTER,after,of:all.length,sums};
@@ -599,7 +601,7 @@ export function readComponents(dir) {
   if (!first) return out;
   out.pass = first.a.pass; out.pages = chain.length; out.complete = !out.next; out.of = chain[chain.length - 1].a.of ?? 0;
   const seen = new Set();
-  for (const { a } of chain) for (const [id, sum, pos] of a.sums ?? []) if (!seen.has(id)) { seen.add(id); out.entries.push({ id, sum, pos: pos ?? Infinity }); }
+  for (const { a } of chain) for (const [id, sum, pos, page] of a.sums ?? []) if (!seen.has(id)) { seen.add(id); out.entries.push({ id, sum, pos: pos ?? Infinity, ...(page ? { page } : {}) }); }
   out.entries.sort((x, y) => x.pos - y.pos);   // the file's order, for the reads and the snapshots
   // Each component's items, by checksum, from every answer that holds them whole (or every slice of them).
   const cand = new Map();
@@ -766,10 +768,11 @@ export async function importComponents(ROOT, cfg = {}, { dir = captureDir(ROOT),
   if (!c.complete) return { ok: false, ...base, why: 'checksums', next: c.next };
   if (c.changed.length || c.gone.length || c.todo.length) return { ok: false, ...base };
   const items = c.entries.flatMap((e) => c.have.get(e.id) ?? []);
-  return writeComponents(ROOT, cfg, items, { base, chunks: c.used.size, stale: c.stale, added: c.added, dir, source, now, engineDir, figmaVersion });
+  const pages = new Map(c.entries.filter((e) => e.page).map((e) => [e.id, e.page]));
+  return writeComponents(ROOT, cfg, items, { base, chunks: c.used.size, stale: c.stale, added: c.added, dir, source, now, engineDir, figmaVersion, pages });
 }
 
-function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0, dir, source, now, engineDir, figmaVersion }) {
+function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0, dir, source, now, engineDir, figmaVersion, pages = new Map() }) {
   const got = componentsFromItems(items);
   const paths = componentFiles(cfg);
   const read = (p) => { try { return JSON.parse(readFileSync(join(ROOT, p), 'utf8')); } catch { return null; } };
@@ -795,7 +798,8 @@ function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0
   const prevP = prev.props ?? {};
   const props = meta(prevP);
   for (const name of got.names) {
-    if (got.props[name]) props[name] = { ...got.props[name], ...keep(prevP[name], PROPS_KEYS) };
+    // The page it is on (from the checksums: the contracts' specs view names it), beside the node it is.
+    if (got.props[name]) props[name] = { ...got.props[name], ...(pages.get(got.props[name].nodeId) ? { pageId: pages.get(got.props[name].nodeId) } : {}), ...keep(prevP[name], PROPS_KEYS) };
     else if (failed(name, 'props') && prevP[name]) props[name] = prevP[name];
   }
   for (const [k] of own(prevP)) if (!inFigma.has(k)) removed.add(k);

@@ -32,7 +32,7 @@ import { loadLocator } from './component-locator.mjs';
 import { createApiReader } from './component-api.mjs';
 import { inProgressNames } from './in-progress.mjs';   // work in progress is not drift
 import { stateAxisTest, cleanFigmaProp } from './figma-props.mjs';
-import { bindingSources, bindFigmaProp, readingsOf, invertsValue, flipBoolean, conventionFor } from './prop-binding.mjs';   // one decision for the check and the contract
+import { bindingSources, bindFigmaProp, readingsOf, invertsValue, flipBoolean, conventionFor, connectSlotsOf } from './prop-binding.mjs';   // one decision for the check and the contract
 
 const ROOT = process.cwd();
 
@@ -342,7 +342,7 @@ for (const [figmaName, entry] of Object.entries(SNAP)) {
 
     // Which code prop or slot it is: one decision for the prop check and the contract (prop-binding.mjs). An
     // INSTANCE_SWAP (e.g. an icon) is NOT assumed to be a slot: the code may expose it as a prop OR a slot.
-    const b = bindFigmaProp(fp, def, { codeProps: api.props, slots: api.slots, recorded, authoredSlots: cbind.slot, figmaSlots: [...figDefs].filter(([, d]) => d?.type === 'SLOT').map(([n]) => n) });
+    const b = bindFigmaProp(fp, def, { codeProps: api.props, slots: api.slots, recorded, authoredSlots: cbind.slot, figmaSlots: [...figDefs].filter(([, d]) => d?.type === 'SLOT').map(([n]) => n), connectSlots: connectSlotsOf(ccProps) });
     if (def?.type === 'INSTANCE_SWAP') {
       if (!b) { SLOT_FAIL.push(`${figmaName}: Figma instance-swap "${fp}" has no code prop or slot  (${rel})`); pushRow('not in code', '-', 'missing'); continue; }
       if (b.as === 'defaultSlot') { OK.push(`${figmaName}/${fp} (default slot)`); pushRow('(default slot)', 'slot', 'match'); continue; }

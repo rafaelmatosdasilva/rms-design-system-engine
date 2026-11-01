@@ -865,12 +865,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const decidedBy = new Map(Object.entries(decided.byComponent).map(([n, list]) => [key(n), list]));
       for (const c of view.components) {
         const list = decidedBy.get(key(c.name));
-        if (list?.length) c.decisions = list.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}) }));
+        if (list?.length) c.decisions = list.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}), ...(d.review ? { review: d.review } : {}) }));
       }
       // Every decision, for the History page: what it is about (a component, or a page of the layer), and where it is written.
       // A lesson says what it became (a check, a step in the agent rules, a rule for the guidelines) and, when the same
       // mistake came back, which guard did not hold; a rule proposed from repeated findings says it waits for a yes.
-      view.decisions = decided.all.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, kind: d.kind, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}),
+      // One whose component changed since it was answered says so: to review again (intent-truth.mjs → decisionsToReview).
+      view.decisions = decided.all.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, kind: d.kind, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}), ...(d.review ? { review: d.review } : {}),
         component: d.component ?? null, page: d.page ?? null, about: d.about ?? (d.component ? 'Components' : 'System'), url: d.url ?? null }));
     } catch { /* no prototype checked yet */ }
     // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
@@ -1123,6 +1124,11 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
     // the template's, at the template's sizes, never the system's components: the page is the frame, the system what it
     // shows. Every pick is the template's default (view.ui empty).
     view.ui = { segmented: null, tabs: null, field: null, button: null, card: null, iconButton: null, tip: null, overlay: null, gaps: [] };
+    // Each screen's page review (read from its code, showroom-quality.mjs) and, when a model judged it, that judgment
+    // (page-judgment.mjs, the last --judge-pages run; nothing is asked here), shown under the screen on its page.
+    if (showroom.length) {
+      try { const rv = await (await import('./page-judgment.mjs')).showroomReviews(ROOT, cfg); for (const s of showroom) if (rv[s.key]) Object.assign(s, rv[s.key]); } catch { /* no review: the screens alone */ }
+    }
     if (showroom.length) view.showroom = showroom;
     // The system's logo at the top of the menu (styleguide.logo, an SVG in the project), in place of its name: its white
     // or black drawn in the page's text colour, so it follows the page's light and dark; its other colours kept.

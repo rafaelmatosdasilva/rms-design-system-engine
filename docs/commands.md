@@ -11,7 +11,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine set up this project` | Asks where your code and Figma are, then sets the project up |
 | `/rms-design-system-engine check the install` | Each problem with the install, and its fix |
 | `/rms-design-system-engine use these guidelines <link>` | Your written guidelines from Notion or GitLab, read on every run |
-| `/rms-design-system-engine use this intent layer <link or folder>` | Your intent layer (DSDS or Markdown pages, on GitLab, GitHub or in a folder of your project) read into each component's documentation, its contract and `llms.txt`, and a page that says what agents use from it |
+| `/rms-design-system-engine use this intent layer <link or folder>` | Your intent layer (DSDS or Markdown pages on GitLab, GitHub or in a folder of your project, or pages in Notion or Confluence) read into each component's documentation, its contract and `llms.txt`, and a page that says what agents use from it |
 | `/rms-design-system-engine refresh the Figma data` | Figma read again, the best way available |
 | `/rms-design-system-engine scan from this Figma branch <Figma link>` | The branch read instead of the main file, so edits on main do not restart a scan |
 
@@ -78,3 +78,4 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine remember this lesson: the clock button was put inside the tile, because a tile holds one action` | Your correction kept with your reason, and the strongest guard that can hold it (a check, a step agents read, or a rule for your guidelines), written once you say yes |
 | `/rms-design-system-engine show the lessons` | Every lesson and what it became, the rules proposed from findings that repeat, and the lines an AI wrote that a person changed since |
+| `/rms-design-system-engine judge the Showroom screens with a model` | Each screen judged on its screenshot and its code: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, with what it cost (uses your model tokens) |

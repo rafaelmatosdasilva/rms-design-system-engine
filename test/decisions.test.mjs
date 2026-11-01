@@ -97,3 +97,24 @@ test('the intent layer\'s own answers: an Add is its component\'s, and a page re
   assert.equal(by('2026-03-03').component, null, 'a page\'s name, not a component\'s');
   assert.deepEqual([by('2026-03-02').what, by('2026-03-02').ruledOut], ['Tile One\'s page confirmed: it still holds after its component changed', []]);
 });
+
+test('an answer whose component changed since is to review again: it still stands, with the note for agents and people; one withdrawn rules nothing out', () => {
+  const answered = {
+    'add:cardTile': { answer: 'no', proposal: 'Write its page.', by: 'QA', at: '2026-03-01' },
+    'add:tileTwo': { answer: 'no', proposal: 'Its page is Tile One.', by: 'QA', at: '2026-03-01' },
+    'recheck:add:tileTwo': { answer: 'no', proposal: 'Does it still hold?', by: 'QA lead', at: '2026-03-06' },
+    'recheck:add:cardTile': { answer: 'yes', proposal: 'Does it still hold?', by: 'QA lead', at: '2026-02-20' },
+  };
+  const note = 'To review again: cardTile changed on 5 Mar 2026: new props `glow`, after this decision was recorded. Where it disagrees with the component\'s contract, follow the contract.';
+  const all = decisionsFrom({ answered, stale: { 'add:cardTile': { note } } });
+  const card = all.find((d) => d.what === 'No: Write its page.');
+  assert.deepEqual([card.component, card.review, card.ruledOut], ['cardTile', note, ['Write its page.']]);
+  const two = all.find((d) => /^No: Its page is Tile One\./.test(d.what));
+  assert.deepEqual([two.what, two.ruledOut], ['No: Its page is Tile One. (withdrawn since)', []]);
+  assert.ok(all.some((d) => d.what === 'Withdrawn once its component changed: Its page is Tile One.' && d.component === 'tileTwo' && d.by === 'QA lead'));
+  assert.ok(all.some((d) => d.what === 'Confirmed after its component changed: Write its page.'));
+  const view = decisionView(all);
+  assert.match(ruledOutLines(view, 'cardTile')[0], /^decided against: Write its page\. \(answered, QA, 2026-03-01\) To review again: cardTile changed on 5 Mar 2026/);
+  assert.deepEqual(ruledOutLines(view, 'tileTwo'), [], 'withdrawn: nothing ruled out');
+  assert.match(decisionsMarkdown(view), /\*\*No: Write its page\.\*\* — ruled out: Write its page\.  \n  To review again: cardTile changed/);
+});

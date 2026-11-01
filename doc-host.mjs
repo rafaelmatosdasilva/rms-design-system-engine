@@ -25,6 +25,8 @@ import { gunzipSync } from 'node:zlib';
 import { parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, envFrom, untar, plainGet, STATE_FILE, projectApi } from './gitlab-source.mjs';
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { normalizeRepo } from './component-changelog.mjs';
+import { notionHost, confluenceHost } from './doc-tools.mjs';
+import { OUT_DIR } from './names.mjs';
 
 const TIMEOUT_MS = Math.max(1000, parseInt(process.env.GITLAB_FETCH_TIMEOUT_MS, 10) || 30000);
 // The files a source reads the text of; every other path is only listed.
@@ -34,17 +36,30 @@ const SKIP_DIR = /^(node_modules|\.git|dist|build|out|coverage|\.next|\.nuxt|\.c
 const MAX_FILES = 5000, MAX_READ = 2000, MAX_BYTES = 1024 * 1024;
 
 // ── Which host a place is ───────────────────────────────────────────────────────────────────────────────────────────
-// A link on github.com is GitHub; any other link is a GitLab project (on any host, as the intent layer always was); a
-// path is a folder in the project.
-export const isGithub = (url) => { try { return /^(www\.)?github\.com$/i.test(new URL(url).host); } catch { return false; } };
+// A link on github.com, or on a GitHub Enterprise host named in GITHUB_HOST, is GitHub; a Notion or Confluence link is
+// that tool's (doc-tools.mjs); any other link is a GitLab project (on any host, as the intent layer always was); a path
+// is a folder in the project.
+const enterprise = (env = process.env) => String(env.GITHUB_HOST ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+export const isGithub = (url, env = process.env) => { try { const h = new URL(url).host.toLowerCase(); return /^(www\.)?github\.com$/.test(h) || enterprise(env).includes(h); } catch { return false; } };
 export const isLink = (s) => /^https?:\/\//i.test(String(s ?? '').trim());
-// https://github.com/<owner>/<repo>[/tree/<ref>[/<path>]] → { owner, repo, ref, path, url } | null
-export function parseGithub(link) {
-  const m = /^https?:\/\/(?:www\.)?github\.com\/([^/?#]+)\/([^/?#]+?)(?:\.git)?(?:\/(?:tree|blob)\/([^/?#]+)(?:\/([^?#]*))?)?\/?(?:[?#].*)?$/i.exec(String(link ?? '').trim());
+// https://<github.com or an enterprise host>/<owner>/<repo>[/tree/<ref>[/<path>]] → { owner, repo, ref, path, url, host,
+// api, raw } | null. raw: where a file's text is read (raw.githubusercontent.com; an enterprise host's own API).
+// any: a link named as GitHub's (intentLayer.github), on whatever host.
+export function parseGithub(link, { any = false } = {}) {
+  const m = /^https?:\/\/([^/?#]+)\/([^/?#]+)\/([^/?#]+?)(?:\.git)?(?:\/(?:tree|blob)\/([^/?#]+)(?:\/([^?#]*))?)?\/?(?:[?#].*)?$/i.exec(String(link ?? '').trim());
   if (!m) return null;
-  return { owner: m[1], repo: m[2], ref: m[3] ? decodeURIComponent(m[3]) : null, path: m[4] ? decodeURIComponent(m[4]).replace(/\/+$/, '') : null, url: `https://github.com/${m[1]}/${m[2]}` };
+  const host = m[1].toLowerCase().replace(/^www\./, ''), dotcom = host === 'github.com';
+  if (!dotcom && !any && !/\bgithub\b|^ghe\.|\.ghe\./.test(host) && !enterprise().includes(host)) return null;
+  return { owner: m[2], repo: m[3], ref: m[4] ? decodeURIComponent(m[4]) : null, path: m[5] ? decodeURIComponent(m[5]).replace(/\/+$/, '') : null, url: `https://${m[1]}/${m[2]}/${m[3]}`, host, api: dotcom ? 'https://api.github.com' : `https://${m[1]}/api/v3`, dotcom };
 }
-export const hostOf = (s) => (!isLink(s) ? 'folder' : isGithub(s) ? 'github' : 'gitlab');
+export function hostOf(s, env = process.env) {
+  if (!isLink(s)) return 'folder';
+  let h = ''; try { h = new URL(s).host.toLowerCase(); } catch { /* not a link */ }
+  if (isGithub(s, env)) return 'github';
+  if (/(^|\.)notion\.(so|site)$/.test(h)) return 'notion';
+  if (/\.atlassian\.net$/.test(h) || /\/wiki\/spaces\/[^/]+\/pages\/\d+|\/pages\/viewpage\.action\?(?:[^#]*&)?pageId=\d+/.test(s)) return 'confluence';
+  return 'gitlab';
+}
 
 // A link to one file of the layer, in its host's own form. src: the snapshot's _source.
 export function fileUrl(src, file) {
@@ -57,8 +72,12 @@ export function fileUrl(src, file) {
 export function layerHost(ROOT, c, opts = {}) {
   if (c.host === 'github') return githubHost(ROOT, c, opts);
   if (c.host === 'folder') return folderHost(ROOT, c);
+  if (c.host === 'notion') return notionHost(ROOT, c, opts);
+  if (c.host === 'confluence') return confluenceHost(ROOT, c, opts);
   return gitlabHost(ROOT, c, opts);
 }
+// The documentation tools: read into Markdown pages, never written.
+export const TOOLS = { notion: 'Notion', confluence: 'Confluence' };
 
 const getter = (fetchImpl, headers, again = null) => async (url) => {
   const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined;
@@ -138,23 +157,25 @@ function gitlabHost(ROOT, c, { env: given, fetchImpl = plainGet } = {}) {
 function githubWhy(status) {
   if (status === 401) return 'GitHub did not accept the token (401): check GITHUB_TOKEN in .env, it may be wrong, expired or revoked';
   if (status === 403 || status === 429) return `GitHub refused (${status}): its limit for requests without a token may be reached, or the token cannot read this repository; put a GITHUB_TOKEN that can read it in .env`;
-  if (status === 404) return 'not found on github.com (404): check the link, or the repository is private and no GITHUB_TOKEN was sent (put one that can read it in .env)';
+  if (status === 404) return 'not found on GitHub (404): check the link, or the repository is private and no GITHUB_TOKEN was sent (put one that can read it in .env)';
   return `GitHub answered ${status}`;
 }
 function githubHost(ROOT, c, { env: given, fetchImpl = plainGet } = {}) {
   const env = given ?? process.env;
-  const g = parseGithub(c.url);
-  if (!g) return { error: `${c.url} is not a GitHub repository link (https://github.com/<owner>/<repo>)` };
+  const g = parseGithub(c.url, { any: true });
+  if (!g) return { error: `${c.url} is not a GitHub repository link (https://github.com/<owner>/<repo>; a GitHub Enterprise host is named in GITHUB_HOST)` };
   const token = envFrom('GITHUB_TOKEN', env, [ROOT]) || envFrom('GH_TOKEN', env, [ROOT]);
   // GitHub's API answers nothing without a User-Agent.
   const headers = { 'User-Agent': 'rms-design-system-engine', Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-  const rawHeaders = { 'User-Agent': 'rms-design-system-engine', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  const rawHeaders = { 'User-Agent': 'rms-design-system-engine', ...(g.dotcom ? {} : { Accept: 'application/vnd.github.raw' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   const get = getter(fetchImpl, headers), raw = getter(fetchImpl, rawHeaders);
-  const api = `https://api.github.com/repos/${g.owner}/${g.repo}`;
+  const api = `${g.api}/repos/${g.owner}/${g.repo}`;
+  // A file's text: from raw.githubusercontent.com, or an enterprise host's own API (its contents, asked for raw).
+  const rawUrl = (sha, path) => g.dotcom ? `https://raw.githubusercontent.com/${g.owner}/${g.repo}/${sha}/${path.split('/').map(encodeURIComponent).join('/')}` : `${api}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${sha}`;
   const fail = (r) => ({ error: r.status ? githubWhy(r.status) : 'could not reach github.com' });
   let dated = 0;
   return {
-    kind: 'github', web: 'github', url: g.url, name: 'github.com', path: g.path, hasToken: !!token,
+    kind: 'github', web: 'github', url: g.url, name: g.host, path: g.path, hasToken: !!token,
     async head() {
       let ref = c.ref ?? g.ref;
       if (!ref) { const r = await get(api); if (!r.ok) return fail(r); ref = (await r.json())?.default_branch || 'main'; }
@@ -175,7 +196,7 @@ function githubHost(ROOT, c, { env: given, fetchImpl = plainGet } = {}) {
       const files = [];
       for (let i = 0; i < want.length; i += 8) {
         await Promise.all(want.slice(i, i + 8).map(async (x) => {
-          const r = await raw(`https://raw.githubusercontent.com/${g.owner}/${g.repo}/${sha}/${x.path.split('/').map(encodeURIComponent).join('/')}`);
+          const r = await raw(rawUrl(sha, x.path));
           if (r.ok) files.push({ path: x.path, data: Buffer.from(await r.arrayBuffer()) });
         }));
       }
@@ -272,7 +293,27 @@ function folderHost(ROOT, c) {
 export function layerWriter(ROOT, c, { env = process.env, fetchImpl = plainGet, sendImpl = null } = {}) {
   if (c.host === 'folder') return folderWriter(ROOT, c);
   if (c.host === 'github') return githubWriter(ROOT, c, { env, fetchImpl, sendImpl });
+  if (TOOLS[c.host]) return toolWriter(ROOT, c, { env, fetchImpl, sendImpl });
   return { error: 'a GitLab layer is written through intent-changes.mjs → layerAccess' };
+}
+// A documentation tool is read, never written: its pages are given as the Markdown files they were read into, so the
+// changes are made on them and listed (intent-changes/CHANGES.md, the Documentation page) for a person to make in the
+// tool. Sending them is refused, in plain words.
+export const toolRefusal = (host) => `the engine reads the layer from ${TOOLS[host]} but never writes there: each change is listed for a person to make in ${TOOLS[host]} (${OUT_DIR}/intent-changes/CHANGES.md, and the Documentation page)`;
+function toolWriter(ROOT, c, { env, fetchImpl, sendImpl }) {
+  const h = layerHost(ROOT, c, { env, fetchImpl, ...(sendImpl ? { sendImpl } : {}) });
+  if (h.error) return h;
+  const refuse = async () => ({ error: toolRefusal(c.host) });
+  return {
+    kind: c.host, writesWith: `nothing: ${TOOLS[c.host]} is only read`, readOnly: true,
+    async files() {
+      const got = await h.files();
+      if (got.error) throw new Error(got.error);
+      return new Map(got.files.map((f) => [f.path, f.data.toString('utf8')]));
+    },
+    commit: refuse,
+    request: refuse,
+  };
 }
 function folderWriter(ROOT, c) {
   const h = folderHost(ROOT, c);
@@ -310,11 +351,11 @@ function folderWriter(ROOT, c) {
   };
 }
 function githubWriter(ROOT, c, { env, fetchImpl, sendImpl }) {
-  const g = parseGithub(c.url);
+  const g = parseGithub(c.url, { any: true });
   if (!g) return { error: `${c.url} is not a GitHub repository link` };
   const h = githubHost(ROOT, c, { env, fetchImpl });
   const token = envFrom('GITHUB_TOKEN', env, [ROOT]) || envFrom('GH_TOKEN', env, [ROOT]);
-  const api = `https://api.github.com/repos/${g.owner}/${g.repo}`;
+  const api = `${g.api}/repos/${g.owner}/${g.repo}`;
   const headers = { 'User-Agent': 'rms-design-system-engine', Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   const send = async (method, path, body) => {
     const fn = sendImpl ?? (await import('./gitlab-source.mjs')).plainSend;

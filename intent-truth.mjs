@@ -22,9 +22,10 @@ import { execFileSync } from 'node:child_process';
 import { codeSnapshotPath, OUT_DIR, ENGINE_DIRS } from './names.mjs';
 import { resolveStatus } from './decision-status.mjs';
 import { matchComponents, systemNames, codeFilesOf } from './intent-layer.mjs';
-import { readDecisions } from './intent-proposals.mjs';
+import { readDecisions, withdrawn } from './intent-proposals.mjs';
 import { copiedLists } from './copied-lists.mjs';
 import { storeFigmaChangelogs } from './snapshot-history.mjs';
+import { figmaChangelogs } from './component-changelog.mjs';
 
 export const KINDS = { name: 'Not in the system', claim: 'Disagrees with the system', stale: 'Out of date', twin: 'Same as another page', copy: 'Copies a generated list' };
 // What the engine keeps of each component's props between runs, to tell when one changed.
@@ -135,7 +136,14 @@ export function systemFacts(ROOT, cfg = {}, { record = true, now = new Date().to
     const n = String(i.component ?? '').replace(/^\./, ''); if (!n || !i.wcag) continue;
     (a11y[n] ??= []).push({ wcag: String(i.wcag), fix: i.fix ?? null, issue: i.issue ?? null });
   }
-  let figma = null; try { figma = storeFigmaChangelogs(ROOT, Object.keys(components)); } catch { /* no store history */ }
+  // Figma's history: the snapshots the project commits (each commit read once, then kept: component-changelog.mjs), else
+  // the snapshots store's saved history.
+  let figma = null;
+  try {
+    const snaps = { props: P.compPropsSnapshot || (existsSync(resolve(ROOT, 'figma-component-props.snapshot.json')) ? 'figma-component-props.snapshot.json' : 'src/figma-component-props.snapshot.json'), vars: P.snapshotVars || 'src/figma-vars.snapshot.json' };
+    figma = figmaChangelogs(ROOT, snaps, Object.keys(components));
+  } catch { /* no git history */ }
+  if (!figma || !Object.keys(figma).length) { try { figma = storeFigmaChangelogs(ROOT, Object.keys(components)); } catch { /* no store history */ } }
   const changed = componentChanges(ROOT, components, { record, now, figma });
   // The intent layer's own files, when its snapshot lists them (a page may point at another page of the layer).
   const il = readJson(resolve(ROOT, (typeof cfg.intentLayer === 'object' && cfg.intentLayer?.out) || 'intent-layer.snapshot.json'));
@@ -214,10 +222,12 @@ export function componentChanges(ROOT, components, { record = true, now = new Da
       for (const [n, f] of filesOf) { const d = last.get(f); if (d) addEvent(n, { at: d, how: 'file', file: f }); }
     }
   } catch { /* no history */ }
-  // Figma's history: each read of Figma that changed what it says of the component (its properties, its variables).
+  // Figma's history: each read of Figma that changed what it says of the component (its properties, its variables). Its
+  // first read is not a change of it: a page written before the snapshots were first kept is not out of date for that.
+  const first = (r) => r.changed.length === 1 && /first time/.test(r.changed[0]);
   for (const [n, list] of Object.entries(figma ?? {})) {
     if (!components[n]) continue;
-    for (const r of (list ?? []).slice(0, 5)) if (r?.date && r.changed?.length) addEvent(n, { at: r.date, how: 'figma', figma: r.changed });
+    for (const r of (list ?? []).slice(0, 5)) if (r?.date && r.changed?.length && !first(r)) addEvent(n, { at: r.date, how: 'figma', figma: r.changed });
   }
   return out;
 }
@@ -249,6 +259,43 @@ export function changeWords(events) {
 
 // The names a change took away (props, values, tokens): a page that still writes one of them says what is no longer so.
 export const removedBy = (events) => [...new Set(events.flatMap((e) => [...(e.removed ?? []), ...(e.tokensRemoved ?? []), ...(e.values ?? []).flatMap((v) => v.removed)]))];
+
+// ── Decisions, against the component's changes ─────────────────────────────────────────────────────────────────────
+// A decision answered in the decisions file (intent-proposals.mjs: add:, fix:, move:) is dated as a page is: when its
+// component changed after it was recorded, or after a person last confirmed it still holds (a yes to recheck:<key>), it
+// is marked to review again, with what changed and since when. It still stands until a person withdraws it (a no).
+// The component a decision is about: add:<component> names it; fix:<page>:<name> and move:<page> name a page, whose
+// component pageComponent gives. A review (review:, recheck:) is not a decision of its own here. → name | null
+export function decisionComponent(key, pageComponent = () => null) {
+  const k = String(key ?? '');
+  let m;
+  if ((m = /^add:(.+)$/.exec(k))) return m[1];
+  if ((m = /^move:(.+)$/.exec(k))) return pageComponent(m[1]) ?? null;
+  if ((m = /^fix:(.+):[^:]*$/.exec(k))) return pageComponent(m[1]) ?? null;
+  return null;
+}
+// decisions: the decisions file; changed: componentChanges' (facts.changed); only(key): the decisions to look at.
+// → { key: { component, at, since, confirmed, changed: [words], truth, note } } for every decision to review again.
+export function decisionsToReview(decisions = {}, changed = {}, { pageComponent = () => null, only = () => true } = {}) {
+  const out = {};
+  for (const [k, d] of Object.entries(decisions ?? {})) {
+    if (!d?.at || /^(review|recheck):/.test(k) || !only(k)) continue;
+    const own = decisionComponent(k, pageComponent);
+    const ch = own && changed?.[own];
+    if (!ch) continue;
+    const again = decisions[`recheck:${k}`];
+    const confirmed = again?.answer === 'yes' && again.at && Date.parse(again.at) > Date.parse(d.at);
+    const since = confirmed ? again.at : d.at;
+    const events = changesSince(ch, since);
+    if (!events.length) continue;
+    const at = events[events.length - 1].at;
+    const words = changeWords(events);
+    const one = events.length === 1 && events[0].how === 'file' ? `${String(events[0].file).split('/').pop()} changed on ${day(at)}` : `${own} changed on ${day(at)}: ${words.join('; ')}`;
+    const truth = `${one}, after this decision was ${confirmed ? 'last confirmed' : 'recorded'}.`;
+    out[k] = { component: own, at, since, confirmed: !!confirmed, changed: words, truth, note: `To review again: ${truth} Where it disagrees with the component's contract, follow the contract.` };
+  }
+  return out;
+}
 
 // ── One page, against the system ────────────────────────────────────────────────────────────────────────────────────
 // Each line a page says, with where it is (the section it is under), code blocks left out: they are examples.
@@ -511,6 +558,7 @@ export function checkedLayer(ROOT, cfg, snap) {
   const k = `${resolve(ROOT)}|${snap._source?.sha ?? ''}|${snap.entities.length}`;
   if (!checked.has(k)) {
     let byKey = new Map();
+    const keptKeys = new Set();
     try {
       const facts = systemFacts(ROOT, cfg);
       const names = [...new Set([...systemNames(ROOT, cfg), ...Object.keys(facts.components)])];
@@ -519,13 +567,16 @@ export function checkedLayer(ROOT, cfg, snap) {
       const reviewedOf = (e) => (decisions[`review:${e.name}`]?.answer === 'yes' ? decisions[`review:${e.name}`].at ?? null : null);
       const found = checkLayer(snap, matchComponents(names, snap.entities, codeFilesOf(ROOT, cfg)), facts, { reviewedOf });
       // A name the team said to keep (intent-proposals.mjs → a yes to fix:<page>:<name>) is no longer a finding.
-      const kept = (e, f) => f.kind === 'name' && decisions[`fix:${e.name}:${String(f.says).replace(/`/g, '')}`]?.answer === 'yes';
+      // One withdrawn since (a no to recheck:<key>) is a finding again. Each one kept is named (keptKeys).
+      const keyOf = (e, f) => `fix:${e.name}:${String(f.says).replace(/`/g, '')}`;
+      const kept = (e, f) => f.kind === 'name' && decisions[keyOf(e, f)]?.answer === 'yes' && !withdrawn(decisions, keyOf(e, f));
+      for (const [e, f] of found) for (const x of f) if (kept(e, x)) keptKeys.add(keyOf(e, x));
       byKey = new Map([...found].map(([e, f]) => [pageKey(e), f.filter((x) => !kept(e, x))]).filter(([, f]) => f.length));
     } catch { /* not checked: nothing said, nothing left out */ }
-    checked.set(k, byKey);
+    checked.set(k, Object.assign(byKey, { keptKeys }));
   }
   const byKey = checked.get(k);
-  return (e) => byKey.get(pageKey(e)) ?? [];
+  return Object.assign((e) => byKey.get(pageKey(e)) ?? [], { kept: byKey.keptKeys ?? new Set() });
 }
 
 // ── The command: --check-intent [file or folder] ────────────────────────────────────────────────────────────────────

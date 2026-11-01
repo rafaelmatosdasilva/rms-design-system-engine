@@ -242,3 +242,36 @@ test('a name is in the system when the code, Figma or the project has it: the do
   for (const n of ['tileOne', 'size', '--acme-space-s', 'errorMessage', 'src/tiles/Tile.vue', 'specs/guide.md', 'aria-label', 'button', '<TileOne size="s" />']) assert.equal(inSystem(f, n), true, n);
   for (const n of ['tileTwo', 'warningMessage', 'src/tiles/Gone.vue']) assert.equal(inSystem(f, n), false, n);
 });
+
+test('a project that commits its Figma snapshots: each read of Figma that changed a component dates it, its first read does not', async () => {
+  const { systemFacts } = await import('../intent-truth.mjs');
+  const dir = tempDir('truth-figma-git-');
+  const env = (at) => ({ ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t', GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at });
+  const git = (at, ...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8', env: env(at) });
+  git('2026-03-01T00:00:00Z', 'init', '-q', '-b', 'main');
+  const snap = (opts) => JSON.stringify({ cardTile: { properties: { 'Size#1:0': { type: 'VARIANT', variantOptions: opts, defaultValue: opts[0] } } } });
+  writeFileSync(join(dir, 'figma-component-props.snapshot.json'), snap(['S']));
+  git('2026-03-01T00:00:00Z', 'add', '-A'); git('2026-03-01T00:00:00Z', 'commit', '-qm', 'Figma read');
+  assert.equal(systemFacts(dir, {}, { record: false }).changed.cardTile, undefined, 'the first read is not a change');
+  writeFileSync(join(dir, 'figma-component-props.snapshot.json'), snap(['S', 'M']));
+  git('2026-03-04T00:00:00Z', 'commit', '-qam', 'Figma read again');
+  const ch = systemFacts(dir, {}, { record: false }).changed.cardTile;
+  assert.equal(ch.how, 'figma');
+  assert.equal(new Date(ch.at).toISOString(), '2026-03-04T00:00:00.000Z');
+  assert.match(changeWords(changesSince(ch, '2026-03-02T00:00:00Z'))[0], /^Figma: property Size/);
+});
+
+test('a decision is dated like a page: its component is found from its key, and a change after it (or after its confirmation) marks it', async () => {
+  const { decisionComponent, decisionsToReview } = await import('../intent-truth.mjs');
+  const pages = { 'Tile One': 'tileOne', Picker: 'datePicker' };
+  const pc = (p) => pages[p] ?? null;
+  assert.deepEqual(['add:cardTile', 'fix:Tile One:tileRow', 'move:Picker', 'review:Tile One', 'recheck:add:cardTile', 'other:x'].map((k) => decisionComponent(k, pc)), ['cardTile', 'tileOne', 'datePicker', null, null, null]);
+  const changed = { datePicker: { at: '2026-04-02T00:00:00Z', how: 'file', file: 'src/date/Picker.vue', added: [], removed: [] } };
+  const d = { 'move:Picker': { answer: 'yes', at: '2026-04-01T00:00:00Z' }, 'add:cardTile': { answer: 'no', at: '2026-04-01T00:00:00Z' } };
+  const r = decisionsToReview(d, changed, { pageComponent: pc });
+  assert.deepEqual(Object.keys(r), ['move:Picker'], 'a component that never changed has nothing to review');
+  assert.equal(r['move:Picker'].truth, 'Picker.vue changed on 2 Apr 2026, after this decision was recorded.');
+  assert.match(r['move:Picker'].note, /^To review again: Picker\.vue changed/);
+  assert.deepEqual(decisionsToReview({ ...d, 'recheck:move:Picker': { answer: 'yes', at: '2026-04-03T00:00:00Z' } }, changed, { pageComponent: pc }), {}, 'confirmed after the change');
+  assert.deepEqual(decisionsToReview(d, changed, { pageComponent: pc, only: (k) => k !== 'move:Picker' }), {});
+});

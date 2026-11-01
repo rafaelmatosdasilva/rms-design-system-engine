@@ -164,3 +164,49 @@ export default {
   assert.deepEqual(by('tone', 'tone')?.values, { Calm: 'calm', Loud: 'loud' });
   assert.equal(by('framed', 'opts.framed')?.values, undefined, 'framed: true is not framed\'s value map');
 });
+
+test('the classic form: a call inside another\'s values fills the prop, the outer one decides whether it is written', () => {
+  const [m] = parseConnectFile(`figma.connect(CardTile, 'https://www.figma.com/design/AbC/Kit?node-id=5-6', {
+  props: {
+    caption: figma.boolean('Show caption', { true: figma.string('Caption'), false: undefined }),
+    hint: figma.boolean('Hide hint', { true: undefined, false: figma.string('Hint words') }),
+    note: figma.enum('Kind', { Plain: undefined, 'With note': figma.string('Note') }),
+    hideClose: figma.boolean('Show close', { true: false, false: true }),
+    badge: figma.nestedProps('Badge', { tone: figma.enum('Tone', { Calm: 'calm' }) }),
+    label: figma.string('Label, with a comma'),
+  },
+  example: (p) => <CardTile {...p} />,
+})`, 'CardTile.figma.tsx');
+  const say = (p) => `${p.figma}→${p.code}:${p.role}${p.negated ? '!' : ''}${p.equals != null ? '=' + p.equals : ''}`;
+  assert.deepEqual(m.props.map(say), [
+    'Caption→caption:value', 'Show caption→caption:condition',
+    'Hint words→hint:value', 'Hide hint→hint:condition!',
+    'Note→note:value', 'Kind→note:condition=With note',
+    'Show close→hideClose:value!',
+    'Badge→badge:value',
+    'Label, with a comma→label:value',
+  ], 'never true or false read as a prop, nor a nested instance\'s props as this one\'s');
+});
+
+test('the template form: what is written between the tags fills the default slot or a named one; another component\'s content is its own', () => {
+  const text = `// url=https://www.figma.com/design/AbC/tileOne?node-id=10-20
+import figma from 'figma'
+const label = figma.selectedInstance.getString('Label')
+const icon = figma.selectedInstance.getInstanceSwap('Icon')
+const showIcon = figma.selectedInstance.getBoolean('Show icon')
+const showBadge = figma.selectedInstance.getBoolean('Show badge')
+const note = figma.selectedInstance.getString('Note')
+const hint = figma.selectedInstance.getString('Hint')
+export default {
+  example: figma.html\`<tile-one><b>\${label}</b>\${showIcon ? \`<span slot="icon">\${icon}</span>\` : ''}\${showBadge ? '<tile-badge slot="badge"></tile-badge>' : ''}<tile-note>\${note}</tile-note><img alt="\${hint}"></tile-one>\`,
+}`;
+  const [m] = parseConnectFile(text, 'One.figma.js');
+  const say = (p) => `${p.figma}→${p.code ?? '∅'}:${p.role}${p.slot ? ' slot' : ''}`;
+  assert.deepEqual(m.props.map(say), ['Label→default:value slot', 'Icon→icon:value slot', 'Show icon→icon:condition slot', 'Show badge→badge:condition slot', 'Note→∅:value', 'Hint→∅:value']);
+  const vue = parseConnectFile(`// url=https://www.figma.com/design/AbC/tileOne?node-id=10-20
+import figma from 'figma'
+const icon = figma.selectedInstance.getInstanceSwap('Icon')
+const label = figma.selectedInstance.getString('Label')
+export default { example: figma.code\`<TileOne><template v-slot:icon>\${icon}</template><template #default>\${label}</template></TileOne>\` }`, 'One.figma.js')[0];
+  assert.deepEqual(vue.props.map(say), ['Icon→icon:value slot', 'Label→default:value slot']);
+});

@@ -571,23 +571,28 @@ Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](http
 
 ### The contracts in the open component specs format
 
-`contracts/specs/` holds the same components in the open component specs format (schema 0.39), for a team that specifies its components that way. One spec per component, and `index.json`.
+`contracts/specs/` holds the same components in the open component specs format (schema 0.39), for a team that specifies its components that way. One spec per component, and `index.json`. `--contracts-out` publishes it too, in `specs/` beside the contracts.
 
 Each spec says only what the contract knows:
 
+- **Where Figma holds it.** Its page and node, and whether it is a set of variants or one component. The page comes from the Figma capture; a component captured before the engine read pages gets it on the next capture.
 - **Its anatomy.** The frame, the frames inside it that Figma lays out, the text layer each text property writes, the instance each swap swaps, and each slot.
 - **Its props.** Each with its type, its values and its default. A variant of False and True is a boolean. What the code calls the prop, and how it writes Figma's values, sits beside it.
 - **Its styles, as tokens.** The frame's padding, gap, corner radius, height and type style. Its fill and stroke in the default, and what each variant paints differently. A text colour goes on the text only when the component has one text property.
 
 Anything else is left out, never guessed: where a part sits, a part whose kind the contract does not know, a text colour with several texts to choose from. The index says what each spec leaves out. It also links each spec to its contract, its code file and its Figma component, so nothing is copied twice.
 
+A test holds every spec the demo builds to a schema written from the format's published types, where each prop must read as exactly one kind.
+
 ### Code Connect drafts
 
-The engine reads the Figma Code Connect files your project commits. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](commands.md#write-component-contracts)).
+The engine reads the Figma Code Connect files your project commits: each code prop and the Figma property it reads, a property that only decides whether another is written (in either form), and, in the template form, what fills a slot between the component's tags. A text or a swapped instance written into a slot the code has pairs with that slot. For a component that has a contract but no Code Connect file, it can draft one: `rms-design-system-engine --code-connect-draft` (see [Commands](commands.md#write-component-contracts)).
 
 - **From what the contract pairs.** Each Figma property's code prop, an enum's values as Figma and the code write them, the booleans, the texts, the instances it swaps, and a switch that decides whether another prop is written.
+- **Slots filled.** In the template form, what fills a slot is written between the component's tags: the default slot's content as it is, a named slot's in the element its framework uses (`slot="icon"` for a web component, `<template #icon>` for Vue), guarded by the property that decides whether it is filled.
+- **Conditions in the classic form too.** A property that decides whether a prop is written wraps the call that fills it: `figma.boolean('Show caption', { true: figma.string('Caption'), false: undefined })`, the other way round when it decides it off, or an enum on the option it decides it under.
 - **In the form you already use.** The classic `figma.connect` form or the template form, whichever your own files are in. With none yet, React gets the classic form and Vue, Svelte and web components the template form. `--form=classic` or `--form=template` picks one.
-- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, a slot, the import.
+- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, a Figma slot property, how a swapped instance is written, the import.
 - **Never in your code.** The drafts go to `.design-system-engine-out/code-connect-drafts/`, in the same folders as each component's file. A person checks each one, moves it beside its component and publishes it with their own Code Connect tooling.
 - **Read back before it is written.** Each draft reads back through the same reader the engine uses for your Code Connect files, to the same pairs it was written from (a test holds it to that).
 
@@ -735,10 +740,11 @@ The part that pays is what agents get. A card now carries what was already ruled
 
 A page is right when it is written. Then its component changes: a prop is added, a value is dropped, a token is renamed. The page still says what was true before.
 
-- **The engine notices.** It keeps each component's props, the values they take and its tokens from run to run. It also reads the code's history and the history of your Figma snapshots. It never asks Figma or GitLab again for this.
+- **The engine notices.** It keeps each component's props, the values they take and its tokens from run to run. It also reads the code's history and the history of your Figma snapshots, from the snapshots store or from the commits of your own repository. Each commit is read once and kept, so a run reads only the new ones. It never asks Figma or GitLab again for this. The first read of Figma is not a change.
 - **The page is marked, not removed.** On the Documentation page its status is Review, Changed since written, with what changed and since when. Agents still read every line, with a note beside it: check it against the contract.
 - **A removed name is said.** When the page still names a prop or token the component no longer has, the page says which.
 - **A person settles it.** Edit the page, or say it still holds. The answer is kept with who gave it and when. The page is not marked again until the component changes again.
+- **Decisions too.** An answer the team gave (a part documented in its parent's page, a name kept, a page kept where it is) is dated the same way. When its component changes after it, the decision is marked to review again on its page and in History, and agents read it with the same note. It still stands until a person says. Say it still holds, and it is kept with who and when; withdraw it, and its question is asked again.
 
 ### Evidence first
 
@@ -880,7 +886,7 @@ A template is a page frame in Figma made of your system's components, such as a 
 
 ### The intent layer
 
-Your intent layer (why each piece exists and how to use it) is read on every run: DSDS or Markdown (MDX) pages, in a GitLab project, a GitHub repository or a folder of your project. On a Markdown page, written for people, only a line that tells what to do is one of its rules; a line that only describes (what the variants are, how it is laid out) stays on its documentation for people, so agents are not handed every paragraph. Links between its pages lead to those pages where the layer lives, and images, lines of links and HTML entities are left out. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown. A note in the code that only says how the component is built, or repeats another, is left alone: it is there for developers.
+Your intent layer (why each piece exists and how to use it) is read on every run: DSDS or Markdown (MDX) pages, in a GitLab project, a GitHub repository or a folder of your project, or pages kept in Notion or Confluence. On a Markdown page, written for people, only a line that tells what to do is one of its rules; a line that only describes (what the variants are, how it is laid out) stays on its documentation for people, so agents are not handed every paragraph. Links between its pages lead to those pages where the layer lives, and images, lines of links and HTML entities are left out. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown. A note in the code that only says how the component is built, or repeats another, is left alone: it is there for developers.
 
 When the layer changes, the style guide follows.
 
@@ -1159,9 +1165,10 @@ Answer with `--lesson-answer <id> yes` or `no`. A no is kept too, so the same gu
 - **A line you changed.** The hook remembers the lines an AI writes. A line that is gone without an AI edit taking it was changed by a person. `--lessons` lists it, with what it reads now, and `--lesson --edit <n> --why "<reason>"` makes it a lesson. It is never one until you give why, and `--unlesson --edit <n>` takes it off the list when it was no correction. A file rewritten or reformatted as a whole is not read as corrections.
 - **A finding marked wrong.** A [finding you mark wrong](#when-a-check-is-wrong), a page review's among them, is a correction of the engine. Its guard is already written: the case its check must pass.
 
-**Findings that repeat become proposed rules.** The same page-review finding on three Showroom screens, or the same edit-check finding in three edits, is proposed as one sentence (`R-page-primary`, `R-edit-colour`):
+**Findings that repeat become proposed rules.** The same page-review finding on three Showroom screens, the same decision [a model judged](#a-model-judges-each-screen-when-you-ask) broken on three screens, or the same edit-check finding in three edits, is proposed as one sentence (`R-page-primary`, `R-judge-primary`, `R-edit-colour`):
 
 - A page review's becomes a rule for your guidelines, such as "Each screen has one primary action in view".
+- A model's judgment becomes one too, such as "A destructive action never looks more prominent than the main decision".
 - An edit check's becomes a step agents read, such as "Write every colour as one of the system's colour tokens". The check already catches it; the step tells the agent before it writes.
 - Only decisions that should be the same every time are named. A judgement, such as which section of a page matters most, never is.
 - A finding that stays on one screen is counted once. Fixed and made again, it counts again.
@@ -1175,7 +1182,43 @@ Answer with `--lesson-answer <id> yes` or `no`. A no is kept too, so the same gu
 - The style guide shows them with the decisions, on the History page and on each component's History, with what each became.
 - Agents are told what a lesson ruled out, the same way they are told every other decision.
 
-The engine does not look at screenshots to judge a page. The page review reads each screen's structure, so a lesson about how a page looks, rather than how it is built, is kept as a rule for your guidelines.
+The page review reads each screen's structure. How a page looks, rather than how it is built, is judged only when you ask a model to (below), and a lesson about it is kept as a rule for your guidelines.
+
+### A model judges each screen, when you ask
+
+The page review measures what it can: one main action, nothing destructive in front, no card in a card, headings in order. Some decisions can't be measured. Is this the right component for what the part does? Does one action really read first, as the screen is drawn? `--judge-pages` asks a model, and only when you run it.
+
+**What the model gets, for each Showroom screen.**
+
+- Its screenshot. A picture kept beside the screen (`showroom/<Screen>.png`) is used as it is; otherwise it is taken from the built style guide, at Figma's size, in the screen's brand and mode.
+- Its code, as a short outline: each component and element, the props that decide how it looks, its words and its line.
+- The components it uses, each with what your intent layer (or Figma's description) says it is for.
+- Its brief, when one is known: `"brief"` in its `<Screen>.json`, or a `<Screen>.brief.md` beside it.
+
+**What it judges.** A short, fixed list of named decisions, the same on every screen and every run:
+
+| Decision | What holds |
+|---|---|
+| `component` | Each part uses the component made for what it does |
+| `primary` | One action reads first; every other looks secondary |
+| `destructive` | A destructive action never looks louder than the main decision |
+| `layout` | The screen is arranged as its brief says. Not judged when the screen has no brief |
+
+- `pageJudgment.decisions` in `ds-config.json` judges fewer of them. A name the engine doesn't know is said and left out.
+- Anything not on the list is left unjudged, so pages keep room to differ.
+
+**What comes back.** For each decision: holds, breaks or unclear, how much it matters (high, medium, low), what the model saw, and one sentence a reviewer can check on the screen.
+
+- It is advisory. It never fails a run.
+- The style guide shows it under each screen in the Showroom, beside the page review, headed "Judged by a model".
+- The run ends with one line: what broke, and what it cost. Each full run repeats the last judgment's line, with what it cost then. Nothing is asked again.
+- A decision judged broken on three screens becomes a [proposed rule](#lessons-a-correction-becomes-a-guard), like the page review's.
+
+**What it costs.** It spends your model tokens: one request per screen, through your own command.
+
+- The default is `claude -p`, allowed to read only the screenshot, with its answer and its price printed as JSON. `pageJudgment.cmd` changes it: any command that reads the prompt on stdin and prints the answer. A command that doesn't print a price is said to.
+- Each answer is kept by the screenshot's hash and the rubric's (the decisions asked, their words and the brief). A screen that didn't change is never paid for twice; change the screen, the brief or the decisions, and it is asked again.
+- Everything stays in the engine's own folder: `.design-system-engine-out/page-judgment.json` (the last run), `page-judgment-cache.json` and the screenshots it took.
 
 ### Does your guidance help your AI tools?
 
@@ -1315,7 +1358,7 @@ What a security review asks, in one place.
 - **On your computer, or your CI runner.** The engine is a set of Node scripts. There is no engine server and no engine account, and nothing it reads is sent to its author.
 - **No npm dependencies.** `package.json` lists none, so there is no third-party package to trust. What it uses beside Node is yours: Chrome, TypeScript, and axe-core, which the installer fetches.
 - **Your own sign-ins.** It reaches Figma, your code host and Notion with your own access, so your company's single sign-on and permissions on those tools apply as they are.
-- **The AI model is your Claude account's.** In Claude Code, what the agent reads (files, command output) goes to Anthropic under your account and its terms. The checks themselves are measured, not asked of a model. Two steps ask one, through your own `claude` command: rating your written guidance (the command can be changed, `guidelines.extract.cmd`) and drafting changes to the intent layer.
+- **The AI model is your Claude account's.** In Claude Code, what the agent reads (files, command output) goes to Anthropic under your account and its terms. The checks themselves are measured, not asked of a model. Three steps ask one, each only when you ask, through your own `claude` command: rating your written guidance (the command can be changed, `guidelines.extract.cmd`), judging your Showroom screens on their screenshots (`pageJudgment.cmd`) and drafting changes to the intent layer.
 
 ### What goes over the network
 

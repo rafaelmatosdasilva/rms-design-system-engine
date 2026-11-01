@@ -45,7 +45,11 @@ test('the classic form: figma.connect with each pair the contract holds, read ba
   assert.match(d.text, /TODO: Size: the code has no value for Extra large \(it has small, large\)/);
   assert.match(d.text, /TODO: State: a state Figma draws \(Default, Hover\)/);
   assert.match(d.text, /TODO: Tone: no code prop the contract pairs it with \(the code has variant/);
-  assert.match(d.text, /TODO: Show caption: decides whether caption is written/);
+  // A property that decides whether a prop is written wraps the call that fills it, and reads back as that condition.
+  assert.match(d.text, /caption: figma\.boolean\('Show caption', \{ true: figma\.string\('Caption'\), false: undefined \}\)/);
+  assert.ok(d.pairs.some((p) => p.figma === 'Show caption' && p.role === 'condition' && p.code === 'caption'));
+  assert.doesNotMatch(d.text, /TODO: Show caption/);
+  assert.match(d.text, /<CardTile size=\{props\.size\} disabled=\{props\.disabled\} hideClose=\{props\.hideClose\} caption=\{props\.caption\} \/>/, 'each prop once in the example');
   assert.match(d.text, /disabled: figma\.enum\('Disabled', \{ False: false, True: true \}\),\s+\/\/ TODO: paired by its name/);
 });
 
@@ -105,4 +109,46 @@ test('--code-connect-draft writes the drafts to the engine\'s own folder only, n
   const again = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--code-connect-draft'], { cwd: root, encoding: 'utf8' });
   assert.match(again, /1 already mapped/);
   assert.ok(!existsSync(draft), 'rewritten whole: the old draft is gone');
+});
+
+// What fills a slot: a text or a swapped instance written between the tags, a named slot in the element the framework
+// names it with, guarded by the property that decides whether it is filled; read back to the same pairs.
+const slotProps = () => [
+  prop('Label', 'TEXT', { slot: 'default', as: 'defaultSlot', source: 'name' }),
+  prop('Icon', 'INSTANCE_SWAP', { slot: 'icon', as: 'slot', source: 'name' }),
+  prop('Show icon', 'BOOLEAN', null, { conditions: [{ code: 'icon', role: 'condition', slot: true }] }),
+  prop('Size', 'VARIANT', { prop: 'size', as: 'prop', source: 'name', options: ['s', 'm'] }, { options: ['S', 'M'] }),
+];
+const withSlots = (d) => parseConnectFile(d.text, d.file)[0].props.filter((p) => p.code).map((p) => ({ figma: p.figma, code: p.code, role: p.role, ...(p.slot ? { slot: true } : {}), ...(p.negated ? { negated: true } : {}) }));
+
+test('the template form writes what fills a slot between the tags, and reads it back as that slot', () => {
+  const web = draftFor(contract('html', 'src/tiles/card-tile.js', 'card-tile', slotProps()));
+  assert.match(web.text, /figma\.html`<card-tile size="\$\{size\}">\$\{label\}\$\{showIcon \? `<span slot="icon">\$\{icon\}<\/span>` : ''\}<\/card-tile>`/);
+  assert.deepEqual(withSlots(web), own(web));
+  assert.deepEqual(own(web).filter((p) => p.slot), [
+    { figma: 'Label', code: 'default', role: 'value', slot: true },
+    { figma: 'Icon', code: 'icon', role: 'value', slot: true },
+    { figma: 'Show icon', code: 'icon', role: 'condition', slot: true },
+  ]);
+  assert.doesNotMatch(web.text, /TODO: Label/, 'the default slot is written, not left');
+  const vue = draftFor(contract('vue', 'src/tiles/CardTile.vue', 'CardTile', slotProps()));
+  assert.match(vue.text, /<CardTile size="\$\{size\}">\$\{label\}\$\{showIcon \? `<template #icon>\$\{icon\}<\/template>` : ''\}<\/CardTile>/);
+  assert.deepEqual(withSlots(vue), own(vue));
+  // A component with nothing between its tags stays self-closed.
+  assert.match(draftFor(contract('vue', 'src/tiles/CardTile.vue', 'CardTile', slotProps().slice(3))).text, /<CardTile size="\$\{size\}" \/>/);
+});
+
+test('the classic form writes a condition the contract holds as the call that wraps its prop, either way and on an option', () => {
+  const props = [
+    prop('Caption', 'TEXT', { prop: 'caption', as: 'prop', source: 'authored' }, { conditions: [] }),
+    prop('Hide caption', 'BOOLEAN', null, { conditions: [{ code: 'caption', role: 'condition', negated: true }] }),
+    prop('Note', 'TEXT', { prop: 'note', as: 'prop', source: 'authored' }),
+    prop('Kind', 'VARIANT', null, { options: ['Plain', 'Noted'], conditions: [{ code: 'note', role: 'condition', equals: 'Noted' }] }),
+  ];
+  const d = draftFor(contract('jsx', 'src/tiles/CardTile.tsx', 'CardTile', props));
+  assert.match(d.text, /caption: figma\.boolean\('Hide caption', \{ true: undefined, false: figma\.string\('Caption'\) \}\)/);
+  assert.match(d.text, /note: figma\.enum\('Kind', \{ Noted: figma\.string\('Note'\) \}\)/);
+  const read = parseConnectFile(d.text, d.file)[0].props.map((p) => ({ figma: p.figma, code: p.code, role: p.role, ...(p.negated ? { negated: true } : {}), ...(p.equals != null ? { equals: p.equals } : {}) }));
+  assert.deepEqual(read, d.pairs.map(({ values, ...p }) => p));
+  assert.doesNotMatch(d.text, /TODO: (Hide caption|Kind)/);
 });

@@ -2,14 +2,17 @@
 // variable a Figma property is read into (figma.selectedInstance.getEnum('size', { s: 's' })), and what the example
 // (figma.html`<tile-one …>`) does with it, each ${…} evaluated for every branch it can take.
 //
-//   readTemplateForm(src) → { tag, props: [{ figma, code, kind, role, negated?, equals?, values? }] }
+//   readTemplateForm(src) → { tag, props: [{ figma, code, kind, role, negated?, equals?, values?, slot? }] }
 //
 // A property either fills an attribute (role value: caption="${caption}", or a bare `disabled` given when it is true) or
 // decides whether an attribute is written at all (role condition: ${revealCaption ? `caption="${caption}"` : ''} makes
 // revealCaption the condition of caption; ${!revealCaption ? `icon="${icon}"` : ''} the condition of icon, negated). A comparison
 // of a property with a value (${type === 'card' ? 'outlined' : ''}) is a condition with `equals`. A property compared
 // with itself only to leave out its default (${size !== 'm' ? `size="${size}"` : ''}) is just its value. An attribute of
-// another component inside the example belongs to that component, never to this one. A property used only inside an
+// another component inside the example belongs to that component, never to this one. What is written between the
+// component's tags fills a slot (role value, slot: true): its default slot ('default'), or the one an element names
+// (<span slot="icon">${icon}</span>, <template #icon>); a property that decides whether it is written decides that slot.
+// Content inside another component it holds is that component's. A property used only inside an
 // expression the reader cannot follow (a call, an array joined) has code null: it is not one Figma property.
 // No dependency: a tokenizer and a small expression parser for what these templates use.
 
@@ -239,6 +242,39 @@ function openAttribute(html) {
   return last;
 }
 const attrName = (a) => String(a).replace(/^v-bind:|^[:@]/, '');
+// Where content written at the end of `html` goes, when it sits between the tags of the component `tag`: 'default' (its
+// default slot), the name of a slot (<span slot="icon">, <template #icon>, <template v-slot:icon>), or null (outside
+// the component, or inside another component it holds, whose content that is).
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+const isComponent = (name) => /-|^[A-Z]|[.:]/.test(name) && name !== 'svelte:fragment';
+function slotOf(name, attrs) {
+  const own = /(?:^|\s)slot\s*=\s*(["'])([^"']+)\1/.exec(attrs)?.[2];
+  if (own) return own;
+  if (name === 'template') { const m = /(?:^|\s)(?:#|v-slot:?)([\w-]*)/.exec(attrs); if (m) return m[1] || 'default'; }
+  return null;
+}
+function contentPlace(html, tag) {
+  if (!tag || openTag(html)) return null;   // inside a tag: an attribute, not content
+  const stack = [];
+  for (const m of html.matchAll(/<(\/?)([A-Za-z][\w.:-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/g)) {
+    const [, close, name, attrs, self] = m;
+    if (close) { const at = stack.map((x) => x.name).lastIndexOf(name); if (at >= 0) stack.length = at; continue; }
+    if (self || VOID.has(name.toLowerCase())) continue;
+    stack.push({ name, attrs });
+  }
+  const at = stack.map((x) => x.name).lastIndexOf(tag);
+  if (at < 0) return null;
+  const inner = stack.slice(at + 1);
+  if (!inner.length) return 'default';
+  // Inside another component (even one placed in a slot of this one): that component's content.
+  if (inner.some((x) => isComponent(x.name))) return null;
+  return slotOf(inner[0].name, inner[0].attrs) ?? 'default';
+}
+// The slot an element written at the start of `text` fills, when `text` starts with one (<tile-badge slot="badge" />).
+function slotStarted(text) {
+  const m = /^\s*<([A-Za-z][\w.:-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)\/?>/.exec(text);
+  return m ? slotOf(m[1], m[2]) : null;
+}
 
 export function readTemplateForm(src) {
   const vars = new Map(), locals = new Map(), order = [];
@@ -280,10 +316,30 @@ export function readTemplateForm(src) {
     const text = b.text;
     if (!text) return;
     const tagHere = openTag(context);
-    if (!tagHere || (tag && tagHere !== tag)) return;   // between tags, or inside another component's tag
     const self = new Set([...text.matchAll(/\u0001[!~]?([^\u0002]+)\u0002/g)].map((x) => x[1]));
     // A mark is the property's own value (!: written the other way round; ~: computed from it, as a part of its words).
     const valueOf = (mark, code, extra = {}) => (mark.startsWith('!') ? emit(mark.slice(1), { code, role: 'value', negated: true, mark: true, ...extra }) : mark.startsWith('~') ? emit(mark.slice(1), { code, role: 'value', derived: true, mark: true, ...extra }) : emit(mark, { code, role: 'value', mark: true, ...extra }));
+    // Between the component's tags: the content of its default slot or of a named one, filled with a property's value
+    // (an instance it swaps, a text), or written only when its conditions hold.
+    if (!tagHere) {
+      const slotFlags = (c) => ({ slot: true, ...(c.negated ? { negated: true } : {}), ...(c.equals != null ? { equals: c.equals } : {}), ...(c.unclear ? { unclear: true } : {}) });
+      const marks = [...text.matchAll(/\u0001([^\u0002]+)\u0002/g)];
+      const filled = new Set();
+      for (const mk of marks) {
+        const where = contentPlace(context + text.slice(0, mk.index), tag);
+        if (where == null) continue;
+        valueOf(mk[1], where, { slot: true });
+        filled.add(where);
+      }
+      // What the branch writes there decides it: an element filling a slot, or content of the default one.
+      const here = contentPlace(context, tag);
+      const target = here === 'default' ? slotStarted(text) ?? (text.trim() ? 'default' : null) : here;
+      for (const where of new Set([...filled, ...(target && !marks.length ? [target] : [])])) {
+        for (const c of b.conds) if (!(self.has(c.v) && (c.equals != null || !c.negated))) emit(c.v, { code: where, role: 'condition', ...slotFlags(c) });
+      }
+      return;
+    }
+    if (tag && tagHere !== tag) return;   // inside another component's tag
     // A fixed true or false written under one property's own on/off (${!framed ? ':framed="false"' : ''}) is that
     // property's value: the code prop holds it (the other way round when they disagree).
     const ownValue = (literal) => {

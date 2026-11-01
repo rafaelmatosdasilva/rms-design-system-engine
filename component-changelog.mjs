@@ -12,8 +12,9 @@
 //   properties and options, and its variables in every mode.
 // commitUrl / prUrl: links in the repository's own host form (GitHub, GitLab).
 // A project read from GitLab (a mirror with no .git) gives the same through the GitLab API (gitlab-history.mjs).
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { OUT_DIR } from './names.mjs';
 import { spawnSync } from 'node:child_process';
 import { mirrorState, mirrorRepo, mirrorBranch, commitsOf, ensureHistory, releaseLogOf } from './gitlab-history.mjs';
 import { diffFiles } from './change-where.mjs';
@@ -155,19 +156,40 @@ export function figmaDiff(a, b, { most = 4 } = {}) {
   for (const k of Object.keys(a.vars)) if (!(k in b.vars)) out.push(`${k} removed`);
   return out.length > most ? [...out.slice(0, most), `and ${out.length - most} more`] : out;
 }
-export function figmaChangelogs(ROOT, { props = null, vars = null } = {}, names = [], { max = 30 } = {}) {
+// What a commit said of every component is kept per commit (FIGMA_GIT_HISTORY, in the engine's output folder): what a
+// commit holds never changes, so each run reads with git show only the commits it has not read before. cache: false
+// reads every one again and keeps nothing.
+export const FIGMA_GIT_HISTORY = `${OUT_DIR}/figma-git-history.json`;
+// What a read of the snapshots says of each component it has properties for, and of each name asked for.
+const digestOf = (props, vars, names) => Object.fromEntries([...new Set([...Object.keys(props ?? {}).filter((n) => !n.startsWith('_')), ...names])].map((n) => [n, figmaOf(props, vars, n)]));
+export function figmaChangelogs(ROOT, { props = null, vars = null } = {}, names = [], { max = 30, cache = true } = {}) {
   const files = [props, vars].filter(Boolean);
   if (!files.length || !names.length) return {};
   const commits = git(ROOT, ['log', `--max-count=${max}`, '--no-merges', '--format=%H%x1f%aI%x1f%s', '--', ...files]).split('\n').filter(Boolean).map((l) => { const [sha, date, subject] = l.split('\x1f'); return { sha, short: sha.slice(0, 7), date, subject }; });
-  const read = new Map();
-  const at = (rev, f) => { if (!f) return null; const k = rev + ':' + f; if (!read.has(k)) { let j = null; try { j = JSON.parse(git(ROOT, ['show', `${rev}:${f}`]) || 'null'); } catch { j = null; } read.set(k, j); } return read.get(k); };
+  if (!commits.length) return {};
+  const key = JSON.stringify(files);
+  const path = join(ROOT, FIGMA_GIT_HISTORY);
+  let kept = null;
+  if (cache) { try { kept = JSON.parse(readFileSync(path, 'utf8')); } catch { /* none yet */ } }
+  const at = kept?.key === key && kept.at && typeof kept.at === 'object' ? kept.at : {};
+  let read = 0;
+  const show = (rev, f) => { if (!f) return null; try { return JSON.parse(git(ROOT, ['show', `${rev}:${f}`]) || 'null'); } catch { return null; } };
+  // A revision's digest: kept, or read now (both snapshots as they were at it). A name asked for that a kept digest does
+  // not hold (a component with no properties in Figma, asked for the first time) reads it again.
+  const digest = (rev) => { if (!at[rev] || names.some((n) => !(n in at[rev]))) { at[rev] = digestOf(show(rev, props), show(rev, vars), names); read++; } return at[rev]; };
+  const none = { props: {}, vars: {}, known: false };
   const out = {};
   for (const r of commits) {
-    const before = { p: at(`${r.sha}^`, props), v: at(`${r.sha}^`, vars) }, after = { p: at(r.sha, props), v: at(r.sha, vars) };
+    const before = digest(`${r.sha}^`), after = digest(r.sha);
     for (const n of names) {
-      const changed = figmaDiff(figmaOf(before.p, before.v, n), figmaOf(after.p, after.v, n));
+      const changed = figmaDiff(before[n] ?? none, after[n] ?? none);
       if (changed.length) (out[n] ??= []).push({ ...r, changed });
     }
+  }
+  // Only the revisions the commits listed still need: one past them is dropped.
+  if (cache && read) {
+    const need = new Set(commits.flatMap((c) => [c.sha, `${c.sha}^`]));
+    try { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, JSON.stringify({ key, at: Object.fromEntries(Object.entries(at).filter(([k]) => need.has(k))) })); } catch { /* not kept: read again next run */ }
   }
   const shas = [...new Set(Object.values(out).flat().map((r) => r.sha))];
   if (shas.length) {

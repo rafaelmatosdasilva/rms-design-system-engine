@@ -1,7 +1,8 @@
 // code-connect-draft.mjs - a draft Code Connect file for each component the contracts pair with Figma and the code but
 // no Code Connect file maps yet, written from what the contract already pairs: each Figma property's code prop, an
 // enum's values as Figma and the code write them, the booleans (and the ones that hold the opposite), the texts, the
-// instances it swaps, and the attributes a property decides are written at all.
+// instances it swaps, what fills a slot (between the tags, in the template form), and the attributes a property decides
+// are written at all (a guard in the template form, the call that wraps the prop's own in the classic one).
 //
 //   draftFor(contract, { form, figmaFile })           → { file, text, pairs, todos } | null
 //   draftsFor(contracts, maps, { form, figmaFile })   → { drafts, skipped: [{ name, why }] }
@@ -12,7 +13,7 @@
 // for Vue, Svelte and web components. A project that has Code Connect files already gets the form they use.
 //
 // A draft is a draft: its first lines say so, and whatever the contract does not settle is a TODO comment where it
-// goes (a value the code does not list, a Figma property no code prop is, a slot, the import). It is written to the
+// goes (a value the code does not list, a Figma property no code prop is, a Figma slot property, the import). It is written to the
 // engine's own folder, never into the code: a person checks it, moves it beside the component and publishes it with
 // their own Code Connect tooling. Pure: no file is read or written here.
 import { isStateAxis } from './contract-code.mjs';
@@ -66,14 +67,15 @@ function readPairs(contract) {
     else if (kind === 'SLOT') todos.push(`${p.name}: a Figma slot, filled in the code's ${c.slot ?? c.prop} slot: write what goes in it`);
     else {
       const code = c.as === 'defaultSlot' ? 'children' : c.prop ?? c.slot;
-      const e = { figma: p.name, kind, code, as: c.as };
+      // A slot it fills: written between the component's tags in the template form ('default': its default slot).
+      const e = { figma: p.name, kind, code, as: c.as, ...(c.as === 'defaultSlot' ? { slot: 'default' } : c.as === 'slot' ? { slot: c.slot ?? c.prop } : {}) };
       if (kind === 'VARIANT') { const v = valuesFor(p, c); e.values = v.map; if (v.todo) todos.push(v.todo); }
       else if (kind === 'BOOLEAN' && c.inverted) e.negated = true;
-      else if (kind === 'INSTANCE_SWAP' && c.as === 'prop') todos.push(`${p.name}: the instance it swaps becomes ${code}; check how its value is written`);
+      else if (kind === 'INSTANCE_SWAP') todos.push(`${p.name}: the instance it swaps ${c.as === 'prop' ? `becomes ${code}` : `fills the ${c.as === 'defaultSlot' ? 'default slot' : `${e.slot} slot`}`}; check how its value is written`);
       if (c.source === 'name' || c.source === 'convention') e.byName = true;
       entries.push(e);
     }
-    for (const cond of p.conditions ?? []) entries.push({ figma: p.name, kind, code: cond.code, condition: true, ...(cond.negated ? { negated: true } : {}), ...(cond.equals != null ? { equals: cond.equals } : {}), ...(cond.unclear ? { unclear: true } : {}) });
+    for (const cond of p.conditions ?? []) entries.push({ figma: p.name, kind, options: p.options, code: cond.code, condition: true, ...(cond.slot ? { slot: true } : {}), ...(cond.negated ? { negated: true } : {}), ...(cond.equals != null ? { equals: cond.equals } : {}), ...(cond.unclear ? { unclear: true } : {}) });
   }
   return { entries, todos };
 }
@@ -95,22 +97,37 @@ function classic(contract, entries, todos, url) {
   const tag = contract.source.code.tag && ident(contract.source.code.tag) ? contract.source.code.tag : camel(contract.name).replace(/^./, (x) => x.toUpperCase());
   const values = entries.filter((e) => !e.condition);
   const lines = [...header(contract, 'classic'), `import figma from '@figma/code-connect'`, `import { ${tag} } from './${baseOf(contract.source.code.file)}'   // TODO: a default export is imported without the braces`, ''];
-  for (const e of entries.filter((x) => x.condition)) todos.push(`${e.figma}: decides whether ${e.code} is written${e.negated ? ' (when it is off)' : e.equals != null ? ` (when it is ${e.equals})` : ''}; the classic form writes that in the example`);
+  const conditions = entries.filter((x) => x.condition);
   lines.push(`figma.connect(${tag}, ${q(url)}, {`, '  props: {');
-  const pairs = [];
+  const pairs = [], guarded = new Set();
+  // A property that decides whether the prop is written wraps its call: figma.boolean('Show caption', { true: …,
+  // false: undefined }), the other way round when it decides it off; an enum on the option it decides it under.
+  const wrap = (g, inner) => {
+    if (g.kind === 'BOOLEAN' && g.equals == null) return `figma.boolean(${q(g.figma)}, ${g.negated ? `{ true: undefined, false: ${inner} }` : `{ true: ${inner}, false: undefined }`})`;
+    const on = g.kind === 'VARIANT' ? (g.equals != null ? (g.negated ? null : g.equals) : (g.options ?? []).find((o) => /^(true|false)$/i.test(String(o)) && /^true$/i.test(String(o)) !== !!g.negated)) : null;
+    return on != null ? `figma.enum(${q(g.figma)}, { ${ident(on) ? on : q(on)}: ${inner} })` : null;
+  };
   for (const e of values) {
     if (!ident(e.code)) { todos.push(`${e.figma}: its code prop ${e.code} is not a name JavaScript can use as a key`); continue; }
-    const call = e.kind === 'VARIANT' ? `figma.enum(${q(e.figma)}, ${mapText(e.values)})`
+    let call = e.kind === 'VARIANT' ? `figma.enum(${q(e.figma)}, ${mapText(e.values)})`
       : e.kind === 'BOOLEAN' ? `figma.boolean(${q(e.figma)}${e.negated ? ', { true: false, false: true }' : ''})`
       : e.kind === 'TEXT' ? `figma.string(${q(e.figma)})`
       : e.kind === 'INSTANCE_SWAP' ? `figma.instance(${q(e.figma)})` : null;
     if (!call) { todos.push(`${e.figma}: a Figma ${e.kind} property, which a draft does not write`); continue; }
+    const guards = [];
+    for (const g of conditions.filter((c) => c.code === e.code && !c.unclear && !c.slot && c.figma !== e.figma)) {
+      const w = wrap(g, call);
+      if (!w) continue;
+      call = w; guards.push(g); guarded.add(g);
+    }
     lines.push(`    ${e.code}: ${call},${e.byName ? '   // TODO: paired by its name: check it is that prop' : ''}`);
-    pairs.push({ figma: e.figma, code: e.code, role: 'value', ...(e.values ? { values: e.values } : {}) });
+    pairs.push({ figma: e.figma, code: e.code, role: 'value', ...(e.negated ? { negated: true } : {}), ...(e.values ? { values: e.values } : {}) });
+    for (const g of guards) pairs.push({ figma: g.figma, code: g.code, role: 'condition', ...(g.kind === 'BOOLEAN' ? (g.negated ? { negated: true } : {}) : { equals: g.equals ?? (g.options ?? []).find((o) => /^(true|false)$/i.test(String(o)) && /^true$/i.test(String(o)) !== !!g.negated) }) });
   }
+  for (const c of conditions) if (!guarded.has(c)) todos.push(`${c.figma}: decides whether ${c.code} is written${c.negated ? ' (when it is off)' : c.equals != null ? ` (when it is ${c.equals})` : ''}${values.some((e) => e.code === c.code) ? '' : `, and no Figma property fills ${c.code}`}: write it in the example`);
   lines.push('  },');
-  const attrs = pairs.filter((p) => p.code !== 'children').map((p) => `${p.code}={props.${p.code}}`);
-  const kids = pairs.some((p) => p.code === 'children');
+  const attrs = pairs.filter((p) => p.role === 'value' && p.code !== 'children').map((p) => `${p.code}={props.${p.code}}`);
+  const kids = pairs.some((p) => p.role === 'value' && p.code === 'children');
   lines.push(`  example: (props) => <${tag}${attrs.length ? ' ' + attrs.join(' ') : ''}${kids ? `>{props.children}</${tag}>` : ' />'},`, '})');
   return { lines, pairs };
 }
@@ -136,26 +153,46 @@ function template(contract, entries, todos, url) {
     if (syntax === 'svelte' && bool) return ` ${e.code}={\${${e.negated ? '!' : ''}${v}}}`;
     return ` ${e.code}="\${${e.negated ? '!' : ''}${v}}"`;
   };
-  const values = entries.filter((e) => !e.condition && e.code !== 'children');
-  for (const e of entries.filter((x) => !x.condition && x.code === 'children')) todos.push(`${e.figma}: fills the code's default slot; write it inside the tag`);
+  const values = entries.filter((e) => !e.condition && !e.slot);
+  const content = entries.filter((e) => !e.condition && e.slot);
   const conditions = entries.filter((e) => e.condition);
+  const testsOf = (guards) => guards.map((g) => { const gv = varOf(g); return gv ? (g.equals != null ? `${gv} === ${literal(g.equals)}` : `${g.negated ? '!' : ''}${gv}`) : null; }).filter(Boolean);
+  const guarded = (tests, text) => (tests.length ? `\${${tests.join(' && ')} ? \`${text.replace(/[\\`]/g, '\\$&')}\` : ''}` : text);
+  const condPair = (g) => ({ figma: g.figma, code: g.code, role: 'condition', ...(g.slot ? { slot: true } : {}), ...(g.negated ? { negated: true } : {}), ...(g.equals != null ? { equals: g.equals } : {}) });
   const parts = [];
   for (const e of values) {
     const v = varOf(e);
     if (!v) { todos.push(`${e.figma}: a Figma ${e.kind} property, which a draft does not write`); continue; }
     // The properties that decide whether this attribute is written, each as the contract says it decides.
-    const guards = conditions.filter((c) => c.code === e.code && !c.unclear);
-    const tests = guards.map((g) => { const gv = varOf(g); return gv ? (g.equals != null ? `${gv} === ${literal(g.equals)}` : `${g.negated ? '!' : ''}${gv}`) : null; }).filter(Boolean);
-    const attr = attrFor(e, v);
-    parts.push(tests.length ? `\${${tests.join(' && ')} ? \`${attr.replace(/[\\`]/g, '\\$&')}\` : ''}` : attr);
+    const guards = conditions.filter((c) => c.code === e.code && !c.unclear && !c.slot);
+    parts.push(guarded(testsOf(guards), attrFor(e, v)));
     pairs.push({ figma: e.figma, code: e.code, role: 'value', ...(e.negated ? { negated: true } : {}), ...(e.values ? { values: e.values } : {}) });
-    for (const g of guards) if (vars.has(g.figma)) pairs.push({ figma: g.figma, code: g.code, role: 'condition', ...(g.negated ? { negated: true } : {}), ...(g.equals != null ? { equals: g.equals } : {}) });
+    for (const g of guards) if (vars.has(g.figma)) pairs.push(condPair(g));
     if (e.byName) todos.push(`${e.figma}: paired with ${e.code} by its name: check it is that prop`);
   }
-  for (const c of conditions) if (!values.some((e) => e.code === c.code) || c.unclear) todos.push(`${c.figma}: decides whether ${c.code} is written${c.negated ? ' (when it is off)' : ''}, and no Figma property fills ${c.code}: write it`);
+  // What fills a slot goes between the tags: the default slot's content as it is, a named slot's in the element the
+  // code's framework names it with (slot="icon" for a web component, <template #icon> for Vue).
+  const inner = [];
+  for (const e of content) {
+    const named = e.slot !== 'default';
+    if (named && (!/^[\w-]+$/.test(e.slot) || !['html', 'vue', 'svelte'].includes(syntax))) { todos.push(`${e.figma}: fills the code's ${e.slot} slot, which a draft does not write in ${syntax}: write it inside the tag`); continue; }
+    const v = varOf(e);
+    if (!v) { todos.push(`${e.figma}: a Figma ${e.kind} property, which a draft does not write`); continue; }
+    const fill = `\${${v}}`;
+    const text = !named ? fill : syntax === 'vue' ? `<template #${e.slot}>${fill}</template>` : syntax === 'svelte' ? `<svelte:fragment slot="${e.slot}">${fill}</svelte:fragment>` : `<span slot="${e.slot}">${fill}</span>`;
+    const guards = conditions.filter((c) => c.slot && c.code === e.slot && !c.unclear);
+    inner.push(guarded(testsOf(guards), text));
+    pairs.push({ figma: e.figma, code: e.slot, role: 'value', slot: true });
+    for (const g of guards) if (vars.has(g.figma)) pairs.push(condPair(g));
+    if (named && syntax === 'svelte') todos.push(`${e.figma}: written into the ${e.slot} slot the Svelte 4 way; a Svelte 5 component takes it as a snippet`);
+  }
+  for (const c of conditions) {
+    const filled = c.slot ? content.some((e) => e.slot === c.code) : values.some((e) => e.code === c.code);
+    if (!filled || c.unclear) todos.push(`${c.figma}: decides whether ${c.slot ? `the ${c.code} slot is filled` : `${c.code} is written`}${c.negated ? ' (when it is off)' : ''}, and no Figma property fills ${c.code}: write it`);
+  }
   const fn = syntax === 'html' ? 'html' : 'code';
   const lines = [`// url=${url}`, `// source=${contract.source.code.file}`, `// component=${tag}`, ...header(contract, 'template'), `import figma from 'figma'`, '', ...[...vars.values()].map((v) => v.line), '',
-    'export default {', `  example: figma.${fn}\`<${tag}${parts.join('')}${syntax === 'html' ? `></${tag}>` : ' />'}\`,`, `  id: ${q(tag)},`, '}'];
+    'export default {', `  example: figma.${fn}\`<${tag}${parts.join('')}${inner.length || syntax === 'html' ? `>${inner.join('')}</${tag}>` : ' />'}\`,`, `  id: ${q(tag)},`, '}'];
   return { lines, pairs };
 }
 

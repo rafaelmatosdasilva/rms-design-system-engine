@@ -49,13 +49,14 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 **Ready to use** · **Why it matters:** What designers know becomes something teammates and agents can read.
 
-*Today: it reads DSDS or Markdown and MDX pages, from GitLab, GitHub or a folder in your project. Its own fixes go back where the layer lives, in its own format: a commit or a merge request on GitLab, a commit or a pull request on GitHub, or the pages in your folder rewritten for you to commit. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
+*Today: it reads DSDS or Markdown and MDX pages from GitLab, GitHub (Enterprise too) or a folder in your project, and pages kept in Notion or Confluence. Its own fixes go back where the layer lives, in its own format: a commit or a merge request on GitLab, a commit or a pull request on GitHub, or the pages in your folder rewritten for you to commit. Notion and Confluence are only read: each fix is listed for a person to make there. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
 
-- Reads your documentation where it already lives: a docs folder, a documentation site's pages, or the `.mdx` beside each component. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
+- Reads your documentation where it already lives: a docs folder, a documentation site's pages, the `.mdx` beside each component, or a Notion or Confluence page and the pages under it. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
 - Shows why each component exists, when to use it and when not, beside Figma and the code.
 - Writes what it is sure of, such as the element a component renders, and drafts the rest, such as an example, for a person to approve.
 - Keeps every decision in one history: differences kept on purpose, proposals answered, what was ruled out and why.
 - Marks a page to review again when its component changes after the page was written: what changed and since when. Agents still read the page, with a note beside it. A person confirms it, or edits it.
+- Does the same for the team's answers: a decision whose component changed since is marked to review again, confirmed or withdrawn by a person.
 - Shows each proposal with every answer it could take and the evidence for each: where it comes from (Figma, the code, the products, your pages, past decisions) and how strong it is.
 - Names who decides each thing that waits on a person, from the owners you set, and counts what waits on each.
 - Reads your guidelines against each other: rules that contradict, rules written twice and rules nothing can check.
@@ -155,6 +156,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Keeps each correction you make to what an AI made as a lesson, with your reason, and turns it into the strongest guard that holds it once you say yes: a check, a step agents read, or a rule for your guidelines.
 - Notices a line an AI wrote that a person changed since, and asks whether it was a correction.
 - Proposes a rule when the same finding comes back on three screens or in three edits.
+- Has a model judge each Showroom screen on its screenshot and its code, when you ask: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, shown beside the page review, with what it cost.
 - Says when a lesson comes back, and which guard did not hold.
 - Measures whether your guidance actually helps agents build better.
 - Adds the same rules to the instruction files of Cursor, Copilot and other agents. *(Coming soon)*

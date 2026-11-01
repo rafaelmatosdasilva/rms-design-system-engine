@@ -347,11 +347,18 @@ its latest commit, its tree and each page's file (GET; `GITHUB_TOKEN` or `GH_TOK
 sent only to GitHub, needed for a private repository, and to date every page past GitHub's 60 calls an hour without
 one). The only file it writes is its own snapshot in your project. Every run reads it again when the branch's commit
 moved (a folder: when a page in it changed), with the same token rules as above, into `intent-layer.snapshot.json`;
-a host not reachable keeps the snapshot and says from which commit. The fixes the engine makes in the layer
+a host not reachable keeps the snapshot and says from which commit. A layer kept in a documentation tool is read
+through its API into Markdown pages, a folder for each page that holds others, each page's own link kept: a Notion
+page (its child pages, and the rows of its databases with their Kind, Status and Component as front matter;
+`NOTION_TOKEN`, the page shared with that integration) or a Confluence page and its descendants (`CONFLUENCE_TOKEN`,
+with `CONFLUENCE_EMAIL` on Atlassian's cloud); each token goes only to its own tool. A GitHub Enterprise host is
+named in `GITHUB_HOST` (or the layer set as `{ "github": "<link>" }`). The fixes the engine makes in the layer
 (`intentLayer.autoFix`, `--intent-changes`) go back where it lives, DSDS or Markdown alike: on GitLab a commit or a
 merge request; on GitHub a commit (only while the branch has not moved) or a pull request, with a `GITHUB_TOKEN`
 that may write to it; in a folder of the project the pages are written there, never committed, for a person to read
-and commit (a page changed since it was read is never overwritten). Each page's sections are read by title (Intent or Overview → what it is for; When to use or
+and commit (a page changed since it was read is never overwritten). Notion and Confluence are never written to: the
+changes are made on the pages as read, into `.design-system-engine-out/intent-changes/`, and listed for a person
+to make there. Each page's sections are read by title (Intent or Overview → what it is for; When to use or
 Usage rules; When not to use or What not to do; Common mistakes; Limitations; a numbered title is read by its
 words), with its use cases (recommended, discouraged) and checklists (rules). Facts the engine reads from Figma
 and the code (anatomy, API, states, tokens, source) are left out, and so is a line written on every page of a

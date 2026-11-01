@@ -38,7 +38,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, posix } from 'node:path';
 import { contractSummaries } from './shared-contracts.mjs';
-import { layerHost, hostOf, isLink, parseGithub, fileUrl as hostFileUrl } from './doc-host.mjs';
+import { layerHost, hostOf, isLink, parseGithub, TOOLS, fileUrl as hostFileUrl } from './doc-host.mjs';
 
 export const ID = 'dsds-gitlab';
 // The reader's version, kept in each snapshot: one written by an older reader is read again even when the commit has
@@ -65,11 +65,11 @@ export function intentLayerConfig(cfg) {
         : read?.folder ? { place: posix.join(slashes(read.folder) || '.', slashes(read.path)), host: 'folder' } : null;
   if ((!raw && !store) || (st && typeof st === 'object' && 'read' in st && st.read == null)) return null;   // read nowhere: no layer
   const o = typeof raw === 'string' ? (isLink(raw) ? { url: raw } : { folder: raw }) : (raw ?? {});
-  const given = o.gitlab ? ['gitlab', o.gitlab] : o.github ? ['github', o.github] : o.folder != null ? ['folder', o.folder] : o.url ? [hostOf(o.url), o.url] : [null, ''];
+  const given = o.gitlab ? ['gitlab', o.gitlab] : o.github ? ['github', o.github] : o.notion ? ['notion', o.notion] : o.confluence ? ['confluence', o.confluence] : o.folder != null ? ['folder', o.folder] : o.url ? [hostOf(o.url), o.url] : [null, ''];
   const host = store?.host ?? given[0];
   let url = String(store?.place ?? given[1] ?? '').trim();
   if (!url || !host) return null;
-  const gh = host === 'github' ? parseGithub(url) : null;
+  const gh = host === 'github' ? parseGithub(url, { any: true }) : null;
   if (host === 'folder') url = slashes(url) || '.';
   const path = slashes(store?.path ?? o.path ?? gh?.path ?? '') || null;
   const ref = store?.ref ?? o.branch ?? o.ref ?? gh?.ref ?? null;
@@ -475,16 +475,16 @@ export const fileUrl = hostFileUrl;
 // ── Reading it where it lives ───────────────────────────────────────────────────────────────────────────────────────
 // Read the layer and write its snapshot. opts: { env, fetchImpl, offline, now }.
 // → { ok, changed, out, source, entities, boilerplate } | { error, out, stale } (stale: the snapshot kept is from an earlier commit)
-const HOST_NAME = { gitlab: 'GitLab', github: 'GitHub', folder: 'its folder' };
+const HOST_NAME = { gitlab: 'GitLab', github: 'GitHub', folder: 'its folder', notion: 'Notion', confluence: 'Confluence' };
 export async function syncIntentLayer(ROOT, cfg, opts = {}) {
   const c = intentLayerConfig(cfg);
   if (!c) return null;
   const out = resolve(ROOT, c.out);
   const prev = readSnapshot(ROOT, cfg);
   const kept = (error) => ({ error, out: c.out, stale: !!prev, source: prev?._source ?? null });
-  if (opts.offline && c.host !== 'folder') return kept(`not checked against ${HOST_NAME[c.host]} this run`);
+  if (opts.offline && c.host !== 'folder') return kept(`not checked against ${HOST_NAME[c.host] ?? c.host} this run`);
   const h = layerHost(ROOT, c, opts);
-  if (h.error) return { error: h.error, out: c.out, stale: !!prev };
+  if (h.error) return { error: h.error, out: c.out, stale: !!prev, source: prev?._source ?? null };
   try {
     const head = await h.head();
     if (head.error) return kept(head.error);
@@ -521,7 +521,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
     const format = c.format ?? (c.entry || dsdsFiles.length || !pages.size ? 'dsds' : 'markdown');
     source.format = format;
     if (c.format) source.formatGiven = c.format;
-    const where = c.host === 'folder' ? `the folder ${source.folder}` : `${source.url.replace(/^https?:\/\//, '')} on ${ref}`;
+    const where = c.host === 'folder' ? `the folder ${source.folder}` : TOOLS[c.host] ? `${TOOLS[c.host]} (${source.url})` : `${source.url.replace(/^https?:\/\//, '')} on ${ref}`;
     let system, entities;
     if (format === 'dsds') {
       const entry = c.entry ?? dsdsFiles.filter((f) => /(^|\/)system\.dsds\.json$/i.test(f)).sort((x, y) => x.split('/').length - y.split('/').length || x.length - y.length)[0] ?? null;
@@ -535,9 +535,11 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
       source.entry = system?.file ?? null;
     }
     const boilerplate = dropBoilerplate(entities);
-    for (const e of entities) e.url = fileUrl(source, e.file);
+    // A documentation tool gives each page's own link; a repository's is built from its path.
+    const linkOf = (f) => got.urls?.[f] ?? fileUrl(source, f);
+    for (const e of entities) e.url = linkOf(e.file);
     // A Markdown page's links to other pages of its site: to those pages where the layer lives.
-    if (format === 'markdown') (await import('./doc-source-markdown.mjs')).resolveLinks(entities, { url: (f) => fileUrl(source, f), paths: layerFiles });
+    if (format === 'markdown') (await import('./doc-source-markdown.mjs')).resolveLinks(entities, { url: linkOf, paths: layerFiles });
     // Each page's own spec, where it has one (its code file's, else its title's); a family's spec several pages are
     // written from is named as shared.
     if (format === 'dsds') try {
@@ -589,7 +591,7 @@ export async function syncIntentLayer(ROOT, cfg, opts = {}) {
 // One line for the person.
 export function describeSync(r) {
   if (!r) return '';
-  const at = (s) => (!s?.sha ? '' : s.host === 'folder' ? `the folder ${s.folder ?? s.url}${s.ref && s.ref !== 'HEAD' ? ` (${s.ref})` : ''}` : `${s.url.replace(/^https?:\/\//, '')} @ ${s.ref} ${s.sha.slice(0, 8)}${s.committedAt ? ` (${s.committedAt.slice(0, 10)})` : ''}`);
+  const at = (s) => (!s?.sha ? '' : s.host === 'folder' ? `the folder ${s.folder ?? s.url}${s.ref && s.ref !== 'HEAD' ? ` (${s.ref})` : ''}` : TOOLS[s.host] ? `${TOOLS[s.host]}${s.committedAt ? ` (last edited ${s.committedAt.slice(0, 10)})` : ''}` : `${s.url.replace(/^https?:\/\//, '')} @ ${s.ref} ${s.sha.slice(0, 8)}${s.committedAt ? ` (${s.committedAt.slice(0, 10)})` : ''}`);
   if (r.error) return r.stale ? `⚠️  Intent layer: ${r.error} - using the copy of ${at(r.source)}` : `❌ Intent layer: ${r.error}`;
   const fmt = r.source?.format === 'markdown' ? 'Markdown pages' : 'pages';
   const lc = r.lastChange;

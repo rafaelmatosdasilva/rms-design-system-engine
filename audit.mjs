@@ -983,6 +983,7 @@ if (process.argv.includes('--contracts-out')) {
   const r = await generateContracts(ROOT, pcfg, { publishTo: dir, force: true });
   if (toStore && !cstore.folder && !r.invalid.length) { const sent = await st.pushStore(ROOT, pcfg, 'contracts', st.folderFiles(dir, 'contracts'), `Contracts published with rms-design-system-engine (${r.components.length})`, { offline: STORE_OFFLINE }); console.log(sent.line); }
   console.log(`📐 Contracts published → ${r.outDir}  (${r.components.length} contract${r.components.length === 1 ? '' : 's'}${r.removed?.length ? ` · ${r.removed.length} removed` : ''}${r.skipped?.length ? ` · ${r.skipped.length} not written, listed in README.md` : ''})`);
+  if (r.specsOut) console.log(`   ℹ️  The same contracts in the ${(await import('./contract-spec.mjs')).SPEC_FORMAT} format → specs/`);
   for (const i of r.invalid.slice(0, 20)) console.log(`   ❌ ${i.name}: ${i.errs.slice(0, 3).join('; ')}`);
   // A breaking change is a release the products move to by a day (releases.mjs): recorded with the system's version.
   try {
@@ -1515,6 +1516,34 @@ if (process.argv.includes('--guidance-rating')) {
   process.exit(0);
 }
 
+// ── --judge-pages: a model judges each Showroom screen against its brief (page-judgment.mjs) ──
+// Only when asked: it spends the person's model tokens, through their own command (pageJudgment.cmd, default claude
+// -p, as the extraction test asks one). Each screen's screenshot (its own picture beside it, else taken from the built
+// style guide), its code, the components it uses with what each is for, and its brief, judged on the decisions named
+// (pageJudgment.decisions). An answer is kept by the screenshot's hash and the rubric's, so an unchanged screen is never
+// paid twice. Advisory: written to .design-system-engine-out/page-judgment.json, beside each screen's page review in the
+// style guide, and a decision judged broken on three screens becomes a proposed rule (lessons.mjs).
+if (process.argv.includes('--judge-pages')) {
+  let jcfg = {}; try { jcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* no setup: the Showroom at its default place */ }
+  const pj = await import('./page-judgment.mjs');
+  const run = await pj.judgePages(ROOT, jcfg);
+  for (const l of pj.judgmentLines(run)) console.log(l);
+  if (run.why) { console.log(`NEXT: ${/style guide/.test(run.why) ? 'build the style guide (rms-design-system-engine --styleguide), then judge the pages again' : 'nothing to judge: tell the person why, from the line above'}`); process.exit(run.screens?.length ? 0 : 2); }
+  // The built style guide shows the judgment at once, beside each screen's page review; its next build reads it too.
+  const page = resolve(ROOT, jcfg.styleguide?.out ?? '.design-system-engine-out/styleguide/index.html');
+  if (run.screens.length && existsSync(page)) {
+    try {
+      const html = readFileSync(page, 'utf8').replace(/<script>window\.__dseShowroomJudged = [\s\S]*?<\/script>/, '');   // the last judgment written in, once
+      const data = JSON.stringify(pj.judgedForPage(run)).replace(/</g, '\\u003c');
+      writeFileSync(page, html.replace(/<\/body>(?![\s\S]*<\/body>)/, () => `<script>window.__dseShowroomJudged = ${data}; if (window.__dseShowroomJudge) window.__dseShowroomJudge(window.__dseShowroomJudged);</script></body>`));
+      console.log(`   Shown beside each screen's page review in the style guide → ${relative(ROOT, page)}#showroom`);
+    } catch { /* the next build shows it */ }
+  }
+  if (!run.screens.length && run.failed.some((f) => /style guide/.test(f.why))) console.log('NEXT: build the style guide (rms-design-system-engine --styleguide), then judge the pages again');
+  else console.log('NEXT: tell the person the decisions judged broken, each with its evidence and the sentence to check, from the lines above; they are advisory, judged by a model, and never fail a run. Say what it cost.');
+  process.exit(0);
+}
+
 // ── --keep / --unkeep: a difference the team decided to keep (kept.mjs) ──
 // --keep --match <words> [--component <name>] --reason "<why>" [--by "<name>"] [--truth figma|code] [--review <date|90d>]
 // keeps the open differences of the last full audit that match, each with why, who and when; they never fail a run
@@ -1988,11 +2017,11 @@ if (process.argv.includes('--intent-layer') || process.argv.some((a) => a.starts
     const r = await il.syncIntentLayer(ROOT, conf, {});
     console.log('\n' + il.describeSync(r));
     if (r?.error) {
-      if (host === 'github') console.log('   If the repository is private, or GitHub limits requests without a token, put a GitHub token that can read it in this project\'s .env as GITHUB_TOKEN=... (never paste it into the chat).');
+      if (host === 'github') console.log('   If the repository is private, or GitHub limits requests without a token, put a GitHub token that can read it in this project\'s .env as GITHUB_TOKEN=... (never paste it into the chat). A GitHub Enterprise host is named in GITHUB_HOST.');
       console.log(`\nNEXT: make the fix named above, then run rms-design-system-engine --intent-layer ${link} again`);
       process.exit(1);
     }
-    console.log(`\nNEXT: rms-design-system-engine   (every run reads it again when ${host === 'folder' ? 'a page in it changed' : 'its commit moved'}, and folds it into the design intent, the contracts and the style guide)`);
+    console.log(`\nNEXT: rms-design-system-engine   (every run reads it again when ${host === 'folder' || ['notion', 'confluence'].includes(host) ? 'a page in it changed' : 'its commit moved'}, and folds it into the design intent, the contracts and the style guide)`);
     process.exit(0);
   }
   const envDirs = [ROOT, ...(existsSync(join(ROOT, '.gitlab-source.json')) ? [dirname(resolve(ROOT))] : [])];   // a mirror's .env is beside it
@@ -2913,6 +2942,8 @@ async function refreshComponentProps(fileKey, token, outPath) {
     const sets  = Object.entries(byNodeId(csMeta?.component_sets));
     const ids   = sets.map(([id]) => id);
     const names = Object.fromEntries(sets.map(([id, s]) => [id, s.name]));
+    // The page each is on, as the listing names it (containing_frame.pageId).
+    const pageOf = Object.fromEntries(sets.filter(([, s]) => s.containing_frame?.pageId).map(([id, s]) => [id, s.containing_frame.pageId]));
 
     // ② Standalone COMPONENTS (single components not in a variant set)
     const compRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/components`, { headers: h });
@@ -2920,7 +2951,7 @@ async function refreshComponentProps(fileKey, token, outPath) {
     const standaloneEntries = Object.entries(byNodeId(compMeta?.components))
       .filter(([, c]) => !c.containing_frame?.containingStateGroup);
     for (const [nodeId, c] of standaloneEntries) {
-      if (!names[nodeId]) { ids.push(nodeId); names[nodeId] = c.name; }
+      if (!names[nodeId]) { ids.push(nodeId); names[nodeId] = c.name; if (c.containing_frame?.pageId) pageOf[nodeId] = c.containing_frame.pageId; }
     }
 
     // ③ Fallback: for unpublished files (API returns nothing), refresh known nodeIds
@@ -2929,7 +2960,7 @@ async function refreshComponentProps(fileKey, token, outPath) {
     try { existingSnap = JSON.parse(readFileSync(outPath, 'utf8')); } catch {}
     for (const [name, entry] of Object.entries(existingSnap)) {
       if (name === '_updated' || !entry?.nodeId) continue;
-      if (!names[entry.nodeId]) { ids.push(entry.nodeId); names[entry.nodeId] = name; }
+      if (!names[entry.nodeId]) { ids.push(entry.nodeId); names[entry.nodeId] = name; if (entry.pageId) pageOf[entry.nodeId] = entry.pageId; }
     }
 
     if (!ids.length) return false;
@@ -2950,7 +2981,7 @@ async function refreshComponentProps(fileKey, token, outPath) {
         const anns  = doc?.annotations ?? [];
         const layerAnns = layerAnnotationsOf(doc);
         if (Object.keys(props).length || anns.length || layerAnns.length) {
-          result[names[nodeId] ?? doc?.name ?? nodeId] = { nodeId, properties: props, annotations: anns, ...(layerAnns.length ? { layerAnnotations: layerAnns } : {}) };
+          result[names[nodeId] ?? doc?.name ?? nodeId] = { nodeId, ...(pageOf[nodeId] ? { pageId: pageOf[nodeId] } : {}), properties: props, annotations: anns, ...(layerAnns.length ? { layerAnnotations: layerAnns } : {}) };
         }
       }
     }
@@ -6401,6 +6432,8 @@ function reportFull(label, items, shown) {
       if (lines.length) { console.log(''); for (const l of lines) console.log(C.yellow(l)); }
       // Each screen's findings kept across runs (lessons.mjs): the same one on three screens becomes a proposed rule.
       if (rows.length) { try { (await import('./lessons.mjs')).noteReview(ROOT, rows.map((r) => ({ place: r.screen, kinds: r.findings.map((f) => f.kind) }))); } catch { /* a help, never a blocker */ } }
+      // The last time a model judged the screens (--judge-pages): said in one line with what it cost. Nothing is asked here.
+      if (rows.length) { try { const pj = await import('./page-judgment.mjs'); const line = pj.judgmentLine(pj.readJudgment(ROOT), { last: true }); if (line) console.log(C.yellow(line)); } catch { /* advisory */ } }
     } catch { /* advisory: never fails */ }
   }
 

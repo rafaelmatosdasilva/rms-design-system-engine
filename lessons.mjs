@@ -21,8 +21,9 @@
 //     correction to confirm, never a lesson until the person gives why;
 //   • a finding marked wrong (wrong.mjs), a page-review finding among them: the person corrected the engine. Its guard
 //     is already written: the case its check must pass.
-// And from findings that repeat: the same page-review finding on three screens, or the same edit-check finding in
-// three edits, is proposed as one checkable sentence. Only kinds that should be decided the same way every time are
+// And from findings that repeat: the same page-review finding on three screens, the same decision a model judged
+// broken on three screens (page-judgment.mjs), or the same edit-check finding in three edits, is proposed as one
+// checkable sentence. Only kinds that should be decided the same way every time are
 // named; a judgement (which section matters most) never is.
 //
 // A lesson that comes back after its guard was written is said, with the guard that did not hold.
@@ -305,6 +306,11 @@ export const REPEAT_RULES = {
   'page:empty': { form: 'guideline', text: 'Every list shows what it holds when it is empty.' },
   'page:error': { form: 'guideline', text: 'Every field that takes input shows what is wrong at the field, in words.' },
   'page:loading': { form: 'guideline', text: 'A page that loads its data shows it loading.' },
+  // A decision a model judged broken, read on the screenshot as well as the code (page-judgment.mjs).
+  'judge:component': { form: 'guideline', text: 'Each part of a screen uses the component made for what it does, as its intent says; never one made for something else.' },
+  'judge:primary': { form: 'guideline', text: 'Each screen shows one main action that reads first; every other action looks secondary.' },
+  'judge:destructive': { form: 'guideline', text: 'A destructive action never looks more prominent than the main decision: not in colour, size or place.' },
+  'judge:layout': { form: 'guideline', text: 'Each screen is arranged as its brief says: what matters most comes first, grouped as the brief groups it.' },
   'edit:colour': { form: 'agent', text: 'Write every colour as one of the system\'s colour tokens (var(--…)); never write a colour by hand.' },
   'edit:size': { form: 'agent', text: 'Write every padding, margin, gap, radius and font size as one of the system\'s size tokens; never in px or rem by hand.' },
   'edit:variable': { form: 'agent', text: 'Use only the CSS variables the theme declares; ask with rms-design-system-engine --query <name> before using one.' },
@@ -345,17 +351,18 @@ const bump = (seen, sig, source, place, now) => {
 
 // A run's page reviews: each screen's finding kinds. A finding counts once per screen while it stays: a screen fixed
 // and then made the same way again counts again, because that is the mistake made twice.
-// screens: [{ place, kinds: [kind] }]
-export function noteReview(ROOT, screens = [], { now = new Date().toISOString() } = {}) {
+// screens: [{ place, kinds: [kind] }]. prefix: 'page' for the page review, 'judge' for a model's judgment of the page
+// (each kept apart, so a screen judged is never counted twice for the same review).
+export function noteReview(ROOT, screens = [], { now = new Date().toISOString(), prefix = 'page' } = {}) {
   const seen = readSeen(ROOT);
   const present = new Map();
-  for (const s of screens) for (const k of new Set(s.kinds ?? [])) { const sig = `page:${k}`; if (!present.has(sig)) present.set(sig, new Set()); present.get(sig).add(s.place); }
+  for (const s of screens) for (const k of new Set(s.kinds ?? [])) { const sig = `${prefix}:${k}`; if (!present.has(sig)) present.set(sig, new Set()); present.get(sig).add(s.place); }
   const reviewed = new Set(screens.map((s) => s.place));
   for (const [sig, r] of Object.entries(seen.repeats)) {
-    if (!sig.startsWith('page:')) continue;
+    if (!sig.startsWith(`${prefix}:`)) continue;
     for (const p of Object.keys(r.places)) if (reviewed.has(p) && !present.get(sig)?.has(p)) r.places[p] = false;
   }
-  for (const [sig, places] of present) for (const p of places) if (!seen.repeats[sig]?.places?.[p]) bump(seen, sig, 'page', p, now);
+  for (const [sig, places] of present) for (const p of places) if (!seen.repeats[sig]?.places?.[p]) bump(seen, sig, prefix, p, now);
   writeSeen(ROOT, seen);
 }
 
@@ -399,7 +406,7 @@ export function proposalFor(ROOT, id, { components = [], authored } = {}) {
   const doc = readLessonsFile(ROOT);
   const lesson = doc.lessons.find((l) => l.id === id);
   if (lesson) return { id, lesson, proposal: proposeGuard(lesson, { components, authored }) };
-  const m = /^R-(page|edit)-(\w+)$/.exec(String(id));
+  const m = /^R-(page|edit|judge)-(\w+)$/.exec(String(id));
   const rule = m && REPEAT_RULES[`${m[1]}:${m[2]}`];
   if (rule) {
     const r = readSeen(ROOT).repeats[`${m[1]}:${m[2]}`] ?? { times: 0, places: {} };
@@ -554,7 +561,7 @@ export function lessonsView(ROOT, { components = componentNamesOf(ROOT), wrong =
   for (const [id, a] of Object.entries(doc.answers)) {
     if (!id.startsWith('R-') || !a.repeat) continue;
     const r = seen.repeats[a.repeat.kind];
-    const after = a.answer === 'yes' ? (r?.hits ?? []).filter((h) => String(h) > String(a.at)).map((at) => ({ at, how: a.form === 'agent' ? 'the edit check found it again' : 'the page review found it again' })) : [];
+    const after = a.answer === 'yes' ? (r?.hits ?? []).filter((h) => String(h) > String(a.at)).map((at) => ({ at, how: a.form === 'agent' ? 'the edit check found it again' : String(a.repeat.kind).startsWith('judge:') ? 'a model judging the page found it again' : 'the page review found it again' })) : [];
     lessons.push({ id, what: a.text, why: `found ${a.repeat.times} times${a.repeat.places?.length ? ` (${a.repeat.places.slice(0, 4).join(', ')}${a.repeat.places.length > 4 ? ` +${a.repeat.places.length - 4}` : ''})` : ''}`, component: null, source: 'repeat', from: a.repeat.kind, by: a.by, at: a.at,
       proposal: { form: a.form, text: a.text, place: a.place }, answer: a.answer, answered: { by: a.by, at: a.at },
       became: a.answer === 'yes' ? { form: a.form, place: a.place, text: a.text, at: a.at, written: a.written ?? [] } : null, back: after, held: after.length ? false : null });
