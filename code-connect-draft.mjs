@@ -1,8 +1,10 @@
 // code-connect-draft.mjs - a draft Code Connect file for each component the contracts pair with Figma and the code but
 // no Code Connect file maps yet, written from what the contract already pairs: each Figma property's code prop, an
 // enum's values as Figma and the code write them, the booleans (and the ones that hold the opposite), the texts, the
-// instances it swaps, what fills a slot (between the tags, in the template form), and the attributes a property decides
-// are written at all (a guard in the template form, the call that wraps the prop's own in the classic one).
+// instances it swaps (figma.instance; getInstanceSwap(…)?.executeTemplate().example, as Code Connect's template API
+// renders one), a Figma slot property (figma.slot; getSlot), what fills a slot (between the tags in the template form;
+// a prop in React's, <Card header={…}>), and the attributes a property decides are written at all (a guard in the
+// template form, the call that wraps the prop's own in the classic one).
 //
 //   draftFor(contract, { form, figmaFile })           → { file, text, pairs, todos } | null
 //   draftsFor(contracts, maps, { form, figmaFile })   → { drafts, skipped: [{ name, why }] }
@@ -13,7 +15,7 @@
 // for Vue, Svelte and web components. A project that has Code Connect files already gets the form they use.
 //
 // A draft is a draft: its first lines say so, and whatever the contract does not settle is a TODO comment where it
-// goes (a value the code does not list, a Figma property no code prop is, a Figma slot property, the import). It is written to the
+// goes (a value the code does not list, a Figma property no code prop is, the import). It is written to the
 // engine's own folder, never into the code: a person checks it, moves it beside the component and publishes it with
 // their own Code Connect tooling. Pure: no file is read or written here.
 import { isStateAxis } from './contract-code.mjs';
@@ -64,14 +66,12 @@ function readPairs(contract) {
       }
     } else if (c.key) todos.push(`${p.name}: fills ${c.prop}.${c.key}, a key of an object prop, which a draft does not write`);
     else if (c.derived) todos.push(`${p.name}: ${c.prop} is computed from it, not its value: write how`);
-    else if (kind === 'SLOT') todos.push(`${p.name}: a Figma slot, filled in the code's ${c.slot ?? c.prop} slot: write what goes in it`);
     else {
       const code = c.as === 'defaultSlot' ? 'children' : c.prop ?? c.slot;
       // A slot it fills: written between the component's tags in the template form ('default': its default slot).
       const e = { figma: p.name, kind, code, as: c.as, ...(c.as === 'defaultSlot' ? { slot: 'default' } : c.as === 'slot' ? { slot: c.slot ?? c.prop } : {}) };
       if (kind === 'VARIANT') { const v = valuesFor(p, c); e.values = v.map; if (v.todo) todos.push(v.todo); }
       else if (kind === 'BOOLEAN' && c.inverted) e.negated = true;
-      else if (kind === 'INSTANCE_SWAP') todos.push(`${p.name}: the instance it swaps ${c.as === 'prop' ? `becomes ${code}` : `fills the ${c.as === 'defaultSlot' ? 'default slot' : `${e.slot} slot`}`}; check how its value is written`);
       if (c.source === 'name' || c.source === 'convention') e.byName = true;
       entries.push(e);
     }
@@ -112,17 +112,20 @@ function classic(contract, entries, todos, url) {
     let call = e.kind === 'VARIANT' ? `figma.enum(${q(e.figma)}, ${mapText(e.values)})`
       : e.kind === 'BOOLEAN' ? `figma.boolean(${q(e.figma)}${e.negated ? ', { true: false, false: true }' : ''})`
       : e.kind === 'TEXT' ? `figma.string(${q(e.figma)})`
-      : e.kind === 'INSTANCE_SWAP' ? `figma.instance(${q(e.figma)})` : null;
+      : e.kind === 'INSTANCE_SWAP' ? `figma.instance(${q(e.figma)})`
+      : e.kind === 'SLOT' ? `figma.slot(${q(e.figma)})` : null;
     if (!call) { todos.push(`${e.figma}: a Figma ${e.kind} property, which a draft does not write`); continue; }
     const guards = [];
-    for (const g of conditions.filter((c) => c.code === e.code && !c.unclear && !c.slot && c.figma !== e.figma)) {
+    // A slot is a prop here (children, the default one): what decides it is filled wraps it the same way.
+    const codeOf = (c) => (c.slot && c.code === 'default' ? 'children' : c.code);
+    for (const g of conditions.filter((c) => codeOf(c) === e.code && !c.unclear && c.figma !== e.figma)) {
       const w = wrap(g, call);
       if (!w) continue;
       call = w; guards.push(g); guarded.add(g);
     }
     lines.push(`    ${e.code}: ${call},${e.byName ? '   // TODO: paired by its name: check it is that prop' : ''}`);
     pairs.push({ figma: e.figma, code: e.code, role: 'value', ...(e.negated ? { negated: true } : {}), ...(e.values ? { values: e.values } : {}) });
-    for (const g of guards) pairs.push({ figma: g.figma, code: g.code, role: 'condition', ...(g.kind === 'BOOLEAN' ? (g.negated ? { negated: true } : {}) : { equals: g.equals ?? (g.options ?? []).find((o) => /^(true|false)$/i.test(String(o)) && /^true$/i.test(String(o)) !== !!g.negated) }) });
+    for (const g of guards) pairs.push({ figma: g.figma, code: e.code, role: 'condition', ...(g.kind === 'BOOLEAN' ? (g.negated ? { negated: true } : {}) : { equals: g.equals ?? (g.options ?? []).find((o) => /^(true|false)$/i.test(String(o)) && /^true$/i.test(String(o)) !== !!g.negated) }) });
   }
   for (const c of conditions) if (!guarded.has(c)) todos.push(`${c.figma}: decides whether ${c.code} is written${c.negated ? ' (when it is off)' : c.equals != null ? ` (when it is ${c.equals})` : ''}${values.some((e) => e.code === c.code) ? '' : `, and no Figma property fills ${c.code}`}: write it in the example`);
   lines.push('  },');
@@ -132,24 +135,36 @@ function classic(contract, entries, todos, url) {
   return { lines, pairs };
 }
 
-function template(contract, entries, todos, url) {
+function template(contract, all, todos, url) {
   const syntax = contract.source.code.syntax;
+  // React's named slots are props: written as the attribute (<Card header={…}>), and what decides them as its condition.
+  const slotProps = new Set(syntax === 'jsx' ? all.filter((e) => !e.condition && e.slot && e.slot !== 'default').map((e) => e.slot) : []);
+  const plain = ({ slot, ...rest }) => rest;
+  const entries = all.map((e) => (!e.condition && slotProps.has(e.slot) ? { ...plain(e), code: e.slot } : e.condition && e.slot && slotProps.has(e.code) ? plain(e) : e));
+  const fn = syntax === 'html' ? 'html' : 'code';
   const tag = contract.source.code.tag || contract.name;
   const vars = new Map();
   const varOf = (e) => {
     if (vars.has(e.figma)) return vars.get(e.figma).name;
     let name = camel(e.figma) || 'value';
     while ([...vars.values()].some((v) => v.name === name) || name === 'figma') name += '_';
-    const getter = e.kind === 'VARIANT' ? `getEnum(${q(e.figma)}, ${mapText(e.values ?? {})})` : e.kind === 'BOOLEAN' ? `getBoolean(${q(e.figma)})` : e.kind === 'TEXT' ? `getString(${q(e.figma)})` : e.kind === 'INSTANCE_SWAP' ? `getInstanceSwap(${q(e.figma)})` : null;
+    const getter = e.kind === 'VARIANT' ? `getEnum(${q(e.figma)}, ${mapText(e.values ?? {})})` : e.kind === 'BOOLEAN' ? `getBoolean(${q(e.figma)})` : e.kind === 'TEXT' ? `getString(${q(e.figma)})` : e.kind === 'INSTANCE_SWAP' ? `getInstanceSwap(${q(e.figma)})` : e.kind === 'SLOT' ? `getSlot(${q(e.figma)})` : null;
     if (!getter) return null;
     vars.set(e.figma, { name, line: `const ${name} = figma.selectedInstance.${getter}` });
     return name;
   };
   const pairs = [];
+  // A swapped instance is written as what its own Code Connect renders (getInstanceSwap(…)?.executeTemplate().example);
+  // a Figma slot property as the slot itself (getSlot), which Code Connect renders as a reference to it.
+  const fillOf = (e, v) => (e.kind === 'INSTANCE_SWAP' ? `${v}?.executeTemplate().example` : v);
   const attrFor = (e, v) => {
     const bool = e.kind === 'BOOLEAN' || (e.kind === 'VARIANT' && Object.values(e.values ?? {}).every((x) => typeof x === 'boolean'));
+    // React's: a swapped instance through Code Connect's own helper, a slot as the node it is.
+    if (syntax === 'jsx' && e.kind === 'INSTANCE_SWAP') return `\${figma.helpers.react.renderProp(${q(e.code)}, ${fillOf(e, v)})}`;
+    if (syntax === 'jsx' && e.kind === 'SLOT') return ` ${e.code}={\${${v}}}`;
     if (syntax === 'html' && bool) return `\${${e.negated ? '!' : ''}${v} ? ' ${e.code}' : ''}`;
-    if (syntax === 'vue' && (bool || e.kind === 'INSTANCE_SWAP')) return ` :${e.code}="\${${e.negated ? '!' : ''}${v}}"`;
+    if (syntax === 'vue' && (bool || e.kind === 'INSTANCE_SWAP' || e.kind === 'SLOT')) return ` :${e.code}="\${${e.negated ? '!' : ''}${fillOf(e, v)}}"`;
+    if (e.kind === 'INSTANCE_SWAP' || e.kind === 'SLOT') return ` ${e.code}="\${${fillOf(e, v)}}"`;
     if (syntax === 'svelte' && bool) return ` ${e.code}={\${${e.negated ? '!' : ''}${v}}}`;
     return ` ${e.code}="\${${e.negated ? '!' : ''}${v}}"`;
   };
@@ -157,7 +172,10 @@ function template(contract, entries, todos, url) {
   const content = entries.filter((e) => !e.condition && e.slot);
   const conditions = entries.filter((e) => e.condition);
   const testsOf = (guards) => guards.map((g) => { const gv = varOf(g); return gv ? (g.equals != null ? `${gv} === ${literal(g.equals)}` : `${g.negated ? '!' : ''}${gv}`) : null; }).filter(Boolean);
-  const guarded = (tests, text) => (tests.length ? `\${${tests.join(' && ')} ? \`${text.replace(/[\\`]/g, '\\$&')}\` : ''}` : text);
+  // What a property decides is written only when it holds; a part that holds a rendered snippet (a swapped instance, a
+  // slot) is itself a figma template, since Code Connect's snippets are never joined as text.
+  const guarded = (tests, text, snippet = false) => (tests.length ? `\${${tests.join(' && ')} ? ${snippet ? `figma.${fn}` : ''}\`${text.replace(/[\\`]/g, '\\$&')}\` : ''}` : text);
+  const snippetOf = (e) => e.kind === 'INSTANCE_SWAP' || e.kind === 'SLOT';
   const condPair = (g) => ({ figma: g.figma, code: g.code, role: 'condition', ...(g.slot ? { slot: true } : {}), ...(g.negated ? { negated: true } : {}), ...(g.equals != null ? { equals: g.equals } : {}) });
   const parts = [];
   for (const e of values) {
@@ -165,7 +183,7 @@ function template(contract, entries, todos, url) {
     if (!v) { todos.push(`${e.figma}: a Figma ${e.kind} property, which a draft does not write`); continue; }
     // The properties that decide whether this attribute is written, each as the contract says it decides.
     const guards = conditions.filter((c) => c.code === e.code && !c.unclear && !c.slot);
-    parts.push(guarded(testsOf(guards), attrFor(e, v)));
+    parts.push(guarded(testsOf(guards), attrFor(e, v), snippetOf(e)));
     pairs.push({ figma: e.figma, code: e.code, role: 'value', ...(e.negated ? { negated: true } : {}), ...(e.values ? { values: e.values } : {}) });
     for (const g of guards) if (vars.has(g.figma)) pairs.push(condPair(g));
     if (e.byName) todos.push(`${e.figma}: paired with ${e.code} by its name: check it is that prop`);
@@ -178,10 +196,10 @@ function template(contract, entries, todos, url) {
     if (named && (!/^[\w-]+$/.test(e.slot) || !['html', 'vue', 'svelte'].includes(syntax))) { todos.push(`${e.figma}: fills the code's ${e.slot} slot, which a draft does not write in ${syntax}: write it inside the tag`); continue; }
     const v = varOf(e);
     if (!v) { todos.push(`${e.figma}: a Figma ${e.kind} property, which a draft does not write`); continue; }
-    const fill = `\${${v}}`;
+    const fill = `\${${fillOf(e, v)}}`;
     const text = !named ? fill : syntax === 'vue' ? `<template #${e.slot}>${fill}</template>` : syntax === 'svelte' ? `<svelte:fragment slot="${e.slot}">${fill}</svelte:fragment>` : `<span slot="${e.slot}">${fill}</span>`;
     const guards = conditions.filter((c) => c.slot && c.code === e.slot && !c.unclear);
-    inner.push(guarded(testsOf(guards), text));
+    inner.push(guarded(testsOf(guards), text, snippetOf(e)));
     pairs.push({ figma: e.figma, code: e.slot, role: 'value', slot: true });
     for (const g of guards) if (vars.has(g.figma)) pairs.push(condPair(g));
     if (named && syntax === 'svelte') todos.push(`${e.figma}: written into the ${e.slot} slot the Svelte 4 way; a Svelte 5 component takes it as a snippet`);
@@ -190,7 +208,6 @@ function template(contract, entries, todos, url) {
     const filled = c.slot ? content.some((e) => e.slot === c.code) : values.some((e) => e.code === c.code);
     if (!filled || c.unclear) todos.push(`${c.figma}: decides whether ${c.slot ? `the ${c.code} slot is filled` : `${c.code} is written`}${c.negated ? ' (when it is off)' : ''}, and no Figma property fills ${c.code}: write it`);
   }
-  const fn = syntax === 'html' ? 'html' : 'code';
   const lines = [`// url=${url}`, `// source=${contract.source.code.file}`, `// component=${tag}`, ...header(contract, 'template'), `import figma from 'figma'`, '', ...[...vars.values()].map((v) => v.line), '',
     'export default {', `  example: figma.${fn}\`<${tag}${parts.join('')}${inner.length || syntax === 'html' ? `>${inner.join('')}</${tag}>` : ' />'}\`,`, `  id: ${q(tag)},`, '}'];
   return { lines, pairs };

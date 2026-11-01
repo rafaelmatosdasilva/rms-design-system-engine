@@ -123,7 +123,10 @@ const withSlots = (d) => parseConnectFile(d.text, d.file)[0].props.filter((p) =>
 
 test('the template form writes what fills a slot between the tags, and reads it back as that slot', () => {
   const web = draftFor(contract('html', 'src/tiles/card-tile.js', 'card-tile', slotProps()));
-  assert.match(web.text, /figma\.html`<card-tile size="\$\{size\}">\$\{label\}\$\{showIcon \? `<span slot="icon">\$\{icon\}<\/span>` : ''\}<\/card-tile>`/);
+  // A swapped instance as Code Connect's template API renders one, the part that holds it a figma template itself.
+  assert.match(web.text, /figma\.html`<card-tile size="\$\{size\}">\$\{label\}\$\{showIcon \? figma\.html`<span slot="icon">\$\{icon\?\.executeTemplate\(\)\.example\}<\/span>` : ''\}<\/card-tile>`/);
+  assert.match(web.text, /const icon = figma\.selectedInstance\.getInstanceSwap\('Icon'\)/);
+  assert.doesNotMatch(web.text, /TODO: Icon/, 'written the documented way, not left to check');
   assert.deepEqual(withSlots(web), own(web));
   assert.deepEqual(own(web).filter((p) => p.slot), [
     { figma: 'Label', code: 'default', role: 'value', slot: true },
@@ -132,7 +135,7 @@ test('the template form writes what fills a slot between the tags, and reads it 
   ]);
   assert.doesNotMatch(web.text, /TODO: Label/, 'the default slot is written, not left');
   const vue = draftFor(contract('vue', 'src/tiles/CardTile.vue', 'CardTile', slotProps()));
-  assert.match(vue.text, /<CardTile size="\$\{size\}">\$\{label\}\$\{showIcon \? `<template #icon>\$\{icon\}<\/template>` : ''\}<\/CardTile>/);
+  assert.match(vue.text, /<CardTile size="\$\{size\}">\$\{label\}\$\{showIcon \? figma\.code`<template #icon>\$\{icon\?\.executeTemplate\(\)\.example\}<\/template>` : ''\}<\/CardTile>/);
   assert.deepEqual(withSlots(vue), own(vue));
   // A component with nothing between its tags stays self-closed.
   assert.match(draftFor(contract('vue', 'src/tiles/CardTile.vue', 'CardTile', slotProps().slice(3))).text, /<CardTile size="\$\{size\}" \/>/);
@@ -151,4 +154,58 @@ test('the classic form writes a condition the contract holds as the call that wr
   const read = parseConnectFile(d.text, d.file)[0].props.map((p) => ({ figma: p.figma, code: p.code, role: p.role, ...(p.negated ? { negated: true } : {}), ...(p.equals != null ? { equals: p.equals } : {}) }));
   assert.deepEqual(read, d.pairs.map(({ values, ...p }) => p));
   assert.doesNotMatch(d.text, /TODO: (Hide caption|Kind)/);
+});
+
+// A Figma slot property: figma.slot in the classic form, getSlot in the template one, read back to the same pairs.
+test('a Figma slot property is written with figma.slot or getSlot, and reads back as that slot', () => {
+  const props = [prop('Body', 'SLOT', { slot: 'body', as: 'slot', source: 'authored' }), prop('Footer', 'SLOT', { slot: 'default', as: 'defaultSlot', source: 'authored' })];
+  const web = draftFor(contract('html', 'src/tiles/card-tile.js', 'card-tile', props));
+  assert.match(web.text, /const body = figma\.selectedInstance\.getSlot\('Body'\)/);
+  assert.match(web.text, /figma\.html`<card-tile><span slot="body">\$\{body\}<\/span>\$\{footer\}<\/card-tile>`/);
+  assert.doesNotMatch(web.text, /TODO: (Body|Footer)/);
+  assert.deepEqual(withSlots(web), own(web));
+  assert.deepEqual(parseConnectFile(web.text, web.file)[0].props.map((p) => p.kind), ['slot', 'slot']);
+  const react = draftFor(contract('jsx', 'src/tiles/CardTile.tsx', 'CardTile', props));
+  assert.match(react.text, /body: figma\.slot\('Body'\),/);
+  assert.match(react.text, /children: figma\.slot\('Footer'\),/);
+  assert.match(react.text, /<CardTile body=\{props\.body\}>\{props\.children\}<\/CardTile>/);
+  assert.deepEqual(parsed(react), own(react));
+  assert.equal(parseConnectFile(react.text, react.file)[0].props[0].kind, 'slot');
+});
+
+// React's named slots are props: the template form writes them as the attribute, a swapped instance through Code
+// Connect's renderProp helper, and what decides one as its guard; the classic form wraps it in the deciding call.
+test('a React template draft writes named slots as props, and reads them back as those props', () => {
+  const props = [...slotProps(), prop('Header', 'SLOT', { slot: 'header', as: 'slot', source: 'authored' })];
+  const d = draftFor(contract('jsx', 'src/tiles/CardTile.tsx', 'CardTile', props), { form: 'template' });
+  assert.match(d.text, /\$\{showIcon \? figma\.code`\$\{figma\.helpers\.react\.renderProp\('icon', icon\?\.executeTemplate\(\)\.example\)\}` : ''\}/);
+  assert.match(d.text, / header=\{\$\{header\}\}/);
+  assert.match(d.text, />\$\{label\}<\/CardTile>`/, 'the default slot stays between the tags');
+  assert.doesNotMatch(d.text, /a draft does not write in jsx/);
+  assert.deepEqual(withSlots(d), own(d));
+  assert.deepEqual(own(d).filter((p) => p.code === 'icon' || p.code === 'header'), [
+    { figma: 'Icon', code: 'icon', role: 'value' },
+    { figma: 'Show icon', code: 'icon', role: 'condition' },
+    { figma: 'Header', code: 'header', role: 'value' },
+  ]);
+  const classic = draftFor(contract('jsx', 'src/tiles/CardTile.tsx', 'CardTile', props));
+  assert.match(classic.text, /icon: figma\.boolean\('Show icon', \{ true: figma\.instance\('Icon'\), false: undefined \}\)/);
+  assert.doesNotMatch(classic.text, /TODO: Show icon/);
+  assert.deepEqual(parsed(classic), own(classic));
+});
+
+// A project's own React template file, written by hand the documented ways, reads to the props it fills.
+test('the reader follows renderProp, a braced JSX value and a swapped instance rendered through executeTemplate', () => {
+  const src = [
+    '// url=https://www.figma.com/design/AcmeKey/Kit?node-id=3-4', "import figma from 'figma'",
+    "const icon = figma.selectedInstance.getInstanceSwap('Icon')", "const body = figma.selectedInstance.getSlot('Body')",
+    "const hasIcon = figma.selectedInstance.getBoolean('Has icon')",
+    "export default { example: figma.code`<CardTile${hasIcon ? figma.helpers.react.renderProp('leading', icon?.executeTemplate().example) : ''} content={${body}} />` }",
+  ].join('\n');
+  const read = parseConnectFile(src, 'CardTile.figma.js')[0].props.map((p) => ({ figma: p.figma, code: p.code, role: p.role }));
+  assert.deepEqual(read, [
+    { figma: 'Icon', code: 'leading', role: 'value' },
+    { figma: 'Body', code: 'content', role: 'value' },
+    { figma: 'Has icon', code: 'leading', role: 'condition' },
+  ]);
 });

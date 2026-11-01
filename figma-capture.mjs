@@ -772,6 +772,9 @@ export async function importComponents(ROOT, cfg = {}, { dir = captureDir(ROOT),
   return writeComponents(ROOT, cfg, items, { base, chunks: c.used.size, stale: c.stale, added: c.added, dir, source, now, engineDir, figmaVersion, pages });
 }
 
+// The first of these that is a Figma node id (a page's name is not one): the page a component is on.
+const pageIdOf = (...seen) => seen.map((x) => (x == null ? null : String(x).replace('-', ':'))).find((x) => x && /^\d+:\d+$/.test(x)) ?? null;
+
 function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0, dir, source, now, engineDir, figmaVersion, pages = new Map() }) {
   const got = componentsFromItems(items);
   const paths = componentFiles(cfg);
@@ -797,10 +800,15 @@ function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0
   // The props: a component with nothing to record has no entry.
   const prevP = prev.props ?? {};
   const props = meta(prevP);
+  const noPage = [];
   for (const name of got.names) {
-    // The page it is on (from the checksums: the contracts' specs view names it), beside the node it is.
-    if (got.props[name]) props[name] = { ...got.props[name], ...(pages.get(got.props[name].nodeId) ? { pageId: pages.get(got.props[name].nodeId) } : {}), ...keep(prevP[name], PROPS_KEYS) };
-    else if (failed(name, 'props') && prevP[name]) props[name] = prevP[name];
+    // The page it is on, beside the node it is (the contracts' specs view names it): from the checksums, else what the
+    // saved answer says of the node's page (an answer from the recipe followed by hand), else what the file held.
+    if (got.props[name]) {
+      const pageId = pageIdOf(pages.get(got.props[name].nodeId), got.props[name].pageId, got.structure[name]?.pageId, got.structure[name]?.page, got.skeleton[name]?.pageId, prevP[name]?.pageId);
+      props[name] = { ...got.props[name], ...(pageId ? { pageId } : {}), ...keep(prevP[name], PROPS_KEYS) };
+      if (!pageId) noPage.push(name);
+    } else if (failed(name, 'props') && prevP[name]) props[name] = prevP[name];
   }
   for (const [k] of own(prevP)) if (!inFigma.has(k)) removed.add(k);
   snaps.props = Object.assign(props, { _updated: now, _source: how, _built: stamp });
@@ -848,7 +856,7 @@ function writeComponents(ROOT, cfg, items, { base, chunks, stale = [], added = 0
   }
   if (!written.length) return { ok: false, ...base, kept: kept.join('\n') };
   for (const f of new Set(stale)) { try { unlinkSync(join(dir, f)); } catch { /* left */ } }
-  return { ok: true, ...base, paths, written, removed: [...removed].filter((n) => !unpublished(n)), unpublished: got.unpublished, dupes: got.dupes, errors: got.errors, notRead, statesKept, added, ...(kept.length ? { kept: kept.join('\n') } : {}),
+  return { ok: true, ...base, paths, written, noPage, removed: [...removed].filter((n) => !unpublished(n)), unpublished: got.unpublished, dupes: got.dupes, errors: got.errors, notRead, statesKept, added, ...(kept.length ? { kept: kept.join('\n') } : {}),
     counts: { chunks, components: Object.keys(components).length, variants: got.variants, props: Object.keys(got.props).length, values: Object.keys(got.values).length, states: Object.keys(got.states).length, skeleton: Object.keys(got.skeleton).length } };
 }
 
@@ -950,6 +958,7 @@ export function importLines(r, rel) {
   const also = n.values || n.states ? `, the raw values of ${n.values}${n.skeleton ? `, the states of ${n.states} and how ${n.skeleton} are built` : ` and the states of ${n.states}`}` : '';
   lines.push(`✓ Figma's components read in ${n.chunks} checked chunk${n.chunks === 1 ? '' : 's'}: ${n.components} component${n.components === 1 ? '' : 's'} with ${n.variants} variants, the props of ${n.props}${also} → ${r.written.join(', ')}`);
   if (r.removed?.length) lines.push(`Taken out, no longer in Figma: ${r.removed.join(', ')}.`);
+  if (r.noPage?.length) lines.push(`ℹ️  ${r.noPage.length} component${r.noPage.length === 1 ? '' : 's'} with no Figma page in what was read, so ${r.noPage.length === 1 ? 'its spec names' : 'their specs name'} no page in metadata.source: ${r.noPage.slice(0, 8).join(', ')}${r.noPage.length > 8 ? ', …' : ''}. rms-design-system-engine --capture-script components sums new records each one's page.`);
   if (r.errors?.length) lines.push(`⚠️  Not read in Figma, kept as it was: ${r.errors.map((e) => `${e.name} (${e.kind}: ${e.error})`).join('; ')}.`);
   for (const [k, names] of Object.entries(r.notRead ?? {})) lines.push(`ℹ️  ${names.length} component${names.length === 1 ? '' : 's'} not read for ${k === 'values' ? 'the raw values' : 'the states'} in this capture, and none before: ${names.slice(0, 8).join(', ')}${names.length > 8 ? ', …' : ''}.`);
   if (r.statesKept) lines.push(`${componentFiles().states} kept as it was: it was not written per component, and ${r.statesKept.length} component${r.statesKept.length === 1 ? ' was' : 's were'} not read with their states. Read them all once: rms-design-system-engine --capture-script components sums new.`);

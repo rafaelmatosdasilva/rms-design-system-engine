@@ -2520,8 +2520,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // A component whose file is still to confirm (a proposal, or files near its name) is that decision, not one to build.
   var PAIRING = {}; (DATA.systemTodo || []).forEach(function (t) { if (t.pairing) PAIRING[t.pairing] = true; });
   // A component only the code has, once Figma's components are captured: not on the page, a task each, with its file.
-  (DATA.notInFigma || []).forEach(function (k) { TODO.push({ who: 'figma', comp: null, area: 'Parity', type: 'Component', codeOnly: k.name, codeFile: k.file, say: 'The code has ' + k.name + ' (' + k.file + '); Figma has no component for it.', todo: 'Add ' + k.name + ' to Figma, remove it from the code, or keep it as a known exception.' }); });
-  ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); if (PAIRING[n]) return; TODO.push({ who: 'code', comp: null, figmaOnly: n, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code.' }); });
+  (DATA.notInFigma || []).forEach(function (k) { TODO.push({ who: 'figma', comp: null, area: 'Parity', type: 'Component', codeOnly: k.name, codeFile: k.file, say: 'The code has ' + k.name + ' (' + k.file + '); Figma has no component for it.', todo: 'Add ' + k.name + ' to Figma, remove it from the code, or keep it as a known exception.', scope: k.scope || null }); });
+  ((DATA.notAgreed && DATA.notAgreed.waiting) || []).forEach(function (w) { var n = String(w).replace(/ \(not built yet\)$/, ''); if (PAIRING[n]) return; TODO.push({ who: 'code', comp: null, figmaOnly: n, say: 'Figma has the ' + n + ' component; the code does not have it yet.', todo: 'Build ' + n + ' in the code.', scope: (DATA.notAgreed.scopes || {})[n] || null }); });
   // A Figma name with a slash is a part of the component named before it (chartBars/bar is chartBars's), never a
   // component of its own: counted and listed with its parent. The parent is the component of that name, a leading mark
   // or a trailing note left out (🟡 tableCell (deprecated) is tableCell/amount's), else the family's own name.
@@ -3413,6 +3413,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     if (!p || p.absent || p.system) return 'the System page';
     if (p.about && p.about.partOf) return p.name + ', part of Component ' + p.about.partOf;
     if (p.missingFor) return 'Component ' + p.missingFor;
+    if (p.recheckFor) return 'Component ' + p.recheckFor;
     var kind = ({ templates: 'Template', foundations: 'Foundation', patterns: 'Pattern', flows: 'Flow', pages: 'Page' })[p.layer];
     return kind ? kind + ' ' + p.name : 'Component ' + ((p.about && p.about.is) || p.component || p.name);
   };
@@ -3451,11 +3452,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       }
       return esc(IL_LAYER[p.layer] || capital(String(p.layer || '').replace(/s$/, '')));
     };
-    var ilGets = function (p) { return ((p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line"><strong>' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + g.lines + ' lines)' : '') + '</strong><span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>')
+    var ilGets = function (p) { return ((p.gets || []).length ? p.gets.map(function (g) { return '<p class="sg-il-line"><strong>' + esc(capital(g.what)) + (g.lines > 1 ? ' (' + esc(String(g.lines)) + ' lines)' : '') + '</strong><span class="pg-par-val">' + esc(g.to.join(', ')) + '</span></p>'; }).join('') : '<p class="pg-missing">Nothing.</p>')
       + ((p.wrong || []).some(function (f) { return f.line && (f.kind === 'name' || f.kind === 'claim'); }) ? '<p class="pg-missing">Not the sentences the system contradicts: they are left out until they are fixed.</p>' : ''); };
     // A page kept as it is: its Keep says it all, so What to do and Why stay empty rather than repeat it on every row.
     // With a proposal still to answer, what to do is to answer it; the engine's own route is said only as the one if not.
-    var ilOpen = function (p) { return (p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || [])).filter(function (x) { return x.answer !== 'no'; }); };
+    // A component's own proposals when the row is for one with no page (to add, or a decision about it to review again).
+    var ilOwn = function (p) { return p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : p.recheckFor ? [(IL.noPageRechecks || {})[p.recheckFor]].filter(Boolean) : (p.proposals || []); };
+    var ilOpen = function (p) { return ilOwn(p).filter(function (x) { return x.answer !== 'no'; }); };
     // Each answer apart, with what it does and the command that gives it, a Copy beside it: pasted into Claude (or run in a
     // terminal), the answer is recorded and its change made. A proposal that does not say what its no does falls back on
     // the page's own task.
@@ -3498,10 +3501,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         : x.decider ? '<p class="sg-il-line"><span class="pg-par-val">Waits on ' + esc(x.decider.name) + '.</span></p>' : '';
     };
     var ilProposal = function (p) {
-      var list = p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || []);
+      var list = ilOwn(p);
       return list.map(function (x) {
         return '<p class="sg-il-line"><strong>' + esc(x.kind === 'fix' ? x.subject + ': ' : '') + esc(x.proposal) + '</strong></p>'
           + (x.split ? '<p class="sg-il-line"><span class="pg-par-val">The evidence is split: a person decides.</span></p>' : '')
+          // Local or shared, with its reason (local-shared.mjs): only a shared one waits on who decides it.
+          + (x.scope && x.scope.reason ? '<p class="sg-il-line"><span class="pg-par-val" data-scope="' + esc(x.scope.scope) + '">' + esc(x.scope.reason) + '</span></p>' : '')
           + ((x.candidates || []).length ? ilCandidates(x) : (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join(''))
           + ilAnsweredBy(x);   // how to answer: in What to do
       }).join('');
@@ -3649,6 +3654,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
     var rows = IL.pages.slice().sort(function (x, y) { return labels.findIndex(function (l) { return l[0] === x.action; }) - labels.findIndex(function (l) { return l[0] === y.action; }); })
       .concat((IL.noPage || []).map(function (n) { return { action: 'missing', decision: 'Add', missingFor: n }; }))
+      // An Add answered with no page, its component changed since: a row of its own, to review the decision again.
+      .concat(Object.keys(IL.noPageRechecks || {}).sort().map(function (n) { var x = IL.noPageRechecks[n]; return { action: 'review', decision: 'Review', recheckFor: n, recheck: 1, decider: x.decider || null }; }))
       .concat(NO_LAYER ? COMPONENTS.filter(function (c) { return !c.codeOnly; }).map(function (c) { return { action: 'keep', component: c.name, noLayer: true }; }).sort(function (x, y) { return x.component.localeCompare(y.component); }) : []);
     // The Tokens row, first: every token a component uses, and those whose variable in Figma has no description yet.
     (function () {
@@ -3699,6 +3706,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           why: '<p class="sg-il-line">' + esc(ab.answered + ' of ' + ab.asked + ' components agents often ask for, and the system does not have, are answered. None of the intent layer\'s pages, and no agent file of this project, says what to do when none fits.') + '</p>', gets: '' }; }
       if (p.missingFor) return { decision: decisionCell('missing', p), write: docWriteOf(p), notes: notesOff(p), file: '<span class="pg-missing">—</span>', forWhat: '<a class="sg-uses-link" href="#' + esc(cid(p.missingFor)) + '">' + esc(p.missingFor) + '</a>',
         updated: docAt(p), reads: '', todo: ilIfNot(p, '<p class="sg-il-line"><strong>Write a page for ' + esc(p.missingFor) + ' in the intent layer, titled ' + esc(p.missingFor) + ', as ' + esc(IL.namesFrom || 'Figma') + ' names it.</strong></p>'), why: '<p class="sg-il-line">No page names this component, by name or by code file.</p>', gets: '<p class="pg-missing">Nothing.</p>' };
+      if (p.recheckFor) { var rx = (IL.noPageRechecks || {})[p.recheckFor] || {};
+        return { decision: decisionCell('review', p), write: [], notes: [], file: '<span class="pg-missing">—</span>', forWhat: compLink(p.recheckFor), updated: docAt(p), reads: '', gets: '',
+          todo: ilIfNot(p, '<p class="sg-il-line"><strong>' + esc('Review a decision again: ' + ((rx.stale || {}).truth || '') + ' Confirm it still holds, or withdraw it.') + '</strong></p>'),
+          why: '<p class="sg-il-line">' + esc('No page of its own: ' + ((rx.was || {}).by || 'the team') + ' answered ' + ((rx.was || {}).answer || '') + ' to "' + ((rx.was || {}).proposal || rx.decision) + '"' + ((rx.was || {}).at ? ' on ' + String(rx.was.at).slice(0, 10) : '') + '.') + '</p>' }; }
       if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
       return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
@@ -3708,7 +3719,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
-    var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || p.name || i); };
+    var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i); };
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
@@ -3717,11 +3728,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Its status first, then the proposal to say yes or no to, then what to do: every change it proposes in one place
       // (its drafts, what is still to write, the notes to remove or change) and one decision on all of them; then what the
       // page is and why.
-      var own = !(p.tokens || p.absent || p.missingFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
+      var own = !(p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo), task = own ? ilTodo(own) : c.todo;
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
       m.querySelector('.sg-row-detail').onclick = function (e) { var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said')); };
-      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.name || p.file || p.component || 'Page', body: body });
+      m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.recheckFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
     // A link to a page's panel (panel=doc:<file>) opens it.

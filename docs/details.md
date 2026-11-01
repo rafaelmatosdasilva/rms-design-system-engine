@@ -590,9 +590,11 @@ The engine reads the Figma Code Connect files your project commits: each code pr
 
 - **From what the contract pairs.** Each Figma property's code prop, an enum's values as Figma and the code write them, the booleans, the texts, the instances it swaps, and a switch that decides whether another prop is written.
 - **Slots filled.** In the template form, what fills a slot is written between the component's tags: the default slot's content as it is, a named slot's in the element its framework uses (`slot="icon"` for a web component, `<template #icon>` for Vue), guarded by the property that decides whether it is filled.
+- **React's named slots are props.** In a React draft, a named slot is written as the prop it is (`<Card header={…}>`), in either form, and the property that decides it wraps it or guards it.
+- **Swapped instances and Figma slots, the documented way.** A swapped instance is `figma.instance('Icon')` in the classic form, and in the template form `getInstanceSwap('Icon')`, written as what its own Code Connect renders (`icon?.executeTemplate().example`; `renderProp` for a React prop). A Figma slot property is `figma.slot('Body')` or `getSlot('Body')`. Both need a recent Code Connect CLI.
 - **Conditions in the classic form too.** A property that decides whether a prop is written wraps the call that fills it: `figma.boolean('Show caption', { true: figma.string('Caption'), false: undefined })`, the other way round when it decides it off, or an enum on the option it decides it under.
 - **In the form you already use.** The classic `figma.connect` form or the template form, whichever your own files are in. With none yet, React gets the classic form and Vue, Svelte and web components the template form. `--form=classic` or `--form=template` picks one.
-- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, a Figma slot property, how a swapped instance is written, the import.
+- **Marked as a draft.** Its first lines say so. Whatever the contract does not settle is a TODO comment where it goes: a value the code does not list, a Figma property no code prop is, the import.
 - **Never in your code.** The drafts go to `.design-system-engine-out/code-connect-drafts/`, in the same folders as each component's file. A person checks each one, moves it beside its component and publishes it with their own Code Connect tooling.
 - **Read back before it is written.** Each draft reads back through the same reader the engine uses for your Code Connect files, to the same pairs it was written from (a test holds it to that).
 
@@ -745,6 +747,7 @@ A page is right when it is written. Then its component changes: a prop is added,
 - **A removed name is said.** When the page still names a prop or token the component no longer has, the page says which.
 - **A person settles it.** Edit the page, or say it still holds. The answer is kept with who gave it and when. The page is not marked again until the component changes again.
 - **Decisions too.** An answer the team gave (a part documented in its parent's page, a name kept, a page kept where it is) is dated the same way. When its component changes after it, the decision is marked to review again on its page and in History, and agents read it with the same note. It still stands until a person says. Say it still holds, and it is kept with who and when; withdraw it, and its question is asked again.
+- **A component with no page is reviewed too.** When the team answered that a component needs no page of its own, and it changes, the Documentation page gives it a row: Review, Decision to review again, with the same answers. One documented in another page is reviewed on that page's row.
 
 ### Evidence first
 
@@ -1025,6 +1028,9 @@ The last three set its risk (high, medium or low), which the reason says. For ex
 Where you see it:
 
 - **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A line under the filters counts them: "4 shared, waiting on Cards lead (3), Design system team (1); 2 local, each product team's own."
+  - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
+- **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
+- **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A control a product's screen builds by hand is local; any other difference is the system's. The list of open issues by the fix each needs counts them too.
 - **The edit check.** After an AI edit, its message ends with whether the file is the product's own or the system's, and on whom a shared one waits.
 - **A change held for sign-off.** The guard says why it is shared and who decides it.
 - **A change in Figma.** `--figma-change` prints it, and the Changes in Figma page shows it.
@@ -1366,6 +1372,7 @@ Nobody copies a value by hand. The engine writes a read-only script for one chun
 - Answers saved before this compact form still read. When new checksums no longer match them, the import says which to read again.
 - `--capture-import` checks every saved answer against it, names a chunk cut or changed while it was saved, and once all are there builds the snapshots: the structure, the props, the raw values, and the state tokens and bindings.
 - A component's facts the capture does not read are kept. A component no longer in Figma is taken out, and the import names it.
+- Each component's Figma page comes from the checksums. When the answers name none (answers saved before the checksums did), the page the file already held is kept, and the import names once the components left with none, whose specs then name no page.
 - On a refresh only the checksums are asked, and only the components that changed are read again.
 - No script switches Figma's page: switching it is saved with the file, so a capture that only reads would still change it.
 - With figma-cli connected, the engine runs the same scripts through it, so both ways of reading Figma give the same snapshots.

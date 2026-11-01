@@ -82,7 +82,7 @@ test('the style guide of a Vue system: Figma\'s components with Figma\'s data, t
   const page = readPage(join(withFigma, '.design-system-engine-out', 'styleguide', 'index.html'));
   assert.doesNotMatch(page, /"name":"HbChip","cls"/, 'not one of the page\'s components');
   assert.doesNotMatch(page, /"codeOnly":\{/);
-  assert.match(page, /"notInFigma":\[\{"name":"HbChip","file":"components\/HbChip.vue"\}\]/);
+  assert.match(page, /"notInFigma":\[\{"name":"HbChip","file":"components\/HbChip.vue","scope":\{"scope":"shared","reason":"Shared: HbChip is the system's: [^"]*"/, 'a task, with whether it is local or shared');
   // A page for it alone says where it is instead.
   const one = run(withFigma, '--component', 'HbChip');
   assert.match(one.stdout, /HbChip: in the code and not in Figma, so not on the page; a task on the whole system's Status page\./, one.stdout + one.stderr);
