@@ -8667,7 +8667,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   if (fillDocs) { fillDocs(); fillDocs = null; }
   // Every component not tried yet in this browser, one after another, while the Status page is open: each built out of
   // sight, its Accessibility check run as its own area runs it, kept, then the list drawn again with what it found.
-  var sweepAt = 0, sweeping = false;
+  var sweepAt = 0, sweeping = false, sweepMissed = [];
+  // The components the sweep tried and could not measure in the browser (nothing drawn to try), for the build to name.
+  window.__sgSweepMissed = function () { return sweepMissed.slice(); };
   // A component the sweep draws out of sight can take the focus on its own (a modal that opens, a field that focuses
   // itself): while a person is on a control of the page, any focus that lands out of sight goes straight back to them.
   var personFocus = null;
@@ -8685,6 +8687,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function a11ySweep() {
     // The component panel (?embed) is this page again: the page around it tries every component already.
     if (ALL || sweeping || html.classList.contains('sg-embed')) return;
+    // Only once the page has loaded (its fonts, its images): before then a component's check waits for the load, and the
+    // sweep would pass it untried, its facts never measured.
+    if (document.readyState !== 'complete') { if (!a11ySweep.waiting) { a11ySweep.waiting = true; window.addEventListener('load', function () { setTimeout(function () { a11ySweep.waiting = false; a11ySweep(); }, 60); }, { once: true }); } return; }
     var list = COMPONENTS.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
     var share = /(?:^|[?&])bake=(\d+)\/(\d+)/.exec(location.hash);
     if (BAKING && share) list = list.filter(function (c, i) { return i % +share[2] === +share[1]; });
@@ -8703,7 +8708,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         var here = document.getElementById(hashParts().id || homeId()); if (!here || !here.matches('main > section')) here = document.getElementById('index');
         Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== here; });
         // The next one is tried whatever happens here: one component's error never stops the rest.
-        try { if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null }; keepA11y(); fillTodo(); } finally { setTimeout(next, 30); }
+        try { if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null }; if (!c.__a11y.live && sec.querySelector('.pg-a11y-rows') && sweepMissed.indexOf(c.name) < 0) sweepMissed.push(c.name); keepA11y(); fillTodo(); } finally { setTimeout(next, 30); }
       };
       try { sec._a11yRun(finish); } catch (e) { finish(); }
     })();
@@ -9454,6 +9459,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var bgRun = null;
     sec._a11yRun = function (cb) {
       if (ALL || !a11yEl || !cur) { cb(); return; }
+      // Before the page has loaded the check waits for the load: so does cb, never told it is done with nothing tried.
+      if (document.readyState !== 'complete') { window.addEventListener('load', function () { setTimeout(function () { sec._a11yRun(cb); }, 60); }, { once: true }); return; }
       // A check already under way (the area was just opened) ends first; then every variant is tried again for this one.
       if (checking) { var before = bgRun; bgRun = function () { if (before) before(); sec._a11yRun(cb); }; return; }
       bgRun = cb; liveSig = null; checkLive();
