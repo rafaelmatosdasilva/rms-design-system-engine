@@ -1036,7 +1036,9 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   })();
   const allNames = [...new Set([...figmaNames, ...codeNames])];
   let targets = cc.only ?? opts.only ?? cc.pilot ?? opts.pilot ?? 'all';
-  if (targets === 'all' || (Array.isArray(targets) && targets.includes('*'))) targets = allNames;
+  // Every component of the system, not a subset: what this run does not write is no longer a component.
+  const everyComponent = targets === 'all' || (Array.isArray(targets) && targets.includes('*'));
+  if (everyComponent) targets = allNames;
   if (typeof targets === 'string') targets = [targets];
   targets = targets.filter((n) => structure[n] || CONTRACT[n] || props[n] || codeNames.includes(n));
   // A component Figma gives no name (only spaces) has none to write a contract by: it is listed apart, by its node, for
@@ -1213,6 +1215,20 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
 
   // A contract an older run wrote for a component with no name (" .contract.json") is taken out: it names nothing.
   for (const f of contractFilesIn(outDir)) if (!f.slice(f.lastIndexOf(sep) + 1).replace(/\.contract\.json$/, '').trim()) { try { unlinkSync(f); } catch { /* already gone */ } }
+  // So is every contract the engine wrote on an earlier run for a component this run did not write (gone from Figma and
+  // the code, renamed, or now laid out elsewhere): left there, it is read as a component the system still has, and one
+  // written before the format had a name (format 1) is read as a contract with none. Only on a run of every component,
+  // and only the engine's own files (they carry x-design-system-engine): a contract written by hand stays.
+  const removed = [];
+  if (everyComponent) {
+    const written = new Set(emitted.map((n) => resolve(outDir, placeOf.get(n))));
+    for (const f of contractFilesIn(outDir)) {
+      if (written.has(f)) continue;
+      const old = readJSON(f);
+      if (!old || typeof old !== 'object' || !old['x-design-system-engine']) continue;
+      try { unlinkSync(f); removed.push(relative(outDir, f)); } catch { /* already gone */ }
+    }
+  }
 
   // 4) AI index (llms.txt) — a machine-readable summary for agents, local beside the contracts.
   // The component catalog for UI generators (ui-catalog.mjs): from the contracts, plus the code
@@ -1290,5 +1306,5 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   const statusCounts = built.reduce((acc, b) => { const st = b.contract.status?.state; if (st) acc[st] = (acc[st] || 0) + 1; return acc; }, {});
 
   try { ensureDir(outDir); writeFileSync(builtFile, JSON.stringify({ _built: stamp }, null, 2) + '\n'); } catch { /* best-effort */ }
-  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, dsdsOut, specsOut, constructionOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
+  return { stamp, tokensOut, schemaOut, outDir, authoredPath, llmsOut, dsdsOut, specsOut, constructionOut, propTypesOut, catalogOut: catalog ? join(outDir, 'catalog.json') : null, tokenCount: countLeaves(tokens), components: emitted, skipped, removed, invalid, authoredIssues, breaking, undefinedRefs, typeMismatches, droppedTokens, prune, statusIssues, statusCounts };
 }
