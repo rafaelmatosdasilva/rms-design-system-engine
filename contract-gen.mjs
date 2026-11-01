@@ -1178,7 +1178,7 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
     const keptHere = keptAll.filter((d) => d.component === name);
     if (keptHere.length) contract.kept = keptHere.map((d) => ({ check: d.check, what: d.what, ...(d.truth ? { truth: d.truth } : {}), reason: d.reason, ...(d.at ? { at: String(d.at).slice(0, 10) } : {}) }));
     // What a screen reader is given (contract-a11y.mjs): measured by the style guide's last build, else read from its markup.
-    const acc = withA11yFacts(contract.accessibility, { code: text ? markupFacts(text, { props: Object.keys(api?.props ?? {}) }) : null, measured: a11yFacts?.components?.[name] ?? null, at: a11yFacts?.at });
+    const acc = withA11yFacts(contract.accessibility, { code: text ? markupFacts(text, { props: Object.keys(api?.props ?? {}) }) : null, measured: a11yFacts?.components?.[name] ?? null, at: a11yFacts?.at, figmaRole: roleWord(props[name]?.annotations) });
     if (acc) contract.accessibility = acc; else delete contract.accessibility;
     // From the code alone, no description is a placeholder saying it came from Figma.
     if ((codeOnly || !(props[name] || structure[name])) && isPlaceholderDescription(contract.description)) contract.description = '';

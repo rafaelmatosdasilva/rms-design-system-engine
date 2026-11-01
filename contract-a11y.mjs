@@ -99,6 +99,18 @@ function elementsOf(markup) {
   }
   return out;
 }
+// The element a JSX or TSX component returns, as written: { tag, markup } from its opening tag to its own closing one,
+// or null when it returns none (a Vue file is read from its template).
+export function jsxRoot(source) {
+  const src = String(source ?? '');
+  if (templateOf(src) != null) return null;
+  const markup = markupOf(src);
+  if (markup == null) return null;
+  const list = elementsOf(markup), i = list.findIndex((x) => !x.close);
+  if (i < 0) return null;
+  const root = list[i];
+  return { tag: root.tag, markup: markup.slice(root.at, root.end) + contentOf(markup, list, i) };
+}
 // The words some markup shows, between its tags.
 function textOf(markup) {
   const s = String(markup);
@@ -249,21 +261,22 @@ export function factsFile(themes = {}, at = null) {
 
 // ── Into the contract ───────────────────────────────────────────────────────────────────────────────────────────
 // acc: the contract's accessibility so far ({ element, role, aria, keyboard }, each { value, from }); code: markupFacts;
-// measured: measuredFacts; at: when it was measured. The browser first, then authored, Figma, the code; for the name,
+// measured: measuredFacts; at: when it was measured; figmaRole: its Figma role annotation. The browser first, then authored, Figma, the code; for the name,
 // the code's prop:x refines the browser's "content". → the new accessibility, or null when nothing is known.
-export function withA11yFacts(acc, { code = null, measured = null, at = null } = {}) {
+export function withA11yFacts(acc, { code = null, measured = null, at = null, figmaRole = null } = {}) {
   const out = { ...(acc ?? {}) };
   const pick = (key, candidates) => {
     const known = candidates.filter((c) => c.value != null);
     if (!known.length) { delete out[key]; return; }
     const top = known[0];
-    const differs = known.slice(1).filter((c) => !same(norm(key, c.value), norm(key, top.value)));
+    const differs = known.slice(1).filter((c, i, all) => !same(norm(key, c.value), norm(key, top.value)) && all.findIndex((d) => d.from === c.from && same(d.value, c.value)) === i);
     out[key] = { value: top.value, from: top.from, ...(differs.length ? { differs: differs.map((c) => ({ value: c.value, from: c.from })) } : {}) };
   };
   const was = (k) => (acc?.[k] ? [{ value: acc[k].value, from: acc[k].from }] : []);
   const m = measured ?? {}, c = code ?? {};
   // Role: authored stays first, as the team decided it; then what the browser has, Figma's annotation, the markup.
-  const roleWas = was('role');
+  // Figma's annotation is kept beside the role even when the team's word or the browser goes first.
+  const roleWas = [...was('role'), ...(figmaRole && acc?.role?.from !== 'figma' ? [{ value: figmaRole, from: 'figma' }] : [])];
   pick('role', [...roleWas.filter((x) => x.from === 'authored'), ...(m.role ? [{ value: m.role, from: 'measured' }] : []), ...roleWas.filter((x) => x.from === 'figma'), ...(c.role ? [{ value: c.role, from: 'code' }] : []), ...roleWas.filter((x) => x.from === 'code' && x.value !== c.role)]);
   // Its name: the browser's source, made exact by the code's (content written from a prop is prop:<x>).
   if (m.name && c.name && /^(content|aria-label|alt)$/.test(m.name) && /^prop:/.test(c.name)) out.name = { value: c.name, from: 'code', measured: m.name };

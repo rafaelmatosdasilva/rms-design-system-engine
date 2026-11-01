@@ -3,6 +3,7 @@
 // is; what the project's Code Connect file says it decides beyond its value; where Figma and the code differ; the props
 // only the code has; its events and slots as the code declares them; its states, the tokens each state paints with,
 // and what the code says about its accessibility. Every fact names where it came from; nothing is guessed.
+import { jsxRoot } from './contract-a11y.mjs';
 import { bindingSources, bindFigmaProp, readingsOf, valuesOf, suggestionFor, invertsValue, flipBoolean, conventionFor, connectSlotsOf } from './prop-binding.mjs';
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -206,8 +207,11 @@ function paintsOf(variants, figmaProps = {}) {
 // What the code says about its accessibility: the element its markup starts with, an explicit role, the aria attributes
 // it sets and the keys it listens to; a role Figma's annotation states and authored semantics come first.
 export function accessibilityOf(codeText = '', { figmaRole = null, authored = null } = {}) {
-  const tpl = /<template>([\s\S]*)<\/template>/.exec(String(codeText))?.[1] ?? '';
-  const root = /<\s*([a-z][\w-]*)/.exec(tpl)?.[1] ?? null;
+  // A Vue template, else the element a JSX or TSX component returns (its root another component: no element of its own).
+  const vue = /<template>([\s\S]*)<\/template>/.exec(String(codeText))?.[1];
+  const jsx = vue == null ? jsxRoot(codeText) : null;
+  const tpl = vue ?? jsx?.markup ?? '';
+  const root = vue != null ? /<\s*([a-z][\w-]*)/.exec(tpl)?.[1] ?? null : jsx && /^[a-z][\w-]*$/.test(jsx.tag) ? jsx.tag : null;
   const role = /\srole\s*=\s*["']([\w-]+)["']/.exec(tpl)?.[1] ?? null;
   const aria = [...new Set([...tpl.matchAll(/\s:?(aria-[\w-]+)\s*=/g)].map((m) => m[1]))];
   const keys = [...new Set([...String(codeText).matchAll(/@key(?:down|up|press)\.([\w.]+)/g)].map((m) => m[1]))];

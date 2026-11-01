@@ -131,13 +131,24 @@ test('demo system: the style guide\'s build measures each component, and its con
   const built = await generateContracts(dir, cfg, { force: true });
   assert.deepEqual(built.invalid, [], JSON.stringify(built.invalid));
   const acc = (n) => JSON.parse(readFileSync(join(built.outDir, `${n}.contract.json`), 'utf8')).accessibility;
-  // The chip is a toggle button in Figma; the browser finds a plain button, and the contract says both.
+  // The chip is a toggle button in Figma; the team's contract and the browser say a plain button, and the contract says both.
   const chip = acc('chip');
-  assert.deepEqual(chip.role, { value: 'button', from: 'measured', differs: [{ value: 'togglebutton', from: 'figma' }] });
+  assert.deepEqual(chip.role, { value: 'button', from: 'authored', differs: [{ value: 'togglebutton', from: 'figma' }] });
   assert.deepEqual(chip.name, { value: 'prop:label', from: 'code', measured: 'content' });
   assert.deepEqual(chip.states, { value: [], from: 'measured' }, 'no aria-pressed: nothing tells a screen reader it is on');
   assert.deepEqual([chip.focusable, chip.keyboard], [{ value: true, from: 'measured' }, { value: ['Enter', 'Space'], from: 'measured' }]);
   assert.match(chip.measuredAt, /^\d{4}-\d{2}-\d{2}$/);
   // The field: a text box named by its label.
   assert.deepEqual([acc('field').role, acc('field').name], [{ value: 'textbox', from: 'measured' }, { value: 'label', from: 'measured' }]);
+});
+
+test('code: a JSX or TSX component gives its element, its role and its ARIA from what it returns, as a Vue template does', async () => {
+  const { accessibilityOf } = await import('../contract-code.mjs');
+  assert.deepEqual(accessibilityOf("export function AcmeChip({ label, on }) { return (<button className='acme-chip' type='button' aria-pressed={on}><span aria-hidden='true' />{label}</button>); }"),
+    { element: { value: 'button', from: 'code' }, aria: { value: ['aria-pressed', 'aria-hidden'], from: 'code' } });
+  assert.deepEqual(accessibilityOf("type Props = { title: string };\nexport const AcmeCard = ({ title }: Props): JSX.Element => <section role=\"region\" aria-label={title} className=\"acme-card\" />;"),
+    { element: { value: 'section', from: 'code' }, role: { value: 'region', from: 'code' }, aria: { value: ['aria-label'], from: 'code' } });
+  // Its root another component: no element of its own is said. The team's word still is.
+  assert.equal(accessibilityOf('export function AcmeWrap() { return <Button>Go</Button>; }'), null);
+  assert.deepEqual(accessibilityOf('export function AcmeWrap() { return <Button>Go</Button>; }', { authored: { element: 'a' } }), { element: { value: 'a', from: 'authored' } });
 });
