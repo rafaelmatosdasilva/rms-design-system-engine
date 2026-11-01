@@ -59,13 +59,17 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
     const text = a?.proposal ?? key;
     // A page confirmed after its component changed, or sent back to be edited: a review, never an option ruled out.
     const review = /^review:(.+)$/.exec(key);
-    if (review) { add({ component: null, kind: 'answered', what: a?.answer === 'no' ? `${review[1]}'s page is to be edited: its component changed` : `${review[1]}'s page confirmed: it still holds after its component changed`, why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' }); continue; }
+    if (review) { add({ component: null, page: review[1], kind: 'answered', what: a?.answer === 'no' ? `${review[1]}'s page is to be edited: its component changed` : `${review[1]}'s page confirmed: it still holds after its component changed`, why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' }); continue; }
     // A decision reviewed again after its component changed: confirmed, or withdrawn (and asked again).
     const again = /^recheck:(.+)$/.exec(key);
-    if (again) { const was = answered[again[1]]?.proposal ?? again[1]; add({ component: componentOf(again[1]), kind: 'answered', what: a?.answer === 'no' ? `Withdrawn once its component changed: ${was}` : `Confirmed after its component changed: ${was}`, why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' }); continue; }
+    if (again) { const was = answered[again[1]]?.proposal ?? again[1]; add({ component: componentOf(again[1]), ...(pageOf(again[1]) ? { page: pageOf(again[1]) } : {}), kind: 'answered', what: a?.answer === 'no' ? `Withdrawn once its component changed: ${was}` : `Confirmed after its component changed: ${was}`, why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' }); continue; }
     // Withdrawn since: it rules nothing out any more.
     const gone = withdrawnFrom(answered, key);
-    add({ component: componentOf(key), kind: 'answered', what: `${a?.answer === 'no' ? 'No' : 'Yes'}: ${text}${gone ? ' (withdrawn since)' : ''}`, ruledOut: a?.answer === 'no' && !gone ? [trim(text)] : [], why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals', ...(stale[key]?.note && !gone ? { review: stale[key].note } : {}) });
+    // The page of the intent layer it is about (fix:, move:, review:), named in its words and under Affects: "Keep its
+    // page" alone says nothing of which one.
+    const page = pageOf(key);
+    const said = page ? String(text).replace(/\bits page\b/i, `${page}'s page`) : text;
+    add({ component: componentOf(key), ...(page ? { page } : {}), kind: 'answered', what: `${a?.answer === 'no' ? 'No' : 'Yes'}: ${said}${gone ? ' (withdrawn since)' : ''}`, ruledOut: a?.answer === 'no' && !gone ? [trim(text)] : [], why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals', ...(stale[key]?.note && !gone ? { review: stale[key].note } : {}) });
   }
   // A need nothing in the system fitted: what was looked at is what was ruled out, with why in the team's own words.
   for (const g of gaps) {
@@ -96,6 +100,14 @@ function componentOf(key) {
   if (/^recheck:/.test(k)) return componentOf(k.slice(8));
   if (/^(fix|move|review):/.test(k)) return null;
   const m = /^([A-Za-z][\w-]*)\s*[:/]/.exec(k);
+  return m ? m[1] : null;
+}
+
+// The intent layer page a proposal's key is about: fix:<page>:<name>, move:<page>, review:<page>. → its name | null
+export function pageOf(key) {
+  const k = String(key ?? '');
+  if (/^recheck:/.test(k)) return pageOf(k.slice(8));
+  const m = /^(?:fix|move|review):([^:]+)/.exec(k);
   return m ? m[1] : null;
 }
 

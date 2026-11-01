@@ -240,7 +240,10 @@
         (x.to ? '<p class="sg-il-line"><span class="pg-log-date">Committed in ' + layerSha(x) + '</span></p>' : '') + '</td><td>' + (x.components.length ? pillsHTML(x.components, 'documentation') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
     };
     var decisionRow = function (d) {
+      // A page of the intent layer named like a component of the system opens that component's Documentation.
+      var pageComp = !d.component && d.page && COMPONENTS.some(function (c) { return c.name === d.page; }) ? d.page : null;
       var about = d.component && COMPONENTS.some(function (c) { return c.name === d.component; }) ? '<a class="sg-uses-link" href="#' + esc(cid(d.component)) + '/history">' + esc(d.component) + '</a>'
+        : pageComp ? '<a class="sg-uses-link" href="#' + esc(cid(pageComp)) + '/documentation">' + esc(pageComp) + '</a>'
         : d.url ? '<a class="sg-uses-link" href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.page || d.about) + '</a>' : esc(d.page || d.component || 'The system');
       // A lesson (a correction a person made) and a rule from repeated findings say what each became, and a lesson that
       // came back says which guard did not hold.
