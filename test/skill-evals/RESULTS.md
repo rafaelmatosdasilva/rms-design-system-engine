@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-11: Skill evaluation: pages to write, suggested prop pairs, where a contract's description and rules come from; every run passed (continuous evaluation)
+
+What changed since the entry below (engine 36f540e): Each finding names its product; the Figma build script imports a library's variables by key (#215); Intent layer: an example drafted on each page, and pages to write most used first (#216); Contracts: descriptions from the intent layer and the code, one element, no stale contracts, named products (#218); Rules agents can be held to: each intent-layer rule checked, checkable or judgment (#217); A component's own file is never counted as a use of it, whatever its name (#222); Features page: fitting your team's setup is actively improving (#220); Contracts say what a screen reader is given; suggested prop pairs asked as yes or no (#219); Features: generate components in Figma and code, where you choose (#221); The engine's modules move into lib/, so the README is the first thing on the page (#225); Usage and config reference: pages to write, suggested prop pairs, and where a contract's description and rules come from. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `f4f4c7b3f014` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 597032e7` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 99e2f8b4` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 50abedb9` `cookbook/refresh-figma.md 3d4c5584` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 8738ac48` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md 22915bd2` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine 5497b03 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.036 | $0.037 |
+| Input a run | 80k | 89k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 89k a run against 80k. no task changed state, and no run moved: the same result. Records: `records/2026-11-01-skill-evaluation-pages-to-write`.
+
 ## 2026-11: Point the hooks, workflows, install, docs and tests at lib/; keep four root entries (continuous evaluation)
 
 What changed since the entry below (engine f9ba9f3): MCP answers fit an agent with no shell; the skill says which route; accessibility guide lines (#189); Move the engine's modules into lib/; Point the hooks, workflows, install, docs and tests at lib/; keep four root entries. The guide changed in `cookbook/ci-and-hooks.md`, `cookbook/full-audit.md`, `cookbook/refresh-figma.md`, `reference/usage.md`.
@@ -16,6 +33,22 @@ Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md
 | Rule violations | 0 | 0 |
 
 **Reading.** Haiku: every task passes and no rule is broken; runs read 80k a run against 81k. no task changed state, and no run moved: the same result. Records: `records/2026-11-01-point-the-hooks-workflows-install`.
+## 2026-11: Usage and config reference: pages to write, suggested prop pairs, and where a contract's description and rules come from (continuous evaluation)
+
+What changed since the entry below (engine f9ba9f3): MCP answers fit an agent with no shell; the skill says which route; accessibility guide lines (#189); Each finding names its product; the Figma build script imports a library's variables by key (#215); Intent layer: an example drafted on each page, and pages to write most used first (#216); Contracts: descriptions from the intent layer and the code, one element, no stale contracts, named products (#218); Rules agents can be held to: each intent-layer rule checked, checkable or judgment (#217); A component's own file is never counted as a use of it, whatever its name (#222); Features page: fitting your team's setup is actively improving (#220); Contracts say what a screen reader is given; suggested prop pairs asked as yes or no (#219); Usage and config reference: pages to write, suggested prop pairs, and where a contract's description and rules come from. The guide changed in `reference/config.md`, `reference/usage.md`.
+
+Guide set measured: `4c968beb392c` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md 60046859` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 6e89e740` `cookbook/ci-and-hooks.md 238d4309` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 3d3c4cae` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 6c5a3936` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 50abedb9` `cookbook/refresh-figma.md cbd2b4d4` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 8738ac48` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 668f5aa1` `reference/usage.md c44be3e7` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine aa621b1 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.035 | $0.037 |
+| Input a run | 81k | 81k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 81k a run against 81k. no task changed state, and no run moved: the same result. Records: `records/2026-11-01-usage-and-config-reference-pages`.
 
 ## 2026-11: Merge remote-tracking branch 'origin/main' into eval-owed-guides (continuous evaluation)
 
