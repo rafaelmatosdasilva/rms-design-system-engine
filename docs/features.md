@@ -16,10 +16,10 @@ Each section says why it matters, then what it does not do well today. A line ma
 | [Track system health](#track-system-health) | Warns about risks before they spread as the system grows: a colour named after one product, a token that points to one that was deleted, a combination that only breaks in dark mode on a phone. | Contracts | Ready to use |
 | [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Contracts, Figma library | Ready to use |
 | [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Contracts, intent | Ready to use |
+| [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Actively improving |
 | [Test accessibility](#test-accessibility) | Tests each component the way people use it: contrast, keyboard, focus, touch size and what a screen reader says. Fix it once in the component and every screen benefits. | Contracts, Compare | Early development |
 | [Build with AI, on the system](#build-with-ai-on-the-system) | AI tools build with your real components, rules and past decisions: in your product's code today, and as clickable prototypes for user tests *(Coming soon)*. Each change is checked as it's made, and what the system lacks goes on a list for design. | Contracts, intent, Catch drift | Early development |
 | [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's playground, spec, Figma match, accessibility and history, plus who needs to do what next. | Everything above | Early development |
-| [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Early development |
 | [Update Figma from the code](#update-figma-from-the-code) | Sends what developers learn back to designers in Figma: accessibility notes, screen issues and links to the code, only after you approve. | Compare, accessibility | Coming soon |
 | [Keep products on the system](#keep-products-on-the-system) | Helps every product move to the next system version: which version each one runs, a ready-made fix per product, one ticket per difference. | Catch drift, health | Coming soon |
 | [Generate components in Figma](#generate-components-in-figma) | Describe a component in plain words and get it built in Figma with your own styles, names and structure, ready for sign-off. | Contracts, intent, Figma library | Coming soon |
@@ -124,6 +124,18 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
 - Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
 
+## Fit your team's setup
+
+**Actively improving** · **Why it matters:** It works with the tools you already use.
+
+*Today: every browser check runs in Chrome.*
+
+- Reads code straight from GitLab, on gitlab.com or your own host, without a clone.
+- Follows a Figma branch, so edits on the main file do not restart a long scan.
+- Reads very large Figma files in checked pieces, and only what changed on the next refresh.
+- Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
+- Answers agents that have no terminal, such as prototyping tools, through MCP. *(Coming soon)*
+
 ## Test accessibility
 
 **Early development** · **Why it matters:** Problems are fixed once, in the component, not in every screen later.
@@ -198,18 +210,6 @@ How it checks the agent's work, in a loop, before you see it:
 - Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
 - Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
 - The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
-
-## Fit your team's setup
-
-**Early development** · **Why it matters:** It works with the tools you already use.
-
-*Today: every browser check runs in Chrome.*
-
-- Reads code straight from GitLab, on gitlab.com or your own host, without a clone.
-- Follows a Figma branch, so edits on the main file do not restart a long scan.
-- Reads very large Figma files in checked pieces, and only what changed on the next refresh.
-- Reads Figma the best way available: figma-cli, the Figma tool of your Claude session, or the Figma API.
-- Answers agents that have no terminal, such as prototyping tools, through MCP. *(Coming soon)*
 
 ## Update Figma from the code
 
