@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf } from '../intent-proposals.mjs';
+import { proposalsFor, applyDecisions, decide, readDecisions, optionsOf, candidatesFor, withEvidence, currentAnswers, pendingOf, usageOf, deciderFor } from '../intent-proposals.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ROOT = tempDir('proposals-');
@@ -72,4 +72,81 @@ test('a decision keeps who made it and when, and the page is given both', () => 
 test('a proposal\'s answers: yes and no by default, or its own list of three or more, each with what it does', () => {
   assert.deepEqual(optionsOf({ yes: 'Kept.', no: 'Merged.' }), [{ answer: 'yes', label: 'If yes', does: 'Kept.' }, { answer: 'no', label: 'If no', does: 'Merged.' }]);
   assert.deepEqual(optionsOf({ options: [{ answer: 'Keep', does: 'Kept.' }, { answer: 'merge', label: 'Merge it', does: 'Merged.' }, { answer: 'drop', does: 'Taken out.' }] }).map((o) => [o.answer, o.label]), [['keep', 'If Keep'], ['merge', 'Merge it'], ['drop', 'If drop']]);
+});
+
+// A page whose component changed after it was written: the team says whether it still holds.
+const stale = { kind: 'stale', at: '2026-03-05T10:00:00Z', since: '2026-03-01T10:00:00Z', truth: 'tileOne changed on 5 Mar 2026: props removed `dense`, after this page was last edited. The page still names `dense`.', changed: ['props removed `dense`'], gone: ['dense'] };
+const staleReport = { pages: [page('Tile One', 'tileOne', { action: 'review', layer: 'components', wrong: [stale] })] };
+const proposeStale = () => proposalsFor({ ROOT, report: staleReport, snap: { entities: [] }, names: ['tileOne'], codeFiles: {}, facts: {}, noPage: [] });
+
+test('a page whose component changed asks whether it still holds; a yes is kept with who and when, and a later change asks again', () => {
+  const P = proposeStale();
+  const x = P.get('review:Tile One');
+  assert.equal(x.kind, 'review');
+  assert.equal(x.since, '2026-03-05T10:00:00Z');
+  assert.match(x.proposal, /^Does Tile One's page still hold for tileOne as it is now\?$/);
+  assert.deepEqual(optionsOf(x).map((o) => o.label), ['It still holds', 'It needs editing']);
+  decide(ROOT, ['review:Tile One'], 'yes', Object.fromEntries(P), { by: 'QA', now: '2026-03-06T09:00:00Z' });
+  const d = readDecisions(ROOT);
+  assert.deepEqual([d['review:Tile One'].by, d['review:Tile One'].effect], ['QA', 'confirm']);
+  assert.ok(currentAnswers(P, d)['review:Tile One'], 'a confirmation after the change answers it');
+  // The component changed again after the confirmation: the old yes no longer answers it.
+  const later = new Map([['review:Tile One', { ...x, since: '2026-03-08T10:00:00Z' }]]);
+  assert.equal(currentAnswers(later, d)['review:Tile One'], undefined);
+});
+
+test('evidence first: each answer a proposal could take, with where its evidence comes from and how strong it is', () => {
+  const P = proposalsFor({ ROOT, report, snap, names: ['listMain', 'tileOne', 'tileTwo', 'tabGroup', 'listMain/Row', 'newThing'], codeFiles, facts, noPage: ['listMain/Row', 'tileTwo', 'newThing'] });
+  // A part its products also place on their own: the evidence is split.
+  const usage = { 'listMain/Row': { products: [{ name: 'Acme shop', files: 3, uses: 5 }, { name: 'Northwind', files: 1, uses: 1 }], inside: ['listMain'], screens: [] } };
+  const row = withEvidence('add:listMain/Row', P.get('add:listMain/Row'), { usage, decisions: {}, report });
+  const yes = row.candidates.find((c) => c.answer === 'yes'), no = row.candidates.find((c) => c.answer === 'no');
+  assert.deepEqual(yes.evidence.map((e) => [e.from, e.strength]), [['Figma', 'strong'], ['The code', 'strong'], ['The usage map', 'weak']]);
+  assert.deepEqual(no.evidence.map((e) => [e.from, e.strength]), [['Products', 'strong']]);
+  assert.match(no.evidence[0].says, /^Acme shop, Northwind use it in 4 files, on its own\.$/);
+  assert.equal(row.recommends, 'yes', 'the engine\'s own answer stands');
+  assert.equal(row.split, undefined);
+  // A page to write that no product uses, and that the team said no to twice before.
+  const past = { 'add:oldA': { answer: 'no', effect: 'write' }, 'add:oldB': { answer: 'no', effect: 'write' }, 'add:oldC': { answer: 'yes', effect: 'documented' } };
+  const write = withEvidence('add:newThing', P.get('add:newThing'), { usage: { newThing: { products: [], inside: [], screens: [] } }, decisions: past, report });
+  assert.deepEqual(write.candidates.find((c) => c.answer === 'no').evidence.map((e) => e.from), ['Products', 'Past decisions']);
+  assert.equal(write.split, true, 'as much speaks against it as for it: a person decides');
+  // A name the team kept on another page before.
+  const fix = withEvidence('fix:Search:searchRow', P.get('fix:Search:searchRow'), { decisions: { 'fix:Other:searchRow': { answer: 'yes' } }, report });
+  assert.ok(fix.candidates[0].evidence.some((e) => e.from === 'Past decisions' && e.strength === 'strong'));
+});
+
+test('a page to review proposes what its evidence says: a name it still writes was taken out, so it needs editing', () => {
+  const x = proposeStale().get('review:Tile One');
+  const [first] = candidatesFor('review:Tile One', x, {});
+  assert.equal(first.answer, 'no');
+  assert.match(first.evidence[0].says, /still names `dense`, which tileOne no longer has/);
+  assert.equal(withEvidence('review:Tile One', x).recommends, 'no');
+  const clean = { ...x, stale: { ...stale, gone: undefined, changed: ['tileOne.vue changed in the code'] } };
+  assert.equal(withEvidence('review:Tile One', clean).recommends, 'yes');
+});
+
+test('what waits on a person names who it waits on, and an answer by someone else is said, never blocked', () => {
+  const owners = { 'tile*': 'Tiles team', listMain: { team: 'Lists team', decides: 'QA lead' }, '*': 'Design system team' };
+  const P = proposalsFor({ ROOT, report, snap, names: ['listMain', 'tileOne', 'tileTwo', 'listMain/Row', 'newThing'], codeFiles, facts, noPage: ['listMain/Row', 'tileTwo', 'newThing'] });
+  const withOwner = new Map([...P].map(([k, x]) => [k, { ...x, decider: deciderFor(x, report, owners) }]));
+  assert.equal(withOwner.get('fix:Search:searchRow').decider.name, 'Design system team', 'a page\'s proposal is its component\'s owner\'s');
+  assert.equal(withOwner.get('add:tileTwo').decider.name, 'Tiles team');
+  assert.equal(withOwner.get('add:newThing').decider.name, 'Design system team');
+  const decisions = { 'add:tileTwo': { answer: 'no', by: 'Developer', at: '2026-03-01' }, 'add:newThing': { answer: 'yes', by: 'design system team', at: '2026-03-01' } };
+  const r = applyDecisions({ report, noPage: ['listMain/Row', 'tileTwo', 'newThing'], proposals: withOwner, decisions });
+  assert.equal(r.addProposals.tileTwo.notOwner, true, 'answered by someone else than its owner');
+  assert.equal(r.addProposals.newThing.notOwner, undefined, 'the owner, however written');
+  const decided = { proposals: withOwner, decisions, noPage: ['listMain/Row', 'tileTwo'], report: { pages: [{ name: 'Tile One', component: 'tileOne', layer: 'components', drafts: [{ where: 'When to use', text: 'x' }] }] }, snap: { system: { drafts: [] } } };
+  const pending = pendingOf(decided, { owners });
+  assert.deepEqual(pending.map((x) => [x.what, x.subject, x.decider?.name]).filter(([w, n]) => w === 'drafts' || /^(listMain\/Row|tileTwo|newThing)$/.test(n)), [['proposal', 'listMain/Row', 'QA lead'], ['drafts', 'tileOne', 'Tiles team']], 'a part is its root\'s; answered ones and pages taken off the list wait on nobody');
+});
+
+test('where each component is used is read from what the audit wrote: the catalog, else each contract', () => {
+  const root = tempDir('usage-');
+  mkdirSync(join(root, 'contracts'), { recursive: true });
+  writeFileSync(join(root, 'contracts', 'tile-one.contract.json'), JSON.stringify({ name: 'tileOne', livesIn: { products: [{ name: 'Acme shop', files: 1, uses: 2 }] } }));
+  assert.equal(usageOf(root).tileOne.products[0].name, 'Acme shop');
+  writeFileSync(join(root, 'contracts', 'catalog.json'), JSON.stringify({ components: { listMain: { livesIn: { products: [] } } } }));
+  assert.deepEqual(Object.keys(usageOf(root)), ['listMain']);
 });
