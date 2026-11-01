@@ -62,7 +62,7 @@ export function usageFrom(ROOT, cfg = {}) {
 // The products whose code uses a component (the system's own pages are not a product). → [names] or null when unknown
 const productsUsing = (usage, component) => {
   const l = component ? usage?.[component] ?? Object.entries(usage ?? {}).find(([n]) => n.toLowerCase() === String(component).toLowerCase())?.[1] : null;
-  return l ? (l.products ?? []).map((p) => p?.name).filter(Boolean) : null;
+  return l ? (l.products ?? []).filter((p) => p?.name && !p.own).map((p) => p.name) : null;
 };
 const UNDO = { remove: 'hard', rename: 'hard', breaking: 'hard', change: 'medium', add: 'easy', fix: 'easy' };
 const UNDO_SAID = { hard: 'hard to undo', medium: 'can be undone', easy: 'easy to undo' };
@@ -127,7 +127,7 @@ export function editScope({ file, before = '', after = '', root = process.cwd(),
 // what a product may lean on, an addition when all it does is add.
 export function changeScope(ch = {}, ctx = {}) {
   const change = (ch.breaking ?? []).length ? 'breaking' : (ch.held ?? []).length ? 'add' : 'change';
-  const reach = ch.usedBy?.products ? ch.usedBy.products.filter((p) => !/^the system's own pages/.test(p)).map((p) => p.replace(/ \(\d+ files?\)$/, '')) : undefined;
+  const reach = ch.usedBy?.products ? ch.usedBy.products.filter((p) => !/^(this project|the system's own pages) \(/.test(p)).map((p) => p.replace(/ \(\d+ files?\)$/, '')) : undefined;
   return scopeOf({ home: 'system', kind: 'figma', change, what: `${ch.component}'s Figma component`, component: ch.component, ...(reach ? { reach } : {}) }, ctx);
 }
 

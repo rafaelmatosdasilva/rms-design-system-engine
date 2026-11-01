@@ -561,6 +561,48 @@ An automated check finds many failures, but it cannot show that a product meets 
 
 Each component gets a contract, rewritten from Figma and the code on every run: its props, variants, states, tokens and the components it nests. `contracts/llms.txt` is the one file AI tools read.
 
+### What a contract says it is for
+
+A contract's `description` comes from the first source that says what the component is for:
+
+1. Your own words in `contract.authored.json`.
+2. Its page in your intent layer: the first paragraph of what it is for.
+3. Its code: the comment on the component in its own file. That is a Vue file's opening `<!-- … -->` or the doc comment above its `export default`, Svelte's `<!-- @component … -->`, or the doc comment right above a React or TypeScript component.
+4. Its description in Figma.
+
+`descriptionFrom` says which one it was: `authored`, `intent`, `code` or `figma`.
+
+- **Nothing says?** The description is a placeholder ("captured from Figma") and there is no `descriptionFrom`. The audit counts it as a component with no description and lists it.
+- **Published into the intent layer?** The page is linked, never copied back as the description.
+- **Licences and lint switches** at the top of a file are not a description.
+
+Each prop says what it is for the same way. A Figma property paired with a code prop takes its `description` from:
+
+1. Your words in `contract.authored.json` (`propDescriptions`).
+2. The code: the doc comment (or the `//` lines) right above the prop, in a Vue props object, a `defineProps` type or a TypeScript interface. Else what the component's own comment says of it (`@size {String} …`), or docgen's description.
+3. Figma, when the code says nothing.
+
+A prop only the code has (`codeOnly`) carries the code's description too.
+
+### Its element, said once
+
+`semantics.element` and `accessibility.element` always name the same element: yours from `contract.authored.json`, else the one the code's markup starts with. Where it was read is in `accessibility.element.from`. A role you write as `semantics.aria.role` is `accessibility.role` too.
+
+### Where it lives
+
+`livesIn.products` lists the products whose code uses the component, each with a name:
+
+1. The product's name in `ds-config.json` (`products` with a `dir`, `pluginDirs`, or `paths.plugins` for `apps/<app>`).
+2. Else its folder, for an app or package nobody listed (`apps/`, `plugins/`, `products/`, `packages/`). A package that holds the system's own components is the system's.
+3. Else `this project`, marked `own: true`: the files outside every product.
+
+### Contracts of components that are gone
+
+A run of every component takes out the contracts it wrote earlier for components it no longer writes: gone from Figma and the code, renamed, or written before contracts had a `name`. Left there, they read as components the system still has.
+
+- **A run of some components** (`contracts.only`) leaves the others alone.
+- **A contract written by hand** in the same folder stays: only the engine's own files (they carry `x-design-system-engine`) are taken out.
+
 ### Colour pairs, not a shortlist
 
 For every text and icon colour, the engine works out the one surface it was made for, reading the names (`content/on-interactive` goes with `surface/interactive`) and confirming it against the values. The pair goes into the contract, into `llms.txt` and into `--query`, so an agent is given the answer instead of every surface that would work: given only a shortlist, it picks a different grey on every card. An edit that puts a colour on another surface is told so at once, with the contrast the two actually give. And a pair whose names promise what its values break (white on a warning yellow) is reported as what it is: the system's own words against its own numbers.

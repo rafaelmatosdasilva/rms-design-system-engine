@@ -134,7 +134,7 @@ export function changeOf({ component, asked = '', ops = [], captures = {}, gramm
 // inside, the screens that draw it. Team files the engine does not read are said, not guessed.
 function usageOf(l, library = null) {
   if (!l && !library) return null;
-  const products = (l?.products ?? []).map((p) => `${p.name ?? 'the system\'s own pages'} (${p.files} file${p.files === 1 ? '' : 's'})`);
+  const products = (l?.products ?? []).map((p) => `${p.name ?? 'this project'} (${p.files} file${p.files === 1 ? '' : 's'})`);
   return { products, inside: (l?.inside ?? []).map((x) => (typeof x === 'string' ? x : x.name)).filter(Boolean), screens: (l?.screens ?? []).length, ...(library ? { library } : {}) };
 }
 

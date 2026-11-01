@@ -204,7 +204,7 @@ export function verificationLine(v) {
 // One line on where a component lives, for the differences list: the products and how many files, what it sits inside.
 export function livesLine(u) {
   if (!u) return null;
-  const where = (u.products ?? []).map((p) => `${p.name ?? "the system's own pages"} (${p.files} ${p.files === 1 ? 'file' : 'files'})`);
+  const where = (u.products ?? []).map((p) => `${p.name ?? 'this project'} (${p.files} ${p.files === 1 ? 'file' : 'files'})`);
   const parts = [where.length ? `Lives in ${where.join(', ')}` : 'No product code uses it yet', ...(u.inside?.length ? [`inside ${u.inside.join(', ')}`] : [])];
   return `_${parts.join('; ')}._`;
 }

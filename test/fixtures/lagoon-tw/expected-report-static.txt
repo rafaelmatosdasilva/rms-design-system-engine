@@ -191,7 +191,8 @@
 ℹ️  Prune candidates: 4 (leaner library = cheaper agent context). Advisory - decide keep or drop.
      1 group(s) of tokens with the same value written by hand · 3 token(s) only one component uses
      Run with --prune to list them.
-ℹ️  Contract completeness: 3/3 have a description · 3/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
+ℹ️  Contract completeness: 0/3 have a description · 1/3 have semantics · 0/3 carry whenNotToUse/useInstead guidance. Advisory only.
+     3 without a description (run with --contract-completeness to list)
 
 ♿ Accessibility from the code (no browser needed): nothing found in 3 markup and 1 style file.
 
@@ -209,17 +210,17 @@
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      10/25 gates pass
   ● Coverage         0/3 components modelled (0%)  ·  exemption debt 0
-  ● Documentation    3/3 contracts have a description (100%)
+  ● Documentation    0/3 contracts have a description (0%)
   ● AI guidance      0/3 carry whenNotToUse/useInstead (0%)
 
 ℹ️  Agreed values: 7 of 7 compared facts agree (recorded in design-system-engine-agreed.json, updated).
 
 ℹ️  Since the last run: this is the first recorded run; the next one lists what is new, gone or changed.
 
-📉 Burndown, open findings per component: badge 4 · 5 not tied to a component
+📉 Burndown, open findings per component: badge 4 · 6 not tied to a component
    next up: badge. Run with --component badge, fix, run again.
 
-📋 Differences between Figma and the code: 7 open, in one list → .design-system-engine-out/differences.md
+📋 Differences between Figma and the code: 8 open, in one list → .design-system-engine-out/differences.md
 
 ─── SUMMARY (relay this in the chat as is; also in .design-system-engine-out/summary.md) ───
 
@@ -247,10 +248,10 @@
 - No hand-built DS components: no product code to scan for hand-built components (set reimplementationSurfaces or pluginDirs)
 - and 16 more
 
-Burndown, open findings per component: badge 4 · 5 not tied to a component
+Burndown, open findings per component: badge 4 · 6 not tied to a component
 Fix first: badge. Run with --component badge, fix, run again.
 
-Every difference between Figma and the code, 7 open, in one list: .design-system-engine-out/differences.md
+Every difference between Figma and the code, 8 open, in one list: .design-system-engine-out/differences.md
 
 NEXT: tell the user what fails under "Token values" (and 1 more failing gate) and the fix it names. Change the code only when they ask for that fix (a request to fix it is that ask: make the change, do not ask again), then run rms-design-system-engine. To accept a known difference instead: rms-design-system-engine --baseline --findings (only when they ask).
 

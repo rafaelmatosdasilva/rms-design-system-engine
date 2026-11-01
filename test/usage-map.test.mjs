@@ -40,12 +40,12 @@ test('where each component lives: its products, the system\'s own pages, what it
       composition: { panel: ['btn', 'icon-close'] },
       screens: { screens: { 'S:1': { name: 'Shop checkout', components: { btn: 3, panel: 1 } } } },
     });
-    assert.deepEqual(u.btn.products, [{ name: 'The Shop', files: 1, uses: 2 }, { name: 'Admin', files: 1, uses: 1 }, { name: null, files: 1, uses: 1 }]);
+    assert.deepEqual(u.btn.products, [{ name: 'The Shop', files: 1, uses: 2 }, { name: 'Admin', files: 1, uses: 1 }, { name: 'this project', files: 1, uses: 1, own: true }]);
     assert.ok(!u.btn.files.some((f) => f.file === 'components/Btn.html'), 'its own definition is not a use');
     assert.deepEqual([u.btn.inside, u.panel.holds], [['panel'], ['btn']]);
     assert.deepEqual(u.btn.screens, [{ screen: 'Shop checkout', count: 3 }]);
     assert.deepEqual(usageLines(u.btn), [
-      "  lives in: The Shop (1 file, 2 uses) · Admin (1 file, 1 use) · the system's own pages (1 file, 1 use)",
+      "  lives in: The Shop (1 file, 2 uses) · Admin (1 file, 1 use) · this project (1 file, 1 use)",
       '  inside: panel',
       '  on Figma screens: Shop checkout (3)',
     ]);
@@ -60,4 +60,27 @@ test('--query says where a component lives, and the differences list says it und
   assert.ok(lines.includes('  inside: panel'));
   const md = differencesMarkdown({ total: 1, fresh: 0, groups: [{ component: 'btn', items: [{ check: 'Token values', what: 'btn: height 32px, Figma 36px', side: 'decide' }] }] }, { livesIn: { btn: livesIn } });
   assert.match(md, /## btn \(1\)\n\n_Lives in The Shop \(2 files\); inside panel\._\n\n- Token values: btn: height 32px/);
+});
+
+test('every product has a name: ds-config.json products, else its folder, else this project; a package of the system is the system\'s', () => {
+  const dir = project({
+    'apps/northwind-web/src/Home.vue': '<template><CardTile /></template>',
+    'products/acme-shop/index.html': '<div class="card-tile"></div>',
+    'packages/acme-admin/src/Page.vue': '<template><CardTile /><CardTile /></template>',
+    'packages/ui/src/Demo.vue': '<template><CardTile /></template>',
+    'packages/ui/src/CardTile.vue': '<template><div class="card-tile"><slot /></div></template>',
+    'src/pages/Index.vue': '<template><CardTile /></template>',
+  });
+  try {
+    const cfg = { products: { 'Northwind web': { dir: 'apps/northwind-web' } } };
+    const files = productFiles(dir, cfg, { systemFiles: ['packages/ui/src/CardTile.vue'] });
+    const u = usageMap(['cardTile'], { files, classFor: () => '.card-tile' });
+    assert.deepEqual(u.cardTile.products, [
+      { name: 'Acme Admin', files: 1, uses: 2 },
+      { name: 'Northwind web', files: 1, uses: 1 },
+      { name: 'Acme Shop', files: 1, uses: 1 },
+      { name: 'this project', files: 2, uses: 2, own: true },
+    ]);
+    assert.ok(u.cardTile.products.every((p) => typeof p.name === 'string' && p.name), 'never null');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

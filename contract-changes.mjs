@@ -34,7 +34,7 @@ export function slimOf(c) {
     codeOnly: names(c.codeOnly), events: names(c.events),
     tokens: [...new Set([...(c.tokens?.used ?? []), ...JSON.stringify(c.anatomy ?? {}).match(/\{[^{}"]+\}/g)?.map((t) => t.slice(1, -1)) ?? []])].sort(),
     ...(c.status ? { status: c.status } : {}),
-    ...(c.livesIn?.products?.length ? { usedBy: c.livesIn.products.map((p) => ({ name: p.name, files: p.files ?? null })) } : {}),
+    ...(c.livesIn?.products?.length ? { usedBy: c.livesIn.products.map((p) => ({ name: p.name ?? 'this project', files: p.files ?? null, ...(p.own || p.name == null ? { own: true } : {}) })) } : {}),
   };
 }
 

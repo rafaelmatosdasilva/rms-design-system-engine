@@ -20,7 +20,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
 import { join, resolve, dirname, extname, relative, sep } from 'node:path';
 import { createRequire } from 'node:module';
-import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi } from './component-source.mjs';
+import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi, commentWords } from './component-source.mjs';
 import { parseCodeConnect, normalizeNodeId } from './codeconnect-check.mjs';
 import { parseConnectFile } from './code-connect-map.mjs';
 import { projectTypeScriptOnly, withinProject, usableTypeScript } from './project-typescript.mjs';
@@ -90,11 +90,13 @@ export function docgenComponents(doc, ROOT = '') {
       const def = p.defaultValue?.value;
       if (def != null && def !== 'undefined') e.default = unq(def);
       if (typeof p.required === 'boolean') e.required = p.required;
+      if (typeof p.description === 'string' && p.description.trim()) e.description = p.description.trim();
       props[name] = e;
     }
     const slotList = Array.isArray(d.slots) ? d.slots : [];
     return {
       names: [d.displayName, d.exportName].filter(Boolean),
+      ...(typeof d.description === 'string' && d.description.trim() ? { description: d.description.trim() } : {}),
       file: file ? resolve(ROOT, file) : null,
       props,
       slots: { named: slotList.map((s) => s.name).filter((n) => n && n !== 'default'), default: slotList.some((s) => !s.name || s.name === 'default') },
@@ -228,6 +230,9 @@ export function typescriptComponentApi(ts, file, text, componentName) {
       if (opts) e.options = opts;
       else if (m.type?.kind === ts.SyntaxKind.BooleanKeyword) e.type = 'boolean';
       e.required = !m.questionToken;
+      // Its doc comment, right above it (/** what it is for */).
+      const said = (ts.getLeadingCommentRanges?.(sf.text, m.getFullStart()) ?? []).map((r) => sf.text.slice(r.pos, r.end)).filter((c) => c.startsWith('/**') || c.startsWith('//')).map(commentWords).filter(Boolean).pop();
+      if (said) e.description = said;
       props[name] = e;
     }
     return props;
@@ -302,7 +307,9 @@ export function mergeApiReadings(readings) {
   for (const r of readings) sources.push(r.source);
   const events = new Map();
   for (const r of readings) for (const e of r.events ?? []) if (!events.has(norm(e))) events.set(norm(e), e);
-  return { props, slots: { named: [...named.values()], default: hasDefault }, events: [...events.values()], readBy: sources };
+  // What the component is for, as the best source that says writes it (docgen's description, its file's own comment).
+  const description = readings.find((r) => typeof r.description === 'string' && r.description.trim())?.description.trim();
+  return { props, slots: { named: [...named.values()], default: hasDefault }, events: [...events.values()], readBy: sources, ...(description ? { description } : {}) };
 }
 
 // How a product writes the component: its tag (a custom element's, else the name the file exports) and the syntax
@@ -375,7 +382,7 @@ export function createApiReader(ROOT, cfg = {}, { classFor, nodeIds = {}, pairin
     const e = cem.find((x) => matches(x.names, name));
     if (e) readings.push({ source: 'custom-elements', props: e.props, slots: e.slots, events: e.events });
     const d = docgen.find((x) => matches(x.names, name) || (file && x.file === file));
-    if (d) readings.push({ source: 'docgen', props: d.props, slots: d.slots, events: d.events });
+    if (d) readings.push({ source: 'docgen', props: d.props, slots: d.slots, events: d.events, description: d.description });
     if (file) {
       const text = read(file);
       const t = typescriptComponentApi(ts, file, text, name);
