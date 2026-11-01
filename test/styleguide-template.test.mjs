@@ -378,7 +378,6 @@ test('in the browser: no script error, a control changes the real component, the
     const a11yFull = () => run(ROWS_FULL('#c-chip .pg-a11y-rows'));
     const a11yRead = await a11yFull();
     assert.match(a11yRead, /a <button type="button"> with aria-pressed/);
-    assert.match(a11yRead, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
     assert.match(a11y, /The audit has not run in a browser yet/);
     assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Pass \(\d+\)/, 'its chips count what passes, in the Status page\'s word');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
@@ -392,6 +391,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.match(live, /Tab reaches it once: "Filter"\..*In all \d+ variants\./);
     assert.match(live, /Given by the browser: Space flips aria-pressed/, 'a native button answers Space itself');
     assert.match(live, /Tested now/, 'each finding says where it comes from');
+    // The text contrast is measured on the same pass, as each variant is drawn, and joins the table with these results:
+    // read with them, never from the table as first drawn.
+    assert.match(live, /1\.4\.3 Contrast \(Minimum\) \(AA\).*Text (at least )?\d+\.\d:1|\d+\.\d:1 on .* variants and colour modes/s);
     // What a person checks names the component and the part it is about.
     assert.match(live, /On chip, its (\w+ part|text)[^.]*, a person checks that/);
     // Each area has its own address, to send someone to it.
