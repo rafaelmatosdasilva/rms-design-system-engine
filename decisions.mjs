@@ -47,6 +47,9 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
   // somebody looked at and did not want, and it is exactly what an agent proposes again.
   for (const [key, a] of Object.entries(answered ?? {})) {
     const text = a?.proposal ?? key;
+    // A page confirmed after its component changed, or sent back to be edited: a review, never an option ruled out.
+    const review = /^review:(.+)$/.exec(key);
+    if (review) { add({ component: null, kind: 'answered', what: a?.answer === 'no' ? `${review[1]}'s page is to be edited: its component changed` : `${review[1]}'s page confirmed: it still holds after its component changed`, why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' }); continue; }
     add({ component: componentOf(key), kind: 'answered', what: `${a?.answer === 'no' ? 'No' : 'Yes'}: ${text}`, ruledOut: a?.answer === 'no' ? [trim(text)] : [], why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' });
   }
   // A need nothing in the system fitted: what was looked at is what was ruled out, with why in the team's own words.
@@ -65,8 +68,13 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
 }
 
 // The component a proposal's key is about, where its key names one (`chip:purpose` → chip).
+// The intent layer's own proposals (intent-proposals.mjs) name their kind first: add:<component>, and fix:, move: and
+// review: a page, never a component of that name.
 function componentOf(key) {
-  const m = /^([A-Za-z][\w-]*)\s*[:/]/.exec(String(key ?? ''));
+  const k = String(key ?? '');
+  if (/^add:/.test(k)) return k.slice(4) || null;
+  if (/^(fix|move|review):/.test(k)) return null;
+  const m = /^([A-Za-z][\w-]*)\s*[:/]/.exec(k);
   return m ? m[1] : null;
 }
 

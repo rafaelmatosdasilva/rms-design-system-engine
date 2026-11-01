@@ -129,7 +129,8 @@ export function lateTodos(impacts = [], products = [], cfg = {}) {
     const late = i.behind.filter((b) => b.late);
     if (!late.length) continue;
     const p = products.find((x) => x.name === i.product) ?? {};
-    const team = p.team ?? cfg.owners?.[i.product] ?? `${i.product} team`;
+    const own = cfg.owners?.[i.product];   // a name, or { team, decides } (decided-by.mjs)
+    const team = p.team ?? (own && typeof own === 'object' ? own.team ?? own.decides : own) ?? `${i.product} team`;
     const hits = i.behind.flatMap((b) => b.touched), docs = hits.reduce((n, t) => n + (t.docs ?? 0), 0);
     const files = new Set(hits.flatMap((t) => t.files));
     const first = late[0];

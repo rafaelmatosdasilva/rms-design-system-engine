@@ -2465,15 +2465,19 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // The team that owns what a task is about (ds-config.json owners: a component, a layer or a token prefix to a team),
   // said after who acts: the longest key that is the component's name, or a token prefix the task names ("primitives/");
   // "*" for everything else. None set: nothing said. A task that already knows its team (a product's own) says that one.
+  // A key may be a glob ("tile*"), and a value a name or { team, decides } (the team is said here; who decides is said
+  // beside what waits on them, decided-by.mjs).
   var OWNERS = (typeof DATA !== 'undefined' && DATA.owners) || {};
   function teamNote(about, team) {
     if (team) return ' · ' + team;
+    var teamName = function (v) { return v && typeof v === 'object' ? (v.team || v.decides || '') : (v || ''); };
     var a = String(about || ''), keys = Object.keys(OWNERS).sort(function (x, y) { return y.length - x.length; });
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i], kl = k.toLowerCase(), al = a.toLowerCase();
-      if (k !== '*' && (al === kl || (k.indexOf('/') >= 0 && al.indexOf(kl) >= 0))) return ' · ' + OWNERS[k];
+      var glob = k !== '*' && k.indexOf('*') >= 0 && new RegExp('^' + kl.split('*').map(function (x) { return x.replace(/[.+?^${}()|[\]\\]/g, '\\$&'); }).join('.*') + '$').test(al);
+      if (k !== '*' && teamName(OWNERS[k]) && (al === kl || glob || (k.indexOf('/') >= 0 && al.indexOf(kl) >= 0))) return ' · ' + teamName(OWNERS[k]);
     }
-    return OWNERS['*'] ? ' · ' + OWNERS['*'] : '';
+    return teamName(OWNERS['*']) ? ' · ' + teamName(OWNERS['*']) : '';
   }
   // Whether the system has a Figma file at all: with none, every fix is the code's.
   var HAS_FIGMA = typeof COMPONENTS === 'undefined' || COMPONENTS.some(function (c) { return !c.codeOnly; });
@@ -3185,7 +3189,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         + card('Where it is used', used)
         + card('What it breaks', lines(x.breaking.map(function (b) { return b.what; })))
         + card('What it adds to the system', lines(x.held.map(function (h) { return h.what; })))
-        + card('Signed off', x.signedOff ? lines([x.signedOff.by + ', ' + String(x.signedOff.at || '').slice(0, 10)]) : '')
+        + card('Signed off', x.signedOff ? lines([x.signedOff.by + ', ' + String(x.signedOff.at || '').slice(0, 10)].concat(x.signedOff.notOwner && x.decider ? [x.decider.name + ' decides it: the sign-off stands, and they should hear of it.'] : [])) : x.decider ? lines(['Waits on ' + x.decider.name + '.']) : '')
         + card('Faults it already had, not fixed by this change', lines(x.faults.map(function (f) { return f.says + (f.value ? ': ' + f.value : ''); })));
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Changes in Figma', x.component], title: x.asked || x.steps[0] || x.component, body: body });
       panelShow(m, from);
@@ -3429,16 +3433,33 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var ilWrong = function (p) { return (p.wrong || []).map(function (f) { return '<p class="sg-il-line"><strong>' + esc((IL.wrongKinds || {})[f.kind] || f.kind) + '</strong>' + '<span class="sg-il-text">' + (f.line ? '\u201c' + esc(f.line) + '\u201d' : esc(f.says)) + '</span><span class="sg-il-label">What the system has</span><span class="sg-il-text">' + esc(f.truth) + (f.source ? ' From ' + esc(f.source) + '.' : '') + '</span></p>'; }).join(''); };
     // The engine's proposed answer to a decision that is the team's (Fix, Add, Move), what it rests on, and how to say
     // yes or no to it is said in What to do (intent-proposals.mjs). A no keeps the decision on the page as it was.
+    // Evidence first: each answer it could take, the one it proposes marked, with what speaks for each, where that comes
+    // from and how strongly (intent-proposals.mjs → candidatesFor). Who it waits on, and who answered it.
+    var IL_STRENGTH = { strong: 'Strong', some: 'Some', weak: 'Weak' };
+    var ilCandidates = function (x) {
+      return (x.candidates || []).map(function (c) {
+        return '<div class="sg-il-group"><p class="sg-il-head">' + esc((c.answer === x.recommends ? 'Proposed · ' : '') + capital(c.says)) + '</p>'
+          + (c.evidence.length ? c.evidence.map(function (e) { return '<p class="sg-il-item">' + esc(e.says) + '<span class="pg-par-val">' + esc(e.from + ' · ' + (IL_STRENGTH[e.strength] || e.strength)) + '</span></p>'; }).join('') : '<p class="sg-il-item pg-missing">Nothing the engine read speaks for it.</p>') + '</div>';
+      }).join('');
+    };
+    var ilAnsweredBy = function (x) {
+      var who = x.by || x.at ? ' by ' + esc(x.by || 'someone') + (x.at ? ' on ' + esc(String(x.at).slice(0, 10)) : '') : '';
+      var other = x.notOwner && x.decider ? ' ' + esc(x.decider.name) + ' decides it: the answer stands, and they should hear of it.' : '';
+      return x.answer === 'no' && x.kind !== 'review' ? '<p class="sg-il-line"><span class="pg-par-val">Declined' + who + ': it stays for the team to settle another way.' + other + '</span></p>'
+        : x.answer ? '<p class="sg-il-line"><span class="pg-par-val">Answered ' + esc(x.answer) + who + '.' + other + '</span></p>'
+        : x.decider ? '<p class="sg-il-line"><span class="pg-par-val">Waits on ' + esc(x.decider.name) + '.</span></p>' : '';
+    };
     var ilProposal = function (p) {
       var list = p.missingFor ? [(IL.addProposals || {})[p.missingFor]].filter(Boolean) : (p.proposals || []);
       return list.map(function (x) {
         return '<p class="sg-il-line"><strong>' + esc(x.kind === 'fix' ? x.subject + ': ' : '') + esc(x.proposal) + '</strong></p>'
-          + (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join('')
-          + (x.answer === 'no' ? '<p class="sg-il-line"><span class="pg-par-val">Declined' + (x.by || x.at ? ' by ' + esc(x.by || 'someone') + (x.at ? ' on ' + esc(String(x.at).slice(0, 10)) : '') : '') + ': it stays for the team to settle another way.</span></p>' : '');   // how to answer: in What to do
+          + (x.split ? '<p class="sg-il-line"><span class="pg-par-val">The evidence is split: a person decides.</span></p>' : '')
+          + ((x.candidates || []).length ? ilCandidates(x) : (x.evidence || []).map(function (e) { return '<p class="sg-il-line"><span class="pg-par-val">' + esc(e) + '</span></p>'; }).join(''))
+          + ilAnsweredBy(x);   // how to answer: in What to do
       }).join('');
     };
     // What the agents read from it, word for word, by kind: the one place to see what reaches them.
-    var IL_READ = [['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
+    var IL_READ = [['review', 'Note beside it'], ['purpose', 'Intent'], ['whenToUse', 'When to use'], ['whenNotToUse', 'When not to use'], ['mistakes', 'Common mistakes'], ['limitations', 'Limitations'], ['rules', 'Rules'], ['sections', 'Other sections']];
     // Each source with where it is written (the intent layer's spec, else its page), then what else the agents read
     // about the component: Figma's description and annotations, the code's note.
     var ilSourceHead = function (name, where) { return '<p class="sg-il-line"><strong>' + esc(name) + '</strong>' + (where ? '<span class="pg-par-val">' + esc(where) + '</span>' : '') + '</p>'; };
@@ -3570,7 +3591,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var needsReview = function (p) { if (p.absent) return !!(p.drafts || []).length; return !p.tokens && (!!p.missingFor || p.action !== 'keep' || docLeft(p).some(function (x) { return x.st === 'check'; })); };
     var needsWrite = function (p) { if (p.absent) return !(p.drafts || []).length; return p.tokens ? p.tokens.missing.length > 0 : docLeft(p).some(function (x) { return x.st === 'todo'; }); };
     var isKeep = function (p) { return !needsReview(p) && !needsWrite(p) && !needsRemove(p); };
-    var reviewTopic = function (p) { return p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
+    // A page whose component changed since it was written: its review is that, whatever else it waits on.
+    var isStale = function (p) { return (p.wrong || []).some(function (f) { return f.kind === 'stale'; }); };
+    var reviewTopic = function (p) { return isStale(p) && p.action === 'review' ? 'Changed since written' : p.missingFor || p.action !== 'keep' ? labelOf(p.missingFor ? 'missing' : p.action) : 'To check'; };
+    // Who a row waits on (ds-config.json owners, decided-by.mjs): its page's, else its component's, else the system's.
+    var deciderOf = function (p) { var d = p.decider || (docComp(p) || {}).decider || (p.absent ? IL.systemDecider : null); return d && d.name ? d.name : null; };
     // Each decision's colour, as the statuses: red to fix, yellow to decide or complete, green done.
     var IL_DOT = { 'delete': 'differs', move: 'differs', missing: 'differs', fix: 'differs', review: 'figma', rename: 'figma', name: 'figma', write: 'figma', improve: 'figma', keep: 'match' };
     var labels = (IL.actionLabels || []).concat([['missing', 'Add']]);
@@ -3603,7 +3628,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A row with notes no agent reads says Remove under its status, and is found by the Remove chip whatever its status.
     var removeUnder = function (p) { return needsRemove(p) ? ['Remove ' + removeTopic(p)] : []; };
     var decisionCell = function (k, p) { var st = statusOf(p); return st === 'keep' ? statusPill(IL_DOT.keep, labelOf('keep'))
-      : st === 'review' ? statusPill('figma', 'Review', [reviewTopic(p)].concat(needsWrite(p) ? ['Missing ' + docTopic(p).charAt(0).toLowerCase() + docTopic(p).slice(1)] : [], removeUnder(p)).join(' · '))
+      : st === 'review' ? statusPill('figma', 'Review', [reviewTopic(p)].concat(needsWrite(p) ? ['Missing ' + docTopic(p).charAt(0).toLowerCase() + docTopic(p).slice(1)] : [], removeUnder(p), deciderOf(p) ? ['Waits on ' + deciderOf(p)] : []).join(' · '))
       : st === 'write' ? statusPill('differs', 'Missing', [docTopic(p)].concat(removeUnder(p)).join(' · ')) : statusPill('differs', 'Remove', removeTopic(p)); };
     // Each row's cells, once: the table shows For, File, Sources, Decision and when its file last changed; a click on the row (or
     // Enter) opens it in the side panel, with what to do, why and what the agents get from it.
@@ -3629,9 +3654,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       if (p.noLayer) return { decision: decisionCell('keep', p), write: docWriteOf(p), notes: notesOff(p), file: '', forWhat: ilFor(p), todo: '', why: '', reads: noLayerReads(p), gets: '', updated: docAt(p) };
       return { decision: decisionCell(p.action, p), write: docWriteOf(p), notes: notesOff(p), file: ilLink(p), forWhat: ilFor(p), todo: ilTodo(p), why: ilWhy(p), reads: ilReads(p), gets: ilGets(p), updated: p.updatedAt ? esc(ilWhen(p.updatedAt)) : '' };
     };
+    var waitsKey = function (d) { return 'waits-' + String(d).toLowerCase().replace(/[^a-z0-9]+/g, '-'); };
     var rowHTML = function (p, i) {
       var c = ilCellsOf(p);
-      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
+      return '<tr class="sg-row-open" tabindex="0" data-il-row="' + i + '" data-chip="' + esc(isKeep(p) ? 'keep' : p.tokens ? 'tokens' : p.absent ? 'system' : p.missingFor ? 'missing' : p.action === 'keep' ? 'left' : p.action) + '"' + (isKeep(p) ? '' : ' data-chip-group="' + [({ review: 'toReview', write: 'toWrite', remove: 'toRemove' })[statusOf(p)]].concat(needsRemove(p) && statusOf(p) !== 'remove' ? ['toRemove'] : [], statusOf(p) === 'review' && deciderOf(p) ? [waitsKey(deciderOf(p))] : []).join(' ') + '"') + '><td>' + c.forWhat + '</td>' + (NO_LAYER ? '' : '<td>' + c.file + '</td>') + '<td>' + ilSources(p) + '</td><td>' + c.decision + '</td><td class="sg-il-when">' + c.updated + '</td><td class="sg-row-go">' + USERS_ARROW + '</td></tr>';
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
     var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || p.name || i); };
@@ -3653,8 +3679,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // A link to a page's panel (panel=doc:<file>) opens it.
     ilSec._openKey = function (key) { var i = rows.findIndex(function (p, j) { return ilKey(p, j) === key; }); if (i >= 0) ilPanel(i, null); return i >= 0; };
     var counts = { keep: rows.filter(isKeep).length, write: rows.filter(function (p) { return statusOf(p) === 'write'; }).length, remove: rows.filter(needsRemove).length };
+    // The rows to review, by who they wait on: one chip each ("Waiting on Cards team 3"), most first.
+    var waits = {}; rows.forEach(function (p) { var d = statusOf(p) === 'review' && deciderOf(p); if (d) waits[d] = (waits[d] || 0) + 1; });
+    var waitChips = Object.keys(waits).sort(function (a, b) { return waits[b] - waits[a] || a.localeCompare(b); }).map(function (d) { return { key: waitsKey(d), label: 'Waiting on ' + d, n: waits[d], dot: 'figma' }; });
     pageBar(ilSec, { links: sourceLinks(ilSrc.url), chips: (function () { var toReview = rows.filter(needsReview).length;
-      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
+      return (toReview ? [{ key: 'toReview', label: 'Review', n: toReview, dot: 'figma' }] : []).concat(waitChips).concat(counts.write ? [{ key: 'toWrite', label: 'Missing', n: counts.write, dot: 'differs' }] : []).concat(counts.remove ? [{ key: 'toRemove', label: 'Remove', n: counts.remove, dot: 'differs' }] : []).concat(counts.keep ? [{ key: 'keep', label: labelOf('keep'), n: counts.keep, dot: IL_DOT.keep }] : []); })(), total: rows.length });
     var ilBox = document.createElement('div'); ilBox.className = 'pg-par-card'; ilSec.appendChild(ilBox);
     ilBox.innerHTML = '<div class="pg-par-scroll"><table class="pg-par-table sg-issues sg-il' + (NO_LAYER ? ' sg-il-nofile' : '') + '"><thead><tr><th>For</th>' + (NO_LAYER ? '' : '<th>File</th>') + '<th>Sources</th><th>Status</th><th>Last updated</th><th class="sg-row-go"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div>';
     ilBox.addEventListener('click', function (e) { var tr = e.target.closest('tr[data-il-row]'); if (!tr || e.target.closest('a, button') || String(window.getSelection && window.getSelection()).length) return; ilPanel(+tr.getAttribute('data-il-row'), tr); });

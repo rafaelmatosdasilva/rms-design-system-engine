@@ -113,6 +113,9 @@ export function codeFilesOf(ROOT, cfg = {}) {
   return out;
 }
 
+// The note an agent reads beside a page whose component changed after it was written: what changed and since when.
+export const reviewNote = (f) => `To review again: ${f.truth} Where it disagrees with the component's contract, follow the contract.`;
+
 // What a component carries from the layer, for the design intent, the contracts and the style guide. wrong: what the
 // content check found on its page (intent-truth.mjs): the lines it says are wrong are left out, and it is listed.
 const FAMILY_POINTER = /^use the family spec\b/i;
@@ -121,8 +124,12 @@ export function componentIntent(e, src, wrong = []) {
   const ok = (t) => !bad.size || ![...bad].some((b) => b && norm(t).includes(b));
   if (bad.size) e = { ...e, purpose: e.purpose.filter(ok), whenToUse: e.whenToUse.filter(ok), whenNotToUse: e.whenNotToUse.filter(ok), mistakes: e.mistakes.filter(ok), limitations: e.limitations.filter(ok), rules: e.rules.filter((r) => ok(r.text ?? r)), sections: e.sections.filter((x) => ok(x.text)) };
   const list = (a) => (a.length ? a : null);
+  // Its component changed after the page was written: every line still reaches the agents, with a note to check it
+  // against the component as it is now (its contract), until a person edits the page or confirms it.
+  const stale = wrong.find((f) => f.kind === 'stale');
   return {
     ...(wrong.length ? { wrong: wrong.map(({ kind, where, line, truth, fix }) => ({ kind, where, line, truth, fix })) } : {}),
+    ...(stale ? { review: { since: stale.since ?? null, at: stale.at ?? null, changed: stale.changed ?? [], note: reviewNote(stale) } } : {}),
     name: e.name, ...(e.kind ? { kind: e.kind } : {}), file: e.file, url: e.url ?? fileUrl(src, e.file), status: e.status ?? null, source: e.source?.label ?? src?.label ?? 'the intent layer',
     // A split page's first line only points to its family's spec: what the component is for is the line after it.
     purpose: e.purpose.find((x) => !FAMILY_POINTER.test(x)) ?? null, whenToUse: list(e.whenToUse), whenNotToUse: list(e.whenNotToUse),
@@ -312,15 +319,17 @@ function decide(page, e, { comp, has }) {
   }
   // What on it the system contradicts, first: fix it before anything is added to it.
   // A copied list is not wrong, only bound to go stale: it is a change to make, not a fix (below).
-  const fix = (page.wrong ?? []).filter((f) => f.kind !== 'copy').map((f) => (f.kind === 'name' ? `${f.says} is not a name the system has. ${f.fix}` : f.kind === 'claim' ? `The page says ${f.says}. ${f.fix}` : f.fix));
+  // A component that changed after its page was written is not wrong yet: a person reviews the page again (Review).
+  const fix = (page.wrong ?? []).filter((f) => f.kind !== 'copy' && f.kind !== 'stale').map((f) => (f.kind === 'name' ? `${f.says} is not a name the system has. ${f.fix}` : f.kind === 'claim' ? `The page says ${f.says}. ${f.fix}` : f.fix));
+  const again = (page.wrong ?? []).filter((f) => f.kind === 'stale').map((f) => `Review it again: ${f.truth} Edit what is no longer true, or confirm it still holds.`);
   for (const f of page.wrong ?? []) if (f.kind === 'copy') todo.push(`${f.fix} ${f.truth}`);
-  if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...todo] };
+  if (fix.length) return { action: 'fix', decision: label('fix'), todo: [...fix, ...again, ...todo] };
   // Lines drafted for it, not the team's word yet: each read, edited as needed, its marker removed (or the line deleted).
   const drafts = page.drafts ?? [];
   // Questions the team left open on it ([open], TBD): a person settles each, writing the answer in its place. Until
   // then no agent reads the line, and a prototype that needs it asks.
   const open = (page.open ?? []).map((q) => `Answer the open question${q.where ? ` under ${q.where}` : ''} "${q.text}". Write the answer in its place and remove the [open] or TBD marker. Agents skip it until then.`);
-  if (drafts.length || open.length) return { action: 'review', decision: label('review'), todo: [...open, ...(drafts.length ? [drafts.length === 1 ? 'Review its draft below. Approve it, change it or drop it, then copy your decision and paste it into Claude Code. Agents won\'t use it until you decide.' : `Review these ${drafts.length} drafts. Approve them all, change one or drop them all, then copy your decision and paste it into Claude Code. Agents won't use them until you decide.`] : []), ...todo] };
+  if (drafts.length || open.length || again.length) return { action: 'review', decision: label('review'), todo: [...again, ...open, ...(drafts.length ? [drafts.length === 1 ? 'Review its draft below. Approve it, change it or drop it, then copy your decision and paste it into Claude Code. Agents won\'t use it until you decide.' : `Review these ${drafts.length} drafts. Approve them all, change one or drop them all, then copy your decision and paste it into Claude Code. Agents won't use them until you decide.`] : []), ...todo] };
   // A page that exists and says something: one decision, improve it, its changes listed one by one (what to add,
   // retitle or remove); keep it only when there is nothing to change.
   const action = page.verdict === 'not used' ? 'write' : todo.length || page.verdict === 'thin' ? 'improve' : 'keep';
@@ -333,7 +342,7 @@ function decide(page, e, { comp, has }) {
 // The lines the content check found wrong and the drafts are not in it: no agent gets them. wrong: its findings.
 export function agentText(e, src, wrong = []) {
   const ci = componentIntent(e, src, wrong);
-  const out = { purpose: ci.purpose ? [ci.purpose] : [], whenToUse: ci.whenToUse ?? [], whenNotToUse: ci.whenNotToUse ?? [], mistakes: ci.mistakes ?? [], limitations: ci.limitations ?? [], rules: ci.rules ?? [] };
+  const out = { purpose: ci.purpose ? [ci.purpose] : [], whenToUse: ci.whenToUse ?? [], whenNotToUse: ci.whenNotToUse ?? [], mistakes: ci.mistakes ?? [], limitations: ci.limitations ?? [], rules: ci.rules ?? [], review: ci.review ? [ci.review.note] : [] };
   if (e.layer !== 'components') out.sections = (ci.sections ?? []).map((x) => `${x.title}: ${x.text}`);
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v.length));
 }
