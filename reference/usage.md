@@ -105,7 +105,9 @@ rms-design-system-engine --publish-styleguide            # write the CI job that
 rms-design-system-engine --docs                          # ALSO build the styleguide HTML this run (design-intent itself is already automatic)
 rms-design-system-engine --no-contracts                  # skip the standard contract + DTCG tokens this run (emitted by default; local, gitignored)
 rms-design-system-engine --contracts-out <dir>          # publish the contracts (one per code file, schema, README) into a shared repository's folder; never pushes
-rms-design-system-engine --watch-intent-layer [min]     # keep running: build the style guide again each time the intent layer gets a new commit (checks every 5 min)
+rms-design-system-engine --watch [min]                  # keep running: build the style guide again whenever the code (every few seconds), Figma or the intent layer (every [min], 5 by default) or the engine changes; --watch-intent-layer is the same watch
+rms-design-system-engine --watch-install [min]          # the same watch in the background from login on, with no terminal open (a LaunchAgent on a Mac, a user service on Linux; its log in .design-system-engine-out/watch.log)
+rms-design-system-engine --watch-uninstall              # take that background watch away
 rms-design-system-engine --check-intent [file|folder]   # whether what intent-layer pages say is true of the system: a page (or folder) before it is written to the layer, or the whole layer; exits 1 on any finding
 rms-design-system-engine --pages-to-write [N]           # the components with no intent-layer page, most used first (products, files, uses); each run that writes the layer starts the top intentLayer.startPages (10 by default) as drafts
 rms-design-system-engine --prop-pairs                    # the Figma properties the engine suggests pairing with a code prop, each a yes or no for a person
@@ -535,7 +537,8 @@ re-derivation.
 
 `--styleguide` builds the styleguide HTML on its own; `--docs` builds it right after the design-intent. It is a
 **generated view** of what Figma and the code agree on, never hand-maintained. Every project fills **one
-template, the engine's** (`templates/styleguide.template.html`), so an improvement made there reaches every design
+template, the engine's** (`templates/styleguide.template.html`, the page's frame, with its styles and script in parts
+under `templates/styleguide/`, joined where each `@part` line stands), so an improvement made there reaches every design
 system on its next run; `ds-config.json → styleguide.template` points a project at a template of its own instead.
 The output goes to `styleguide.out`, else `.design-system-engine-out/styleguide/index.html`. With `--component <name>`
 the page holds that component and the components it nests only (found in its markup's classes and in its own file's
@@ -935,7 +938,7 @@ most every six hours, and says in one line what moved since and when the page wa
 the store's pipelines (GitLab's Pipeline: Read), also a pipeline that has waited for a runner or failed. A style guide
 build always asks, and says how to publish when the page is behind; with `"styleguide": { "publish": "auto" }` it
 publishes itself, where GitLab lets the person write the store, so a pipeline that cannot run never leaves the team on
-an old page; `--no-publish` builds a preview that is never published. `--guide-status` asks now. The Status page shows, by its title, when it was built and with which engine.
+an old page; `--no-publish` builds a preview that is never published. `--guide-status` asks now.
 
 Config: `styleguide: { template?, out?, iconSource?, plugins?, chrome?, publish? }` (`publish: "auto"`: a build publishes to the style guide store when the published page is behind). `plugins` is `[{ key, match, name?, href? }]`, a short usage label per app, a fragment of its source path, its full name and its page; without it each app in `paths.plugins` gets a short label made from its name (the initials of a name with two or more words, `order-history` → `OH`, the name itself for one word, and full names if two apps would share a label). Because it renders **only** what the
 DS actually contains and agrees on, the styleguide can never invent or drift — the same guarantee Gate 20
