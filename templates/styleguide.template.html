@@ -9386,7 +9386,9 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // The Status page has every component tried in the background, as its Accessibility area does; cb when it is done.
     var bgRun = null;
     sec._a11yRun = function (cb) {
-      if (ALL || !a11yEl || !cur || checking) { cb(); return; }
+      if (ALL || !a11yEl || !cur) { cb(); return; }
+      // A check already under way (the area was just opened) ends first; then every variant is tried again for this one.
+      if (checking) { var before = bgRun; bgRun = function () { if (before) before(); sec._a11yRun(cb); }; return; }
       bgRun = cb; liveSig = null; checkLive();
       if (!checking && bgRun) { var f = bgRun; bgRun = null; f(); }   // nothing left running after it
     };
