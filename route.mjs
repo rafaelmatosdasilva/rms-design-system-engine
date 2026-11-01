@@ -165,7 +165,7 @@ const NOT_STYLE_GUIDE = /\bfix\b|\bcorrig|\breflow|\bhow (?:do|to|does)\b/i;
 // The style guide shared with the team, rebuilt on every push: the CI job that publishes it is written.
 const PUBLISH_STYLE_GUIDE = /\b(?:publish|share|host|deploy|put)\w*\b[^.\n]{0,40}\bstyle ?guide\b|\bstyle ?guide\b[^.\n]{0,40}\b(?:online|link|url|the (?:whole )?team|everyone|pages|published|shared)\b|\b(?:publica|partilha|compartilha)\w*\b[^.\n]{0,30}\bguia de estilos?\b/i;
 const FIGMA_URL = /https?:\/\/(?:www\.)?figma\.com\/(?:design|file)\/[\w-]+\S*/i;
-const STEP_LIST = /(^|\s)1[.)]\s[\s\S]*\s2[.)]\s/;
+export const STEP_LIST = /(^|\s)1[.)]\s[\s\S]*\s2[.)]\s/;
 
 // Each rule: [recipe, test, what to run, a note]. First match wins; the order is part of the contract (tested).
 const BUILD_VERB = /\b(build|create|implement|generate|code|constr[oó]i\w*|cria\w*|implementa\w*|gera\w*)\b/i;
