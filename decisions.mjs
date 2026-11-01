@@ -18,6 +18,7 @@ import { join, resolve } from 'node:path';
 import { projectPath } from './names.mjs';
 import { readIntentLayer, systemNames, matchComponents, codeFilesOf } from './intent-layer.mjs';
 import { projectLessons, lessonDecisions } from './lessons.mjs';
+import { systemFacts, decisionsToReview } from './intent-truth.mjs';
 
 // What each kind of decision is called where a person reads it, and whether it rules an option out for an agent.
 export const KINDS = {
@@ -39,7 +40,9 @@ const capital = (s) => { const t = String(s ?? ''); return t ? t[0].toUpperCase(
 
 // Every decision in one shape, whatever file it came from.
 // → { component, kind, what, ruledOut: [string], why, by, at, from, said } (said: the decision as the person gave it)
-export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [], lessons = [] } = {}) {
+// stale: { key: { note } } for each answered proposal to review again (intent-truth.mjs → decisionsToReview): said
+// beside it, for a person and for agents.
+export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], checked = [], written = [], layer = [], lessons = [], stale = {} } = {}) {
   const out = [];
   const add = (d) => { if (d.what) out.push({ component: null, ruledOut: [], why: null, by: null, at: null, said: null, ...d, what: trim(d.what), why: d.why ? trim(d.why) : null, said: d.said ? trim(d.said, 600) : null }); };
 
@@ -55,7 +58,12 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
     // A page confirmed after its component changed, or sent back to be edited: a review, never an option ruled out.
     const review = /^review:(.+)$/.exec(key);
     if (review) { add({ component: null, kind: 'answered', what: a?.answer === 'no' ? `${review[1]}'s page is to be edited: its component changed` : `${review[1]}'s page confirmed: it still holds after its component changed`, why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' }); continue; }
-    add({ component: componentOf(key), kind: 'answered', what: `${a?.answer === 'no' ? 'No' : 'Yes'}: ${text}`, ruledOut: a?.answer === 'no' ? [trim(text)] : [], why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' });
+    // A decision reviewed again after its component changed: confirmed, or withdrawn (and asked again).
+    const again = /^recheck:(.+)$/.exec(key);
+    if (again) { const was = answered[again[1]]?.proposal ?? again[1]; add({ component: componentOf(again[1]), kind: 'answered', what: a?.answer === 'no' ? `Withdrawn once its component changed: ${was}` : `Confirmed after its component changed: ${was}`, why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals' }); continue; }
+    // Withdrawn since: it rules nothing out any more.
+    const gone = withdrawnFrom(answered, key);
+    add({ component: componentOf(key), kind: 'answered', what: `${a?.answer === 'no' ? 'No' : 'Yes'}: ${text}${gone ? ' (withdrawn since)' : ''}`, ruledOut: a?.answer === 'no' && !gone ? [trim(text)] : [], why: a?.why ?? null, by: a?.by, at: a?.at, said: a?.said, from: 'the answered proposals', ...(stale[key]?.note && !gone ? { review: stale[key].note } : {}) });
   }
   // A need nothing in the system fitted: what was looked at is what was ruled out, with why in the team's own words.
   for (const g of gaps) {
@@ -81,10 +89,14 @@ export function decisionsFrom({ kept = [], answered = {}, gaps = [], debt = [], 
 function componentOf(key) {
   const k = String(key ?? '');
   if (/^add:/.test(k)) return k.slice(4) || null;
+  if (/^recheck:/.test(k)) return componentOf(k.slice(8));
   if (/^(fix|move|review):/.test(k)) return null;
   const m = /^([A-Za-z][\w-]*)\s*[:/]/.exec(k);
   return m ? m[1] : null;
 }
+
+// A decision a person withdrew once its component changed (a no to recheck:<key>, given after it).
+const withdrawnFrom = (answered, key) => { const r = answered?.[`recheck:${key}`], d = answered?.[key]; return r?.answer === 'no' && !!r.at && !!d?.at && Date.parse(r.at) >= Date.parse(d.at); };
 
 // The whole log, and the same decisions by component. → { all, byComponent, general, total, ruledOut }
 export function decisionView(all = []) {
@@ -98,7 +110,7 @@ export function decisionView(all = []) {
 }
 
 // Everything the engine and the team recorded, read from where each is kept. cfg is read for nothing but the paths.
-export function gatherDecisions(ROOT, { gaps = null, writtenFile = 'DECISIONS.md' } = {}) {
+export function gatherDecisions(ROOT, { gaps = null, writtenFile = 'DECISIONS.md', stale = null } = {}) {
   const json = (p, fallback) => { try { return JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')); } catch { return fallback; } };
   const kept = json(projectPath(ROOT, 'kept'), []);
   const answered = json(projectPath(ROOT, 'intentDecisions'), {});
@@ -110,7 +122,22 @@ export function gatherDecisions(ROOT, { gaps = null, writtenFile = 'DECISIONS.md
   const written = existsSync(resolve(ROOT, writtenFile)) ? writtenDecisions(readFileSync(resolve(ROOT, writtenFile), 'utf8'), writtenFile) : [];
   let lessons = [];
   try { lessons = lessonDecisions(projectLessons(ROOT)); } catch { /* no lessons yet */ }
-  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written, layer: layerDecisions(ROOT), lessons }));
+  return decisionView(decisionsFrom({ kept: Array.isArray(kept) ? kept : [], answered, gaps: merged, debt, checked, written, layer: layerDecisions(ROOT), lessons, stale: stale ?? staleAnswers(ROOT, answered) }));
+}
+
+// The answered proposals whose component changed since (intent-truth.mjs → decisionsToReview), read from the project:
+// an Add only while its component still has no page of its own (then its page is what is reviewed). → { key: { note } }
+function staleAnswers(ROOT, answered) {
+  if (!Object.entries(answered ?? {}).some(([k, a]) => a?.at && /^(add|fix|move):/.test(k))) return {};
+  try {
+    const cfg = JSON.parse(readFileSync(resolve(ROOT, 'ds-config.json'), 'utf8'));
+    const snap = readIntentLayer(ROOT, cfg);
+    const facts = systemFacts(ROOT, cfg, { record: false });
+    const matched = snap ? matchComponents([...new Set([...systemNames(ROOT, cfg), ...Object.keys(facts.components)])], snap.entities, codeFilesOf(ROOT, cfg)) : new Map();
+    const byPage = new Map([...matched].map(([n, e]) => [e.name, n]));
+    const hasPage = new Set(matched.keys());
+    return decisionsToReview(answered, facts.changed, { pageComponent: (p) => byPage.get(p) ?? null, only: (k) => !(/^add:/.test(k) && hasPage.has(k.slice(4))) });
+  } catch { return {}; }
 }
 
 // A DECISIONS.md the team wrote: each `## <heading>` a decision, the component when the heading names one, and a
@@ -138,7 +165,8 @@ export function ruledOutLines(view, name, { most = 4 } = {}) {
   // A general decision that names this component rules it out everywhere, not only on its own page.
   const named = (view.general ?? []).filter((d) => d.ruledOut.some((x) => norm(x).includes(key)) || norm(d.what).includes(key));
   const list = [...mine, ...named].slice(0, most);
-  return list.map((d) => `decided against: ${d.ruledOut.join(', ') || d.what}${d.why ? ` - ${d.why}` : ''} (${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''})`);
+  // One to review again (its component changed since) still stands, with the note beside it.
+  return list.map((d) => `decided against: ${d.ruledOut.join(', ') || d.what}${d.why ? ` - ${d.why}` : ''} (${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''})${d.review ? ` ${d.review}` : ''}`);
 }
 
 // The log a person reads: the decisions about each component, then the ones about the system as a whole.
@@ -147,7 +175,7 @@ export function decisionsMarkdown(view, { title = 'Decisions' } = {}) {
     `> Gathered by rms-design-system-engine from where each decision was made: the kept differences, the answered proposals, the accepted differences, the checks made by hand, the prototypes' gap list, the lessons, and a DECISIONS.md the team wrote. Nothing here is written by the engine, and nothing here is rewritten by it.`, ''];
   if (!view.total) { lines.push('Nothing decided yet.'); return lines.join('\n') + '\n'; }
   lines.push(`${view.total} decision${view.total === 1 ? '' : 's'}, ${view.ruledOut} of them ruling an option out.`, '');
-  const one = (d) => `- **${d.what}**${d.ruledOut.length && d.kind !== 'lesson' ? ` — ruled out: ${d.ruledOut.join(', ')}` : ''}${d.why ? `  \n  Why: ${d.why}` : ''}${d.became ? `  \n  ${d.became}` : ''}${d.back ? `  \n  🔁 ${capital(d.back)}` : ''}  \n  *${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''}, from ${d.from}*`;
+  const one = (d) => `- **${d.what}**${d.ruledOut.length && d.kind !== 'lesson' ? ` — ruled out: ${d.ruledOut.join(', ')}` : ''}${d.review ? `  \n  ${d.review}` : ''}${d.why ? `  \n  Why: ${d.why}` : ''}${d.became ? `  \n  ${d.became}` : ''}${d.back ? `  \n  🔁 ${capital(d.back)}` : ''}  \n  *${KINDS[d.kind].said}${d.by ? `, ${d.by}` : ''}${d.at ? `, ${String(d.at).slice(0, 10)}` : ''}, from ${d.from}*`;
   for (const name of Object.keys(view.byComponent).sort()) {
     lines.push(`## ${name}`, '', ...view.byComponent[name].map(one), '');
   }

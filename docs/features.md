@@ -56,6 +56,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Writes what it is sure of, such as the element a component renders, and drafts the rest, such as an example, for a person to approve.
 - Keeps every decision in one history: differences kept on purpose, proposals answered, what was ruled out and why.
 - Marks a page to review again when its component changes after the page was written: what changed and since when. Agents still read the page, with a note beside it. A person confirms it, or edits it.
+- Does the same for the team's answers: a decision whose component changed since is marked to review again, confirmed or withdrawn by a person.
 - Shows each proposal with every answer it could take and the evidence for each: where it comes from (Figma, the code, the products, your pages, past decisions) and how strong it is.
 - Names who decides each thing that waits on a person, from the owners you set, and counts what waits on each.
 - Reads your guidelines against each other: rules that contradict, rules written twice and rules nothing can check.

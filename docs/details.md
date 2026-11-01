@@ -735,10 +735,11 @@ The part that pays is what agents get. A card now carries what was already ruled
 
 A page is right when it is written. Then its component changes: a prop is added, a value is dropped, a token is renamed. The page still says what was true before.
 
-- **The engine notices.** It keeps each component's props, the values they take and its tokens from run to run. It also reads the code's history and the history of your Figma snapshots. It never asks Figma or GitLab again for this.
+- **The engine notices.** It keeps each component's props, the values they take and its tokens from run to run. It also reads the code's history and the history of your Figma snapshots, from the snapshots store or from the commits of your own repository. Each commit is read once and kept, so a run reads only the new ones. It never asks Figma or GitLab again for this. The first read of Figma is not a change.
 - **The page is marked, not removed.** On the Documentation page its status is Review, Changed since written, with what changed and since when. Agents still read every line, with a note beside it: check it against the contract.
 - **A removed name is said.** When the page still names a prop or token the component no longer has, the page says which.
 - **A person settles it.** Edit the page, or say it still holds. The answer is kept with who gave it and when. The page is not marked again until the component changes again.
+- **Decisions too.** An answer the team gave (a part documented in its parent's page, a name kept, a page kept where it is) is dated the same way. When its component changes after it, the decision is marked to review again on its page and in History, and agents read it with the same note. It still stands until a person says. Say it still holds, and it is kept with who and when; withdraw it, and its question is asked again.
 
 ### Evidence first
 

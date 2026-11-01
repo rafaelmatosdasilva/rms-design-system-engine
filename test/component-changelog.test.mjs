@@ -49,3 +49,30 @@ test('ticketOf: the ticket a commit was made for, its address, and what the comm
   assert.equal(ticketLinks(dir), 'https://tracker.example/issues/{id}');
   assert.equal(ticketOf('#4521 - x', {}, dir).ticketUrl, 'https://tracker.example/issues/4521');
 });
+
+test('Figma reads in git are walked once: each commit read is kept, and a later run reads only the new commits', async () => {
+  const { FIGMA_GIT_HISTORY } = await import('../component-changelog.mjs');
+  const { readFileSync: read } = await import('node:fs');
+  const dir = tempDir('figma-walk-');
+  run(dir, 'init', '-q', '-b', 'main');
+  const snap = (opts) => JSON.stringify({ cardTile: { properties: { 'Size#1:0': { type: 'VARIANT', variantOptions: opts, defaultValue: opts[0] } } } }, null, 2);
+  writeFileSync(join(dir, 'props.json'), snap(['S'])); run(dir, 'add', '-A'); run(dir, 'commit', '-qm', 'first read');
+  writeFileSync(join(dir, 'props.json'), snap(['S', 'M'])); run(dir, 'commit', '-qam', 'second read');
+  const files = { props: 'props.json' };
+  const first = figmaChangelogs(dir, files, ['cardTile']).cardTile;
+  assert.deepEqual(first.map((r) => r.subject), ['second read', 'first read']);
+  const kept = JSON.parse(read(join(dir, FIGMA_GIT_HISTORY), 'utf8'));
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+  assert.ok(kept.at[head] && kept.at[`${head}^`], 'each commit and the one before it kept');
+  // What is kept is what the next run uses: no commit read again (a planted digest shows through).
+  kept.at[head].cardTile.props.Size = 'VARIANT · S, M, L · S';
+  writeFileSync(join(dir, FIGMA_GIT_HISTORY), JSON.stringify(kept));
+  assert.match(figmaChangelogs(dir, files, ['cardTile']).cardTile[0].changed[0], /S, M, L/);
+  // A new commit: read, the older ones still from what was kept.
+  writeFileSync(join(dir, 'props.json'), snap(['S', 'M', 'XL'])); run(dir, 'commit', '-qam', 'third read');
+  const third = figmaChangelogs(dir, files, ['cardTile']).cardTile;
+  assert.deepEqual(third.map((r) => r.subject), ['third read', 'second read', 'first read']);
+  assert.match(third[1].changed[0], /S, M, L/, 'the commit read before is not read again');
+  // cache: false reads every commit as it is.
+  assert.deepEqual(figmaChangelogs(dir, files, ['cardTile'], { cache: false }).cardTile[1].changed, ['property Size VARIANT · S · S → VARIANT · S, M · S']);
+});
