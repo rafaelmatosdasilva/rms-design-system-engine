@@ -147,7 +147,7 @@ function template(contract, entries, todos, url) {
     const guards = conditions.filter((c) => c.code === e.code && !c.unclear);
     const tests = guards.map((g) => { const gv = varOf(g); return gv ? (g.equals != null ? `${gv} === ${literal(g.equals)}` : `${g.negated ? '!' : ''}${gv}`) : null; }).filter(Boolean);
     const attr = attrFor(e, v);
-    parts.push(tests.length ? `\${${tests.join(' && ')} ? \`${attr.replace(/`/g, '\\`')}\` : ''}` : attr);
+    parts.push(tests.length ? `\${${tests.join(' && ')} ? \`${attr.replace(/[\\`]/g, '\\$&')}\` : ''}` : attr);
     pairs.push({ figma: e.figma, code: e.code, role: 'value', ...(e.negated ? { negated: true } : {}), ...(e.values ? { values: e.values } : {}) });
     for (const g of guards) if (vars.has(g.figma)) pairs.push({ figma: g.figma, code: g.code, role: 'condition', ...(g.negated ? { negated: true } : {}), ...(g.equals != null ? { equals: g.equals } : {}) });
     if (e.byName) todos.push(`${e.figma}: paired with ${e.code} by its name: check it is that prop`);
