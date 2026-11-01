@@ -5,8 +5,14 @@
 // space of its own. Layout (widths, grids, positions, a 1px rule) is the template's. A look role the system has no
 // token for, left to the browser's own, is listed too.
 //
+// Built and published, it is also held to what a page owes its readers: every file it links to is there beside it (a
+// missing one fails it, so a page with a hole is never published), and its weight, the page and every file it loads, is
+// said, with a warning past WEIGHT_WARN_MB and where most of it goes.
+//
 //   import { checkStyleguidePage } from './styleguide-check.mjs'   → [{ selector, property, value, why }]
 //   node audit.mjs --styleguide-check [page.html]                  prints them; exit 1 when there are any
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { readPage } from './styleguide-files.mjs';
 import { markupFindings } from './a11y-static.mjs';
 
@@ -118,14 +124,58 @@ export function checkStyleguidePage(html, { missing = missingRoles(html) } = {})
 export const failures = (found) => found.filter((f) => !f.warning);
 export function checkLines(found) {
   const bad = failures(found), warn = found.filter((f) => f.warning);
-  const roles = warn.filter((f) => f.property.startsWith('--sg-')), icons = warn.filter((f) => f.property === 'accessibility');
+  const roles = warn.filter((f) => f.property.startsWith('--sg-')), icons = warn.filter((f) => f.property === 'accessibility'), weight = warn.filter((f) => f.property === 'weight');
   const warnLines = [...(roles.length ? [`   ⚠️  the system has no token for ${roles.map((f) => f.property.replace(/^--sg-/, '')).join(', ')}: the page's default is shown there`] : []),
-    ...icons.map((f) => `   ⚠️  ${f.why}`)];
+    ...icons.map((f) => `   ⚠️  ${f.why}`), ...weight.map((f) => `   ${f.info ? 'ℹ️ ' : '⚠️ '} ${f.why.charAt(0).toUpperCase()}${f.why.slice(1)}.`)];
   if (!bad.length) return ['✅ Style guide check: the page uses only the system (its colours, fonts, text styles, radii and spacing).', ...warnLines];
-  return [`❌ Style guide check: ${bad.length} thing${bad.length === 1 ? '' : 's'} on the page not from the system`,
+  const files = bad.filter((f) => f.property === 'file');
+  return [`❌ Style guide check: ${[bad.length - files.length ? `${bad.length - files.length} thing${bad.length - files.length === 1 ? '' : 's'} on the page not from the system` : '', files.length ? `${files.length} file${files.length === 1 ? '' : 's'} the page links to not there` : ''].filter(Boolean).join(', ')}`,
     ...bad.slice(0, 40).map((f) => `   • ${f.selector} { ${f.property}: ${f.value} }: ${f.why}`),
     ...(bad.length > 40 ? [`   … and ${bad.length - 40} more`] : []), ...warnLines];
 }
 
-// The page with the files it links beside it written back in (its styles and code: styleguide-files.mjs).
-export function checkFile(file, opts = {}) { return checkStyleguidePage(readPage(file), opts); }
+// The local files a page names: each src and href that is not an anchor, a data URL or an address on the web.
+const NOT_A_FILE = /^(#|data:|blob:|https?:|\/\/|mailto:|tel:|javascript:|about:|\{\{)/i;
+export function localFiles(html) {
+  const out = new Set();
+  const markup = String(html).replace(/<(script|style)\b([^>]*)>[\s\S]*?<\/\1>/gi, '<$1$2></$1>');   // a tag's own attributes, never the code inside it
+  for (const m of markup.matchAll(/<(?:script|link|img|a|source|iframe|video|audio)\b[^>]*?\s(?:src|href)\s*=\s*["']([^"']+)["']/gi)) {
+    const ref = m[1].trim();
+    if (!ref || NOT_A_FILE.test(ref)) continue;
+    let path = ref.split(/[?#]/)[0];
+    try { path = decodeURIComponent(path); } catch { /* kept as written */ }
+    if (path) out.add(path);
+  }
+  return [...out];
+}
+
+// The page's weight: its own file and each local file it names that is there, the largest first.
+export const WEIGHT_WARN_MB = 25;
+export function pageWeight(file) {
+  const dir = dirname(resolve(file)), files = [{ file: relative(dir, resolve(file)), bytes: statSync(file).size }];
+  for (const f of localFiles(readFileSync(file, 'utf8'))) {
+    const abs = resolve(dir, f);
+    if (abs !== resolve(file) && existsSync(abs) && statSync(abs).isFile()) files.push({ file: f, bytes: statSync(abs).size });
+  }
+  files.sort((a, b) => b.bytes - a.bytes);
+  return { bytes: files.reduce((n, f) => n + f.bytes, 0), files };
+}
+const mb = (b) => `${(b / 1048576).toFixed(b < 10 * 1048576 ? 1 : 0)} MB`;
+
+// What the built page owes its readers: every file it links to there, and its weight said (a warning past the budget).
+export function pageFindings(file, { warnMB = WEIGHT_WARN_MB } = {}) {
+  const found = [];
+  const dir = dirname(resolve(file));
+  for (const f of localFiles(readFileSync(file, 'utf8'))) {
+    if (!existsSync(join(dir, f))) found.push({ selector: 'link', property: 'file', value: f, why: `a file the page links to is not there (${f}): publish the page with the files beside it, or build it again` });
+  }
+  const w = pageWeight(file);
+  const top = w.files.slice(0, 3).map((f) => `${f.file} ${mb(f.bytes)}`).join(', ');
+  found.push({ selector: 'page', property: 'weight', value: mb(w.bytes), bytes: w.bytes, warning: true, info: w.bytes <= warnMB * 1048576,
+    why: w.bytes > warnMB * 1048576 ? `the page and its files weigh ${mb(w.bytes)}, past ${warnMB} MB, slow to open on a phone or a slow connection; the largest: ${top}` : `the page and its files weigh ${mb(w.bytes)} (the largest: ${top})` });
+  return found;
+}
+
+// The page with the files it links beside it written back in (its styles and code: styleguide-files.mjs), and what the
+// built page owes its readers.
+export function checkFile(file, opts = {}) { return [...checkStyleguidePage(readPage(file), opts), ...pageFindings(file)]; }

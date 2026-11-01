@@ -638,6 +638,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 | Tasks | Everything still open, with who acts and what to do |
 | Foundations | Colours, typography, spacing, radii, motion and icons |
 | Components | One page for each component, in areas you switch between |
+| Templates | Each page template, what it is made of and the frame it comes from, when you list templates |
 
 ### Status
 
@@ -695,6 +696,16 @@ Also on each component.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
 - **Status and coverage.** Stable, beta or deprecated when your team says so, and how much of its file your tests cover.
 
+### Templates
+
+A template is a page frame in Figma made of your system's components, such as a settings page or a list with a side panel. List yours under `templates` in `ds-config.json` and the style guide gets a Templates page.
+
+- **What it is made of.** The components Figma places in it, in Figma's order. Each one with a page of its own is linked.
+- **Whether the code uses each one.** Each component says In the code, Not in the code, Kept out on purpose or In progress. It is the same answer the template check gives (Gate [17]).
+- **Its code file.** The file it is built in, and how many of its components that file uses. With no file found, it says so and nothing is compared.
+- **The frame it comes from.** A picture of the frame from Figma, beside the list, and a link to see it in Figma. The picture comes from your reference images, or from Figma with `FIGMA_TOKEN`.
+- **The order.** When the code places the components in another order than Figma, it says so. It is a note, never a failure.
+
 ### The intent layer
 
 Your intent layer (why each piece exists and how to use it) is read on every run: DSDS or Markdown (MDX) pages, in a GitLab project, a GitHub repository or a folder of your project. On a Markdown page, written for people, only a line that tells what to do is one of its rules; a line that only describes (what the variants are, how it is laid out) stays on its documentation for people, so agents are not handed every paragraph. Links between its pages lead to those pages where the layer lives, and images, lines of links and HTML entities are left out. Each component's Documentation shows it beside Figma, the code and the contract, each line with where it came from and a link to its page; agents get it in the contracts, `llms.txt` and the prototypes, so they can compose a page that has no Figma layout yet. The Documentation page (once the Intent layer page) reviews every page with one decision (Delete, Move, Rename, Name, Write, Improve, Keep, Add), why, and each change to make in the layer, and gathers what is still to write about each component from every source, with where to write it (Figma, the intent layer). It also flags Remove on each component whose Figma annotations or code notes no agent reads: a note that repeats the description, is only a link, or is past the three an agent is shown. A note in the code that only says how the component is built, or repeats another, is left alone: it is there for developers.
@@ -749,6 +760,17 @@ The template is only the layout. Every colour, weight and space on the page is o
 - The engine fails the page when anything on it is not from your system, or when its own text falls below 4.5:1 in any colour mode.
 - Page titles use your own heading style. `"title-scale"` in `styleguide.chrome` changes their size.
 - A colour you set in `styleguide.chrome` carries to the ones that follow it. A new `bg` is also the stage behind each component, unless you set `stage` too.
+
+### The page is checked too
+
+The style guide is held to what a page owes the people who read it, as a product's page is.
+
+- **Every file it links to is there.** A script, a style sheet or a picture the page names that is missing fails the check, so a page with a hole is never published.
+- **Its size is shown.** Every build says how much the page and its files weigh, with the largest files. Past 25 MB it warns, since the page is slow to open on a phone.
+- **Its own pages are compared between builds.** A build that opens the page in a browser takes a picture of each page in the menu: Status, the foundations and each component, 40 at most. It compares each one with the picture from the last build.
+  - Words are hidden in the pictures, so a date or a count that changes every build is not a change.
+  - A page that changed is named, with how much of it changed, and a picture marking what changed is in `.design-system-engine-out/styleguide-shots/diff`.
+  - It never fails the build. A change you meant is fine; one nobody meant is a fault in the page.
 
 ### Modes
 

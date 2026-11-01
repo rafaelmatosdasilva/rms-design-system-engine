@@ -100,8 +100,10 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - A status page: how far each component is in Figma, code, accessibility and documentation.
 - A task list that says who acts and which team owns each component or token layer.
 - Foundations: colours, type, spacing, corners, motion and icons, every mode side by side.
+- A Templates page: each page template, the components it is made of in Figma's order, whether its code uses each one, and its frame from Figma.
 - Every colour and space on the page is one of your tokens, so it looks like your system.
 - Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
+- The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
 
 ## Catch drift in product code and AI edits
 
