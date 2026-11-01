@@ -53,7 +53,7 @@ test('the layer\'s changes on History: a card each, linked to the components the
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#history tr[data-chip="intent"]')`, { attempts: 200 }), true, 'History has its rows');
     const cards = await run(`[...document.querySelectorAll('#history .pg-inspect')].filter((c) => c.querySelector('tr[data-chip="intent"]')).map((c) => c.querySelector('.pg-inspect-head').textContent + ' | ' + c.querySelector('tbody').innerText.replace(/\\s+/g, ' ').trim())`);
-    assert.deepEqual(cards, ['Intent layer2026-10-31 | 2 pages changed button, Saving Committed in c2d4e6f8 button', 'Intent layer2026-10-20 | 1 file changed, none of them a page Committed in b0b1b2b3 No component']);
+    assert.deepEqual(cards, ['Intent layer2026-10-31 | 2 pages changed Saving Committed in c2d4e6f8 button', 'Intent layer2026-10-20 | 1 file changed, none of them a page Committed in b0b1b2b3 No component']);
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href^="https://github.com/acme/guidelines/commit/"]') !== null`), true, 'its commit linked');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href="#c-button/documentation"]') !== null`), true, 'the component its page documents');
     // A chip of its own when History has another kind beside it (one kind alone needs none).

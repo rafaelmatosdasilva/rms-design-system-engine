@@ -222,7 +222,8 @@
       // What changed, then the components read for the first time, named; the commit that saved the read under the last.
       var rows = changed.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; }).map(function (c) { return ['<p class="sg-il-line">' + esc(c.changed.map(figmaChange).join('; ')) + '</p>', pillsHTML([c.name], 'history')]; });
       var names = first.map(function (c) { return c.name; }).sort();
-      if (names.length) rows.push(['<p class="sg-il-line">Read for the first time</p><p class="sg-il-line"><span class="pg-par-val">' + esc(names.join(', ')) + '</span></p>', pillsHTML(names, 'history')]);
+      // The components it read for the first time are named once, as their pills under Affects.
+      if (names.length) rows.push(['<p class="sg-il-line">Read for the first time</p>', pillsHTML(names, 'history')]);
       var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short || '') + '</code>';
       if (rows.length) rows[rows.length - 1][0] += '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + '</span></p>';
       return rows.map(function (r) { return '<tr data-chip="figma"><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
@@ -233,7 +234,9 @@
     var layerSha = function (x) { return !x.to ? '' : x.url ? '<a class="sg-uses-link" href="' + esc(x.url) + '" target="_blank" rel="noopener"><code>' + esc(x.to.slice(0, 8)) + '</code></a>' : '<code>' + esc(x.to.slice(0, 8)) + '</code>'; };
     var layerWhat = function (x) { return x.pages.length ? plural(x.pages.length, 'page', 'pages') + ' changed' : plural(x.files || 0, 'file', 'files') + ' changed, none of them a page'; };
     var layerRows = function (x) {
-      return '<tr data-chip="intent"><td><p class="sg-il-line"><strong>' + esc(layerWhat(x)) + '</strong></p>' + (x.pages.length ? '<p class="sg-il-line"><span class="pg-par-val">' + esc(x.pages.join(', ')) + '</span></p>' : '') +
+      // A page whose component is under Affects is named there only: the others (a pattern, a foundation) are named here.
+      var others = x.pages.filter(function (p) { return !x.components.some(function (n) { return n.toLowerCase().replace(/[^a-z0-9]/g, '') === String(p).toLowerCase().replace(/[^a-z0-9]/g, ''); }); });
+      return '<tr data-chip="intent"><td><p class="sg-il-line"><strong>' + esc(layerWhat(x)) + '</strong></p>' + (others.length ? '<p class="sg-il-line"><span class="pg-par-val">' + esc(others.join(', ')) + '</span></p>' : '') +
         (x.to ? '<p class="sg-il-line"><span class="pg-log-date">Committed in ' + layerSha(x) + '</span></p>' : '') + '</td><td>' + (x.components.length ? pillsHTML(x.components, 'documentation') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
     };
     var decisionRow = function (d) {

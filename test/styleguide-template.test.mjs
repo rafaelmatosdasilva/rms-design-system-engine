@@ -1697,8 +1697,8 @@ test('History: a read of Figma is a card of its own, dated: a row a changed comp
   assert.deepEqual(rows, [
     ['showLabel added; labelContent added', ['c-buttonFloat/history']],
     ['tileSlot added', ['c-navTab/history']],
-    ['Read for the first timecardRow, chipRowSaved in 9878c3f', ['c-cardRow/history', 'c-chipRow/history']],
-  ], 'what changed on the left, the component it changed as its pill; the new ones named in plain words, each its pill; the commit that saved the read under the last');
+    ['Read for the first timeSaved in 9878c3f', ['c-cardRow/history', 'c-chipRow/history']],
+  ], 'what changed on the left, the component it changed as its pill; the new ones named once, as their pills under Affects; the commit that saved the read under the last');
   assert.doesNotMatch(fns.figmaRows(read).split('<td>').filter((_, i) => i % 2).join(''), /href="#/, 'no pill in What: the components are pills only under Affects');
   assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'Figma2026-10-27', 'Figma and its day, nothing else');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
