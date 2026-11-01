@@ -22,6 +22,7 @@
 // Pure but for changesView, which reads the changes the engine kept.
 import { ground, predict, modelOf, opWords, FIELDS, optionNamed } from './figma-ops.mjs';
 import { diffModels, diffLines } from './component-diff.mjs';
+import { whoSaid } from './sign-off.mjs';
 
 const W = `["'\`]?`;
 const NAME = '([\\w/=.-]+(?: [\\w-]+)?)';
@@ -149,6 +150,9 @@ export function changeLines(ch) {
   }
   if (ch.breaking.length) out.push(`Breaking (${ch.breaking.length}), held for sign-off with what they break:`, ...ch.breaking.map((b) => `   • ${b.what}`));
   if (ch.held.length) out.push(`Held for sign-off (it adds to the system): ${ch.held.map((h) => h.what).join('; ')}.`);
+  // Local or shared (local-shared.mjs), and on whom it waits; who made it and who signed it off, never the same one.
+  if (ch.scope) out.push(`${ch.scope.reason}${ch.scope.decider && (ch.held.length || ch.breaking.length) && !ch.signedOff ? ` It waits on ${ch.scope.decider.name}.` : ''}`);
+  if (ch.signedOff) out.push(`Signed off by ${ch.signedOff.by}${ch.signedOff.author ? `; made by ${whoSaid(ch.signedOff.author)}` : ''}.`);
   if (ch.named.length) out.push('Named the way the system names things:', ...ch.named.map((n) => `   • ${n.from} → ${n.to}`));
   if (ch.faults.length) out.push(`Faults ${ch.component} already has, not fixed by this change (${ch.faults.length}; --figma-fix ${ch.component} fixes the renames):`, ...ch.faults.slice(0, 6).map((f) => `   • ${f.says}${f.value ? `: ${f.value}` : ''}`), ...(ch.faults.length > 6 ? [`   • and ${ch.faults.length - 6} more`] : []));
   if (ch.questions.length) out.push(`To answer before it is made (${ch.questions.length}):`, ...ch.questions.map((q) => `   • ${q.ask}`));
@@ -180,7 +184,8 @@ export function realLines({ real, mismatch }, component) {
 }
 
 // Every change the engine kept: waiting to be made, or made and read again. → [{ component, at, asked, steps, status:
-// 'waiting' | 'made' | 'not as said', report, real, mismatch, usedBy, breaking, held, faults, signedOff, readAt }]
+// 'waiting' | 'made' | 'not as said', report, real, mismatch, usedBy, breaking, held, faults, signedOff, readAt, author,
+// scope }]
 export function changesView(ROOT, { outDir = '.design-system-engine-out', readdirSync, readFileSync, join } = {}) {
   const dir = join(ROOT, outDir, 'changes'), out = [];
   const read = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
@@ -190,7 +195,7 @@ export function changesView(ROOT, { outDir = '.design-system-engine-out', readdi
     if (!ch?.component || ch.kind !== 'change') continue;
     const last = (ch.done ?? []).at(-1);
     out.push({ component: ch.component, at: ch.at, asked: ch.asked ?? '', steps: (ch.ops ?? []).map(opWords), status: !last ? 'waiting' : last.mismatch?.length ? 'not as said' : 'made',
-      report: ch.report, real: last?.real ?? null, mismatch: last?.mismatch ?? [], readAt: last?.readAt ?? null, usedBy: ch.usedBy ?? null, breaking: ch.breaking ?? [], held: ch.held ?? [], faults: ch.faults ?? [], signedOff: ch.signedOff ?? null });
+      report: ch.report, real: last?.real ?? null, mismatch: last?.mismatch ?? [], readAt: last?.readAt ?? null, usedBy: ch.usedBy ?? null, breaking: ch.breaking ?? [], held: ch.held ?? [], faults: ch.faults ?? [], signedOff: ch.signedOff ?? null, author: ch.author ?? null, scope: ch.scope ?? null });
   }
   // One change made twice (its file waiting, and kept once made) is shown once, as made.
   const seen = new Set();

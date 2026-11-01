@@ -1004,6 +1004,31 @@ These run beside the gates. Most give advice and never fail a run, and each can 
 
 A product that builds a component by hand, or styles a class almost like one of yours, comes back to you as a decision. Use the component, with a new option if it needs one, or add the new one to the system on purpose.
 
+### Local or shared
+
+Every gap the engine finds and every change an agent proposes is sorted into one of two kinds, with the reason in one line.
+
+- **Local.** It stays in one product: its own screen, its own CSS, its version, its pages. Its team acts, and it waits on no one.
+- **Shared.** It changes what other products get: a shared component's options or props, a token, a contract, a component in Figma. It waits on the person who decides for it, from `owners` in `ds-config.json` ([Who owns what](#who-owns-what)).
+
+How it is judged:
+
+| What | How |
+|---|---|
+| Where it lives | The system (its theme, its components and their contracts, its Figma file) or one product. One the engine cannot place counts as shared until someone says. |
+| Effect on other products | How many products' code uses the component, from the usage map. |
+| How hard it is to undo | A removal, a rename or a breaking change is hard. A changed value is less so. An addition is easy. |
+| Ambiguity | A decision between Figma and the code, or a place the engine could not tell. |
+
+The last three set its risk (high, medium or low), which the reason says. For example: "Shared: cardTile's size=xs is the system's: 3 products use it (Northwind, Acme shop, Acme admin); hard to undo, high risk."
+
+Where you see it:
+
+- **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A line under the filters counts them: "4 shared, waiting on Cards lead (3), Design system team (1); 2 local, each product team's own."
+- **The edit check.** After an AI edit, its message ends with whether the file is the product's own or the system's, and on whom a shared one waits.
+- **A change held for sign-off.** The guard says why it is shared and who decides it.
+- **A change in Figma.** `--figma-change` prints it, and the Changes in Figma page shows it.
+
 ### Instructions for AI agents
 
 `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, Cursor and Copilot rules and skills are found on their own. Every component, prop value and token they name must exist, with each prop written the way the code writes it (`Tone=` where the code has `tone` is flagged). A wrong name there makes every agent that reads it build the wrong thing.
@@ -1253,6 +1278,26 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 - When a request needs a sentence said as it is (the Figma data was not refreshed) and the AI's reply leaves it out, the hook sends it back once to add it.
 - **The AI cannot make a check pass on its own.** Accepting a difference as debt (`--baseline`, or editing `design-system-engine-baseline.json`), keeping one on purpose (`--keep`, or editing `design-system-engine-kept.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json` is written by the audit alone.
 - **A lesson's answer is yours.** `--lesson-answer`, or an edit to `design-system-engine-lessons.json`, waits for your yes or no.
+- **A change to the system waits for a sign-off.** An edit that adds a token to the theme or an option to a component is held until someone signs it off. The agent that made it never does: see [A second reviewer](#a-second-reviewer).
+
+### A second reviewer
+
+The agent that made a change to the system never signs it off. Someone else reviews it first.
+
+- **Who made it is written down.** When the hook holds the edit, it keeps the agent's session with it (`.design-system-engine-out/held-for-sign-off.json`, the engine's own file). A change in Figma keeps who asked for it the same way.
+- **A person signs it off.** `rms-design-system-engine --sign-off "<what>" --by "<who>"`, with the name the person gives.
+- **The author is refused.** A sign-off is refused, with the reason, when the reviewer is the one who made the change: the same name, the same agent session, or an agent's own name where a person's goes.
+- **Or a second agent reviews it.** `rms-design-system-engine --second-review "<what>"`, run from another agent session, runs the engine's checks on the change again: the edit check on what it adds, a token whose value the theme already has, an option the component already has written another way, and what a change in Figma still has to answer or breaks. It records itself as the reviewer.
+- **Some changes always wait for a person.** A removal, a rename, a breaking change or one of high risk, whatever the setting.
+
+`review` in `ds-config.json` sets who may review:
+
+| `review.second` | Who signs it off |
+|---|---|
+| `"person"` (the default) | A person. A second review still runs, and its findings wait for them. |
+| `"agent-or-person"` | A person, or a second agent review that finds nothing. |
+
+The sign-offs keep who made each change and who reviewed it (`design-system-engine-signoffs.json`). `--sign-off` alone lists them, and the style guide's History shows both names on each one, and on each change in Figma.
 
 ### Every UI edit is checked as it is made
 

@@ -33,10 +33,11 @@
 // Who decides: ds-config.json → owners (decided-by.mjs → ownerOf). Each proposal names the one it waits on (decider); an
 // answer given by someone else is kept, and said.
 
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { projectPath } from './names.mjs';
 import { ownerOf, notTheOwner } from './decided-by.mjs';
+import { usageFrom } from './local-shared.mjs';
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const words = (n) => String(n ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -306,15 +307,7 @@ export function pendingOf(decided, cfg = {}) {
 
 // Where each component is used (usage-map.mjs), as the audit last wrote it into the catalog and the contracts: no new
 // read of the products. → { name: livesIn }
-export function usageOf(ROOT, cfg = {}) {
-  const dir = resolve(ROOT, cfg.contracts?.out ?? 'contracts');
-  const out = {};
-  try { for (const [n, e] of Object.entries(JSON.parse(readFileSync(join(dir, 'catalog.json'), 'utf8')).components ?? {})) if (e?.livesIn) out[n] = e.livesIn; } catch { /* no catalog */ }
-  if (Object.keys(out).length) return out;
-  const walk = (d) => { let es = []; try { es = readdirSync(d, { withFileTypes: true }); } catch { return; } for (const x of es) { const p = join(d, x.name); if (x.isDirectory()) walk(p); else if (x.name.endsWith('.contract.json')) { try { const c = JSON.parse(readFileSync(p, 'utf8')); if (c.livesIn && c.name) out[c.name] = c.livesIn; } catch { /* unreadable */ } } } };
-  walk(dir);
-  return out;
-}
+export function usageOf(ROOT, cfg = {}) { return usageFrom(ROOT, cfg); }
 
 // Everything above for a project, as the style guide and the command read it: the layer as last read, checked, its
 // proposals and the team's decisions applied. → { report (decided), noPage, proposals, addProposals, decisions } or null
