@@ -87,7 +87,7 @@
     if (team) return team.kind === sug.kind ? (instead ? '<span class="pg-stage-sug">' + esc(instead.trim()) + '</span>' : '')
       : '<span class="pg-stage-sug">' + esc('From what the page measures it would be ' + sug.status + ' (' + sug.why.join('; ') + ').' + instead) + '</span>';
     if (c.migration) return '';
-    return statusPill({ kind: sug.kind, status: sug.status }).replace('class="sg-status ', 'class="sg-status sg-status--suggested ') +
+    return '<span class="sg-status sg-status--suggested sg-status--' + esc(sug.kind) + '">' + esc(sug.status) + '</span>' +
       '<span class="pg-stage-sug">' + esc('Suggested from ' + sug.why.join('; ') + '.' + instead + ' The team makes it its own with status in contract.authored.json.') + '</span>';
   }
   // Its stage on its page, again once its accessibility has been tried here.
