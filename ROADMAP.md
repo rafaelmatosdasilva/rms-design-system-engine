@@ -14,7 +14,7 @@ Where the engine is going. These are intentions, not dated commitments. The [fea
 
 - **Update Figma from the code:** accessibility notes, screen issues and links to the code written into Figma, after a yes.
 - **Keep products on the system:** token renames and retired components carried to every product, with a ready-made fix each.
-- **Generate components in Figma:** new and changed components built from a plain description, with your own styles and structure.
+- **Generate components in Figma and code:** new and changed components built from a plain description, with your own styles and structure, in Figma, in code or both, as you choose.
 - **Build code from Figma:** the build order for a system that exists only in Figma, each piece checked once built.
 
 ## The project itself
