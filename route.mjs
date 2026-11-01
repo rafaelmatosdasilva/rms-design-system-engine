@@ -189,6 +189,11 @@ const KEEP_WHY = /\b(because|since|porque|pois|j[aá] que)\b\s+([^.!?\n]{4,200})
 // A decision the team made, with what it ruled out ("record that the tile has no large size, we ruled out a size per
 // page because no screen needs it", "descartamos o tamanho grande"): written on its page in the intent layer.
 const DECISION_SAYS = /\bruled? out\b|\b(record|log|write down|note down)\b[^.\n]{0,40}\b(decision|decided)\b|\bwe decided\b|\bdecis[ãa]o\b|\bdecidimos\b|\bdescart(amos|ado|ada)\b/i;
+// A correction a person makes to what an agent made, kept as a lesson ("remember this lesson: the agent put a clock
+// inside a tile, because a tile holds one action", "don't do that again"), or the lessons asked for ("show the
+// lessons"). Recorded with --lesson and the person's reason, then proposed as the strongest guard that holds it.
+const LESSON_SAYS = /\b(remember|keep|record|note|save|log|teach|learn\w*|show|list|what|which)\b[^.\n]{0,25}\blessons?\b|\blessons?\s*:|\b(learn(ed|t)? from (this|that|it)|don'?t do (this|that|it) again|never do (this|that|it) again|(remember|note) (this|that) (correction|mistake))\b|\b(guarda|regista|lembra|mostra|lista)\w*\b[^.\n]{0,25}\bli[çc](ão|ões)\b|\bn[ãa]o fa[çc]as? (isso|isto) (de novo|outra vez)\b/i;
+const LESSON_LIST = /^\s*(show|list|what are|which are|see|mostra|lista|quais)\b[^.\n]{0,30}\blessons?\b|\blessons?\b[^.\n]{0,20}\b(so far|learned|we have|there are)\b|\bli[çc][õo]es\b[^.\n]{0,20}\b(aprendidas|que temos)\b/i;
 // A part named by the team ("the row is a part of the tile list, it is never used on its own", "X is its own
 // component"): recorded with --part on its root's page.
 const PART_SAYS = /\b(is|are)\s+(a\s+)?parts?\s+of\b|\bnever (used|placed) on its own\b|\bits own component\b|\b(é|faz)\s+parte\s+d[eoa]\b/i;
@@ -254,6 +259,7 @@ const RULES = [
   ['refresh-figma', (t) => (FIGMA_URL.test(t) && USE_FIGMA_FILE.test(t) || FIGMA_BRANCH.test(t)) && !PROTOTYPE.test(t) && !BUILD_VERB.test(t) && !TO_CODE.test(t), 'figma-file'],
   ['a11y-notes', (t) => CHECKED_SAYS.test(t) && SC.test(t), 'checked'],
   ['guidelines-links', (t) => PART_SAYS.test(t) && !LINK.test(t), 'part'],
+  ['guidelines-links', (t) => LESSON_SAYS.test(t) && !LINK.test(t), 'lesson'],
   ['guidelines-links', (t) => DECISION_SAYS.test(t) && !LINK.test(t), 'decision'],
   ['guidelines-links', (t) => LINK.test(t)],
   // A token renamed in Figma: one change renames it everywhere, the old name kept pointing at the new one.
@@ -516,6 +522,18 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
       const part = own || pivot < 0 ? order[0] : order.find((n) => at(n) < pivot), root = own ? null : order.find((n) => at(n) > pivot && n !== part);
       const run = `${cmd} --part ${part ?? '<part>'} ${own ? 'none' : root ?? '<root>'}`;
       return { recipe, question: false, run: [run], notes, kind, ...(part && (own || root) ? {} : { ask: own ? 'which component it is, as Figma names it' : 'which component is the part and which its root, as Figma names them', askHow: 'the part, then its root' }) };
+    }
+    if (kind === 'lesson') {
+      if (LESSON_LIST.test(t)) {
+        notes.push('The lessons: each correction a person made, what it became (a check, a step in the agent rules, a rule for the guidelines) or is proposed to become, the rules repeated findings propose, and the lines an agent wrote that a person changed since. Relay them; ask the person yes or no for each proposal, saying where its yes writes it, and never answer for them.');
+        return { recipe, question: false, run: [`${cmd} --lessons`], notes, kind };
+      }
+      // What was wrong, in the person's words, and why: the words after "lesson:" (or "again:") up to the reason.
+      const why = KEEP_WHY.exec(t)?.[2]?.trim().replace(/"/g, "'");
+      const said = (/\b(?:lessons?|again|correction|mistake)\s*[:,-]\s*(.+?)(?=\s*,?\s+(?:because|since|porque|pois)\b|$)/i.exec(t)?.[1] ?? '').trim().replace(/[.;]+$/, '').replace(/"/g, "'");
+      notes.push('A correction the person made to what an agent made: keep it with --lesson, in their own words (what was wrong) and their reason (--why), never words you add; add --component <name> when it is about one component. The engine proposes the strongest guard that holds it (a check, else a step in the agent rules, else a rule for the guidelines) and says where a yes writes it: ask the person yes or no and record it with --lesson-answer <id> yes|no. Never answer for them.');
+      const run = `${cmd} --lesson ${said ? JSON.stringify(said) : '"<what was wrong>"'} --why ${why ? JSON.stringify(why) : '"<their reason>"'}`;
+      return { recipe, question: false, run: [run], notes, kind, ...(said && why ? {} : { ask: said ? 'why it was wrong, in their own words' : 'what was wrong and why, in their own words', askHow: 'what was wrong in quotes, then their reason in --why' }) };
     }
     if (kind === 'decision') {
       // On the page it is about (a component, a pattern, a template, a flow, a foundation, the system), one line with

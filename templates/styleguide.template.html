@@ -3276,8 +3276,12 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     var decisionRow = function (d) {
       var about = d.component && COMPONENTS.some(function (c) { return c.name === d.component; }) ? '<a class="sg-uses-link" href="#' + esc(cid(d.component)) + '/history">' + esc(d.component) + '</a>'
         : d.url ? '<a class="sg-uses-link" href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.page || d.about) + '</a>' : esc(d.page || d.component || 'The system');
-      return '<tr data-chip="decisions"><td><p class="sg-il-line"><span class="sg-log-tag">Decision</span> <strong>' + esc(d.what) + '</strong></p>' +
+      // A lesson (a correction a person made) and a rule from repeated findings say what each became, and a lesson that
+      // came back says which guard did not hold.
+      var tag = d.kind === 'lesson' ? 'Lesson' : d.kind === 'rule' || d.kind === 'proposed' ? 'Rule' : 'Decision';
+      return '<tr data-chip="decisions"><td><p class="sg-il-line"><span class="sg-log-tag">' + tag + '</span> <strong>' + esc(d.what) + '</strong></p>' +
         (d.ruledOut && d.ruledOut.length ? '<p class="sg-il-line">Ruled out ' + esc(d.ruledOut.join(', ')) + '.</p>' : '') + (d.why ? '<p class="sg-il-line">' + esc(capital(d.why).replace(/\.?$/, '.')) + '</p>' : '') +
+        (d.became ? '<p class="sg-il-line">' + esc(d.became.replace(/\.?$/, '.')) + '</p>' : '') + (d.back ? '<p class="sg-il-line">' + esc(capital(d.back).replace(/\.?$/, '.')) + '</p>' : '') +
         '<p class="sg-il-line"><span class="pg-log-date">' + esc(capital(d.said) + (d.by ? ' by ' + d.by : '') + (d.at ? ' on ' + String(d.at).slice(0, 10) : '')) + '</span></p></td><td>' + about + '</td></tr>';
     };
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
@@ -7527,7 +7531,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // reader needs before proposing it again. Each says what was ruled out, why, who, and when.
     var dec = (c.decisions || []).map(function (d) {
       return '<tr><td>' + esc(d.what) + (d.ruledOut && d.ruledOut.length ? '<br><span class="pg-dim">ruled out: ' + esc(d.ruledOut.join(', ')) + '</span>' : '') + '</td><td>' +
-        (d.why ? esc(d.why) + ' ' : '') + '<span class="pg-dim">' + esc(d.said + (d.by ? ', ' + d.by : '')) + '</span>' + (d.at ? ' ' + day(d.at) : '') + '</td></tr>';
+        (d.why ? esc(d.why) + ' ' : '') + '<span class="pg-dim">' + esc(d.said + (d.by ? ', ' + d.by : '')) + '</span>' + (d.at ? ' ' + day(d.at) : '') +
+        (d.became ? '<br>' + esc(d.became) : '') + (d.back ? '<br>' + esc(d.back) : '') + '</td></tr>';
     }).join('');
     // Each change made to it in Figma through the engine, with its status, opening its before and after on the Changes in
     // Figma page.

@@ -1522,6 +1522,135 @@ if (process.argv.includes('--wrong') || process.argv.includes('--unwrong')) {
   process.exit(0);
 }
 
+// ── --lesson / --lessons / --lesson-answer / --unlesson: a correction becomes the strongest guard that holds it ──
+// --lesson "<what was wrong>" --why "<reason>" [--component <name>] [--rule "<the sentence>"] keeps what a person
+// corrected, with who and when, and proposes it in the strongest form that can hold it: a check, else a step in the
+// agent rules, else a rule for the guidelines. --lesson --edit <n> --why "<reason>" confirms one of the lines an agent
+// wrote that a person changed since. --lessons lists every lesson, the rules repeated findings propose and the
+// corrections waiting. --lesson-answer <id> yes|no is the person's answer: a yes writes the guard where it belongs.
+// --unlesson <id> takes one back, and --unlesson --edit <n> takes a changed line off the list as no correction. Only the
+// person teaches a lesson or answers one: the project's hooks ask otherwise.
+if (['--lesson', '--lessons', '--lesson-answer', '--unlesson'].some((f) => process.argv.includes(f))) {
+  const ls = await import('./lessons.mjs');
+  let lcfg = {}; try { lcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { /* no setup yet: a lesson is kept all the same */ }
+  const argOf = (flag) => { const i = process.argv.indexOf(flag); return i > -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : null; };
+  const components = ls.componentNamesOf(ROOT, lcfg);
+  const by = (await import('./decided-by.mjs')).decidedBy(ROOT);
+  const FORM = ls.FORMS;
+  const fresh = ls.sweepCorrections(ROOT);
+  if (process.argv.includes('--unlesson') && argOf('--edit')) {
+    // A changed line that was no correction (a rename, a refactor): taken off the list, never a lesson.
+    const c = ls.takeCorrection(ROOT, argOf('--edit'));
+    if (!c) { console.log(`No correction ${argOf('--edit')} (--lessons lists them).`); process.exit(1); }
+    console.log(`✓ Not a correction: ${c.file}: \`${c.text}\` is off the list.`);
+    console.log('NEXT: none');
+    process.exit(0);
+  }
+  if (process.argv.includes('--unlesson')) {
+    const id = argOf('--unlesson');
+    if (!id) { console.log('Usage: rms-design-system-engine --unlesson <id>: takes a lesson back, with its answer (the guard it wrote stays where it is; take that out by hand).'); process.exit(2); }
+    const gone = ls.dropLessons(ROOT, (l) => l.id === id);
+    if (!gone.length) { console.log(`No lesson is called ${id} (--lessons lists them).`); process.exit(1); }
+    console.log(`✓ Lesson ${id} taken back: ${gone[0].what}`);
+    if (await sendDecisions() == null) console.log(`NEXT: commit ${ls.LESSONS_FILE} when the person asks`); else console.log('NEXT: none');
+    process.exit(0);
+  }
+  if (process.argv.includes('--lesson-answer')) {
+    const at = process.argv.indexOf('--lesson-answer'), id = process.argv[at + 1], ans = String(process.argv[at + 2] ?? '').toLowerCase();
+    if (!id || id.startsWith('--') || !['yes', 'no'].includes(ans)) { console.log('Usage: rms-design-system-engine --lesson-answer <id> yes|no [--rule "<the sentence, in the person\'s words>"]. --lessons lists each lesson and what it would become.'); process.exit(2); }
+    const { mayWrite } = await import('./writes.mjs');
+    const may = mayWrite(lcfg, 'engine');
+    let r;
+    try { r = ls.answerProposal(ROOT, id, ans, { components, cfg: lcfg, by, rule: argOf('--rule'), may: may.answer === 'no' ? 'no' : 'yes' }); } catch (e) { console.log(`❌ ${e.message} (--lessons lists them).`); process.exit(2); }
+    if (ans === 'no') {
+      console.log(`✓ ${id} answered no: it stays a lesson, shown with the decisions, and is not proposed again.`);
+      if (await sendDecisions() == null) console.log(`NEXT: commit ${ls.LESSONS_FILE} when the person asks`); else console.log('NEXT: none');
+      process.exit(0);
+    }
+    console.log(`✅ ${id} answered yes: ${FORM[r.proposal.form].said}, ${r.proposal.text}`);
+    if (r.blocked) console.log(`   ℹ️  Not written: ${r.blocked}. The guard to write: ${r.proposal.place}.`);
+    for (const f of r.wrote) console.log(`   written into ${f} (${r.proposal.place})${r.proposal.form === 'check' ? ': the edit check holds it from the next edit' : ''}`);
+    if (r.next === 'agent-rules') {
+      const ar = await import('./agent-rules.mjs');
+      const files = ar.filesWithRules(ROOT);
+      for (const f of files) { const w = ar.writeRules(ROOT, f, { steps: ls.agentSteps(ROOT) }); console.log(`   ${w.done === 'unchanged' ? 'already in' : 'written into'} ${f}, with the engine's rules`); }
+      if (files.length) ls.noteWritten(ROOT, id, files);
+      console.log(`   Agents in Claude Code are told it with every request this project's hooks route.${files.length ? '' : ' An agent with no hooks reads it once the engine\'s rules are in its instruction file: rms-design-system-engine --agent-rules shows them, and --agent-rules --write puts them there when the person says yes.'}`);
+    }
+    if (r.next === 'draft') {
+      const il = await import('./intent-layer.mjs'), ch = await import('./intent-changes.mjs');
+      if (lcfg.intentLayer && !process.argv.includes('--offline')) { try { for (const x of await il.syncSources(ROOT, lcfg)) if (x.line) console.log('   ' + x.line); } catch (e) { console.log('   ⚠️  Intent layer: ' + String(e.message).split('\n')[0]); } }
+      const snap = lcfg.intentLayer ? il.readIntentLayer(ROOT, lcfg) : null;
+      if (!snap?._source?.sha) console.log('   No intent layer is read here, so the rule is kept in the lessons file: the style guide shows it with the decisions, DECISIONS.md lists it, and agents are given it. With an intent layer (ds-config.json → intentLayer) it is drafted on its page for the team to approve.');
+      else {
+        const access = ch.layerAccess(ROOT, lcfg);
+        let files = null;
+        if (access.error) console.log(`   ❌ ${access.error}`);
+        else { try { files = await ch.layerFiles(access, snap._source.sha); } catch (e) { console.log(`   ❌ ${e.message}`); } }
+        if (files) {
+          const codes = Object.values(il.codeFilesOf(ROOT, lcfg));
+          const on = r.lesson?.component ?? null;
+          let plan = on ? ch.draftLinesPlan(snap, on, 'Rules', [r.proposal.text], files, { task: `Lesson ${id}`, codes }) : { error: 'no component' };
+          if (plan.error) plan = ch.draftLinesPlan(snap, ch.SYSTEM_PAGE, 'Rules', [r.proposal.text], files, { task: `Lesson ${id}`, codes });
+          if (plan.error) console.log(`   ❌ ${plan.error}.`);
+          else {
+            const summary = `A rule drafted from lesson ${id} on ${plan.page}, under Rules, in ${plan.file}.\n\n${plan.lines.map((l) => `- ${l}`).join('\n')}\n`;
+            const dir = ch.writeLocal(ROOT, plan.files, summary);
+            ls.noteWritten(ROOT, id, `${plan.file} (a draft on ${plan.page})`);
+            console.log(`   📝 Drafted on ${plan.page}, under Rules (${plan.file}) → ${relative(ROOT, dir)} (CHANGES.md says it). No agent gets it until the team approves it.`);
+            const message = `Intent layer: a rule from lesson ${id} on ${plan.page}\n\n${plan.lines.map((l) => `- ${l}`).join('\n')}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
+            for (const how of ['commit', 'merge-request']) {
+              if (!process.argv.includes('--' + how)) continue;
+              const mw = await ch.mayWrite(ROOT, lcfg, how);
+              if (!mw.ok) { console.log(`   ℹ️  Not sent: ${mw.why}.`); break; }
+              const done = how === 'commit'
+                ? await ch.commitToBranch(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, message })
+                : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/lesson-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: a rule from lesson ${id}`, description: summary, message });
+              console.log(done.error ? `   ❌ ${done.error}` : how === 'commit' ? `   ✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `   🔀 Merge request: ${done.url}  (branch ${done.branch})`);
+            }
+          }
+        }
+      }
+    }
+    if (await sendDecisions() == null) console.log(`NEXT: commit ${ls.LESSONS_FILE}${r.wrote.length ? ` and ${r.wrote.join(', ')}` : ''} when the person asks`); else console.log('NEXT: none');
+    process.exit(0);
+  }
+  const what = argOf('--lesson'), edit = argOf('--edit');
+  if (process.argv.includes('--lessons') || (!what && !edit)) {
+    const view = ls.projectLessons(ROOT, lcfg);
+    const lines = ls.lessonsLines(view);
+    if (fresh.length) console.log(`✏️  ${fresh.length} line${fresh.length === 1 ? '' : 's'} an agent wrote ${fresh.length === 1 ? 'was' : 'were'} changed by someone else since.`);
+    if (!lines.length) { console.log('No lesson yet. Keep one when a person corrects what an agent made: rms-design-system-engine --lesson "<what was wrong>" --why "<their reason>" [--component <name>].'); console.log('NEXT: none'); process.exit(0); }
+    for (const l of lines) console.log(l);
+    const waiting = view.lessons.filter((l) => !l.answer).length + view.proposed.length;
+    console.log(waiting || view.corrections.length
+      ? `NEXT: ${waiting ? 'ask the person yes or no for each proposal, saying where its yes writes it; record it with --lesson-answer <id> yes|no' : ''}${waiting && view.corrections.length ? '; ' : ''}${view.corrections.length ? 'ask the person whether each changed line was a correction and why; keep it with --lesson --edit <n> --why "<their reason>", or take it off with --unlesson --edit <n>' : ''}. Never answer for them.`
+      : 'NEXT: none');
+    process.exit(0);
+  }
+  const why = argOf('--why');
+  let c = null;
+  if (edit) { c = ls.pendingCorrections(ROOT)[Number(edit) - 1] ?? null; if (!c) { console.log(`❌ No correction ${edit} (--lessons lists them).`); process.exit(2); } }
+  if (!why) { console.log('❌ A lesson needs why: add --why "<the person\'s reason>". Ask them for it; never write one for them.'); process.exit(2); }
+  const component = argOf('--component');
+  const { lesson, back } = ls.recordLesson(ROOT, { what: what ?? ls.correctionWhat(c), why, component, source: c ? 'edit' : 'said', from: c?.file ?? null, rule: argOf('--rule'), edit: c ? { file: c.file, text: c.text, now: c.now ?? null } : null }, { by });
+  if (c) ls.takeCorrection(ROOT, c.n);
+  const view = ls.projectLessons(ROOT, lcfg);
+  const mine = view.lessons.find((l) => l.id === lesson.id);
+  if (back) {
+    console.log(`🔁 ${lesson.id} came back: ${lesson.what}`);
+    console.log(mine?.became ? `   Its guard was ${FORM[mine.became.form].said}: ${mine.became.text} (${mine.became.place}), and it did not hold.` : '   It has no guard yet.');
+    console.log(mine?.became ? 'NEXT: tell the person which guard did not hold; when a stronger one fits, record the lesson again in other words with --rule' : `NEXT: ask the person yes or no to ${FORM[mine.proposal.form].said}: ${mine.proposal.text} (${mine.proposal.place}); record it with --lesson-answer ${lesson.id} yes|no`);
+    process.exit(0);
+  }
+  console.log(`🧠 Lesson ${lesson.id} kept, in ${ls.LESSONS_FILE}: ${lesson.what}`);
+  console.log(`   why: ${lesson.why}${lesson.by ? ` (${lesson.by})` : ''}`);
+  console.log(`   The strongest form that holds it: ${FORM[mine.proposal.form].said}. ${mine.proposal.text}`);
+  console.log(`   A yes writes it into ${mine.proposal.place}.`);
+  console.log(`NEXT: ask the person yes or no to holding it as ${FORM[mine.proposal.form].said}, saying where its yes writes it; record it with --lesson-answer ${lesson.id} yes|no (with --rule "<their words>" for a step or a rule). Never answer for them.`);
+  process.exit(0);
+}
+
 // ── --checked <component> <criterion>: a person checked a WCAG criterion by hand ──
 // Recorded with the component as it is now (checked.mjs): the style guide shows it Done, by whom and when, until the
 // component changes. --unchecked takes one back. Only the person marks a check; the project's hooks ask otherwise.
@@ -2545,16 +2674,18 @@ if (process.argv.includes('--check-ui')) {
 // person is asked; --write puts it in the project's instruction files (or the one named), once they said yes.
 if (process.argv.includes('--agent-rules')) {
   const { rulesSection, ruleTargets, writeRules } = await import('./agent-rules.mjs');
+  // With the steps lessons became in this project: each a correction a person said yes to holding as a step.
+  let steps = []; try { steps = (await import('./lessons.mjs')).agentSteps(ROOT); } catch { /* no lessons */ }
   const w = process.argv.find((a) => a === '--write' || a.startsWith('--write='));
   const targets = w?.includes('=') ? [w.slice('--write='.length)] : ruleTargets(ROOT);
   if (!w) {
-    console.log(rulesSection());
+    console.log(rulesSection(steps));
     console.log(`\nThese are the engine's rules for an agent that has no hooks (Cursor, Copilot and others read only their own instruction file). Nothing was written.`);
     console.log(`NEXT: ask the person whether to add them to ${targets.join(' and ')}; once they say yes, run rms-design-system-engine --agent-rules --write${targets.length === 1 && targets[0] !== 'AGENTS.md' ? `=${targets[0]}` : ''}.`);
     process.exit(0);
   }
   for (const f of targets) {
-    const r = writeRules(ROOT, f);
+    const r = writeRules(ROOT, f, { steps });
     console.log(r.done === 'unchanged' ? `✓ ${f} already has the engine's rules.` : `✅ The engine's rules ${r.done === 'added' ? 'added to' : 'updated in'} ${f} (between the rms-design-system-engine markers; run again to update them).`);
   }
   process.exit(0);
@@ -6156,8 +6287,11 @@ function reportFull(label, items, shown) {
   if (!ONLY) {
     try {
       const sq = await import('./showroom-quality.mjs');
-      const lines = sq.showroomQualityLines(await sq.showroomQuality(ROOT, cfg));
+      const rows = await sq.showroomQuality(ROOT, cfg);
+      const lines = sq.showroomQualityLines(rows);
       if (lines.length) { console.log(''); for (const l of lines) console.log(C.yellow(l)); }
+      // Each screen's findings kept across runs (lessons.mjs): the same one on three screens becomes a proposed rule.
+      if (rows.length) { try { (await import('./lessons.mjs')).noteReview(ROOT, rows.map((r) => ({ place: r.screen, kinds: r.findings.map((f) => f.kind) }))); } catch { /* a help, never a blocker */ } }
     } catch { /* advisory: never fails */ }
   }
 
@@ -6801,6 +6935,18 @@ function reportFull(label, items, shown) {
     const lines = wrongLines(ROOT);
     if (lines.length) { console.log(C.yellow(`\n🔁 ${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(`   ${l}`)); }
   } catch { /* nothing marked wrong, or the file is not readable */ }
+
+  // ── What people corrected, and what each correction became ─────────────────
+  // A lesson is a correction kept with why, proposed in the strongest form that holds it (a check, a step in the
+  // agent rules, a rule for the guidelines), and written there on the person's yes. One line: how many hold, what waits
+  // for a yes (a lesson, a rule a repeated finding proposes, a line an agent wrote that a person changed since), and
+  // which came back with the guard that did not hold. --lessons lists them.
+  try {
+    const ls = await import('./lessons.mjs');
+    ls.sweepCorrections(ROOT);
+    const line = ls.lessonsLine(ls.projectLessons(ROOT, cfg));
+    if (line) console.log((/came back|waiting|proposed|to confirm/.test(line) ? C.yellow : C.dim)(`\n🧠 ${line}`));
+  } catch { /* no lessons yet, or the files are not readable */ }
 
   // ── One log of what the team decided ───────────────────────────────────────
   // Every decision a person makes is already recorded, each in its own file and each for its own reason. Gathered

@@ -23,7 +23,9 @@
 // the agent reads it: the route, the exact command and the sentences to say arrive with the request, so
 // picking them is never the agent's decision, even when it skips the router.
 // As a PostToolUse hook, a UI edit is checked when it is made: what it added that the design system does
-// not have goes back to the agent with the right name (edit-check.mjs). "editCheck": false turns that part off.
+// not have goes back to the agent with the right name (edit-check.mjs). "editCheck": false turns that part off. The
+// lines the agent wrote and what the check found are kept (lessons.mjs): a line a person later changes is a correction
+// to confirm, and a finding made again and again becomes a proposed rule.
 // Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
 // The engine's own writes (node … audit.mjs, rms-design-system-engine) are never blocked.
 import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
@@ -32,8 +34,9 @@ import { fileURLToPath } from 'node:url';
 import { route, routeText, projectState, SAY, PROTOTYPE } from './route.mjs';
 import { additionsOf, signedOff, SIGN_OFFS } from './sign-off.mjs';
 import { readDoc } from './skill-files.mjs';
-import { editCheck, editHookOutput, sessionLeftovers } from './edit-check.mjs';
+import { editCheck, editCheckRun, editHookOutput, sessionLeftovers } from './edit-check.mjs';
 import { PROJECT, OUT_DIR } from './names.mjs';
+import { agentSteps as agentStepsOf } from './lessons.mjs';
 
 const ENGINE = dirname(fileURLToPath(import.meta.url));
 
@@ -195,6 +198,7 @@ function systemHold(event, file, cfg) {
   const list = adds.map((a) => a.what).join('; ');
   return { decision: 'deny', reason: `This edit adds to the design system itself (${list}), which every product then gets: it waits for a named person to sign it off. Tell the person what it adds and ask who signs it off (the system's owner, or themselves if they are); once they say, run rms-design-system-engine --sign-off ${JSON.stringify(adds[0].what)} --by "<who>"${adds.length > 1 ? ' for each' : ''}, then make the edit again. To use what the system has instead, take the closest one it already has and say so.` };
 }
+const LESSON_ASKED = /\b(lessons?|learn\w*|remember|correct\w*|wrong|mistake|again)\b|\b(li[çc][ãa]o|li[çc][õo]es|aprend\w*|lembr\w*|errad[oa]|erro)\b/i;   // the person corrects, or answers a guard
 const KEEP_ASKED = /\b(keep|kept|keeping)\b|\b(on purpose|intentional\w*|deliberate\w*|by design)\b|\b(mant[eé]m|manter|mantemos|mantenha|de prop[oó]sito|intencional\w*)\b/i;   // the person keeps a difference on purpose
 const EXCEPTION_ASKED = /\b(exception|exempt|ignore|skip|mapping|map|exce[çc][õoã]|isen[çc]|ignor|mapa|mapeamento|set ?up|configur|install|init)\w*/i;   // setting the project up writes the map too
 const NAMES_ASKED = /\b(renam|name|bind|alias|record|contract|map)\w*|\b(renome|nome|v[ií]ncul|regist|contrat|mape)\w*/i;   // the person asks to record or rename a binding
@@ -206,6 +210,7 @@ export function decisionFile(path, cfg = {}) {
   if (b === PROJECT.agreed.now) return 'agreed';
   if (b === PROJECT.kept.now) return 'kept';
   if (b === PROJECT.checked.now) return 'checked';
+  if (b === PROJECT.lessons.now) return 'lessons';
   if (b === PROJECT.map.now) return 'exceptions';
   if (b === basename(cfg.contracts?.authored ?? 'contract.authored.json')) return 'names';
   const refs = [cfg.visualRefs, PROJECT.refs.now].filter(Boolean).map((d) => String(d).replace(/^\.?\/+|\/+$/g, ''));
@@ -219,6 +224,7 @@ const DECISION = {
   names: { asked: NAMES_ASKED, reason: (f) => `${f} records which code name stands for each Figma name: a binding added there makes a differently named prop pass instead of fixing it. Confirm the person asked for this binding, or name the prop the way Figma does.` },
   checked: { asked: CHECKED_ASKED, reason: (f) => `${f} records what a person checked by hand: an agent never marks a check it did not make. When the person says they checked one, run rms-design-system-engine --checked <component> <criterion>; otherwise leave it to check.` },
   pictures: { asked: PICTURE_ASKED, reason: (f) => `${f} is an approved reference picture: it changes only when a person approves the new one. Report the difference, or confirm the person approved it.` },
+  lessons: { asked: LESSON_ASKED, reason: (f) => `${f} holds what people corrected and what each correction became, with who said yes: an agent never writes a lesson or an answer of its own. When the person corrects something, run rms-design-system-engine --lesson "<what was wrong>" --why "<their reason>"; when they say yes or no to a guard, --lesson-answer <id> yes|no.` },
 };
 const decisionVerdict = (kind, file, userText) => {
   if (kind === 'agreed') return { decision: 'deny', reason: `${basename(file)} is the engine's record of what Figma and the code last agreed on: only the audit writes it. Run the audit instead.` };
@@ -288,6 +294,8 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
       const v = decisionVerdict(kind, f, userText);
       if (v) return v;
     }
+    // A lesson becomes a guard only on the person's yes or no: --lesson-answer runs when their message gives it.
+    if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--lesson-answer\b/.test(cmd) && !(userText !== null && (APPROVES.test(userText) || /^\s*(no|nope|n[ãa]o)\b/i.test(userText) || (/\b(yes|no|sim|n[ãa]o)\b/i.test(userText) && /\b(lessons?|li[çc][ãa]o|guards?|rules?|checks?|steps?|L\d+|R-[\w-]+)\b/i.test(userText))))) return { decision: 'ask', reason: 'A lesson becomes a check, an agent step or a rule only when the person says yes. Show them what it would become (rms-design-system-engine --lessons) and ask.' };
     // The engine's rules go into an agent's instruction file only once the person said yes.
     if (/(^|[\s;&|(])(node\s+\S*audit\.mjs|rms-design-system-engine)\b[^|;&\n]*\s--agent-rules\b[^|;&\n]*\s--write\b/.test(cmd) && !(userText !== null && (APPROVES.test(userText) || asksForChange(userText)))) return { decision: 'ask', reason: 'The engine\'s rules go into an instruction file only when the person says yes. Show them the section (rms-design-system-engine --agent-rules) and ask.' };
     if (/\bgit\b[^|;&\n]*\spush\b/.test(cmd)) return { decision: 'ask', reason: 'Pushing sends the work to the remote. Confirm the person asked for a push.' };
@@ -332,7 +340,12 @@ export function routePrompt(event, { root, engineDir = ENGINE, cfg = {}, env = p
   if (r.recipe === 'prototype') { try { const f = join(root, OUT_DIR, 'prototypes', 'request.json'); mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, JSON.stringify({ at: new Date().toISOString(), text }, null, 2) + '\n'); } catch { /* a help, never a blocker */ } }
   let recipe = '';
   try { recipe = readDoc(engineDir, 'recipe', r.recipe) ?? ''; } catch { /* the pointer line still names it */ }
-  return `The engine already routed this request (rms-design-system-engine's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}`;
+  // The steps lessons became in this project (a person corrected an agent and said yes to holding it as a step): said
+  // with every request, so the agent reads them before it works rather than after the check hands its edit back.
+  let steps = [];
+  try { steps = agentStepsOf(root); } catch { /* none */ }
+  const learned = steps.length ? `\nLearned in this project (each a correction a person said yes to holding as a step; follow them):\n${steps.map((x) => `- ${x}`).join('\n')}` : '';
+  return `The engine already routed this request (rms-design-system-engine's project hook); follow it and do not run --route again.\n${routeText(r, recipe, state.cmd, { maxRecipe: MAX_RECIPE })}${learned}`;
 }
 
 export function promptOutput(context) {
@@ -370,7 +383,11 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
         try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* defaults */ }
         // A page in prototypes/ is held to the system too: its components, what each is given, where each goes.
         const page = (await import('./page-check.mjs')).pageHookCheck(event, { root, cfg, outDir: OUT_DIR });
-        const out = editHookOutput([editCheck(event, { root, cfg }), page].filter(Boolean).join('\n\n') || null);
+        const run = editCheckRun(event, { root, cfg });
+        // What lessons are made from: the lines this agent wrote (a person changing one later is a correction), and
+        // what the check found in them (a finding made again and again becomes a proposed rule).
+        try { if (run && cfg.hooks !== false) { const ls = await import('./lessons.mjs'); ls.noteAgentEdit(root, event, run.added); ls.noteEdit(root, run.rel, run.found); } } catch { /* a help, never a blocker */ }
+        const out = editHookOutput([editCheck(event, { root, cfg, run }), page].filter(Boolean).join('\n\n') || null);
         if (out) process.stdout.write(out);
       }
     } else if (existsSync(cfgPath)) {

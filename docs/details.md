@@ -945,6 +945,50 @@ For a system with brands (Figma's extended collections), System health lists eac
 
 Then it says which source decides when two disagree. The goal of the people who use the product first, then verified research, then the system's documented standards, then accepted past decisions, then general heuristics, with this system's own source named at each level and WCAG 2.2 AA as the floor. Under the tokens it says what each is for in your team's own words, from the descriptions you write on the variables in Figma, the brand's first, so an agent picks a colour by its purpose and not by its name alone. The notes your team writes in Figma outside any component (on its foundations, brand and pattern pages) are said too, by page, once the annotation categories are read (`--annotation-categories`); a note for whoever draws the file (Authoring) is left out. It stays small enough to read whole. For a large system the full catalog stays in `catalog.json`.
 
+### Lessons: a correction becomes a guard
+
+When you correct what an AI made, the correction is usually said once, in a chat, and lost. The next agent makes the same mistake. A lesson keeps it.
+
+**Keep one.** [Tell Claude](commands.md#build-with-ai-on-the-system) what was wrong and why, or run `rms-design-system-engine --lesson "<what was wrong>" --why "<your reason>"` (add `--component <name>` when it is about one component).
+
+- It is kept in `design-system-engine-lessons.json`, beside your other decisions, with who said it and when. Commit it.
+- Why is required. The AI asks you for it and never writes one for you.
+- The same lesson told again is not a second lesson: it is the first one coming back.
+
+**Each lesson is proposed in the strongest form that holds it.** The engine says which, and where a yes writes it:
+
+| Form | When | Where a yes writes it |
+|---|---|---|
+| A check | The engine can measure it: a component inside another, a prop combination, a value written by hand, an import with what replaces it | The authored contract (`neverCombineWith`, or its `guards`), or `imports` in `ds-config.json`. The edit check holds it from the next edit |
+| A step agents read | It is about how the agent works, such as asking before adding a token | Said to the agent with every request in Claude Code, and in the engine's section of `AGENTS.md` and the other instruction files that have it |
+| A rule for your guidelines | Anything else | One sentence a reviewer can check, drafted on the component's page or the System page of your intent layer, for your team to approve |
+
+Answer with `--lesson-answer <id> yes` or `no`. A no is kept too, so the same guard is not proposed again. `--rule "<sentence>"` gives a step or a rule in your own words. Only your answer writes anything: the hooks ask you first.
+
+**Where corrections come from.**
+
+- **What you say.** Any correction, recorded as above.
+- **A line you changed.** The hook remembers the lines an AI writes. A line that is gone without an AI edit taking it was changed by a person. `--lessons` lists it, with what it reads now, and `--lesson --edit <n> --why "<reason>"` makes it a lesson. It is never one until you give why, and `--unlesson --edit <n>` takes it off the list when it was no correction. A file rewritten or reformatted as a whole is not read as corrections.
+- **A finding marked wrong.** A [finding you mark wrong](#when-a-check-is-wrong), a page review's among them, is a correction of the engine. Its guard is already written: the case its check must pass.
+
+**Findings that repeat become proposed rules.** The same page-review finding on three Showroom screens, or the same edit-check finding in three edits, is proposed as one sentence (`R-page-primary`, `R-edit-colour`):
+
+- A page review's becomes a rule for your guidelines, such as "Each screen has one primary action in view".
+- An edit check's becomes a step agents read, such as "Write every colour as one of the system's colour tokens". The check already catches it; the step tells the agent before it writes.
+- Only decisions that should be the same every time are named. A judgement, such as which section of a page matters most, never is.
+- A finding that stays on one screen is counted once. Fixed and made again, it counts again.
+
+**A lesson that comes back is said.** When the same mistake is found again after its guard was written, `--lessons` and the run say so, with the guard that did not hold. A check that caught it held; the agent was still not told before it wrote.
+
+**Where you see them.**
+
+- Every full run ends with one line: how many lessons hold and as what, what waits for your yes, and what came back.
+- `--lessons` lists each lesson with what it became, the proposed rules and the changed lines. `--unlesson <id>` takes one back.
+- The style guide shows them with the decisions, on the History page and on each component's History, with what each became.
+- Agents are told what a lesson ruled out, the same way they are told every other decision.
+
+The engine does not look at screenshots to judge a page. The page review reads each screen's structure, so a lesson about how a page looks, rather than how it is built, is kept as a rule for your guidelines.
+
 ### Does your guidance help your AI tools?
 
 `node eval-run.mjs --levels bare,steering,parity` runs the same generation tasks three ways, with the prompt alone, with your own instruction files (`AGENTS.md`, `CLAUDE.md`, rules), and with what this skill writes for agents (`contracts/llms.txt`). Each is scored by the same checks, design-system tokens and classes and accessibility, so you see what each kind of guidance adds or costs.
@@ -977,6 +1021,7 @@ The engine makes the decisions, not the AI model, so it behaves the same on a sm
 - The AI asks you before a commit, a push, a `ds-config.json` edit, or a code change you did not ask for.
 - When a request needs a sentence said as it is (the Figma data was not refreshed) and the AI's reply leaves it out, the hook sends it back once to add it.
 - **The AI cannot make a check pass on its own.** Accepting a difference as debt (`--baseline`, or editing `design-system-engine-baseline.json`), keeping one on purpose (`--keep`, or editing `design-system-engine-kept.json`), adding an exception to `design-system-engine-map.mjs`, or replacing an approved picture in `.design-system-engine-refs/` waits for you, unless your latest message asked for it. `design-system-engine-agreed.json` is written by the audit alone.
+- **A lesson's answer is yours.** `--lesson-answer`, or an edit to `design-system-engine-lessons.json`, waits for your yes or no.
 
 ### Every UI edit is checked as it is made
 
@@ -991,6 +1036,7 @@ After the AI edits a style, markup or component file, the hook reads only what t
 - An import from the library your system replaced, or from inside the system's package (`imports` in `ds-config.json`), with the import to write.
 - A component put inside another the way your system never does, with where it goes instead.
 - A class rule that nearly copies one of your components.
+- What a [lesson](#lessons-a-correction-becomes-a-guard) became a check for: a prop combination or a value a person corrected before.
 
 The AI fixes it before moving on. The check is silent when the edit is clean, and never flags your own components, token definitions, comments or data. `"editCheck": false` turns it off.
 
