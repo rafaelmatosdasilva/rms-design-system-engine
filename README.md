@@ -2,13 +2,13 @@
 
 <p align="center">
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/rafaelmatosdasilva/rms-design-system-engine/tests.yml?branch=main&label=2%2C000%2B%20tests&logo=github" alt="2,000+ tests, run on every change"></a>
-  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/test/skill-evals/RESULTS.md"><img src="https://img.shields.io/badge/AI%20evaluated-results-0b7285" alt="AI evaluated: published results"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/rafaelmatosdasilva/rms-design-system-engine"><img src="https://api.scorecard.dev/projects/github.com/rafaelmatosdasilva/rms-design-system-engine/badge" alt="OpenSSF Scorecard"></a>
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#security-and-data"><img src="https://img.shields.io/badge/privacy-local--first-2b8a3e" alt="Privacy: local-first"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/dependencies-0-2b8a3e" alt="No npm dependencies"></a>
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#code-on-gitlab"><img src="https://img.shields.io/badge/company%20GitLab-supported-fc6d26?logo=gitlab&logoColor=white" alt="Company GitLab supported"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20·%20Figma-a259ff?logo=figma&logoColor=white" alt="Works with Claude Code and Figma">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
-  <a href="https://www.bestpractices.dev/projects/16082"><img src="https://www.bestpractices.dev/projects/16082/badge" alt="OpenSSF Best Practices"></a>
+  <a href="https://www.bestpractices.dev/projects/16082"><img src="https://img.shields.io/cii/level/16082?label=OpenSSF%20security%20practices" alt="OpenSSF security practices"></a>
 </p>
 
 AI agents can build interfaces in minutes. But scattered tools and specialised skills aren't enough. They work in isolation, repeat work and rarely share knowledge.
