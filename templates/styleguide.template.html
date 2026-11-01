@@ -1708,6 +1708,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-row-detail-body .sg-il-cmd > button { flex: none; }
 .sg-row-detail-body .sg-il-draft { margin-top: var(--sg-space-xl); }   /* each draft and its decisions, apart from the next */
 .sg-log-tag { display: inline-block; margin-right: var(--sg-space-xs); padding: 0 var(--sg-space-xs); border: var(--sg-line); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); color: var(--sg-muted); }   /* a decision among the changes */
+.sg-row-detail-body .sg-il-example { display: block; margin: var(--sg-space-s) 0 0; overflow-x: auto; }   /* a drafted example's code, under its line */
+.sg-row-detail-body .sg-il-example code { font-size: var(--sg-s); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; font-variant-ligatures: none; }
 .sg-row-detail-body .sg-il-draft-text { margin-bottom: var(--sg-cell-x); }   /* the drafts, then what can be done with them, as much room between as at the card's sides */
 .sg-decide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--sg-space-l); align-items: start; margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* under them, the card's own side padding (its body's bottom padding is less) */   /* the three side by side, each as tall as it holds; under one another where there is no room */
 .sg-decide { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); padding: var(--sg-space-m) var(--sg-space-l); border: var(--sg-line); border-radius: var(--sg-radius-s); background: color-mix(in srgb, var(--sg-decide-hue) 12%, transparent); }
@@ -3549,8 +3551,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       (p.missingFor ? [] : p.drafts || []).forEach(function (d) {
         var k = String(d.where) + '\u0000' + String(d.text).replace(/\s+/g, ' ').trim();
         if (seen[k]) return; seen[k] = 1;
-        var g = groups.filter(function (x) { return x.where === d.where; })[0] || (groups.push({ where: d.where, lines: [] }), groups[groups.length - 1]);
-        g.lines.push(d.text);
+        var g = groups.filter(function (x) { return x.where === d.where; })[0] || (groups.push({ where: d.where, lines: [], codes: [] }), groups[groups.length - 1]);
+        g.lines.push(d.text); g.codes.push(d.code == null ? null : String(d.code));   // a drafted example: its code, shown under its line
       });
       write = write || []; notes = notes || [];
       var off = notes.filter(function (n) { return /^yes/i.test(n.remove || ''); }), fix = notes.filter(function (n) { return off.indexOf(n) < 0; });
@@ -3561,7 +3563,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // A note: the note itself, then the issue and why, in one sentence or two.
       var noteBody = function (x, why) { return '<span class="pg-par-val">\u201c' + esc(noteOf(x)) + '\u201d</span><span class="sg-il-text">' + esc(why) + '</span>'; };
       var parts = write.filter(function (x) { return x.part; }), toWrite = write.filter(function (x) { return !x.part; });
-      var html = groups.map(function (g) { return section(g.where, g.lines.map(function (t) { return '<span class="pg-par-val">' + esc(t) + '</span>'; }).join('')); }).join('')
+      var html = groups.map(function (g) { return section(g.where, g.lines.map(function (t, i) { return '<span class="pg-par-val">' + esc(t) + '</span>' + (g.codes[i] != null ? '<pre class="sg-il-example"><code>' + esc(g.codes[i]) + '</code></pre>' : ''); }).join('')); }).join('')
         + toWrite.map(function (x) { return section((x.check ? 'To check · ' : 'To draft · ') + x.what, x.html); }).join('')
         + parts.map(function (x) { return section(x.what, x.html); }).join('')
         + off.map(function (x) { return section('Remove · ' + capital(x.from || 'a note'), noteBody(x, x.why || x.remove.replace(/^yes[:,]?\s*/i, '') || 'Nothing in it reaches an agent.')); }).join('')

@@ -718,6 +718,17 @@ Two lines are never crossed. What is certain is written as final and what is jud
 
 A component's role in the intent layer follows the same line: written as final when its code renders an element that has one (`<button>` is a button), drafted from what the component does when it renders a plain `div` or `span`, and only ever one of the ARIA roles.
 
+### An example on every page
+
+Rules tell an agent what to do; an example shows it. A page with none gets one, drafted from how the products use the component.
+
+- **The call the products write most.** The engine reads the files the usage map names for it and finds every call. The form most of them take is the example.
+- **In the code's own syntax.** Vue, Svelte, JSX or a web component, as the component's contract says.
+- **Only what the contract has.** Each prop, event and slot in it is one the contract names. A class, a directive or a prop the component does not take is left out.
+- **None of a product's own data.** A value the prop takes stays. A product's words become `…`, and an expression is named after its prop.
+- **Where it came from.** The line above it says how many of the uses take this form, and the file, line and product it was taken from.
+- **A draft.** It goes under Examples, in the page's own format: a code block in a Markdown page, a block of text titled Examples in a DSDS page. Dropped, it goes whole, code and all. A component no product uses keeps the example written from its own code.
+
 ### Parts are not components
 
 Some components exist only as pieces of another: a dropdown's row, a table's cell, a chart's legend. Figma and the code keep each one as a component, but nobody places one on its own. Listed beside the others, they read as more components to choose from, and each asks for documentation of its own.

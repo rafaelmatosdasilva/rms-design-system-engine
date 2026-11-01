@@ -31,6 +31,7 @@ export { writeTokenFrom };
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
 import { layerWriter, TOOLS, toolRefusal } from './doc-host.mjs';
 import { linesOf, checkPage } from './intent-truth.mjs';
+import { exampleText } from './intent-examples.mjs';
 
 export const CHANGES_DIR = `${OUT_DIR}/intent-changes`;
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -109,7 +110,7 @@ export function specOf(e, idx) {
 // ── Editing a Markdown spec ─────────────────────────────────────────────────────────────────────────────────────────
 // The written sections first, in the order a spec keeps them (Purpose to Limitations), then the reference ones (its role,
 // do and don't, an example): a spec checked for its section order takes a new one in its place.
-const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example', 'properties', 'data', 'events', 'slots', 'parts', 'decisions'];   // Decisions last: the team's record, apart from what it documents
+const ORDER = ['purpose', 'when to use', 'when not to use', 'rules', 'common mistakes', 'limitations', 'role', 'do and don\'t', 'example', 'examples', 'properties', 'data', 'events', 'slots', 'parts', 'decisions'];   // Decisions last: the team's record, apart from what it documents
 // The role of the element a component's code renders, as a screen reader names it (none for an element with no role).
 // An example of a component in use: its tag, and each prop that takes named values with the first of them (up to three),
 // so every name and value in it is one the code takes.
@@ -243,6 +244,26 @@ export function mdAdd(text, where, line, { sure = false } = {}) {
   return lines.join('\n');
 }
 
+// An example drafted for a page (intent-examples.mjs): its line, marked a draft, and the code under it in a fenced block,
+// at the end of the page's Example or Examples section (made, titled Examples, where the spec's order puts it).
+const fenceOf = (d) => ['```' + (d.lang ?? ''), ...String(d.code).split('\n'), '```'];
+export function mdAddExample(text, d) {
+  const lines = text.split('\n'), block = [MARK + d.text, '', ...fenceOf(d)];
+  const at = lines.findIndex((l) => /^##\s/.test(l) && /^examples?$/.test(headKey(l)));
+  if (at >= 0) {
+    let end = at + 1; while (end < lines.length && !/^#{1,2}\s/.test(lines[end])) end++;
+    let last = end - 1; while (last > at && !lines[last].trim()) last--;
+    lines.splice(last + 1, 0, '', ...block);
+    return lines.join('\n');
+  }
+  const rank = ORDER.indexOf('examples');
+  const later = lines.findIndex((l, i) => i > 0 && /^##\s/.test(l) && (ORDER.indexOf(headKey(l)) > rank || (ORDER.indexOf(headKey(l)) < 0 && headKey(l) !== 'metadata')));
+  const all = ['## Examples', '', ...block];
+  if (later < 0) return text.replace(/\s*$/, '\n\n') + all.join('\n') + '\n';
+  lines.splice(later, 0, ...all, '');
+  return lines.join('\n');
+}
+
 // ── Editing a DSDS page ─────────────────────────────────────────────────────────────────────────────────────────────
 const SECTION = { 'when to use': ['when-to-use', 'should'], 'when not to use': ['when-to-use', 'should-not'], rules: ['how-to-use', 'should'], 'common mistakes': ['how-to-use', 'must-not'], limitations: ['how-to-use', 'should'] };
 const indentOf = (text) => (/\n(\t+)"/.exec(text)?.[1]?.slice(0, 1)) ?? ' '.repeat((/\n( +)"/.exec(text)?.[1] ?? '  ').length);
@@ -322,6 +343,23 @@ export function jsonAdd(entry, where, line, { sure = false, layout = null } = {}
   s.items.push({ level, statement: mark + line });
 }
 
+// The same in a DSDS page: a block of text titled Examples, where the layer's pages hold their examples (a section of its
+// own, or a block inside another section, as layoutOf reads them), else a section of its own. Never twice.
+export function jsonAddExample(entry, d, { layout = null } = {}) {
+  const body = [MARK + d.text, '', ...fenceOf(d)].join('\n');
+  const all = (entry.sections ?? []).flatMap((x) => x.freeform ?? []);
+  if (all.some((b) => String(b.body ?? '').includes(String(d.code)))) return;
+  const shape = layout?.shapes.get('examples') ?? layout?.shapes.get('example') ?? 'own';
+  const host = shape.startsWith('in:') ? shape.slice(3) : null;
+  entry.sections ??= [];
+  let s = entry.sections.find((x) => x.kind === 'section' && (host ? String(x.title ?? '').toLowerCase() === host.toLowerCase() : /^examples?$/i.test(String(x.title ?? '').trim())));
+  if (!s) { s = { kind: 'section', for: 'all', title: host ?? 'Examples', freeform: [] }; entry.sections.push(s); }
+  s.freeform ??= [];
+  const b = s.freeform.find((x) => /^examples?$/i.test(String(x.title ?? '').trim()));
+  if (b) b.body = (String(b.body ?? '').trim() ? String(b.body).replace(/\s*$/, '\n\n') : '') + body;
+  else s.freeform.push({ title: 'Examples', body });
+}
+
 // ── What to change ──────────────────────────────────────────────────────────────────────────────────────────────────
 // report: useReport's, with the content check's findings (wrong) on each page. → [{ entity, page, remove, rewrite, need }]
 //   rewrite: [{ line (as written), finding }]; need: ['purpose' | 'whenToUse' | 'whenNotToUse' | 'mistakes' | 'limitations'
@@ -330,7 +368,7 @@ export function jsonAdd(entry, where, line, { sure = false, layout = null } = {}
 // partOf: Map(page name → the code files that use it), for each page of an internal part (intent-proposals.mjs → partsOf).
 // hold: the keys of the Fix proposals the team has not answered (intent-answers.mjs): their sentences wait for the answer.
 // The part a waiting draft is in, by the heading it sits under.
-const DRAFT_PART = { purpose: 'purpose', 'when to use': 'whenToUse', 'when not to use': 'whenNotToUse', 'common mistakes': 'mistakes', limitations: 'limitations', role: 'role', example: 'example', "do and don't": 'doDont' };
+const DRAFT_PART = { purpose: 'purpose', 'when to use': 'whenToUse', 'when not to use': 'whenNotToUse', 'common mistakes': 'mistakes', limitations: 'limitations', role: 'role', example: 'example', examples: 'example', "do and don't": 'doDont' };
 export function planOf(snap, report, { leftForPeople = new Set(), code = null, partOf = new Map(), hold = new Set() } = {}) {
   const byKey = new Map(snap.entities.map((e) => [`${e.file}#${e.name}`, e]));
   const nameOfCode = (f) => snap.entities.find((x) => x.code && String(x.code).replace(/^\.?\//, '') === String(f).replace(/^\.?\//, ''))?.name ?? String(f).split('/').pop().replace(/\.\w+$/, '');
@@ -479,12 +517,16 @@ ${JSON.stringify(asks, null, 1)}`;
 // the props no comment explains. Nothing in them is judged, so nothing to review. → plan, each item's drafted holding them
 export function sureParts(plan, facts) {
   for (const it of plan) {
-    it.drafted = (it.drafted ?? []).filter((d) => !d.sure);
+    it.drafted = (it.drafted ?? []).filter((d) => !d.sure && !d.example);
     for (const x of it.need.find((n) => n?.write)?.write ?? []) it.drafted.push({ ...x, sure: true });
-    const name = it.page.component, b = name ? briefOf(name, facts) : null; if (!b) continue;
+    const name = it.page.component, b = name ? briefOf(name, facts) : null;
+    if (!b) { if (it.need.includes('example') && it.example) it.drafted.push({ where: 'Examples', text: exampleText(it.example), code: it.example.code, lang: it.example.lang, example: true }); continue; }
     // Written "Role: button", not "button": a reader that keeps a section's lines as rules, and not its title, still says what it is.
     if (it.need.includes('role') && ROLE_OF[b.root]) it.drafted.push({ where: 'Role', text: `Role: ${ROLE_OF[b.root]}`, sure: true });
-    if (it.need.includes('example') && b.tag) it.drafted.push({ where: 'Example', text: exampleOf(b), sure: true });
+    // The way the products use it most (intent-examples.mjs), when it was found: a draft, the code under its line. Else
+    // one from its own use or its own tag and props, as the code is.
+    if (it.need.includes('example') && it.example) it.drafted.push({ where: 'Examples', text: exampleText(it.example), code: it.example.code, lang: it.example.lang, example: true });
+    else if (it.need.includes('example') && b.tag) it.drafted.push({ where: 'Example', text: exampleOf(b), sure: true });
   }
   return plan;
 }
@@ -549,7 +591,11 @@ export function applyPlan(plan, files, { codes = [] } = {}) {
       else held.push({ name: e.name, why: `"${r.line}" names what the system does not have, and nothing it has says it: ${r.why ?? 'a person decides'}` });
     }
     if ((it.drafted ?? []).length && src?.shared) held.push({ name: e.name, why: `it is written from ${src.spec}, which other pages are written from too: give it a spec of its own, then draft it` });
-    else for (const d of it.drafted ?? []) { edit((t) => mdAdd(t, d.where, d.text, { sure: d.sure }), (x) => (jsonAdd(x, d.where, d.text, { sure: d.sure, layout }), true)); did.drafted.push(d); }
+    else for (const d of it.drafted ?? []) {
+      if (d.example) edit((t) => mdAddExample(t, d), (x) => (jsonAddExample(x, d, { layout }), true));
+      else edit((t) => mdAdd(t, d.where, d.text, { sure: d.sure }), (x) => (jsonAdd(x, d.where, d.text, { sure: d.sure, layout }), true));
+      did.drafted.push(d);
+    }
     if (did.removed.length || did.rewritten.length || did.drafted.length) pages.push(did);
   }
   return { files: next, pages, held };
@@ -560,14 +606,22 @@ export function applyPlan(plan, files, { codes = [] } = {}) {
 // (the line is deleted). In the page's spec and its DSDS page alike, as the changes are made.
 const draftOf = (raw, text) => DRAFT.test(raw) && flat(raw.replace(DRAFT, '')) === flat(text);
 // to: undefined approves, a string changes, null drops.
+// A drafted example (a line of its own, not a list item, then its code in a fenced block) goes whole when it is dropped.
+const withBlock = (lines, i) => {
+  let j = i + 1; while (j < lines.length && !lines[j].trim()) j++;
+  if (!/^\s*(```|~~~)/.test(lines[j] ?? '')) return i;
+  let k = j + 1; while (k < lines.length && !/^\s*(```|~~~)\s*$/.test(lines[k])) k++;
+  return k < lines.length ? k : i;
+};
 export function mdReview(src, text, to) {
   let hit = false;
-  const out = [];
-  for (const l of src.split('\n')) {
-    const m = /^(\s*[-*]\s+)?(.*)$/.exec(l);
+  const out = [], all = src.split('\n');
+  for (let i = 0; i < all.length; i++) {
+    const l = all[i], m = /^(\s*[-*]\s+)?(.*)$/.exec(l);
     if (!draftOf(m[2], text)) { out.push(l); continue; }
     hit = true;
     if (to !== null) out.push((m[1] ?? '') + (to ?? m[2].replace(DRAFT, '').trim()));
+    else { if (!m[1]) i = withBlock(all, i); while (out.length && !out.at(-1).trim() && !(all[i + 1] ?? '').trim()) out.pop(); }
   }
   return !hit ? src : (to === null ? dropEmptyHeadings(out) : out).join('\n');
 }
@@ -579,7 +633,22 @@ export function jsonReview(entry, text, to) {
       s.items = s.items.filter((it) => { if (!draftOf(String(it.statement ?? ''), text)) return true; n++; if (to === null) return false; it.statement = next(it.statement); return true; });
       if (s.kind === 'guidelines' && !s.items.length) return false;
     }
-    for (const f of s.freeform ?? []) if (typeof f.body === 'string') f.body = f.body.split('\n').flatMap((l) => { const m = /^(\s*[-*]\s+)?(.*)$/.exec(l); if (!draftOf(m[2], text)) return [l]; n++; return to === null ? [] : [(m[1] ?? '') + next(m[2])]; }).join('\n');
+    let emptied = false;
+    for (const f of s.freeform ?? []) if (typeof f.body === 'string') {
+      const all = f.body.split('\n'), out = [];
+      let hit = false;
+      for (let i = 0; i < all.length; i++) {
+        const l = all[i], m = /^(\s*[-*]\s+)?(.*)$/.exec(l);
+        if (!draftOf(m[2], text)) { out.push(l); continue; }
+        n++; hit = true;
+        if (to !== null) out.push((m[1] ?? '') + next(m[2])); else if (!m[1]) i = withBlock(all, i);
+      }
+      if (!hit) continue;
+      f.body = to === null ? out.join('\n').replace(/\n{3,}/g, '\n\n').trim() : out.join('\n');
+      if (!f.body) emptied = true;
+    }
+    // A block left with no text at all (a drafted example dropped) goes, and its section when it held nothing else.
+    if (emptied) { s.freeform = s.freeform.filter((f) => typeof f.body !== 'string' || f.body.trim()); if (s.kind === 'section' && !s.freeform.length && !s.body && !s.content) return false; }
     return true;
   });
   if (draftOf(String(entry.description ?? ''), text)) { n++; if (to === null) delete entry.description; else entry.description = next(entry.description); }
@@ -738,7 +807,7 @@ export function describeReview({ pages, problems }) {
   const n = (k) => pages.reduce((t, p) => t + p[k].length, 0);
   const out = [`Drafts reviewed on ${pages.length} page${pages.length === 1 ? '' : 's'}: ${n('approved')} approved, ${n('changed')} changed, ${n('dropped')} dropped.`, ''];
   for (const p of pages) {
-    out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
+    out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec && p.spec !== p.file ? ` (and \`${p.file}\`)` : ''}`, '');
     for (const l of p.approved) out.push(`- Approved: "${l}"`);
     for (const c of p.changed) out.push(`- Changed: "${c.line}" → "${c.to}"`);
     for (const l of p.dropped) out.push(`- Dropped: "${l}"`);
@@ -760,7 +829,7 @@ export function describeChanges({ pages, held, merged = [], started = [], ownSpe
   for (const p of pages) {
     out.push(`### ${p.name}`, `\`${p.spec ?? p.file}\`${p.spec ? ` (and \`${p.file}\`)` : ''}`, '');
     for (const r of p.rewritten) out.push(`- Written again (draft): "${r.line}" → "${r.text}"`);
-    for (const d of p.drafted) out.push(d.sure ? `- Written from the code, ${d.where}: "${d.text}"` : `- Drafted, ${d.where}: "${d.text}"`);
+    for (const d of p.drafted) out.push(d.sure ? `- Written from the code, ${d.where}: "${d.text}"` : `- Drafted, ${d.where}: "${d.text}"`, ...(d.example ? ['', '  ```' + (d.lang ?? ''), ...String(d.code).split('\n').map((l) => '  ' + l), '  ```', ''] : []));
     if (p.removed.length) out.push(`- Taken out, written on every page alike: ${p.removed.map((l) => `"${l}"`).join(', ')}`);
     out.push('');
   }
@@ -889,6 +958,20 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
     plan.push({ entity: s.entity, page: { name: s.entity.name, file: s.file, component: c.name }, remove: [], rewrite: [], need: ['purpose', 'whenToUse', 'whenNotToUse', 'mistakes', 'limitations', 'example', 'role', 'doDont'] });
   }
   for (const it of plan) it.code = codeOf(it.entity);
+  // An example for each page that shows none: the way the products use it most, from the files the usage map names
+  // (intent-examples.mjs), drafted. One the products do not use keeps the example from its code.
+  if (plan.some((it) => it.need.includes('example'))) {
+    const ex = await import('./intent-examples.mjs');
+    const contracts = (await import('./sign-off.mjs')).contractsByFile(ROOT, cfg), usage = (await import('./local-shared.mjs')).usageFrom(ROOT, cfg);
+    const texts = new Map();
+    const textOf = (f) => { if (!texts.has(f)) { let t = null; try { t = readFileSync(resolve(ROOT, f), 'utf8'); } catch { /* moved since the audit */ } texts.set(f, t); } return texts.get(f); };
+    for (const it of plan.filter((x) => x.need.includes('example') && x.entity.code)) {
+      const c = contracts.get(String(it.entity.code).replace(/^\.?\//, '')); if (!c) continue;
+      const lives = usage[c.name] ?? usage[it.page.component] ?? null;
+      const call = ex.commonCall({ contract: c, files: (lives?.files ?? []).map((f) => ({ file: f.file, product: f.product ?? null, text: textOf(f.file) })) });
+      if (call) it.example = call;
+    }
+  }
   const codes = snap.entities.map((e) => e.code);
   // The engine's own section (Data) as its page shows it and its spec does not: written in the spec too, or the next
   // time the layer generates its pages from the specs, the line is gone from the page.

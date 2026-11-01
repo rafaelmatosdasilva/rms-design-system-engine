@@ -131,3 +131,9 @@ test('the proposals and the part questions are copied in words too', () => {
   assert.match(tpl, /var run = function \(to\) \{ return ENGINE \+ ' on Component ' \+ c\.name \+ ', ' \+ \(to === 'none' \? 'It is its own component' : 'It is a part of Component ' \+ to\); \};/);
   assert.doesNotMatch(tpl, /'rms-design-system-engine --(intent-decide|review-drafts|part) /, 'no copied decision names a flag');
 });
+
+test('a drafted example shows its code under its line', () => {
+  const html = loadChanges()({ name: 'tileMedia', file: 'docs/tile-media.md', drafts: [{ where: 'Examples', text: 'The most common way the products use it (2 of the 4 uses read), from a.vue, line 3:', code: '<TileMedia size="small" />', lang: 'vue' }, { where: 'Limitations', text: 'One picture only.' }] });
+  assert.match(html, /<strong>Examples<\/strong><span class="pg-par-val">The most common way[^<]*<\/span><pre class="sg-il-example"><code>&lt;TileMedia size=&quot;small&quot; \/><\/code><\/pre>/);
+  assert.match(html, /<strong>Limitations<\/strong><span class="pg-par-val">One picture only\.<\/span><\/div>/, 'a draft with no code shows none');
+});
