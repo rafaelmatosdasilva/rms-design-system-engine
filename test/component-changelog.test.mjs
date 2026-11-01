@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { ruleChanges, changelogs, figmaChangelogs, releaseLog } from '../component-changelog.mjs';
+import { ruleChanges, changelogs, figmaChangelogs, releaseLog } from '../lib/component-changelog.mjs';
 import { tempDir } from './helpers.mjs';
 
 test('ruleChanges: each declaration changed, added or removed, in a few words', () => {
@@ -37,7 +37,7 @@ test('a change inside a rule counts, not only one to the line that names the cla
 });
 
 test('ticketOf: the ticket a commit was made for, its address, and what the commit says without it', async () => {
-  const { ticketOf, ticketLinks } = await import('../component-changelog.mjs');
+  const { ticketOf, ticketLinks } = await import('../lib/component-changelog.mjs');
   assert.deepEqual(ticketOf('#4521 - fixed the chip padding', { changelog: { ticketUrl: 'https://issues.example/t/{id}' } }), { ticket: '#4521', ticketUrl: 'https://issues.example/t/4521', says: 'fixed the chip padding' });
   assert.deepEqual(ticketOf('KIT-88: tile caption wraps', { changelog: { ticket: '[A-Z]+-\\d+' } }), { ticket: 'KIT-88', ticketUrl: null, says: 'tile caption wraps' });
   assert.equal(ticketOf('Tile caption wraps (#12)'), null, 'a pull request at its end is not a ticket');
@@ -51,7 +51,7 @@ test('ticketOf: the ticket a commit was made for, its address, and what the comm
 });
 
 test('Figma reads in git are walked once: each commit read is kept, and a later run reads only the new commits', async () => {
-  const { FIGMA_GIT_HISTORY } = await import('../component-changelog.mjs');
+  const { FIGMA_GIT_HISTORY } = await import('../lib/component-changelog.mjs');
   const { readFileSync: read } = await import('node:fs');
   const dir = tempDir('figma-walk-');
   run(dir, 'init', '-q', '-b', 'main');

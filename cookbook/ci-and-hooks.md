@@ -26,14 +26,14 @@ Once deployed, the webhook server auto-triggers parity checks on every DS change
 
 ```bash
 # Start the server (keep running)
-node ~/.claude/skills/rms-design-system-engine/webhook-server.mjs
+node ~/.claude/skills/rms-design-system-engine/lib/webhook-server.mjs
 
 # Register with Figma once (public URL required)
-FIGMA_TOKEN=xxx node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --url https://your-host.com/webhook
+FIGMA_TOKEN=xxx node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --url https://your-host.com/webhook
 
 # Manage webhooks
-node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --list
-node ~/.claude/skills/rms-design-system-engine/setup-webhook.mjs --delete <id>
+node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --list
+node ~/.claude/skills/rms-design-system-engine/lib/setup-webhook.mjs --delete <id>
 ```
 
 Configure `webhook.port` and `webhook.secret` in `ds-config.json`.

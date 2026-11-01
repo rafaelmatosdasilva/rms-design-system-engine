@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { textStyle, textStyleKey, shortStyleNames, styleNames, namesStyle, scaleStyles, componentStyleKey } from '../text-styles.mjs';
-import { compareTokens } from '../capture-compare.mjs';
-import { systemScales } from '../prototype-pieces.mjs';
-import { buildSheetLines } from '../build-list.mjs';
+import { textStyle, textStyleKey, shortStyleNames, styleNames, namesStyle, scaleStyles, componentStyleKey } from '../lib/text-styles.mjs';
+import { compareTokens } from '../lib/capture-compare.mjs';
+import { systemScales } from '../lib/prototype-pieces.mjs';
+import { buildSheetLines } from '../lib/build-list.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const recipe = readFileSync(join(ENGINE, 'cookbook', 'refresh-figma.md'), 'utf8');

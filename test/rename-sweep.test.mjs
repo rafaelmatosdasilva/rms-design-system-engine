@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { renamedTokens, sweepFiles, linesDiff } from '../rename-sweep.mjs';
+import { renamedTokens, sweepFiles, linesDiff } from '../lib/rename-sweep.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -34,7 +34,7 @@ test('--rename-sweep writes one patch for the system and one per product, and ea
   put(ds, 'figma/vars.json', JSON.stringify({ color: { light: { 'chip/bg/color': '#fff', 'text/primary/color': '#111' } } }));
   git(ds, 'init', '-q'); git(ds, '-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '.'); git(ds, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'first read');
   put(ds, 'figma/vars.json', JSON.stringify({ color: { light: { 'chip/background/color': '#fff', 'text/primary/color': '#111' } } }));   // renamed in Figma, read again
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--rename-sweep'], { cwd: ds, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--rename-sweep'], { cwd: ds, encoding: 'utf8' });
   assert.match(r.stdout, /1 token renamed in Figma since the last commit:\n\s+chip\/bg\/color → chip\/background\/color\s+\(--chip-bg → --chip-background\)/);
   assert.match(r.stdout, /This system: 3 lines in 2 files/);
   assert.match(r.stdout, /shop: 1 line in 1 file/);
@@ -49,5 +49,5 @@ test('--rename-sweep writes one patch for the system and one per product, and ea
   assert.equal(readFileSync(join(shop, 'app.css'), 'utf8'), '.cart { background: var(--chip-background); }\n');
   // Nothing renamed: said so.
   git(ds, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'swept');
-  assert.match(spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--rename-sweep'], { cwd: ds, encoding: 'utf8' }).stdout, /No token renamed in Figma since/);
+  assert.match(spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--rename-sweep'], { cwd: ds, encoding: 'utf8' }).stdout, /No token renamed in Figma since/);
 });

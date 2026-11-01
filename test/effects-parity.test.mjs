@@ -3,7 +3,7 @@
 // Figma's clipping, is a decision.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shadowsOf, codeEffects, effectsFindings, effectsSnapshot, EFFECTS_CAPTURE_JS, effectsCaptureScript } from '../effects-parity.mjs';
+import { shadowsOf, codeEffects, effectsFindings, effectsSnapshot, EFFECTS_CAPTURE_JS, effectsCaptureScript } from '../lib/effects-parity.mjs';
 
 const CSS = [{ file: 'theme.css', text: `:root { --shadow-color: rgba(0, 0, 0, 0.25); --blur: 4px; }
 /* a comment with { braces } never splits a rule */

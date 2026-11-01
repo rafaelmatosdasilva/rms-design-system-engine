@@ -6,8 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseGitlabUrl, refCandidates, gitlabApiUrls, tokenAllowedFor, slugForUrl, fetchGitlabMarkdown } from '../gitlab-fetch.mjs';
-import { gitlabTargets, guidelineFiles, generateIntent } from '../intent-gen.mjs';
+import { parseGitlabUrl, refCandidates, gitlabApiUrls, tokenAllowedFor, slugForUrl, fetchGitlabMarkdown } from '../lib/gitlab-fetch.mjs';
+import { gitlabTargets, guidelineFiles, generateIntent } from '../lib/intent-gen.mjs';
 import { makeFixture } from './helpers.mjs';
 
 test('parseGitlabUrl: project wiki, group wiki, blob and raw files, subgroups, any host', () => {
@@ -81,8 +81,8 @@ test('a GitLab page reaches the intent layer: its component section lands on tha
 // ── Pasting a link into the chat: rms-design-system-engine --guidelines <link> ───────────────────
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { notionTargets } from '../intent-gen.mjs';
-const AUDIT = fileURLToPath(new URL('../audit.mjs', import.meta.url));
+import { notionTargets } from '../lib/intent-gen.mjs';
+const AUDIT = fileURLToPath(new URL('../lib/audit.mjs', import.meta.url));
 const run = (dir, args) => { try { return { code: 0, out: execFileSync('node', [AUDIT, ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITLAB_TOKEN: '', NOTION_TOKEN: '', GITLAB_FETCH_TIMEOUT_MS: '1000', NOTION_FETCH_TIMEOUT_MS: '1000' } }) }; } catch (e) { return { code: e.status, out: (e.stdout || '') + (e.stderr || '') }; } };
 
 test('notionTargets: a single link keeps writing to sources[0]; a list writes each page to its own file', () => {

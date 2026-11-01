@@ -1,7 +1,7 @@
 // fix-hint.mjs - contract-aware fix citations (feature #1). Pure; no fs beyond loadTokensDict.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tokenVar, resolveTokenValue, tokenSource } from '../fix-hint.mjs';
+import { tokenVar, resolveTokenValue, tokenSource } from '../lib/fix-hint.mjs';
 
 test('tokenVar applies the naming convention, tolerates junk', () => {
   assert.equal(tokenVar('radii/button'), '--radii-button');

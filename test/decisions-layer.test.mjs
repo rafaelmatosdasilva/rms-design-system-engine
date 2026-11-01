@@ -1,10 +1,10 @@
 // Decisions written in the intent layer (decisions.mjs, doc-source-dsds.mjs, intent-changes.mjs decisionPlan).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDecision, decisionLine, layerDecisionsOf, decisionsFrom, decisionView, ruledOutLines } from '../decisions.mjs';
-import { entityView } from '../doc-source-dsds.mjs';
-import { decisionPlan } from '../intent-changes.mjs';
-import { buildLlms } from '../contract-gen.mjs';
+import { parseDecision, decisionLine, layerDecisionsOf, decisionsFrom, decisionView, ruledOutLines } from '../lib/decisions.mjs';
+import { entityView } from '../lib/doc-source-dsds.mjs';
+import { decisionPlan } from '../lib/intent-changes.mjs';
+import { buildLlms } from '../lib/contract-gen.mjs';
 
 test('a decision is one line a person reads, and the engine reads back', () => {
   const line = 'Tile has no Large size. Ruled out: a Large size; a size picked per page. Why: no screen needs it. Decided by Pat on 27 Oct 2026.';
@@ -50,7 +50,7 @@ test('llms.txt says what was decided against, before the catalog', () => {
 });
 
 test('a decision asked for in words goes to --decision with what was ruled out and why, never to keep', async () => {
-  const { route } = await import('../route.mjs');
+  const { route } = await import('../lib/route.mjs');
   const r = route('we decided the chip has no large size, we ruled out a large chip because it breaks the row', { hasConfig: true, components: ['chip'] });
   assert.deepEqual(r.run, ['rms-design-system-engine --decision chip "<what was decided>" --ruled-out "a large chip" --why "it breaks the row"']);
   assert.match(route('keep the chip height on purpose because the product needs a larger tap target', { hasConfig: true, components: ['chip'] }).run[0], / --keep /);

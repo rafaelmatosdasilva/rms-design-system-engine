@@ -27,7 +27,7 @@ const engine = git('rev-parse', '--short', 'HEAD');
 // The audit's browser checks (every variant combination, the rendered page) run in Chrome: without one they are
 // skipped and the tasks that ask for what they find fail for a reason that is not the guide's. Found here once.
 if (!process.env.CHROME_PATH) {
-  const { findChrome } = await import(join(ENGINE, 'cdp.mjs'));
+  const { findChrome } = await import(join(ENGINE, 'lib', 'cdp.mjs'));
   const found = findChrome({ playwright: true });
   if (!found) { console.log('✗ no Chrome found: set CHROME_PATH, the audit\'s browser checks need it'); process.exit(2); }
   process.env.CHROME_PATH = found;

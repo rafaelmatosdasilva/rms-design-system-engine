@@ -4,10 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { componentFaults, faultLines, partsOf } from '../component-faults.mjs';
-import { componentOf } from '../run-diff.mjs';
-import { systemFacts, checkPage } from '../intent-truth.mjs';
-import { codeSnapshotPath } from '../names.mjs';
+import { componentFaults, faultLines, partsOf } from '../lib/component-faults.mjs';
+import { componentOf } from '../lib/run-diff.mjs';
+import { systemFacts, checkPage } from '../lib/intent-truth.mjs';
+import { codeSnapshotPath } from '../lib/names.mjs';
 import { tempDir } from './helpers.mjs';
 
 const kinds = (list, name) => list.filter((f) => f.component === name).map((f) => f.kind);
@@ -161,7 +161,7 @@ defineProps({ startOpen: Boolean }) // startOpenz is old
 });
 
 test('a fault of the code is the code\'s to fix, with the fix for its kind', async () => {
-  const { plainAction } = await import('../run-diff.mjs');
+  const { plainAction } = await import('../lib/run-diff.mjs');
   assert.deepEqual(plainAction('acmePanel: Read once. `startOpen` is read once, when it is mounted  (src/panel/Panel.vue:11)', 'acmePanel'),
     { who: 'code', todo: 'Follow the prop with a watch, or let the screen own it (v-model), so a screen can change it after it is shown.' });
   assert.equal(plainAction('acmeNote: Line breaks lost. A line break in its `description` is lost', 'acmeNote').who, 'code');
@@ -196,7 +196,7 @@ const showRegion = computed(() => { if (props.readOnly) return false; return pro
   // Where the code hides only what Figma hides, nothing is said; nor when Figma's own layer holds the part.
   assert.deepEqual(componentFaults([drop('true')], { styles: css, toggles: { acmeDrop: { showArea: ['Area'], showHint: ['Hint'] } } }).filter((x) => x.kind === 'hidesMore' && /label/.test(x.says)), []);
   assert.deepEqual(componentFaults([drop('showRegion')], { styles: css, toggles: { acmeDrop: { showArea: ['Area', 'Label Container', 'Hint'], showLabel: ['Label'], showHint: ['Hint'] } } }).filter((x) => x.kind === 'hidesMore'), []);
-  const { plainAction } = await import('../run-diff.mjs');
+  const { plainAction } = await import('../lib/run-diff.mjs');
   assert.equal(plainAction(`acmeDrop: ${'Hides more than in Figma'}. Turning \`showArea\` off…`, 'acmeDrop').who, 'both');
 });
 

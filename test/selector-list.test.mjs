@@ -3,7 +3,7 @@
 // for the rest of it. A real system's gates 12, 13 and 14 failed on exactly these.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitSelectors, withoutHeardState } from '../selector-list.mjs';
+import { splitSelectors, withoutHeardState } from '../lib/selector-list.mjs';
 import { runGate } from './helpers.mjs';
 
 test('a selector list is split at its own commas, never inside :not(), :is() or an attribute value', () => {

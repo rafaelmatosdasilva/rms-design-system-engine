@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { loadBaselineLabels, currentFailingLabels, classifyBaseline, writeBaseline } from '../baseline.mjs';
+import { loadBaselineLabels, currentFailingLabels, classifyBaseline, writeBaseline } from '../lib/baseline.mjs';
 import { tempDir } from './helpers.mjs';
 
 const G = (label, pass, planLimited = false) => ({ label, pass, planLimited });
@@ -65,7 +65,7 @@ test('writeBaseline round-trips the current failing gates', () => {
 });
 
 test('findings: a gate is debt only when every ❌ line is accepted; fixed lines ratchet out', async () => {
-  const { findingKeys, loadBaselineFindings } = await import('../baseline.mjs');
+  const { findingKeys, loadBaselineFindings } = await import('../lib/baseline.mjs');
   const gate = (label, lines) => ({ label, pass: false, lines });
   const A = gate('Structure  (12 components)', ['\x1b[31m❌ chip: padding 8px, code 6px\x1b[0m', '❌ FAIL  0', '✅ tag ok']);
   const B = gate('Tokens', ['❌ --ink differs', '❌ --brand differs']);

@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { prototypePage } from '../prototype.mjs';
-import { checkPrototype, pageGaps } from '../prototype-pieces.mjs';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { prototypePage } from '../lib/prototype.mjs';
+import { checkPrototype, pageGaps } from '../lib/prototype-pieces.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });

@@ -7,8 +7,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { namingFromCode, namingWords, settleFromCapture, FROM_CAPTURE } from '../setup-facts.mjs';
-import { varsFromDesign } from '../figma-cli-import.mjs';
+import { namingFromCode, namingWords, settleFromCapture, FROM_CAPTURE } from '../lib/setup-facts.mjs';
+import { varsFromDesign } from '../lib/figma-cli-import.mjs';
 import { tidepoolDesign } from './figma-cli-design.mjs';
 import { tempDir } from './helpers.mjs';
 
@@ -102,7 +102,7 @@ test('end to end: setup lists what it cannot know, and the first capture fills d
   writeFileSync(join(dir, 'src', 'styles', 'tokens.css'), css);
   writeFileSync(join(dir, 'package.json'), '{"name":"kit"}\n');
   spawnSync('git', ['init', '-q'], { cwd: dir });
-  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', FIGMA_TOKEN: '' } });
+  const run = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', FIGMA_TOKEN: '' } });
   let r = run('--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Kit', '--theme-css=src/styles/tokens.css', '--project=.', '--no-hooks');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   let cfg = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8'));

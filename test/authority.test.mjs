@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AUTHORITY, authorityLines, authorityOf } from '../authority.mjs';
-import { buildLlms } from '../contract-gen.mjs';
+import { AUTHORITY, authorityLines, authorityOf } from '../lib/authority.mjs';
+import { buildLlms } from '../lib/contract-gen.mjs';
 import { tempDir } from './helpers.mjs';
 
 test('the order: the users\' goal, research, documented standards, past decisions, heuristics', () => {

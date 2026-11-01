@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { generateContracts } from '../contract-gen.mjs';
+import { generateContracts } from '../lib/contract-gen.mjs';
 
 test('a component Figma gives no name is listed by its node, never written as " .contract.json"', async () => {
   const dir = makeFixture({

@@ -2,7 +2,7 @@
 // tries components in several tabs at once; Chrome would otherwise wake a background tab once a second, then a minute).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findChrome, launchChrome, connectCDP, openPage } from '../cdp.mjs';
+import { findChrome, launchChrome, connectCDP, openPage } from '../lib/cdp.mjs';
 
 const CHROME = findChrome({ playwright: true });
 const PAGE = 'data:text/html,' + encodeURIComponent('<script>window.n=0;(function tick(){window.n++;setTimeout(tick,0)})()</script>');

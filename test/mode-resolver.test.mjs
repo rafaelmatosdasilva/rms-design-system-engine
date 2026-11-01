@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadModes, loadCollections, allModes, buildResolver, detectModes } from '../mode-resolver.mjs';
+import { loadModes, loadCollections, allModes, buildResolver, detectModes } from '../lib/mode-resolver.mjs';
 
 // ── loadModes / loadCollections / allModes ───────────────────────────────────
 test('loadModes falls back to light/dark when nothing configured', () => {

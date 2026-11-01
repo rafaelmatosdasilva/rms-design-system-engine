@@ -8,11 +8,11 @@ import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './helpers.mjs';
-import { modelOf, predict, ground, opsScript } from '../figma-ops.mjs';
-import { specOf, specLines, likeOf, nameOf, askedOf, sharedOf, primitiveTest, EXT } from '../component-spec.mjs';
-import { diffModels, diffLines } from '../component-diff.mjs';
-import { grammarOf } from '../construction-grammar.mjs';
-import { route } from '../route.mjs';
+import { modelOf, predict, ground, opsScript } from '../lib/figma-ops.mjs';
+import { specOf, specLines, likeOf, nameOf, askedOf, sharedOf, primitiveTest, EXT } from '../lib/component-spec.mjs';
+import { diffModels, diffLines } from '../lib/component-diff.mjs';
+import { grammarOf } from '../lib/construction-grammar.mjs';
+import { route } from '../lib/route.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -282,7 +282,7 @@ test('--spec and --figma-build: asked, held for sign-off, then the script the gu
   writeFileSync(join(root, 'src/vars.json'), JSON.stringify({ variableScopes: varNames, aliases: { light: { 'chipFilter/label/color': ['text/default'] } } }));
   writeFileSync(join(root, 'src/skeleton.json'), JSON.stringify(skeleton));
   writeFileSync(join(root, 'component-values.snapshot.json'), JSON.stringify(values));
-  const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
+  const cli = (...args) => { try { return execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '' } }); } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? ''); } };
   assert.match(cli('--spec', 'something for filters'), /Which of the system's components is it like\? .*chipFilter/s);
   const first = cli('--spec', 'a tag like chipFilter, called tag');
   assert.match(first, /tag: a spec built like chipFilter, 2 variants/);

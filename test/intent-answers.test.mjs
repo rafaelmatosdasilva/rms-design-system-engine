@@ -1,8 +1,8 @@
 // intent-answers.mjs - what each of the team's answers to the engine's proposals changes in the intent layer's files.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersFor, markPart, addRow, applyMerges, startPage, commonLines, ownSpec } from '../intent-answers.mjs';
-import { planOf, specIndex, specOf } from '../intent-changes.mjs';
+import { answersFor, markPart, addRow, applyMerges, startPage, commonLines, ownSpec } from '../lib/intent-answers.mjs';
+import { planOf, specIndex, specOf } from '../lib/intent-changes.mjs';
 
 const ent = (name, code, extra = {}) => ({ kind: 'component', layer: 'components', name, file: `specs/dsds/tiles/${name.toLowerCase().replace(/ /g, '-')}.dsds.json`, code, purpose: [], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], ...extra });
 const grip = ent('Tile Grip', 'src/tiles/Grip.vue', { purpose: ['Lets a person drag a tile.'], whenNotToUse: ['Not for lists.', 'Another component owns it more specifically.'], repeatedLines: ['Another component owns it more specifically.'] });

@@ -2,7 +2,7 @@
 // in once, replace an earlier build's, and never close the page's own script early.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withBaked, withoutBaked, BAKED_ID, ageOpen, withOpenSince, OPEN_ID, savedFor } from '../styleguide-bake.mjs';
+import { withBaked, withoutBaked, BAKED_ID, ageOpen, withOpenSince, OPEN_ID, savedFor } from '../lib/styleguide-bake.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 test('the results are kept in the page right after its data, before its script reads them; an earlier build\'s replaced', () => {
@@ -24,11 +24,11 @@ test('what a component holds never closes the script it is kept in', () => {
 });
 
 test('a page whose script stops is said at once, never waited out for an hour', { timeout: budget(120000) }, async (t) => {
-  const { findChrome } = await import('../cdp.mjs');
+  const { findChrome } = await import('../lib/cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const { writeFileSync, rmSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { bakeA11y } = await import('../styleguide-bake.mjs');
+  const { bakeA11y } = await import('../lib/styleguide-bake.mjs');
   const dir = tempDir('sg-dead-');
   try {
     const file = join(dir, 'index.html');
@@ -42,11 +42,11 @@ test('a page whose script stops is said at once, never waited out for an hour', 
 });
 
 test('saved results go into the page before it tries anything, so it tries only what changed; they come back with the new ones', { timeout: budget(120000) }, async (t) => {
-  const { findChrome } = await import('../cdp.mjs');
+  const { findChrome } = await import('../lib/cdp.mjs');
   if (!findChrome({ playwright: true }) || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
   const { writeFileSync, readFileSync, rmSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { bakeA11y, readSaved, RESULTS_FILE } = await import('../styleguide-bake.mjs');
+  const { bakeA11y, readSaved, RESULTS_FILE } = await import('../lib/styleguide-bake.mjs');
   const dir = tempDir('sg-saved-');
   try {
     const file = join(dir, 'index.html');
@@ -90,11 +90,11 @@ test('a page built without trying its accessibility carries the saved results: t
   const { writeFileSync } = await import('node:fs');
   const { fileURLToPath } = await import('node:url');
   const { fixtureProject } = await import('./helpers.mjs');
-  const { readPage } = await import('../styleguide-files.mjs');
+  const { readPage } = await import('../lib/styleguide-files.mjs');
   const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'sg-saved-');
   writeFileSync(join(dir, 'a11y-results.snapshot.json'), JSON.stringify({ at: '2026-01-01T00:00:00.000Z', themes: { acme: { button: { sig: 'x.y', live: { ran: {} }, items: [] } } } }));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Accessibility from the saved results/);
   const baked = JSON.parse(new RegExp(`<script id="${BAKED_ID}" type="application/json">([\\s\\S]*?)</script>`).exec(readPage(join(dir, '.design-system-engine-out', 'styleguide', 'index.html')))[1]);

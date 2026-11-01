@@ -2,7 +2,7 @@
 // it flags a token that aliases a tier its mayReference list disallows. Never imposes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyTier, checkTiers } from '../tier-check.mjs';
+import { classifyTier, checkTiers } from '../lib/tier-check.mjs';
 
 const tiers = [
   { name: 'primitive', match: '^primitives/' },

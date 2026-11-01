@@ -1,7 +1,7 @@
 // System health: advice the audit gives so the system stays healthy as it grows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { modeAttributes, modesBelowRoot, productsWithTwoThemes, undescribedTokens, catalogueOnlyPatches, nearDuplicateComponents, namedByLook } from '../system-advice.mjs';
+import { modeAttributes, modesBelowRoot, productsWithTwoThemes, undescribedTokens, catalogueOnlyPatches, nearDuplicateComponents, namedByLook } from '../lib/system-advice.mjs';
 import { tempDir } from './helpers.mjs';
 
 test('a mode set on an element below the page root, in markup or a script', () => {
@@ -62,8 +62,8 @@ test('semantic tokens named by look, not by role', () => {
 });
 
 test('the To do rows for the tokens: descriptions for Figma, then a decision, with its examples; shared primitives are no row; a token one component uses is no row', async () => {
-  const { tokenTodos } = await import('../system-advice.mjs');
-  const { tokenUsers } = await import('../contract-gen.mjs');
+  const { tokenTodos } = await import('../lib/system-advice.mjs');
+  const { tokenUsers } = await import('../lib/contract-gen.mjs');
   const vars = { color: {
     light: { 'a/x/color': '#fff', 'b/y/color': '#fff', 'c/z/color': '#fff', 'd/w/color': '#fff', 'e/color': '#000', 'f/color': '#000', 'primitives/white': '#fff' },
     dark: { 'a/x/color': '#111', 'b/y/color': '#111', 'c/z/color': '#111', 'd/w/color': '#111', 'e/color': '#eee', 'f/color': '#eee', 'primitives/white': '#fff' } },
@@ -82,7 +82,7 @@ test('the To do rows for the tokens: descriptions for Figma, then a decision, wi
 });
 
 test('a token no component uses yet is no fault (white label): no task, its description included, no rename guess', async () => {
-  const { tokenTodos } = await import('../system-advice.mjs');
+  const { tokenTodos } = await import('../lib/system-advice.mjs');
   const vars = { color: { light: { 'a/x/color': '#123456', 'later/y/color': '#654321', 'later/z/color': '#222222', 'advanced/buttonSort/background/color': '#333333', 'primitives/white': '#ffffff' } },
     tokenMeta: { 'later/z/color': { description: 'For the retail brand' }, 'advanced/buttonSort/background/color': { description: 'Kept' } } };
   const rows = tokenTodos({ vars, usedTokens: new Set(['a/x']), components: ['buttonSortBar'] });
@@ -90,7 +90,7 @@ test('a token no component uses yet is no fault (white label): no task, its desc
 });
 
 test('aliases to a removed token: a Figma variable the capture found pointing nowhere, a code token showing only its fallback', async () => {
-  const { brokenFigmaAliases, danglingCodeAliases, tokenTodos } = await import('../system-advice.mjs');
+  const { brokenFigmaAliases, danglingCodeAliases, tokenTodos } = await import('../lib/system-advice.mjs');
   assert.deepEqual(brokenFigmaAliases({ brokenAliases: [{ name: 'chip/bg', mode: 'Light', target: 'VariableID:1:2' }, { mode: 'Dark' }] }), [{ name: 'chip/bg', mode: 'Light', target: 'VariableID:1:2' }]);
   assert.deepEqual(brokenFigmaAliases({}), []);
   const files = [
@@ -112,8 +112,8 @@ test('aliases to a removed token: a Figma variable the capture found pointing no
 });
 
 test('a token named after a product or a brand, the components\' own tokens aside', async () => {
-  const { brandNamedTokens, tokenTodos } = await import('../system-advice.mjs');
-  const { brandNames } = await import('../code-roots.mjs');
+  const { brandNamedTokens, tokenTodos } = await import('../lib/system-advice.mjs');
+  const { brandNames } = await import('../lib/code-roots.mjs');
   const { writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const dir = tempDir('brands-');

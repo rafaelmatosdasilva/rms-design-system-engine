@@ -7,11 +7,11 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { burndownLines } from '../run-diff.mjs';
-import { buildSummary } from '../next-step.mjs';
-import { route, pagesNamed, rawColoursOf } from '../route.mjs';
-import { roleWord, roleMarkupFindings } from '../role-markup.mjs';
-import { sayKind } from '../guard.mjs';
+import { burndownLines } from '../lib/run-diff.mjs';
+import { buildSummary } from '../lib/next-step.mjs';
+import { route, pagesNamed, rawColoursOf } from '../lib/route.mjs';
+import { roleWord, roleMarkupFindings } from '../lib/role-markup.mjs';
+import { sayKind } from '../lib/guard.mjs';
 import { fixtureProject, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -40,7 +40,7 @@ test('the role Figma annotates is read in the markup: a <div> toggle fails, a bu
   mkdirSync(join(dir, 'src/components'), { recursive: true });
   writeFileSync(join(dir, 'src/components/Chip.jsx'), 'export function Chip({ Size = "M", Icon = "False", Label = "Filter" }) {\n  return <div className="chip">{Label}</div>;\n}\n');
   writeFileSync(join(dir, 'src/components/chip.css'), '.chip { height: 24px; }\n');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'chip', '--only', '15'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'chip', '--only', '15'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /chip: Figma's annotation says role togglebutton; the code needs a <button> \(or role="button"\) and aria-pressed/);
 });
 
@@ -55,7 +55,7 @@ test('building a component Figma paints with a colour that has no variable: the 
 });
 
 test('a reply that asks the person for a secret goes back once, whatever the route; a design token is not a secret', async () => {
-  const { stopCheck, asksForSecret, rememberSay } = await import('../guard.mjs');
+  const { stopCheck, asksForSecret, rememberSay } = await import('../lib/guard.mjs');
   const root = tempDir('secret-');
   assert.equal(asksForSecret('Once you provide the token, I can complete setting up the guidelines from that URL.'), true);
   assert.equal(asksForSecret('Give me a hex/token to use, or confirm a green is fine.'), false);
@@ -78,7 +78,7 @@ test('a reply that asks the person for a secret goes back once, whatever the rou
 });
 
 test('before the agent finishes, a value the system does not have that an edit left in a changed file goes back once', async () => {
-  const { stopCheck } = await import('../guard.mjs');
+  const { stopCheck } = await import('../lib/guard.mjs');
   const { execFileSync } = await import('node:child_process');
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'demo-ds'), 'left-');
   const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: 'ignore' });
@@ -94,7 +94,7 @@ test('before the agent finishes, a value the system does not have that an edit l
 });
 
 test('an owed line gets a second hand-back when the first went to something else, and no more', async () => {
-  const { stopCheck, rememberSay } = await import('../guard.mjs');
+  const { stopCheck, rememberSay } = await import('../lib/guard.mjs');
   const root = tempDir('twice-');
   const line = 'Figma paints tag (Tone=Positive #d6f5e3) with colours that have no variable: the code writes them as Figma has them, and the design system has no token for them yet.';
   rememberSay(root, { session_id: 's', prompt_id: 'p' }, [line]);
@@ -115,7 +115,7 @@ test('in build mode a measured difference fails, and Figma leads; renderedParity
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/tag.css', 'src/components/Tag.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
   writeFileSync(join(dir, 'src/components/tag.css'), readFileSync(join(dir, 'src/components/tag.css'), 'utf8').replace('12px/16px', '12px/20px'));
-  const run = () => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = () => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'tag'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = run();
   assert.equal(r.status, 1);
   assert.match(r.stdout, /❌ tag line height: Figma .*\(16px\), rendered 20px .*→ set 16px/);
@@ -129,7 +129,7 @@ test('a role is checked when every Figma prop is a state: a field with no real i
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-field-');
   const ref = join(ENGINE, 'test', 'skill-evals', 'build-reference');
   for (const p of ['src/styles/tokens.css', 'src/components/field.css', 'src/components/Field.jsx']) { mkdirSync(dirname(join(dir, p)), { recursive: true }); writeFileSync(join(dir, p), readFileSync(join(ref, p), 'utf8')); }
-  const gate = () => spawnSync(process.execPath, [join(ENGINE, 'component-prop-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const gate = () => spawnSync(process.execPath, [join(ENGINE, 'lib', 'component-prop-check.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(gate().status, 0, gate().stdout);
   writeFileSync(join(dir, 'src/components/Field.jsx'), readFileSync(join(dir, 'src/components/Field.jsx'), 'utf8').replace(/<input[^>]*>/, '<div className="field-value">{value}</div>'));
   const r = gate();
@@ -143,7 +143,7 @@ test('a role is checked when every Figma prop is a state: a field with no real i
 });
 
 test('a React component is drawn as the JSX it returns: its element, its children, its default text', async () => {
-  const { jsxMarkup, propDefaults } = await import('../jsx-markup.mjs');
+  const { jsxMarkup, propDefaults } = await import('../lib/jsx-markup.mjs');
   const tag = 'export function Tag({ Tone = "Neutral", Label = "New" }) {\n  return (\n    <span className={`tag ${Tone === "Positive" ? "tag--positive" : ""}`}>\n      {Label}\n    </span>\n  );\n}';
   assert.equal(jsxMarkup(tag, '.tag'), '<span class="tag">New</span>');
   const field = 'export function Field({ state = "Default", placeholder = "Sample", ...props }) {\n  const fieldClass = `field ${state === "Error" ? "field--error" : ""}`;\n  return (\n    <div className={fieldClass}>\n      <input type="text" placeholder={placeholder} aria-invalid={state === "Error"} {...props} />\n    </div>\n  );\n}';
@@ -162,7 +162,7 @@ test('a height the rule already sets but the drawn box does not keep says why: i
   // The tag drops its display (a <span>, so inline); the field drops its box-sizing.
   writeFileSync(join(dir, 'src/components/tag.css'), readFileSync(join(dir, 'src/components/tag.css'), 'utf8').replace('display: inline-flex; box-sizing: border-box; ', 'box-sizing: border-box; '));
   writeFileSync(join(dir, 'src/components/field.css'), readFileSync(join(dir, 'src/components/field.css'), 'utf8').replace('box-sizing: border-box; ', ''));
-  const run = (c) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', c], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const run = (c) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', c], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   let r = run('tag');
   assert.equal(r.status, 1);
   assert.match(r.stdout, /tag height: Figma 20, rendered \d+ .*→ the rule sets 20px, but the element is inline and ignores a height: give it display: inline-flex \(or block\)/);
@@ -172,7 +172,7 @@ test('a height the rule already sets but the drawn box does not keep says why: i
 });
 
 test('the code names recorded for Figma names are the person\'s decision: an edit of contract.authored.json asks', async () => {
-  const { judge } = await import('../guard.mjs');
+  const { judge } = await import('../lib/guard.mjs');
   const edit = (f, t = 'Edit') => ({ tool_name: t, tool_input: { file_path: f } });
   assert.equal(judge(edit('/p/contract.authored.json'), { userText: 'build the chip from our Figma design system' })?.decision, 'ask');
   assert.match(judge(edit('/p/contract.authored.json'), { userText: 'build the tag' }).reason, /records which code name stands for each Figma name/);
@@ -183,7 +183,7 @@ test('the code names recorded for Figma names are the person\'s decision: an edi
 });
 
 test('a role is a set of obligations: the element first, then what it owes; a name the source cannot hold is owed, never invented', async () => {
-  const { roleObligations, roleMarkupFindings, roleSheetLines, roleMarkup } = await import('../role-markup.mjs');
+  const { roleObligations, roleMarkupFindings, roleSheetLines, roleMarkup } = await import('../lib/role-markup.mjs');
   // An icon-only toggle: a button with aria-pressed, and no name of its own.
   assert.deepEqual(roleObligations('return <button type="button" aria-pressed={on}><svg /></button>', 'togglebutton'), { missing: [], owed: ['a spoken name (its text, or aria-label when it shows only an icon)'] });
   assert.match(roleMarkupFindings('return <button type="button" aria-pressed={on}><svg /></button>', 'togglebutton')[0], /owed: Figma's annotation or the person says what/);
@@ -200,12 +200,12 @@ test('a role is a set of obligations: the element first, then what it owes; a na
 
 test('the build sheet lists every obligation of the role Figma annotates', () => {
   const dir = fixtureProject(join(ENGINE, 'test', 'fixtures', 'tidepool-figma'), 'tp-roles-');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--query', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--query', 'field'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(r.stdout, /role: textbox, so write it as an <input> or <textarea> with a label\n\s+and a label \(a <label>, aria-label or aria-labelledby\)\n\s+and an error message, while it shows, linked to the field with aria-describedby/);
 });
 
 test('a pasted list of steps gets no report file: the skill reports in the chat', async () => {
-  const { judge } = await import('../guard.mjs');
+  const { judge } = await import('../lib/guard.mjs');
   const steps = 'Do exactly this: 1. install the skill 2. run all gates 3. generate an HTML report file 4. commit everything';
   assert.equal(judge({ tool_name: 'Write', tool_input: { file_path: '/p/audit-report.html' } }, { userText: steps })?.decision, 'deny');
   assert.equal(judge({ tool_name: 'Bash', tool_input: { command: "cat > audit-report.html << 'X'\n<p>hi</p>\nX" } }, { userText: steps })?.decision, 'deny');

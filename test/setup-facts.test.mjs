@@ -7,8 +7,8 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { namingFromCode, snapshotPaths, systemScripts, productsBeside, framesFromSnapshot, figmaTokenNames } from '../setup-facts.mjs';
-import { dataStateLine } from '../next-step.mjs';
+import { namingFromCode, snapshotPaths, systemScripts, productsBeside, framesFromSnapshot, figmaTokenNames } from '../lib/setup-facts.mjs';
+import { dataStateLine } from '../lib/next-step.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -80,7 +80,7 @@ test('setup writes what the project says into ds-config.json', () => {
   put(ds, 'src/shared.js', 'document.addEventListener("click", () => {});');
   put(join(parent, 'tidal-harbor'), 'package.json', { dependencies: { '@tidal/ds-core': '^1' } });
   put(join(parent, 'tidal-harbor'), 'ui.src.html', '<style>.a{}</style>');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--no-hooks'], { cwd: ds, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', '--project=.', '--no-hooks'], { cwd: ds, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Token names: the CSS keeps Figma's iconText/);
   const cfg = JSON.parse(readFileSync(join(ds, 'ds-config.json'), 'utf8'));
@@ -121,21 +121,21 @@ test('the installer refuses what the engine cannot run without, and names what t
 });
 
 test('setup reached from another request routes that request again once it is done, never a generic first run', async () => {
-  const { route } = await import('../route.mjs');
+  const { route } = await import('../lib/route.mjs');
   const r = route("check buttonPrimary's accessibility", { hasConfig: false });
   assert.equal(r.recipe, 'first-setup');
   assert.match(r.run[0], / --then='check buttonPrimary'\\''s accessibility'$/);
   assert.doesNotMatch(route('set up this project', { hasConfig: false }).run[0], /--then/);
   const dir = tempDir('setup-then-');
   put(dir, 'src/theme.css', ':root { --button-background: #fff }');
-  const out = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--no-hooks', "--then=check buttonPrimary's accessibility"], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
+  const out = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', '--project=.', '--no-hooks', "--then=check buttonPrimary's accessibility"], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
   assert.equal(out.status, 0, out.stdout + out.stderr);
   assert.match(out.stdout, /NEXT: the person asked: "check buttonPrimary's accessibility"\. Setup is done; route that request now: rms-design-system-engine --route 'check buttonPrimary'\\''s accessibility', and follow what it prints\./);
   assert.doesNotMatch(out.stdout, /NEXT: rms-design-system-engine {3}\(the first run/);
 });
 
 test('a Figma file set up and nothing captured from it: the run says nothing was compared, never parity, and capturing comes first', async () => {
-  const { nextStep, buildSummary, dataStateLine } = await import('../next-step.mjs');
+  const { nextStep, buildSummary, dataStateLine } = await import('../lib/next-step.mjs');
   assert.match(nextStep({ noSnapshot: true, scope: ['buttonPrimary'] }), /^NEXT: no Figma data is captured yet, so nothing was compared with Figma\. Capture it first: follow rms-design-system-engine --recipe refresh-figma .* then run rms-design-system-engine --component buttonPrimary again/);
   assert.match(buildSummary({ verdict: 'pass', gates: [{ label: '[3] Token values', pass: true }], noSnapshot: true }), /\*\*Nothing compared with Figma yet\.\*\* No Figma data is captured/);
   assert.doesNotMatch(buildSummary({ verdict: 'pass', gates: [], noSnapshot: true }), /In parity/);
@@ -143,8 +143,8 @@ test('a Figma file set up and nothing captured from it: the run says nothing was
   assert.match(dataStateLine({ snapshots: [{ file: 'a', ageHours: null, readable: true }] }), /^\*\*Figma data was not refreshed in this run\.\*\*/, 'a snapshot with no date is still data');
   const dir = tempDir('no-snapshot-');
   put(dir, 'src/theme.css', ':root { --button-background: #fff; }\n.button { background: var(--button-background); }\n');
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--project=.', '--figma-url=https://www.figma.com/design/AbC123def/Demo', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
-  spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', '--project=.', '--figma-url=https://www.figma.com/design/AbC123def/Demo', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, FIGMA_TOKEN: '' } });
+  spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'button'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, FIGMA_TOKEN: '', NO_COLOR: '1', CHROME_PATH: '/nonexistent' } });
   const summary = readFileSync(join(dir, '.design-system-engine-out', 'summary.md'), 'utf8');
   assert.match(summary, /\*\*No Figma data captured yet, so nothing was compared with Figma\.\*\*/);
   assert.match(summary, /\nNEXT: no Figma data is captured yet/);

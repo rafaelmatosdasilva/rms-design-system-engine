@@ -1,8 +1,8 @@
 // which interaction concept a state is, from ds-config states or, by default, the names.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { conceptOf } from '../state-concepts.mjs';
-import { stateContrastFindings } from '../contrast-check.mjs';
+import { conceptOf } from '../lib/state-concepts.mjs';
+import { stateContrastFindings } from '../lib/contrast-check.mjs';
 
 test('concepts: declared props and values first, names otherwise; a false boolean is never the state', () => {
   assert.equal(conceptOf('State=Hover'), 'hover');

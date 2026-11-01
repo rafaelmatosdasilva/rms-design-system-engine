@@ -6,11 +6,11 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { fillHistory, blameOf, commitsOf, readHistory, missing, releaseLogOf, HISTORY_FILE } from '../gitlab-history.mjs';
-import { STATE_FILE } from '../gitlab-source.mjs';
-import { codeReason, reasonLine } from '../change-reason.mjs';
-import { changelogs, repoUrl, defaultBranch, ruleChanges } from '../component-changelog.mjs';
-import { recordAgreed } from '../agreed.mjs';
+import { fillHistory, blameOf, commitsOf, readHistory, missing, releaseLogOf, HISTORY_FILE } from '../lib/gitlab-history.mjs';
+import { STATE_FILE } from '../lib/gitlab-source.mjs';
+import { codeReason, reasonLine } from '../lib/change-reason.mjs';
+import { changelogs, repoUrl, defaultBranch, ruleChanges } from '../lib/component-changelog.mjs';
+import { recordAgreed } from '../lib/agreed.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40), HEAD = 'd'.repeat(40), NEXT = 'e'.repeat(40);

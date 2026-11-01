@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture } from './helpers.mjs';
-import { codeReason, reasonLine, figmaReason, figmaReasonLine } from '../change-reason.mjs';
+import { codeReason, reasonLine, figmaReason, figmaReasonLine } from '../lib/change-reason.mjs';
 
 const git = (dir, ...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_NAME: 'QA', GIT_AUTHOR_EMAIL: 'a@x', GIT_COMMITTER_NAME: 'QA', GIT_COMMITTER_EMAIL: 'a@x', GIT_AUTHOR_DATE: '2026-09-20T10:00:00Z', GIT_COMMITTER_DATE: '2026-09-20T10:00:00Z' } });
 

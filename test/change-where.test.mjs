@@ -2,8 +2,8 @@
 // besides a component's code. An invented system (Acme): a chip and a tag, their docs, demo pages and tests.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { requestOf, requestLabel, closesOf, diffFiles, whereOf, pathKey } from '../change-where.mjs';
-import { ticketOf } from '../component-changelog.mjs';
+import { requestOf, requestLabel, closesOf, diffFiles, whereOf, pathKey } from '../lib/change-where.mjs';
+import { ticketOf } from '../lib/component-changelog.mjs';
 
 test('the request a commit came by, and what it says it closes', () => {
   assert.deepEqual(requestOf('Each component says what it is for (#70)'), { n: '70' });

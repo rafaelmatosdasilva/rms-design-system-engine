@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PLACES, PLACE, ANSWERS, mayWrite, unanswered, recordWrite, writesLines, writeRule } from '../writes.mjs';
+import { PLACES, PLACE, ANSWERS, mayWrite, unanswered, recordWrite, writesLines, writeRule } from '../lib/writes.mjs';
 import { makeFixture } from './helpers.mjs';
 
 test('one answer per place; not answered is ask, and the engine records what the person says', () => {
@@ -74,7 +74,7 @@ test('what a person reads, and the one sentence an agent is given before it chan
 // The answer reaches what the agent reads, not only what the engine does: a request that would change the design
 // file carries this project's own answer, so an agent is never told to ask where the answer is already no.
 test('what the agent is told about a Figma change follows the project\'s answer', async () => {
-  const { route } = await import('../route.mjs');
+  const { route } = await import('../lib/route.mjs');
   const ask = route('add the roles to figma', { writes: { figma: 'ask' } });
   assert.match(ask.notes.join('\n'), /show the person the list and ask/);
   const never = route('add the roles to figma', { writes: { figma: 'no' } });

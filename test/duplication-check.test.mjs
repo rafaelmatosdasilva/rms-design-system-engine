@@ -1,7 +1,7 @@
 // duplication-check.mjs - single-source-of-truth / list-duplication advisory.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findNameMentions, duplicationFindings } from '../duplication-check.mjs';
+import { findNameMentions, duplicationFindings } from '../lib/duplication-check.mjs';
 
 test('findNameMentions matches whole tokens, not substrings, and handles token paths', () => {
   const text = 'Use buttonPrimary and radii/button. Avoid myButtonPrimary and radii/buttonLarge.';

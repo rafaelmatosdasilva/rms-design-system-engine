@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
-const names = [...readFileSync(join(ENGINE, 'audit.mjs'), 'utf8').matchAll(/addGate\('([^']+?)  \(/g)].map((m) => m[1]);
+const names = [...readFileSync(join(ENGINE, 'lib', 'audit.mjs'), 'utf8').matchAll(/addGate\('([^']+?)  \(/g)].map((m) => m[1]);
 
 test('the audit numbers 25 gates, the names the guides use', () => assert.equal(names.length, 25));
 

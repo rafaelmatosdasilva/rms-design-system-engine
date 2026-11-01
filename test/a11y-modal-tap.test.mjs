@@ -7,9 +7,9 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { modalEscape, A11Y_GUIDE, severityOf, cvdVariantFindings, colourDistance, changeLine } from '../a11y-check.mjs';
-import { A11Y_WCAG } from '../styleguide-data.mjs';
-import { findChrome } from '../cdp.mjs';
+import { modalEscape, A11Y_GUIDE, severityOf, cvdVariantFindings, colourDistance, changeLine } from '../lib/a11y-check.mjs';
+import { A11Y_WCAG } from '../lib/styleguide-data.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -47,7 +47,7 @@ const page = (body) => `<!doctype html><html lang="en"><head><meta charset="utf-
 
 const run = (dir, file) => {
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
   catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
   const at = out.indexOf('{'); assert.ok(at > -1, out);
   return JSON.parse(out.slice(at));
@@ -96,7 +96,7 @@ test('in the browser: red and green variants, and a selected tab drawn only by i
   <div class="tabsok" role="tablist"><button class="tabok" role="tab" aria-selected="true">One</button><button class="tabok" role="tab" aria-selected="false">Two</button></div>`;
   const dir = makeFixture({ 'page.html': page(body), 'ds-config.json': { componentSelectors: { badge: '.badge', tabs: '.tabs', tabsok: '.tabsok' } } });
   let out = '';
-  try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--component', 'badge,tabs,tabsok'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
+  try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, '--json', '--no-axe', '--component', 'badge,tabs,tabsok'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); }
   catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
   const d = JSON.parse(out.slice(out.indexOf('{')));
   const of = (k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
@@ -111,7 +111,7 @@ test('what a screen reader says when a press shows a toast; one put in no live r
   const toast = (live) => page(`<button id="go">Show toast</button>${live ? '<div class="region" role="status"></div>' : ''}
     <script>document.getElementById('go').addEventListener('click', () => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = 'Saved'; ${live ? "document.querySelector('.region')" : 'document.querySelector("main")'}.appendChild(t); });</script>`);
   const dir = makeFixture({ 'bad.html': toast(false), 'good.html': toast(true), 'ds-config.json': { componentSelectors: { toast: '.toast' } } });
-  const go = (file) => { let out = ''; try { out = execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe', '--component', 'toast'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); } catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); } return JSON.parse(out.slice(out.indexOf('{'))); };
+  const go = (file) => { let out = ''; try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, file)).href, '--json', '--no-axe', '--component', 'toast'], { cwd: dir, encoding: 'utf8', timeout: budget(240000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1' } }); } catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); } return JSON.parse(out.slice(out.indexOf('{'))); };
   const bad = go('bad.html'), good = go('good.html');
   const of = (d, k) => d.issues.filter((i) => i.issue === k).map((i) => i.selector);
   assert.deepEqual(of(bad, 'unannounced'), ['div.toast "Saved" (shown by pressing "Show toast"): in no live region, and the focus does not go to it'], JSON.stringify(bad.issues.map((i) => [i.issue, i.selector])));

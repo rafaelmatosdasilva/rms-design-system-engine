@@ -1,7 +1,7 @@
 // pair-derive.mjs - derive text/bg contrast pairs from token names.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveContrastPairs } from '../pair-derive.mjs';
+import { deriveContrastPairs } from '../lib/pair-derive.mjs';
 
 test('pairs text with the background sharing its qualifier (state or variant)', () => {
   const pairs = deriveContrastPairs([
@@ -45,7 +45,7 @@ test('skips components with no background, non-color tokens, and dedupes', () =>
 });
 
 test('drawnOn: a name-derived pair Figma never draws together is left out; what Figma draws on a token is paired', async () => {
-  const { applyDrawnOn } = await import('../pair-derive.mjs');
+  const { applyDrawnOn } = await import('../lib/pair-derive.mjs');
   const derived = deriveContrastPairs(['check/text/selected/color', 'check/background/selected/color', 'chip/label/color', 'chip/background/color']);
   const structure = {
     checkBox: { drawnOn: [{ fg: 'check/text/selected/color', on: 'surface', icon: false }], fills: ['check/background/selected/color'] },   // beside its own box

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { nextVersion, bumpFor, RELEASE_LABELS } from '../release-version.mjs';
+import { nextVersion, bumpFor, RELEASE_LABELS } from '../lib/release-version.mjs';
 
 test('the first release takes the package.json version', () => {
   assert.equal(nextVersion('', 'minor', '1.0.0'), 'v1.0.0');

@@ -6,9 +6,9 @@ import { mkdirSync, writeFileSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { codeRoots } from '../code-roots.mjs';
-import { projectStyleText } from '../a11y-static.mjs';
-import { uiFiles } from '../route.mjs';
+import { codeRoots } from '../lib/code-roots.mjs';
+import { projectStyleText } from '../lib/a11y-static.mjs';
+import { uiFiles } from '../lib/route.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,7 +47,7 @@ test('audit: a variable only a sibling uses is not unused; a class named only in
   writeFileSync(join(ds, '..', 'app', 'ui.src.html'), '<div class="card" style="color: var(--brand)"></div>\n');
   mkdirSync(join(ds, '.design-system-engine-out'), { recursive: true });
   writeFileSync(join(ds, '.design-system-engine-out', 'last-findings.json'), JSON.stringify({ lines: ['.orphan defined but never applied'] }));
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--only', '11'], { cwd: ds, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: join(ds, 'no-chrome') } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--only', '11'], { cwd: ds, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', CHROME_PATH: join(ds, 'no-chrome') } });
   const out = r.stdout + r.stderr;
   assert.doesNotMatch(out, /unused \(scanned[^\n]*--brand/);
   assert.match(out, /\.orphan/);

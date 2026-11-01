@@ -1,12 +1,12 @@
 // A prototype written in the system's own code is held to the system: only its components, each given only what it
 // takes, where the documentation puts it. An invented Acme system, in Vue and in JSX.
 import { test } from 'node:test';
-import { docCoverage } from '../doc-coverage.mjs';
+import { docCoverage } from '../lib/doc-coverage.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { docFields, readLiteral, literalBindings, shapeFindings, requiredKeys, UNKNOWN } from '../prop-shapes.mjs';
-import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../page-check.mjs';
+import { docFields, readLiteral, literalBindings, shapeFindings, requiredKeys, UNKNOWN } from '../lib/prop-shapes.mjs';
+import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../lib/page-check.mjs';
 import { tempDir } from './helpers.mjs';
 
 const put = (root, rel, text) => { const p = join(root, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
@@ -207,7 +207,7 @@ import SearchField from '@/components/library/search/SearchField'
 });
 
 test('an example the intent layer gets is the product\'s own use of the component, its product attributes left out', async () => {
-  const { withRealUses, briefOf, exampleOf } = await import('../intent-changes.mjs');
+  const { withRealUses, briefOf, exampleOf } = await import('../lib/intent-changes.mjs');
   const { root, catalog, context } = acme();
   const page = await pageSystem(root, {}, catalog);
   put(root, '.design-system-engine-out/prototypes/page-system.json', JSON.stringify(pageCache(page, context)));
@@ -216,7 +216,7 @@ test('an example the intent layer gets is the product\'s own use of the componen
 });
 
 test('what an agent cannot learn from the documentation: props, events, slots and lists no comment and no page explains', async () => {
-  const { docCoverage, coverageLines } = await import('../doc-coverage.mjs');
+  const { docCoverage, coverageLines } = await import('../lib/doc-coverage.mjs');
   const { root, catalog } = acme();
   const page = await pageSystem(root, {}, catalog);
   const ctx = { components: { TabStrip: { purpose: 'Switches views.', intentLayer: { whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: ['Send picked with the id of the tab.'], examples: [] } } } };
@@ -232,7 +232,7 @@ test('what an agent cannot learn from the documentation: props, events, slots an
 });
 
 test('the documentation under load: needs turned into "which component?" scenarios, graded; requests from its own pages', async () => {
-  const { scenariosFrom, runChoices, gradeChoices, sweepRequests, menuOf, codeOf } = await import('../doc-stress.mjs');
+  const { scenariosFrom, runChoices, gradeChoices, sweepRequests, menuOf, codeOf } = await import('../lib/doc-stress.mjs');
   const { root, catalog } = acme();
   const page = await pageSystem(root, {}, catalog);
   const ctx = {
@@ -252,14 +252,14 @@ test('the documentation under load: needs turned into "which component?" scenari
   assert.deepEqual(g.confusions, { SearchField: [{ chose: 'TabStrip', text: 'Use it when people look for a record by typing part of its name.' }] }, 'a tag answers for its component');
   assert.deepEqual(sweepRequests(ctx).map((r) => r.from), ['Orders page'], 'a whole page, not one of its sections');
   assert.equal(codeOf('Here:\n```vue\n<template/>\n```'), '<template/>\n');
-  const { sharedLines, withoutOwnUse } = await import('../doc-stress.mjs');
+  const { sharedLines, withoutOwnUse } = await import('../lib/doc-stress.mjs');
   const twins = { components: { TabStrip: { intentLayer: { whenToUse: ['People pick one of several.'] } }, Toolbar: { intentLayer: { whenToUse: ['People pick one of several.', 'Actions sit above a list.'] } } } };
   assert.deepEqual(sharedLines(twins, page).map((x) => x.components), [['TabStrip', 'Toolbar']]);
   assert.deepEqual(withoutOwnUse(twins, page), ['TabStrip'], 'a line of its own sets Toolbar apart');
 });
 
 test('a need the system has a component for is not a gap, unless the page says it looked at it and why it does not fit', async () => {
-  const { systemFor } = await import('../page-check.mjs');
+  const { systemFor } = await import('../lib/page-check.mjs');
   const comps = { secretField: {}, rateGrid: {}, drawerPanel: {}, tickBoxPrimary: {} };
   assert.deepEqual(systemFor('a secret field for the login', comps), ['secretField']);
   assert.deepEqual(systemFor('a grid of rates', comps), ['rateGrid']);
@@ -310,7 +310,7 @@ test('coverage asks the questions an agent actually gets stuck on: which value, 
 });
 
 test('coverage asks the edges a screen meets first: content that does not fit, and one action where there are two', async () => {
-  const { docCoverage, coverageLines } = await import('../doc-coverage.mjs');
+  const { docCoverage, coverageLines } = await import('../lib/doc-coverage.mjs');
   const page = { components: {
     // A dialog with two actions and a place for content.
     sheet: { props: { primaryButtonLabel: {}, secondaryButtonLabel: {}, description: {} }, slots: { named: ['body'] } },

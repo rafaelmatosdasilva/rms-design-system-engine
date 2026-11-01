@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, utimesSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
-import { workspaceDir, engineFiles, openWorkspace } from '../workspace.mjs';
-import { STATE_FILE } from '../gitlab-source.mjs';
+import { workspaceDir, engineFiles, openWorkspace } from '../lib/workspace.mjs';
+import { STATE_FILE } from '../lib/gitlab-source.mjs';
 import { tempDir } from './helpers.mjs';
 
 const P = { host: 'gitlab.acme.test', path: 'team/design-store' };

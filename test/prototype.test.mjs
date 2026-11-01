@@ -6,9 +6,9 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { checkPrototype, pieceCatalog, systemScales, systemFamily, mergeGaps, gapLine } from '../prototype-pieces.mjs';
-import { screenToPrototype, layoutHabits, screenCaptureScript } from '../screen-layout.mjs';
-import { styleBlocks } from '../styleguide-gen.mjs';
+import { checkPrototype, pieceCatalog, systemScales, systemFamily, mergeGaps, gapLine } from '../lib/prototype-pieces.mjs';
+import { screenToPrototype, layoutHabits, screenCaptureScript } from '../lib/screen-layout.mjs';
+import { styleBlocks } from '../lib/styleguide-gen.mjs';
 import { fixtureProject, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -178,7 +178,7 @@ function builtTidepool(prefix) {
   }
   return dir;
 }
-const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
+const run = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, timeout: budget(300000) });
 
 test('--prototype draws a valid composition with the components\' own markup and lists its gaps; an invalid one is not drawn', { timeout: budget(600000) }, () => {
   const dir = builtTidepool('tp-proto-');
@@ -223,7 +223,7 @@ test('--prototype --from-screens turns each designed screen into a drawn startin
 
 // ── Asking for a prototype in words ──────────────────────────────────────────────────────────────────────────────
 test('a prototype request routes to the prototype recipe and its catalog, in English and Portuguese', async () => {
-  const { route } = await import('../route.mjs');
+  const { route } = await import('../lib/route.mjs');
   const s = { components: ['button', 'chip', 'field', 'tag'], build: true };
   for (const p of ['prototype a notification settings page with our components', 'mock up a checkout screen', 'faz um protótipo do ecrã de perfil', 'create a wireframe for the login']) {
     const r = route(p, s);
@@ -237,7 +237,7 @@ test('a prototype request routes to the prototype recipe and its catalog, in Eng
 });
 
 test('while prototyping, an edit outside prototypes/ asks first; the composition itself passes', async () => {
-  const { judge } = await import('../guard.mjs');
+  const { judge } = await import('../lib/guard.mjs');
   const ask = (file) => judge({ tool_name: 'Write', tool_input: { file_path: file } }, { userText: 'prototype a settings page with our components' });
   assert.equal(ask('prototypes/settings.json'), null);
   assert.equal(ask('src/components/Toggle.jsx')?.decision, 'ask');
@@ -245,7 +245,7 @@ test('while prototyping, an edit outside prototypes/ asks first; the composition
 });
 
 test('the reply owes the gaps of the prototype just drawn, once', async () => {
-  const { prototypeGapsOwed } = await import('../guard.mjs');
+  const { prototypeGapsOwed } = await import('../lib/guard.mjs');
   const root = tempDir('proto-owed-');
   mkdirSync(join(root, '.design-system-engine-out', 'prototypes'), { recursive: true });
   const write = () => writeFileSync(join(root, '.design-system-engine-out', 'prototypes', 'last.json'), JSON.stringify({ at: new Date().toISOString(), pending: true, gaps: [{ need: 'a toggle switch for each channel', kind: 'component', line: 'component: a toggle switch for each channel' }, { need: 'a Row layout component', kind: 'layout', line: 'layout: a Row layout component' }] }));
@@ -258,7 +258,7 @@ test('the reply owes the gaps of the prototype just drawn, once', async () => {
 });
 
 test('a page that differs from the product\'s other pages owes that too, named as a difference', async () => {
-  const { stopCheck } = await import('../guard.mjs');
+  const { stopCheck } = await import('../lib/guard.mjs');
   const root = tempDir('proto-differs-');
   mkdirSync(join(root, '.design-system-engine-out', 'prototypes'), { recursive: true });
   writeFileSync(join(root, '.design-system-engine-out', 'prototypes', 'last.json'), JSON.stringify({ at: new Date().toISOString(), pending: true, gaps: [{ need: 'page padding padding/m', kind: 'consistency', line: "page padding: padding/s here, padding/m on the product's other pages (settings)" }] }));
@@ -332,8 +332,8 @@ test('a Missing box carries what the guidelines say the system lacks, so the rep
 
 // each component is sized in a prototype as the products' screens size it, over its Figma master's own sizing.
 test('the products\' screens decide how a component fills its place in a prototype', async () => {
-  const { screenSizing, screenFills } = await import('../screen-layout.mjs');
-  const { prototypePage } = await import('../prototype.mjs');
+  const { screenSizing, screenFills } = await import('../lib/screen-layout.mjs');
+  const { prototypePage } = await import('../lib/prototype.mjs');
   const bar = (fillW) => ({ kind: 'instance', component: 'Status Bar', fillW, fillH: false });
   const screens = [
     { tree: { kind: 'frame', children: [bar(true), { kind: 'instance', component: 'chip', fillW: false }, { kind: 'instance', component: 'chip', fillW: false }] } },

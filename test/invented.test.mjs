@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { inventionsIn, noteInvented, readInvented, rejectedFrom, INVENTED_FILE } from '../invented.mjs';
-import { buildCatalog } from '../ui-catalog.mjs';
+import { inventionsIn, noteInvented, readInvented, rejectedFrom, INVENTED_FILE } from '../lib/invented.mjs';
+import { buildCatalog } from '../lib/ui-catalog.mjs';
 import { tempDir } from './helpers.mjs';
 
 const findings = [
@@ -73,9 +73,9 @@ test('the page check\'s own record feeds the same table: one lesson, whichever r
 });
 
 test('an event it does not emit, and the page check\'s tags filed under the catalog\'s names; each component lists what was written for it', async () => {
-  const { inventedFor } = await import('../invented.mjs');
+  const { inventedFor } = await import('../lib/invented.mjs');
   const { mkdirSync, writeFileSync } = await import('node:fs');
-  const { buildLlms } = await import('../contract-gen.mjs');
+  const { buildLlms } = await import('../lib/contract-gen.mjs');
   const inv = inventionsIn([{ message: 'tile-strip emits no "click-tile" (it emits: clicked, closed)' }]);
   assert.deepEqual(inv.events['tile-strip.click-tile'], { right: 'clicked', times: 1 }, 'the closest of the ones it emits');
   const dir = tempDir('invented-pages-');

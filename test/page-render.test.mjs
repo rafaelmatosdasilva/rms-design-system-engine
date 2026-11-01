@@ -4,9 +4,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { findChrome } from '../cdp.mjs';
-import { loadTypeScript } from '../component-harness.mjs';
-import { stressPage } from '../page-render.mjs';
+import { findChrome } from '../lib/cdp.mjs';
+import { loadTypeScript } from '../lib/component-harness.mjs';
+import { stressPage } from '../lib/page-render.mjs';
 import { tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });

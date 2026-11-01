@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runGate } from './helpers.mjs';
-import { counterpart, rejectedNames, rightFor } from '../prop-vocabulary.mjs';
+import { counterpart, rejectedNames, rightFor } from '../lib/prop-vocabulary.mjs';
 
 const GATE = 'component-prop-check.mjs';
 const project = (figmaOptions, codeUnion, { figmaProp = 'size', codeProp = 'size' } = {}) => ({
@@ -80,7 +80,7 @@ const reactProject = (authored) => ({
 });
 
 test('every destructured React prop is read, so label is found', async () => {
-  const { extractReact } = await import('../component-source.mjs');
+  const { extractReact } = await import('../lib/component-source.mjs');
   assert.deepEqual([...extractReact('function A({ a, b, c = 1, d: e, f })')], ['a', 'b', 'c', 'd', 'f']);
   const { out } = runGate(GATE, reactProject(null));
   assert.doesNotMatch(out, /Figma property "Label" has no code prop/);

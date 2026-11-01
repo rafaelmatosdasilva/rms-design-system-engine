@@ -28,7 +28,7 @@ import { HELDOUT } from './heldout.mjs';
 import { BUILD, TIDEPOOL } from './build-tasks.mjs';
 import { PROTO } from './proto-tasks.mjs';
 import { variant } from './variants.mjs';
-import { envVar } from '../../names.mjs';
+import { envVar } from '../../lib/names.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i === -1 ? d : process.argv[i + 1]; };

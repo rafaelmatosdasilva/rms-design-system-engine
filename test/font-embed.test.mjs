@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { embedRemoteFonts, keepSubsets } from '../font-embed.mjs';
+import { embedRemoteFonts, keepSubsets } from '../lib/font-embed.mjs';
 import { tempDir } from './helpers.mjs';
 
 const CSS = `/* cyrillic */
@@ -46,7 +46,7 @@ test('a stylesheet that cannot be read keeps its link and says why', async () =>
 });
 
 test('a family the CSS asks for first that nothing loads is found; carried, linked, generic and fallback ones are not', async () => {
-  const { missingFamilies, serviceFonts } = await import('../font-embed.mjs');
+  const { missingFamilies, serviceFonts } = await import('../lib/font-embed.mjs');
   const html = `<head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&amp;display=swap"></head>
 <style>@font-face { font-family: "acme"; src: url(data:font/woff2;base64,AA) }
 body { font-family: "Open Sans", sans-serif; } code { font-family: SFMono-Regular, "Ubuntu Mono", monospace; }
@@ -60,14 +60,14 @@ h1 { font-family: Inter, sans-serif; } .b { font-family: acme; } .c { font-famil
 });
 
 test('missingFamilies: a family named through a custom property, in a rule or an inline style, is found', async () => {
-  const { missingFamilies } = await import('../font-embed.mjs');
+  const { missingFamilies } = await import('../lib/font-embed.mjs');
   assert.deepEqual(missingFamilies('<style>:root { --font-family: Acme Sans; } body { font-family: var(--font-family, serif); }</style>'), ['Acme Sans']);
   assert.deepEqual(missingFamilies('<b style="font-family:var(--unset, acme grotesk), sans-serif">a</b>'), ['acme grotesk']);
   assert.deepEqual(missingFamilies('<style>@font-face { font-family: "Acme Sans"; src: url(x); } :root { --f: Acme Sans; } p { font-family: var(--f); }</style>'), []);
 });
 
 test('a family\'s own files are found in any folder of the system, by file or folder name', async () => {
-  const { localFonts } = await import('../font-embed.mjs');
+  const { localFonts } = await import('../lib/font-embed.mjs');
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const root = tempDir('own-fonts-');
   mkdirSync(join(root, 'assets/fonts/Acme'), { recursive: true });
@@ -88,7 +88,7 @@ test('a family\'s own files are found in any folder of the system, by file or fo
 });
 
 test('a family on no font service but on Fontsource is written in from there', async () => {
-  const { fontsourceFonts } = await import('../font-embed.mjs');
+  const { fontsourceFonts } = await import('../lib/font-embed.mjs');
   const meta = { family: 'Open Thing', subsets: ['latin', 'cyrillic'], weights: [400, 700], styles: ['normal'], variable: false,
     variants: { 400: { normal: { latin: { url: { woff2: 'https://cdn.example/latin-400.woff2' } } } }, 700: { normal: { latin: { url: { woff2: 'https://cdn.example/latin-700.woff2' } } } } } };
   const r = await fontsourceFonts(['Open Thing', 'Gone'], { fetchText: async (u) => { if (/open-thing/.test(u)) return JSON.stringify(meta); throw new Error('404'); }, fetchBytes: async (u) => Buffer.from(u) });

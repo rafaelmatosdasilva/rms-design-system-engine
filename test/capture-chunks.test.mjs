@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { effectsCaptureScript } from '../effects-parity.mjs';
-import { motionCaptureScript } from '../motion-parity.mjs';
-import { startChunks, takeAnswer, readKept } from '../capture-chunks.mjs';
+import { effectsCaptureScript } from '../lib/effects-parity.mjs';
+import { motionCaptureScript } from '../lib/motion-parity.mjs';
+import { startChunks, takeAnswer, readKept } from '../lib/capture-chunks.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
@@ -126,7 +126,7 @@ test('an answer cut or edited, a page of checksums out of order, or Figma change
 test('--figma-effects writes each next script until all are read, then keeps the snapshot; the next capture reads only what changed', async () => {
   const dir = tempDir('cli-effects-');
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { snapshotVars: 'src/figma-vars.snapshot.json' } }));
-  const cli = (...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const cli = (...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   const cap = join(dir, '.design-system-engine-out', 'figma-capture');
   const figma = fakeFigma();
   const all = async () => {

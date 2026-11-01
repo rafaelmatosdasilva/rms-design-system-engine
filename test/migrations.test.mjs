@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { retired, usesOf, migrationSteps, migrationPatches, migrationsMarkdown, migrationView, projectMigrations } from '../migrations.mjs';
+import { retired, usesOf, migrationSteps, migrationPatches, migrationsMarkdown, migrationView, projectMigrations } from '../lib/migrations.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 test('what is retired: a deprecated component, a deprecated token with its replacement, an old name a rename kept', () => {
@@ -101,7 +101,7 @@ test('the audit writes the steps beside its other hand-back files and says so in
     writeFileSync(join(dir, 'contract.authored.json'), JSON.stringify({ components: { button: { status: 'deprecated', supersededBy: 'chip' } } }));
     mkdirSync(join(dir, 'src', 'pages'), { recursive: true });
     writeFileSync(join(dir, 'src', 'pages', 'Home.jsx'), "import { Button } from '../components/Button';\nexport const Home = () => <Button Label=\"Save\" />;\n");
-    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+    const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
     assert.match(r.stdout, /🚚 1 retired component or token still used in \d+ places? \(button\): what replaces each and every place → \.design-system-engine-out\/handback\/migrations\.md/);
     const md = readFileSync(join(dir, '.design-system-engine-out/handback/migrations.md'), 'utf8');
     assert.match(md, /## The button component \(\.button\)\n\nUse chip \(\.chip\) instead\./);

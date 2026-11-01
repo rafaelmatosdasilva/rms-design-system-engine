@@ -7,14 +7,14 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { revealWords } from '../a11y-check.mjs';
-import { findChrome } from '../cdp.mjs';
+import { revealWords } from '../lib/a11y-check.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
 const HAS_CHROME = !!CHROME && typeof WebSocket !== 'undefined';
 const run = (dir, component) => {
-  try { return execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--component', component, '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
+  try { return execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--component', component, '--url', pathToFileURL(join(dir, 'page.html')).href, '--json'], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME } }); }
   catch (e) { return e.stdout ?? ''; }
 };
 const result = (out) => JSON.parse(out.slice(out.indexOf('{\n')));

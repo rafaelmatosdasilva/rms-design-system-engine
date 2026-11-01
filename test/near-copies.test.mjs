@@ -6,10 +6,10 @@ import { join, dirname, basename } from 'node:path';
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { classRules, nearCopies, systemRules, productCopies } from '../system-advice.mjs';
-import { editCheck } from '../edit-check.mjs';
+import { classRules, nearCopies, systemRules, productCopies } from '../lib/system-advice.mjs';
+import { editCheck } from '../lib/edit-check.mjs';
 import { makeFixture, fixtureProject, budget } from './helpers.mjs';
-import { readPage } from '../styleguide-files.mjs';
+import { readPage } from '../lib/styleguide-files.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const system = '.button { display: inline-flex; padding: 4px 12px; border-radius: 6px; background: var(--button-background); color: var(--button-text); font: inherit; }\n.chip { display: inline-flex; }\n';
@@ -77,14 +77,14 @@ test('the audit says it under System health, and the style guide puts it in the 
     mkdirSync(shop, { recursive: true });
     writeFileSync(join(shop, 'shop.css'), `/* the shop's own */\n.shopButton {\n  ${copy};\n}\n`);
     writeFileSync(join(shop, 'index.html'), '<link rel="stylesheet" href="shop.css">\n<button class="shopButton">Buy</button>\n');
-    const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+    const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--styleguide', '--no-a11y-bake'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
     const html = readPage(join(dir, '.design-system-engine-out/styleguide/index.html'));
     const data = JSON.parse(html.match(/id="sg-data">([\s\S]*?)<\/script>/)[1]);
     const button = (data.allComponents ?? data.components).find((c) => c.name === 'button');
     assert.deepEqual(button?.copies?.map((x) => [x.product, x.file, x.line, x.cls]), [[basename(shop), 'shop.css', 2, 'shopButton']], r.stdout.slice(-2000));
     assert.ok(button.copies[0].same >= decls.length - 1);
     // On the button's own page, in its Products area: a row, a decision for the person.
-    const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../cdp.mjs');
+    const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
     const chromePath = findChrome({ playwright: true });
     if (!chromePath || typeof WebSocket === 'undefined') { t.skip('no Chrome'); return; }
     const c = await launchChrome(chromePath);
@@ -98,7 +98,7 @@ test('the audit says it under System health, and the style guide puts it in the 
       assert.match(row, /^\d+[\w-]+-shop\.shopButton shop\.css:2You decideLocal, waits on no one[\w-]+-shop's \.shopButton is nearly button \(\d+ of \d+ declarations alike; it differs in background[^)]*\)\.Decide: use button in [\w-]+-shop, with a new option if it needs one, or add \.shopButton to the system on purpose\. Your team decides which\./);
       close();
     } finally { c.kill(); }
-    const audit = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+    const audit = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs')], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
     assert.match(audit.stdout, /1 class in the products nearly copies a system component\. For each, decide: use the component \(with a new option if it needs one\), or add the new one to the system on purpose:\n\s+· \.\.\/[\w-]+-shop\/shop\.css:2 {2}\.shopButton is nearly button \(\d+ of \d+ declarations alike; differs in background/);
   } finally { rmSync(dir, { recursive: true, force: true }); rmSync(shop, { recursive: true, force: true }); }
 });

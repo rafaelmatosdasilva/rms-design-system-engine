@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findChrome } from '../../cdp.mjs';
+import { findChrome } from '../../lib/cdp.mjs';
 
 export const ENGINE = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 export const DEMO = join(ENGINE, 'test', 'fixtures', 'demo-ds');
@@ -92,7 +92,7 @@ export function makeProject(source, setup, { engine = true, skillFiles = [] } = 
   if (!engine) for (const p of ['ds-config.json', 'src/figma', ...skillFiles]) rmSync(join(dir, p), { recursive: true, force: true });
   const env = { ...process.env, ...GIT_ENV };
   execFileSync('git', ['init', '-q'], { cwd: dir, env });
-  if (engine && existsSync(join(dir, 'ds-config.json'))) execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--install-hooks'], { cwd: dir, stdio: 'ignore' });
+  if (engine && existsSync(join(dir, 'ds-config.json'))) execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--install-hooks'], { cwd: dir, stdio: 'ignore' });
   execFileSync('git', ['add', '-A'], { cwd: dir, env });
   execFileSync('git', ['commit', '-qm', 'init'], { cwd: dir, env });
   // The files the project ignores, as they were before the run: one the run leaves as it was is not its change.

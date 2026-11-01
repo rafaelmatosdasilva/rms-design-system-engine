@@ -4,7 +4,7 @@
 // including the `case: "kebab"` knob that resolves the selectedHover ⇄ selected-hover mismatch.
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { tokenToVar, varToToken, resolveNamingSpec, DEFAULT_NAMING } from '../naming-convention.mjs';
+import { tokenToVar, varToToken, resolveNamingSpec, DEFAULT_NAMING } from '../lib/naming-convention.mjs';
 
 // ── Default (zero-config) reproduces the old inline convention exactly ─────────────
 test('[naming] default: slash→hyphen, drops trailing /color and /default', () => {

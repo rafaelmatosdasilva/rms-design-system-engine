@@ -5,9 +5,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { productFiles, usageMap, usageLines, usesIn } from '../usage-map.mjs';
-import { answerLines } from '../query.mjs';
-import { differencesMarkdown } from '../run-diff.mjs';
+import { productFiles, usageMap, usageLines, usesIn } from '../lib/usage-map.mjs';
+import { answerLines } from '../lib/query.mjs';
+import { differencesMarkdown } from '../lib/run-diff.mjs';
 import { tempDir } from './helpers.mjs';
 
 const project = (files) => {

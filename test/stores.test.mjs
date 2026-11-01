@@ -5,9 +5,9 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf, gitStorePush } from '../stores.mjs';
+import { placeOf, storesOf, writeAccess, forgetAccess, pullStore, pushStore, localFiles, accessLines, gitStoreFiles, gitPlaceOf, gitStorePush } from '../lib/stores.mjs';
 import { execFileSync } from 'node:child_process';
-import { mayWrite } from '../intent-changes.mjs';
+import { mayWrite } from '../lib/intent-changes.mjs';
 import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';
@@ -248,7 +248,7 @@ test('the differences kept on purpose are a part of their own, kept with the dec
 });
 
 test('publishing the style guide sends the page and what it links to, never the rest of its folder', async () => {
-  const { pageFiles } = await import('../stores.mjs');
+  const { pageFiles } = await import('../lib/stores.mjs');
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const d = tempDir('sg-pub-');
@@ -262,7 +262,7 @@ test('publishing the style guide sends the page and what it links to, never the 
 });
 
 test('the team\'s themes: read into the engine\'s own folder, never the project\'s; only theme files go either way', async () => {
-  const { THEMES_DIR } = await import('../stores.mjs');
+  const { THEMES_DIR } = await import('../lib/stores.mjs');
   const ROOT = project(), shared = project();
   mkdirSync(join(shared, 'themes', 'acme'), { recursive: true });
   writeFileSync(join(shared, 'themes', 'ocean.theme.json'), '{"id":"t1","name":"Ocean"}');
@@ -279,7 +279,7 @@ test('the team\'s themes: read into the engine\'s own folder, never the project\
 });
 
 test('a style guide build shares the themes the store lacks, or holds older; a colleague\'s newer one is kept', async () => {
-  const { themesToShare, THEMES_DIR } = await import('../stores.mjs');
+  const { themesToShare, THEMES_DIR } = await import('../lib/stores.mjs');
   const ROOT = project(), mine = project();
   mkdirSync(join(ROOT, THEMES_DIR), { recursive: true });
   writeFileSync(join(ROOT, THEMES_DIR, 'ocean.theme.json'), '{"id":"t1","name":"Ocean","changed":"2026-02-01"}');
@@ -396,8 +396,8 @@ test('a store on GitHub is read and written with git, the same way as one on Git
 });
 
 test('publishing the style guide again removes the files an earlier page linked, never one a page there still links', async () => {
-  const { pageFiles } = await import('../stores.mjs');
-  const { writeStyleguide } = await import('../styleguide-files.mjs');
+  const { pageFiles } = await import('../lib/stores.mjs');
+  const { writeStyleguide } = await import('../lib/styleguide-files.mjs');
   const page = (n) => `<!--sg-file:styleguide-->\n<style>.a{}</style>\n<script type="application/json" id="sg-data">{"n":${n}}</script>`;
   const d = project();
   writeStyleguide(join(d, 'index.html'), page(1));

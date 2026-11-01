@@ -2,9 +2,9 @@
 // never from how bad the finding sounds, and where the engine cannot tell it says a person decides.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ROUTES, ROUTE, routeFor, routePlan, routeCounts, routeLines } from '../issue-routes.mjs';
-import { issuesFor } from '../issues.mjs';
-import { keptKey } from '../kept.mjs';
+import { ROUTES, ROUTE, routeFor, routePlan, routeCounts, routeLines } from '../lib/issue-routes.mjs';
+import { issuesFor } from '../lib/issues.mjs';
+import { keptKey } from '../lib/kept.mjs';
 
 test('the route comes from the check, not from the words of the finding', () => {
   assert.deepEqual(ROUTES, ['intent', 'code', 'figma', 'person']);

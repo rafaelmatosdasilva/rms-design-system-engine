@@ -7,10 +7,10 @@ import { writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { prototypePage, fontLoader, fontLines, shippedFamilies, designFamilies } from '../prototype.mjs';
-import { fontStack, systemFamily, systemScales } from '../prototype-pieces.mjs';
-import { FONTS_IN } from '../prototype-render.mjs';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../cdp.mjs';
+import { prototypePage, fontLoader, fontLines, shippedFamilies, designFamilies } from '../lib/prototype.mjs';
+import { fontStack, systemFamily, systemScales } from '../lib/prototype-pieces.mjs';
+import { FONTS_IN } from '../lib/prototype-render.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } from '../lib/cdp.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const CHROME = findChrome({ playwright: true });

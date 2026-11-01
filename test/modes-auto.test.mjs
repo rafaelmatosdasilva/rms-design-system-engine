@@ -15,7 +15,7 @@ function project(theme) {
   writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ paths: { themeCSS: 'theme.css', snapshotVars: 'vars.json' }, figma: { colorCollection: 'Styling' } }));
   writeFileSync(join(dir, 'vars.json'), JSON.stringify({ color: { light: {}, dark: {} }, modeVariants: { Sizing: { modes: [{ name: 'Desktop', snapshotKey: 'desktop' }, { name: 'Phone', snapshotKey: 'phone' }], vars: { 'padding/s': { kind: 'scalar', values: { desktop: '8px', phone: '10px' } } } } } }));
   writeFileSync(join(dir, 'theme.css'), theme);
-  return spawnSync(process.execPath, [join(ENGINE, 'mode-completeness-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  return spawnSync(process.execPath, [join(ENGINE, 'lib', 'mode-completeness-check.mjs')], { cwd: dir, encoding: 'utf8' });
 }
 
 test('a mode the code has no CSS for fails, naming the value it owes', () => {
@@ -39,13 +39,13 @@ test('a component\'s height is read from the base values, not from a breakpoint\
   writeFileSync(join(dir, 'structure.json'), JSON.stringify({ _updated: new Date().toISOString(), components: { chip: facts } }));
   writeFileSync(join(dir, 'structure-contract.mjs'), `export const CONTRACT = { chip: ${JSON.stringify(facts)} };\nexport const CSS_HEIGHT_RULES = { chip: { selector: '.chip', prop: 'height' } };\n`);
   writeFileSync(join(dir, 'theme.css'), ':root {\n  /* sizes; the phone ones are in @media below */\n  --gap: 4px;\n  --h: 24px;\n}\n.chip { height: var(--h); }\n@media (max-width: 480px) {\n  :root {\n    --h: 32px;\n  }\n}\n');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'structure-check.mjs')], { cwd: dir, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'structure-check.mjs')], { cwd: dir, encoding: 'utf8' });
   assert.match(r.stdout, /PASS {2}1\/1 CSS height rules/, r.stdout);
   assert.doesNotMatch(r.stdout, /CSS height is 32px/);
 });
 
 test('a font recorded as a bound typography variable reads as its text scale, like one recorded from a text style', async () => {
-  const { textScaleKey, withTextScaleKeys } = await import('../naming-convention.mjs');
+  const { textScaleKey, withTextScaleKeys } = await import('../lib/naming-convention.mjs');
   assert.deepEqual(['typography/m/font-size', 'font-size/l', 'type/body/weight', 'm', null].map(textScaleKey), ['m', 'l', 'body', 'm', null]);
   assert.equal(textScaleKey('radii/card'), 'radii/card', 'a name that is not a text property is left as it is');
   assert.deepEqual(withTextScaleKeys({ chip: { h: 24, fontSizeVar: 'typography/s/font-size', fontWeightVar: 's' } }).chip, { h: 24, fontSizeVar: 's', fontWeightVar: 's' });

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { recordWrong, readWrong, dropWrong, byCheck, wrongLines, wrongPath } from '../wrong.mjs';
+import { recordWrong, readWrong, dropWrong, byCheck, wrongLines, wrongPath } from '../lib/wrong.mjs';
 import { tempDir } from './helpers.mjs';
 
 const dir = () => tempDir('wrong-');
@@ -59,7 +59,7 @@ test('a mark is taken back when the check is fixed', () => {
 });
 
 test('each finding marked wrong is a case its check must pass: still raised, or passed now, only for the checks that ran', async () => {
-  const { wrongCases, caseLines } = await import('../wrong.mjs');
+  const { wrongCases, caseLines } = await import('../lib/wrong.mjs');
   const d = dir();
   recordWrong(d, [f('Token values', 'chip radius differs', 'chip'), f('Markup', 'tile has no id', 'tile'), f('Icons', 'star path differs')], { why: 'it reads the hover rule' });
   const cases = wrongCases(d, [{ check: 'Token values', what: 'chip radius differs' }], ['Token values', 'Markup']);
@@ -79,7 +79,7 @@ test('--wrong marks the last audit\'s findings that match, only with why; --unwr
   writeFileSync(join(d, 'ds-config.json'), '{}');
   mkdirSync(join(d, '.design-system-engine-out'), { recursive: true });
   writeFileSync(join(d, '.design-system-engine-out', 'findings.json'), JSON.stringify({ findings: [{ check: 'Token values', evidence: 'chip radius differs', component: 'chip' }, { check: 'Markup', evidence: 'tile has no id', component: 'tile' }] }));
-  const run = (...a) => spawnSync(process.execPath, [join(process.cwd(), 'audit.mjs'), ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+  const run = (...a) => spawnSync(process.execPath, [join(process.cwd(), 'lib', 'audit.mjs'), ...a], { cwd: d, encoding: 'utf8', env: { ...process.env, DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
   assert.match(run('--wrong', '--match', 'radius').stdout, /needs why/);
   const ok = run('--wrong', '--match', 'radius', '--why', 'it reads the hover rule', '--by', 'QA');
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);

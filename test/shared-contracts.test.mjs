@@ -3,7 +3,7 @@
 // it still says what the code and Figma say.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { contractSummaries, sharedContractFor, contractDrift } from '../shared-contracts.mjs';
+import { contractSummaries, sharedContractFor, contractDrift } from '../lib/shared-contracts.mjs';
 
 const published = {
   schemaVersion: 1, id: 'tileOne', name: 'tileOne', version: '1.0.0', anatomy: { root: {} },

@@ -8,9 +8,9 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeFixture, tempDir } from './helpers.mjs';
-import { sourcesOf, sourcesNow, changes } from '../ci-changed.mjs';
-import { githubJob, gitlabJob, layerJob, writePublishJob, remoteOf, LAYER_EVENT } from '../publish-job.mjs';
-import { syncIntentLayer, describeSync, readIntentLayer } from '../intent-layer.mjs';
+import { sourcesOf, sourcesNow, changes } from '../lib/ci-changed.mjs';
+import { githubJob, gitlabJob, layerJob, writePublishJob, remoteOf, LAYER_EVENT } from '../lib/publish-job.mjs';
+import { syncIntentLayer, describeSync, readIntentLayer } from '../lib/intent-layer.mjs';
 
 const LAYER = 'https://github.com/acme/guidelines';
 const PAGES = {
@@ -131,7 +131,7 @@ test('a build names the layer pages changed since the last read', async () => {
 });
 
 test('a team published to a store: the store\'s own job builds from the profile, hourly and when the layer\'s job starts it, never on its own pushes', async () => {
-  const { storeJob, storeTarget, writeStoreJobs } = await import('../publish-job.mjs');
+  const { storeJob, storeTarget, writeStoreJobs } = await import('../lib/publish-job.mjs');
   assert.deepEqual(storeTarget({ gitlab: 'https://gitlab.acme.io/design/guide/-/tree/pages', path: 'site' }), { host: 'gitlab', origin: 'https://gitlab.acme.io', path: 'design/guide', branch: 'pages' });
   assert.deepEqual(storeTarget({ gitlab: 'https://gitlab.acme.io/design/guide', branch: 'trunk' }).branch, 'trunk');
   assert.equal(storeTarget({ folder: 'site' }), null);

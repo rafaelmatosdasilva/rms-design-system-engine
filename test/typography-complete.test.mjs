@@ -8,9 +8,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { varsFromItems, standInFigma, varsScript, runRecipe, varsItems } from '../figma-capture.mjs';
-import { typographyPairs, typoTargets, familyGroups, bodyFontFamily } from '../text-styles.mjs';
-import { agreedTokens, typographyTodos } from '../styleguide-data.mjs';
+import { varsFromItems, standInFigma, varsScript, runRecipe, varsItems } from '../lib/figma-capture.mjs';
+import { typographyPairs, typoTargets, familyGroups, bodyFontFamily } from '../lib/text-styles.mjs';
+import { agreedTokens, typographyTodos } from '../lib/styleguide-data.mjs';
 import { runGate } from './helpers.mjs';
 
 const alias = (id) => ({ type: 'VARIABLE_ALIAS', id });

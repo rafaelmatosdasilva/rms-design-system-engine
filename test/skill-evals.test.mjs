@@ -234,7 +234,7 @@ export function guideMeasured(results, now, files) {
   return { ok: !!seen.size && !unmeasured.length, sets, unmeasured };
 }
 test('RESULTS.md records the guide set that is in the repository', async () => {
-  const { guideSetHash, guideFileHashes } = await import('../skill-files.mjs');
+  const { guideSetHash, guideFileHashes } = await import('../lib/skill-files.mjs');
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const results = readFileSync(join(root, 'test', 'skill-evals', 'RESULTS.md'), 'utf8');
   const now = guideSetHash(root);

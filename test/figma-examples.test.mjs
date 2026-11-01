@@ -2,9 +2,9 @@
 // (its words, its icons, a list's items) in the style guide's Playground.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { examplesSnapshot, bestExample, readExamplesWith } from '../figma-examples.mjs';
-import { harnessCases } from '../component-harness.mjs';
-import { listSamples } from '../vue-harness.mjs';
+import { examplesSnapshot, bestExample, readExamplesWith } from '../lib/figma-examples.mjs';
+import { harnessCases } from '../lib/component-harness.mjs';
+import { listSamples } from '../lib/vue-harness.mjs';
 
 const BAR = { page: 'navigation', frame: 'Horizontal Examples', props: { style: '1' }, texts: [], items: ['home-m:Home', 'arrows-m:Transfers', 'bell-m:Alerts'].map((x, i) => ({ component: 'navigation/LinkCompact', props: { mainIcon: x.split(':')[0], LabelContent: x.split(':')[1], showLabel: true, state: i === 0 ? 'selected' : 'default' }, texts: [x.split(':')[1]] })) };
 

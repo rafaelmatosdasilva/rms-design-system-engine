@@ -2,7 +2,7 @@
 // reporting spelling differences as design differences.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { colorHex, sameColor, sameHex, lengthPx, timeMs, sameValue, sameEasing } from '../css-values.mjs';
+import { colorHex, sameColor, sameHex, lengthPx, timeMs, sameValue, sameEasing } from '../lib/css-values.mjs';
 import { runGate, EMPTY_ENGINE_MAP } from './helpers.mjs';
 
 test('colours: every CSS spelling reads as the same hex', () => {

@@ -5,8 +5,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findIconFolder, folderSymbols, svgToSymbol, symbolId, iconFolder, codeConnectIcons } from '../icon-folder.mjs';
-import { captureIcons, structureInputFiles } from '../structure-capture.mjs';
+import { findIconFolder, folderSymbols, svgToSymbol, symbolId, iconFolder, codeConnectIcons } from '../lib/icon-folder.mjs';
+import { captureIcons, structureInputFiles } from '../lib/structure-capture.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = fileURLToPath(new URL('..', import.meta.url));
@@ -56,7 +56,7 @@ const linkedProject = () => {
   files['src/figma/icons/icons.figma.batch.json'] = JSON.stringify({ templateFile: './icons.figma.batch.js', components: [...['alert', 'close', 'check', 'plus', 'minus'].map((n) => link(`m/${n}-m`)), link('m/search-m'), { url: 'x', component: 'Button' }] });
   return project(files);
 };
-const run = (root, script) => spawnSync(process.execPath, [join(ENGINE, script)], { cwd: root, encoding: 'utf8' });
+const run = (root, script) => spawnSync(process.execPath, [join(ENGINE, 'lib', script)], { cwd: root, encoding: 'utf8' });
 
 test('Figma\'s icons are read from Code Connect\'s batch files, each meeting its file on its path', () => {
   const root = linkedProject();

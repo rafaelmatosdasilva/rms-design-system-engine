@@ -8,9 +8,9 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
-import { A11Y_GUIDE, A11Y_BLOCKER, A11Y_ADVISORY, severityOf, a11yVerdict, a11yFindingRecord } from '../a11y-check.mjs';
-import { WCAG21 } from '../wcag21.mjs';
-import { findChrome } from '../cdp.mjs';
+import { A11Y_GUIDE, A11Y_BLOCKER, A11Y_ADVISORY, severityOf, a11yVerdict, a11yFindingRecord } from '../lib/a11y-check.mjs';
+import { WCAG21 } from '../lib/wcag21.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
@@ -47,7 +47,7 @@ const PAGE = `<!doctype html><html lang="en"><head><title>T</title><style>
   BODY
 </main></body></html>`;
 const run = (dir, args, env = {}) => {
-  try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1', ...env } }) }; }
+  try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--url', pathToFileURL(join(dir, 'page.html')).href, ...args], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, CHROME_PATH: CHROME, NO_COLOR: '1', ...env } }) }; }
   catch (e) { return { code: e.status, out: (e.stdout ?? '') + (e.stderr ?? '') }; }
 };
 

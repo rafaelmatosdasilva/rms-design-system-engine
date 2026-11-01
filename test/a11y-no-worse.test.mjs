@@ -6,7 +6,7 @@ import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { blockers, recordOf, compare, noWorse, elementOf, variantOf } from '../a11y-no-worse.mjs';
+import { blockers, recordOf, compare, noWorse, elementOf, variantOf } from '../lib/a11y-no-worse.mjs';
 import { tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -77,7 +77,7 @@ test('--a11y-no-worse --record keeps the build\'s blockers; --a11y-no-worse then
   const root = tempDir('acme-a11y-no-worse-');
   const out = join(root, '.design-system-engine-out');
   mkdirSync(out, { recursive: true });
-  const run = (...args) => { try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI_COMMIT_BRANCH: 'main' } }) }; } catch (e) { return { code: e.status, out: `${e.stdout}${e.stderr}` }; } };
+  const run = (...args) => { try { return { code: 0, out: execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI_COMMIT_BRANCH: 'main' } }) }; } catch (e) { return { code: e.status, out: `${e.stdout}${e.stderr}` }; } };
   assert.equal(run('--a11y-no-worse', '--record').code, 2, 'nothing to keep before an audit');
   writeFileSync(join(out, 'a11y.json'), JSON.stringify(base));
   const first = run('--a11y-no-worse');

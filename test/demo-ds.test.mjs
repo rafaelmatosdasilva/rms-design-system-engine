@@ -18,7 +18,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findChrome } from '../cdp.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 import { fixtureProject, bareEnv, auditFixture, normalise, golden as goldenOf, budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -53,7 +53,7 @@ test('demo design system, with Chrome: every deliberate difference is found, and
 });
 
 test('in progress: an experimental component on one side is listed, never failed; on both sides it is compared', async () => {
-  const { inProgressList, inProgressNames } = await import('../in-progress.mjs');
+  const { inProgressList, inProgressNames } = await import('../lib/in-progress.mjs');
   const { makeFixture } = await import('./helpers.mjs');
   const files = (css) => ({
     'ds-config.json': { paths: { themeCSS: 'theme.css', compPropsSnapshot: 'props.json', snapshotStructure: 'struct.json' }, knownUnimplementedComponents: ['sheet'] },
@@ -74,7 +74,7 @@ test('in progress: an experimental component on one side is listed, never failed
 });
 
 test('visual diff: a Figma image from a reference, else the REST API (a component set gives its default variant), cached', async () => {
-  const { figmaImage } = await import('../visual-diff.mjs');
+  const { figmaImage } = await import('../lib/visual-diff.mjs');
   const { makeFixture } = await import('./helpers.mjs');
   const dir = makeFixture({ '.design-system-engine-refs/components/chip.png': 'png' });
   const cfg = { figmaFileKey: 'KEY' };
@@ -97,7 +97,7 @@ test('visual diff: a Figma image from a reference, else the REST API (a componen
 });
 
 test('Figma prop types: one interface per component, states left out, names as the code uses them', async () => {
-  const { propTypesDts, codePropName } = await import('../figma-props.mjs');
+  const { propTypesDts, codePropName } = await import('../lib/figma-props.mjs');
   const props = {
     _updated: 'x',
     chip: { nodeId: '1:1', properties: { 'Size': { type: 'VARIANT', defaultValue: 'M', variantOptions: ['M', 'L'] }, 'Icon': { type: 'VARIANT', defaultValue: 'False', variantOptions: ['False', 'True'] },
@@ -118,7 +118,7 @@ test('Figma prop types: one interface per component, states left out, names as t
 
 const TSC = spawnSync('which', ['tsc'], { encoding: 'utf8' }).stdout.trim();
 test('Figma prop types: tsc accepts matching props and rejects drifted ones', { skip: TSC ? false : 'no tsc' }, async () => {
-  const { propTypesDts } = await import('../figma-props.mjs');
+  const { propTypesDts } = await import('../lib/figma-props.mjs');
   const dir = tempDir('figma-props-');
   writeFileSync(join(dir, 'figma-props.d.ts'), propTypesDts(JSON.parse(readFileSync(join(FIXTURE, 'src', 'figma-component-props.snapshot.json'), 'utf8')), { cfg: JSON.parse(readFileSync(join(FIXTURE, 'ds-config.json'), 'utf8')) }));
   const file = (name, sizes) => { writeFileSync(join(dir, name), `import type { ChipFigmaProps } from './figma-props';\ntype ChipProps = { label?: string; size?: ${sizes}; icon?: boolean };\nconst p: ChipProps = {};\nexport const check: ChipFigmaProps = p;\n`); return name; };
@@ -133,7 +133,7 @@ test('--init on the demo writes the modes its theme CSS really uses (a data attr
   const dir = project();
   const want = JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).figma.modes;
   execFileSync('git', ['rm', '-q', 'ds-config.json'], { cwd: dir });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', "--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool", '--theme-css=src/theme.css', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', "--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/Tidepool", '--theme-css=src/theme.css', '--no-hooks'], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Mode Dark: :root\[data-theme="dark"\] in src\/theme\.css/);
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).figma.modes, want);

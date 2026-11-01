@@ -9,7 +9,7 @@ import { context, decisionPoints } from './lib.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
 import { HELDOUT } from './heldout.mjs';
-import { envVar } from '../../names.mjs';
+import { envVar } from '../../lib/names.mjs';
 
 let privateTasks = [];
 const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');

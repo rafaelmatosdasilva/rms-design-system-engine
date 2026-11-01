@@ -1,7 +1,7 @@
 // one next step and one plain summary per run, so an agent relays the engine's words.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextStep, buildSummary, failLines, measuredLines, dataStateLine, notCheckedLines } from '../next-step.mjs';
+import { nextStep, buildSummary, failLines, measuredLines, dataStateLine, notCheckedLines } from '../lib/next-step.mjs';
 
 const gate = (label, pass, lines = [], extra = {}) => ({ label, pass, lines, ...extra });
 const tokens = gate('Token values  (color · sizing)', false, ['✅ PASS  25', '❌ FAIL  1', '❌ [sizing/-] radii/chip → --radii-chip', 'Fix:  src/theme.css:17 - change --radii-chip: 12px → 16px']);
@@ -76,7 +76,7 @@ test('the summary lists what a gate could not check, even inside a gate that pas
 });
 
 test('the verification headline, each component passing, drifting or not checked', async () => {
-  const { verification, verificationLine } = await import('../run-diff.mjs');
+  const { verification, verificationLine } = await import('../lib/run-diff.mjs');
   const d = { groups: [
     { component: 'chip', items: [{ side: 'decide' }] },
     { component: 'card', items: [{ side: 'figma' }] },   // work in the Figma file alone is not drift

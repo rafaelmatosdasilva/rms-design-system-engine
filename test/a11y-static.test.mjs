@@ -1,7 +1,7 @@
 // accessibility checks that need no browser. What they find, and the look-alikes they leave alone.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { markupFindings, cssFindings, styleOnly, staticA11y, focusIndex, classTags } from '../a11y-static.mjs';
+import { markupFindings, cssFindings, styleOnly, staticA11y, focusIndex, classTags } from '../lib/a11y-static.mjs';
 import { makeFixture, budget } from './helpers.mjs';
 
 const kinds = (xs) => xs.map((x) => [x.line, x.kind]);
@@ -132,7 +132,7 @@ test('a name written after a spread replaces the one the caller passes; before i
 });
 
 test('a long stretch with no brace (a blanked inline image) is read in one pass, and the project\'s styles once', async () => {
-  const { focusIndex } = await import('../a11y-static.mjs');
+  const { focusIndex } = await import('../lib/a11y-static.mjs');
   const blank = `${' '.repeat(300000)}\n.btn { outline: none; }`;
   const t = Date.now();
   assert.deepEqual(kinds(cssFindings(blank)), [[2, 'focus']]);
@@ -157,7 +157,7 @@ test('a scoped run lists only the findings about the component: its own file, or
     // A page that uses it, and hand-styles one: only the hand-built one is about the component.
     'src/pages/Login.vue': '<template>\n  <main>\n    <div @click="go">Go</div>\n    <button\n      class="button-primary"><svg/></button>\n  </main>\n</template>\n',
   });
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--component', 'ButtonPrimary', '--only', 'accessibility'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: budget(100000) });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--component', 'ButtonPrimary', '--only', 'accessibility'], { cwd: dir, encoding: 'utf8', env: { ...process.env, CI: '1', NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' }, timeout: budget(100000) });
   const out = r.stdout + r.stderr;
   assert.match(out, /src\/buttons\/Primary\.vue:3 {2}an image with no alt/, out.slice(-2500));
   assert.match(out, /src\/pages\/Login\.vue:4 {2}a button with only an icon inside/, 'a hand-built one carries the class: it is about the component');

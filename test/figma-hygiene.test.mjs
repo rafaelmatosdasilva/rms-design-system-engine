@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine } from '../figma-hygiene.mjs';
-import { byNodeId } from '../figma-fetch.mjs';
-import { burndown } from '../run-diff.mjs';
+import { hygieneOf, hygieneFindings, hygieneBlock, hygieneScore, reliability, reliabilityLine } from '../lib/figma-hygiene.mjs';
+import { byNodeId } from '../lib/figma-fetch.mjs';
+import { burndown } from '../lib/run-diff.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const solid = (r, g, b, extra = {}) => ({ type: 'SOLID', color: { r, g, b }, ...extra });

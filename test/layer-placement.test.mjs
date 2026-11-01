@@ -1,7 +1,7 @@
 // A token belongs in the first layer where its value can change (layer-placement.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { layerPlacement, layerPlacementLines } from '../layer-placement.mjs';
+import { layerPlacement, layerPlacementLines } from '../lib/layer-placement.mjs';
 
 const snap = {
   _collections: { color: 'Theme', colorModes: ['Light', 'Dark'] },

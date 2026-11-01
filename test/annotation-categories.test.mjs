@@ -6,9 +6,9 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { noteKey, captureScript, mergeCaptures, noteKind, isRequirement, requirementEntry, noteIsTodo, loadCategories, categoriesPath } from '../annotation-categories.mjs';
+import { noteKey, captureScript, mergeCaptures, noteKind, isRequirement, requirementEntry, noteIsTodo, loadCategories, categoriesPath } from '../lib/annotation-categories.mjs';
 import { makeFixture, budget, tempDir } from './helpers.mjs';
-import { OUT_DIR } from '../names.mjs';
+import { OUT_DIR } from '../lib/names.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -71,7 +71,7 @@ test('the categories snapshot sits beside the component-props one, and a missing
 test('--annotation-categories: no file writes the read-only script; the files it returned become the snapshot', () => {
   const dir = makeFixture({ 'ds-config.json': { figmaFileKey: 'KEY123', paths: { compPropsSnapshot: 'props.json' } },
     'props.json': { chip: { nodeId: '1:2', annotations: [{ label: 'Role: button' }, { label: 'Why it exists' }] } } });
-  const run = (...args) => execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--annotation-categories', ...args], { cwd: dir, encoding: 'utf8', timeout: budget(60000) });
+  const run = (...args) => execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--annotation-categories', ...args], { cwd: dir, encoding: 'utf8', timeout: budget(60000) });
   let out = run();
   assert.match(out, /figma-capture\/annotation-categories\.js/, out);
   assert.match(out, /on the file KEY123/, out);
@@ -87,8 +87,8 @@ test('--annotation-categories: no file writes the read-only script; the files it
 });
 
 test('the words of notes outside components are kept by page, a page read again replaces its own, and llms.txt says them; authoring notes are left out', async () => {
-  const { mergeCaptures, fileGuidance, captureScript } = await import('../annotation-categories.mjs');
-  const { buildLlms } = await import('../contract-gen.mjs');
+  const { mergeCaptures, fileGuidance, captureScript } = await import('../lib/annotation-categories.mjs');
+  const { buildLlms } = await import('../lib/contract-gen.mjs');
   // The real script, on a fake file: a note on a brand page's frame is kept, one inside a component is not.
   const comp = { type: 'COMPONENT', name: 'tile', parent: null };
   const inside = { type: 'TEXT', name: 'label', parent: comp, annotations: [{ label: 'Keep it short', categoryId: 'c1' }] };

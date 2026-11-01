@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeFixture } from './helpers.mjs';
-import { generateIntent } from '../intent-gen.mjs';
+import { generateIntent } from '../lib/intent-gen.mjs';
 
 const baseFiles = {
   'theme.css': ':root{}\n',

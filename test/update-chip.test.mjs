@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findChrome } from '../cdp.mjs';
+import { findChrome } from '../lib/cdp.mjs';
 import { BUILD, TIDEPOOL } from './skill-evals/build-tasks.mjs';
 import { hasTypescript } from './skill-evals/build-score.mjs';
 import { budget, tempDir } from './helpers.mjs';

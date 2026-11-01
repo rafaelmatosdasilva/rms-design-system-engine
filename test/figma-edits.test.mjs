@@ -2,9 +2,9 @@
 // listed as an edit, and applied by a script that changes only what was listed, once.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { codeRole, componentRole, figmaEdits, applyScript, editLines, writeFigmaEdits } from '../figma-edits.mjs';
-import { figmaWriteVerdict } from '../guard.mjs';
-import { route } from '../route.mjs';
+import { codeRole, componentRole, figmaEdits, applyScript, editLines, writeFigmaEdits } from '../lib/figma-edits.mjs';
+import { figmaWriteVerdict } from '../lib/guard.mjs';
+import { route } from '../lib/route.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { budget, tempDir } from './helpers.mjs';
@@ -85,7 +85,7 @@ test('router: bringing Figma in line with the code goes to the engine\'s edits; 
 });
 
 test('the prototypes\' gaps become the design team\'s to do list in Figma: its own page and frame, one card per need, written afresh', async () => {
-  const { gapEdits } = await import('../figma-edits.mjs');
+  const { gapEdits } = await import('../lib/figma-edits.mjs');
   assert.deepEqual(gapEdits([]), [], 'no gap, no list');
   const merged = [{ need: 'a toggle switch', kind: 'component', closest: null, used: 'chip', prototypes: ['notify', 'settings'] }, { need: 'a Page layout component', kind: 'layout', used: 'the engine\'s Page', prototypes: ['notify'] }];
   const edits = [...figmaEdits(SNAP, VIEW), ...gapEdits(merged)];
@@ -117,7 +117,7 @@ test('router: sending the prototypes\' gaps to Figma goes to the engine\'s edits
 });
 
 test('names written otherwise than the rest of the system are renamed in their component sets, options first, after a yes', async () => {
-  const { renameEdits, applyScript, editLines } = await import('../figma-edits.mjs');
+  const { renameEdits, applyScript, editLines } = await import('../lib/figma-edits.mjs');
   const snap = { buttonX: { nodeId: '1:1' } };
   const edits = renameEdits(snap, [{ component: 'buttonX', kind: 'option', prop: 'state', name: 'default', want: 'Default', why: 'w' }, { component: 'buttonX', kind: 'property', name: 'label-content', want: 'Label Content', why: 'w' }, { component: 'none', kind: 'property', name: 'x', want: 'X' }]);
   assert.deepEqual(edits.map((e) => [e.what, e.from, e.to]), [['option', 'default', 'Default'], ['property', 'label-content', 'Label Content']], 'a component Figma has no node for is left out');
@@ -131,8 +131,8 @@ test('names written otherwise than the rest of the system are renamed in their c
 });
 
 test('each annotation no check reads goes to Figma with the wording a check reads, beside the to do list; the annotation is not changed', async () => {
-  const { annotationEdits, annotationWording, gapEdits } = await import('../figma-edits.mjs');
-  const { annotationUses } = await import('../a11y-check.mjs');
+  const { annotationEdits, annotationWording, gapEdits } = await import('../lib/figma-edits.mjs');
+  const { annotationUses } = await import('../lib/a11y-check.mjs');
   assert.equal(annotationWording('This is a button'), 'Role: button');
   assert.equal(annotationWording('acts like a toggle'), 'Role: togglebutton');
   assert.equal(annotationWording('Pressing Esc'), 'Escape closes it');
@@ -167,9 +167,9 @@ test('each annotation no check reads goes to Figma with the wording a check read
 });
 
 test('with Figma\'s categories: a note in a design-intent category is never a to do, one in Accessibility always is; the capture only reads', async () => {
-  const { annotationEdits } = await import('../figma-edits.mjs');
-  const { annotationUses } = await import('../a11y-check.mjs');
-  const { noteKey, captureScript } = await import('../annotation-categories.mjs');
+  const { annotationEdits } = await import('../lib/figma-edits.mjs');
+  const { annotationUses } = await import('../lib/a11y-check.mjs');
+  const { noteKey, captureScript } = await import('../lib/annotation-categories.mjs');
   const texts = ['The remove button is enabled with two lines.', 'Announce the total when it changes.', 'Esc', 'Role: dialog'];
   const cats = { categories: { i: { label: 'Intent' }, a: { label: 'Accessibility' } }, notes: { '2:2': { [noteKey(texts[0])]: 'i', [noteKey(texts[1])]: 'a' } } };
   const snap = { dialog: { nodeId: '2:2', annotations: texts.map((label) => ({ label })) } };
@@ -214,7 +214,7 @@ test('--figma-edits lists each edit on the demo design system, and the engine ne
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true, filter: (p) => !/node_modules|\.design-system-engine-out|\.git(\/|$)/.test(p) });
   // Run as a person runs it: on CI (CI set) the engine never writes the design file, and says so instead of asking.
   const { CI: _ci, ...asPerson } = process.env;
-  const out = execFileSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--figma-edits'], { cwd: dir, encoding: 'utf8', timeout: 100000, env: asPerson });
+  const out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--figma-edits'], { cwd: dir, encoding: 'utf8', timeout: 100000, env: asPerson });
   assert.doesNotMatch(out, /❌|is not defined|Cannot read/, out.slice(0, 400));
   // What each edit is, named: the evaluation holds an agent to saying these, so the engine owes them.
   assert.match(out, /field: a textbox/);
@@ -246,7 +246,7 @@ test('a construction fix renames the component itself, or a layer in every varia
 });
 
 test('Dev Mode: each component linked to its code once, each variable its CSS name as Web code syntax, one written otherwise said', async () => {
-  const { devModeEdits, applyScript, editLines } = await import('../figma-edits.mjs');
+  const { devModeEdits, applyScript, editLines } = await import('../lib/figma-edits.mjs');
   const edits = devModeEdits([{ component: 'tileCard', nodeId: '1:2', file: 'src/TileCard.vue', url: 'https://git.example.com/kit/-/blob/main/src/TileCard.vue' }, { component: 'tileRow', nodeId: '9:9', file: 'src/TileRow.vue', url: 'https://git.example.com/kit/-/blob/main/src/TileRow.vue' }],
     [{ variable: 'kit/tile/color', css: '--kit-tile-color' }, { variable: 'kit/tile/text/color', css: '--kit-tile-text' }]);
   assert.deepEqual(edits.find((e) => e.kind === 'codesyntax').except, { 'kit/tile/text/color': '--kit-tile-text' }, 'only the names the plain rule does not give travel in the script');

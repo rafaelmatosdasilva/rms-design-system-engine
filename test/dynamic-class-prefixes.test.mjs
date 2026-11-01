@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractDynamicClassPrefixes } from '../dynamic-class-prefixes.mjs';
+import { extractDynamicClassPrefixes } from '../lib/dynamic-class-prefixes.mjs';
 
 test('extracts the trailing class prefix from a + splice and a ${} template', () => {
   const corpus = [
@@ -29,7 +29,7 @@ test('returns nothing for a fragment with no name-ish trailing prefix', () => {
 });
 
 test('a large corpus is scanned in linear time (a template prefix is found from its "${", not from every position)', async () => {
-  const { extractDynamicClassPrefixes } = await import('../dynamic-class-prefixes.mjs');
+  const { extractDynamicClassPrefixes } = await import('../lib/dynamic-class-prefixes.mjs');
   const big = 'x'.repeat(3_000_000) + ' `badge-${t}` `a}b-${c}` ' + 'y'.repeat(1_000_000);
   const t0 = Date.now();
   assert.deepEqual(extractDynamicClassPrefixes(big), ['badge-', 'b-']);

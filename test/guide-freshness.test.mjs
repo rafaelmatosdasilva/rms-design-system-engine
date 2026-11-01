@@ -3,8 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { freshness, builtFrom, BUILT_FROM } from '../guide-freshness.mjs';
-import { forgetAccess } from '../stores.mjs';
+import { freshness, builtFrom, BUILT_FROM } from '../lib/guide-freshness.mjs';
+import { forgetAccess } from '../lib/stores.mjs';
 import { tempDir } from './helpers.mjs';
 
 const HOST = 'gitlab.acme.test';

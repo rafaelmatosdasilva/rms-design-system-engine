@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, symlinkSync, exist
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ENGINE } from './lib.mjs';
-import { skillMd, guideAtRef } from '../../skill-files.mjs';
+import { skillMd, guideAtRef } from '../../lib/skill-files.mjs';
 
 const GUIDE = 'rms-design-system-engine.md';
 const git = (...a) => execFileSync('git', a, { cwd: ENGINE, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });

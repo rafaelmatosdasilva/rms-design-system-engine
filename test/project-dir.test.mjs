@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { hasCode, projectFor, POINTER } from '../project-dir.mjs';
+import { hasCode, projectFor, POINTER } from '../lib/project-dir.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -37,11 +37,11 @@ test('told where the project is, the engine works there and remembers it for the
   const project = tempDir('pd-proj-');
   execFileSync('git', ['init', '-q'], { cwd: project });
   mkdirSync(join(project, 'src'), { recursive: true }); writeFileSync(join(project, 'src', 'theme.css'), ':root { --a: #fff; }');
-  const r = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--no-hooks', `--project=${project}`], { cwd: from, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--init', '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X', '--no-hooks', `--project=${project}`], { cwd: from, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.ok(existsSync(join(project, 'ds-config.json')), 'set up in the project');
   assert.ok(!existsSync(join(from, 'ds-config.json')), 'not where it ran from');
   assert.equal(readFileSync(join(from, POINTER), 'utf8').trim(), project);
-  const again = spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), '--version'], { cwd: from, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const again = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--version'], { cwd: from, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(again.stderr, new RegExp(`Project: ${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
 });

@@ -6,12 +6,12 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { nextStep, buildSummary } from '../next-step.mjs';
+import { nextStep, buildSummary } from '../lib/next-step.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const FIGMA = '--figma-url=https://www.figma.com/design/AbCdEf123456XyZ/X';
-const engine = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
+const engine = (dir, ...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
 const init = (dir, ...args) => engine(dir, '--init', '--no-hooks', ...args);
 
 // A folder of other code: a plugin's page with its own styles, no stylesheet of design tokens.

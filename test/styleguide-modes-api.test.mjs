@@ -4,9 +4,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { attrModeCSS, colourAttrMode, modeAxes, modeScopes, codeControls, apiView } from '../styleguide-data.mjs';
-import { textComponentApi, extractTypes, extractDocumented } from '../component-source.mjs';
-import { codeCases, figmaPropFor } from '../component-harness.mjs';
+import { attrModeCSS, colourAttrMode, modeAxes, modeScopes, codeControls, apiView } from '../lib/styleguide-data.mjs';
+import { textComponentApi, extractTypes, extractDocumented } from '../lib/component-source.mjs';
+import { codeCases, figmaPropFor } from '../lib/component-harness.mjs';
 
 const cfg = { figma: { modes: [{ name: 'Light', cssSelector: 'root' }, { name: 'Dark', cssSelector: 'data:theme=dark' }] } };
 const THEME = ':root { --bg: #fff; --gap: 16px; }\n:root[data-theme="dark"] { --bg: #000; }\n:root[data-size="phone"] { --gap: 8px; }\n:root[data-theme="dark"][data-size="phone"] { --bg: #111; }';

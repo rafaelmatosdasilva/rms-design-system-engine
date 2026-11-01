@@ -13,8 +13,8 @@ import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
-import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../../cdp.mjs';
-import { usableTypeScript, TYPESCRIPT_HINT } from '../../project-typescript.mjs';
+import { findChrome, launchChrome, connectCDP, openPage, waitForTrue } from '../../lib/cdp.mjs';
+import { usableTypeScript, TYPESCRIPT_HINT } from '../../lib/project-typescript.mjs';
 
 // TypeScript, loaded when a build is first transpiled, so the scorer's other helpers (the prototype scorer imports
 // them) work on a machine that has none. The build's own first, then the global npm folder's; one that cannot read JSX

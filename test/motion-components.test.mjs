@@ -4,8 +4,8 @@
 // does not is for whoever keeps Figma; both with another duration or curve, Claude's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animationsOf, keyframesWhat, keyframesIn, codeMotions, figmaMotions, componentMotionFindings, componentMotionRows, componentTransitions, motionSpec, motionOverview } from '../motion-components.mjs';
-import { MOTION_CAPTURE_JS, motionCaptureScript, motionSnapshot } from '../motion-parity.mjs';
+import { animationsOf, keyframesWhat, keyframesIn, codeMotions, figmaMotions, componentMotionFindings, componentMotionRows, componentTransitions, motionSpec, motionOverview } from '../lib/motion-components.mjs';
+import { MOTION_CAPTURE_JS, motionCaptureScript, motionSnapshot } from '../lib/motion-parity.mjs';
 
 const CSS = [{ file: 'theme.css', text: `:root { --modal-duration: 280ms; --modal-easing: cubic-bezier(0.22, 1, 0.36, 1); --modal-offset: 8px; }
 /* The spinner; a comment with { braces } and ; never splits a rule */

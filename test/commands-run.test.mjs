@@ -51,7 +51,7 @@ const COMMANDS = [
 const runOne = (command) => new Promise((done) => {
   const dir = tempDir('cmd-run-');
   cpSync(DEMO, dir, { recursive: true });
-  execFile(process.execPath, [join(ENGINE, 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26, env: { ...process.env, DESIGN_SYSTEM_ENGINE_FIGMA_CLI: 'none' } },
+  execFile(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26, env: { ...process.env, DESIGN_SYSTEM_ENGINE_FIGMA_CLI: 'none' } },
     (err, stdout, stderr) => done({ command, out: `${stdout ?? ''}${stderr ?? ''}`, timedOut: err?.killed === true }));
 });
 

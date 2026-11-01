@@ -16,4 +16,4 @@ jobs:
         with:
           node-version: 24
       - name: Verify docs match audit.mjs
-        run: node sync-docs.mjs --check
+        run: node lib/sync-docs.mjs --check
