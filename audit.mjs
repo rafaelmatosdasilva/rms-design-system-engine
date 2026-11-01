@@ -990,6 +990,74 @@ if (process.argv.includes('--products')) {
   process.exit(0);
 }
 
+// ── --code-connect-draft [--form=classic|template]: a draft Code Connect file for each component without one ──
+// From what each contract pairs (code-connect-draft.mjs), in the form the project's own Code Connect files use (else
+// React's classic form, the template form for Vue, Svelte and web components). Written to OUT_DIR/code-connect-drafts
+// only, never beside the code: a person checks each TODO and moves the file. Rewritten whole each time.
+if (process.argv.includes('--code-connect-draft')) {
+  let dcfg = {};
+  try { dcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const form = _argValue('--form');
+  if (form && !['classic', 'template'].includes(form)) { console.log(`❌ --form=${form}: say classic (figma.connect) or template (figma.selectedInstance).`); process.exit(2); }
+  const { generateContracts } = await import('./contract-gen.mjs');
+  const { contractsIn } = await import('./contract-changes.mjs');
+  const { codeConnectMaps } = await import('./code-connect-map.mjs');
+  const dr = await import('./code-connect-draft.mjs');
+  const r = await generateContracts(ROOT, dcfg, {});
+  let include = null; try { include = JSON.parse(readFileSync(join(ROOT, 'figma.config.json'), 'utf8'))?.codeConnect?.include ?? null; } catch { /* none */ }
+  const maps = codeConnectMaps(ROOT, { include });
+  // The form the project's own files are in, by most of them.
+  const forms = maps.map((m) => { try { return dr.formOf(readFileSync(join(ROOT, m.file), 'utf8')); } catch { return null; } }).filter(Boolean);
+  const theirs = forms.length ? (forms.filter((f) => f === 'template').length * 2 >= forms.length ? 'template' : 'classic') : null;
+  const { drafts, skipped } = dr.draftsFor(contractsIn(r.outDir), maps, { form: form ?? theirs, figmaFile: dcfg.figmaFileKey || null });
+  const out = join(ROOT, OUT_DIR, 'code-connect-drafts');
+  (await import('node:fs')).rmSync(out, { recursive: true, force: true });
+  for (const d of drafts) { mkdirSync(dirname(join(out, d.file)), { recursive: true }); writeFileSync(join(out, d.file), d.text); }
+  const mapped = skipped.filter((s) => /maps it already/.test(s.why)).length;
+  if (!drafts.length) { console.log(`No draft to write: ${mapped ? `${mapped} component${mapped === 1 ? ' has' : 's have'} a Code Connect file already, and ` : ''}no other component is paired with both a Figma component and a code file.`); process.exit(0); }
+  console.log(`📝 ${drafts.length} Code Connect draft${drafts.length === 1 ? '' : 's'} → ${OUT_DIR}/code-connect-drafts (${drafts[0].form === 'classic' ? 'figma.connect' : 'template'} form${form ? '' : theirs ? ', as your Code Connect files' : ''})${mapped ? ` · ${mapped} already mapped` : ''}`);
+  for (const d of drafts) console.log(`   • ${d.name}: ${d.file}, ${d.pairs.length} pair${d.pairs.length === 1 ? '' : 's'}${d.todos.length ? `, ${d.todos.length} TODO${d.todos.length === 1 ? '' : 's'}` : ''}`);
+  console.log('NEXT: read each draft, settle its TODOs, then move it beside its component and publish it with your Code Connect tooling. The engine writes nothing into the code.');
+  process.exit(0);
+}
+
+// ── --contract-changes [--record] [--base <folder>]: what a merge request changes in the contracts (contract-changes.mjs) ──
+// For a merge request's pipeline: the contracts built from its code against the base branch's (kept with --record in
+// OUT_DIR/contracts-last-build.json), or against the contracts published last (--base <folder>). Per component, what
+// was added, removed or changed, what breaks, and which products use it. Exit 1 only on a breaking change nothing
+// accounts for (ds-config.json contractChanges.failOn, or --fail-on: unaccounted, breaking, never); the lines are also
+// written to OUT_DIR/contract-changes.md for the merge request.
+if (process.argv.includes('--contract-changes')) {
+  let kcfg = {};
+  try { kcfg = JSON.parse(readFileSync(join(ROOT, 'ds-config.json'), 'utf8')); } catch { console.error('❌ ds-config.json not found at project root.'); process.exit(1); }
+  const cc = await import('./contract-changes.mjs');
+  const rel = await import('./releases.mjs');
+  const { signedOff } = await import('./sign-off.mjs');
+  const failOn = _argValue('--fail-on') ?? kcfg.contractChanges?.failOn ?? 'unaccounted';
+  if (!cc.FAIL_ON.includes(failOn)) { console.log(`❌ failOn ${failOn}: say ${cc.FAIL_ON.join(', ')}.`); process.exit(2); }
+  const { generateContracts } = await import('./contract-gen.mjs');
+  const r = await generateContracts(ROOT, kcfg, { force: true });
+  let commit = null; try { const { execFileSync } = await import('node:child_process'); commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { /* not a git checkout */ }
+  const now = cc.recordOf(cc.contractsIn(r.outDir), { commit, branch: process.env.CI_COMMIT_BRANCH || process.env.GITHUB_REF_NAME || null, systemVersion: rel.systemVersion(ROOT, kcfg) });
+  const file = join(ROOT, OUT_DIR, cc.RECORD_FILE);
+  if (process.argv.includes('--record')) {
+    if (!Object.keys(now.contracts).length) { console.log('❌ No component contract could be built from this code, so there is nothing to keep.'); process.exit(2); }
+    mkdirSync(join(ROOT, OUT_DIR), { recursive: true });
+    writeFileSync(file, JSON.stringify(now, null, 1) + '\n');
+    console.log(`✅ Kept this build's contracts (${Object.keys(now.contracts).length} component${Object.keys(now.contracts).length === 1 ? '' : 's'}) in ${OUT_DIR}/${cc.RECORD_FILE}.`);
+    process.exit(0);
+  }
+  const baseDir = _argValue('--base');
+  let base = null;
+  if (baseDir) { base = cc.baseOfFolder(resolve(ROOT, baseDir), { branch: `the contracts in ${baseDir}` }); if (!Object.keys(base.contracts).length) base = null; }
+  else { try { base = JSON.parse(readFileSync(file, 'utf8')); } catch { /* none kept yet */ } }
+  const releases = rel.readReleases(ROOT);
+  const v = cc.verdict(base, now, { failOn, products: rel.productsOf(ROOT, kcfg), account: (c) => cc.accountedFor(c, { signedOff: (what) => signedOff(ROOT, what), releases, base, compareVersions: rel.compareVersions }) });
+  console.log(v.lines.join('\n'));
+  if (v.markdown) { mkdirSync(join(ROOT, OUT_DIR), { recursive: true }); writeFileSync(join(ROOT, OUT_DIR, cc.REPORT_FILE), v.markdown); }
+  process.exit(v.code);
+}
+
 // ── --figma-effects: each component's shadows, blurs, gradient and image fills, clipping and blend mode ──
 // Without a file: writes the read-only capture script to run with the Figma tool of the session (or figma-cli). With the
 // file its answer was saved to: the next script while there is more (each component's checksum first, then only the
@@ -6460,6 +6528,15 @@ function reportFull(label, items, shown) {
           } else if (tokenUniverse) {
             console.log(`\nℹ️  Multi-brand coverage${via}: all ${tokenUniverse} tokens are defined across every brand (${brands.join(', ')}).`);
           }
+          // A brand changes values, never structure (brand-shape.mjs): each component's shape in each brand, from the
+          // code capture, against the first brand's.
+          try {
+            const { brandShapeDiffs, brandShapeLines } = await import('./brand-shape.mjs');
+            const { codeSnapshotPath } = await import('./names.mjs');
+            const code = JSON.parse(readFileSync(resolve(ROOT, codeSnapshotPath(cfg)), 'utf8'));
+            const lines = brandShapeLines(brandShapeDiffs(code.components ?? {}, brands));
+            if (lines.length) { console.log(C.yellow(`\n⚠️  ${lines[0]}`)); for (const l of lines.slice(1)) console.log(C.yellow(`   ${l}`)); }
+          } catch { /* no code capture yet */ }
         } else if (suggest && suggest.length) {
           // Detected candidate multi-mode collections in the capture but no declared brands: nudge,
           // never assume (modes may be theme/density/locale, not brands).
@@ -6604,6 +6681,7 @@ function reportFull(label, items, shown) {
       const issues = r.invalid.length ? ` · ⚠️ ${r.invalid.length} schema issue(s)` : '';
       console.log(r.kept ? `\n📐 ${r.kept}` : `\n📐 Contracts → ${r.outDir.replace(ROOT + '/', '')}  (${r.components.length} component${r.components.length === 1 ? '' : 's'} · ${r.tokenCount} DTCG tokens${issues})`);
       if (r.dsdsOut && r.components?.length) console.log(`ℹ️  DSDS view → ${r.dsdsOut.replace(ROOT + '/', '')}: the ${r.components.length} contract${r.components.length === 1 ? '' : 's'} in DSDS ${(await import('./contract-dsds.mjs')).DSDS_VERSION}, for a team that documents its system in that format.`);
+      if (r.specsOut && r.components?.length) { const sp = await import('./contract-spec.mjs'); console.log(`ℹ️  Specs view → ${r.specsOut.replace(ROOT + '/', '')}: the ${r.components.length} contract${r.components.length === 1 ? '' : 's'} in the ${sp.SPEC_FORMAT} format ${sp.SPEC_VERSION}, for a team that specifies its components that way.`); }
       if (r.propTypesOut) console.log(`ℹ️  Figma prop types → ${r.propTypesOut.replace(ROOT + '/', '')}: type a component's props with its <Name>FigmaProps so tsc shows prop drift.`);
       if (r.authoredIssues?.length) {
         console.log(C.yellow(`⚠️  contract.authored.json has ${r.authoredIssues.length} issue(s) — the malformed binding(s) below are ignored until fixed:`));

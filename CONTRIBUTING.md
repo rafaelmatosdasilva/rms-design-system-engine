@@ -1,5 +1,7 @@
 # Contributing
 
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). How decisions are made is in [GOVERNANCE.md](GOVERNANCE.md), and where the engine is going in [ROADMAP.md](ROADMAP.md).
+
 ## Report a problem or ask for something
 
 Open an issue on GitHub. Say what you ran, what you expected and what happened instead, with the run's output. A security problem goes through the Security tab instead, never an issue ([SECURITY.md](SECURITY.md)).

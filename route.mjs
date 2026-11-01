@@ -246,9 +246,13 @@ const GENERATED_UI = /\bgenerated\s+(?:ui|screens?|pages?|layouts?|views?|markup
 const CHECK_IT = /\b(?:check|validate|verify|lint|test|audit|review|confirm|against|conform\w*|verifica\w*|valida\w*|confer\w*|confirma\w*|contra)\b/i;
 const generatedUi = (t) => GENERATED_UI.test(t) && CHECK_IT.test(t) && !PROTOTYPE.test(t);
 const UI_FILE_SAID = /(?<![\w.-])((?:\.{1,2}\/|~\/|\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:json|html?|jsx|tsx|vue|svelte))\b/i;
+// Code Connect files drafted from the contracts ("draft the Code Connect files", "escreve os ficheiros de Code Connect"):
+// one for each component that has none, in the engine's own folder. Checking the ones the project has is not this.
+const CODE_CONNECT_DRAFT = /\b(draft|write|create|generate|make|scaffold|start|rascunh\w*|escrev\w*|cria\w*|gera\w*|fa[zç]\w*)\b[^.\n]{0,60}\bcode[\s-]?connect\b|\bcode[\s-]?connect\b[^.\n]{0,20}\b(drafts?|rascunhos?)\b|--code-connect-draft/i;
 const RULES = [
   ['full-audit', (t) => lastResult(t), 'last-result'],
   ['ask-the-system', (t) => generatedUi(t), 'check-ui'],
+  ['ask-the-system', (t) => CODE_CONNECT_DRAFT.test(t) && !/\bhow (do|does|to|can|should)\b|\bcomo\b/i.test(t), 'code-connect-draft'],
   ['figma-edits', (t) => CONSTRUCTION_FIX.test(t), 'construction-fix'],
   ['ask-the-system', (t) => CONSTRUCTION.test(t), 'construction'],
   ['build-component-figma', (t, s) => figmaBuild(t, s.components) && IN_FIGMA.test(t) && !/\b(roles?|annotations?|accessibility|a11y|acessibilidade|prototype|prot[oó]tipo|screen|ecr[ãa])\b/i.test(t), 'figma-build'],
@@ -454,6 +458,10 @@ function routeRequest(text, { hasConfig, components, cmd, build = false, pages =
     if (kind === 'last-result') {
       notes.push('The person asks what a run already found: print the last run\'s SUMMARY with --summary and relay it as it is. Run no new audit in its place; only when it says there is no summary yet, run the command its NEXT line names.');
       return { recipe: named.length ? 'audit-component' : recipe, question: false, run: [`${cmd} --summary`], notes, kind };
+    }
+    if (kind === 'code-connect-draft') {
+      notes.push('A draft Code Connect file for each component the contracts pair with Figma and the code that no Code Connect file maps yet, in the form the project already uses. The engine writes them to its own folder, never into the code: give the person the list it prints, with each draft\'s TODOs, and leave moving and publishing them to the person.');
+      return { recipe, question: false, run: [`${cmd} --code-connect-draft`], notes, kind };
     }
     if (kind === 'check-ui') {
       const file = t.match(UI_FILE_SAID)?.[1] ?? null;
