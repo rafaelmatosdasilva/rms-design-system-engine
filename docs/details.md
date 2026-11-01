@@ -793,6 +793,11 @@ Two lines are never crossed. What is certain is written as final and what is jud
 
 A component's role in the intent layer follows the same line: written as final when its code renders an element that has one (`<button>` is a button), drafted from what the component does when it renders a plain `div` or `span`, and only ever one of the ARIA roles.
 
+What each list holds (a page's Data lines) is the engine's own, written from the code:
+
+- **It follows the code.** When the code changes what a list's items hold, the old line comes out and the code's new one goes in, as final, in the Markdown spec and the DSDS page alike. It is never drafted for a person.
+- **The changes say only what was made.** A line planned for a page that none of its files holds is listed as not found, in the run's summary and in `CHANGES.md`, never counted as changed.
+
 ### An example on every page
 
 Rules tell an agent what to do; an example shows it. A page with none gets one, drafted from how the products use the component.
