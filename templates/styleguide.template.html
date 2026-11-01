@@ -7162,6 +7162,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   function liveA11yHTML(root, a) {
     var line = function (ok, text, wcag) { return a11yRow(ok ? 'done' : 'todo', 'In the browser', esc(text), wcag, FROM_PAGE); };
     var out = [], stops = tabStops(root), had = document.activeElement;
+    liveA11yHTML.keys = [];
     var interactive = [root].concat(Array.prototype.slice.call(root.querySelectorAll('[role]'))).filter(function (el) { return INTERACTIVE.test(el.getAttribute('role') || '') && shown(el); });
     var wants = a && a.key && INTERACTIVE.test(a.key);
     // Disabled as set: Tab passes it by, as it should, and its behaviours are not tried.
@@ -7189,6 +7190,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     if (stops.length && !out.some(function (h) { return /Focus Visible|Non-text|Name, Role/.test(h); })) out.push(line(true, (stops.length === 1 ? 'It shows its focus' : 'Each stop shows its focus') + ' and has a name.', 'WCAG 2.4.7 Focus Visible (AA)'));
     ((a && a.behaviours) || []).forEach(function (row) {
       var r = tryBehaviour(root, row, a.key);
+      // The keys that did what its role asks, pressed here (or a native control's own): its contract says them.
+      if (row.act.keys && (r.ok || r.given)) row.act.keys.forEach(function (k) { liveA11yHTML.keys.push(k === ' ' ? 'Space' : k); });
       out.push(r.given ? a11yRow('done', 'In the browser', 'Given by the browser: ' + esc(row.says) + ' (' + esc(r.given) + ').', row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)', FROM_PAGE) : line(r.ok, row.says.replace(/^\w/, function (ch) { return ch.toUpperCase(); }) + (r.ok ? '.' : ', but ' + r.saw + '.'), row.act.keys ? 'WCAG 2.1.1 Keyboard (A)' : 'WCAG 4.1.2 Name, Role, Value (A)'));
     });
     if (had && had.focus && document.activeElement !== had) had.focus({ preventScroll: true, focusVisible: false });
@@ -9448,7 +9451,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       colours.forEach(function (a) { var next = []; modeSets.forEach(function (ms) { a.values.forEach(function (v) { if (v.value) next.push(ms.concat([[a, v]])); }); }); if (next.length) modeSets = next; });
       // Colours read as they settle in each mode, never halfway through a component's own transition.
       play.hidden = false; play.classList.add('pg-offstage'); preview.hidden = false; preview.classList.add('pg-still');
-      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {}, spoken = {}, spokenOrder = [];
+      var plan = a11yCombos(), groups = [], byKey = {}, lowest = null, failing = 0, measured = 0, wran = {}, wkinds = {}, spoken = {}, spokenOrder = [], facts = [], factsBy = {};
       // Each variant is drawn, then measured once the system's own scripts have answered the change: their observers add
       // roles, Tab stops, names and wiring a moment after it is drawn, as in a product, so it is never measured in the
       // same step it is drawn in. A message to the page itself is the next task without a timer's wait.
@@ -9480,6 +9483,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         if (all0.some(function (el) { return el.matches('a[href],button,input:not([type=hidden]),select,textarea,summary,[tabindex]:not([tabindex="-1"]),[contenteditable=""],[contenteditable=true],[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=slider],[role=spinbutton],[role=combobox],[role=textbox],[role=searchbox]'); })) wran.control = 1;
         if (all0.some(function (el) { return el.matches('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]),select,textarea,[role=textbox],[role=searchbox],[role=combobox],[role=spinbutton],[contenteditable=""],[contenteditable=true]'); })) wran.field = 1;
         try { tb.innerHTML = liveA11yHTML(root, c.a11y); } catch (e) { tb.innerHTML = a11yRow('check', 'In the browser', 'It could not be tried here.', '', FROM_PAGE); }
+        // Its control as a screen reader is given it in this variant (its role, where its name comes from, the states it
+        // announces, whether Tab reaches it, the keys it answers), kept with the results for its contract: the same facts
+        // once, with the variants they hold in.
+        if (window.__wcag21 && window.__wcag21.facts) try {
+          var fx = window.__wcag21.facts(root), kd = liveA11yHTML.keys || [];
+          fx.keys = fx.keys.concat(kd.filter(function (k, i) { return fx.keys.indexOf(k) < 0 && kd.indexOf(k) === i; }));
+          var fk = JSON.stringify(fx);
+          if (!factsBy[fk]) { factsBy[fk] = { f: fx, when: [] }; facts.push(factsBy[fk]); }
+          factsBy[fk].when.push(cb.set);
+        } catch (e) { /* the other variants' facts stand */ }
         // WCAG 2.1 (wcag-page.js): what its markup and its CSS show in this variant.
         if (window.__wcag21) try {
           var w = window.__wcag21.check(root, { name: c.name }), byKind = {};
@@ -9537,6 +9550,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
           ? esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + ', needs ' + lowest.need + ':1. Too low in ' + failing + ' of ' + measured + ' variants and colour modes.'
           : 'Text at least ' + esc((Math.floor(lowest.ratio * 10) / 10).toFixed(1)) + ':1 in all ' + measured + ' variants and colour modes (the lowest on "' + esc(lowest.words) + '" in ' + esc(lowest.where) + '), needs ' + lowest.need + ':1.' });
         var live = { ran: wran, tried: n };
+        if (facts.length) live.facts = facts;
         a11yRender(live);
         wcagUse(plan, live);
         if (!checking && bgRun) { var f = bgRun; bgRun = null; f(); }   // nothing left to try after it (no in-page checks)

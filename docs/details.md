@@ -607,6 +607,31 @@ A run of every component takes out the contracts it wrote earlier for components
 
 For every text and icon colour, the engine works out the one surface it was made for, reading the names (`content/on-interactive` goes with `surface/interactive`) and confirming it against the values. The pair goes into the contract, into `llms.txt` and into `--query`, so an agent is given the answer instead of every surface that would work: given only a shortlist, it picks a different grey on every card. An edit that puts a colour on another surface is told so at once, with the contrast the two actually give. And a pair whose names promise what its values break (white on a warning yellow) is reported as what it is: the system's own words against its own numbers.
 
+### What a screen reader is given
+
+Each contract's `accessibility` says what a screen reader gets from the component, so an agent builds it right the first time.
+
+- **Its role.** What it is announced as: `button`, `link`, `textbox`.
+- **Its name.** How it is given: `content` (what it holds), `prop:label` (the words of that prop), `aria-label`, `labelledby`, `label`, `alt` or `title`.
+- **Its states.** The ones it announces: `aria-expanded`, `aria-pressed`, `disabled`.
+- **Its focus and keys.** Whether Tab reaches it (`focusable`), and the keys it answers (`keyboard`: `Enter`, `Space`, `Escape`).
+- **Each state that differs.** `byState` lists a state whose facts are not the rest's, with what tells it apart (`Disabled: True`: Tab passes it by, no keys).
+
+Each fact says where it came from, and none is guessed:
+
+| `from` | What it means |
+|---|---|
+| `measured` | The style guide's build tried every variant in a browser. |
+| `code` | Read from the component's own markup, with no browser. |
+| `figma` | Its role annotation in Figma. |
+| `authored` | Written in `contract.authored.json`. |
+
+- **The browser first.** It is what the code really gives. The team's own word on the role (`authored`) still comes first.
+- **Nothing lost.** Where another source says otherwise, it is kept beside it (`differs`): a toggle button in Figma that the browser finds a plain button says both.
+- **The code makes the name exact.** The browser says a button is named by its content; the code says that content is the `label` prop, so the name is `prop:label`.
+- **Where it is kept.** The build writes what it measured to `.design-system-engine-out/a11y-facts.json`, and the next contract build reads it. `measuredAt` says the day.
+- **Without a browser.** The facts come from the markup alone, marked `code`. What the markup cannot say (a root that is another component, a role set by an expression) is left out.
+
 ### The contracts in DSDS too
 
 Beside the contracts, `contracts/dsds/` holds the same components in [DSDS](https://designsystemdocspec.org) 0.23, for a team that documents its system in that format: one file per component and an index. Each says what the engine reads from Figma and the code (the variants and states, what it nests, what to use instead, its status) and links the rest, as DSDS asks: the contract as its spec, the code file as its source, the Figma component, and your own page, whose guidance is never copied back.

@@ -2267,6 +2267,8 @@ if (process.argv.includes('--styleguide')) {
           } else console.log(`   Saved in ${RESULTS_FILE}: the next build here tries only what changes (ds-config.json → stores.snapshots shares it with the team).`);
         }
       }
+      // What each component gives a screen reader, measured on every variant: kept in the output folder for its contract.
+      if (!b.skipped && !b.dead && b.themes) { const fa = await import('./contract-a11y.mjs'); fa.writeA11yFacts(ROOT, fa.factsFile(b.themes, new Date().toISOString())); }
       for (const e of b.errors ?? []) console.log(`   ⚠️  The page threw while trying: ${e}`);
       // A page whose own script stopped shows nothing that works: never kept as built, so a publish keeps the last good one.
       if (b.dead) { console.error(`❌ The style guide's script stopped while the page was drawn${b.errors?.length ? `: ${b.errors[0]}` : ''}. Fix it before publishing.`); process.exit(1); }
@@ -2293,6 +2295,8 @@ if (process.argv.includes('--styleguide')) {
         const html = readFileSync(page, 'utf8'), next = withBaked(html, { at: savedAt(join(ROOT, RESULTS_FILE)), themes: saved });
         if (next !== html) writeFileSync(page, next);
         console.log(`   Accessibility from the saved results (${RESULTS_FILE}): a component changed since is tried by the browser that opens the page.`);
+        const fa = await import('./contract-a11y.mjs');
+        fa.writeA11yFacts(ROOT, fa.factsFile(saved, savedAt(join(ROOT, RESULTS_FILE))));
       }
     }
     // The page's own pages pictured in the browser and compared with the last build's (styleguide-shots.mjs): a layout
