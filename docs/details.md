@@ -717,7 +717,11 @@ Your intent layer (why each piece exists and how to use it) is read on every run
 
 When the layer changes, the style guide follows.
 
-- **The page is built again on its own.** See It updates on its own, above.
+- **A change the engine makes is published at once.** A fix copied from the style guide and run in Claude Code (an answer to a proposal, drafts approved, changed or dropped, a part named, lines drafted), or one the engine makes on its own (`intentLayer.autoFix`), is committed to the layer. The same command then:
+  - builds the style guide again from the layer as it is now;
+  - checks the new page: built from that commit, with the pages the change was about;
+  - publishes it where your team's guide lives: its store (set in `ds-config.json` or your company's profile), else your publish job on GitHub or GitLab, started with your token (`GITHUB_TOKEN`, or `GITLAB_WRITE_TOKEN`). Without one, it gives the link to start the job by hand.
+- **A change made in the layer by hand** builds the page again on its own too. See It updates on its own, above.
 - **Each build says what moved.** It names the pages that changed since the layer was last read, and checks the whole layer again: names that do not exist, the guidance rating and rules that contradict Figma or the code.
 - **A private layer needs a token.** The job reads it with `INTENT_LAYER_TOKEN` (GitHub) or `GITLAB_TOKEN` (GitLab). Without one it cannot read the layer: it builds from the copy kept in the project, if there is one, and says so in its log.
 

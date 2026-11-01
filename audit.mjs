@@ -117,6 +117,20 @@ async function sendDecisions(part = 'decisions') {
   console.log(r.line);
   return r.ok;
 }
+// After this run committed a change to the intent layer (a decision copied from the style guide, drafts approved, a
+// part named, lines drafted, the layer fixed on its own): the style guide built again from the layer as it is now,
+// checked for the pages the change was about, and published where the team's guide lives, its store or its publish job
+// (guide-follow.mjs), so the person who made the change sees it on the page they open. Not in CI: the pipeline builds
+// and publishes the page itself next. → true when it followed.
+async function followLayer(pcfg, pages = [], { build = true } = {}) {
+  const made = (await import('./intent-changes.mjs')).committedThisRun();
+  if (!made.length) return false;
+  if (process.env.CI) { console.log('   The pipeline builds and publishes the style guide next, with this change.'); return true; }
+  const { guideFollow } = await import('./guide-follow.mjs');
+  const { env } = await guideEnv();
+  for (const l of await guideFollow(ROOT, pcfg, { pages: [...new Set(pages)].filter(Boolean), sha: made[made.length - 1].sha, engine: SCRIPT_DIR, env, offline: STORE_OFFLINE, rebuild: build })) console.log(l);
+  return true;
+}
 const SHOW_TREND = process.argv.includes('--trend');
 const INIT_ONLY  = process.argv.includes('--init');
 
@@ -585,7 +599,8 @@ if (process.argv.includes('--intent-decide')) {
   // What the answer changes in the layer, made now: on the pages it was about (a page to start is found by its answer).
   const only = new Set(keys.map((k) => d.proposals.get(k)?.page).filter(Boolean));
   console.log((await (await import('./intent-changes.mjs')).actOnAnswers(ROOT, pcfg, { only })));
-  console.log('NEXT: rebuild the style guide to see it (--styleguide).');
+  const followed = await followLayer(pcfg, [...only]);
+  console.log(followed ? 'NEXT: tell the person what the lines above say: the change made in the layer, the style guide built again, and where it was published.' : 'NEXT: rebuild the style guide to see it (--styleguide).');
   process.exit(0);
 }
 
@@ -792,7 +807,8 @@ if (process.argv.includes('--review-drafts')) {
     const done = await ch.commitToBranch(access, { files: result.files, created: result.created, sha: snap._source.sha, target: snap._source.ref, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(`✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}`);
-    console.log('NEXT: the approved lines reach the agents on the next run; the style guide shows them in each component\'s Documentation.');
+    await followLayer(pcfg, decisions.map((d) => d.page));
+    console.log('NEXT: tell the person what the lines above say: the approved lines are in the layer, the style guide built again and published where the team opens it; agents get them on the next run.');
     process.exit(0);
   }
   if (process.argv.includes('--merge-request')) {
@@ -845,7 +861,8 @@ if (process.argv.includes('--part')) {
       : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/part-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: ${said}`, description: `${said}, on ${plan.page}, in ${plan.file}.`, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
-    console.log('NEXT: the next style guide build shows it, and agents get it on the run after.');
+    if (how === 'commit') await followLayer(pcfg, [part, to !== 'none' ? to : null]);
+    console.log(how === 'commit' ? 'NEXT: tell the person what the lines above say: the change is in the layer and on the published style guide; agents get it on the next run.' : 'NEXT: once the merge request is merged, the style guide follows (its job builds when the layer changes); agents get it on the run after.');
     process.exit(0);
   }
   console.log('NEXT: read the change; to send it: the same command with --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
@@ -884,7 +901,8 @@ if (process.argv.includes('--draft')) {
       : await ch.openMergeRequest(access, { files: plan.files, created: new Set(), sha: snap._source.sha, target: snap._source.ref, branch: `design-system-engine/drafts-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`, title: `Intent layer: drafts on ${plan.page}`, description: summary, message });
     if (done.error) { console.log(`❌ ${done.error}`); process.exit(1); }
     console.log(how === 'commit' ? `✅ Committed on ${snap._source.ref}: ${done.url ?? done.sha}` : `🔀 Merge request: ${done.url}  (branch ${done.branch})`);
-    console.log('NEXT: rebuild the style guide (--styleguide): the page\'s Documentation shows the drafts with one decision for them, to copy into Claude Code.');
+    if (how === 'commit') await followLayer(pcfg, [subject]);
+    console.log(how === 'commit' ? 'NEXT: tell the person what the lines above say: the drafts are on the published style guide, in the page\'s Documentation, with one decision for them to copy into Claude Code.' : 'NEXT: once the merge request is merged, the style guide follows (its job builds when the layer changes) and shows the drafts with one decision for them.');
     process.exit(0);
   }
   console.log('NEXT: show the person the drafts; to send them: the same command with --commit (straight on the layer\'s branch) or --merge-request, only when the person asks');
@@ -2015,7 +2033,10 @@ if (process.argv.includes('--styleguide')) {
       for (const line of pageOnlyLines(pageOnlyCopies(ROOT, sgConfig.styleguide?.out ?? relative(ROOT, r.out)))) console.log(line); }
     // The page the team opens, when it is behind: published from this build where the setup asks for it
     // ("styleguide": { "publish": "auto" }) and GitLab lets this person write it; else said, with the command.
-    if (!failures(found).length && !STORE_OFFLINE && !SCOPE_COMPONENTS.length) {
+    // This build committed a fix to the intent layer (intentLayer.autoFix): the page just built shows it, so it is
+    // published where the team's guide lives now, not when someone publishes next.
+    const followed = !failures(found).length && !SCOPE_COMPONENTS.length && !process.argv.includes('--no-publish') && await followLayer(sgConfig, [], { build: false });
+    if (!followed && !failures(found).length && !STORE_OFFLINE && !SCOPE_COMPONENTS.length) {
       try {
         const g = await (await import('./guide-freshness.mjs')).freshness(ROOT, sgConfig, { ...(await guideEnv()), force: true });
         if (g.behind && sgConfig.styleguide?.publish === 'auto' && !process.argv.includes('--no-publish')) { console.log((await publishGuide(sgConfig, resolve(ROOT, r.out))).line); }
@@ -6381,6 +6402,8 @@ function reportFull(label, items, shown) {
     // drafts marked for the team (intent-changes.mjs → autoFix).
     const fixed = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg, { offline: process.argv.includes('--offline') });
     if (fixed) console.log('\n' + fixed);
+    // Committed to the layer: the team's style guide follows now, not at someone's next build.
+    await followLayer(cfg);
   } catch (e) { console.log(C.yellow('\n⚠️  Documentation sources: not read (' + e.message + ')')); }
 
   // ── Design-intent (adopt-aware OUTPUT, not a gate) ──────────────────────────
