@@ -2,8 +2,9 @@
 // be told by a webhook (a code repository the team may only read): it asks each source for its latest commit, and Figma
 // for its file's version, and compares them with what the last build was made from.
 //
-//   sourcesOf(ROOT, cfg)            → [{ what, gitlab?, ref?, path?, figma? }]: the code, each store read from GitLab
-//                                     (snapshots, decisions, themes, the intent layer), the profile, the Figma file
+//   sourcesOf(ROOT, cfg)            → [{ what, gitlab?, ref?, path?, figma?, layer? }]: the code, each store read from
+//                                     GitLab (snapshots, decisions, themes, the intent layer), an intent layer on GitHub,
+//                                     the profile, the Figma file
 //   sourcesNow(sources, { get })    → { what: id } (the latest commit, or Figma's version; null when it cannot be read)
 //   changes(now, last)              → [{ what, from, to }] (a source that cannot be read counts as changed)
 //
@@ -12,6 +13,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseGitlabProject } from './gitlab-source.mjs';
+import { intentLayerConfig as layerConfig } from './doc-source-dsds.mjs';
+import { layerHost } from './doc-host.mjs';
 
 // Where a build reads from. A place written only (the style guide the build publishes) is left out: its own commits
 // would start the next build.
@@ -27,6 +30,11 @@ export function sourcesOf(ROOT, cfg = {}) {
   // The intent layer, when it is a GitLab project (a GitHub one or a folder of the project is not asked of GitLab).
   const il = typeof cfg.intentLayer === 'string' ? (/^https?:\/\//i.test(cfg.intentLayer) && !/^https?:\/\/(www\.)?github\.com\//i.test(cfg.intentLayer) ? cfg.intentLayer : null) : cfg.intentLayer?.gitlab ?? (cfg.intentLayer?.url && !/github\.com\//i.test(cfg.intentLayer.url) ? cfg.intentLayer.url : null);
   if (il && !out.some((x) => x.what === 'intentLayer')) out.push({ what: 'intentLayer', gitlab: il, ref: null });
+  // A layer in a GitHub repository (intentLayer, or stores.intentLayer.read): asked of GitHub, the way the build reads it.
+  if (!out.some((x) => x.what === 'intentLayer')) {
+    const c = layerConfig(cfg);
+    if (c?.host === 'github') out.push({ what: 'intentLayer', layer: c });
+  }
   // The profile: a file in a project (…/-/blob/<ref>/<path>).
   const prof = /^(https?:\/\/[^/]+\/.+?)\/-\/blob\/([^/]+)\/(.+)$/.exec(String(cfg.profile?.source ?? ''));
   if (prof) out.push({ what: 'the profile', gitlab: prof[1], ref: prof[2], path: decodeURIComponent(prof[3]) });
@@ -35,12 +43,19 @@ export function sourcesOf(ROOT, cfg = {}) {
 }
 
 // Each source's latest commit (for its path when it has one), and the Figma file's version. get(url, headers) → { ok,
-// json() }. env: GITLAB_TOKEN, FIGMA_TOKEN.
-export async function sourcesNow(sources, { get, env = process.env } = {}) {
+// json() }. env: GITLAB_TOKEN, FIGMA_TOKEN, GITHUB_TOKEN. root and fetchImpl: for a layer on GitHub, read as the build
+// reads it (doc-host.mjs: its token from the environment or the project's .env).
+export async function sourcesNow(sources, { get, env = process.env, root = process.cwd(), fetchImpl } = {}) {
   const out = {};
   for (const s of sources) {
     const key = s.what + (s.path ? `:${s.path}` : '');
     try {
+      if (s.layer) {
+        const h = layerHost(root, s.layer, { env, ...(fetchImpl ? { fetchImpl } : {}) });
+        const head = h.error ? null : await h.head();
+        out[key] = head && !head.error ? String(head.sha) : null;
+        continue;
+      }
       if (s.figma) {
         if (!env.FIGMA_TOKEN) { out[key] = 'not read (no FIGMA_TOKEN)'; continue; }
         const r = await get(`https://api.figma.com/v1/files/${encodeURIComponent(s.figma)}?depth=1`, { 'X-Figma-Token': env.FIGMA_TOKEN });
