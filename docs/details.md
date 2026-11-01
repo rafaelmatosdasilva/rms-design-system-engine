@@ -588,6 +588,14 @@ A prop only the code has (`codeOnly`) carries the code's description too.
 
 `semantics.element` and `accessibility.element` always name the same element: yours from `contract.authored.json`, else the one the code's markup starts with. Where it was read is in `accessibility.element.from`. A role you write as `semantics.aria.role` is `accessibility.role` too.
 
+### Where it lives
+
+`livesIn.products` lists the products whose code uses the component, each with a name:
+
+1. The product's name in `ds-config.json` (`products` with a `dir`, `pluginDirs`, or `paths.plugins` for `apps/<app>`).
+2. Else its folder, for an app or package nobody listed (`apps/`, `plugins/`, `products/`, `packages/`). A package that holds the system's own components is the system's.
+3. Else `this project`, marked `own: true`: the files outside every product.
+
 ### Contracts of components that are gone
 
 A run of every component takes out the contracts it wrote earlier for components it no longer writes: gone from Figma and the code, renamed, or written before contracts had a `name`. Left there, they read as components the system still has.

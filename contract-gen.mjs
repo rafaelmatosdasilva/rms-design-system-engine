@@ -593,7 +593,12 @@ const CONTRACT_SCHEMA = {
     relationships: { type: 'object', properties: { composesWith: strs, neverCombineWith: strs } },
     usage: { type: 'object', properties: { element: str, props: { type: 'object' } } },
     slots: { type: 'array', items: { type: 'object', required: ['name'] } },
-    livesIn: { type: 'object' },
+    livesIn: {
+      type: 'object', description: 'Where it is used: the products whose code uses it, the files, what it sits inside and holds, the Figma screens that draw it.',
+      properties: {
+        products: { type: 'array', items: { type: 'object', required: ['name'], properties: { name: { type: 'string', description: 'The product, as ds-config.json names it, else its folder; this project for the files outside every product.' }, files: { type: 'integer' }, uses: { type: 'integer' }, own: { const: true, description: 'The files outside every product (this project), not another product.' } } } },
+      },
+    },
     'x-design-system-engine': { type: 'object' },
   },
 };
@@ -1114,7 +1119,8 @@ export async function generateContracts(ROOT, cfg, opts = {}) {
   }
   try {
     const { productFiles, usageMap } = await import('./usage-map.mjs');
-    files = productFiles(ROOT, cfg);
+    // A package that holds the system's own component files is the system's, never a product named by its folder.
+    files = productFiles(ROOT, cfg, { systemFiles: targets.map((n) => apiEntryOf(n)?.file).filter(Boolean) });
     const screens = readJSON(resolve(ROOT, paths.snapshotScreenComponents || 'figma-screen-components.snapshot.json')) || {};
     lives = usageMap(targets, { files, classFor, composition, codeNesting: code?.nesting ?? {}, screens });
   } catch { /* best-effort */ }

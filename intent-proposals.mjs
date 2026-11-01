@@ -173,7 +173,7 @@ export function candidatesFor(key, x, { usage = {}, decisions = {}, report = { p
   const yes = { answer: 'yes', says: x.kind === 'review' || x.kind === 'recheck' ? 'It still holds: confirm it.' : x.proposal, evidence: [] };
   const no = { answer: 'no', says: x.kind === 'review' ? 'It needs editing.' : x.kind === 'recheck' ? 'It no longer holds: withdraw it, and answer it again.' : x.no ?? 'Not as proposed.', evidence: [] };
   const lives = usage[x.subject] ?? null;
-  const products = (lives?.products ?? []).filter((p) => p.name);
+  const products = (lives?.products ?? []).filter((p) => p.name && !p.own);   // this project is not another product
   const screens = lives?.screens ?? [];
   const n = (k, one, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
   // Past answers to proposals of the same kind and effect: how the team settled the same question before.
