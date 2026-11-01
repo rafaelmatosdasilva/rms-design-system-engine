@@ -2096,7 +2096,11 @@ if (process.argv.includes('--publish-styleguide')) {
       if (!existsSync(page)) { console.log(`❌ No style guide built yet at ${relative(ROOT, page)}: rms-design-system-engine --styleguide first.`); process.exit(1); }
       const r = await publishGuide(pcfg, page);
       console.log(r.line);
-      console.log(r.ok ? 'NEXT: tell the person where it went (the line above).' : 'NEXT: tell the person the line above; nothing was sent.');
+      // So it updates by itself from now on: the store's own job, and the intent layer's job that starts it (written to
+      // the engine's output folder for the person to add; never in CI, where this is that job publishing).
+      const jobs = process.env.CI ? [] : (await import('./publish-job.mjs')).writeStoreJobs(ROOT, pcfg, st.storesOf(pcfg).styleguide.write);
+      for (const l of jobs) console.log(l);
+      console.log(r.ok ? `NEXT: tell the person where it went (the line above)${jobs.length ? ', and what the lines after it say to add once so it updates by itself' : ''}.` : 'NEXT: tell the person the line above; nothing was sent.');
       process.exit(r.ok ? 0 : 1);
     } }
   const { writePublishJob, githubJob, gitlabJob, hostOf, productRepos } = await import('./publish-job.mjs');

@@ -129,3 +129,29 @@ test('a build names the layer pages changed since the last read', async () => {
   const notAPage = await syncIntentLayer(dir, cfg, { env: {}, fetchImpl: fakeGithub({ sha: '0001112223334', changed: ['README.txt'] }).fetchImpl });
   assert.match(describeSync(notAPage), /Changed since the last read: 1 file, none of them a page/);
 });
+
+test('a team published to a store: the store\'s own job builds from the profile, hourly and when the layer\'s job starts it, never on its own pushes', async () => {
+  const { storeJob, storeTarget, writeStoreJobs } = await import('../publish-job.mjs');
+  assert.deepEqual(storeTarget({ gitlab: 'https://gitlab.acme.io/design/guide/-/tree/pages', path: 'site' }), { host: 'gitlab', origin: 'https://gitlab.acme.io', path: 'design/guide', branch: 'pages' });
+  assert.deepEqual(storeTarget({ gitlab: 'https://gitlab.acme.io/design/guide', branch: 'trunk' }).branch, 'trunk');
+  assert.equal(storeTarget({ folder: 'site' }), null);
+  const job = storeJob({ profile: 'https://gitlab.acme.io/acme/setup/-/blob/main/profile.json' });
+  for (const want of ["$CI_PIPELINE_SOURCE =~ /^(schedule|trigger|pipeline|web|api)$/", "--profile 'https://gitlab.acme.io/acme/setup/-/blob/main/profile.json' --ci-changed", 'exit_codes: [3]', '- .dse/', '--styleguide --no-publish', '--styleguide-check', '--publish-styleguide', '--ci-changed --record', 'GITLAB_WRITE_TOKEN', 'Pipeline schedules']) assert.ok(job.includes(want), want);
+  assert.doesNotMatch(job, /CI_PIPELINE_SOURCE[^\n]*push/, 'never on a push to the store: the page it sends is one');
+  assert.ok(job.indexOf('audit.mjs --styleguide-check') < job.indexOf('audit.mjs --publish-styleguide'), 'a page that fails its check is never sent');
+  // With the profile's link: the job, and the layer's job pointed at the store's project.
+  const dir = project('https://gitlab.acme.io/design/ds.git');
+  const place = { gitlab: 'https://gitlab.acme.io/design/guide', branch: 'main' };
+  const lines = writeStoreJobs(dir, { profile: { source: 'https://gitlab.acme.io/acme/setup/-/blob/main/profile.json' }, intentLayer: LAYER }, place);
+  assert.match(lines[0], /add the job in \.design-system-engine-out\/style-guide-store-job\.yml to design\/guide \(its \.gitlab-ci\.yml\)/);
+  assert.match(readFileSync(join(dir, '.design-system-engine-out', 'intent-layer-job.yml'), 'utf8'), /projects\/design%2Fguide\/trigger\/pipeline/, 'the layer\'s job starts the store\'s');
+  // With no profile: the setup written as one beside the job, when the code is read from GitLab; else said.
+  const mirror = project('https://gitlab.acme.io/design/ds.git', { '.gitlab-source.json': JSON.stringify({ source: 'https://gitlab.acme.io/design/ds' }) });
+  const own = writeStoreJobs(mirror, { figmaFileKey: 'AbC123', stores: { styleguide: { write: place } } }, place);
+  assert.match(own.join('\n'), /No company profile is set up, so the setup is written as one/);
+  const prof = JSON.parse(readFileSync(join(mirror, '.design-system-engine-out', 'design-system-engine-profile.json'), 'utf8'));
+  assert.deepEqual([prof.project, prof.config.figmaFileKey], ['https://gitlab.acme.io/design/ds', 'AbC123']);
+  assert.match(readFileSync(join(mirror, '.design-system-engine-out', 'style-guide-store-job.yml'), 'utf8'), /--profile '\.\.\/design-system-engine-profile\.json'/);
+  assert.match(writeStoreJobs(project(null), {}, place)[0], /The code is not read from GitLab here/);
+  assert.match(writeStoreJobs(project(null), {}, { folder: 'site' })[0], /not a GitLab project/);
+});

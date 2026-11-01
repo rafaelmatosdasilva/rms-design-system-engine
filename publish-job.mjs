@@ -16,6 +16,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { intentLayerConfig as layerConfig } from './doc-source-dsds.mjs';
+import { exportProfile } from './profile.mjs';
 import { OUT_DIR } from './names.mjs';
 
 export const ENGINE_REPO = 'https://github.com/rafaelmatosdasilva/rms-design-system-engine.git';
@@ -226,6 +227,90 @@ ${run}
     paths:
       - public
 `;
+}
+
+// The job for a team whose style guide is published to a store (stores.styleguide: a GitLab project of the team's), with
+// the code in a repository it may only read, so no job can live beside the code. It lives in the store's own project and
+// builds there from the company's profile (where the code, the intent layer, the stores and Figma are): every hour when
+// something it is built from moved (--ci-changed), and at once when the intent layer's own job triggers it. It never
+// runs on a push to the store, since the page it sends is one. What it may write is GitLab's answer for its token.
+// profile: the profile's link (or a file kept beside the job in the store's project).
+export function storeJob({ profile }) {
+  const dse = 'node /opt/dse/audit.mjs';
+  return `# Written by rms-design-system-engine --publish-styleguide for the style guide's own project: the guide built and
+# published here by itself, from the company's profile, so a change to the intent layer, the code, Figma or the engine
+# is on the page within the hour, and at once when the intent layer's own job triggers this one. It never runs on a
+# push here: the page it sends is one. Set once in this project:
+#   Settings → CI/CD → Variables (masked): GITLAB_TOKEN, a token that reads the code, the intent layer, the stores and
+#   the profile; GITLAB_WRITE_TOKEN, this project's access token, which sends the page (GitLab decides what it may do);
+#   FIGMA_TOKEN for each component's Figma image.
+#   Build → Pipeline schedules: every hour, on the default branch.
+style-guide-build:
+  image: node:24-bookworm
+  rules:
+    - if: $CI_PIPELINE_SOURCE =~ /^(schedule|trigger|pipeline|web|api)$/
+  variables:
+    CHROME_PATH: /usr/bin/chromium
+  cache:
+    key: style-guide-build
+    paths:
+      - .dse/             # the code's mirror, the setup and what the last build was made from
+  allow_failure:
+    exit_codes: [3]       # a scheduled run with nothing new: stopped, nothing published
+  before_script:
+    - git clone --depth 1 ${ENGINE_REPO} /opt/dse
+    - mkdir -p .dse && cd .dse
+    - ${dse} --profile '${String(profile).replace(/'/g, "''")}' --ci-changed || { code=$?; if [ "$CI_PIPELINE_SOURCE" = schedule ] || [ "$code" != 3 ]; then exit $code; fi; }   # 3: nothing moved
+    - apt-get update -qq && apt-get install -y -qq chromium > /dev/null
+  script:
+    - ${dse} --styleguide --no-a11y-bake --no-publish   # the page the audit measures each component on
+    - ${dse} || true                                    # the differences the page shows; a failing audit still publishes
+    - ${dse} --styleguide --no-publish                  # the page again, with them, its accessibility tried and kept in it
+    - ${dse} --styleguide-check                         # only the system on it, its own accessibility: else nothing is published
+    - ${dse} --publish-styleguide                       # sent to the style guide store, where GitLab lets the token write
+    - ${dse} --ci-changed --record                      # what this build was made from, for the next scheduled run
+`;
+}
+
+// Where the job that publishes the guide lives, for the intent layer's own job to start: the system's own repository
+// (its remote), or the style guide store's project. → { host, origin, path, branch } | null
+export function storeTarget(place) {
+  if (!place?.gitlab) return null;
+  try {
+    const u = new URL(String(place.gitlab));
+    const path = u.pathname.replace(/^\/+|\/+$/g, '').replace(/\/-\/.*$/, '').replace(/\.git$/, '');
+    if (!path.includes('/')) return null;
+    const branch = place.branch ?? (/\/-\/tree\/([^/]+)/.exec(u.pathname)?.[1] ?? 'main');
+    return { host: 'gitlab', origin: `${u.protocol}//${u.host}`, path, branch };
+  } catch { return null; }
+}
+
+// For a team published to a store: the store's job and the intent layer's own job (pointed at the store's project),
+// written to the engine's output folder for the person to add, with what to set once. → [line]
+export function writeStoreJobs(ROOT, cfg = {}, place) {
+  const target = storeTarget(place);
+  if (!target) return [`   The style guide store is not a GitLab project (${place?.folder ?? place?.github ?? 'nowhere'}): no job can build it there; whoever builds publishes it.`];
+  const lines = [];
+  let profile = cfg.profile?.source ?? null;
+  const dir = join(ROOT, OUT_DIR);
+  mkdirSync(dir, { recursive: true });
+  if (!profile || !/^https?:\/\//i.test(profile)) {
+    // No profile the pipeline can read: the setup as one (exportProfile: no token, nothing personal), kept beside the job
+    // in the store's project (the job runs one folder down).
+    let project = null; try { project = JSON.parse(readFileSync(join(ROOT, '.gitlab-source.json'), 'utf8')).source ?? null; } catch { /* the code is a folder */ }
+    if (!project) return [`   The code is not read from GitLab here, so a job in ${target.path} could not reach it: whoever builds publishes the page (with "styleguide": { "publish": "auto" }, every build that is behind).`];
+    writeFileSync(join(dir, 'design-system-engine-profile.json'), JSON.stringify(exportProfile(cfg, { project }), null, 2) + '\n');
+    profile = '../design-system-engine-profile.json';
+    lines.push(`   No company profile is set up, so the setup is written as one (${OUT_DIR}/design-system-engine-profile.json, no token in it): add it to ${target.path} beside the job.`);
+  }
+  writeFileSync(join(dir, 'style-guide-store-job.yml'), storeJob({ profile }));
+  lines.unshift(`   So the page updates by itself, add the job in ${OUT_DIR}/style-guide-store-job.yml to ${target.path} (its .gitlab-ci.yml), with the variables and the hourly schedule its first lines name.`);
+  const layer = layerConfig(cfg), lj = layerJob(layer, target);
+  if (lj) {
+    writeFileSync(join(dir, 'intent-layer-job.yml'), lj.text);
+    lines.push(`   The intent layer lives in ${layer.url}: so a change there is published at once, add the job in ${OUT_DIR}/intent-layer-job.yml to that repository (${lj.file}), with ${lj.needs.join('; ')}.`);
+  }
+  return lines;
 }
 
 // The job for the intent layer's own repository: on every push to its default branch it tells the system's style guide
