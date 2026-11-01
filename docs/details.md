@@ -561,6 +561,48 @@ An automated check finds many failures, but it cannot show that a product meets 
 
 Each component gets a contract, rewritten from Figma and the code on every run: its props, variants, states, tokens and the components it nests. `contracts/llms.txt` is the one file AI tools read.
 
+### What a contract says it is for
+
+A contract's `description` comes from the first source that says what the component is for:
+
+1. Your own words in `contract.authored.json`.
+2. Its page in your intent layer: the first paragraph of what it is for.
+3. Its code: the comment on the component in its own file. That is a Vue file's opening `<!-- … -->` or the doc comment above its `export default`, Svelte's `<!-- @component … -->`, or the doc comment right above a React or TypeScript component.
+4. Its description in Figma.
+
+`descriptionFrom` says which one it was: `authored`, `intent`, `code` or `figma`.
+
+- **Nothing says?** The description is a placeholder ("captured from Figma") and there is no `descriptionFrom`. The audit counts it as a component with no description and lists it.
+- **Published into the intent layer?** The page is linked, never copied back as the description.
+- **Licences and lint switches** at the top of a file are not a description.
+
+Each prop says what it is for the same way. A Figma property paired with a code prop takes its `description` from:
+
+1. Your words in `contract.authored.json` (`propDescriptions`).
+2. The code: the doc comment (or the `//` lines) right above the prop, in a Vue props object, a `defineProps` type or a TypeScript interface. Else what the component's own comment says of it (`@size {String} …`), or docgen's description.
+3. Figma, when the code says nothing.
+
+A prop only the code has (`codeOnly`) carries the code's description too.
+
+### Its element, said once
+
+`semantics.element` and `accessibility.element` always name the same element: yours from `contract.authored.json`, else the one the code's markup starts with. Where it was read is in `accessibility.element.from`. A role you write as `semantics.aria.role` is `accessibility.role` too.
+
+### Where it lives
+
+`livesIn.products` lists the products whose code uses the component, each with a name:
+
+1. The product's name in `ds-config.json` (`products` with a `dir`, `pluginDirs`, or `paths.plugins` for `apps/<app>`).
+2. Else its folder, for an app or package nobody listed (`apps/`, `plugins/`, `products/`, `packages/`). A package that holds the system's own components is the system's.
+3. Else `this project`, marked `own: true`: the files outside every product.
+
+### Contracts of components that are gone
+
+A run of every component takes out the contracts it wrote earlier for components it no longer writes: gone from Figma and the code, renamed, or written before contracts had a `name`. Left there, they read as components the system still has.
+
+- **A run of some components** (`contracts.only`) leaves the others alone.
+- **A contract written by hand** in the same folder stays: only the engine's own files (they carry `x-design-system-engine`) are taken out.
+
 ### Colour pairs, not a shortlist
 
 For every text and icon colour, the engine works out the one surface it was made for, reading the names (`content/on-interactive` goes with `surface/interactive`) and confirming it against the values. The pair goes into the contract, into `llms.txt` and into `--query`, so an agent is given the answer instead of every surface that would work: given only a shortlist, it picks a different grey on every card. An edit that puts a colour on another surface is told so at once, with the contrast the two actually give. And a pair whose names promise what its values break (white on a warning yellow) is reported as what it is: the system's own words against its own numbers.
@@ -926,6 +968,19 @@ When the layer changes, the style guide follows.
 - **A change made in the layer by hand** builds the page again on its own too. See It updates on its own, above.
 - **Each build says what moved.** It names the pages that changed since the layer was last read, and checks the whole layer again: names that do not exist, the guidance rating and rules that contradict Figma or the code.
 - **A private layer needs a token.** The job reads it with `INTENT_LAYER_TOKEN` (GitHub) or `GITLAB_TOKEN` (GitLab). Without one it cannot read the layer: it builds from the copy kept in the project, if there is one, and says so in its log.
+
+Each rule on a page is said as what holds it. The page's Documentation panel and `--check-intent` count them: how many rules, how many checked, checkable and judgment.
+
+| Status | What it means |
+| --- | --- |
+| Checked | A check the engine already runs enforces it, and the check is named: the edit check's colours, sizes, prop values or imports, the static accessibility check, the nesting rules, or a guard you said yes to before. |
+| Checkable | A guard could hold it on every edit: a component never inside another, a prop value or combination not allowed, a token never to write, a prop or slot always there, an import replaced, at most so many of a component on one screen. |
+| Judgment | A person judges it, or a model judging the page. |
+
+- **A checkable rule proposes its guard.** Say yes or no on the Documentation page, or with `--intent-decide <key> yes`. A yes writes the guard into `contract.authored.json` (an import into `ds-config.json`), and the rule is checked from then on, linked to it. A no is kept, and the rule stays one agents read.
+- **A vague rule gets a rewrite.** One that names no component, prop, value, token or count ("use it appropriately") is given one sentence a reviewer can check, from what the page says. A yes drafts it under Rules for your review.
+- **Agents are held to them.** Each rule in a contract carries its status. Checked and checkable rules are hard constraints.
+- **English and Portuguese.** The same rule, written in either, is read the same way.
 
 With no intent layer, every row can still be finished.
 
@@ -1345,6 +1400,7 @@ After the AI edits a style, markup or component file, the hook reads only what t
 - A component put inside another the way your system never does, with where it goes instead.
 - A class rule that nearly copies one of your components.
 - What a [lesson](#lessons-a-correction-becomes-a-guard) became a check for: a prop combination or a value a person corrected before.
+- What a rule of your intent layer became a check for, once you said yes: also a prop or slot a component always has, and at most so many of a component on one screen.
 
 The AI fixes it before moving on. The check is silent when the edit is clean, and never flags your own components, token definitions, comments or data. `"editCheck": false` turns it off.
 

@@ -395,13 +395,22 @@ if (process.argv.includes('--check-intent')) {
   const snap = { ...layer, entities };
   const facts = truth.systemFacts(ROOT, pcfg, { record: false });
   const names = [...new Set([...il.systemNames(ROOT, pcfg), ...Object.keys(facts.components)])];
-  const found = truth.checkLayer(snap, il.matchComponents(names, entities, il.codeFilesOf(ROOT, pcfg)), facts);
+  const matched = il.matchComponents(names, entities, il.codeFilesOf(ROOT, pcfg));
+  const found = truth.checkLayer(snap, matched, facts);
   const shown = [...found].filter(([e]) => !mine || mine.includes(e)).map(([e, f]) => [`${e.name} (${e.file})`, f]);
   const { n, text } = truth.report(shown);
   const pages = mine ? mine.length : entities.length;
-  if (!n) { console.log(`✅ ${pages} page${pages === 1 ? '' : 's'} checked: nothing on ${pages === 1 ? 'it' : 'them'} is contradicted by the system.`); console.log(mine ? 'NEXT: the page can be written to the intent layer.' : 'NEXT: none'); process.exit(0); }
+  // Each page's rules, said as what holds them (rule-checks.mjs): checked, checkable (with the guard it becomes),
+  // judgment, and the vague ones with a rewrite. Said, never a finding: the exit code is the findings'.
+  const rc = await import('./rule-checks.mjs');
+  const rules = rc.layerRules({ entities: mine ?? entities }, matched, rc.readRuleContext(ROOT, pcfg, { components: facts.components }), { decisions: (await import('./intent-proposals.mjs')).readDecisions(ROOT) });
+  const ruleLines = rc.ruleReport(rules);
+  const asked = [...rules.values()].flatMap((r) => r.rules).filter((x) => x.key && !x.answer).length;
+  const askNext = asked ? (mine ? `; once the page is in the layer, ask the person yes or no to each guard and rewrite its rules propose (--intent-decide lists them)` : `; ask the person yes or no to each guard and rewrite the rules propose (--intent-decide "<key>" yes|no), never answering for them`) : '';
+  if (!n) { console.log(`✅ ${pages} page${pages === 1 ? '' : 's'} checked: nothing on ${pages === 1 ? 'it' : 'them'} is contradicted by the system.`); if (ruleLines.length) console.log(ruleLines.join('\n')); console.log(mine ? `NEXT: the page can be written to the intent layer${askNext}.` : asked ? `NEXT: ${askNext.slice(2)}.` : 'NEXT: none'); process.exit(0); }
   console.log(`❌ ${n} finding${n === 1 ? '' : 's'} on ${shown.length} of ${pages} page${pages === 1 ? '' : 's'}:${text}`);
-  console.log(mine ? '\nNEXT: fix each finding in the page, then run --check-intent on it again; write it to the intent layer only once it passes.' : '\nNEXT: fix each finding in its page in the intent layer (the Intent layer page of the style guide lists them under Fix).');
+  if (ruleLines.length) console.log('\n' + ruleLines.join('\n'));
+  console.log(mine ? `\nNEXT: fix each finding in the page, then run --check-intent on it again; write it to the intent layer only once it passes${askNext}.` : `\nNEXT: fix each finding in its page in the intent layer (the Intent layer page of the style guide lists them under Fix)${askNext}.`);
   process.exit(1);
 }
 
@@ -614,9 +623,34 @@ if (process.argv.includes('--intent-decide')) {
   // Answered by someone else than its owner: kept as given, and said, so the owner hears of it.
   const others = [...new Set(keys.map((k) => d.proposals.get(k)?.decider).filter((o) => db.notTheOwner(by, o)).map((o) => o.name))];
   if (others.length) console.log(`ℹ️  Answered by ${by}, and ${others.join(' and ')} ${others.length === 1 ? 'is' : 'are'} who decides ${keys.length === 1 ? 'it' : 'these'} (ds-config.json → owners): the answer stands; tell ${others.join(' and ')}.`);
+  // A rule held as a check, or written again (rule-checks.mjs). A yes to a guard writes it where the edit check reads it
+  // (lessons.mjs → withGuard: the authored contract, or ds-config.json for an import), linked to its rule; a yes to a
+  // rewrite is drafted through the layer's own draft (--draft). A no is kept, and makes nothing.
+  const ruleKeys = keys.filter((k) => /^(guard|rewrite):/.test(k));
+  const sq = (x) => `'${String(x).replace(/'/g, "'\\''")}'`;
+  const drafts = [];
+  if (ans === 'yes' && ruleKeys.length) {
+    const { mayWrite } = await import('./writes.mjs');
+    const { withGuard } = await import('./lessons.mjs');
+    const authoredFile = pcfg.contracts?.authored ?? 'contract.authored.json';
+    const readOwn = (f) => { try { return JSON.parse(readFileSync(join(ROOT, f), 'utf8')); } catch { return {}; } };
+    for (const k of ruleKeys) {
+      const x = d.proposals.get(k);
+      if (x.kind === 'rewrite') { drafts.push(`rms-design-system-engine --draft ${sq(x.page)} 'Rules' ${sq(x.rewrite)} --task 'Rule rewrite'`); continue; }
+      if (mayWrite(pcfg, 'engine').answer === 'no') { console.log(`   ℹ️  Not written: this project does not let the engine write its own files (ds-config.json → writes.engine). The guard to write: ${x.place}.`); continue; }
+      const made = withGuard({ ...x.guard, ...(x.guard.kind === 'pairing' || x.guard.kind === 'import' ? {} : { page: x.page }) }, { authored: readOwn(authoredFile), config: readOwn('ds-config.json'), id: k, rule: x.rule });
+      if (made.authored) writeFileSync(join(ROOT, authoredFile), JSON.stringify(made.authored, null, 2) + '\n');
+      if (made.config) writeFileSync(join(ROOT, 'ds-config.json'), JSON.stringify(made.config, null, 2) + '\n');
+      console.log(`   written into ${x.place}: the edit check holds "${x.rule}" from the next edit, and the rule is checked from the next run.`);
+    }
+  }
   await sendDecisions();
   // What the answer changes in the layer, made now: on the pages it was about (a page to start is found by its answer).
-  const only = new Set(keys.map((k) => d.proposals.get(k)?.page).filter(Boolean));
+  const only = new Set(keys.filter((k) => !ruleKeys.includes(k)).map((k) => d.proposals.get(k)?.page).filter(Boolean));
+  if (!only.size && ruleKeys.length === keys.length) {
+    console.log(drafts.length ? `NEXT: draft the rewrite${drafts.length === 1 ? '' : 's'} on ${drafts.length === 1 ? 'its page' : 'their pages'} for the team to review: ${drafts.join('; ')}` : `NEXT: ${ans === 'yes' ? 'commit the file named above when the person asks' : 'none'}`);
+    process.exit(0);
+  }
   console.log((await (await import('./intent-changes.mjs')).actOnAnswers(ROOT, pcfg, { only })));
   const followed = await followLayer(pcfg, [...only]);
   console.log(followed ? 'NEXT: tell the person what the lines above say: the change made in the layer, the style guide built again, and where it was published.' : 'NEXT: rebuild the style guide to see it (--styleguide).');
@@ -6939,8 +6973,10 @@ function reportFull(label, items, shown) {
             parts.some((p) => p && typeof p === 'object' && (p.whenNotToUse || p.useInstead));
           rowsC.push({
             name: j.id || f.replace(/\.contract\.json$/, ''),
-            desc: !!(j.description && String(j.description).trim()),
-            sem: !!(j.semantics && typeof j.semantics === 'object' && Object.keys(j.semantics).length),
+            // The engine's own placeholder says nothing: a component with only that has no description.
+            desc: !!(j.description && String(j.description).trim() && !/— captured from Figma by rms-design-system-engine\.$/.test(j.description)),
+            // An element or a role said somewhere: an empty placeholder ({ element: null, aria: {} }) is none.
+            sem: !!(j.semantics?.element || Object.keys(j.semantics?.aria ?? {}).length || j.accessibility?.element || j.accessibility?.role),
             guidance,
           });
         }

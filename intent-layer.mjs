@@ -176,7 +176,7 @@ export function layerPages(snap) {
 // guide take it. The usage report below is built from this table, so it says what is true of the readers.
 export const REACH = {
   components: {
-    purpose: ['its contract', 'llms.txt (when Figma has no description)', 'the prototype context', 'its documentation in the style guide'],
+    purpose: ['its contract (its description too, unless contract.authored.json writes one)', 'llms.txt', 'the prototype context', 'its documentation in the style guide'],
     whenToUse: ['its contract', 'the prototype context', 'its documentation in the style guide'],
     whenNotToUse: ['its contract', 'llms.txt (the first line)', 'the prototype context and its checks', 'its documentation in the style guide'],
     mistakes: ['its contract', 'the prototype context', 'its documentation in the style guide'],

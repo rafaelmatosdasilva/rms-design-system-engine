@@ -59,7 +59,7 @@ export function apiEntry(ROOT, reader, name) {
     file: a.file ? relative(ROOT, a.file) : null, how: a.how, readBy: a.readBy,
     props: a.props, slots: { ...a.slots, ...(Object.keys(slotProps).length ? { props: slotProps } : {}) },
     events: (a.events ?? []).map((e) => (payloads[e] ? { name: e, payload: payloads[e] } : { name: e })),
-    ...(a.tag ? { tag: a.tag, syntax: a.syntax } : {}),
+    ...(a.tag ? { tag: a.tag, syntax: a.syntax } : {}), ...(a.description ? { description: a.description } : {}),
     ...(a.codeConnect ? { codeConnect: a.codeConnect } : {}), ...(a.codeConnectProps ? { codeConnectProps: a.codeConnectProps } : {}),
     ...(a.codeConnectFile ? { codeConnectFile: relative(ROOT, a.codeConnectFile) } : {}), ...(a.codeConnectTag ? { codeConnectTag: a.codeConnectTag } : {}),
   };

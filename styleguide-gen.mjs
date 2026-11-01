@@ -775,6 +775,9 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         // (intent-proposals.mjs): a row the team has settled is no longer asked of them.
         const decided = await (await import('./intent-proposals.mjs')).decidedLayer(ROOT, cfg);
         const report = decided.report, wrongOf = decided.wrongOf;
+        // Each page's rules, said as what holds them (rule-checks.mjs), by the page's file and name.
+        const rulesBy = new Map([...(decided.rules ?? [])].map(([e, r]) => [`${e.file}#${e.name}`, r]));
+        const ruleOf = (e) => (e ? rulesBy.get(`${e.file}#${e.name}`) ?? null : null);
         const counts = report.pages.reduce((t, p) => (t[p.action] = (t[p.action] ?? 0) + 1, t), {});
         const src = snap._source ?? {};
         // Is there a component the system does not have? (layer-questions.mjs) Answered when the layer says what to do
@@ -783,7 +786,7 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         const agentFiles = RULE_FILES.map((f) => { try { return { name: f, lines: readFileSync(join(ROOT, f), 'utf8').split(/\n+/) }; } catch { return null; } }).filter(Boolean);
         const absent = (await import('./layer-questions.mjs')).absentComponent([...view.components.map((c) => c.name), ...Object.keys(readJson(cfg.paths?.snapshotStructure ?? 'src/figma-structure.snapshot.json')?.components ?? {})], { layer: snap, more: agentFiles });
         absent.entry = src.entry ?? null; absent.entryUrl = (await import('./doc-host.mjs')).fileUrl(src, src.entry);
-        view.intentLayer = { absent, ...(snap.system?.drafts?.length ? { systemDrafts: snap.system.drafts } : {}), source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])) })),
+        view.intentLayer = { absent, ...(snap.system?.drafts?.length ? { systemDrafts: snap.system.drafts } : {}), source: { url: src.url ?? null, ref: src.ref ?? null, sha: src.sha ?? null, committedAt: src.committedAt ?? null, fetchedAt: src.fetchedAt ?? null }, counts: report.counts, actions: Object.fromEntries(il.ACTIONS.map(([k]) => [k, counts[k] ?? 0])), actionLabels: il.ACTIONS, wrongKinds: truth.KINDS, namesFrom: from, repeated: snap.boilerplate ?? 0, pages: report.pages.map((p, i) => ({ ...p, reads: il.agentText(snap.entities[i], src, wrongOf(snap.entities[i])), ...(ruleOf(snap.entities[i]) ? { ruleCheck: ruleOf(snap.entities[i]) } : {}) })),
           noPage: decided.noPage, addProposals: decided.addProposals, ...(Object.keys(decided.noPageRechecks ?? {}).length ? { noPageRechecks: decided.noPageRechecks } : {}) };
         // Who each page waits on when it waits on a person (ds-config.json → owners): the page counts its rows by it.
         const { ownerOf } = await import('./decided-by.mjs');
