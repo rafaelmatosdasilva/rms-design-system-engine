@@ -868,6 +868,7 @@ button.sg-tk-twist:hover { background: var(--sg-hover-fill); color: var(--sg-tex
 .sg-tk-crumb:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-link-pill { display: inline-flex; align-items: center; gap: var(--sg-space-s); max-width: 100%; margin: 0; padding: var(--sg-space-xs) var(--sg-space-s); border: var(--sg-line); border-radius: var(--sg-radius-s); background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-s); text-align: left; overflow-wrap: break-word; word-break: normal; cursor: pointer; text-decoration: none; }   /* anything that opens something else, in a table: its words in a pill, an arrow after them (a token's alias, a component's area) */
 .sg-link-pill:hover { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }
+.sg-link-pill[hidden] { display: none; }   /* a pill past the first ten of a list stays out of view until its More asks for it */
 .sg-link-pill--table { margin: var(--sg-space-xxs) var(--sg-space-xxs) var(--sg-space-xxs) 0; vertical-align: middle; }   /* a link in a table, as a pill: several in one cell sit apart */
 table a[href].sg-link-pill.sg-link-pill--table { text-decoration: none; color: var(--sg-text); }   /* never underlined, as a pill is not */
 table a[href].sg-link-pill.sg-where-pill { color: var(--sg-muted); }   /* where else a commit changed things: quieter than a component */

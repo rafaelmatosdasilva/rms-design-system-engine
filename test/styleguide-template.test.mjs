@@ -1685,7 +1685,7 @@ test('History: each card dated as what it holds is: the code by its release, a r
 
 test('History: a read of Figma is a card of its own, dated: a row a changed component with what changed, then the ones read for the first time, named, the pills only under Affects', () => {
   const tpl = templateText();
-  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 12;'), tpl.indexOf('    var decisionRow = function (d) {'));
+  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 10;'), tpl.indexOf('    var decisionRow = function (d) {'));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const fns = new Function('esc', 'cid', 'sysButton', src + 'return { figmaRows, figmaHead, figmaChange, pillsHTML };')(esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`);
   assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
@@ -1702,8 +1702,9 @@ test('History: a read of Figma is a card of its own, dated: a row a changed comp
   assert.doesNotMatch(fns.figmaRows(read).split('<td>').filter((_, i) => i % 2).join(''), /href="#/, 'no pill in What: the components are pills only under Affects');
   assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'Figma2026-10-27', 'Figma and its day, nothing else');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
-  assert.equal((many.match(/ hidden>/g) ?? []).length, 2, 'the first twelve shown');
-  assert.match(many, /<button data-pills-more>2 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.equal((many.match(/ hidden>/g) ?? []).length, 4, 'the first ten shown');
+  assert.match(many, /<button data-pills-more>4 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.match(tpl, /\.sg-link-pill\[hidden\] \{ display: none; \}/, 'a pill kept back stays hidden, its pill style never showing it');
   assert.match(tpl, /order\.sort\(function \(a, b\) \{ return dayOf\(b\) - dayOf\(a\) \|\| releaseOrder\(a, b\); \}\);/, 'the code\'s releases and the reads of Figma in one order, newest first');
 });
 

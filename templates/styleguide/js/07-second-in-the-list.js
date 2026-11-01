@@ -205,7 +205,7 @@
     order.sort(function (a, b) { return dayOf(b) - dayOf(a) || releaseOrder(a, b); });
     // The components a change affects: links the table turns into pills (pillLinks), the first ones shown, the rest one
     // click away.
-    var PILLS_SHOWN = 12;
+    var PILLS_SHOWN = 10;
     var pillsHTML = function (names, area) {
       return names.map(function (n, i) { return '<a href="#' + esc(cid(n)) + (area ? '/' + area : '') + '"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</a>'; }).join(' ') +
         (names.length > PILLS_SHOWN ? ' ' + sysButton('button', (names.length - PILLS_SHOWN) + ' more', ' data-pills-more') : '');
