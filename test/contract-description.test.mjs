@@ -94,3 +94,8 @@ test('published into the intent layer, a contract never takes the page\'s words 
   assert.deepEqual([c.description, c.descriptionFrom], ['What the code says of the card.', 'code']);
   assert.ok(c.intentPage, 'the page is linked instead');
 });
+
+test('a comment closed the other way HTML allows (--!>) is read the same', () => {
+  assert.equal(componentComment('CardTile.vue', '<!-- A tile for one subject. --!>\n<template><div /></template>'), 'A tile for one subject.');
+  assert.equal(componentComment('CardTile.svelte', '<!-- @component A tile for one subject. --!>\n<div></div>'), 'A tile for one subject.');
+});

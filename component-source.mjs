@@ -401,7 +401,7 @@ export function extractEvents(file, text, propNames = []) {
 // A comment's words: the comment marks and a doc comment's stars taken off, up to its first tag line (@param …) or the
 // end of its first paragraph, on one line. '' for a comment that only switches a tool off or names a licence.
 export function commentWords(raw) {
-  const body = String(raw ?? '').replace(/^\s*(?:\/\*\*?|<!--)/, '').replace(/(?:\*\/|-->)\s*$/, '').replace(/^\s*@component\b/, '');
+  const body = String(raw ?? '').replace(/^\s*(?:\/\*\*?|<!--)/, '').replace(/(?:\*\/|--!?>)\s*$/, '').replace(/^\s*@component\b/, '');
   const lines = [];
   for (const line of body.split('\n').map((l) => l.replace(/^\s*(?:\*|\/\/\/?)\s?/, '').trim())) {
     if (/^@\w/.test(line)) break;
@@ -420,8 +420,8 @@ export function componentComment(file, text) {
   const t = String(text ?? '');
   const ext = extname(String(file)).toLowerCase();
   const first = (...res) => { for (const re of res) { const m = re.exec(t); const w = m ? commentWords(m[1]) : ''; if (w) return w; } return ''; };
-  if (ext === '.svelte') return first(/<!--\s*(@component[\s\S]*?)-->/);
-  if (ext === '.vue') return first(/^\s*(<!--[\s\S]*?-->)\s*</, new RegExp(DOC + String.raw`\s*(?:export\s+default\b|(?:defineOptions|defineComponent)\s*\()`));
+  if (ext === '.svelte') return first(/<!--\s*(@component[\s\S]*?)--!?>/);
+  if (ext === '.vue') return first(/^\s*(<!--[\s\S]*?--!?>)\s*</, new RegExp(DOC + String.raw`\s*(?:export\s+default\b|(?:defineOptions|defineComponent)\s*\()`));
   return first(new RegExp(DOC + String.raw`\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*(?:export\s+default\s+(?:function|class)\b|(?:export\s+)?(?:function\s+[A-Z]|(?:const|let|var)\s+[A-Z][\w$]*\s*[:=]|class\s+[A-Z]))`));
 }
 
