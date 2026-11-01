@@ -28,6 +28,10 @@ export async function portAnswers(port, fetchImpl = globalThis.fetch, timeoutMs 
   } catch { return false; }
 }
 
+// DESIGN_SYSTEM_ENGINE_FIGMA_CLI=none: figma-cli is never asked, even where it is installed and Figma answers (a test,
+// or a run that must not read the Figma file open on this computer).
+export const figmaCliOff = (env = process.env) => env.DESIGN_SYSTEM_ENGINE_FIGMA_CLI === 'none';
+
 // figma-cli in Safe Mode: no debugging port, its daemon talks to the FigCli plugin open in Figma. Connected when a
 // one-line eval comes back through it.
 export function safeModeAnswers(run = (args) => spawnSync('figma-cli', args, { encoding: 'utf8', timeout: 15000 })) {
@@ -42,8 +46,9 @@ export async function chooseFigmaSource(ROOT, cfg = {}, { env = process.env, whi
   const snap = join(ROOT, cfg.paths?.snapshotVars ?? 'src/figma-vars.snapshot.json');
   const dj = mtime(design), sv = mtime(snap);
   if (dj != null && (sv == null || dj > sv)) return { route: 'design-json', file: designJsonPath(cfg), why: `${designJsonPath(cfg)} is newer than the snapshots` };
-  if (which('figma-cli') && await answers(figmaCliPort(env))) return { route: 'figma-cli', why: `figma-cli is installed and Figma answers on port ${figmaCliPort(env)}` };
-  if (which('figma-cli') && await safe()) return { route: 'figma-cli', why: 'figma-cli is installed and Figma answers through its FigCli plugin (Safe Mode)' };
+  const cli = !figmaCliOff(env) && which('figma-cli');
+  if (cli && await answers(figmaCliPort(env))) return { route: 'figma-cli', why: `figma-cli is installed and Figma answers on port ${figmaCliPort(env)}` };
+  if (cli && await safe()) return { route: 'figma-cli', why: 'figma-cli is installed and Figma answers through its FigCli plugin (Safe Mode)' };
   if (env.FIGMA_TOKEN && cfg.figmaFileKey) return { route: 'rest', why: 'FIGMA_TOKEN is set: the audit refreshes from the Figma API on every run' };
   return { route: 'mcp', why: 'no figma-cli connection and no design.json: the Figma tool of this session reads it' };
 }

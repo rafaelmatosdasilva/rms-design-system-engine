@@ -1091,7 +1091,7 @@ if (process.argv.includes('--figma-examples')) {
   if (files.length) {
     try { snap = fe.examplesSnapshot(files.map((f) => readFileSync(resolve(ROOT, f), 'utf8'))); } catch (e) { console.log(`❌ ${String(e.message).split('\n')[0]}`); process.exit(2); }
   } else {
-    const answers = /^\s*1\s*$/m.test(spawnSync('figma-cli', ['eval', 'return 1'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '');
+    const answers = !(await import('./figma-source.mjs')).figmaCliOff() && /^\s*1\s*$/m.test(spawnSync('figma-cli', ['eval', 'return 1'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '');
     const cli = (await import('./figma-capture.mjs')).figmaCliEval(ROOT, { timeout: 600000 });
     if (answers) {
       console.log('  Reading the examples in Figma through figma-cli, in parts…');
@@ -1175,7 +1175,7 @@ if (process.argv.includes('--figma-brands')) {
   if (files.length) {
     try { snap = fb.brandsSnapshot(files.map((f) => readFileSync(resolve(ROOT, f), 'utf8'))); } catch (e) { console.log(`❌ ${String(e.message).split('\n')[0]}`); process.exit(2); }
   } else {
-    const answers = /^\s*1\s*$/m.test(spawnSync('figma-cli', ['eval', 'return 1'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '');
+    const answers = !(await import('./figma-source.mjs')).figmaCliOff() && /^\s*1\s*$/m.test(spawnSync('figma-cli', ['eval', 'return 1'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '');
     const cli = (await import('./figma-capture.mjs')).figmaCliEval(ROOT, { timeout: 600000 });
     if (answers) {
       console.log('  Reading the brands in Figma through figma-cli, a collection at a time…');

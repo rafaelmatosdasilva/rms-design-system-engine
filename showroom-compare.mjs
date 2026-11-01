@@ -156,7 +156,7 @@ export async function compareShowroom(ROOT, cfg, pageFile, { refresh = false, to
       const node = /node-id=(\d+)[-:](\d+)/.exec(meta.figma ?? '');
       if (!node) continue;
       const id = `${node[1]}:${node[2]}`;
-      if (cliOk == null) cliOk = /^\s*1\s*$/m.test(spawnSync('figma-cli', ['eval', 'return 1'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '');
+      if (cliOk == null) cliOk = process.env.DESIGN_SYSTEM_ENGINE_FIGMA_CLI !== 'none' && /^\s*1\s*$/m.test(spawnSync('figma-cli', ['eval', 'return 1'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '');
       if (!cliOk) { const f = join(dir, `${k}.figma-layout.js`); writeFileSync(f, layoutCaptureScript(id)); next.push(`run ${relative(ROOT, f)} with the Figma tool of this session on the file that holds the screen (in parts: from, count) and save what it returns as ${relative(ROOT, file)}`); continue; }
       try {
         const out = { texts: [], instances: [] };

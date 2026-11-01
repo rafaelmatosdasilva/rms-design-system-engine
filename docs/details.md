@@ -1173,6 +1173,7 @@ bash ~/.claude/skills/rms-design-system-engine/install.sh
 | `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` | Turns off the daily self-update |
 | `DESIGN_SYSTEM_ENGINE_TYPESCRIPT=project` | Uses only the project's own TypeScript |
 | `DESIGN_SYSTEM_ENGINE_CHROME=none` | Reads the code with no browser, even where Chrome is installed |
+| `DESIGN_SYSTEM_ENGINE_FIGMA_CLI=none` | Never asks figma-cli, even where it is installed and Figma answers |
 | `DESIGN_SYSTEM_ENGINE_MIRRORS=<folder>` | Keeps every project mirror in one folder on this computer (for example `~/.cache/rms-engine/mirrors`), per host and project, instead of beside the work |
 | `DESIGN_SYSTEM_ENGINE_WORKSPACE=<folder>` | Keeps the engine's own files of a GitLab project (setup, snapshots, contracts, history, hand-back, output) in that folder, per host and project, apart from the mirror of its code |
 | `DESIGN_SYSTEM_ENGINE_USAGE_LOG=1` | Records which recipes and commands ran, locally |
