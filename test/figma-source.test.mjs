@@ -23,6 +23,7 @@ test('the route, in order: a newer design.json, figma-cli connected, the API wit
   const safe = await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), which: () => '/bin/figma-cli', safe: async () => true });
   assert.deepEqual([safe.route, /Safe Mode/.test(safe.why)], ['figma-cli', true], 'Safe Mode: no debugging port, the FigCli plugin answers');
   assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), which: () => null, safe: async () => true })).route, 'mcp', 'not installed: never asked');
+  assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), which: () => '/bin/figma-cli', answers: async () => true, safe: async () => true, env: { DESIGN_SYSTEM_ENGINE_FIGMA_CLI: 'none' } })).route, 'mcp', 'switched off: never asked, even when Figma answers');
   assert.equal((await chooseFigmaSource('/p', cfg, { ...none, mtime: at({}), env: { FIGMA_TOKEN: 't' } })).route, 'rest');
   assert.equal(figmaCliPort({ FIGMA_PORT: '9333' }), 9333);
   assert.equal(figmaCliPort({ FIGMA_PORT: 'x' }), 9222);

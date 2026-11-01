@@ -70,3 +70,10 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine how does our system build a component in Figma?` | Its construction rules (names, properties, variants, layers, auto layout, variables), each with how many components follow it, and the questions only your team can answer |
 | `/rms-design-system-engine fix the construction of the chip in Figma` | What the chip must change to follow how your system builds components, renamed in Figma after you say yes |
+
+## Build with AI, on the system
+
+| Ask in Claude Code | What you get |
+|---|---|
+| `/rms-design-system-engine remember this lesson: the clock button was put inside the tile, because a tile holds one action` | Your correction kept with your reason, and the strongest guard that can hold it (a check, a step agents read, or a rule for your guidelines), written once you say yes |
+| `/rms-design-system-engine show the lessons` | Every lesson and what it became, the rules proposed from findings that repeat, and the lines an AI wrote that a person changed since |

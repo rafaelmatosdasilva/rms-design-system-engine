@@ -44,14 +44,14 @@ const COMMANDS = [
   '--prototype --consistency', '--prototype --flow', '--baseline', '--checked', '--ci-changed', '--a11y-no-worse', '--code-connect',
   '--contracts-out', '--docs', '--extract', '--intent', '--profile-export', '--rename-sweep', '--review-drafts',
   '--showroom-compare', '--update', '--check-update', '--from-figma-cli', '--figma-screens', '--figma-effects',
-  '--figma-motion', '--figma-examples', '--figma-brands', '--brands-css', '--refresh-snapshots',
+  '--figma-motion', '--figma-examples', '--figma-brands', '--brands-css', '--refresh-snapshots', '--lessons',
 ];
 
 // Each in a project of its own, so one that writes something cannot make the next one read it.
 const runOne = (command) => new Promise((done) => {
   const dir = tempDir('cmd-run-');
   cpSync(DEMO, dir, { recursive: true });
-  execFile(process.execPath, [join(ENGINE, 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26 },
+  execFile(process.execPath, [join(ENGINE, 'audit.mjs'), ...command.split(' ').filter(Boolean)], { cwd: dir, encoding: 'utf8', timeout: budget(90000), maxBuffer: 1 << 26, env: { ...process.env, DESIGN_SYSTEM_ENGINE_FIGMA_CLI: 'none' } },
     (err, stdout, stderr) => done({ command, out: `${stdout ?? ''}${stderr ?? ''}`, timedOut: err?.killed === true }));
 });
 

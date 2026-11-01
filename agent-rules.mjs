@@ -22,7 +22,9 @@ export const ENGINE_RULES = [
   'Never on your own: edit the Figma snapshots or `ds-config.json` by hand, accept a difference as debt (`--baseline`), mark a check as done, write to Figma, or ask for a token in the chat (a token goes in `.env`, set by the person).',
 ];
 
-export function rulesSection() {
+// steps: what lessons became in this project (lessons.mjs agentSteps): each a correction a person said yes to holding as
+// a step, so an agent that has no hooks reads it before it works.
+export function rulesSection(steps = []) {
   return [
     START,
     '## Design system (rms-design-system-engine)',
@@ -30,6 +32,7 @@ export function rulesSection() {
     'The UI in this project follows its design system, which rms-design-system-engine checks against Figma.',
     '',
     ...ENGINE_RULES.map((r) => `- ${r}`),
+    ...(steps.length ? ['', 'Learned in this project, each from a correction a person said yes to:', '', ...steps.map((r) => `- ${r}`)] : []),
     END,
   ].join('\n');
 }
@@ -43,11 +46,11 @@ export function ruleTargets(root) {
 // Agents other than Claude Code set up here: what makes the section worth offering after setup.
 export const otherAgents = (root) => ['AGENTS.md', '.cursorrules', '.github/copilot-instructions.md', '.windsurfrules', '.cursor'].filter((f) => existsSync(join(root, f)));
 
-// Write the section into one file: added at its end, or put in place of the one already there.
+// Write the section into one file: added at its end, or put in place of the one already there. steps: as rulesSection.
 // → { file, done: 'added' | 'updated' | 'unchanged' }
-export function writeRules(root, file) {
+export function writeRules(root, file, { steps = [] } = {}) {
   const path = join(root, file);
-  const section = rulesSection();
+  const section = rulesSection(steps);
   const cursor = file.endsWith('.mdc');
   let text = existsSync(path) ? readFileSync(path, 'utf8') : (cursor ? '---\ndescription: The design system rules rms-design-system-engine checks\nalwaysApply: true\n---\n' : '');
   const a = text.indexOf(START), b = text.indexOf(END);
@@ -57,3 +60,7 @@ export function writeRules(root, file) {
   if (done !== 'unchanged') { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, next); }
   return { file, done };
 }
+
+// The instruction files that already hold the engine's section: a step a lesson became is written there at once, the
+// person having said yes to it; a file that never had the section gets it only through --agent-rules --write.
+export const filesWithRules = (root) => ruleTargets(root).filter((f) => { try { return readFileSync(join(root, f), 'utf8').includes(START); } catch { return false; } });

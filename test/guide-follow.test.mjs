@@ -95,3 +95,11 @@ test('to the team\'s store when it has one; a build that failed publishes nothin
 test('nothing committed to the layer in this run: nothing to follow', () => {
   assert.deepEqual(committedThisRun(), []);
 });
+
+test('a layer in a folder of the project: the guide here is built again, and the published one waits for the push that carries the change', async () => {
+  const s = sender(204);
+  const dir = project('https://github.com/acme/ds.git', { '.github/workflows/style-guide.yml': 'x' });
+  const lines = await guideFollow(dir, {}, { pages: ['Button'], sha: null, local: true, stores: {}, build: builder('abc1234def5678', ['Button']), env: { GITHUB_TOKEN: 'gh0' }, send: s.send });
+  assert.match(lines.join('\n'), /written in the project's folder, not committed: the style guide here shows it, and the published one follows once it is committed and pushed/);
+  assert.equal(s.calls.length, 0, 'the job is not started: it would build without the change');
+});

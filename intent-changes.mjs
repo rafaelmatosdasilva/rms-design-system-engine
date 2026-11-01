@@ -29,6 +29,7 @@ import { intentLayerConfig, DRAFT } from './doc-source-dsds.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, plainSend, untar, projectApi } from './gitlab-source.mjs';
 export { writeTokenFrom };
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
+import { layerWriter } from './doc-host.mjs';
 import { linesOf, checkPage } from './intent-truth.mjs';
 
 export const CHANGES_DIR = `${OUT_DIR}/intent-changes`;
@@ -37,12 +38,12 @@ const flat = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 const MARK = '**Draft:** ';
 
 // ── The layer, where it lives ───────────────────────────────────────────────────────────────────────────────────────
-// → { p, base, ref, get(path), send(method, path, body) }, or { error }
-export function layerAccess(ROOT, cfg, { env = process.env } = {}) {
+// → { p, base, ref, get(path), send(method, path, body) }, or { error }. A layer on GitHub or in a folder of the project
+// gets its own access (doc-host.mjs → layerWriter: files, commit, request), which the functions below hand over to.
+export function layerAccess(ROOT, cfg, { env = process.env, fetchImpl, sendImpl } = {}) {
   const c = intentLayerConfig(cfg);
   if (!c) return { error: 'ds-config.json names no intent layer (intentLayer)' };
-  // The layer is read from GitHub or a folder of the project too; the engine writes its changes only to a GitLab project.
-  if (c.host !== 'gitlab') return { error: `the engine writes its changes to an intent layer on GitLab only, and this one is ${c.host === 'github' ? 'on GitHub' : `the folder ${c.folder}`}: the Documentation page lists each change for a person to make` };
+  if (c.host !== 'gitlab') return layerWriter(ROOT, c, { env, ...(fetchImpl ? { fetchImpl } : {}), ...(sendImpl ? { sendImpl } : {}) });
   const e = { ...env };
   const folders = [ROOT, ...(existsSync(join(ROOT, STATE_FILE)) ? [dirname(resolve(ROOT))] : [])];
   e.GITLAB_HOST = hostEnvFrom(e, folders);
@@ -68,6 +69,7 @@ export function layerAccess(ROOT, cfg, { env = process.env } = {}) {
 
 // Every text file of the layer at a commit. → Map(path → text)
 export async function layerFiles(access, sha) {
+  if (access.files) return access.files(sha);
   const r = await access.get(`/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}`);
   if (!r.ok) throw new Error(`GitLab answered ${r.status} for the layer's files`);
   const out = new Map();
@@ -91,10 +93,12 @@ export function specIndex(files, { codes = [] } = {}) {
     else if (src) byFolder.push([src.replace(/\/?$/, '/'), f]);
     if (h1 && !byTitle.has(norm(h1))) byTitle.set(norm(h1), f);
   }
-  return { byCode, byFolder, byTitle, codes: codes.map((c) => String(c ?? '').replace(/^\.?\//, '')).filter(Boolean) };
+  return { byCode, byFolder, byTitle, files: new Set(files.keys()), codes: codes.map((c) => String(c ?? '').replace(/^\.?\//, '')).filter(Boolean) };
 }
-// → { spec, shared } (shared: a family's spec, written into several pages), or null
+// → { spec, shared } (shared: a family's spec, written into several pages), or null. A Markdown page (a layer written as
+// Markdown) is its own spec.
 export function specOf(e, idx) {
+  if (/\.(md|mdx|markdown)$/i.test(String(e.file ?? '')) && idx.files?.has(e.file)) return { spec: e.file, shared: false };
   const code = String(e.code ?? '').replace(/^\.?\//, '');
   if (code && idx.byCode.has(code)) return { spec: idx.byCode.get(code), shared: false };
   if (idx.byTitle.has(norm(e.name))) return { spec: idx.byTitle.get(norm(e.name)), shared: false };
@@ -778,6 +782,7 @@ export function writeLocal(ROOT, files, summary) {
 // One branch, one commit, one merge request, from the commit the changes were made on: the team merges it, or not.
 // → { url, branch } | { error }
 export async function openMergeRequest(access, { files, sha, target, title, description, branch, message, created = new Set() }) {
+  if (access.request) return access.request({ files, sha, target, title, description, branch, message, created });
   const b = await access.send('POST', `/repository/branches?branch=${encodeURIComponent(branch)}&ref=${encodeURIComponent(sha)}`);
   if (!b.ok) return { error: b.status === 403 || b.status === 401 ? `GitLab refused (${b.status}) the token in ${access.writesWith}: it needs Commit Create (and Merge request Create) on the layer, and your role there Developer or more. Add the layer to your token's projects, or ask a Maintainer of it for the role` : `GitLab answered ${b.status} when making the branch` };
   const c = await access.send('POST', '/repository/commits', { branch, commit_message: message, actions: [...files].map(([file_path, content]) => (content === null ? { action: 'delete', file_path } : { action: created.has(file_path) ? 'create' : 'update', file_path, content })) });
@@ -796,6 +801,12 @@ export async function openMergeRequest(access, { files, sha, target, title, desc
 const committed = [];
 export const committedThisRun = () => [...committed];
 export async function commitToBranch(access, { files, sha, target, message, created = new Set() }) {
+  if (access.commit) {
+    // GitHub, or a folder (written there, not committed: local, so the published guide waits for a push).
+    const r = await access.commit({ files, sha, target, message, created });
+    if (!r?.error) committed.push({ sha: r?.sha ? String(r.sha) : null, ref: target, ...(r?.sha ? {} : { local: true }) });
+    return r;
+  }
   const h = await access.get(`/repository/commits/${encodeURIComponent(target)}`);
   if (!h.ok) return { error: `GitLab answered ${h.status} for ${target}` };
   const head = String((await h.json())?.id ?? '');
@@ -829,6 +840,10 @@ export async function commitToBranch(access, { files, sha, target, message, crea
 // write token's role in the layer and whether it may push to the branch (stores.mjs → writeAccess); what the setup or
 // the person says is never enough. → { ok } | { ok: false, why, mergeRequest? (a merge request would be accepted) }
 export async function mayWrite(ROOT, cfg, want = 'commit', opts = {}) {
+  // A folder of the project: its changes are written there for a person to commit. GitHub answers for its own token.
+  const c = intentLayerConfig(cfg);
+  if (c?.host === 'folder') return { ok: true };
+  if (c?.host === 'github') { const { envFrom } = await import('./gitlab-source.mjs'); return envFrom('GITHUB_TOKEN', opts.env ?? process.env, [ROOT]) || envFrom('GH_TOKEN', opts.env ?? process.env, [ROOT]) ? { ok: true } : { ok: false, why: 'no GITHUB_TOKEN in .env that may write to the layer\'s repository' }; }
   const { writeAccess } = await import('./stores.mjs');
   const a = await writeAccess(ROOT, cfg, 'intentLayer', opts);
   if (!a.mode) return { ok: false, why: a.why };
@@ -959,7 +974,7 @@ export async function actOnAnswers(ROOT, cfg, { only }) {
     const done = await commitToBranch(p.access, { files: p.result.files, created: p.result.created, sha: p.snap._source.sha, target: p.snap._source.ref, message: 'Intent layer: the team\'s answers made by rms-design-system-engine (' + p.summary.split('\n')[0].replace(/\.$/, '') + ')\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>' });
     if (done.error) return `⚠️  The layer is not changed yet: ${done.error}`;
     try { const il = await import('./intent-layer.mjs'); await il.syncSources(ROOT, cfg); } catch { /* next run reads it */ }
-    return `🔧 Made in the layer and committed on ${p.snap._source.ref}: ${p.summary.split('\n')[0]} ${done.url ?? done.sha} (${OUT_DIR}/intent-changes/CHANGES.md says each change)${p.note ? `\n   ${p.note}` : ''}`;
+    return `🔧 Made in the layer and ${done.said ?? `committed on ${p.snap._source.ref}: ${done.url ?? done.sha}`}: ${p.summary.split('\n')[0]} (${OUT_DIR}/intent-changes/CHANGES.md says each change)${p.note ? `\n   ${p.note}` : ''}`;
   } catch (e) { return `⚠️  The layer is not changed yet: ${e.message}`; }
 }
 
@@ -982,6 +997,6 @@ export async function autoFix(ROOT, cfg, { offline = false } = {}) {
     if (done.error) return `⚠️  Intent layer not fixed this run: ${done.error}`;
     // Read again, so what this run builds shows the layer as it is now.
     try { const il = await import('./intent-layer.mjs'); await il.syncSources(ROOT, cfg); } catch { /* next run reads it */ }
-    return `🔧 Intent layer fixed and committed on ${p.snap._source.ref}: ${p.summary.split('\n')[0]} ${done.url ?? done.sha} (${OUT_DIR}/intent-changes/CHANGES.md says each change)${p.note ? `\n   ${p.note}` : ''}`;
+    return `🔧 Intent layer fixed and ${done.said ?? `committed on ${p.snap._source.ref}: ${done.url ?? done.sha}`}: ${p.summary.split('\n')[0]} (${OUT_DIR}/intent-changes/CHANGES.md says each change)${p.note ? `\n   ${p.note}` : ''}`;
   } catch (e) { return `⚠️  Intent layer not fixed this run: ${e.message}`; }
 }

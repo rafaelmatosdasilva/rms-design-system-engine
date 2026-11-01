@@ -88,7 +88,7 @@ export async function storePublish(ROOT, cfg, page, { env = process.env, offline
   return st.pushStore(ROOT, cfg, 'styleguide', files, 'Style guide published with rms-design-system-engine, after a change to the intent layer', { offline });
 }
 
-export async function guideFollow(ROOT, cfg = {}, { pages = [], sha = null, engine, stores = null, publish = null, env = process.env, build = spawnBuild, rebuild = true, send = plainSend, offline = false } = {}) {
+export async function guideFollow(ROOT, cfg = {}, { pages = [], sha = null, local = false, engine, stores = null, publish = null, env = process.env, build = spawnBuild, rebuild = true, send = plainSend, offline = false } = {}) {
   if (!stores) { try { stores = (await import('./stores.mjs')).storesOf(cfg); } catch { stores = {}; } }
   if (!publish) publish = (page) => storePublish(ROOT, cfg, page, { env, offline });
   const out = [];
@@ -118,6 +118,9 @@ export async function guideFollow(ROOT, cfg = {}, { pages = [], sha = null, engi
   if (t.kind === 'store') {
     const r = publish ? await publish(page) : null;
     out.push(r?.line ?? '   The style guide store was not written.');
+  } else if ((t.kind === 'github' || t.kind === 'gitlab') && local) {
+    // A layer in a folder of the project: written there, not committed, so the job would build without it.
+    out.push(`   The change is written in the project's folder, not committed: the style guide here shows it, and the published one follows once it is committed and pushed (a push builds it).`);
   } else if (t.kind === 'github' || t.kind === 'gitlab') {
     out.push((await startJob(t, { env, send, folders: [ROOT, resolve(ROOT, '..')] })).line);
   } else {
