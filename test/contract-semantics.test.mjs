@@ -42,7 +42,8 @@ test('semantics.element and accessibility.element never disagree', async () => {
   assert.equal(read('cardTile').usage?.element, 'div');
   // A role authored without an element: the code's element, and the authored role in accessibility too.
   assert.deepEqual(read('tabTile').semantics, { aria: { role: 'tab' }, element: 'button' });
-  assert.deepEqual(read('tabTile').accessibility.role, { value: 'tab', from: 'authored' });
+  // and where the code's own markup gives another role, that is kept beside it, never lost
+  assert.deepEqual(read('tabTile').accessibility.role, { value: 'tab', from: 'authored', differs: [{ from: 'code', value: 'button' }] });
   // An authored element wins over the code's, in both.
   assert.deepEqual([read('chipTile').semantics.element, read('chipTile').accessibility.element], ['button', { value: 'button', from: 'authored' }]);
 });
