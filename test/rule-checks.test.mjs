@@ -184,7 +184,8 @@ function project(rules) {
   writeFileSync(join(root, 'intent-layer.snapshot.json'), JSON.stringify({ _source: { id: 'dsds', label: 'the intent layer', url: 'docs', sha: 'abc' }, entities: [entityView(entity, 'docs/components/tile.dsds.json', 'components')] }));
   return root;
 }
-const run = (root, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8' });
+// As a person runs it: on CI the engine never writes its own files (writes.mjs), so the run is not a CI one.
+const run = (root, ...args) => spawnSync(process.execPath, [join(ENGINE, 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
 
 test('--check-intent says each page\'s rules; a yes writes the guard and the rule is checked from then on; a no is kept', () => {
   const root = project(['Never put a Button inside a Tile.', 'Nunca uses o tom `loud` no Tile.', 'Use it appropriately.', 'Use Tile when content belongs together.']);
