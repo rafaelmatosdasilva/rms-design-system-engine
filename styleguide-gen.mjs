@@ -865,13 +865,14 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const decidedBy = new Map(Object.entries(decided.byComponent).map(([n, list]) => [key(n), list]));
       for (const c of view.components) {
         const list = decidedBy.get(key(c.name));
-        if (list?.length) c.decisions = list.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}), ...(d.review ? { review: d.review } : {}) }));
+        if (list?.length) c.decisions = list.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}), ...(d.review ? { review: d.review } : {}), ...(d.author ? { author: d.author, reviewer: d.reviewer } : {}) }));
       }
       // Every decision, for the History page: what it is about (a component, or a page of the layer), and where it is written.
       // A lesson says what it became (a check, a step in the agent rules, a rule for the guidelines) and, when the same
       // mistake came back, which guard did not hold; a rule proposed from repeated findings says it waits for a yes.
+      // A sign-off says who made the change and who reviewed it.
       // One whose component changed since it was answered says so: to review again (intent-truth.mjs → decisionsToReview).
-      view.decisions = decided.all.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, kind: d.kind, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}), ...(d.review ? { review: d.review } : {}),
+      view.decisions = decided.all.map((d) => ({ what: d.what, ruledOut: d.kind === 'lesson' ? [] : d.ruledOut, why: d.why, by: d.by, at: d.at, said: KINDS[d.kind].said, kind: d.kind, ...(d.became ? { became: d.became } : {}), ...(d.back ? { back: d.back } : {}), ...(d.review ? { review: d.review } : {}), ...(d.author ? { author: d.author, reviewer: d.reviewer } : {}),
         component: d.component ?? null, page: d.page ?? null, about: d.about ?? (d.component ? 'Components' : 'System'), url: d.url ?? null }));
     } catch { /* no prototype checked yet */ }
     // Its properties: in its contract. The one everybody reads is in the team's intent layer (published there with
@@ -1490,6 +1491,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       // when someone else signed it off, said too.
       const { ownerOf, notTheOwner } = await import('./decided-by.mjs');
       for (const x of fc) { const o = ownerOf(cfg.owners, x.component); if (o && ((x.held ?? []).length || (x.breaking ?? []).length)) { x.decider = o; if (x.signedOff && notTheOwner(x.signedOff.by, o)) x.signedOff.notOwner = true; } }
+      // Local or shared, with its reason (local-shared.mjs), and who made it and who signed it off, in words.
+      const { changeScope, usageFrom } = await import('./local-shared.mjs');
+      const { whoSaid } = await import('./sign-off.mjs');
+      const usage = usageFrom(ROOT, cfg);
+      for (const x of fc) {
+        x.scope = changeScope(x, { usage, owners: cfg.owners });
+        if (x.author) x.authorSaid = whoSaid(x.author);
+        if (x.signedOff) x.signedOff.reviewerSaid = whoSaid(x.signedOff.reviewer) ?? x.signedOff.by;
+      }
       if (fc.length) view.figmaChanges = fc;
     } catch { /* no changes */ }
     // How much each area weighs in the Health page's one number (styleguide.health.weights); the page's own otherwise.
@@ -1634,6 +1644,19 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         }
       } catch { /* no pictures: the cards show the names */ }
     }
+    // Local or shared (local-shared.mjs), with its reason in one line: each component's own tasks change what every
+    // product using it gets, and wait on the one who decides for it; each task not tied to one component is sorted by
+    // what it is about (a product's page or version is that product's; the system's tokens, text styles and modes are
+    // the system's). The Tasks page counts them and says on whom the shared ones wait.
+    try {
+      const { scopeOf, todoScope, usageFrom } = await import('./local-shared.mjs');
+      const usage = usageFrom(ROOT, cfg), sctx = { usage, owners: cfg.owners };
+      for (const c of new Set([...(view.allComponents ?? []), ...view.components])) {
+        const known = Object.keys(usage).some((n) => n.toLowerCase() === String(c.name).toLowerCase());
+        c.scope = scopeOf({ home: 'system', kind: 'component', change: 'change', what: c.name, component: c.name, ...(known || !Array.isArray(c.usage) ? {} : { reach: c.usage.map((u) => u?.name ?? u?.key ?? u).filter(Boolean) }) }, sctx);
+      }
+      for (const t of view.systemTodo ?? []) t.scope = todoScope(t, sctx);
+    } catch { /* the page builds without it */ }
     lastView = view;
     agreedSummary = { components: view.components.length, codeOnly: view.codeOnly ?? 0, notInFigma: view.notInFigma?.length ?? 0, line: view.notAgreed.line, ...(view.scope ? { scope: view.scope } : {}) };
     return JSON.stringify(view).replace(/</g, '\\u003c');

@@ -8,7 +8,9 @@
 //   • asks the person before editing ds-config.json, committing, pushing, applying the hand-back patch, or writing the
 //     engine's rules into an agent's instruction file;
 //   • holds an edit that adds to the design system itself (a token in the theme, an option on a component) until a named
-//     person signed it off (sign-off.mjs, --sign-off), and asks before a sign-off the person did not give;
+//     person signed it off (sign-off.mjs, --sign-off), and asks before a sign-off the person did not give. It says why
+//     the edit is shared and who decides it (local-shared.mjs, ds-config.json owners), and writes down the session that
+//     made it, so that session never signs it off (a second reviewer, second-review.mjs);
 //   • keeps the records of the system's decisions for the person: what was accepted as debt, the exception
 //     lists and the approved reference pictures (replaced or deleted; a new one is not yet approved) change only
 //     when the person's latest message asks for it, and the record of what both sides last agreed on is the
@@ -29,10 +31,11 @@
 // Anything else, or any project without a ds-config.json, or one with "hooks": false, passes untouched.
 // The engine's own writes (node … audit.mjs, rms-design-system-engine) are never blocked.
 import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
-import { join, basename, resolve, dirname } from 'node:path';
+import { join, basename, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { route, routeText, projectState, SAY, PROTOTYPE } from './route.mjs';
-import { additionsOf, signedOff, SIGN_OFFS } from './sign-off.mjs';
+import { additionsOf, signedOff, SIGN_OFFS, HELD, recordHeld, reviewMode, themeFiles, contractsByFile } from './sign-off.mjs';
+import { editScope, usageFrom } from './local-shared.mjs';
 import { readDoc } from './skill-files.mjs';
 import { editCheck, editCheckRun, editHookOutput, sessionLeftovers } from './edit-check.mjs';
 import { PROJECT, OUT_DIR } from './names.mjs';
@@ -196,7 +199,15 @@ function systemHold(event, file, cfg) {
   try { adds = additionsOf({ file, before, after, cfg, root }).filter((a) => !signedOff(root, a.what)); } catch { return null; }
   if (!adds.length) return null;
   const list = adds.map((a) => a.what).join('; ');
-  return { decision: 'deny', reason: `This edit adds to the design system itself (${list}), which every product then gets: it waits for a named person to sign it off. Tell the person what it adds and ask who signs it off (the system's owner, or themselves if they are); once they say, run rms-design-system-engine --sign-off ${JSON.stringify(adds[0].what)} --by "<who>"${adds.length > 1 ? ' for each' : ''}, then make the edit again. To use what the system has instead, take the closest one it already has and say so.` };
+  // Who made it, for the sign-off: the one who made a change never reviews it (sign-off.mjs). The hook's own session.
+  const rel = relative(root, resolve(root, String(file)));
+  try { recordHeld(root, adds, { file: rel, edit: { tool: event.tool_name, input: { ...input, file_path: rel } }, author: event.session_id ? { kind: 'agent', session: String(event.session_id) } : null }); } catch { /* held all the same */ }
+  // Shared (local-shared.mjs): why, and on whom it waits.
+  let scope = null;
+  try { scope = editScope({ file: rel, before, after, root, files: { theme: new Set(themeFiles(cfg)), components: contractsByFile(root, cfg) } }, { usage: usageFrom(root, cfg), owners: cfg.owners }); } catch { /* said without it */ }
+  const owner = scope?.decider?.name ?? null;
+  const second = reviewMode(cfg) === 'agent-or-person' ? ` Or have a second agent session review it (rms-design-system-engine --second-review ${JSON.stringify(adds[0].what)}): never this one, which made the change.` : '';
+  return { decision: 'deny', reason: `This edit adds to the design system itself (${list}), which every product then gets: it waits for a named person to sign it off.${scope?.scope === 'shared' ? ` ${scope.reason}` : ''} Tell the person what it adds and ask who signs it off (${owner ? `${owner} decides for it in ds-config.json owners` : "the system's owner, or themselves if they are"}); once they say, run rms-design-system-engine --sign-off ${JSON.stringify(adds[0].what)} --by "<who>"${adds.length > 1 ? ' for each' : ''}, then make the edit again. Never your own name: the agent that made a change never signs it off.${second} To use what the system has instead, take the closest one it already has and say so.` };
 }
 const LESSON_ASKED = /\b(lessons?|learn\w*|remember|correct\w*|wrong|mistake|again)\b|\b(li[çc][ãa]o|li[çc][õo]es|aprend\w*|lembr\w*|errad[oa]|erro)\b/i;   // the person corrects, or answers a guard
 const KEEP_ASKED = /\b(keep|kept|keeping)\b|\b(on purpose|intentional\w*|deliberate\w*|by design)\b|\b(mant[eé]m|manter|mantemos|mantenha|de prop[oó]sito|intencional\w*)\b/i;   // the person keeps a difference on purpose
@@ -259,6 +270,7 @@ export function judge(event, { cfg = {}, userText = null } = {}) {
     const file = input.file_path ?? input.notebook_path ?? input.path;
     if (isSnapshot(file)) return { decision: 'deny', reason: `${basename(file)} is written by the Figma capture, never by hand (a hand edit fakes a refresh). Refresh it with the capture (rms-design-system-engine --recipe refresh-figma), or leave it stale and say so.` };
     if (basename(String(file ?? '')) === 'ds-config.json') return { decision: 'ask', reason: 'ds-config.json is the project\'s parity setup. Confirm this edit is what you asked for (guidelines links go through rms-design-system-engine --guidelines, never a hand edit).' };
+    if (basename(String(file ?? '')) === basename(HELD)) return { decision: 'deny', reason: `${basename(HELD)} records what the guard held and who made it: written by the engine, never by hand.` };
     if (basename(String(file ?? '')) === SIGN_OFFS) return { decision: 'deny', reason: `${SIGN_OFFS} records who signed off what is added to the system: it is written by rms-design-system-engine --sign-off "<what>" --by "<who>", once the person names who signs it off, never by hand.` };
     const held = systemHold(event, file, cfg);
     if (held) return held;

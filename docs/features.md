@@ -119,6 +119,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
 - Flags CSS variables and text casing the design never asked for.
 - Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
+- Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
 - Checks Tailwind classes against Figma.
 - Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
 - Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
@@ -153,6 +154,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Gives agents the real component names, what each token is for and the decisions already made.
 - Remembers names agents invent, and tells the next agent the right one.
 - Stops the AI from making a check pass on its own.
+- Never lets the agent that made a change to the system sign it off. A person does, or, if you allow it, a second agent that runs the engine's checks on the change again.
 - Keeps each correction you make to what an AI made as a lesson, with your reason, and turns it into the strongest guard that holds it once you say yes: a check, a step agents read, or a rule for your guidelines.
 - Notices a line an AI wrote that a person changed since, and asks whether it was a correction.
 - Proposes a rule when the same finding comes back on three screens or in three edits.
