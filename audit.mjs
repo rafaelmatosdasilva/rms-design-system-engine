@@ -983,6 +983,7 @@ if (process.argv.includes('--contracts-out')) {
   const r = await generateContracts(ROOT, pcfg, { publishTo: dir, force: true });
   if (toStore && !cstore.folder && !r.invalid.length) { const sent = await st.pushStore(ROOT, pcfg, 'contracts', st.folderFiles(dir, 'contracts'), `Contracts published with rms-design-system-engine (${r.components.length})`, { offline: STORE_OFFLINE }); console.log(sent.line); }
   console.log(`📐 Contracts published → ${r.outDir}  (${r.components.length} contract${r.components.length === 1 ? '' : 's'}${r.removed?.length ? ` · ${r.removed.length} removed` : ''}${r.skipped?.length ? ` · ${r.skipped.length} not written, listed in README.md` : ''})`);
+  if (r.specsOut) console.log(`   ℹ️  The same contracts in the ${(await import('./contract-spec.mjs')).SPEC_FORMAT} format → specs/`);
   for (const i of r.invalid.slice(0, 20)) console.log(`   ❌ ${i.name}: ${i.errs.slice(0, 3).join('; ')}`);
   // A breaking change is a release the products move to by a day (releases.mjs): recorded with the system's version.
   try {
@@ -2941,6 +2942,8 @@ async function refreshComponentProps(fileKey, token, outPath) {
     const sets  = Object.entries(byNodeId(csMeta?.component_sets));
     const ids   = sets.map(([id]) => id);
     const names = Object.fromEntries(sets.map(([id, s]) => [id, s.name]));
+    // The page each is on, as the listing names it (containing_frame.pageId).
+    const pageOf = Object.fromEntries(sets.filter(([, s]) => s.containing_frame?.pageId).map(([id, s]) => [id, s.containing_frame.pageId]));
 
     // ② Standalone COMPONENTS (single components not in a variant set)
     const compRes = await figmaFetch(`https://api.figma.com/v1/files/${fileKey}/components`, { headers: h });
@@ -2948,7 +2951,7 @@ async function refreshComponentProps(fileKey, token, outPath) {
     const standaloneEntries = Object.entries(byNodeId(compMeta?.components))
       .filter(([, c]) => !c.containing_frame?.containingStateGroup);
     for (const [nodeId, c] of standaloneEntries) {
-      if (!names[nodeId]) { ids.push(nodeId); names[nodeId] = c.name; }
+      if (!names[nodeId]) { ids.push(nodeId); names[nodeId] = c.name; if (c.containing_frame?.pageId) pageOf[nodeId] = c.containing_frame.pageId; }
     }
 
     // ③ Fallback: for unpublished files (API returns nothing), refresh known nodeIds
@@ -2957,7 +2960,7 @@ async function refreshComponentProps(fileKey, token, outPath) {
     try { existingSnap = JSON.parse(readFileSync(outPath, 'utf8')); } catch {}
     for (const [name, entry] of Object.entries(existingSnap)) {
       if (name === '_updated' || !entry?.nodeId) continue;
-      if (!names[entry.nodeId]) { ids.push(entry.nodeId); names[entry.nodeId] = name; }
+      if (!names[entry.nodeId]) { ids.push(entry.nodeId); names[entry.nodeId] = name; if (entry.pageId) pageOf[entry.nodeId] = entry.pageId; }
     }
 
     if (!ids.length) return false;
@@ -2978,7 +2981,7 @@ async function refreshComponentProps(fileKey, token, outPath) {
         const anns  = doc?.annotations ?? [];
         const layerAnns = layerAnnotationsOf(doc);
         if (Object.keys(props).length || anns.length || layerAnns.length) {
-          result[names[nodeId] ?? doc?.name ?? nodeId] = { nodeId, properties: props, annotations: anns, ...(layerAnns.length ? { layerAnnotations: layerAnns } : {}) };
+          result[names[nodeId] ?? doc?.name ?? nodeId] = { nodeId, ...(pageOf[nodeId] ? { pageId: pageOf[nodeId] } : {}), properties: props, annotations: anns, ...(layerAnns.length ? { layerAnnotations: layerAnns } : {}) };
         }
       }
     }

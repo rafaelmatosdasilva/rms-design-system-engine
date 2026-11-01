@@ -1,12 +1,14 @@
 // code-connect-map.mjs - what a project's own Figma Code Connect files say about each component: which Figma property
 // each code prop is, and how its values are written, read from the committed *.figma.* files (never Figma's API).
 //
-//   codeConnectMaps(ROOT, { include })   → [{ file, nodeId, slug, id, tag, props: [{ figma, code, kind, role?, negated?, equals?, values? }] }]
+//   codeConnectMaps(ROOT, { include })   → [{ file, nodeId, slug, id, tag, props: [{ figma, code, kind, role, negated?, equals?, values?, slot? }] }]
 //   codeConnectFor(maps, name, nodeId)   → the map that connects that Figma component, or null
 //   parseConnectFile(text, file)         → one file's maps
 //
 // Two forms are read. The classic one, figma.connect(Component, 'url', { props: { label: figma.string('Label') } }),
-// names each code prop beside the Figma property it reads. The template one (figma.selectedInstance.getEnum('size',
+// names each code prop beside the Figma property it reads; a Figma property whose values map to another figma call
+// (label: figma.boolean('Show label', { true: figma.string('Label'), false: undefined })) decides whether that prop is
+// written, and the call inside fills it. The template one (figma.selectedInstance.getEnum('size',
 // { s: 's' }) into a variable, the variable written into an attribute of figma.html`<button-primary buttonSize="${…}">`)
 // names it by the attribute the variable fills. Advisory: the code's own API stays the truth; this pairs names.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -33,6 +35,67 @@ function objectAt(text, from) {
   return '';
 }
 
+// From a quote at i, just past its closing one: a template literal's ${…} skipped whole, strings inside it too.
+function skipQuoted(text, i) {
+  const q = text[i++];
+  while (i < text.length && text[i] !== q) {
+    if (text[i] === '\\') { i += 2; continue; }
+    if (q === '`' && text[i] === '$' && text[i + 1] === '{') {
+      let d = 1; i += 2;
+      while (i < text.length && d) { const c = text[i]; if (c === '\'' || c === '"' || c === '`') { i = skipQuoted(text, i); continue; } if (c === '{') d++; else if (c === '}') d--; i++; }
+      continue;
+    }
+    i++;
+  }
+  return i + 1;
+}
+// The top-level entries of an object literal's body: [{ key, value (its source) }], strings and brackets balanced.
+function entriesOf(body) {
+  const parts = []; let depth = 0, start = 0;
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (c === '\'' || c === '"' || c === '`') { i = skipQuoted(body, i) - 1; continue; }
+    if ('([{'.includes(c)) depth++;
+    else if (')]}'.includes(c)) depth--;
+    else if (c === ',' && !depth) { parts.push(body.slice(start, i)); start = i + 1; }
+  }
+  parts.push(body.slice(start));
+  const out = [];
+  for (const p of parts) {
+    const m = /^\s*(?:(['"])(.*?)\1|([A-Za-z_$][\w$]*|-?\d+(?:\.\d+)?))\s*:\s*([\s\S]*?)\s*$/.exec(p.replace(/\/\/[^\n]*$/gm, ''));
+    if (m) out.push({ key: m[2] ?? m[3], value: m[4] });
+  }
+  return out;
+}
+// One figma.kind('Figma name', { … }) call: { kind, figma, map (the entries of its object, when it has one) } or null.
+function callOf(value) {
+  const m = /^figma\.(enum|boolean|string|instance|children|nestedProps|textContent)\(\s*(['"`])([^'"`]+)\2\s*(,?)/.exec(String(value).trim());
+  if (!m) return null;
+  const rest = String(value).trim().slice(m[0].length);
+  return { kind: m[1], figma: m[3], map: m[4] && /^\s*\{/.test(rest) ? entriesOf(objectAt(rest, 0)) : null, body: m[4] && /^\s*\{/.test(rest) ? objectAt(rest, 0) : '' };
+}
+// What one classic prop says: its value (a figma call), each call inside another's values filling it, and the outer
+// call deciding whether it is written: a boolean on true (on false: negated), an enum on the option it maps it under.
+// A call that maps both ways to another call picks which one fills it: a condition whose direction is not one.
+function classicReadings(code, value, conds = []) {
+  const call = callOf(value);
+  if (!call) return [];
+  const inner = call.kind === 'nestedProps' ? [] : (call.map ?? []).filter((e) => callOf(e.value));
+  if (!inner.length) {
+    const values = call.kind === 'enum' ? valuesOf(call.body) : undefined;
+    const flips = call.kind === 'boolean' && call.map && call.map.length && call.map.every((e) => (e.key === 'true' && e.value === 'false') || (e.key === 'false' && e.value === 'true'));
+    return [{ figma: call.figma, code, kind: call.kind, role: 'value', ...(flips ? { negated: true } : {}), ...(values ? { values } : {}) }, ...conds];
+  }
+  const out = [];
+  for (const e of inner) {
+    const both = call.kind === 'boolean' && inner.length > 1;
+    const cond = { figma: call.figma, code, kind: call.kind, role: 'condition', ...(both ? { unclear: true } : call.kind === 'boolean' ? (e.key === 'false' ? { negated: true } : {}) : { equals: e.key }) };
+    out.push(...classicReadings(code, e.value, [...conds, cond]));
+  }
+  const seen = new Set();
+  return out.filter((r) => { const k = JSON.stringify(r); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
 export function parseConnectFile(text = '', file = '') {
   const src = String(text);
   const out = [];
@@ -51,10 +114,7 @@ export function parseConnectFile(text = '', file = '') {
     const body = objectAt(src, m.index + m[0].length);
     const propsBody = objectAt(body, (/\bprops\s*:/.exec(body)?.index ?? -1) + 1);
     const props = [];
-    for (const p of String(propsBody).matchAll(/([A-Za-z_$][\w$]*)\s*:\s*figma\.(enum|boolean|string|instance|children|nestedProps|textContent)\(\s*(['"`])([^'"`]+)\3/g)) {
-      const values = p[2] === 'enum' ? valuesOf(objectAt(propsBody, p.index + p[0].length)) : undefined;
-      props.push({ figma: p[4], code: p[1], kind: p[2], ...(values ? { values } : {}) });
-    }
+    for (const { key, value } of entriesOf(propsBody)) if (/^[A-Za-z_$][\w$]*$/.test(key)) props.push(...classicReadings(key, value));
     out.push({ file, nodeId: nodeIdOf(m[3]), slug: slugOf(m[3]), id: null, tag: m[1].split('.').pop(), props });
   }
   return out;

@@ -136,7 +136,7 @@ export function codeConnectPairs(text, fileAbs) {
         if (base) file = [base, ...['.vue', '.tsx', '.ts', '.jsx', '.js', '.svelte'].map((x) => base + x)].find((p) => existsSync(p) && extname(p)) ?? null;
       }
       const propMap = {};
-      for (const p of m.props) if (p.code && p.role === 'value' && !p.event && !(p.figma in propMap)) propMap[p.figma] = p.code;
+      for (const p of m.props) if (p.code && p.role === 'value' && !p.event && !p.slot && !(p.figma in propMap)) propMap[p.figma] = p.code;
       out.push({ component: m.tag ?? m.id ?? '', nodeId: m.nodeId, file, propMap, connections: m.props, connectFile: fileAbs });
     }
     return out;
@@ -149,12 +149,13 @@ export function codeConnectPairs(text, fileAbs) {
       const base = resolve(dirname(fileAbs), imp[1]);
       file = [base, ...['.tsx', '.ts', '.jsx', '.js', '.vue', '.svelte'].map((x) => base + x), ...['index.tsx', 'index.ts', 'index.jsx', 'index.js'].map((x) => join(base, x))].find((p) => existsSync(p) && extname(p)) ?? null;
     }
-    const propMap = {};
-    const start = text.indexOf(c.component, c.index);
+    // Its props as code-connect-map.mjs reads them: a call inside another's values (caption: figma.boolean('Show
+    // caption', { true: figma.string('Caption') })) fills the prop, the outer one only decides whether it is written.
     const end = (() => { const nxt = text.indexOf('figma.connect(', c.index + 1); return nxt === -1 ? text.length : nxt; })();
-    const body = text.slice(start, end);
-    for (const m of body.matchAll(/([A-Za-z_$][\w$]*)\s*:\s*figma\.(?:enum|boolean|string|instance|children|textContent|nestedProps)\(\s*(['"`])([^'"`]+)\2/g)) propMap[m[3]] = m[1];
-    out.push({ component: c.component, nodeId: c.nodeId, file, propMap });
+    const [own] = parseConnectFile(text.slice(c.index, end), fileAbs);
+    const propMap = {};
+    for (const p of own?.props ?? []) if (p.code && p.role === 'value' && !(p.figma in propMap)) propMap[p.figma] = p.code;
+    out.push({ component: c.component, nodeId: c.nodeId, file, propMap, ...(own?.props?.length ? { connections: own.props, connectFile: fileAbs } : {}) });
   }
   return out;
 }

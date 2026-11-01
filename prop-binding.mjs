@@ -8,7 +8,9 @@
 //   valuesOf(fp, codeConnectProps) → every attribute or key the Code Connect file fills with the property's value
 //   invertsValue(fp, code, ctx) → true when a true/false binding writes the opposite value (show ↔ hide)
 //   readingsOf(fp, codeConnectProps) → what the project's Code Connect file does with the property beyond its value:
-//                                      [{ code, role: 'condition', negated?, equals? }]
+//                                      [{ code, role: 'condition', slot?, negated?, equals? }] (slot: it decides whether
+//                                      that slot is filled)
+//   connectSlotsOf(codeConnectProps) → { figmaProp: slot }: the slots the Code Connect file writes a value into
 //
 // The order, strongest first: a binding the project wrote for the component (contract.authored.json bindings), a
 // documented alias (ds-config.json componentPropAliases), the project's own Code Connect file, then the same name (letter
@@ -26,14 +28,22 @@ export function bindingSources({ codeConnect = null, aliases = null, authored = 
 }
 
 // ctx: { codeProps: { name: {…} } (the code's API props), slots: { named: [], default: bool }, recorded (bindingSources),
-//        authoredSlots: { figmaProp: true | 'slotName' }, figmaSlots: [the component's Figma SLOT properties] }
+//        authoredSlots: { figmaProp: true | 'slotName' }, figmaSlots: [the component's Figma SLOT properties],
+//        connectSlots: { figmaProp: 'slotName' | 'default' } (connectSlotsOf: the slots its Code Connect file fills) }
 // The word a slot is named for, without "slot" and without a family before it: slotBody and sheet-body are body.
 const slotWord = (n) => norm(String(n).replace(/slot/ig, ' ').split(/[-_\s]+|(?=[A-Z])/).filter(Boolean).pop() ?? '');
-export function bindFigmaProp(fp, def, { codeProps = {}, slots = { named: [], default: false }, recorded = {}, authoredSlots = {}, figmaSlots = [] } = {}) {
+export function bindFigmaProp(fp, def, { codeProps = {}, slots = { named: [], default: false }, recorded = {}, authoredSlots = {}, figmaSlots = [], connectSlots = {} } = {}) {
   const names = Object.keys(codeProps);
   const byNorm = new Map(names.map((p) => [norm(p), p]));
   const rec = recorded[fp];
   const slotByNorm = new Map((slots.named ?? []).map((n) => [norm(n), n]));
+  // The project's Code Connect file writes its value between the component's tags, into a slot the code has: that slot,
+  // unless a binding written by hand or a documented alias says otherwise.
+  const cs = connectSlots[fp];
+  if (cs && authoredSlots[fp] == null && !(rec && rec.source !== 'codeConnect') && ['TEXT', 'INSTANCE_SWAP', 'SLOT'].includes(def?.type)) {
+    if (cs === 'default' && slots.default) return { code: 'default', as: 'defaultSlot', source: 'codeConnect', exactName: true };
+    if (cs !== 'default' && slotByNorm.has(norm(cs))) return { code: slotByNorm.get(norm(cs)), as: 'slot', source: 'codeConnect', exactName: true };
+  }
   // A recorded key of an object prop (Code Connect writing :opts="{ caption: … }"): that prop, at that key.
   const keyed = rec && rec.name.includes('.') && names.includes(rec.name.split('.')[0]) ? { code: rec.name.split('.')[0], as: 'prop', source: rec.source, exactName: true, key: rec.name.split('.').slice(1).join('.') } : null;
   // An instance swap may be a prop or a slot: its own name first, then a recorded one, then a slot.
@@ -88,13 +98,21 @@ export function suggestionFor(fp, unusedCodeProps = []) {
 
 // Every attribute (or key of one) the Code Connect file fills with a property's value, in the order it writes them.
 export function valuesOf(fp, codeConnectProps = []) {
-  return [...new Set((codeConnectProps ?? []).filter((p) => p.figma === fp && p.role === 'value' && p.code && !p.event).map((p) => p.code))];
+  return [...new Set((codeConnectProps ?? []).filter((p) => p.figma === fp && p.role === 'value' && p.code && !p.event && !p.slot).map((p) => p.code))];
 }
 
 // What the Code Connect file does with a property besides filling its value: the attributes it decides are written.
 export function readingsOf(fp, codeConnectProps = []) {
   return (codeConnectProps ?? []).filter((p) => p.figma === fp && p.role === 'condition' && p.code && !p.event)
-    .map((p) => ({ code: p.code, role: 'condition', ...(p.negated ? { negated: true } : {}), ...(p.equals != null ? { equals: p.equals } : {}), ...(p.unclear ? { unclear: true } : {}) }));
+    .map((p) => ({ code: p.code, role: 'condition', ...(p.slot ? { slot: true } : {}), ...(p.negated ? { negated: true } : {}), ...(p.equals != null ? { equals: p.equals } : {}), ...(p.unclear ? { unclear: true } : {}) }));
+}
+
+// The slots the Code Connect file writes a property's value into, as content between the component's tags:
+// { figmaProp: slot name ('default' for its default slot) }, the first one each property fills.
+export function connectSlotsOf(codeConnectProps = []) {
+  const out = {};
+  for (const p of codeConnectProps ?? []) if (p.role === 'value' && p.slot && p.code && !(p.figma in out)) out[p.figma] = p.code;
+  return out;
 }
 
 // Whether a true/false binding writes the opposite of the Figma value (Figma "Show close" on is the code's hideClose
