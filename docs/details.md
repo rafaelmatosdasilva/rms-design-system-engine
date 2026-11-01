@@ -1200,7 +1200,14 @@ A screen that lays its own control over a component (a clear button over a text 
 
 ### Tailwind
 
-- Each component's own classes are compared with what Figma states for it (`h-9` against a 36px height, `px-3 py-2` against its padding tokens), and a difference names the class to write.
+- Each component's own classes are compared with what Figma states for it (`h-9` against a 36px height, `px-3 py-2` against its padding tokens), and a difference names the class to write. What is compared:
+  - height, padding, corner, gap, and the fill, text and border colours;
+  - text size, weight and line height, and border width;
+  - shadow, from Figma's effects, and motion: a hover that Figma animates needs `transition` with its duration and easing.
+- **Each variant on its own.** The classes each option writes are read (`cva` and `tailwind-variants`, a map of option to classes, a conditional on the prop), so Figma's Large is compared with the Large classes, not with every class in the file.
+- **Each state.** `hover:`, `active:`, `focus-visible:`, `disabled:` and `aria-`/`data-` classes are compared with the colour Figma binds in that state. A state Figma draws differently with no class for it is named, with the class to add.
+- **Each mode.** In dark mode (or a brand), each colour is checked as the theme's override block or a `dark:` class draws it, against the value Figma gives that variable in the mode.
+- **Tailwind v3 too.** A `tailwind.config` theme (and its `extend`) is read as text, never run, so its colours, spacing, corners, type, shadows and durations name the utility to write, as a v4 `@theme` does.
 - A class with a value in brackets (`rounded-[4px]`, `bg-[#b42318]`) steps outside the theme. When your `@theme` has the same value, it names the utility to write. Otherwise it says the value is not in the design system.
 - `--init` sees a Tailwind theme and sets `"namingConvention": { "preset": "tailwind" }`. Figma's token names are then matched to the theme's own (`surface/base/color` to `--color-surface-base`), and a theme variable used through its utility counts as used.
 
