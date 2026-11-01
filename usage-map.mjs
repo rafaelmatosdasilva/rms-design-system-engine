@@ -13,27 +13,48 @@ const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const squash = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
 const words = (n) => String(n).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-// The product a file belongs to, by its full name: ds-config.json pluginDirs (a product in its own folder or repository)
-// or apps/<app>, named as styleguide.plugins names it, else the app's name in words. null for the system's own files.
-export function productResolver(ROOT, cfg = {}) {
+// The product a file belongs to, by its full name: ds-config.json pluginDirs (a product in its own folder or repository),
+// a products entry with a dir, or apps/<app> listed in paths.plugins, named as styleguide.plugins names it, else the
+// app's name in words; else the folder it sits in under apps/, plugins/, products/ or packages/ (a package that holds the
+// system's own component files, systemFiles, is the system's). null for the system's own files.
+const PRODUCT_DIRS = /^(apps|plugins|products|packages)$/;
+export function productResolver(ROOT, cfg = {}, { systemFiles = [] } = {}) {
   const named = cfg.styleguide?.plugins ?? [];
   const apps = cfg.paths?.plugins ?? [];
   const dirs = Object.entries(cfg.pluginDirs ?? {}).map(([app, d]) => [app, resolve(ROOT, d)]);
+  const listed = Object.entries(cfg.products && typeof cfg.products === 'object' ? cfg.products : {})
+    .map(([key, p]) => [p?.name ?? (Array.isArray(cfg.products) ? null : key), typeof p?.dir === 'string' && p.dir ? resolve(ROOT, p.dir) : null])
+    .filter(([n, d]) => n && d);
   const nameOf = (app) => { const g = named.find((p) => p.match === app || p.key === app || (p.match && app.includes(p.match))); return g?.name ?? words(app); };
+  const own = new Set(systemFiles.map((f) => resolve(ROOT, f)));
+  const holdsSystem = (d) => [...own].some((f) => f.startsWith(d + sep));
+  const under = (abs, d) => abs === d || abs.startsWith(d + sep);
   return (abs) => {
-    const own = dirs.find(([, d]) => abs === d || abs.startsWith(d + sep));
-    if (own) return nameOf(own[0]);
+    const dir = dirs.find(([, d]) => under(abs, d));
+    if (dir) return nameOf(dir[0]);
+    const product = listed.filter(([, d]) => under(abs, d)).sort((a, b) => b[1].length - a[1].length)[0];
+    if (product) return product[0];
     const rel = relative(resolve(ROOT), abs).split(sep);
     const app = apps.find((a) => rel.some((part, i) => part === a && i > 0 && /^(apps|plugins|packages)$/.test(rel[i - 1])));
-    return app ? nameOf(app) : null;
+    if (app) return nameOf(app);
+    // An app or a package of its own nobody listed: named by its folder.
+    const at = rel.findIndex((part, i) => PRODUCT_DIRS.test(part) && i + 2 < rel.length);
+    if (at < 0 || rel.slice(0, at).includes('..')) return null;
+    const folder = rel[at + 1];
+    if (rel[at] === 'packages' && holdsSystem(resolve(ROOT, ...rel.slice(0, at + 2)))) return null;
+    return nameOf(folder);
   };
 }
 
+// Where the files outside every product are counted: the project itself (the system's own pages, or the one app the
+// project is). Never null, so a reader always has a name; own says it is not another product.
+export const THIS_PROJECT = 'this project';
+
 // The markup files a component can be used in: the products' code and the system's own pages ({ file, text, product,
 // productName }), the same walk the catalog's real examples read. product: true for a file in a product's own root.
-export function productFiles(ROOT, cfg = {}, { limit = 4000 } = {}) {
+export function productFiles(ROOT, cfg = {}, { limit = 4000, systemFiles = [] } = {}) {
   const roots = codeRoots(ROOT, cfg);
-  const productOf = productResolver(ROOT, cfg);
+  const productOf = productResolver(ROOT, cfg, { systemFiles });
   const files = [];
   const walk = (dir, product, depth = 0) => {
     if (depth > 8 || files.length > limit) return;
@@ -71,8 +92,11 @@ export function usesIn(name, cls, file, text, counts = null) {
 // names: the system's components · files: productFiles(…) · classFor: name → its class · composition: Figma's nesting
 // ({ parent: [child] }) · codeNesting: the code snapshot's nesting ({ parent: { contains: { child } } }) · screens: the
 // screen components snapshot ({ screens: { id: { name, components: { name: count } } } }).
-// → { <name>: { products: [{ name, files, uses }], files: [{ file, uses, product }], inside: [], holds: [], screens: [{ screen, count }] } }
-export function usageMap(names, { files = [], classFor = null, composition = {}, codeNesting = {}, screens = {} } = {}) {
+// → { <name>: { products: [{ name, files, uses, own? }], files: [{ file, uses, product }], inside: [], holds: [], screens: [{ screen, count }] } }
+//   own: the files outside every product, named this project.
+// definedIn: { <name>: its own code file }, so a file named with a prefix (HbButton.vue for button) is still its definition.
+const sameFile = (a, b) => !!b && String(a).replace(/\\/g, '/').replace(/^\.\//, '').endsWith(String(b).replace(/\\/g, '/').replace(/^\.\//, ''));
+export function usageMap(names, { files = [], classFor = null, composition = {}, codeNesting = {}, screens = {}, definedIn = {} } = {}) {
   const known = new Set(names);
   const counts = new Map();
   const out = Object.fromEntries(names.map((n) => [n, { products: [], files: [], inside: [], holds: [], screens: [] }]));
@@ -80,16 +104,16 @@ export function usageMap(names, { files = [], classFor = null, composition = {},
     const cls = classFor ? classFor(name) : null;
     const byProduct = new Map();
     for (const f of files) {
-      if (squash(f.file.split('/').pop().replace(/\.[^.]+$/, '')) === squash(name)) continue;   // its own definition
+      if (squash(f.file.split('/').pop().replace(/\.[^.]+$/, '')) === squash(name) || sameFile(f.file, definedIn[name])) continue;   // its own definition
       if (!counts.has(f.file)) counts.set(f.file, classUseCounts(f.text));
       const uses = usesIn(name, cls, f.file, f.text, counts.get(f.file));
       if (!uses) continue;
       out[name].files.push({ file: f.file, uses, ...(f.productName ? { product: f.productName } : {}) });
       const key = f.productName ?? '';
-      const p = byProduct.get(key) ?? { name: f.productName ?? null, files: 0, uses: 0 };
+      const p = byProduct.get(key) ?? { name: f.productName ?? THIS_PROJECT, files: 0, uses: 0, ...(f.productName ? {} : { own: true }) };
       p.files++; p.uses += uses; byProduct.set(key, p);
     }
-    out[name].products = [...byProduct.values()].sort((a, b) => (a.name === null) - (b.name === null) || b.uses - a.uses);
+    out[name].products = [...byProduct.values()].sort((a, b) => !!a.own - !!b.own || b.uses - a.uses);
     out[name].files.sort((a, b) => b.uses - a.uses || a.file.localeCompare(b.file));
     out[name].files = out[name].files.slice(0, 12);
   }
@@ -113,7 +137,7 @@ export function usageMap(names, { files = [], classFor = null, composition = {},
 export function usageLines(u, { indent = '  ' } = {}) {
   if (!u) return [];
   const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
-  const where = (u.products ?? []).map((p) => `${p.name ?? "the system's own pages"} (${n(p.files, 'file', 'files')}, ${n(p.uses, 'use', 'uses')})`);
+  const where = (u.products ?? []).map((p) => `${p.name ?? THIS_PROJECT} (${n(p.files, 'file', 'files')}, ${n(p.uses, 'use', 'uses')})`);
   const lines = [`${indent}lives in: ${where.length ? where.join(' · ') : 'no product code uses it yet'}`];
   if (u.inside?.length) lines.push(`${indent}inside: ${u.inside.join(', ')}`);
   if (u.holds?.length) lines.push(`${indent}holds: ${u.holds.join(', ')}`);

@@ -535,7 +535,8 @@ test('no Figma file: the components are the code\'s, and the intent layer still 
   assert.deepEqual(c.components.sort(), ['Filter', 'Main']);
   assert.deepEqual(c.invalid, []);
   const main = JSON.parse(readFileSync(join(dir, 'contracts', 'Main.contract.json'), 'utf8'));
-  assert.equal(main.description, '');                                            // never a placeholder that says Figma
+  // Its page says what it is for: that is its description (never a placeholder that says Figma).
+  assert.deepEqual([main.description, main.descriptionFrom], ['The next step.', 'intent']);
   assert.equal(main.intent.purpose, 'The next step.');
   const cat = JSON.parse(readFileSync(join(dir, 'contracts', 'catalog.json'), 'utf8')).components.Main;
   assert.equal(cat.selector, '.acme-main-button');
@@ -543,7 +544,7 @@ test('no Figma file: the components are the code\'s, and the intent layer still 
   assert.equal(cat.props.disabled.type, 'boolean');
   const llms = readFileSync(join(dir, 'contracts', 'llms.txt'), 'utf8');
   assert.match(llms, /from the code alone \(no Figma file\)/);
-  assert.match(llms, /\[Main\]\(\.\/Main\.contract\.json\): · props: label, disabled\n {4}- for: The next step\.\n {4}- avoid: Not for navigation\./);
+  assert.match(llms, /\[Main\]\(\.\/Main\.contract\.json\): The next step\.  · props: label, disabled\n {4}- avoid: Not for navigation\./);
 });
 
 // ── Setup takes the documentation link ───────────────────────────────────────────────────────────────────────────
