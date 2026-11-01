@@ -105,6 +105,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
 - Finds the code file of each Figma component on its own, so nobody writes a map.
 - Checks icons, slots and the parts inside each component.
+- Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
 - Checks that a brand changes only values, never which parts a component draws or how they are laid out.
 - Warns when a Figma frame changed since the version you approved.
 - Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
