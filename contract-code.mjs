@@ -72,6 +72,9 @@ export function codeHalf(contractProps, figmaProps = {}, api = null, { authored 
         ...(inverted ? { inverted: true } : {}),
         ...((api?.codeConnectProps ?? []).some((x) => x.figma === p.name && x.role === 'value' && x.derived && x.code === (b.key ? `${b.code}.${b.key}` : b.code)) ? { derived: true } : {}),
       };
+      // What it is for: the team's words (contract.authored.json propDescriptions) first, then the code's own comment on the
+      // prop, then Figma's.
+      if (c.description && !(typeof authored?.propDescriptions?.[p.name] === 'string' && authored.propDescriptions[p.name].trim())) out.description = String(c.description).trim();
       // Where Figma and the code differ on it: its default, and the values each has that the other does not (through
       // the Code Connect value map when there is one: Figma "Large" written "lg").
       const differences = [];

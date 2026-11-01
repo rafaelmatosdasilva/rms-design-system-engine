@@ -20,7 +20,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { codeRoots } from './code-roots.mjs';
 import { join, resolve, dirname, extname, relative, sep } from 'node:path';
 import { createRequire } from 'node:module';
-import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi } from './component-source.mjs';
+import { norm, SKIP_DIR, componentSourceFiles, textReader, resolveComponentFile, textComponentApi, commentWords } from './component-source.mjs';
 import { parseCodeConnect, normalizeNodeId } from './codeconnect-check.mjs';
 import { parseConnectFile } from './code-connect-map.mjs';
 import { projectTypeScriptOnly, withinProject, usableTypeScript } from './project-typescript.mjs';
@@ -90,6 +90,7 @@ export function docgenComponents(doc, ROOT = '') {
       const def = p.defaultValue?.value;
       if (def != null && def !== 'undefined') e.default = unq(def);
       if (typeof p.required === 'boolean') e.required = p.required;
+      if (typeof p.description === 'string' && p.description.trim()) e.description = p.description.trim();
       props[name] = e;
     }
     const slotList = Array.isArray(d.slots) ? d.slots : [];
@@ -229,6 +230,9 @@ export function typescriptComponentApi(ts, file, text, componentName) {
       if (opts) e.options = opts;
       else if (m.type?.kind === ts.SyntaxKind.BooleanKeyword) e.type = 'boolean';
       e.required = !m.questionToken;
+      // Its doc comment, right above it (/** what it is for */).
+      const said = (ts.getLeadingCommentRanges?.(sf.text, m.getFullStart()) ?? []).map((r) => sf.text.slice(r.pos, r.end)).filter((c) => c.startsWith('/**') || c.startsWith('//')).map(commentWords).filter(Boolean).pop();
+      if (said) e.description = said;
       props[name] = e;
     }
     return props;

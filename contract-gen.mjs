@@ -193,8 +193,9 @@ function buildProps(props, propDescriptions = {}) {
     // A slot that takes only the components Figma lists for it (none listed: it takes any).
     if (def.type === 'SLOT' && def.slotSettings?.allowPreferredValuesOnly && (def.preferredValues ?? []).length) p.slot = { preferredOnly: true, preferred: def.preferredValues.length };
     // Figma component-property definitions carry no per-prop description, so this is authored
-    // (contract.authored.json → components[name].propDescriptions), with a forward-compat capture path.
-    const desc = def.description ?? propDescriptions[name];
+    // (contract.authored.json → components[name].propDescriptions), with a forward-compat capture path. The team's words
+    // win; the code's comment on the prop it is paired with comes before Figma's (contract-code.mjs codeHalf).
+    const desc = (typeof propDescriptions[name] === 'string' && propDescriptions[name].trim()) ? propDescriptions[name] : def.description;
     if (typeof desc === 'string' && desc.trim()) p.description = desc.trim();
     if (Array.isArray(def.variantOptions)) p.options = def.variantOptions;
     out.push(p);

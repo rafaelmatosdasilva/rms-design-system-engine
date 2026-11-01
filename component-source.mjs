@@ -425,12 +425,24 @@ export function componentComment(file, text) {
   return first(new RegExp(DOC + String.raw`\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*(?:export\s+default\s+(?:function|class)\b|(?:export\s+)?(?:function\s+[A-Z]|(?:const|let|var)\s+[A-Z][\w$]*\s*[:=]|class\s+[A-Z]))`));
 }
 
+// What each prop's own comment says it is for: the doc comment (or the // lines) right above it, in a Vue props object,
+// a defineProps type, a TypeScript interface or type. code prop (normalised) -> its words.
+export function extractPropComments(text) {
+  const out = new Map();
+  const re = /(\/\*\*(?:(?!\*\/)[\s\S])*\*\/|(?:^[ \t]*\/\/[^\n]*\n)+)\s*(?:readonly\s+)?['"]?([A-Za-z_$][\w$]*)['"]?\s*\??\s*:/gm;
+  for (const m of String(text ?? '').matchAll(re)) {
+    const words = commentWords(m[1]);
+    if (words && !out.has(norm(m[2]))) out.set(norm(m[2]), words);
+  }
+  return out;
+}
+
 // The text reading of one component file, in the shape component-api.mjs merges.
 //   { props: { name: { default?, options?, required? } }, slots: { named: [...], default: bool }, events: [names], description? }
 export function textComponentApi(file, text) {
   // A Vue file's props are read from its scripts only: its template's bindings (:icon="icon") are never a default.
   const code = /\.vue$/i.test(String(file)) ? [...String(text).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n') || text : text;
-  const defaults = extractDefaults(code), options = extractOptions(code), required = extractRequired(code), types = extractTypes(code), documented = extractDocumented(code), built = extractDefaultExpressions(code);
+  const defaults = extractDefaults(code), options = extractOptions(code), required = extractRequired(code), types = extractTypes(code), documented = extractDocumented(code), built = extractDefaultExpressions(code), commented = extractPropComments(code);
   const props = {};
   for (const p of extractProps(file, text)) {
     const e = {}, doc = documented.get(norm(p));
@@ -441,7 +453,9 @@ export function textComponentApi(file, text) {
     const type = types.get(norm(p)) ?? doc?.type;
     if (type) e.type = type;
     if (required.has(norm(p))) e.required = required.get(norm(p));
-    if (doc?.description) e.description = doc.description;
+    // Its own comment, right above it, else what the component's comment says of it (@size {String} …).
+    const said = commented.get(norm(p)) ?? doc?.description;
+    if (said) e.description = said;
     if (e.default === undefined && built.has(norm(p))) e.defaultExpression = built.get(norm(p));
     props[p] = e;
   }
