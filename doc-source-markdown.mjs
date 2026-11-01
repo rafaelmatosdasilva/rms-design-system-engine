@@ -217,8 +217,11 @@ export function readMarkdown(texts, { paths = [], root = '' } = {}) {
     const { data: fm, body } = frontMatter(text);
     const meta = metaTitle(body);
     const doc = mdSections(plainText(body));
-    // The layer's own README or index: the system's page. A layer folder's index: guidance for that layer.
+    // The layer's own README or index: the system's page. A layer folder's index, or a page named for a layer that holds
+    // pages of its own (Components.md beside Components/, as a documentation tool's parent page is): guidance for it.
     if (/^(readme|index)$/i.test(name) && (!dir || (layerFolder(dir) === posix.basename(dir) && !fm.title && !meta))) { systemFiles.push({ path, dir, fm, doc }); continue; }
+    const own = dir ? `${dir}/${name}` : name;
+    if (layerOf('', name) !== 'system' && [...all].some((p) => relOf(p).startsWith(own + '/'))) { systemFiles.push({ path, dir: own, fm: {}, doc }); continue; }
     const tab = TAB.test(name) && dir ? name.toLowerCase() : null;
     if (tab && DEV_TAB.test(tab)) continue;
     // A component's folder is its page: its tabs, the file named after it (Button/Button.mdx), and a docs folder in it

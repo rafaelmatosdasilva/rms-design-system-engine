@@ -29,7 +29,7 @@ import { intentLayerConfig, DRAFT } from './doc-source-dsds.mjs';
 import { STATE_FILE, parseGitlabProject, tokenFrom, writeTokenFrom, hostEnvFrom, plainGet, plainSend, untar, projectApi } from './gitlab-source.mjs';
 export { writeTokenFrom };
 import { tokenAllowedFor } from './gitlab-fetch.mjs';
-import { layerWriter } from './doc-host.mjs';
+import { layerWriter, TOOLS, toolRefusal } from './doc-host.mjs';
 import { linesOf, checkPage } from './intent-truth.mjs';
 
 export const CHANGES_DIR = `${OUT_DIR}/intent-changes`;
@@ -833,6 +833,7 @@ export async function mayWrite(ROOT, cfg, want = 'commit', opts = {}) {
   // A folder of the project: its changes are written there for a person to commit. GitHub answers for its own token.
   const c = intentLayerConfig(cfg);
   if (c?.host === 'folder') return { ok: true };
+  if (TOOLS[c?.host]) return { ok: false, readOnly: true, why: toolRefusal(c.host) };
   if (c?.host === 'github') { const { envFrom } = await import('./gitlab-source.mjs'); return envFrom('GITHUB_TOKEN', opts.env ?? process.env, [ROOT]) || envFrom('GH_TOKEN', opts.env ?? process.env, [ROOT]) ? { ok: true } : { ok: false, why: 'no GITHUB_TOKEN in .env that may write to the layer\'s repository' }; }
   const { writeAccess } = await import('./stores.mjs');
   const a = await writeAccess(ROOT, cfg, 'intentLayer', opts);
@@ -956,7 +957,7 @@ export async function prepareLayerFix(ROOT, cfg, { drafts = true, answers = null
 export async function actOnAnswers(ROOT, cfg, { only }) {
   try {
     const may = await mayWrite(ROOT, cfg, 'commit');
-    if (!may.ok) return `ℹ️  The layer is not changed yet: ${may.why}. The next run that may write to it (--intent-changes) makes the change.`;
+    if (!may.ok) return may.readOnly ? `ℹ️  The layer is not changed: ${may.why}. --intent-changes writes the change there for them to read.` : `ℹ️  The layer is not changed yet: ${may.why}. The next run that may write to it (--intent-changes) makes the change.`;
     const p = await prepareLayerFix(ROOT, cfg, { only });
     if (p.error) return `⚠️  The layer is not changed yet: ${p.error}`;
     if (!p.result.files.size) return '✅ Nothing to change in the layer for this answer.';
