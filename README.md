@@ -8,7 +8,7 @@
   <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md#code-on-gitlab"><img src="https://img.shields.io/badge/company%20GitLab-supported-fc6d26?logo=gitlab&logoColor=white" alt="Company GitLab supported"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20·%20Figma-a259ff?logo=figma&logoColor=white" alt="Works with Claude Code and Figma">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
-  <a href="https://github.com/rafaelmatosdasilva/rms-design-system-engine/commits/main"><img src="https://img.shields.io/github/last-commit/rafaelmatosdasilva/rms-design-system-engine/main?label=last%20commit" alt="Last commit"></a>
+  <a href="https://www.bestpractices.dev/projects/16082"><img src="https://www.bestpractices.dev/projects/16082/badge" alt="OpenSSF Best Practices"></a>
 </p>
 
 AI agents can build interfaces in minutes. But scattered tools and specialised skills aren't enough. They work in isolation, repeat work and rarely share knowledge.
