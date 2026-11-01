@@ -38,6 +38,9 @@ import { writeStyleguide } from './styleguide-files.mjs';
 const ENGINE_DIR = dirname(fileURLToPath(import.meta.url));
 // The engine's own template, used when the project has none (ds-config.json → styleguide.template wins).
 export const ENGINE_TEMPLATE = join(ENGINE_DIR, 'templates', 'styleguide.template.html');
+// Each component's own code, read for what it says of its stage (a status, @deprecated and what replaces it): kept beside
+// the component, never written into the page.
+const CODE_TEXT = new WeakMap();
 
 // ── DS-derived colour-mode CSS ────────────────────────────────────────────────
 // The DS expresses colour mode ONLY as @media (prefers-color-scheme: dark). The
@@ -741,6 +744,13 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       if (hasLayer && !opts.offline) { try { const fixed = await (await import('./intent-changes.mjs')).autoFix(ROOT, cfg); if (fixed) console.log('   ' + fixed); } catch { /* the guide is built from the layer as read */ } }
       const ilSnap = ilMod.readIntentLayer(ROOT, cfg);
       const ilMatch = ilSnap ? ilMod.matchComponents(view.components.map((c) => c.name), ilSnap.entities, ilMod.codeFilesOf(ROOT, cfg)) : new Map();
+      // Each change read from the layer, for History: an Intent layer card each, the pages it changed linked to
+      // the components they document.
+      if (ilSnap?.changes?.length) {
+        const compsOf = new Map();
+        for (const [comp, e] of ilMatch) if (e?.name) compsOf.set(e.name, [...(compsOf.get(e.name) ?? []), comp]);
+        view.intentChanges = ilSnap.changes.map((ch) => ({ at: ch.at ?? null, to: ch.to ?? null, url: ch.url ?? null, pages: ch.pages ?? [], files: (ch.files ?? []).length, components: [...new Set((ch.pages ?? []).flatMap((p) => compsOf.get(p) ?? []))].sort() }));
+      }
       // What the system contradicts on each page (intent-truth.mjs): left out of its documentation, and said.
       const ilWrong = (await import('./intent-truth.mjs')).checkedLayer(ROOT, cfg, ilSnap);
       for (const c of view.components) {
@@ -1468,11 +1478,15 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
       const authored = readJson(cfg.contracts?.authored ?? 'contract.authored.json')?.components ?? {};
       const summary = readJson(cfg.styleguide?.coverage ?? 'coverage/coverage-summary.json');
       for (const c of view.components) {
-        const st = statusView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.status ?? null, text: c.source?.text ?? '' });
+        // Its code as the code says it (its own file even when it is drawn another way), for a stage written there.
+        const code = c.source?.text ?? (() => { const f = c.api?.file ?? cfg.componentFiles?.[c.name]; return f ? readText(f) : ''; })();
+        if (code) CODE_TEXT.set(c, code);
+        const st = statusView({ description: c.description, annotations: c.annotations, note: c.note, authored: authored[c.name]?.status ?? null, text: code });
         if (st) c.status = st;
         const cov = coverageOf(summary, c.source?.file ?? c.api?.file);
         if (cov) c.coverage = cov;
       }
+
       if (cfg.styleguide?.groups) view.groups = cfg.styleguide.groups;
     } catch { /* no status, no coverage */ }
     // How the system builds a component in Figma (construction-grammar.mjs), for the Construction page: each rule, what
@@ -1522,6 +1536,16 @@ export async function generateStyleguide(ROOT, cfg, opts = {}) {
         for (const c of new Set([...(view.allComponents ?? []), ...view.components])) if (mv.components[c.name]) c.migration = mv.components[c.name];
       }
     } catch { /* the page builds without it */ }
+    // Being retired, and what replaces it: a release that retired it, else a stage of deprecated said in Figma or
+    // the code, with the component a line there names instead. The page suggests each component's stage from it.
+    try {
+      const { deprecationOf } = await import('./styleguide-data.mjs');
+      const names = view.components.map((c) => c.name);
+      for (const c of view.components) {
+        const d = deprecationOf({ status: c.status, migration: c.migration, description: c.description, annotations: c.annotations, note: c.note, text: CODE_TEXT.get(c) ?? '', names });
+        if (d) c.retiring = d;
+      }
+    } catch { /* no stage suggested from it */ }
     // Where the code draws a shadow, a blur, a fill, clipping or blending otherwise than Figma, from the last audit.
     try {
       const fx = readJson(join(OUT_DIR, 'effects.json'));

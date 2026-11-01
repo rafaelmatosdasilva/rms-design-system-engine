@@ -578,6 +578,10 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-status { display: inline-flex; align-items: center; padding: var(--sg-space-xxs) var(--sg-space-s); border-radius: var(--sg-radius-pill); font-size: var(--sg-xs); font-weight: var(--sg-text-weight); color: var(--sg-text); background: color-mix(in srgb, var(--sg-muted) 14%, transparent); vertical-align: middle; }
 .sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
 .sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
+.sg-status--stable { background: color-mix(in srgb, var(--sg-positive) 20%, transparent); }
+.sg-status--suggested { background: transparent; box-shadow: inset 0 0 0 1px var(--sg-line-colour); }   /* the stage the page suggests, outlined: the team's own is filled */
+.pg-stage { display: contents; }   /* its pill and words sit in the status line as its other items do */
+.pg-stage-sug { color: var(--sg-muted); }
 .sg-status--code-only { background: color-mix(in srgb, var(--sg-text-2) 16%, transparent); }
 .sg-status--connected { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); gap: var(--sg-space-xxs); }
 .sg-status-mark { width: 14px; height: 14px; flex: none; }   /* the project's Code Connect pairs it with Figma */
@@ -3253,7 +3257,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
   // the commits that changed a component, from the components' changelogs.
   var RLOG = DATA.releaseLog || [];
   var DECISIONS = (DATA.decisions || []).slice();
-  if (CHANGES.length || RLOG.length || DECISIONS.length) {
+  if (CHANGES.length || RLOG.length || DECISIONS.length || (DATA.intentChanges || []).length) {
     hr(); navLink('history', 'history');
     var wn = section('history', 'Changes', 'History', '');
     // The components each commit changed, from their changelogs.
@@ -3289,7 +3293,10 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     order.forEach(function (g) { g.commits = g.commits.filter(function (x) { return !FIGMA[x.r.sha || x.r.subject]; }); });
     // A read of Figma is a release of the design: a card of its own, beside the code's releases, newest first by date.
     figmaReads.sort(newestFirst).forEach(function (x, i) { order.push({ k: '', on: '', at: String(x.r.date), commits: [], read: x, firstRead: i === figmaReads.length - 1 }); });
-    order = order.filter(function (g) { return g.commits.length || g.read || (g.decisions || []).length; });
+    // Each change read from the intent layer (DATA.intentChanges): a card of its own too, dated by its commit, with the
+    // pages it changed and the components they document.
+    (DATA.intentChanges || []).forEach(function (x) { order.push({ k: '', on: '', at: String(x.at || ''), commits: [], layer: x }); });
+    order = order.filter(function (g) { return g.commits.length || g.read || g.layer || (g.decisions || []).length; });
     var dayOf = function (g) { var t = Date.parse(g.k && g.on ? g.on : g.at); return isNaN(t) ? 0 : t; };
     order.sort(function (a, b) { return dayOf(b) - dayOf(a) || releaseOrder(a, b); });
     // The components a change affects: links the table turns into pills (pillLinks), the first ones shown, the rest one
@@ -3318,6 +3325,13 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     };
     // A read of Figma is dated, never released: Figma, and the day it was read.
     var figmaHead = function (g) { return '<span class="sg-log-tag">Figma</span>' + esc(String(g.read.r.date).slice(0, 10)); };
+    // A change to the intent layer: what it changed, the commit that made it, and the components its pages document.
+    var layerSha = function (x) { return !x.to ? '' : x.url ? '<a class="sg-uses-link" href="' + esc(x.url) + '" target="_blank" rel="noopener"><code>' + esc(x.to.slice(0, 8)) + '</code></a>' : '<code>' + esc(x.to.slice(0, 8)) + '</code>'; };
+    var layerWhat = function (x) { return x.pages.length ? plural(x.pages.length, 'page', 'pages') + ' changed' : plural(x.files || 0, 'file', 'files') + ' changed, none of them a page'; };
+    var layerRows = function (x) {
+      return '<tr data-chip="intent"><td><p class="sg-il-line"><strong>' + esc(layerWhat(x)) + '</strong></p>' + (x.pages.length ? '<p class="sg-il-line"><span class="pg-par-val">' + esc(x.pages.join(', ')) + '</span></p>' : '') +
+        (x.to ? '<p class="sg-il-line"><span class="pg-log-date">Committed in ' + layerSha(x) + '</span></p>' : '') + '</td><td>' + (x.components.length ? pillsHTML(x.components, 'documentation') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
+    };
     var decisionRow = function (d) {
       var about = d.component && COMPONENTS.some(function (c) { return c.name === d.component; }) ? '<a class="sg-uses-link" href="#' + esc(cid(d.component)) + '/history">' + esc(d.component) + '</a>'
         : d.url ? '<a class="sg-uses-link" href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.page || d.about) + '</a>' : esc(d.page || d.component || 'The system');
@@ -3352,6 +3366,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // the decisions it holds.
     var cardHead = function (g) {
       if (g.read) return figmaHead(g);
+      if (g.layer) return '<span class="sg-log-tag">Intent layer</span>' + esc(String(g.layer.at || '').slice(0, 10));
       if (g.day) return esc(g.day);
       var n = byTicket(g.commits, function (x) { return x.r; }).length; return '<span class="sg-log-tag">Code</span>' + releaseHead(g) + '  ·  ' + n + (n === 1 ? ' issue' : ' issues');
     };
@@ -3360,11 +3375,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       var rows = (g.decisions || []).map(function (d) { return { at: String(d.at || ''), html: decisionRow(d) }; })
         .concat(byTicket(g.commits, function (x) { return x.r; }).map(function (t) { return { at: String(t.items[0].r.date || ''), html: codeRow(t) }; }));
       rows.sort(function (a, b) { return when(b.at) - when(a.at); });
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + cardHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + (g.read ? figmaRows(g.read) : rows.map(function (r) { return r.html; }).join('')) + '</tbody></table></div>';
+      return '<div class="pg-inspect"><div class="pg-inspect-head">' + cardHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + (g.read ? figmaRows(g.read) : g.layer ? layerRows(g.layer) : rows.map(function (r) { return r.html; }).join('')) + '</tbody></table></div>';
     }).join('');
     // The code, Figma, the decisions or all: a chip for each kind the page has, when it has two, and a release with
     // nothing of the kind chosen out of the way (read from the page itself: box is a var another page reuses).
-    var kinds = [['code', 'Code'], ['figma', 'Figma'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
+    var kinds = [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
     if (kinds.length > 1) pageBar(wn, { chips: kinds });
     box.addEventListener('click', function (e) { var b = e.target.closest('[data-pills-more]'); if (!b) return; Array.prototype.forEach.call(b.parentNode.querySelectorAll('a[hidden]'), function (p) { p.hidden = false; }); b.remove(); });
     wn.addEventListener('sg-chip', function (e) { Array.prototype.forEach.call(e.currentTarget.querySelectorAll('.pg-inspect'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); }); });
@@ -7637,9 +7652,14 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     fig += (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
       return '<tr><td><a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + (x.signedOff ? '<br><span class="pg-dim">' + esc('signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '') + '</td></tr>';
     }).join('');
-    var out = (dec ? card('Decisions', dec, 'decisions') : '') + (fig ? card('Figma', fig, 'figma') : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
-    // Its code, Figma and its decisions: chips, as the History page has, for each kind it has when it has two.
-    var has = [['code', 'Code', log.length || u.uncommitted], ['figma', 'Figma', fig], ['decisions', 'Decisions', dec]].filter(function (x) { return x[2]; });
+    // Each change to the intent layer on a page that documents it: what changed and the commit that made it.
+    var lay = (DATA.intentChanges || []).filter(function (x) { return (x.components || []).indexOf(c.name) >= 0; }).map(function (x) {
+      var sha = !x.to ? '' : x.url ? '<a class="sg-uses-link" href="' + esc(x.url) + '" target="_blank" rel="noopener"><code>' + esc(x.to.slice(0, 8)) + '</code></a>' : '<code>' + esc(x.to.slice(0, 8)) + '</code>';
+      return '<tr><td>' + (sha || 'Changed') + '</td><td>' + esc((x.pages.length === 1 ? 'Its page changed: ' : 'Its page and ' + (x.pages.length - 1) + ' more changed: ') + x.pages.join(', ') + '.') + ' ' + day(x.at || '') + '</td></tr>';
+    }).join('');
+    var out = (dec ? card('Decisions', dec, 'decisions') : '') + (lay ? card('Intent layer', lay, 'intent') : '') + (fig ? card('Figma', fig, 'figma') : '') + (u.uncommitted ? card('Its code', '<tr><td>Now</td><td>Has changes not committed yet</td></tr>') : '');
+    // Its code, Figma, the intent layer and its decisions: chips, as the History page has, for each kind it has when it has two.
+    var has = [['code', 'Code', log.length || u.uncommitted], ['figma', 'Figma', fig], ['intent', 'Intent layer', lay], ['decisions', 'Decisions', dec]].filter(function (x) { return x[2]; });
     var hist = has.length > 1 ? '<p class="pg-par-sum"><span class="sg-chips" role="group" aria-label="Show">' + [['all', 'All']].concat(has).map(function (x) { return '<button type="button" class="sg-chip" data-hist="' + x[0] + '" aria-pressed="' + (x[0] === 'all') + '">' + x[1] + '</button>'; }).join('') + '</span></p>' : '';
     if (!log.length) return hist + '<div class="pg-cards">' + out + areaInfo('No commit has changed it yet, or the project is not in git.') + '</div>';
 
@@ -8241,6 +8261,43 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
     // How many checks each state counts, so a card can say how much of them is done (its percentage).
     par.n = p.n; acc.n = a.n; doc.n = d.n;
     return { par: par, acc: acc, doc: doc, all: all, untested: untested, fix: p.fix + a.fix + d.fix + (c.codeOnly ? 1 : 0), dec: p.dec + a.dec + d.dec };
+  }
+  // The stage the page suggests for it, from what it measures, in the Status row's own words: Stable when Parity is
+  // Match, Accessibility Pass and Documentation Ready (N/A counts as met) and, when the project's tests report it, at
+  // least STABLE_COVERAGE of its lines covered; Deprecated when a release retired it or Figma or the code says so, with
+  // what replaces it; Beta otherwise, with what is left. None while its accessibility is untested, and none for a
+  // component only one side has. The team's own stage (c.status) is never replaced: the suggestion is said beside it
+  // only when they differ.
+  var STABLE_COVERAGE = 80;
+  function suggestedStage(c) {
+    if (c.retiring) return { kind: 'deprecated', status: 'Deprecated', why: [c.retiring.from ? 'retired, as ' + c.retiring.from + ' says' : 'retired'], instead: c.retiring.instead || null };
+    if (c.codeOnly || cssOnly(c)) return null;
+    var s = componentStates(c);
+    if (s.untested) return null;
+    var left = [];
+    if (s.par.say !== 'Match') left.push('Parity ' + s.par.say);
+    if (s.acc.say !== 'Pass' && s.acc.say !== 'N/A') left.push('Accessibility ' + s.acc.say);
+    if (s.doc.say !== 'Ready' && s.doc.say !== 'N/A') left.push('Documentation ' + s.doc.say);
+    if (c.coverage && c.coverage.lines < STABLE_COVERAGE) left.push('tests cover ' + Math.round(c.coverage.lines) + '% of its lines, under ' + STABLE_COVERAGE + '%');
+    return left.length ? { kind: 'beta', status: 'Beta', why: left }
+      : { kind: 'stable', status: 'Stable', why: ['Parity Match, Accessibility ' + s.acc.say + ', Documentation ' + s.doc.say + (c.coverage ? ', tests cover ' + Math.round(c.coverage.lines) + '% of its lines' : '')] };
+  }
+  function stageHTML(c) {
+    var sug = suggestedStage(c), team = c.status;
+    if (!sug) return '';
+    // A release that retired it says what replaces it on its own line (its migration): not said twice.
+    var instead = c.migration ? '' : sug.instead ? ' Use ' + sug.instead + ' instead.' : sug.kind === 'deprecated' ? ' Nothing replaces it yet.' : '';
+    if (team) return team.kind === sug.kind ? (instead ? '<span class="pg-stage-sug">' + esc(instead.trim()) + '</span>' : '')
+      : '<span class="pg-stage-sug">' + esc('From what the page measures it would be ' + sug.status + ' (' + sug.why.join('; ') + ').' + instead) + '</span>';
+    if (c.migration) return '';
+    return statusPill({ kind: sug.kind, status: sug.status }).replace('class="sg-status ', 'class="sg-status sg-status--suggested ') +
+      '<span class="pg-stage-sug">' + esc('Suggested from ' + sug.why.join('; ') + '.' + instead + ' The team makes it its own with status in contract.authored.json.') + '</span>';
+  }
+  // Its stage on its page, again once its accessibility has been tried here.
+  function stageInto(sec, c) {
+    var el = sec && sec.querySelector('.pg-stage'); if (!el) return;
+    el.innerHTML = stageHTML(c);
+    var p = el.closest('.pg-status'); if (p) p.hidden = !p.textContent.trim();
   }
   // A component's area tab and the state it carries, as its Status row says it.
   var AREA_STATE = { parity: 'par', a11y: 'acc', docs: 'doc' };
@@ -8878,7 +8935,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
         // Retired and still in use: what replaces it and how much still moves, each place a row of the Status page.
         (c.migration ? '<p class="pg-status pg-migration">' + (c.status ? '' : statusPill({ kind: 'deprecated', status: 'Deprecated' })) + '<span>' + esc((c.migration.toName ? 'Use ' + c.migration.toName + ' instead. ' : 'Nothing replaces it yet. ') + 'Still used in ' + c.migration.count + (c.migration.count === 1 ? ' place' : ' places') + ' (' + c.migration.products.map(function (p) { return p.name + ' ' + p.count; }).join(', ') + '), each on the ') + '<a href="#status">Status</a> page.</span></p>' : '') +
         // Its class, its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
-        '<div class="pg-meta">' + (c.status || c.coverage || c.codeConnect ? '<p class="pg-status">' + statusPill(c.status) + (c.codeConnect ? '<span class="sg-status sg-status--connected" title="' + esc('Code Connect: ' + c.codeConnect.file) + '">' + CODE_CONNECT_SVG + 'Code Connect</span>' : '') + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') + (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') + (ALL ? '' : factsHTML(c)) + '</div>' +
+        '<div class="pg-meta">' + (c.status || c.coverage || c.codeConnect || stageHTML(c) || !c.codeOnly ? '<p class="pg-status"' + (c.status || c.coverage || c.codeConnect || stageHTML(c) ? '' : ' hidden') + '>' + statusPill(c.status) + '<span class="pg-stage">' + stageHTML(c) + '</span>' + (c.codeConnect ? '<span class="sg-status sg-status--connected" title="' + esc('Code Connect: ' + c.codeConnect.file) + '">' + CODE_CONNECT_SVG + 'Code Connect</span>' : '') + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') + (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') + (ALL ? '' : factsHTML(c)) + '</div>' +
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
@@ -9371,6 +9428,7 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
       // Its tab carries its state, as its Status row says it, once the browser has tried it.
       var accNow = componentStates(c).acc;
       areaState(sec.querySelector('.pg-areas [data-v="a11y"]'), accNow); areaNA(sec.querySelector('.pg-area[data-area="a11y"]'), accNow);
+      stageInto(sec, c);   // the stage it suggests, now that its accessibility is known
       labelCells(a11yEl.closest('.pg-a11y'));
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });

@@ -754,7 +754,9 @@ Now they come together in one log, written to `DECISIONS.md` in the output folde
 
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#write-the-intent-layer) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
-The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma and what was decided, each row tagged Code, Figma or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
+The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided, each row tagged Code, Figma, Intent layer or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
+
+- **An intent layer change** is a card of its own: the pages it changed, the commit that made it, and the components those pages document. The engine keeps the last 50 changes it read, in the layer's snapshot.
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 
@@ -895,7 +897,11 @@ Also on each component.
 - **A token's panel.** Click any token to see its value in each mode, the components that use it, and a button to copy it.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
-- **Status and coverage.** Stable, beta or deprecated when your team says so, and how much of its file your tests cover.
+- **Status and coverage.** Stable, beta or deprecated, and how much of its file your tests cover.
+  - Your team's own stage always wins. Set it as `status` in `contract.authored.json`, or as `Status: beta` in its Figma description, or with `@deprecated` in its code.
+  - Without one, the page suggests a stage from what it measures, in the Status table's words. Stable when Parity is Match, Accessibility Pass and Documentation Ready, with at least 80% of its lines covered when your tests report coverage. Beta otherwise, with what is left.
+  - With one that differs from what the page measures, the page says what it would be beside it.
+  - A component being retired names what replaces it, from the release that retired it or from a line such as "use button instead" in Figma or its code.
 
 ### Templates
 
