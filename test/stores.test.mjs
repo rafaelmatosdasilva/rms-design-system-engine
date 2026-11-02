@@ -430,7 +430,17 @@ test('a commit the gateway timed out on but GitLab made is sent, said once and n
   const other = fakeGitlab();
   other.http.send = async (url, o) => (o?.body?.branch ? { ok: false, status: 502, json: async () => ({}) } : (await fakeGitlab().http.send(url, o)));
   forgetAccess();
-  assert.equal((await pushStore(project(), cfg, 'styleguide', new Map([['index.html', '<p>x</p>']]), 'Style guide published', { env, http: other.http, retryMs: 1 })).ok, false, 'one that did not land is not sent');
+  const never = await pushStore(project(), cfg, 'styleguide', new Map([['index.html', '<p>x</p>']]), 'Style guide published', { env, http: other.http, retryMs: 1 });
+  assert.equal(never.ok, false, 'one that never landed is not sent');
+  assert.match(never.line, /GitLab answered 502 to the commit \(sent 3 times\)/);
+  // A gateway that turns the commit down once, and takes it the next time: sent again, and said sent.
+  const once = fakeGitlab(), sendOnce = once.http.send;
+  let refused = 0;
+  once.http.send = async (url, o) => (o?.body?.branch && refused++ === 0 ? { ok: false, status: 502, json: async () => ({}) } : sendOnce(url, o));
+  forgetAccess();
+  const again = await pushStore(project(), cfg, 'styleguide', new Map([['index.html', '<p>again</p>']]), 'Style guide published', { env, http: once.http, retryMs: 1 });
+  assert.equal(again.ok, true, again.line);
+  assert.equal(once.files['index.html'], '<p>again</p>');
 });
 
 // ── Writing a store with the person's own git access ────────────────────────────────────────────────────────────
