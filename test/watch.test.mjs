@@ -140,6 +140,13 @@ test('a watch: a burst of saves built once it settles, the remote sources asked 
   await failing.tick(0);
   assert.equal((await failing.tick(1)).ok, false);
   assert.equal(lines.at(-1), '❌ the build failed (exit 1); tried again at the next check');
+  // Another round already building (a person's --watch --once) is no failure: it waits for the next check.
+  let fy = 'a';
+  const waiting = makeWatch({ code: () => fy, engine: () => 'e', build: async () => ({ ok: false, busy: true, line: 'a round is already running (process 7, since 07:54)' }), log: (l) => lines.push(l), remoteEveryMs: Infinity, settleMs: 0 });
+  fy = 'b';
+  await waiting.tick(0);
+  await waiting.tick(1);
+  assert.equal(lines.at(-1), '⏳ a round is already running (process 7, since 07:54): built at the next check');
 });
 
 test('the background job: a LaunchAgent on a Mac, a user service on Linux, each project its own; elsewhere, said why', () => {
