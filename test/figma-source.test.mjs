@@ -70,3 +70,10 @@ test('a Figma read is sent to the team\'s snapshots store at once, so it is ever
   assert.equal(r.status, 0, r.stderr);
   assert.ok(readdirSync(join(dir, 'shared'), { recursive: true }).some((f) => /figma-vars\.snapshot\.json$/.test(f)), r.stdout);
 });
+
+test('a token named as Figma\'s own tools name it (FIGMA_ACCESS_TOKEN) is the engine\'s FIGMA_TOKEN; FIGMA_TOKEN set wins', async () => {
+  const { figmaTokenAlias } = await import('../lib/figma-source.mjs');
+  assert.equal(figmaTokenAlias({ FIGMA_ACCESS_TOKEN: 'a' }).FIGMA_TOKEN, 'a');
+  assert.equal(figmaTokenAlias({ FIGMA_ACCESS_TOKEN: 'a', FIGMA_TOKEN: 'b' }).FIGMA_TOKEN, 'b');
+  assert.equal(figmaTokenAlias({}).FIGMA_TOKEN, undefined);
+});

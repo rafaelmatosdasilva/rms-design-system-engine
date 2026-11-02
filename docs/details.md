@@ -924,7 +924,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
 - **Your own copy updates on its own too.** On your computer, the style guide can build itself again whenever something changes ([ask for it](commands.md#publish-a-living-style-guide)):
   - your design system's code, a few seconds after you save, commit or switch branch;
-  - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set;
+  - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set (a `FIGMA_ACCESS_TOKEN`, the name Figma's own tools use, counts as one);
   - the intent layer, checked every 5 minutes;
   - your team's stores, the profile and a code mirror on GitLab, checked every 5 minutes;
   - the engine itself, after it updates.
