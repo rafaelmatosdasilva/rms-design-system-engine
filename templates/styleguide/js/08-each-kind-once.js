@@ -246,7 +246,15 @@
   var WRITE_TO = { 'What it is': DOC_HOME, 'When to use': DOC_HOME, 'When not to use': DOC_HOME, 'Common mistakes': DOC_HOME, Limitations: DOC_HOME, Example: DOC_HOME, 'Intent layer': function () { return 'Its page in the intent layer'; },
     'Do and don\'t': DOC_HOME, Role: DOC_HOME, 'Its tokens': function () { return 'Its variables\' descriptions in Figma'; }, Properties: function () { return 'Its shared contract'; } };
   var writeTo = function (r) { return r.st === 'todo' && WRITE_TO[r.kind] ? Object.assign({}, r, { src: [WRITE_TO[r.kind]()], writeTo: true }) : r; };
+  // Its stage, when the team has not set it or sets another than the page measures, is a task of its Documentation:
+  // shown and numbered there, never counted in its Documentation state (the stage is worked out from that state).
   function docIssueRows(c) {
+    var rows = docIssueRowsOwn(c);
+    if (docIssueRows.busy) return rows;
+    docIssueRows.busy = true;
+    try { return rows.concat(stageRows(c).map(function (r) { r.area = 'Documentation'; r.extra = true; return r; })); } finally { docIssueRows.busy = false; }
+  }
+  function docIssueRowsOwn(c) {
     if (c.codeOnly) return [];
     // A part is documented in its root's page, under Parts: that section is all it asks for.
     if (c.partOf && c.partOf.root) return [partDocRow(c)].map(writeTo);

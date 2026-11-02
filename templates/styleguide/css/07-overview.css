@@ -162,9 +162,6 @@ html:has(.sg-showroom-full) { overflow: hidden; }   /* the page under it never s
 .sg-status--beta { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); }
 .sg-status--deprecated { background: color-mix(in srgb, var(--sg-warning) 24%, transparent); }
 .sg-status--stable { background: color-mix(in srgb, var(--sg-positive) 20%, transparent); }
-.sg-status--suggested { background: transparent; box-shadow: inset 0 0 0 1px var(--sg-line-colour); }   /* the stage the page suggests, outlined: the team's own is filled */
-.pg-stage { display: contents; }   /* its pill and words sit in the status line as its other items do */
-.pg-stage-sug { color: var(--sg-muted); }
 .sg-status--code-only { background: color-mix(in srgb, var(--sg-text-2) 16%, transparent); }
 .sg-status--connected { background: color-mix(in srgb, var(--sg-accent) 16%, transparent); gap: var(--sg-space-xxs); }
 .sg-status-mark { width: 14px; height: 14px; flex: none; }   /* the project's Code Connect pairs it with Figma */

@@ -79,22 +79,17 @@
     return left.length ? { kind: 'beta', status: 'Beta', why: left }
       : { kind: 'stable', status: 'Stable', why: ['Parity Match, Accessibility ' + s.acc.say + ', Documentation ' + s.doc.say + (c.coverage ? ', tests cover ' + Math.round(c.coverage.lines) + '% of its lines' : '')] };
   }
-  function stageHTML(c) {
+  // The stage the page measures, on the Tasks page: one to set when the team gave none, one to look at again when it
+  // differs from the team's. The team makes it its own with status in contract.authored.json.
+  function stageRows(c) {
     var sug = suggestedStage(c), team = c.status;
-    if (!sug) return '';
-    // A release that retired it says what replaces it on its own line (its migration): not said twice.
-    var instead = c.migration ? '' : sug.instead ? ' Use ' + sug.instead + ' instead.' : sug.kind === 'deprecated' ? ' Nothing replaces it yet.' : '';
-    if (team) return team.kind === sug.kind ? (instead ? '<span class="pg-stage-sug">' + esc(instead.trim()) + '</span>' : '')
-      : '<span class="pg-stage-sug">' + esc('From what the page measures it would be ' + sug.status + ' (' + sug.why.join('; ') + ').' + instead) + '</span>';
-    if (c.migration) return '';
-    return '<span class="sg-status sg-status--suggested sg-status--' + esc(sug.kind) + '">' + esc(sug.status) + '</span>' +
-      '<span class="pg-stage-sug">' + esc('Suggested from ' + sug.why.join('; ') + '.' + instead + ' The team makes it its own with status in contract.authored.json.') + '</span>';
-  }
-  // Its stage on its page, again once its accessibility has been tried here.
-  function stageInto(sec, c) {
-    var el = sec && sec.querySelector('.pg-stage'); if (!el) return;
-    el.innerHTML = stageHTML(c);
-    var p = el.closest('.pg-status'); if (p) p.hidden = !p.textContent.trim();
+    if (!sug || (team && team.kind === sug.kind)) return [];
+    var why = sug.why.join('; ');
+    var said = team ? 'Its stage says ' + team.status + '; what the page measures makes it ' + sug.status + ' (' + why + ').' : 'No stage yet: what the page measures makes it ' + sug.status + ' (' + why + ').';
+    var how = team ? 'Keep ' + team.status + ', or change its status in contract.authored.json.' : 'Set its status in contract.authored.json (' + sug.kind + ').';
+    return [{ key: c.name + '\u0000stage', area: 'System', kind: 'Stage', figma: '', code: '', todo: esc(said) + '<span class="pg-todo">' + esc(how + (sug.instead ? ' Use ' + sug.instead + ' instead.' : '')) + '</span>',
+      who: WHO.both, st: 'check', rel: '', at: DATA.builtAt || null,
+      scope: { scope: 'shared', reason: 'Shared: its stage is what every product reads before it uses ' + c.name + '.' } }];
   }
   // A component's area tab and the state it carries, as its Status row says it.
   var AREA_STATE = { parity: 'par', a11y: 'acc', docs: 'doc' };
