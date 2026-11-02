@@ -230,7 +230,9 @@ test('the catalog shows what each component is for and the product\'s pages; a d
     { component: 'Text', props: { text: 'Notifications', style: 'm', as: 'h1' } },
     { component: 'field', props: {} },
     { component: 'button', props: { Label: 'Save' } },
-  ] }));
+  // This page takes input, so it owes an error state. It is about the catalog rather than about states, so it says
+  // why it needs none - which is what any page in this position does.
+  ], states: { error: 'the preference saves locally and cannot fail' } }));
   const r = run('--prototype', 'prototypes/notify.json');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /📓 WHAT THE DOCUMENTATION SAYS ABOUT WHAT THIS PROTOTYPE USES\n.*field: A one-line text input\. Role textbox\. Guidelines: Only for typing text\./);

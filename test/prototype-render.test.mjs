@@ -130,7 +130,9 @@ test('a part that opens another opens it in the browser, with the focus inside; 
     { component: 'chip', props: { Label: 'Email' } },
     { component: 'button', props: { Label: 'Rename', opens: 'rename' } },
     { id: 'rename', component: 'Stack', props: { padding: 'padding/m', gap: 'padding/s' }, children: [{ component: 'field', props: {} }, { component: 'button', props: { Label: 'Save' } }] },
-  ] }));
+  // The panel takes input, so the page owes an error state. This test is about opening a part and the keyboard, so
+  // it says why it needs none - which is what any page in this position does.
+  ], states: { error: 'the rename is checked as it is typed, so saving never fails' } }));
   let r = run('--prototype', 'prototypes/filters.json');
   assert.equal(r.status, 0, r.stdout);
   assert.match(r.stdout, /🖱  HOW IT WORKS {2}3 tried in the browser, all as in a product/, r.stdout);
