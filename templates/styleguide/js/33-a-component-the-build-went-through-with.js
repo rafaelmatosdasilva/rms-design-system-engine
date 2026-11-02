@@ -299,7 +299,7 @@
         // Retired and still in use: what replaces it and how much still moves, each place a row of the Status page.
         (c.migration ? '<p class="pg-status pg-migration">' + (c.status ? '' : statusPill({ kind: 'deprecated', status: 'Deprecated' })) + '<span>' + esc((c.migration.toName ? 'Use ' + c.migration.toName + ' instead. ' : 'Nothing replaces it yet. ') + 'Still used in ' + c.migration.count + (c.migration.count === 1 ? ' place' : ' places') + ' (' + c.migration.products.map(function (p) { return p.name + ' ' + p.count; }).join(', ') + '), each on the ') + '<a href="#status">Status</a> page.</span></p>' : '') +
         // Its class, its version, when it last changed and how to import it: one line, wrapping only when the room runs out.
-        '<div class="pg-meta">' + (c.status || c.coverage || c.codeConnect || stageHTML(c) || !c.codeOnly ? '<p class="pg-status"' + (c.status || c.coverage || c.codeConnect || stageHTML(c) ? '' : ' hidden') + '>' + statusPill(c.status) + '<span class="pg-stage">' + stageHTML(c) + '</span>' + (c.codeConnect ? '<span class="sg-status sg-status--connected" title="' + esc('Code Connect: ' + c.codeConnect.file) + '">' + CODE_CONNECT_SVG + 'Code Connect</span>' : '') + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') + (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') + (ALL ? '' : factsHTML(c)) + '</div>' +
+        '<div class="pg-meta">' + (c.coverage || c.codeConnect || !c.codeOnly ? '<p class="pg-status"' + (c.coverage || c.codeConnect ? '' : ' hidden') + '>' + (c.codeConnect ? '<span class="sg-status sg-status--connected" title="' + esc('Code Connect: ' + c.codeConnect.file) + '">' + CODE_CONNECT_SVG + 'Code Connect</span>' : '') + (c.coverage ? '<span>Tests cover ' + esc(String(Math.round(c.coverage.lines))) + '% of its lines</span>' : '') + '</p>' : '') + (c.cls ? '<p class="pg-selector"><code>' + esc(/^#/.test(c.cls) ? c.cls : '.' + c.cls) + '</code></p>' : '') + (ALL ? '' : factsHTML(c)) + '</div>' +
       '</div>' +
       // Each area says where it stands: Parity, Accessibility and Documentation in the Status row's own words and dots
       // (componentStates), Motion with the system's alert icon while something moves otherwise than Figma.
@@ -792,7 +792,6 @@
       // Its tab carries its state, as its Status row says it, once the browser has tried it.
       var accNow = componentStates(c).acc;
       areaState(sec.querySelector('.pg-areas [data-v="a11y"]'), accNow); areaNA(sec.querySelector('.pg-area[data-area="a11y"]'), accNow);
-      stageInto(sec, c);   // the stage it suggests, now that its accessibility is known
       labelCells(a11yEl.closest('.pg-a11y'));
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
