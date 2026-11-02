@@ -108,3 +108,18 @@ test('a state the page owes: made of the system, and not ready; said why, it is 
   assert.equal(thin.status, 1);
   assert.match(`${thin.stdout}`, /data-no-error says this page needs no error state: say why in it/);
 });
+
+// A prototype carries what the last check of it found, so somebody opening it from the team's store can judge it
+// without running anything.
+test("--prototype <page>: the check is kept beside the page, and carries what it found", { timeout: budget(300000) }, () => {
+  const dir = project();
+  run(dir, '--prototype', 'prototypes/SignIn.jsx', '--no-browser');
+  const at = join(dir, 'prototypes', 'SignIn.check.json');
+  assert.equal(existsSync(at), true);
+  const rec = JSON.parse(readFileSync(at, 'utf8'));
+  assert.equal(rec.name, 'SignIn');
+  assert.deepEqual(Object.keys(rec.used).sort(), ['Button', 'Field']);
+  assert.deepEqual(rec.owes, ['error'], 'the states it owes travel with it too');
+  assert.equal(rec.ok, false);
+  assert.match(rec.$description, /carried with it wherever the prototype goes/);
+});
