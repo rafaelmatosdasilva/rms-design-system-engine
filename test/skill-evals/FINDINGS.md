@@ -28,7 +28,18 @@ It used a token wherever it had been shown one, and invented wherever it had not
 
 **Changed.** The catalog names what the wrapper may use, and nothing else, with the way out in the same breath. What a component owns stays that component's, matched against every name the system has and not only the ones built in code.
 
-**Still open.** Whether it moves the number. The same reading has not been done on the composition side.
+**Confirmed on a second arm.** The same reading was run again on the documentation-only runs, which have no engine behind them at all and were measured separately. Every value is attributed to the tag it sits on:
+
+| | Runs | On the page's own wrapper | On a system component |
+|---|---|---|---|
+| With the engine | 26 | 7 (100%) | 0 |
+| Documentation only | 45 | 10 (100%) | 0 |
+
+**Across 71 runs, not one invented value was ever placed on a system component.** `<div> ← 400px`, `<div> ← 1px`, `<p> ← 1rem`, `<circle> ← #E5E7EB`. Where an agent had a component, it used the component's own props and nothing else. The counts are small because this reads values inside an opening tag and not those in a multi-line style object, so it understates how many; the ratio is the finding, and it is the same ratio in both arms.
+
+**Still open.** Whether it moves the number.
+
+**And a thing that turned out not to exist.** The plan was to read the composition side the same way. There is almost nothing to read: of 75 writes into `prototypes/` across the documentation-only runs, **74 are code files and one is a composition**. The measured project's system is built in code, so a page there is correctly a `.jsx` — which means every failure in these arms is on the code side, and the composition path has never been measured at this scale. That is a gap in the measurement, not a finding about agents.
 
 ---
 
