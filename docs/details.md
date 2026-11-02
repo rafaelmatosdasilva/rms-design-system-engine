@@ -106,6 +106,13 @@ cd my-project
 rms-design-system-engine --init
 ```
 
+Setup ends with a first result, so you see what the engine is for before learning anything else:
+
+- **One component, checked.** The one Figma and your code pair most fully, compared with Figma (`--first-result`, or `--first-result <component>` for another).
+- **Its three main findings.** What fails first, one per check, each with what to do and who does it.
+- **What to ask next.** Three requests to try, such as showing that component in the style guide.
+- With no Figma data yet, it says to run the first audit, which reads Figma, then shows the first result.
+
 ### A Figma branch
 
 - A branch link (`figma.com/design/<file>/branch/<branch>/...`) names the branch. Every read then follows the branch, which stays as it is while the main file changes.
