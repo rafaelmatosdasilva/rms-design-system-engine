@@ -2648,9 +2648,14 @@ const ZERO = /^0+$/;
 // Every commit in a range (A..B; A empty or zeros: all of B's history).
 export function rangeFindings(range) {
   const [a, b] = range.includes('..') ? range.split('..') : ['', range];
-  // A start this clone does not have (a force-pushed branch's old tip) checks all of B's history.
-  const known = a && !ZERO.test(a) && (() => { try { execFileSync('git', ['cat-file', '-e', `${a}^{commit}`], { cwd: ROOT, stdio: 'ignore' }); return true; } catch { return false; } })();
-  const shas = git(['rev-list', ...(known ? [`${a}..${b}`] : [b])]).split('\n').filter(Boolean);
+  // A start this clone does not have (a new branch's push, a force-pushed branch's old tip): the commits B brings that
+  // the default branch does not have yet, as a pull request would. Only B on the default branch itself (a rewritten
+  // main) checks all of its history: what is already on main was checked when it came.
+  const ok = (args) => { try { execFileSync('git', args, { cwd: ROOT, stdio: 'ignore' }); return true; } catch { return false; } };
+  const known = a && !ZERO.test(a) && ok(['cat-file', '-e', `${a}^{commit}`]);
+  const main = ['origin/main', 'origin/HEAD', 'main'].find((r) => ok(['rev-parse', '--verify', '--quiet', `${r}^{commit}`]));
+  const onMain = main && ok(['merge-base', '--is-ancestor', b, main]);
+  const shas = git(['rev-list', ...(known ? [`${a}..${b}`] : main && !onMain ? [b, '--not', main] : [b])]).split('\n').filter(Boolean);
   return shas.flatMap(commitFindings);
 }
 // What a push sends: for each ref, the commits the remote does not have yet, and the ref's own name.
