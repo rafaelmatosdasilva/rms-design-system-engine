@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
 import {
   stableJson, engineFiles, checkSignature, runSignature, styleguideSignatures, projectSignature,
-  keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE, whyChecked, whyCheckedLine, cssRuleList,
+  keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE, whyChecked, whyCheckedLine, cssRuleList, sharedOnly,
 } from '../lib/a11y-check.mjs';
 import { OUT_DIR } from '../lib/names.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -291,4 +291,58 @@ test('pages shared out among copies of the check report what one run reports, an
   assert.deepEqual(issues(a.json), issues(b.json));
   const again = runAll(shared, { CHROME_PATH: '/nonexistent/chrome' });
   assert.match(again.out, /4 of 4 pages unchanged since they were last checked/);
+});
+
+// The guide's own CSS is mostly its own screens (the Status table, a side panel): a change there reaches no component's
+// stage, so it must not send every component to be checked again. What reaches the stages is signed apart (reachBase),
+// from the classes read on the page around and inside them.
+const guidePage = (guideCss = '', systemCss = '.chip { padding: 8px }') => `<!doctype html><html lang="en"><head><title>Guide</title><style data-system>${systemCss}</style>
+<style>body { margin: 0 } .sg-page { padding: 16px } .sg-panel { color: #555 } ${guideCss}</style></head><body><main class="sg-page"><h1>Guide</h1>
+<section id="c-chip" class="sg-comp"><div class="pg-preview"><button class="chip">Go</button></div></section><aside class="sg-panel">Panel</aside>
+<script type="application/json" id="sg-data">${JSON.stringify({ components: [{ name: 'chip', cls: 'chip', markup: '<button class="chip">Go</button>' }] })}</script></main></body></html>`;
+const REACH = ['chip', 'pg-preview', 'sg-comp', 'sg-page'];
+
+test('what of the shared CSS reaches the stages is signed apart: the guide\'s own screens never move it', () => {
+  const one = styleguideSignatures(guidePage(), { reach: REACH });
+  assert.ok(one.reachBase);
+  assert.equal(styleguideSignatures(guidePage()).reachBase, undefined, 'only with what the page showed');
+  // The guide's side panel, its own buttons, a custom property only the panel sets: the base moves, what reaches does not.
+  const panel = styleguideSignatures(guidePage('.sg-panel .sg-il-choice[aria-pressed="true"] .sg-mark { color: red } .sg-panel { --sg-hue: red }'), { reach: REACH });
+  assert.notEqual(panel.base, one.base);
+  assert.equal(panel.reachBase, one.reachBase);
+  assert.equal(panel.comp.chip, one.comp.chip);
+  // Around a stage, before one (a + or ~ reaches from there), with no class at all, or the system's own: it reaches.
+  for (const css of ['.sg-comp { background: #000 }', 'main > section { color: red }', '.sg-page .pg-preview { outline: 1px solid }'])
+    assert.notEqual(styleguideSignatures(guidePage(css), { reach: REACH }).reachBase, one.reachBase, css);
+  assert.notEqual(styleguideSignatures(guidePage('', '.chip { padding: 8px } .sg-panel { color: red }'), { reach: REACH }).reachBase, one.reachBase, 'the system\'s CSS always counts');
+});
+
+test('a part takes the results of the one checked before only when its components and its check are the same, and only the shared CSS moved', () => {
+  const parts = { run: 'r', base: 'b2', comp: { chip: 'c1' } };
+  const was = { at: '2026-11-02T10:00:00Z', parts: { run: 'r', base: 'b1', comp: { chip: 'c1' }, reachBase: 'x' }, delta: {} };
+  assert.equal(sharedOnly(parts, { a: was }), was);
+  assert.equal(sharedOnly(parts, { a: { ...was, parts: { ...was.parts, reachBase: undefined } } }), null, 'one kept before what reaches was signed: checked');
+  assert.equal(sharedOnly({ ...parts, comp: { chip: 'c2' } }, { a: was }), null, 'a component changed');
+  assert.equal(sharedOnly({ ...parts, run: 'r2' }, { a: was }), null, 'the check changed');
+  assert.equal(sharedOnly({ ...parts, base: 'b1' }, { a: was }), null, 'nothing shared moved: it would have been kept by its signature');
+  const newer = { ...was, at: '2026-11-02T11:00:00Z', parts: { ...was.parts, comp: { chip: 'c0' } } };
+  assert.equal(sharedOnly(parts, { a: was, b: newer }), null, 'the newest is the one that counts');
+});
+
+test('the style guide\'s own CSS changed outside every stage: its parts are put back after a look, never checked again', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(600000) }, () => {
+  const dir = makeFixture({ 'ds-config.json': JSON.stringify({ name: 'Acme' }), [`${OUT_DIR}/styleguide/index.html`]: guidePage() });
+  const page = join(dir, OUT_DIR, 'styleguide', 'index.html');
+  const go = (env = {}) => {
+    let out; try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), '--json-out', join(dir, 'a11y.json')], { cwd: dir, encoding: 'utf8', timeout: budget(120000), env: { ...process.env, ...env } }); } catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
+    return { out, json: JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8')) };
+  };
+  const first = go();
+  assert.ok(Object.values(readKept(join(dir, OUT_DIR, KEPT_FILE))).every((k) => k.parts?.reachBase), 'what reaches its stages is kept with it');
+  writeFileSync(page, guidePage('.sg-panel .sg-il-choice { border: 1px solid red }'));
+  const panel = go();
+  assert.match(panel.out, /1 of them only after a look: the style guide's own CSS changed, and none of what changed reaches a component's stage/);
+  assert.deepEqual(panel.json.issues, first.json.issues);
+  assert.match(go({ CHROME_PATH: '/nonexistent/chrome' }).out, /1 of 1 page unchanged since it was last checked/, 'and from then on, no browser');
+  writeFileSync(page, guidePage('.sg-panel .sg-il-choice { border: 1px solid red } .sg-comp { background: #000 }'));
+  assert.match(go().out, /1 part checked again: the CSS every component shares changed/, 'a change around a stage is checked');
 });
