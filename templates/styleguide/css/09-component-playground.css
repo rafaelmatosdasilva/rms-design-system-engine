@@ -504,7 +504,7 @@ input.sg-input, textarea.sg-input, #sg-search input.sg-input { background: var(-
 /* Radius and border, three cards in one language: a solid line where the component has a border (the theme's width), a
    dashed one where it has none; only the component in focus in the hue, the rest neutral. */
 .sg-bk-rl-stage { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
-.sg-bk-rl-draw { width: 100%; height: 100%; overflow: visible; }
+.sg-bk-rl-stage > .sg-bk-rl-draw { width: 88cqw; height: 88cqh; overflow: visible; }   /* sized to its box (a percentage height does not resolve in the grid, so a wide card drew it as tall as it is wide, over its caption), a little inside it, centered */
 .sg-bk-corners, .sg-bk-rl-tex { width: min(100cqw, 100cqh, calc(var(--sg-space-xxl) * 12)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sg-space-l); }   /* one size for a corner and a tile, four across in both cards */
 .sg-bk-corners { row-gap: calc(var(--sg-space-xxl) * 1.5); font-size: var(--sg-s); }
 .sg-bk-rl, .sg-bk-rl-draw { --rl-c: var(--sg-muted); }

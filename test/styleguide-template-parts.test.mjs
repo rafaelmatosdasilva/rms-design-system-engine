@@ -54,3 +54,10 @@ test('the page\'s text helpers: tags stripped until none is left, entities unesc
 test('the Status page has no line saying when it was built and with which engine', () => {
   assert.doesNotMatch(templateText(), /'Built ' \+ when|' · engine ' \+/);
 });
+
+test('the corner card\'s drawing is sized to its box, a little inside it, so a wide card never draws it over its caption', () => {
+  // A percentage height does not resolve in the card's grid: on a wide card the drawing grew as tall as it is wide.
+  // And the general rule for the brand kit's drawings (.sg-bk-geo, later in the sheet) must not win over this one.
+  assert.match(templateText(), /\.sg-bk-rl-stage > \.sg-bk-rl-draw \{ width: 88cqw; height: 88cqh; overflow: visible; \}/);
+  assert.match(templateText(), /\.sg-bk-rl-stage \{ flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; \}/, 'its box a size container, so cq units are its own');
+});
