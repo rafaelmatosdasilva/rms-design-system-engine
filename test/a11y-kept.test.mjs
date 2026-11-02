@@ -200,3 +200,25 @@ test('a component whose selector is not valid CSS leaves the page kept: said not
   assert.match(second.out, /1 of 1 page unchanged since it was last checked: its results are put back/, second.out);
   assert.deepEqual(second.json.notRead, said);
 });
+
+// Several pages to check are shared out among copies of the check, each in a browser of its own; the report is the same
+// as one run's, and the next run puts every page back.
+test('pages shared out among copies of the check report what one run reports, and are all kept for the next', { skip: HAS_CHROME ? false : 'no Chrome available', timeout: budget(900000) }, () => {
+  const pages = { 'p1.html': PAGE.replace('BODY', ''), 'p2.html': PAGE.replace('BODY', '<img src="x.png">'), 'p3.html': PAGE.replace('BODY', '<a href="#"></a>'), 'p4.html': PAGE.replace('BODY', '<p>ok</p>') };
+  const runAll = (dir, env = {}) => {
+    let out;
+    const urls = Object.keys(pages).flatMap((f) => ['--url', pathToFileURL(join(dir, f)).href]);
+    try { out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'a11y-check.mjs'), ...urls, '--json-out', join(dir, 'a11y.json')], { cwd: dir, encoding: 'utf8', timeout: budget(300000), env: { ...process.env, ...env } }); }
+    catch (e) { out = (e.stdout ?? '') + (e.stderr ?? ''); }
+    return { out, json: JSON.parse(readFileSync(join(dir, 'a11y.json'), 'utf8')) };
+  };
+  const shared = makeFixture({ ...pages, 'ds-config.json': JSON.stringify({ a11y: { parallel: 2 } }) });
+  const one = makeFixture({ ...pages, 'ds-config.json': JSON.stringify({ a11y: { parallel: 1 } }) });
+  const a = runAll(shared), b = runAll(one);
+  assert.match(a.out, /4 parts to check: 2 pages at once/);
+  assert.doesNotMatch(b.out, /pages at once/);
+  const issues = (j) => j.issues.map((i) => `${i.issue} ${i.page ?? ''}`).sort();
+  assert.deepEqual(issues(a.json), issues(b.json));
+  const again = runAll(shared, { CHROME_PATH: '/nonexistent/chrome' });
+  assert.match(again.out, /4 of 4 pages unchanged since they were last checked/);
+});
