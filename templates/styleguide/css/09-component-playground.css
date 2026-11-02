@@ -101,9 +101,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-matrix .sg-mx-row.is-link { cursor: pointer; }   /* a row opens the component's page: its own hover and press */
 .sg-matrix .sg-mx-row.is-link:hover > td { background: var(--sg-a2); }
 .sg-matrix .sg-mx-row.is-link:active > td { background: var(--sg-a3); }
-.sg-matrix .sg-mx-row > td.sg-mx-cell-go { cursor: pointer; }   /* a cell opens that area: its own hover and press, over the row's */
-.sg-matrix .sg-mx-row > td.sg-mx-cell-go:hover .sg-link-pill { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }   /* the cell answers through its pill */
-.sg-matrix .sg-mx-row > td.sg-mx-cell-go:hover .sg-link-go { color: var(--sg-text); }
+.sg-matrix .sg-mx-row.is-link:hover:not(:has(.sg-link-pill:hover, .sg-tip:hover)) .sg-mx-go { background: var(--sg-hover-fill); color: var(--sg-text); }   /* the row and its arrow open the same page: hovering one lights both, never while an area's pill (another place) is the one hovered */
+.sg-matrix .sg-mx-row .sg-link-pill { cursor: pointer; }   /* only an area's pill opens that area: the rest of its cell is the row's */
 .sg-mx-go:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-mx-go > svg { width: calc(var(--sg-space-l) + var(--sg-space-xxs)); height: calc(var(--sg-space-l) + var(--sg-space-xxs)); }
 /* The component's page in a panel over the Status page. */
@@ -973,6 +972,20 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-decide-said { flex-basis: 100%; color: var(--sg-muted); font-size: var(--sg-s); }
 .sg-decide-said:empty { display: none; }   /* where to paste it, on its own line once copied */
 .sg-decide-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); }   /* a decision's mark, there to tell the three apart at a glance */
+.sg-row-detail-body .sg-il-group-decide + .sg-il-group-decide { margin-top: var(--sg-space-xl); }   /* New text for the page, Changes to rules, Other changes: each its own block */
+.sg-row-detail-body .sg-il-group-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }   /* its heading and count, Approve all at the other end */
+.sg-row-detail-body .sg-il-choices { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-s); }   /* each item's own decision, under it */
+.sg-il-choice { --sg-decide-hue: var(--sg-muted); }
+.sg-il-choice--approve { --sg-decide-hue: #2e7d32; } .sg-il-choice--change { --sg-decide-hue: #b26a00; } .sg-il-choice--drop { --sg-decide-hue: var(--sg-danger); }
+:where(:root)[data-sg-scheme="dark"] .sg-il-choice--approve { --sg-decide-hue: #6fcf75; } :where(:root)[data-sg-scheme="dark"] .sg-il-choice--change { --sg-decide-hue: #f0b35a; }
+.sg-il-choice[aria-pressed="true"] .sg-decide-mark { color: var(--sg-decide-hue); }   /* the answer chosen: the button pressed as any of the page's, its mark in its hue */
+.sg-row-detail-body .sg-il-source { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); font-weight: var(--sg-text-weight); }   /* where a draft comes from */
+.sg-row-detail-body .sg-il-source--warn { color: var(--sg-text); padding-left: var(--sg-space-s); border-left: 2px solid var(--sg-danger); }   /* a name only Figma has, written as a prop */
+.sg-row-detail-body .sg-il-edit { display: block; width: 100%; box-sizing: border-box; margin-top: var(--sg-space-s); font: inherit; resize: vertical; }   /* Change: the item's own words, to edit in place */
+.sg-row-detail-body .sg-il-edit[hidden] { display: none; }
+.sg-row-detail-body .sg-il-quiet { margin-top: var(--sg-space-m); }
+.sg-row-detail-body .sg-il-quiet > summary { cursor: pointer; color: var(--sg-muted); font-size: var(--sg-s); }
+.sg-row-detail-body .sg-il-review-copy { margin-bottom: calc(var(--sg-cell-x) - var(--sg-space-s)); }   /* the decisions to copy, under every group */
 .sg-row-detail-body .sg-il-codes { display: flex; flex-wrap: wrap; gap: var(--sg-space-xs); margin-top: var(--sg-space-xs); }
 /* What the agents read: each section a block, its lines close, a clear space between sections. */
 .sg-row-detail-body .sg-il-group { margin: 0 0 var(--sg-space-l); }

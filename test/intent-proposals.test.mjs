@@ -240,3 +240,17 @@ test('a recheck of an Add answered with no page is kept for its component\'s own
   const again = applyDecisions({ report: shown, noPage, proposals: P, decisions: currentAnswers(P, readDecisions(root)) });
   assert.equal(again.noPageRechecks.newThing, undefined);
 });
+
+test('a change to a rule with nothing but the engine\'s own reading behind it is never recommended: No is its answer, folded away', () => {
+  const guard = { kind: 'guard', subject: 'Tile', page: 'Tile', rule: 'Only one Tile per screen.', proposal: 'Hold the rule as a check: At most 1 Tile on one screen.', evidence: ['The edit check can hold it on every edit.', 'A yes writes it into contract.authored.json → guards.'], no: 'It stays a rule agents read.' };
+  const bare = withEvidence('guard:Tile:1', guard, {});
+  assert.deepEqual([bare.recommends, bare.quiet], ['no', true]);
+  assert.ok(bare.candidates.find((c) => c.answer === 'yes').evidence.every((e) => e.from === 'The engine' && e.strength === 'weak'));
+  assert.match(bare.candidates.find((c) => c.answer === 'no').evidence[0].says, /Only the engine's own reading of the rule speaks for the change/);
+  // The team's own word for it, or its past yes to the same kind: recommended, as any proposal is.
+  const must = withEvidence('guard:Tile:1', { ...guard, level: 'must' }, {});
+  assert.deepEqual([must.recommends, must.quiet], ['yes', undefined]);
+  assert.equal(withEvidence('guard:Tile:1', guard, { decisions: { 'guard:Card:2': { answer: 'yes' } } }).recommends, 'yes');
+  const rewrite = withEvidence('rewrite:Tile:1', { kind: 'rewrite', subject: 'Tile', page: 'Tile', proposal: 'Rewrite it.', evidence: ['It names nothing.'] }, {});
+  assert.deepEqual([rewrite.recommends, rewrite.quiet], ['no', true]);
+});

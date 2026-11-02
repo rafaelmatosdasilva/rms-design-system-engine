@@ -597,6 +597,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await until(`document.getElementById('sg-comp-panel').classList.contains('is-parked')`, (v) => v === true), true, 'the X closes it, once it has slid out (its page kept, out of sight, for the next one)');
     const cellGo = await run(`(() => { const b = document.querySelector('#status .sg-mx-go--cell'); if (!b) return null; b.click(); const src = document.querySelector('#sg-comp-panel iframe').getAttribute('data-at'); document.querySelector('#sg-comp-panel [data-panel-close]').click(); return src; })()`);
     if (cellGo) assert.match(cellGo, /[?&]embed#c-[^/]+\/(parity|accessibility|documentation)\?st=(todo|check)$/, 'a cell opens its area, filtered');
+    // Only the pill opens its area: the rest of its cell is the row's, and opens the component's own page.
+    const cellRest = await run(`(() => { const b = document.querySelector('#status .sg-mx-go--cell'); if (!b) return null; const td = b.closest('td'); td.dispatchEvent(new MouseEvent('click', { bubbles: true })); const src = document.querySelector('#sg-comp-panel iframe').getAttribute('data-at'); document.querySelector('#sg-comp-panel [data-panel-close]').click(); return [src, getComputedStyle(td).cursor === 'pointer' && !td.closest('.is-link'), getComputedStyle(b).cursor]; })()`);
+    if (cellRest) { assert.match(cellRest[0], /[?&]embed#c-[^/?]+$/, 'the cell around the pill opens the component, as its row does'); assert.deepEqual(cellRest.slice(1), [false, 'pointer'], 'the pointer is the pill\'s'); }
     assert.equal(await run(`!!document.querySelector('#status .sg-mx-side, #status .sg-mx-split')`), false, 'no side panel');
     assert.equal(await run(`[...document.querySelectorAll('#status tr.sg-mx-row')].every((tr) => ['stFigma', 'stCode', 'stPar', 'stAcc', 'stDoc'].every((k) => tr.dataset[k]))`), true, 'every row carries each column\'s state, for the filters to count');
     assert.match(await run(`[...document.querySelectorAll('#status .sg-matrix td .pg-par-status')].map((e) => e.textContent).join('|')`), /^Found\|Found\|(Match|Partial|Differs|N\/A)\|/);
@@ -1773,4 +1776,12 @@ test('a component named with a note in brackets gives no part to draw, and the p
   const uses = tpl.split('\n').filter((l) => /querySelector(All)?\(c\.only\)/.test(l));
   assert.ok(uses.length >= 2, 'the playground and the anatomy read c.only');
   for (const l of uses) assert.match(l, /try \{[^}]*querySelector(All)?\(c\.only\)/, l.trim());
+});
+
+test('the Status matrix: only an area\'s pill opens that area; hovering a row lights its arrow, never while a pill is the one hovered', () => {
+  const tpl = templateText();
+  assert.doesNotMatch(tpl, /sg-mx-cell-go/, 'no cell of its own answers: the rest of it is the row\'s');
+  assert.match(tpl, /\.sg-matrix \.sg-mx-row\.is-link:hover:not\(:has\(\.sg-link-pill:hover, \.sg-tip:hover\)\) \.sg-mx-go \{ background: var\(--sg-hover-fill\); color: var\(--sg-text\); \}/);
+  assert.match(tpl, /\.sg-matrix \.sg-mx-row \.sg-link-pill \{ cursor: pointer; \}/);
+  assert.match(tpl, /\.sg-link-pill:focus-visible \{ outline: 2px solid var\(--sg-accent\)/, 'the pill keeps its focus ring');
 });
