@@ -46,3 +46,8 @@ test/.nuxt-tools/*
 !test/.*-tools/package.json
 !test/.*-tools/package-lock.json
 !test/.*-tools/osv-scanner.toml
+
+# Tokens for GitLab and Figma: local only, never committed (this repository is public).
+.env
+.env.*
+!.env.example
