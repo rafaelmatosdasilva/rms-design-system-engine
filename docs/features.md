@@ -216,6 +216,8 @@ A reason too thin to be one is not taken. *A check a page cannot satisfy honestl
 
 Ten symptoms of one mistake read as ten mistakes. The agent fixed them one at a time for thirty turns and was never told the file was the wrong shape. Now it gets one sentence, the shape itself, and the keys its file has instead — so it can map one onto the other.
 
+And where your components are code, it is told something better than the shape of a composition: **which file this project writes.** The catalog of such a project says twice that a page here is a `.jsx` — and the agent wrote a `.json` anyway. Sending it off to write a *better composition* would only send it back to the wrong kind of file. So it now reads: your components are code, a page here is written in that code, write `prototypes/<Name>.jsx`.
+
 **Each prototype carries its own evaluation.** What every check found used to live in one place, in the engine's output folder: good for counting across a project, no use to the prototype itself. A prototype is a part of its own now — read from your team's store into `prototypes/` and sent back from it — and the page travelled, its handoff travelled, what people said about it travelled, and nothing about whether it holds up did.
 
 Now `prototypes/<name>.check.json` sits beside the page, as the handoff and the comments do: which components it used and how often, the mistakes with why each happened, what the system lacked for it, the states it owes. The store carries it, and so does every file the engine keeps beside a page — named deliberately rather than left to the extensions, because the check record travelled only because it happens to be JSON and the handoff did not travel at all.
