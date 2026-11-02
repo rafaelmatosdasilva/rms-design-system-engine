@@ -212,6 +212,12 @@ There is an honest way out, which there has to be, and it costs a reason:
 
 A reason too thin to be one is not taken. *A check a page cannot satisfy honestly is a check people turn off.* A starting point read from a designed screen is excused everything: it is incomplete on purpose, and failing it for not being finished is the same mistake pointing the other way.
 
+**Every finding says which part it is about.** Watched in a measured run: an agent was told `"undefined" is not in the catalog`, could not tell which of the page's parts it meant, ran the check seventeen more times, searched the project for a schema, deleted the page, started over, and ran out of turns with nothing finished.
+
+Both halves of that were the engine's. The finding carried the part's id all along and the report never printed it; and a part you gave no id was keyed `node-7`, a number in walk order that is findable in nothing. Now a finding opens with where it is — `Page › children[1] › children[0]`, or `"actions" (Page › children[0])` for a part you named — which is a route you can follow with the file open.
+
+And a part with no component at all is no longer quoted as a component called `undefined`. It says what it is: a part that was never finished.
+
 **A file in the wrong shape is told so once, not symptom by symptom.** An agent wrote a format of its own invention — `{ name, layout, gap, components: [{ type, label }] }` — and the engine answered with ten findings: the root is not a component, `"undefined"` is not in the catalog, the id `"undefined"` is used in three places. Every one true, and not one of them the thing that was wrong.
 
 Ten symptoms of one mistake read as ten mistakes. The agent fixed them one at a time for thirty turns and was never told the file was the wrong shape. Now it gets one sentence, the shape itself, and the keys its file has instead — so it can map one onto the other.
