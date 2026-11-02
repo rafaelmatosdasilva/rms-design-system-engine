@@ -1,5 +1,7 @@
 # Skill evaluation results
 
+What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
+
 ## 2026-11: Guide: first result after setup, git's hooks, accessibility the design owes (continuous evaluation)
 
 What changed since the entry below (engine d0594f9): setup ends with --first-result; the hooks recipe and usage tell git's pre-commit and pre-push (--git-check: commit warns, push refuses, only for what the change uses); the Figma accessibility block and its frame on the design team's to-do page. The guide changed in `rms-design-system-engine.md`.
