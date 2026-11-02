@@ -71,6 +71,16 @@ const NOT_PROJECT = /expected-report|\/\.design-system-engine-out(\/|$)|\/\.git(
 // The project every run works on, as a hash of what a run copies. Each version is measured on its own checkout,
 // so two versions compare only when this is the same: a change to the demo design system changes every task,
 // and the version before is measured again on it (test/skill-evals.test.mjs holds RESULTS.md to this hash).
+// The same tasks, pointed at a project of somebody's own. Everything such a run produces belongs to that team -
+// their component names in the files kept with each row, their words in the transcripts - so the whole set is
+// marked private here, by construction, rather than left to how a task happens to be named. The recorder drops a
+// row whose task id starts with private- (record.mjs, pruneRow), and a guard that depends on somebody having
+// remembered a naming convention is not a guard.
+export function againstOwnProject(tasks, source) {
+  if (!source) return tasks;
+  return tasks.map((t) => ({ ...t, source, private: true, id: /^private-/.test(String(t.id)) ? t.id : `private-${t.id}` }));
+}
+
 export function projectHash(source = DEMO) {
   const h = createHash('sha256');
   for (const f of walk(source).filter((p) => !NOT_PROJECT.test(p)).map((p) => relative(source, p)).sort()) h.update(`${f}\n`).update(readFileSync(join(source, f)));
