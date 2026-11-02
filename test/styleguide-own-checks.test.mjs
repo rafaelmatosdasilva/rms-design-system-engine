@@ -71,7 +71,10 @@ test('in the browser: the same page twice is unchanged; a page whose layout move
   assert.deepEqual([first.compared, first.fresh], [0, first.pages]);
   assert.ok(existsSync(join(shots, 'last', 'status.png')) && existsSync(join(shots, 'last', 'c-button.png')));
   const again = await guideShots(page, shots);
-  assert.deepEqual([again.compared, again.changed], [first.pages, []], 'nothing moved, nothing said');
+  assert.deepEqual([again.compared + again.kept, again.changed], [first.pages, []], 'nothing moved, nothing said');
+  // A component page drawn from the same as before keeps its picture; the other pages are pictured every build.
+  assert.ok(again.kept > 0 && existsSync(join(shots, 'last', 'c-button.png')), JSON.stringify(again));
+  assert.ok(again.compared > 0, 'the Status page and the foundations, every build');
   // The page's own layout moved: every page is pushed down.
   writeFileSync(page, readFileSync(page, 'utf8').replace('</head>', '<style>.sg-section > h2 { margin-top: 240px !important; }</style></head>'));
   const moved = await guideShots(page, shots);
