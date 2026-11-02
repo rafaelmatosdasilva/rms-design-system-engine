@@ -923,12 +923,36 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - your design system's code, a few seconds after you save, commit or switch branch;
   - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set;
   - the intent layer, checked every 5 minutes;
+  - your team's stores, the profile and a code mirror on GitLab, checked every 5 minutes;
   - the engine itself, after it updates.
+  - It runs only what the change feeds, and publishes to your team's store only a page that changed. No CI runner? This keeps the team's page up to date ([Rebuilt on your own computer](#rebuilt-on-your-own-computer)).
   - It runs in the background from login on, with no terminal open: a LaunchAgent on a Mac, a user service on Linux. What it does goes to `.design-system-engine-out/watch.log`, and one request turns it off.
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 - **The template comes in parts.** Its file is the page's frame; its styles and its script are parts of their own under `templates/styleguide/` (`css/` and `js/`, one area of the page each, such as the Overview, the Tokens page or the Status page), joined in order when the page is built. A change is reviewed and tested one area at a time, and the page they make is the same. A project's own template can be one file, or use parts the same way (a line `/*@part …*/` in its styles, `//@part …` in its script).
+
+### Rebuilt on your own computer
+
+Some teams have no CI runner, so no pipeline ever rebuilds their guide. The background watch (`--watch`, kept running by `--watch-install`) does it on a person's own computer instead.
+
+- **It runs only what the change feeds.** One table in `lib/auto-build.mjs` says which steps each source feeds:
+
+  | What moved | What runs |
+  |---|---|
+  | The intent layer | The contracts and the design intent, then the style guide, its check and the publish. No audit. |
+  | The themes | The style guide, its check and the publish |
+  | The code, Figma, the snapshots, the team's decisions or the profile | The audit, then everything after it |
+  | The engine | Everything, since its output may differ. Each step's own caches keep it short. |
+
+- **It publishes only a page that changed.** With a style guide store set, the published `built-from.json` keeps the page's fingerprint, so a build that made the same page sends only that record.
+- **Never from a branch of your own.** A checkout on another branch than its remote's default is built, never published.
+- **A failed step is never published.** The round says where it failed, and it is tried again at the next check.
+- **One round at a time.** A lock file stops a second round while one runs.
+- **One line a round** in `.design-system-engine-out/watch.log`: what moved, what ran, how long, and whether it published.
+- **One round now.** `--watch --once` (or `--auto --once`) runs one round and stops, for a scheduler of your own.
+- **No token is stored.** Each step reads them from the project's `.env`, as every run does.
+- **`--guide-status`** says whether the watch is on, and what its last round did.
 
 ### What's in it
 

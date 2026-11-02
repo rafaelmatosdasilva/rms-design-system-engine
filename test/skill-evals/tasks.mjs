@@ -112,7 +112,7 @@ export function figmaOptionScore(ctx, { op, breaks }) {
     check('ran the engine\'s change for the chip', hasEngineRun(ctx, (c) => /--figma-change\s+chip\b/.test(c))),
     check('only what was asked', (ch?.ops ?? []).length === 1 && op(ch.ops[0]), JSON.stringify(ch?.ops ?? null)),
     check('no value of its own', noValue(ch?.ops)),
-    check(breaks ? 'says what it breaks' : 'says it adds to the system, held for sign-off', breaks ? /\bbreak/i.test(said) : /\bsign(s|ed)?[- ]off|\bheld\b|\bapprov/i.test(said)),
+    check(breaks ? 'says what it breaks' : 'says it adds to the system, held for sign-off', breaks ? /\bbreak/i.test(said) : /\bsign(s|ed)?(\s+(it|this|that|them))?[- ]off|\bheld\b|\bapprov/i.test(said)),
     check('asks before Figma is changed', asksFirst(said)),
     check('does not claim Figma was changed', !claimsFigma(said)),
     check('no files changed', !ctx.changed.length, ctx.changed.join(', ')),

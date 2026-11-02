@@ -10,8 +10,9 @@
 // needs a Figma token says so and exits 2, and both are the engine working. What a command may never do is fall over
 // - a Node stack, a name that is not defined, a property read off nothing. That line is the whole test.
 //
-// Left out, and why: --watch and --watch-intent-layer (they never return), --watch-install and --watch-uninstall (they
-// add or take away a job at the person's login), --install-hooks and --remove-hooks (they change a
+// Left out, and why: --watch and --watch-intent-layer (they never return), --watch --once and --auto --once (a round
+// builds the whole guide; auto-build.test.mjs runs them), --watch-install and --watch-uninstall (they add or take away
+// a job at the person's login), --install-hooks and --remove-hooks (they change a
 // project's git config), --commit and --publish-styleguide (they write somewhere real), --init and --reconfigure
 // (covered by the setup tests, which check what they scaffold), and --refresh-figma and the captures (they want a
 // token and a browser; their offline refusal is covered by their own tests).
@@ -47,6 +48,7 @@ const COMMANDS = [
   '--contracts-out', '--docs', '--extract', '--intent', '--profile-export', '--rename-sweep', '--review-drafts',
   '--showroom-compare', '--update', '--check-update', '--from-figma-cli', '--figma-screens', '--figma-effects',
   '--figma-motion', '--figma-examples', '--figma-brands', '--brands-css', '--refresh-snapshots', '--lessons',
+  '--outputs',
 ];
 
 // A home of their own: --update links the /rms-design-system-engine command in ~/.claude/commands, and run with the
