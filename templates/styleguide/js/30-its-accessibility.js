@@ -62,7 +62,7 @@
     var add = function (label, st, html, from, todo, who, fresh) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from, todo: todo || '', who: who || '', fresh: !!fresh }); };
     (c.a11yFindings || []).forEach(function (x) {
       var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[x.who] || WHO.both) + teamNote(c.name) : '', x.new);
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), x.from || 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[x.who] || WHO.both) + teamNote(c.name) : '', x.new);
     });
     if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '.') + placesTag(i.items || i.details.map(placeOf)), auditOn(ch.at), esc(capital(i.fix))); });
     var stat = {};

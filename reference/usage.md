@@ -165,7 +165,8 @@ rms-design-system-engine --figma-screens <answer.json>   # keep its answer as th
 rms-design-system-engine --figma-a11y                    # write the read-only script that reads the same screens for accessibility: each text and lone icon with what is drawn behind it, inside instances, and each control under 24 by 24, to run with use_figma
 rms-design-system-engine --figma-a11y <answer.json>      # keep its answer as the screen accessibility snapshot (paths.screenA11y) and say what the screens owe (screen-a11y.mjs); every audit with accessibility says it again
 rms-design-system-engine --summary                       # print the plain result of the last run again (relay it as is); a full audit's has the components passing, drifting and not checked under its verdict, and says when the Figma file is only partly or not reliable enough to compare
-rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks (done by --init); --remove-hooks takes them out
+rms-design-system-engine --install-hooks                 # add the project's Claude Code hooks and git's pre-commit and pre-push hooks (done by --init); --remove-hooks takes them out
+rms-design-system-engine --git-check commit|push         # what git's hooks run: only for what the change uses; commit warns and exits 0, push exits 1 while a finding is left
 rms-design-system-engine --doctor                        # check the install (command link, hooks, Chrome, Node) with the one fix for each problem
 rms-design-system-engine --route "<request>"             # the first step for any request: the recipe, the exact command, SAY and NEXT (the project's hook runs it for /rms-design-system-engine requests)
 rms-design-system-engine --recipe [name]                 # print a task recipe from the skill's cookbook (no name lists them)

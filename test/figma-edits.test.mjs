@@ -264,3 +264,10 @@ test('Dev Mode: each component linked to its code once, each variable its CSS na
   assert.match(lines, /Dev Mode links to the code \(2 components linked to their code file in Dev Mode\)/);
   assert.match(lines, /NEXT: show the person the Dev Mode links and code syntax above/);
 });
+
+test('a name read from Figma is data in the script, never code: what could end a string or a script is written as an escape', () => {
+  const ls = String.fromCharCode(0x2028), hostile = `cardTile</script><script>x()</script>${ls}`;
+  const script = applyScript([{ kind: 'role', nodeId: '1:2', component: hostile, label: `Role: button ${hostile}` }]);
+  assert.ok(!/<\/?script/.test(script) && !script.includes(ls), 'no tag and no line separator in the script');
+  assert.equal(JSON.parse(/const edits = (\[[\s\S]*?\]);\n/.exec(script)[1])[0].component, hostile, 'read back, the same name');
+});

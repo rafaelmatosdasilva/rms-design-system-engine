@@ -106,6 +106,13 @@ cd my-project
 rms-design-system-engine --init
 ```
 
+Setup ends with a first result, so you see what the engine is for before learning anything else:
+
+- **One component, checked.** The one Figma and your code pair most fully, compared with Figma (`--first-result`, or `--first-result <component>` for another).
+- **Its three main findings.** What fails first, one per check, each with what to do and who does it.
+- **What to ask next.** Three requests to try, such as showing that component in the style guide.
+- With no Figma data yet, it says to run the first audit, which reads Figma, then shows the first result.
+
 ### A Figma branch
 
 - A branch link (`figma.com/design/<file>/branch/<branch>/...`) names the branch. Every read then follows the branch, which stays as it is while the main file changes.
@@ -546,13 +553,23 @@ GitHub's runners already have Chrome. A pull request can read the caches its bas
 
 ### What the Figma file is missing
 
-Some problems belong to the Figma file. They are listed for whoever keeps it.
+Some problems belong to the Figma file. They are found in Figma alone, before any code exists, and listed for whoever keeps it.
 
-- An interactive component with no focus state, so the code has to invent the focus ring.
-- An error state with no message, so the error is shown by colour alone.
-- A control under 24 pixels.
+- **Contrast.** Each text colour on each surface it is drawn on, in every mode: 4.5:1 for text, 3:1 for an icon or large text.
+- **Pairs the system makes.** A text colour is also measured on the background its name pairs it with, and on every surface when nothing is drawn under it.
+- **Focus.** An interactive component with no focus state, so the code has to invent the focus ring.
+- **Focus ring.** A ring drawn in the focus state is held to 3:1 against every surface, in every mode.
+- **Target size.** A control under 24 pixels tall or wide, in any of its variants.
+- **Role.** A component whose name says it is a control (`iconButton`, `textField`) and has no `Role:` note.
+- **Name.** A control that shows no words and has no note naming it (`aria-label: "Close"`).
+- **Error.** An error state with no message, so the error is shown by colour alone.
 
-Meanwhile Claude writes a visible focus ring and leaves an error message's words to you.
+Each gap reaches the design team:
+
+- **In Figma.** `--figma-edits` puts each one on the page "Design system to do", in a frame "Accessibility the design owes": one card per gap, with its WCAG criterion and its fix. It is written only after you say yes, and afresh each time, so what is fixed clears.
+- **On the style guide.** Each one is on its component's Accessibility list and on the Tasks page, for you in Figma.
+
+Meanwhile Claude writes a visible focus ring and leaves the words of an error message or a name to you. `"designA11y": false` in `ds-config.json` turns this off.
 
 ### What it cannot tell you
 
@@ -1182,6 +1199,7 @@ These run beside the gates. Most give advice and never fail a run, and each can 
 | Workarounds | A control laid over a component, a sign of a missing slot or prop | `"workarounds": false` |
 | Tailwind | Classes that differ from Figma, and values in brackets outside the theme | `"tailwind": false` |
 | Values written by hand | Every value a token should carry, with the token to use | `"census": false` (a run fails when a file's count grows) |
+| A commit warns, a push refuses | What a commit or a push uses that has a finding | `--remove-hooks`, or `"hooks": false` |
 
 ### Near copies of a component
 
@@ -1257,6 +1275,20 @@ A screen that lays its own control over a component (a clear button over a text 
 ### Values written by hand
 
 The census (`🧮`) counts each colour, spacing, radius, font size, duration, layer and shadow a token should carry, with the token to use when one has that value, the files that guess most first. `rms-design-system-engine --census` lists each one and keeps the count, so it only falls. A file with more than before fails the run.
+
+### A commit warns, a push refuses
+
+`--install-hooks` (and `--init`) also adds two git hooks to the project. They look only at what your change uses.
+
+- **A commit warns.** It lists what the commit adds that has a finding, and always goes ahead.
+- **A push refuses.** While one of those findings is left, the push stops with the list. Fix them and push again.
+- **Only what the change uses.** The lines the commit or push adds, read against what they replace. The rest of the system's differences never stop either one.
+- **What counts.** What the edit check finds on those lines: a value written by hand, a token declared nowhere, a prop a component does not take. And a difference the last full audit found in a component or token those lines use.
+- **What never counts.** A difference you accepted as debt, one you keep on purpose, or one that is Figma's work alone.
+- **A finding marked wrong** (`--wrong`) is shown, but never stops a push.
+- **Nothing slow.** The hooks never open a browser or reach the network. They read the audit's findings as the last full run left them, so run the audit again once a change fixes one.
+- **Your own hooks stay yours.** The hooks go in `.git/hooks`, never committed. When the project already has its own `pre-commit` or `pre-push`, or keeps its hooks in a committed folder, the engine changes nothing and prints the one line to add there.
+- `--remove-hooks`, or `"hooks": false` in `ds-config.json`, turns them off with the others.
 
 ## Review the Figma library
 
@@ -1625,6 +1657,7 @@ Nothing else. figma-cli, the MCP server, Chrome and the usage log (`DESIGN_SYSTE
 - **Code people wrote: never.** What it finds comes back as a patch for a person to apply.
 - **Figma, generated code, its own files, your issue tracker:** yes, ask or no, per project ([where the engine may write](#where-the-engine-may-write-and-where-it-must-never)). On CI, ask becomes no, and the design file and product code are never written.
 - **In Claude Code,** the hooks make the AI ask before a commit, a push or a setting change, and it cannot make a check pass on its own ([the hooks keep the rules](#the-hooks-keep-the-rules)).
+- **In git,** a commit warns and a push refuses only for what the change uses ([a commit warns, a push refuses](#a-commit-warns-a-push-refuses)).
 
 ### Install without piping into a shell
 

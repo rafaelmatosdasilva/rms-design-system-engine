@@ -274,8 +274,11 @@ Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
 ♿ Accessibility from the code (no browser needed): 1 finding in 3 markup and 1 style file (1 focus outline removed and not put back). Advisory.
      src/theme.css:70  .tp-field__input removes the focus outline and no focus style puts one back
 
-♿ Accessibility in the Figma file: 2 things the design owes (for whoever keeps the Figma file; the parity never changes Figma):
-   • button, chip have no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
+♿ Accessibility in the Figma file: 5 things the design owes (for whoever keeps the Figma file; the parity never changes Figma):
+   • button, chip, field have no focus state in Figma, so the code invents the focus ring and no one designs it: add a focus state (a visible ring, at least 3:1 against what is behind it)
+   • field has no role note in Figma: its name says a textbox, and nothing tells the code which role to give it (WCAG 4.1.2): add the annotation "Role: textbox" (or the role it really has)
+   • field's State=Error adds no message: the error is shown by its colour alone (WCAG 1.4.1, 3.3.1): add an error message part to the error state (its words a text property), so the code can link it to the field
+   rms-design-system-engine --figma-edits puts each on the design team's to do list in Figma, written only after a yes.
 
   AI-READINESS SCORECARD  (advisory - a running measure, never blocks)
   ● Gate health      10/25 gates pass

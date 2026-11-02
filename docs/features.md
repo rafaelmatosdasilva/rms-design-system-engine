@@ -16,7 +16,7 @@ Each section says why it matters, then what it does not do well today. A line ma
 | [Track system health](#track-system-health) | Warns about risks before they spread as the system grows: a colour named after one product, a token that points to one that was deleted, a combination that only breaks in dark mode on a phone. | Contracts | Ready to use |
 | [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Contracts, Figma library | Ready to use |
 | [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Contracts, intent | Ready to use |
-| [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Early development |
+| [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Actively improving |
 | [Test accessibility](#test-accessibility) | Tests each component the way people use it: contrast, keyboard, focus, touch size and what a screen reader says. Fix it once in the component and every screen benefits. | Contracts, Compare | Early development |
 | [Build with AI, on the system](#build-with-ai-on-the-system) | AI tools build with your real components, rules and past decisions: in your product's code today, and as clickable prototypes for user tests *(Coming soon)*. Each change is checked as it's made, and what the system lacks goes on a list for design. | Contracts, intent, Catch drift | Early development |
 | [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's playground, spec, Figma match, accessibility and history, plus who needs to do what next. | Everything above | Early development |
@@ -117,7 +117,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 **Ready to use** · **Why it matters:** Shortcuts do not pile up until the system falls apart.
 
-*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down.*
+*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
 
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
@@ -125,12 +125,13 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
 - Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
 - Checks Tailwind classes against Figma.
+- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
 - Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
 - Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
 
 ## Fit your team's setup
 
-**Early development** · **Why it matters:** It works with the tools you already use.
+**Actively improving** · **Why it matters:** It works with the tools you already use.
 
 *Today: every browser check runs in Chrome.*
 
@@ -153,7 +154,8 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
 - Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
-- Lists what the Figma file is missing, such as a focus state or an error message.
+- Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
+- Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
 - Tries again only what changed, so a second run takes seconds.
 - Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
 - Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
