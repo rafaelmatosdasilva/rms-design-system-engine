@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
 import {
   stableJson, engineFiles, checkSignature, runSignature, styleguideSignatures, projectSignature,
-  keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE,
+  keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE, whyChecked, whyCheckedLine,
 } from '../lib/a11y-check.mjs';
 import { OUT_DIR } from '../lib/names.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -74,6 +74,19 @@ test('a style guide part is signed by its components as the page data gives them
   assert.equal(changed.base, one.base);
   assert.notEqual(styleguideSignatures(page([cardTile, chip], '.a{color:green}')).base, one.base, 'the system CSS changed');
   assert.equal(styleguideSignatures('<script id="sg-data">{not json</script>'), null);
+  // A comment or the spacing of the CSS is not the CSS: an engine change that rewords the page's comments keeps every part.
+  assert.equal(styleguideSignatures(page([cardTile, chip], '/* the page */ .a { color: red }\n\n.b{ color:blue } /* why */')).base, one.base);
+  assert.notEqual(styleguideSignatures(page([cardTile, chip], '.a :hover{color:red}.b{color:blue}')).base, styleguideSignatures(page([cardTile, chip], '.a:hover{color:red}.b{color:blue}')).base, 'a space that is a combinator still counts');
+});
+
+// A part checked again says why, from what it was signed with last time.
+test('a part checked again says why: the check, the page CSS, a component by name, or never checked before', () => {
+  const was = { k1: { parts: { run: 'r', base: 'b', comp: { chip: 'c1', cardTile: 't1' } } }, k2: { parts: { run: 'r', base: 'b', comp: { badge: 'g1' } } }, k3: { parts: { run: 'r', base: 'b', comp: { tab: 'x' } } } };
+  const t = (comp, extra = {}) => ({ parts: { run: 'r', base: 'b', comp }, ...extra });
+  const w = whyChecked([t({ chip: 'c1', cardTile: 't2' }), t({ badge: 'g1' }, { parts: { run: 'r', base: 'B', comp: { badge: 'g1' } } }), t({ tab: 'x' }, { parts: { run: 'R', base: 'b', comp: { tab: 'x' } } }), t({ menu: 'm' }), t({ chip: 'c1' }, { kept: {} })], was);
+  assert.deepEqual(w, { checked: 4, run: 1, css: 1, components: ['cardTile'], fresh: 1 });
+  assert.equal(whyCheckedLine(w), "4 parts checked again: the check or its settings changed (1); the page's CSS changed (1); 1 component changed (cardTile); not checked before (1)");
+  assert.equal(whyCheckedLine(whyChecked([], was)), '');
 });
 
 test('the project is signed by its files, less the packages, what the engine writes and the configuration', () => {
