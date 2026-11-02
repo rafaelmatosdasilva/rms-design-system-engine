@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tempDir } from './helpers.mjs';
 import { LOCK } from '../lib/auto-build.mjs';
-import { roundRunning, waitForRound, ROUND_ENV, ancestorsOf } from '../lib/run-lock.mjs';
+import { roundRunning, waitForRound, ROUND_ENV, ancestorsOf, roundRead } from '../lib/run-lock.mjs';
 
 // A run started by hand waits for a round of the watch; the round's own steps, and a lock left by a process that is gone, never.
 test('a run started by hand waits for a round of the watch, never for its own round or a lock nobody holds', async () => {
@@ -25,4 +25,20 @@ test('a run started by hand waits for a round of the watch, never for its own ro
   assert.equal(w.gave, undefined);
   assert.match(said[0], /^⏳ The background watch is running a round on this project \(process 4242, since 03:00\): waiting for it to end/);
   assert.deepEqual(await waitForRound(root, { env: {} }), { waited: 0 });
+});
+
+// The profile, the stores and the READMEs are read once in a watch round, by its first step; a new round reads them again.
+test('a watch round reads from GitLab once: its first step marks it, the next steps skip it, the next round reads again', () => {
+  const root = tempDir('round-read-'), lock = join(root, LOCK);
+  mkdirSync(dirname(lock), { recursive: true });
+  const env = { [ROUND_ENV]: '4242' };
+  assert.equal(roundRead(root, { env: {} }).done, false, 'not in a round: always read');
+  writeFileSync(lock, JSON.stringify({ pid: 4242, at: '2026-11-02T08:00:00.000Z' }));
+  const first = roundRead(root, { env });
+  assert.equal(first.done, false);
+  first.mark();
+  assert.equal(roundRead(root, { env }).done, true, 'a later step of the same round');
+  assert.equal(roundRead(root, { env: {} }).done, false, 'a run by hand reads');
+  writeFileSync(lock, JSON.stringify({ pid: 4242, at: '2026-11-02T09:00:00.000Z' }));
+  assert.equal(roundRead(root, { env }).done, false, 'the next round reads again');
 });

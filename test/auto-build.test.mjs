@@ -15,16 +15,16 @@ const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const ids = STEPS.map((s) => s.id);
 
 test('each source feeds its steps, written as data in one place', () => {
-  assert.deepEqual(stepsFor([{ what: 'intentLayer' }]), ['outputs', 'build', 'check', 'publish'], 'the intent layer: the contracts, the design intent and the page, no gates');
-  assert.deepEqual(stepsFor([{ what: 'the engine' }]), ['page', 'audit', 'build', 'check', 'publish'], 'the engine: everything');
+  assert.deepEqual(stepsFor([{ what: 'intentLayer' }]), ['outputs', 'build', 'publish'], 'the intent layer: the contracts, the design intent and the page, no gates');
+  assert.deepEqual(stepsFor([{ what: 'the engine' }]), ['page', 'audit', 'build', 'publish'], 'the engine: everything');
   for (const what of ['Figma', 'the code', 'snapshots:design/snapshots', 'decisions', 'kept', 'the profile:design-system-engine-profile.json']) {
-    assert.deepEqual(stepsFor([{ what }]), ['page', 'audit', 'build', 'check', 'publish'], `${what}: the audit and everything after`);
+    assert.deepEqual(stepsFor([{ what }]), ['page', 'audit', 'build', 'publish'], `${what}: the audit and everything after`);
   }
-  assert.deepEqual(stepsFor([{ what: 'themes' }]), ['build', 'check', 'publish'], 'the themes: the page only');
+  assert.deepEqual(stepsFor([{ what: 'themes' }]), ['build', 'publish'], 'the themes: the page only');
   assert.deepEqual(stepsFor([{ what: 'styleguide' }]), [], 'what a round publishes starts nothing');
-  assert.deepEqual(stepsFor([{ what: 'something new' }]), ['page', 'audit', 'build', 'check', 'publish'], 'a source not listed: everything');
-  assert.deepEqual(stepsFor([{ what: 'intentLayer' }, { what: 'Figma' }]), ['page', 'audit', 'build', 'check', 'publish'], 'the audit makes the contracts and the design intent itself');
-  assert.deepEqual(stepsFor([{ what: 'intentLayer:specs' }, { what: 'themes' }]), ['outputs', 'build', 'check', 'publish']);
+  assert.deepEqual(stepsFor([{ what: 'something new' }]), ['page', 'audit', 'build', 'publish'], 'a source not listed: everything');
+  assert.deepEqual(stepsFor([{ what: 'intentLayer' }, { what: 'Figma' }]), ['page', 'audit', 'build', 'publish'], 'the audit makes the contracts and the design intent itself');
+  assert.deepEqual(stepsFor([{ what: 'intentLayer:specs' }, { what: 'themes' }]), ['outputs', 'build', 'publish']);
   for (const [what, steps] of Object.entries(FEEDS)) for (const s of steps) assert.ok(ids.includes(s), `${what} feeds a step there is (${s})`);
   assert.deepEqual(STEPS.find((s) => s.id === 'outputs').args, ['--outputs']);
   assert.deepEqual(STEPS.find((s) => s.id === 'check').args, ['--styleguide-check']);
@@ -72,10 +72,10 @@ test('one round now: only the intent layer moved, only its steps run; published 
   const h = harness(root, { sources: { now: { ...BASE, 'intentLayer:specs': 'l2' } } });
   const r = await autoRound(root, h.deps);
   assert.equal(r.result, 'published');
-  assert.deepEqual(h.ran, ['outputs', 'build', 'check'], 'no audit gates, which read only Figma and the code');
+  assert.deepEqual(h.ran, ['outputs', 'build'], 'no audit gates, which read only Figma and the code');
   assert.equal(h.pubs.length, 1);
   assert.equal(lastRecord(root).sources['intentLayer:specs'], 'l2');
-  assert.match(logLines(root).at(-1), /moved: intentLayer:specs l1 → l2 · ran outputs, build, check, publish · \d+s · published$/);
+  assert.match(logLines(root).at(-1), /moved: intentLayer:specs l1 → l2 · ran outputs, build, publish · \d+s · published$/);
   const again = harness(root, { sources: { now: { ...BASE, 'intentLayer:specs': 'l2' } } });
   assert.equal((await autoRound(root, again.deps)).result, 'nothing moved', 'the next round has nothing to do');
 });
@@ -85,7 +85,7 @@ test('one round now: the engine moved, every step runs; the same page is not pub
   record(root, BASE);
   const h = harness(root, { sources: { now: { ...BASE, 'the engine': 'e2' } }, published: false });
   const r = await autoRound(root, h.deps);
-  assert.deepEqual(h.ran, ['page', 'audit', 'build', 'check']);
+  assert.deepEqual(h.ran, ['page', 'audit', 'build']);
   assert.equal(r.result, 'built');
   assert.match(r.line, /not published \(the page is the same as the one published\)$/);
   assert.equal(lastRecord(root).sources['the engine'], 'e2', 'recorded all the same');
@@ -95,7 +95,7 @@ test('one round now: no build recorded yet, the whole sequence', async () => {
   const root = tempDir('acme-auto-');
   const h = harness(root, { sources: { now: BASE } });
   const r = await autoRound(root, h.deps);
-  assert.deepEqual(h.ran, ['page', 'audit', 'build', 'check']);
+  assert.deepEqual(h.ran, ['page', 'audit', 'build']);
   assert.match(r.line, /no build recorded yet/);
   assert.deepEqual(lastRecord(root).sources, BASE);
 });
@@ -106,15 +106,15 @@ test('one round now: differences the audit finds still build the page; a failed 
   const findings = harness(root, { sources: { now: { ...BASE, Figma: '101' } }, fail: { audit: 1 } });
   assert.equal((await autoRound(root, findings.deps)).result, 'published', 'exit 1 of the audit is differences found');
   record(root, BASE);
-  const failing = harness(root, { sources: { now: { ...BASE, Figma: '101' } }, fail: { check: 1 } });
+  const failing = harness(root, { sources: { now: { ...BASE, Figma: '101' } }, fail: { build: 1 } });
   const r = await autoRound(root, failing.deps);
   assert.equal(r.result, 'failed');
   assert.equal(failing.pubs.length, 0, 'never published');
   assert.deepEqual(lastRecord(root).sources, BASE, 'not recorded');
-  assert.match(logLines(root).at(-1), /failed at its check \(exit 1\): not published, tried again next round$/);
+  assert.match(logLines(root).at(-1), /failed at the style guide \(exit 1\): not published, tried again next round$/);
   const retry = harness(root, { sources: { now: { ...BASE, Figma: '101' } } });
   await autoRound(root, retry.deps);
-  assert.deepEqual(retry.ran, ['page', 'audit', 'build', 'check'], 'the next round tries again');
+  assert.deepEqual(retry.ran, ['page', 'audit', 'build'], 'the next round tries again');
   const crashed = harness(root, { sources: { now: { ...BASE, Figma: '102' } }, fail: { audit: 2 } });
   assert.equal((await autoRound(root, crashed.deps)).result, 'failed', 'any other exit of the audit is a failure');
   const refused = harness(root, { sources: { now: { ...BASE, Figma: '103' } }, publishOk: false });
@@ -185,7 +185,7 @@ test('the code as a checkout here: its commit is a source, and a branch of its o
 
 test('the watch\'s own sources under their FEEDS names; the stores asked beside them, without the ones it checks itself', () => {
   assert.deepEqual(Object.values(WATCHED).map((w) => stepsFor([{ what: w }])), [
-    ['page', 'audit', 'build', 'check', 'publish'], ['page', 'audit', 'build', 'check', 'publish'], ['outputs', 'build', 'check', 'publish'], ['page', 'audit', 'build', 'check', 'publish'],
+    ['page', 'audit', 'build', 'publish'], ['page', 'audit', 'build', 'publish'], ['outputs', 'build', 'publish'], ['page', 'audit', 'build', 'publish'],
   ]);
   const now = { 'snapshots:snapshots': 's2', 'themes:themes': 't2', 'decisions:decisions': null, 'the profile:p.json': 'p1', Figma: '9', 'the code': 'c2', styleguide: 'x2' };
   const base = { 'snapshots:snapshots': 's1', 'themes:themes': 't1', 'decisions:decisions': 'd1', 'the profile:p.json': 'p1', Figma: '8', 'the code': 'c1', styleguide: 'x1' };
@@ -217,19 +217,19 @@ test('a watch tick runs only what the moved sources feed, and publishes only a p
   await w.tick(0);
   codeSig = 'c2'; await w.tick(10); const first = await w.tick(20);
   assert.deepEqual(first.moved, ['the code']);
-  assert.deepEqual(ran, ['page', 'audit', 'build', 'check']);
+  assert.deepEqual(ran, ['page', 'audit', 'build']);
   assert.deepEqual([sent, records], [['Button'], []], 'a page never published: sent');
   ran.length = 0; codeSig = 'c3'; await w.tick(30); await w.tick(40);
   assert.deepEqual([sent, records], [['Button'], ['Button']], 'built again, the same page: only its record');
   ran.length = 0; layerMoved = true; body = 'cardTile';
   const layer = await w.tick(2000);
   assert.deepEqual(layer.moved, ['intentLayer']);
-  assert.deepEqual(ran, ['outputs', 'build', 'check'], 'the intent layer: no audit');
+  assert.deepEqual(ran, ['outputs', 'build'], 'the intent layer: no audit');
   assert.deepEqual(sent, ['Button', 'cardTile'], 'a page that changed: sent');
   ran.length = 0; layerMoved = false; storesMoved = ['themes:themes'];
   await w.tick(4000);
-  assert.deepEqual(ran, ['build', 'check'], 'a store: only what it feeds');
-  assert.match(logLines(root).at(-1), /moved: themes:themes · ran build, check, publish · \d+s · not published \(the page is the same as the one published\)$/);
+  assert.deepEqual(ran, ['build'], 'a store: only what it feeds');
+  assert.match(logLines(root).at(-1), /moved: themes:themes · ran build, publish · \d+s · not published \(the page is the same as the one published\)$/);
 });
 
 test('a watch build that failed is tried again at the next check, for the same sources, never at every tick', async () => {
@@ -258,7 +258,7 @@ test('--guide-status: whether the background watch is on, and what its last roun
   await autoRound(root, harness(root, { sources: { now: { ...BASE, 'intentLayer:specs': 'l9' } } }).deps);
   const said = watchLines(root, { job: { file: '/h/Library/LaunchAgents/acme.plist' }, installed: true });
   assert.match(said[0], /The background watch is on for this folder \(\/h\/Library\/LaunchAgents\/acme\.plist\)/);
-  assert.match(said[1], /Its last round, .*moved: intentLayer:specs l1 → l9 · ran outputs, build, check, publish · .* · published\.$/);
+  assert.match(said[1], /Its last round, .*moved: intentLayer:specs l1 → l9 · ran outputs, build, publish · .* · published\.$/);
 });
 
 test('the commands: --watch --once and --auto --once, one round now, with nothing moved since the last build', { timeout: budget(60000) }, () => {
