@@ -133,9 +133,7 @@ decisions, then general heuristics. WCAG 2.2 AA is the floor at every level. Say
 own preference above a documented standard. The project's `llms.txt` names its own source at each level.
 
 **The project's hooks.** `--init` installs Claude Code hooks in the project (`.claude/settings.local.json`;
-`--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off), and git's
-`pre-commit` and `pre-push` hooks (`--git-check commit|push`: a commit only warns, a push refuses while a finding is left,
-both only for what the change uses; when the project has hooks of its own, the line to add is printed). They
+`--install-hooks` adds them to an existing project, `--remove-hooks` or `"hooks": false` turns them off). They
 refuse a hand edit of a Figma snapshot, and ask the person before a `ds-config.json` edit, a commit, a push,
 applying the hand-back, accepting a difference (`--baseline` or the baseline file), keeping one on purpose (`--keep` or `design-system-engine-kept.json`), marking a check made by hand (`--checked`, only when the person says they checked it), an exception, a code name
 recorded for a Figma name (`contract.authored.json`), replacing an approved reference picture, or a code edit, unless the person's latest message asked for that change. After a UI
