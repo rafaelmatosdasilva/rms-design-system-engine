@@ -32,13 +32,21 @@ test('a watch round reads from GitLab once: its first step marks it, the next st
   const root = tempDir('round-read-'), lock = join(root, LOCK);
   mkdirSync(dirname(lock), { recursive: true });
   const env = { [ROUND_ENV]: '4242' };
-  assert.equal(roundRead(root, { env: {} }).done, false, 'not in a round: always read');
+  assert.equal(roundRead(root, { env: {}, fresh: true }).done, false, 'not in a round: always read');
   writeFileSync(lock, JSON.stringify({ pid: 4242, at: '2026-11-02T08:00:00.000Z' }));
-  const first = roundRead(root, { env });
+  const first = roundRead(root, { env, fresh: true });
   assert.equal(first.done, false);
   first.mark();
-  assert.equal(roundRead(root, { env }).done, true, 'a later step of the same round');
-  assert.equal(roundRead(root, { env: {} }).done, false, 'a run by hand reads');
+  assert.equal(roundRead(root, { env, fresh: true }).done, true, 'a later step of the same round');
+  assert.equal(roundRead(root, { env: {}, fresh: true }).done, false, 'a run by hand reads');
   writeFileSync(lock, JSON.stringify({ pid: 4242, at: '2026-11-02T09:00:00.000Z' }));
-  assert.equal(roundRead(root, { env }).done, false, 'the next round reads again');
+  assert.equal(roundRead(root, { env, fresh: true }).done, false, 'the next round reads again');
+  // Within one process, the answer stays the one it first gave: the first step still reads what it reads later on.
+  const root2 = tempDir('round-read-2-');
+  mkdirSync(dirname(join(root2, LOCK)), { recursive: true });
+  writeFileSync(join(root2, LOCK), JSON.stringify({ pid: 7, at: '2026-11-02T10:00:00.000Z' }));
+  const env2 = { [ROUND_ENV]: '7' };
+  const firstAsk = roundRead(root2, { env: env2 });
+  firstAsk.mark();
+  assert.equal(roundRead(root2, { env: env2 }).done, false, 'asked again in the same process: as it first answered');
 });
