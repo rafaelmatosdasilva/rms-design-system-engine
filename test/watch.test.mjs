@@ -3,11 +3,11 @@
 // job that keeps it running from login on (a LaunchAgent on a Mac, a user service on Linux).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, readFileSync, existsSync, cpSync, realpathSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync, cpSync, realpathSync, symlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { codeSignature, engineSignature, figmaVersionNow, snapshotFigmaVersion, makeWatch, jobFor, installWatch, uninstallWatch, realJobDir } from '../lib/watch.mjs';
+import { codeSignature, engineSignature, figmaVersionNow, snapshotFigmaVersion, makeWatch, jobFor, installWatch, uninstallWatch, realJobDir, stableNode } from '../lib/watch.mjs';
 import { OUT_DIR } from '../lib/names.mjs';
 import { budget, tempDir } from './helpers.mjs';
 
@@ -66,6 +66,37 @@ test('Figma: its version in one call, against the one the snapshots were read at
   writeFileSync(join(dir, 'src', 'figma-vars.snapshot.json'), JSON.stringify({ _figmaVersion: '2209' }));
   assert.equal(snapshotFigmaVersion(dir, {}), '2209');
   assert.equal(snapshotFigmaVersion(tempDir('watch-none-'), {}), null);
+});
+
+test('the engine updated by the watch itself, between rounds: built for, then the watch starts again on it', async () => {
+  let engineSig = 'e1', updates = 0, restarted = 0;
+  const builds = [], lines = [];
+  const w = makeWatch({
+    code: () => 'c', engine: () => engineSig,
+    update: () => { updates++; if (updates === 2) { engineSig = 'e2'; return { line: 'ℹ️  The engine updated itself (e1 → e2).' }; } return null; },
+    build: async (why, moved) => { builds.push(moved); return { ok: true }; },
+    restart: () => { restarted++; },
+    log: (l) => lines.push(l), remoteEveryMs: 60000,
+  });
+  assert.deepEqual(await w.tick(0), { built: false });
+  assert.equal(updates, 1, 'asked with the remote sources');
+  await w.tick(1000);
+  assert.equal(updates, 1, 'not on every tick');
+  const r = await w.tick(60000);
+  assert.deepEqual(r.moved, ['the engine']);
+  assert.ok(lines.includes('ℹ️  The engine updated itself (e1 → e2).'));
+  assert.equal(restarted, 1);
+});
+
+test('the job starts node by a path an upgrade leaves in place', () => {
+  const dir = tempDir('watch-node-');
+  mkdirSync(join(dir, 'Cellar', 'node', '24.1.0', 'bin'), { recursive: true }); mkdirSync(join(dir, 'bin'));
+  const versioned = join(dir, 'Cellar', 'node', '24.1.0', 'bin', 'node');
+  writeFileSync(versioned, '');
+  symlinkSync(versioned, join(dir, 'bin', 'node'));
+  assert.equal(stableNode(versioned, `/nowhere:${join(dir, 'bin')}`), join(dir, 'bin', 'node'), 'the link on the PATH');
+  assert.equal(stableNode(versioned, join(dir, 'Cellar', 'node', '24.1.0', 'bin')), versioned, 'no link: its own path');
+  assert.equal(stableNode('/no/such/node', ''), '/no/such/node');
 });
 
 test('a watch: a burst of saves built once it settles, the remote sources asked every few minutes, a new engine starts it again', async () => {
@@ -172,6 +203,10 @@ test('the commands: the job written and taken away again, and a watch that sees 
     let r = run('--watch-uninstall');
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /No background watch for this folder: nothing to take away\./);
+    // An ordinary run in a test: the default watch is never installed, and the status says why.
+    r = run('--guide-status');
+    assert.match(r.stdout, /No background watch for this folder \(this is a test run\)/, r.stdout + r.stderr);
+    assert.ok(!existsSync(join(home, 'Library', 'LaunchAgents')) && !existsSync(join(home, '.config', 'systemd')), 'nothing written');
     r = run('--watch-install', '7');
     const job = jobFor({ ROOT: realpathSync(dir), engineDir: ENGINE, home, minutes: 7 });   // the folder as the run sees it (a temporary folder on a Mac is a link)
     assert.ok(existsSync(job.file), 'the job is written');
@@ -183,6 +218,7 @@ test('the commands: the job written and taken away again, and a watch that sees 
     r = run('--watch-uninstall');
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /✅ The background watch is off/);
+    assert.match(r.stdout, /It stays off for this folder: no run turns it on again/);
     assert.ok(!existsSync(job.file), 'the job is gone');
   }
   // The watch itself: started, a save seen, the style guide built.

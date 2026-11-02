@@ -39,6 +39,8 @@ test('told the code is here, a folder with no design tokens starts from Figma, a
   const r = init(dir, FIGMA, '--project=.');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Build mode: no stylesheet declares design tokens in .*, so it starts from Figma/);
+  // Setup's closing summary says whether the background watch is on, and why not: never turned on from a test.
+  assert.match(r.stdout, /🔁 The style guide does not rebuild itself on this computer: this is a test run\./);
   assert.equal(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).build, true);
 });
 
