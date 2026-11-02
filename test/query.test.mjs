@@ -115,3 +115,11 @@ test('--check-ui on a page checks it as an edit (what changed since the last com
   assert.match(r.stdout, /#2e7d32 is not a design-system colour/);
   assert.doesNotMatch(r.stdout, /not valid JSON/);
 });
+
+test('a name asked in the singular finds the system\'s irregular plural, and the other way round', async () => {
+  const { nearest } = await import('../lib/query.mjs');
+  assert.deepEqual(nearest('radius', [], [{ path: 'radii/chip' }, { path: 'spacing/s' }]), ['radii/chip']);
+  assert.deepEqual(nearest('radii', [], [{ path: 'radius/card' }]), ['radius/card']);
+  assert.deepEqual(nearest('index', [], [{ path: 'z/indices/overlay' }]), ['z/indices/overlay']);
+  assert.deepEqual(nearest('radius', [], [{ path: 'spacing/s' }]), [], 'nothing alike, nothing said');
+});
