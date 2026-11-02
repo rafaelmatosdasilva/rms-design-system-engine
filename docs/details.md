@@ -854,7 +854,7 @@ A page's panel on the Documentation page holds every change it asks for, in grou
 | Decisions about the page | Its other proposals: a page to write, a name to keep, a part's page, a page or a decision to review again |
 | Other changes | What is still to write, a part's page to move, notes no agent reads |
 
-- **One action per group.** Each group has one button, Approve all, for everything it shows (never what is folded away). It copies the decision in plain words for you to paste into Claude Code ("Approve all 3 drafts"). What you leave stays as it is.
+- **Three actions per group, under its proposals.** Approve all, Change and Drop all, for everything the group shows (never what is folded away). Each copies its decision in plain words for you to paste into Claude Code ("Approve all 3 drafts"). No item has an action of its own. What you leave stays as it is.
 - **One draft per section.** The engine drafts one line for each section a page lacks, never a second for the same section, and never a line the page already says.
 - **Each draft beside its source.** The props it names, as the code has them (its file and the values each takes), and the line it says again, on the page or in Figma's notes or the code's comment.
 - **A name only Figma has is flagged.** A Figma property the code does not take, written as a prop, is shown as a warning on its draft. The engine's own drafts never write one: they say what the code does, or call it Figma's.

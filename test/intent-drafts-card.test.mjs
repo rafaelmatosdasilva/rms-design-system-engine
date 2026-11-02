@@ -19,25 +19,28 @@ const loadReview = () => {
   const ilTaskOf = new Function(`return (${/var ilTaskOf = (function \(drafts\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
   const ilAnsweredBy = (x) => (x.decider ? `<waits>${x.decider.name}</waits>` : '');
   const isRuleChange = new Function(`return (${/var isRuleChange = (function \(x\) \{[^\n]*\});/.exec(tpl)[1]})`)();
-  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', `${src}\nreturn { ilChanges: ilChanges, ilApproved: ilApproved, ilDraftFrom: ilDraftFrom };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange);
+  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', `${src}\nreturn { ilChanges: ilChanges, ilGroupDecision: ilGroupDecision, ilDraftFrom: ilDraftFrom };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange);
 };
 const loadChanges = () => loadReview().ilChanges;
 const ENGINE = '/rms-design-system-engine-acme';
 const unq = (s) => String(s).replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-// Each group as the page draws it: its key, heading, its one action (approveAll: its label), and items, each with its
-// heading, its body, whether it is folded away, and the words approving it adds to the group's decision.
-const groupsOf = (html) => [...html.matchAll(/<div class="sg-il-group-decide" data-il-group="(\w+)"((?: data-il-all-\w+="[^"]*")*)><div class="sg-il-group-head"><strong>([^<]+)<\/strong>([\s\S]*?)(?=<div class="sg-il-group-decide"|<\/div><\/div>$)/g)].map((m) => ({
+// Each group as the page draws it: its key, heading, its words for each action (all), the labels of its actions (under
+// its items), and items, each with its heading, its body, whether it is folded away, and the words each answer adds.
+const groupsOf = (html) => [...html.matchAll(/<div class="sg-il-group-decide" data-il-group="(\w+)"((?: data-il-all-\w+="[^"]*")*)><div class="sg-il-group-head"><strong>([^<]+)<\/strong><\/div>([\s\S]*?)(?=<div class="sg-il-group-decide"|<\/div><\/div>$)/g)].map((m) => ({
   key: m[1], head: m[3], all: Object.fromEntries([...m[2].matchAll(/data-il-all-(\w+)="([^"]*)"/g)].map((a) => [a[1], unq(a[2])])),
-  approveAll: (/<button data-il-all="\w+"[^>]*>([^<]+)<\/button>/.exec(m[4]) ?? [])[1] ?? null,
-  items: [...m[4].matchAll(/<div class="sg-il-line sg-il-change sg-il-item" data-il-item((?: data-il-approve="[^"]*")?)><strong>([^<]+)<\/strong>([\s\S]*?)<\/div>(?=<div class="sg-il-line|<details|<\/details>|<\/div>|$)/g)].map((i) => ({
+  actions: [...m[4].matchAll(/<button data-il-all="\w+" data-il-do="(\w+)"[^>]*>([^<]+)<\/button>/g)].map((x) => `${x[1]}:${x[2]}`),
+  actionsLast: /<div class="sg-il-group-actions"[^>]*>(?:<button[^>]*>[^<]+<\/button>)+<span class="sg-decide-said" role="status"><\/span><\/div><\/div>$/.test(m[4]) || /<div class="sg-il-group-actions"[^>]*>(?:<button[^>]*>[^<]+<\/button>)+<span class="sg-decide-said" role="status"><\/span><\/div>$/.test(m[4]),
+  items: [...m[4].matchAll(/<div class="sg-il-line sg-il-change sg-il-item" data-il-item((?: data-il-(?:approve|change|drop)="[^"]*")*)><strong>([^<]+)<\/strong>([\s\S]*?)<\/div>(?=<div class="sg-il-line|<details|<\/details>|<div class="sg-il-group-actions"|<\/div>|$)/g)].map((i) => ({
     head: unq(i[2]), body: i[3], quiet: m[4].slice(0, i.index).includes('<details'),
-    approve: unq((/data-il-approve="([^"]*)"/.exec(i[1]) ?? [])[1] ?? ''),
+    steps: Object.fromEntries([...i[1].matchAll(/data-il-(\w+)="([^"]*)"/g)].map((x) => [x[1], unq(x[2])])),
   })),
 }));
-// The decision a group's Approve all copies, as the panel makes it: the group's own words, else each item it shows.
-const approved = (html, gi) => { const g = groupsOf(html)[gi]; return loadReview().ilApproved(unq(/data-il-on="([^"]*)"/.exec(html)[1]), g.all.approve, g.items.filter((x) => !x.quiet).map((x) => x.approve)); };
+// The decision a group's action copies (k: approve, change or drop), as the panel makes it: the group's own words, else
+// each item it shows.
+const decision = (html, gi, k = 'approve') => { const g = groupsOf(html)[gi]; return loadReview().ilGroupDecision(unq(/data-il-on="([^"]*)"/.exec(html)[1]), g.all[k], g.items.filter((x) => !x.quiet).map((x) => x.steps[k])); };
+const approved = (html, gi) => decision(html, gi, 'approve');
 
-test('the drafts are in the What to do card under New text for the page, each once, with one action for the group', () => {
+test('the drafts are in the What to do card under New text for the page, each once, with the group\'s three actions under them', () => {
   assert.match(tpl, /card\('What to do', todo \|\| task\)/);
   assert.doesNotMatch(tpl, /card\('(Drafts to review|Still to write|To remove)'/, 'no second card for any change');
   const html = loadChanges()({ name: 'tileBar', file: 'specs/tile-bar.dsds.json', drafts: [
@@ -46,23 +49,28 @@ test('the drafts are in the What to do card under New text for the page, each on
     { where: 'Do and don\'t', text: 'Do: dock it to the bottom.' },
     { where: 'Limitations', text: 'Does not show loading by itself.' },   // the same draft again
   ] });
-  assert.match(html, /^<p class="sg-il-line">Approve copies the decision for its group; paste it into Claude Code\. What you leave stays as it is\. Agents won't use the drafts until you approve\.<\/p>/);
+  assert.match(html, /^<p class="sg-il-line">Approve all, Change or Drop all under a group copies its decision; paste it into Claude Code\. What you leave stays as it is\. Agents won't use the drafts until you approve\.<\/p>/);
   const g = groupsOf(html);
   assert.deepEqual(g.map((x) => x.head), ['New text for the page (3)'], 'one group, its count in its heading');
   assert.deepEqual(g[0].items.map((x) => x.head), ['Limitations', 'Limitations', 'Do and don\'t']);
   assert.equal((html.match(/pg-par-val">Does not show loading/g) ?? []).length, 1, 'the same draft once');
-  assert.equal(g[0].approveAll, 'Approve all 3', 'one action for the group, its count on it');
-  assert.equal(g[0].items[1].approve, 'Approve the draft "Takes at most two buttons."');
+  assert.deepEqual(g[0].actions, ['approve:Approve all 3', 'change:Change', 'drop:Drop all 3'], 'three actions for the group, its count on them');
+  assert.ok(g[0].actionsLast, 'below its proposals');
+  assert.deepEqual(g[0].items[1].steps, { approve: 'Approve the draft "Takes at most two buttons."', change: 'Change the draft "Takes at most two buttons.": ask me for my words', drop: 'Drop the draft "Takes at most two buttons."' });
   assert.doesNotMatch(html, /data-il-choose|data-il-edit|<textarea/, 'no action, and nothing to edit, on an item');
+  assert.equal((html.match(/data-il-do="/g) ?? []).length, 3, 'three actions, once');
   assert.doesNotMatch(html, /data-il-copy-review|data-il-preview|Copy decisions|data-il-copy="/, 'no Copy: the group\'s action copies');
 });
 
-test('Approve all copies the decision on every draft the group shows, in plain words', () => {
+test('each of the group\'s actions copies its decision on every draft the group shows, in plain words', () => {
   const html = loadChanges()({ name: 'tileBar', file: 'specs/tile-bar.dsds.json', drafts: [{ where: 'Purpose', text: 'A.' }, { where: 'Purpose', text: 'B `x`.' }, { where: 'Limitations', text: 'C.' }] });
   assert.equal(approved(html, 0), '/rms-design-system-engine-acme on Component tileBar, Approve all 3 drafts.');
+  assert.equal(decision(html, 0, 'change'), '/rms-design-system-engine-acme on Component tileBar, Change the drafts: ask me which, and for my words.');
+  assert.equal(decision(html, 0, 'drop'), '/rms-design-system-engine-acme on Component tileBar, Drop all 3 drafts.');
   const one = loadChanges()({ name: 'error', file: 'e.json', drafts: [{ where: 'Limitations', text: 'Use an inline error.' }] });
-  assert.equal(groupsOf(one)[0].approveAll, 'Approve', 'one draft: Approve, with no count');
+  assert.deepEqual(groupsOf(one)[0].actions, ['approve:Approve', 'change:Change', 'drop:Drop'], 'one draft: no count');
   assert.equal(approved(one, 0), '/rms-design-system-engine-acme on Component error, Approve its draft.');
+  assert.equal(decision(one, 0, 'change'), '/rms-design-system-engine-acme on Component error, Change its draft: ask me for my words.');
   assert.ok(!/\.json|\.md|--/.test(approved(html, 0)), 'no file, no flag');
 });
 
@@ -104,16 +112,17 @@ test('the changes to rules are a group of their own, apart from the drafts; one 
   assert.deepEqual([hold.quiet, quiet.head, quiet.quiet], [false, 'Rewrite the rule', true]);
   assert.match(html, /<details class="sg-il-quiet"><summary>1 more the engine has no ground for: No, unless you say otherwise<\/summary>/);
   assert.match(quiet.body, /Only the engine's own reading of the rule speaks for it/);
-  assert.equal(g[1].approveAll, 'Approve', 'Approve for the one it shows');
+  assert.deepEqual(g[1].actions, ['approve:Approve', 'change:Change', 'drop:Drop'], 'for the one it shows');
+  assert.equal(decision(html, 1, 'drop'), '/rms-design-system-engine-acme on Component Tile, No to "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen.".');
   assert.equal(approved(html, 1), '/rms-design-system-engine-acme on Component Tile, Yes to "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen.".', 'what is folded away is left as it is');
   // A rule change is decided here only: never again under Proposal.
   assert.match(tpl, /var list = ilOwn\(p\)\.filter\(function \(x\) \{ return !isRuleChange\(x\); \}\);/);
   assert.match(tpl, /ilChanges\(p, c\.write, c\.notes, own \? ilTodo\(own, true\) : c\.todo, ilOpen\(p\)\)/);
 });
 
-test('the panel\'s Approve all copies what its group shows, never what is folded away, and says where to paste it', () => {
-  assert.match(tpl, /var g = all\.closest\('\[data-il-group\]'\), shown = Array\.prototype\.filter\.call\(g\.querySelectorAll\('\[data-il-item\]'\), function \(it\) \{ return !it\.closest\('\.sg-il-quiet'\); \}\);/);
-  assert.match(tpl, /copyText\(ilApproved\(box\.getAttribute\('data-il-on'\), g\.getAttribute\('data-il-all-approve'\), shown\.map\(function \(it\) \{ return it\.getAttribute\('data-il-approve'\); \}\)\), all, g\.querySelector\('\.sg-il-group-head \.sg-decide-said'\), 'Paste it in Claude Code'\);/);
+test('the panel\'s actions copy what their group shows, never what is folded away, and say where to paste it', () => {
+  assert.match(tpl, /var k = all\.getAttribute\('data-il-do'\), g = all\.closest\('\[data-il-group\]'\), shown = Array\.prototype\.filter\.call\(g\.querySelectorAll\('\[data-il-item\]'\), function \(it\) \{ return !it\.closest\('\.sg-il-quiet'\); \}\);/);
+  assert.match(tpl, /copyText\(ilGroupDecision\(box\.getAttribute\('data-il-on'\), g\.getAttribute\('data-il-all-' \+ k\), shown\.map\(function \(it\) \{ return it\.getAttribute\('data-il-' \+ k\); \}\)\), all, all\.parentNode\.querySelector\('\.sg-decide-said'\), 'Paste it in Claude Code'\);/);
   assert.doesNotMatch(tpl, /var ilGroupsOf = |var ilDecided = |data-il-copy-review|detail\.oninput = /, 'no per-item choice and no Copy decisions left');
 });
 
@@ -142,10 +151,11 @@ test('every other change a page asks for is in What to do too, under Other chang
   assert.match(html, /Remove · Code note<\/strong><span class="pg-par-val">“A copy of its description”<\/span><span class="sg-il-text">Figma says it already\.<\/span><\/div>/, 'a note and why, in one place');
   assert.match(html, /“Save flow pattern available here: a link”<\/span><span class="sg-il-text">The agent cannot open a link\. Write in words what to take from it\.</);
   assert.doesNotMatch(html, /Why remove it|What to change|>Where</, 'no labels, no file to find');
-  assert.equal(groupsOf(html)[1].approveAll, 'Approve all 3');
+  assert.deepEqual(groupsOf(html)[1].actions, ['approve:Approve all 3', 'change:Change', 'drop:Drop all 3']);
+  assert.equal(decision(html, 1, 'drop'), '/rms-design-system-engine-acme on Component tileBar, Write nothing new and leave its notes as they are.');
   assert.equal(approved(html, 1), '/rms-design-system-engine-acme on Component tileBar, Write "When to use it, not a sibling" under ## When to use as drafts I review; then remove "A copy of its description" where it lives; then for "Save flow pattern available here: a link", write in words what to take from it.');
   // The page's task first, in plain words.
-  assert.match(loadChanges()({ name: 'a', file: 'a.json', drafts: [{ where: 'Purpose', text: 'X.' }] }, [], [], '<p class="sg-il-line">Its task.</p>'), /^<p class="sg-il-line">Its task\.<\/p><p class="sg-il-line">Approve copies the decision for its group;/);
+  assert.match(loadChanges()({ name: 'a', file: 'a.json', drafts: [{ where: 'Purpose', text: 'X.' }] }, [], [], '<p class="sg-il-line">Its task.</p>'), /^<p class="sg-il-line">Its task\.<\/p><p class="sg-il-line">Approve all, Change or Drop all under a group copies its decision;/);
   // Nothing to change: no card.
   assert.equal(loadChanges()({ name: 'chip', file: 'c.json' }, [], []), '');
 });

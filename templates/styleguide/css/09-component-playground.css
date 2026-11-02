@@ -974,9 +974,11 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-decide-mark { width: var(--sg-mark); height: var(--sg-mark); flex: none; color: var(--sg-muted); }   /* a decision's mark, there to tell the three apart at a glance */
 .sg-row-detail-body .sg-il-group-decide + .sg-il-group-decide { margin-top: var(--sg-space-xl); }   /* New text for the page, Changes to rules, Other changes: each its own block */
 .sg-row-detail-body .sg-il-group-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }   /* its heading and count, Approve all at the other end */
-.sg-row-detail-body .sg-il-group-head [data-il-all] { padding: var(--sg-space-m) var(--sg-space-l); font-size: var(--sg-m); gap: var(--sg-space-s); }   /* the group's one action, large enough to find and hit */
-.sg-row-detail-body .sg-il-group-head [data-il-all] { --sg-decide-hue: #2e7d32; } :where(:root)[data-sg-scheme="dark"] .sg-row-detail-body .sg-il-group-head [data-il-all] { --sg-decide-hue: #6fcf75; }
-.sg-row-detail-body .sg-il-group-head [data-il-all] .sg-decide-mark { color: var(--sg-decide-hue); }   /* its mark green, as an approve's is */
+.sg-row-detail-body .sg-il-group-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-s); margin-top: var(--sg-space-m); }   /* the group's three actions, under its proposals */
+.sg-row-detail-body .sg-il-group-actions [data-il-do] { padding: var(--sg-space-m) var(--sg-space-l); font-size: var(--sg-m); gap: var(--sg-space-s); }   /* large enough to find and hit */
+.sg-row-detail-body [data-il-do="approve"] { --sg-decide-hue: #2e7d32; } .sg-row-detail-body [data-il-do="change"] { --sg-decide-hue: #b26a00; } .sg-row-detail-body [data-il-do="drop"] { --sg-decide-hue: var(--sg-danger); }
+:where(:root)[data-sg-scheme="dark"] .sg-row-detail-body [data-il-do="approve"] { --sg-decide-hue: #6fcf75; } :where(:root)[data-sg-scheme="dark"] .sg-row-detail-body [data-il-do="change"] { --sg-decide-hue: #f0b35a; }
+.sg-row-detail-body [data-il-do] .sg-decide-mark { color: var(--sg-decide-hue); }   /* each action's mark in its hue */
 .sg-row-detail-body .sg-il-source { display: block; margin-top: var(--sg-space-xxs); color: var(--sg-muted); font-size: var(--sg-s); font-weight: var(--sg-text-weight); }   /* where a draft comes from */
 .sg-row-detail-body .sg-il-source--warn { color: var(--sg-text); padding-left: var(--sg-space-s); border-left: 2px solid var(--sg-danger); }   /* a name only Figma has, written as a prop */
 .sg-row-detail-body .sg-il-quiet { margin-top: var(--sg-space-m); }
