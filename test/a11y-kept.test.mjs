@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { makeFixture, budget } from './helpers.mjs';
 import {
   stableJson, engineFiles, checkSignature, runSignature, styleguideSignatures, projectSignature,
-  keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE, whyChecked, whyCheckedLine,
+  keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE, whyChecked, whyCheckedLine, cssRuleList,
 } from '../lib/a11y-check.mjs';
 import { OUT_DIR } from '../lib/names.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -61,22 +61,92 @@ test('a run is signed by what it was asked, never by where its report goes or wh
 });
 
 test('a style guide part is signed by its components as the page data gives them and the system CSS in any order', () => {
-  const page = (comps, css = '.a{color:red}.b{color:blue}') => `<style data-system>${css}</style><script type="application/json" id="sg-data">${JSON.stringify({ components: comps, audit: { at: Date.now() } })}</script>`;
+  const page = (comps, css = 'main{color:red}body{color:blue}') => `<style data-system>${css}</style><script type="application/json" id="sg-data">${JSON.stringify({ components: comps, audit: { at: Date.now() } })}</script>`;
   const cardTile = { name: 'cardTile', cls: 'cardTile', markup: '<div class="cardTile" data-v-1a2b3c4d>x</div>', a11y: { role: 'group', checked: 'today' }, renders: [{ style: 'top: 120px; width: 10px' }] };
   const chip = { name: 'chip', cls: 'chip', markup: '<span class="chip">y</span>' };
   const one = styleguideSignatures(page([cardTile, chip]));
   // Where a render sat, when it was checked, a Vue scoped id and the order of the CSS rules are not the component.
-  const same = styleguideSignatures(page([{ ...cardTile, markup: cardTile.markup.replace('1a2b3c4d', '9f9f9f9f'), a11y: { role: 'group', checked: 'later' }, renders: [{ style: 'top: 900px; width: 10px' }] }, chip], '.b{color:blue}.a{color:red}'));
+  const same = styleguideSignatures(page([{ ...cardTile, markup: cardTile.markup.replace('1a2b3c4d', '9f9f9f9f'), a11y: { role: 'group', checked: 'later' }, renders: [{ style: 'top: 900px; width: 10px' }] }, chip], 'body{color:blue}main{color:red}'));
   assert.deepEqual(same, one);
   const changed = styleguideSignatures(page([{ ...cardTile, markup: '<div class="cardTile">z</div>' }, chip]));
   assert.notEqual(changed.comp.cardTile, one.comp.cardTile);
   assert.equal(changed.comp.chip, one.comp.chip, 'only the component that changed');
   assert.equal(changed.base, one.base);
-  assert.notEqual(styleguideSignatures(page([cardTile, chip], '.a{color:green}')).base, one.base, 'the system CSS changed');
+  assert.notEqual(styleguideSignatures(page([cardTile, chip], 'main{color:green}body{color:blue}')).base, one.base, 'the CSS every component shares changed');
   assert.equal(styleguideSignatures('<script id="sg-data">{not json</script>'), null);
   // A comment or the spacing of the CSS is not the CSS: an engine change that rewords the page's comments keeps every part.
-  assert.equal(styleguideSignatures(page([cardTile, chip], '/* the page */ .a { color: red }\n\n.b{ color:blue } /* why */')).base, one.base);
-  assert.notEqual(styleguideSignatures(page([cardTile, chip], '.a :hover{color:red}.b{color:blue}')).base, styleguideSignatures(page([cardTile, chip], '.a:hover{color:red}.b{color:blue}')).base, 'a space that is a combinator still counts');
+  assert.equal(styleguideSignatures(page([cardTile, chip], '/* the page */ main { color: red }\n\nbody{ color:blue } /* why */')).base, one.base);
+  assert.notEqual(styleguideSignatures(page([cardTile, chip], 'main :hover{color:red}body{color:blue}')).base, styleguideSignatures(page([cardTile, chip], 'main:hover{color:red}body{color:blue}')).base, 'a space that is a combinator still counts');
+});
+
+// A token that changes in Figma tries again only the components that resolve it: each is signed with the rules that
+// name its classes and the custom properties they resolve, through var() and in every brand.
+test('one token change re-signs only the components that resolve it, through var() and in every brand', () => {
+  const css = `:root { --colour-accent: #0037fa; --colour-ink: #1a1a1a; --chip-bg: var(--colour-accent); --space-s: 8px }
+    [data-brand="acme"] { --colour-accent: #00aa55 }
+    body { margin: 0; color: var(--colour-ink) }
+    .chip { background: var(--chip-bg); padding: var(--space-s) }
+    @media (hover: hover) { .chip:hover { outline: 1px solid var(--colour-accent) } }
+    .cardTile { padding: var(--space-s); border: 1px solid #ccc }
+    .badge { color: var(--colour-ink) }
+    .appShell .header { box-shadow: 0 1px var(--colour-accent) }
+    .badge:not(.ghost) { font-weight: 600 }`;
+  const page = (c, brands = { list: [{ key: 'acme', name: 'Acme' }], read: '2026-01-01' }) => `<style data-system>${c}</style><script type="application/json" id="sg-data">${JSON.stringify({ brands, components: [
+    { name: 'chip', cls: 'chip', markup: '<span class="chip">y</span>' },
+    { name: 'cardTile', cls: 'cardTile', markup: '<div class="cardTile">x</div>' },
+    { name: 'badge', cls: 'badge', markup: '<span class="badge" style="border-color: var(--colour-line)">1</span>' },
+  ] })}</script>`;
+  const one = styleguideSignatures(page(css));
+  assert.deepEqual(one.uses.chip, ['--chip-bg', '--colour-accent', '--space-s'], 'its own rules, followed through var()');
+  assert.deepEqual(one.uses.badge, ['--colour-line'], 'what the shared CSS resolves is the base\'s, and a style in its markup counts');
+  const changed = (a, b) => Object.keys(a.comp).filter((n) => a.comp[n] !== b.comp[n]);
+  // The accent, in one brand only: the chip resolves it through --chip-bg; the card and the badge do not.
+  const acme = styleguideSignatures(page(css.replace('#00aa55', '#ff0000')));
+  assert.equal(acme.base, one.base);
+  assert.deepEqual(changed(one, acme), ['chip']);
+  // A token only the card uses.
+  const space = styleguideSignatures(page(css.replace('--space-s: 8px', '--space-s: 12px')));
+  assert.deepEqual(changed(one, space).sort(), ['cardTile', 'chip']);
+  // A token the shared CSS resolves (the body's text) is every component's: the base changes.
+  const ink = styleguideSignatures(page(css.replace('#1a1a1a', '#000')));
+  assert.notEqual(ink.base, one.base);
+  // A rule of the app no component carries (its shell) styles nothing here, so a token only it uses keeps everything.
+  assert.deepEqual(styleguideSignatures(page(css.replace('0 1px var(--colour-accent)', '0 2px red'))), one);
+  // A class only inside :not() is not needed: that rule is the badge's.
+  assert.notDeepEqual(styleguideSignatures(page(css.replace('font-weight: 600', 'font-weight: 700'))).comp.badge, one.comp.badge);
+  // When the brands were read, and the tokens they name that the system lacks, measure nothing.
+  assert.deepEqual(styleguideSignatures(page(css, { list: [{ key: 'acme', name: 'Acme' }], read: '2026-02-02', unknown: ['x'] })), one);
+  // A brand's own stylesheet is read the same way.
+  const brandCss = (v) => ({ list: [{ key: 'acme', name: 'Acme' }], css: `[data-brand="acme"] :is(.sg-layout) { --space-s: ${v} }` });
+  const b1 = styleguideSignatures(page(css, brandCss('10px'))), b2 = styleguideSignatures(page(css, brandCss('14px')));
+  assert.equal(b2.base, b1.base);
+  assert.deepEqual(changed(b1, b2).sort(), ['cardTile', 'chip']);
+  // The run says which components were checked again, and the token that moved them.
+  const part = (s) => ({ run: 'r', base: s.base, comp: { chip: s.comp.chip, cardTile: s.comp.cardTile }, tokens: Object.fromEntries([...s.uses.chip, ...s.uses.cardTile].map((v) => [v, s.tokens[v]])) });
+  const w = whyChecked([{ parts: part(space), uses: { chip: space.uses.chip, cardTile: space.uses.cardTile } }], { k: { parts: part(one) } });
+  assert.deepEqual(w.components.sort(), ['cardTile', 'chip']);
+  assert.deepEqual(Object.fromEntries(Object.entries(w.tokens).map(([v, ns]) => [v, ns.sort()])), { '--space-s': ['cardTile', 'chip'] });
+  assert.equal(whyCheckedLine(w), '1 part checked again: 2 components changed (cardTile, chip), by token --space-s (2)');
+});
+
+test('the CSS is read as its rules: at-rules, nesting, and strings or data URLs that hold braces and semicolons', () => {
+  const rules = cssRuleList(`@font-face { font-family: "X"; src: url(data:font/woff2;base64,AA==) }
+    @media (min-width: 600px) { .a { color: red } @supports (display: grid) { .b { display: grid } } }
+    .c { content: "}"; color: blue; .d { color: green } @media print { color: black } }
+    @keyframes spin { from { transform: rotate(0) } to { transform: rotate(1turn) } }
+    @import url("x.css");`);
+  const show = (r) => `${r.at.join('|')}§${r.sel}§${r.decls.map(([p, v]) => `${p}:${v}`).join(';')}`;
+  assert.deepEqual(rules.map(show).sort(), [
+    '@font-face§§font-family:"X";src:url(data:font/woff2;base64,AA==)',
+    '@keyframes spin§from§transform:rotate(0)',
+    '@keyframes spin§to§transform:rotate(1turn)',
+    '@media (min-width: 600px)§.a§color:red',
+    '@media (min-width: 600px)|@supports (display: grid)§.b§display:grid',
+    '@media print§.c§color:black',
+    '§.c§content:"}";color:blue',
+    '§.c{.d§color:green',
+    '§@import url("x.css")§',
+  ].sort());
 });
 
 // A part checked again says why, from what it was signed with last time.
@@ -84,8 +154,8 @@ test('a part checked again says why: the check, the page CSS, a component by nam
   const was = { k1: { parts: { run: 'r', base: 'b', comp: { chip: 'c1', cardTile: 't1' } } }, k2: { parts: { run: 'r', base: 'b', comp: { badge: 'g1' } } }, k3: { parts: { run: 'r', base: 'b', comp: { tab: 'x' } } } };
   const t = (comp, extra = {}) => ({ parts: { run: 'r', base: 'b', comp }, ...extra });
   const w = whyChecked([t({ chip: 'c1', cardTile: 't2' }), t({ badge: 'g1' }, { parts: { run: 'r', base: 'B', comp: { badge: 'g1' } } }), t({ tab: 'x' }, { parts: { run: 'R', base: 'b', comp: { tab: 'x' } } }), t({ menu: 'm' }), t({ chip: 'c1' }, { kept: {} })], was);
-  assert.deepEqual(w, { checked: 4, run: 1, css: 1, components: ['cardTile'], fresh: 1 });
-  assert.equal(whyCheckedLine(w), "4 parts checked again: the check or its settings changed (1); the page's CSS changed (1); 1 component changed (cardTile); not checked before (1)");
+  assert.deepEqual(w, { checked: 4, run: 1, css: 1, components: ['cardTile'], tokens: {}, fresh: 1 });
+  assert.equal(whyCheckedLine(w), "4 parts checked again: the check or its settings changed (1); the CSS every component shares changed (1); 1 component changed (cardTile); not checked before (1)");
   assert.equal(whyCheckedLine(whyChecked([], was)), '');
   // An older entry for the same components is not the one compared: the newest is.
   const older = { old: { at: '2026-01-01', parts: { run: 'r', base: 'b', comp: { chip: 'c0' } } }, now: { at: '2026-02-01', parts: { run: 'r', base: 'b', comp: { chip: 'c1' } } } };
