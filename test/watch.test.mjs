@@ -236,3 +236,20 @@ test('the commands: the job written and taken away again, and a watch that sees 
   } finally { p.kill(); }
   assert.doesNotMatch(out, /\n\s+at .+\.mjs:\d+|is not defined|is not a function/);
 });
+
+// A round that failed, on a new engine that starts the watch again, is not forgotten: the next watch tries it first.
+test('a failed round is kept for the next watch, which tries it again at its first check; a build that works clears it', async () => {
+  let kept = 'unset', restarted = 0, eng = 'e1';
+  const builds = [];
+  const a = makeWatch({ code: () => 'c1', engine: () => eng, build: async (why) => { builds.push(why); return { ok: false, status: 1 }; }, restart: () => { restarted++; }, keepRetry: (r) => { kept = r; }, remoteEveryMs: 1000 });
+  eng = 'e2';
+  await a.tick(0);
+  assert.equal(restarted, 1, 'a new engine starts the watch again');
+  assert.deepEqual(kept, { reasons: ['the engine updated'], moved: ['the engine'] }, 'what failed is kept for the next watch');
+  kept = 'unset';
+  const b = makeWatch({ code: () => 'c1', engine: () => 'e2', retry: { reasons: ['the engine updated'], moved: ['the engine'] }, build: async (why, what) => { builds.push([why, what]); return { ok: true } }, keepRetry: (r) => { kept = r; }, remoteEveryMs: 1000 });
+  const r = await b.tick(0);
+  assert.equal(r.built, true);
+  assert.deepEqual(builds.at(-1), [['the engine updated'], ['the engine']]);
+  assert.equal(kept, null, 'built: nothing left to try again');
+});
