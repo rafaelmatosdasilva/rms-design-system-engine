@@ -858,6 +858,7 @@ A page's panel on the Documentation page holds every change it asks for, in grou
 - **One draft per section.** The engine drafts one line for each section a page lacks, never a second for the same section, and never a line the page already says.
 - **Each draft beside its source.** The props it names, as the code has them (its file and the values each takes), and the line it says again, on the page or in Figma's notes or the code's comment.
 - **A name only Figma has is flagged.** A Figma property the code does not take, written as a prop, is shown as a warning on its draft. The engine's own drafts never write one: they say what the code does, or call it Figma's.
+- **A rewrite is offered for it.** A draft written before that names one gets a proposed rewrite. It calls the property Figma's and says what carries it in the code: a prop of the same name, or the prop or field the code's own comment says shows it. The review shows it under the draft, and listing the drafts in Claude Code shows it too, ready to take as it is or edit.
 
 ### Pages to write, most used first
 
@@ -972,6 +973,12 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **The first screen loads first.** What only a component's own page reads (its code, its whole changelog, its Code Connect, its Figma images) is a small file of its own in `assets`, loaded when that component opens. The Status page, the menu and the overview show without waiting for it.
+- **Three more load when first used.**
+  - The brands' embedded fonts, when a brand is chosen.
+  - The Showroom screens' drawings, when the Showroom or a screen's card is shown.
+  - What the agents read of each intent layer page, when its row opens on the Documentation page.
+  - An address that shows one at once (a brand already chosen, `#showroom`, `#documentation`) loads it with the page.
+- **A large guide is published in parts.** On GitLab, a guide too large for one commit goes as several: its pictures first, then its data, then the page that links them. The page never names a file that is not there yet. If someone else commits in between, the rest waits for the next round, and the run says how many parts landed.
 - **The component panel downloads nothing twice.** The panel is the page again, in a frame. It takes the data the page around it already holds, so a host that sends no cache header costs no second download.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 - **The template comes in parts.** Its file is the page's frame; its styles and its script are parts of their own under `templates/styleguide/` (`css/` and `js/`, one area of the page each, such as the Overview, the Tokens page or the Status page), joined in order when the page is built. A change is reviewed and tested one area at a time, and the page they make is the same. A project's own template can be one file, or use parts the same way (a line `/*@part …*/` in its styles, `//@part …` in its script).

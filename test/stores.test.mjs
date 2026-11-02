@@ -514,6 +514,33 @@ test('a commit the gateway timed out on but GitLab made is sent, said once and n
   assert.equal(once.files['index.html'], '<p>again</p>');
 });
 
+test('a large style guide goes in parts: pictures, then its parts and data, the page that links them last, each on the one before', async () => {
+  const { inParts } = await import('../lib/stores.mjs');
+  const act = (file_path, n, action = 'create') => ({ action, file_path, ...(action === 'delete' ? {} : { content: 'x'.repeat(n) }) });
+  const acts = [act('sg/index.html', 10), act('sg/assets/index.data.0123456789.js', 60), act('sg/assets/img/0123456789.png', 50), act('sg/assets/tile.part.0123456789.js', 30), act('sg/assets/img/abcdef0123.png', 50), act('sg/old.data.0123456789.js', 0, 'delete')];
+  assert.deepEqual(inParts(acts, 1000).map((p) => p.length), [6], 'it all fits: one part');
+  const parts = inParts(acts, 100).map((p) => p.map((x) => x.file_path.replace('sg/', '')));
+  assert.deepEqual(parts, [['assets/img/0123456789.png', 'assets/img/abcdef0123.png'], ['assets/tile.part.0123456789.js', 'assets/index.data.0123456789.js'], ['index.html', 'old.data.0123456789.js']]);
+  // Sent: three commits in that order, each said as a part, the state kept after each.
+  const g = fakeGitlab(), ROOT = project();
+  const files = new Map([['index.html', '<script src="assets/index.data.0123456789.js"></script>'], ['assets/index.data.0123456789.js', 'd'.repeat(60)], ['assets/img/0123456789.png', 'p'.repeat(50)], ['assets/img/abcdef0123.png', 'q'.repeat(50)]]);
+  const r = await pushStore(ROOT, cfgWith({ styleguide: { write: LINK } }), 'styleguide', files, 'Style guide published', { env, http: g.http, partBytes: 150 });
+  assert.equal(r.ok, true, r.line);
+  assert.match(r.line, /4 files committed on .* in 3 parts/);
+  const commits = g.writes().filter((c) => c[1].endsWith('/repository/commits'));
+  assert.deepEqual(commits.map((c) => c[3].commit_message), ['Style guide published (part 1 of 3)', 'Style guide published (part 2 of 3)', 'Style guide published (part 3 of 3)']);
+  assert.deepEqual(commits.at(-1)[3].actions.map((x) => x.file_path), ['index.html'], 'the page last');
+  for (const [k, v] of files) assert.equal(g.files[k], v, k);
+  // The branch moves between two parts: what landed is said, and the rest waits for the next round.
+  const m = fakeGitlab(), send = m.http.send;
+  m.http.send = async (url, o) => { const res = await send(url, o); if (o?.body?.branch && /part 1 of/.test(o.body.commit_message)) m.head = 'f'.repeat(40); return res; };
+  forgetAccess();
+  const moved = await pushStore(project(), cfgWith({ styleguide: { write: LINK } }), 'styleguide', files, 'Style guide published', { env, http: m.http, partBytes: 150 });
+  assert.equal(moved.ok, false);
+  assert.match(moved.line, /1 of 3 parts committed, then main moved \(now ffffffff\): run again to send the rest/);
+  assert.equal(m.files['index.html'], undefined, 'the page never names files not there yet');
+});
+
 // ── Writing a store with the person's own git access ────────────────────────────────────────────────────────────
 test('no token: a store is written by git push, built without checking anything out, and a refusal is passed on', () => {
   const home = tempDir('git-push-home-');

@@ -474,7 +474,10 @@
       var code = file(p.code || ((f.props || []).filter(function (x) { return x.file; })[0] || {}).file) || 'the code';
       var tick = function (x) { return '`' + x + '`'; };
       var out = (f.props || []).filter(function (x) { return x.from !== 'Figma'; }).map(function (x) { return 'The code: ' + tick(x.name) + ', a prop of ' + (file(x.file) || code) + (x.options && x.options.length ? ', takes ' + x.options.map(tick).join(', ') : '') + '.'; });
-      var warn = (f.figmaOnly || []).map(function (n) { return 'Figma: ' + tick(n) + ' is a property of the Figma component, not a prop ' + code + ' takes. Change the draft to say what the code does, or name it as Figma\'s.'; });
+      var carries = function (n) { var k = (f.carriers || {})[n]; return k ? ' The code carries it in ' + (k.field ? 'the ' + tick(k.field) + ' field of ' + tick(k.prop) : tick(k.prop)) + '.' : ''; };
+      var warn = (f.figmaOnly || []).map(function (n) { return 'Figma: ' + tick(n) + ' is a property of the Figma component, not a prop ' + code + ' takes.' + carries(n) + ' Change the draft to say what the code does, or name it as Figma\'s.'; });
+      // The rewrite offered (draft-sources.mjs → rewriteOf), for the person to take to Claude Code or edit.
+      if (f.rewrite && f.rewrite !== d.text) warn.push('Proposed instead: ' + f.rewrite);
       if (f.line) out.push('Says again: “' + f.line.text + '” (' + f.line.from + ').');
       return warn.map(function (t) { return '<span class="sg-il-source sg-il-source--warn">' + esc(t) + '</span>'; }).join('') + out.map(function (t) { return '<span class="sg-il-source">' + esc(t) + '</span>'; }).join('');
     };
@@ -682,8 +685,12 @@
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
     var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i); };
+    var ilLaterFailed = false;
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
+      // What the agents read of each page is in a later file (styleguide-files.mjs): the panel opens once it is here.
+      // One that cannot be read opens it without (asked for again on the next load of the page).
+      if (!ilLaterFailed && needLater('intentLayer', function (ok) { if (!ok) ilLaterFailed = true; ilPanel(i, from); })) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       m._key = ilKey(p, i);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };

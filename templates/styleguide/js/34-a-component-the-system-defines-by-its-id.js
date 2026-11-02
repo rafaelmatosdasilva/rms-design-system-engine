@@ -228,6 +228,8 @@
   var BRANDS = DATA.brands && DATA.brands.list && DATA.brands.list.length ? DATA.brands : null, BRAND_CTL = null;
   if (BRANDS) {
     var bst = document.createElement('style'); bst.id = 'sg-brand-css'; bst.textContent = (BRANDS.faces || '') + '\n' + (BRANDS.css || ''); document.head.appendChild(bst);
+    // The brands' embedded fonts, in a later file of their own: loaded the first time a brand is chosen.
+    var brandFonts = function () { needLater('fonts', function (ok) { if (ok) bst.textContent = (BRANDS.faces || '') + '\n' + (BRANDS.css || ''); }); };
     // The guide around the previews takes the brand too, its look only: its colours, its corners and its family, read
     // from the page's own map of roles to the system (each --sg-* colour and radius role, and what is made of them, as
     // the lines and a switch's choice), declared again where the brand's values are; its sizes and spacing stay its own.
@@ -280,7 +282,7 @@
       }, 1500);
     };
     var setBrand = function (k) {
-      if (k && brandOf(k)) html.setAttribute('data-brand', k); else html.removeAttribute('data-brand');
+      if (k && brandOf(k)) { html.setAttribute('data-brand', k); brandFonts(); } else html.removeAttribute('data-brand');
       try { if (k) localStorage.setItem('sg-brand', k); else localStorage.removeItem('sg-brand'); } catch (e) {}
       setQuery('brand', k && brandOf(k) ? k : 'default');   // the address always names the theme, the default one too
       redrawAll();

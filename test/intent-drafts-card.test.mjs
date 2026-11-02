@@ -78,6 +78,18 @@ test('each draft shows where it comes from: the code\'s prop, a name only Figma 
   assert.match(c.body, /Source: none found on the page, in Figma or in the code\./);
 });
 
+test('a draft that names a property only Figma has is offered a rewrite, beside what carries it in the code', () => {
+  const text = 'It shows the time only when `showClock` is set.', rewrite = 'It shows the time only when Figma\'s `showClock` (in the code, the `time` field of `savedAt`) is set.';
+  const html = loadChanges()({ name: 'Draft Saver', component: 'draftSaver', code: 'src/saver/DraftSaver.vue', file: 'specs/draft-saver.dsds.json', drafts: [
+    { where: 'Limitations', text, from: { props: [{ name: 'showClock', from: 'Figma' }], figmaOnly: ['showClock'], rewrite, carriers: { showClock: { prop: 'savedAt', field: 'time' } } } },
+  ] });
+  const [b] = groupsOf(html)[0].items;
+  assert.match(b.body, /not a prop DraftSaver\.vue takes\. The code carries it in the `time` field of `savedAt`\./);
+  assert.ok(unq(b.body).includes('Proposed instead: ' + rewrite), 'the rewrite, word for word');
+  const none = loadChanges()({ name: 'Draft Saver', component: 'draftSaver', file: 'd.json', drafts: [{ where: 'Limitations', text: 'Give `savedAt`.', from: { props: [], line: null } }] });
+  assert.doesNotMatch(none, /Proposed instead/, 'nothing to mend: no rewrite');
+});
+
 test('the changes to rules are a group of their own, apart from the drafts; one with only the engine behind it is folded away and left out of Approve all', () => {
   const rule = (proposal, more = {}) => ({ kind: 'guard', key: `guard:Tile:${proposal.length}`, rule: 'Only one Tile per screen.', proposal, candidates: [{ answer: 'yes', evidence: [{ from: "The team's pages", says: 'The page marks the rule must.' }] }], decider: { name: 'Tiles team' }, ...more });
   const html = loadChanges()({ name: 'Tile', file: 't.json', drafts: [{ where: 'Purpose', text: 'Groups content.' }] }, [], [], '', [

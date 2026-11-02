@@ -32,6 +32,39 @@
     return true;
   }
   COMPONENTS.forEach(function (c) { if (PARTS[c.name]) partTake(c); });
+  // What the first screen never shows, each in a later file of its own (styleguide-files.mjs → LATERS; DATA.sgLater names
+  // it): the brands' embedded fonts, the Showroom screens' drawings, the intent layer's text. The data keeps each value's
+  // place, empty, until it is loaded; then each is put back where it was. One the page loaded with it (the address shows
+  // it at once) is put back before anything is drawn.
+  var LATER = DATA.sgLater || {}, LATER_IN = {}, LATER_WAIT = {};
+  var LATER_GIVE = {
+    fonts: function (f) { if (DATA.brands) DATA.brands.faces = f; },
+    showroom: function (m) { (DATA.showroom || []).forEach(function (x) { if (x && x.markup === '' && Object.prototype.hasOwnProperty.call(m, x.key)) x.markup = m[x.key]; }); },
+    intentLayer: function (t) { var il = DATA.intentLayer; if (!il) return; (t.pages || []).forEach(function (x, i) { var p = il.pages && il.pages[i]; if (x && p) Object.keys(x).forEach(function (k) { p[k] = x[k]; }); }); if (t.noPageOthers) il.noPageOthers = t.noPageOthers; }
+  };
+  function laterTake(k) {
+    if (LATER_IN[k]) return true;
+    var make = self.SG_LATER && self.SG_LATER[k]; if (!make || !LATER_GIVE[k]) return false;
+    LATER_GIVE[k](make()); LATER_IN[k] = true; return true;
+  }
+  function laterHere(k) { return !LATER[k] || !!LATER_IN[k]; }
+  // A later file, loaded when it is not here yet: true while it loads, done(ok) called once it has; false when it is here.
+  function needLater(k, done) {
+    if (laterHere(k) || laterTake(k)) return false;
+    if (LATER_WAIT[k]) { LATER_WAIT[k].push(done); return true; }
+    LATER_WAIT[k] = [done];
+    var s = document.createElement('script');
+    (self.SG_LATER_FILES = self.SG_LATER_FILES || {})[k] = LATER[k];
+    s.onload = s.onerror = function () {
+      var ok = false; try { ok = laterTake(k); } catch (e) { ok = false; }
+      if (!ok) s.remove();   // asked for again next time
+      var waiting = LATER_WAIT[k] || []; delete LATER_WAIT[k];
+      waiting.forEach(function (f) { f(ok); });
+    };
+    s.src = LATER[k]; document.head.appendChild(s);
+    return true;
+  }
+  Object.keys(LATER).forEach(laterTake);
   // A component the code has only as a CSS class (its class in the stylesheet, no component file, nothing it renders):
   // found, yet with no props to read or try, so its page draws it from Figma's structure.
   // Where an accessibility finding is, as places of a table (What it affects, in the row's panel), never a run-on list in

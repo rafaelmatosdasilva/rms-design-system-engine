@@ -17,6 +17,7 @@
 - The backlog holds only issues of the engine itself: how it connects, reads and resolves content, measures, compares and analyzes. Each item is written in general terms and never names or describes a product (a plugin, an app) or a particular design system. A gap in a product or in a design system is not a backlog item: fix it there, or tell the owner.
 - When the owner asks what is next to fix (accessibility or any other area), answer with the engine's own work, from the backlog: never the design system's or a product's tasks.
 - A rule the owner states for how to work goes into memory at once, in the same push: this file for the engine, the backlog's own rules for the backlog.
+- Before building a backlog item, show the owner a mockup of it (before and after, as a page they can open) and build only once they say go. A mockup uses invented names only, and stays out of this repository.
 - Releases follow what merged, not the calendar, and the owner never acts on them: Claude starts `.github/workflows/release.yml` (workflow_dispatch), which tags the next version when `main` has new commits and publishes a GitHub Release with generated notes, and says which version went out. After each merge, Claude releases:
   - the same day, alone, a pull request labelled `release: major`, so its notes explain that one change;
   - the same day, a finished new capability (merged, documented and on the features page), with whatever else merged that day;

@@ -4,7 +4,8 @@
 // does not.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { draftSource, figmaOnlyNamed } from '../lib/draft-sources.mjs';
+import { draftSource, figmaOnlyNamed, carrierOf, rewriteOf } from '../lib/draft-sources.mjs';
+import { docLines } from '../lib/prop-shapes.mjs';
 import { factsFrom } from '../lib/intent-truth.mjs';
 import { draftPlan, briefOf, draftPrompt } from '../lib/intent-changes.mjs';
 
@@ -32,6 +33,27 @@ test('the drafter is told which props are only Figma\'s, and keeps no line that 
   draftPlan(plan, facts, null, { answers: { '0.d': { limitations: ['It shows the time only when `showClock` is set.', 'It shows the time only when `savedAt` is given.'] } } });
   assert.deepEqual(plan[0].drafted.map((d) => d.text), ['It shows the time only when `savedAt` is given.']);
   assert.match(plan[0].dropped[0].why, /`showClock`, a property of the Figma component that the code does not take/);
+});
+
+test('where the code carries a property only Figma has: a prop of its name, a field of its name, or what the doc comment says', () => {
+  const doc = docLines('/**\n * @savedAt {Object} when it was last saved\n *   - time {String}: shown as a clock\n *     - zone {String} deeper\n * @icon {String} the icon before the label\n */');
+  assert.deepEqual(doc, [{ prop: 'savedAt', field: null, says: 'when it was last saved' }, { prop: 'savedAt', field: 'time', says: 'shown as a clock' }, { prop: 'icon', field: null, says: 'the icon before the label' }], 'a field is the first level only');
+  const c = { props: { savedAt: { from: 'the code' }, icon: { from: 'the code' }, showClock: { from: 'Figma' }, showIcon: { from: 'Figma' }, hasBadge: { from: 'Figma' } }, doc };
+  assert.deepEqual(carrierOf('showIcon', c), { prop: 'icon' }, 'show taken off: the prop of that name');
+  assert.deepEqual(carrierOf('showClock', c), { prop: 'savedAt', field: 'time' }, 'the field the comment says shows it');
+  assert.equal(carrierOf('hasBadge', c), null, 'nothing in the code says: none');
+});
+
+test('the rewrite offered names each Figma property as Figma\'s, with what carries it, and passes the check', () => {
+  const f = factsFrom({ components: { draftSaver: { props: { savedAt: { from: 'the code' }, showClock: { from: 'Figma' }, hasBadge: { from: 'Figma' } }, doc: [{ prop: 'savedAt', field: 'time', says: 'shown as a clock' }] } } });
+  const text = 'It shows the time only when `showClock` is set. `hasBadge` adds a dot. Give `savedAt` to show it.';
+  const r = rewriteOf(text, f, 'draftSaver');
+  assert.equal(r, 'It shows the time only when Figma\'s `showClock` (in the code, the `time` field of `savedAt`) is set. Figma\'s `hasBadge` adds a dot. Give `savedAt` to show it.');
+  assert.deepEqual(figmaOnlyNamed(r, f, 'draftSaver'), []);
+  const s = draftSource({ text }, { component: 'draftSaver', facts: f });
+  assert.equal(s.rewrite, r);
+  assert.deepEqual(s.carriers, { showClock: { prop: 'savedAt', field: 'time' } });
+  assert.equal(draftSource({ text: 'Give `savedAt`.' }, { component: 'draftSaver', facts: f }).rewrite, undefined, 'nothing to mend: no rewrite');
 });
 
 test('one draft a part: a second line for the same part is not kept, nor one that says again a line the page has', () => {
