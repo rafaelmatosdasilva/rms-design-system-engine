@@ -199,16 +199,31 @@
     var frameChoice = function () { return window.__dseShowroomFrame || 'auto'; };
     // The grid: one card a screen, the screen itself in small (its drawing, nothing in it to reach or read twice).
     // A screen's card: its name and the screen in small; its fit (drawn again to the card's width) on a._fit.
-    var screenCard = function (s) {
+    // The screens' drawings are in a later file (styleguide-files.mjs): a card made before it is here gets its screen once
+    // it is; the grid's cards wait for the Showroom to open, a card shown elsewhere (a component's Used in) asks for it.
+    var srPending = function (s) { return s.markup === '' && !laterHere('showroom'); }, srWaiting = [];
+    var srLoad = function () {
+      needLater('showroom', function (ok) {
+        if (!ok) return;
+        srWaiting.splice(0).forEach(function (w) { w(); });
+        var at = srDetail.dataset.at; if (at && !srDetail.hidden) { delete srDetail.dataset.at; sr._screen(at); }
+        if (typeof refit === 'function') refit();
+      });
+    };
+    var screenCard = function (s, wait) {
       var a = document.createElement('a'); a.className = 'sg-card' + (DATA.ui && DATA.ui.card ? ' ' + DATA.ui.card.cls : ' sg-card--own'); a.href = '#showroom/' + encodeURIComponent(s.key); a.dataset.screenKey = s.key;
       a.innerHTML = '<h3>' + esc(s.title || s.key) + '</h3>';   // the screen's name alone
       var thumb = document.createElement('div'); thumb.className = 'sg-thumb sg-showroom-thumb'; thumb.setAttribute('aria-hidden', 'true');
-      if (s.markup) {
+      var draw = function () {
+        if (!s.markup) return;
         var small = document.createElement('div'); small.className = 'sg-showroom sg-showroom-screen'; small.setAttribute('inert', ''); small.innerHTML = s.markup;
         Array.prototype.forEach.call(small.querySelectorAll('[id]'), function (e) { e.removeAttribute('id'); });
         Array.prototype.forEach.call(small.querySelectorAll('a, button, input, select, textarea, [tabindex]'), function (e) { e.setAttribute('tabindex', '-1'); });
-        thumb.appendChild(small); a._fit = drawAt(s, small, thumb);
-      }
+        thumb.appendChild(small); a._draw = drawAt(s, small, thumb); a._draw();
+      };
+      // Its fit, whenever its screen is drawn: until then, nothing to size.
+      if (s.markup || srPending(s)) a._fit = function () { if (a._draw) a._draw(); };
+      if (srPending(s)) { srWaiting.push(draw); if (!wait) srLoad(); } else draw();
       a.insertBefore(thumb, a.firstChild);
       return a;
     };
@@ -241,7 +256,7 @@
     }
     DATA.showroom.forEach(function (s) {
       SCREENS[s.key] = s;
-      var a = screenCard(s);
+      var a = screenCard(s, true);
       if (a._fit) fits.push(a._fit);
       srGrid.appendChild(a);
     });
@@ -347,6 +362,8 @@
     };
     sr._screen = function (key) {
       var s = SCREENS[key] || null;
+      // The Showroom shown: its drawings asked for (each card, and this screen, drawn once they are here).
+      if (DATA.showroom.some(srPending)) srLoad();
       // The grid: the product its address names, else All (never a filter left from before).
       if (!s && srFilter) showGroup(GROUPS.indexOf(key) >= 0 ? key : 'all');
       srGrid.hidden = !!s; if (srLead) srLead.hidden = !!s; if (srFilter) srFilter.hidden = !!s; srDetail.hidden = !s; sr._title = s ? (s.title || s.key) : null;

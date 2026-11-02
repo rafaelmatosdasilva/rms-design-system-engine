@@ -441,6 +441,39 @@ test('publishing the style guide again removes a picture its last data named, ne
   for (const f of ['chip.html', chipData, chipPic]) assert.ok('sg/' + f in g.files, f);
 });
 
+test('publishing the style guide again removes the parts its last data named, never one another page\'s data still names', async () => {
+  const { pageFiles } = await import('../lib/stores.mjs');
+  const { writeStyleguide } = await import('../lib/styleguide-files.mjs');
+  const pic = (seed) => `data:image/png;base64,${Buffer.alloc(3000, seed).toString('base64')}`;
+  // A component whose Code Connect and Figma image only its own page reads: both in its part.
+  const page = (seed) => `<!--sg-file:styleguide-->\n<style>.a{}</style>\n<script type="application/json" id="sg-data">${JSON.stringify({ components: [{ name: 'cardTile', codeConnect: { n: seed }, figmaShots: [{ src: pic(seed) }] }] })}</script>`;
+  const d = project();
+  writeStyleguide(join(d, 'index.html'), page(1));
+  const before = [...pageFiles(join(d, 'index.html')).keys()];
+  const oldPart = before.find((f) => /\.part\./.test(f)), oldPic = before.find((f) => f.startsWith('assets/img/'));
+  assert.ok(oldPart && oldPic, 'the page sends its part and the picture the part names');
+  writeStyleguide(join(d, 'chip.html'), page(2));
+  const chip = [...pageFiles(join(d, 'chip.html')).keys()], chipPart = chip.find((f) => /\.part\./.test(f)), chipPic = chip.find((f) => f.startsWith('assets/img/'));
+  const at = (files) => Object.fromEntries(files.map((f) => ['sg/' + f, readFileSync(join(d, f), 'latin1')]));
+  const g = fakeGitlab({ files: { ...at([...before, ...chip]) } });
+  writeStyleguide(join(d, 'index.html'), page(3));
+  const files = pageFiles(join(d, 'index.html'));
+  const r = await pushStore(project(), cfgWith({ styleguide: { write: { gitlab: LINK, path: 'sg' } } }), 'styleguide', files, 'Style guide', { env, http: g.http });
+  assert.equal(r.ok, true, r.line);
+  assert.ok(!('sg/' + oldPart in g.files) && !('sg/' + oldPic in g.files), 'the last build\'s part and its picture are removed');
+  for (const f of ['chip.html', chipPart, chipPic]) assert.ok('sg/' + f in g.files, f);
+  // A folder store whose other page's data cannot be read: its part may still be named there, so none goes.
+  const dir = project(), cfg = cfgWith({ styleguide: { write: { folder: dir } } });
+  mkdirSync(join(dir, 'assets'), { recursive: true });
+  writeFileSync(join(dir, 'chip.html'), '<script id="sg-data" data-src="assets/chip.data.0123456789.js"></script>');
+  writeFileSync(join(dir, oldPart), 'x');
+  assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
+  assert.ok(existsSync(join(dir, oldPart)), 'kept while a page\'s data is missing');
+  writeFileSync(join(dir, 'chip.html'), '<p>no data</p>');
+  assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
+  assert.ok(!existsSync(join(dir, oldPart)), 'removed once no page may name it');
+});
+
 // A write GitLab turns down says why, in GitLab's own words; a gateway's page says nothing more than its status.
 test('a refused commit says GitLab\'s reason; a page with none says the status alone', async () => {
   const { reasonOf } = await import('../lib/stores.mjs');
@@ -479,6 +512,33 @@ test('a commit the gateway timed out on but GitLab made is sent, said once and n
   const again = await pushStore(project(), cfg, 'styleguide', new Map([['index.html', '<p>again</p>']]), 'Style guide published', { env, http: once.http, retryMs: 1 });
   assert.equal(again.ok, true, again.line);
   assert.equal(once.files['index.html'], '<p>again</p>');
+});
+
+test('a large style guide goes in parts: pictures, then its parts and data, the page that links them last, each on the one before', async () => {
+  const { inParts } = await import('../lib/stores.mjs');
+  const act = (file_path, n, action = 'create') => ({ action, file_path, ...(action === 'delete' ? {} : { content: 'x'.repeat(n) }) });
+  const acts = [act('sg/index.html', 10), act('sg/assets/index.data.0123456789.js', 60), act('sg/assets/img/0123456789.png', 50), act('sg/assets/tile.part.0123456789.js', 30), act('sg/assets/img/abcdef0123.png', 50), act('sg/old.data.0123456789.js', 0, 'delete')];
+  assert.deepEqual(inParts(acts, 1000).map((p) => p.length), [6], 'it all fits: one part');
+  const parts = inParts(acts, 100).map((p) => p.map((x) => x.file_path.replace('sg/', '')));
+  assert.deepEqual(parts, [['assets/img/0123456789.png', 'assets/img/abcdef0123.png'], ['assets/tile.part.0123456789.js', 'assets/index.data.0123456789.js'], ['index.html', 'old.data.0123456789.js']]);
+  // Sent: three commits in that order, each said as a part, the state kept after each.
+  const g = fakeGitlab(), ROOT = project();
+  const files = new Map([['index.html', '<script src="assets/index.data.0123456789.js"></script>'], ['assets/index.data.0123456789.js', 'd'.repeat(60)], ['assets/img/0123456789.png', 'p'.repeat(50)], ['assets/img/abcdef0123.png', 'q'.repeat(50)]]);
+  const r = await pushStore(ROOT, cfgWith({ styleguide: { write: LINK } }), 'styleguide', files, 'Style guide published', { env, http: g.http, partBytes: 150 });
+  assert.equal(r.ok, true, r.line);
+  assert.match(r.line, /4 files committed on .* in 3 parts/);
+  const commits = g.writes().filter((c) => c[1].endsWith('/repository/commits'));
+  assert.deepEqual(commits.map((c) => c[3].commit_message), ['Style guide published (part 1 of 3)', 'Style guide published (part 2 of 3)', 'Style guide published (part 3 of 3)']);
+  assert.deepEqual(commits.at(-1)[3].actions.map((x) => x.file_path), ['index.html'], 'the page last');
+  for (const [k, v] of files) assert.equal(g.files[k], v, k);
+  // The branch moves between two parts: what landed is said, and the rest waits for the next round.
+  const m = fakeGitlab(), send = m.http.send;
+  m.http.send = async (url, o) => { const res = await send(url, o); if (o?.body?.branch && /part 1 of/.test(o.body.commit_message)) m.head = 'f'.repeat(40); return res; };
+  forgetAccess();
+  const moved = await pushStore(project(), cfgWith({ styleguide: { write: LINK } }), 'styleguide', files, 'Style guide published', { env, http: m.http, partBytes: 150 });
+  assert.equal(moved.ok, false);
+  assert.match(moved.line, /1 of 3 parts committed, then main moved \(now ffffffff\): run again to send the rest/);
+  assert.equal(m.files['index.html'], undefined, 'the page never names files not there yet');
 });
 
 // ── Writing a store with the person's own git access ────────────────────────────────────────────────────────────

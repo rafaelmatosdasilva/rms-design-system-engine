@@ -269,8 +269,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.deepEqual(await until(`(() => { const p = document.getElementById('demo-panel'); return p && !p.hidden ? [p.querySelector('h1, h2, .sg-panel-title') && p.querySelector('h1, h2, .sg-panel-title').textContent.trim(), p.querySelector('.demo-body').textContent] : null; })()`, Boolean), ['Demo', '<b>Hello</b>'], 'the module\'s panel opens with its title and body, its words escaped');
     await run(`document.getElementById('demo-panel')._shut()`);
     assert.equal(await until(`document.getElementById('demo-panel').hidden`, (v) => v === true), true, 'and closes');
+    // What only its page reads (its code) is in its part, loaded when its page opens: not in the data the Status page read.
+    const chipCode = `(self.SG_DATA.components.find((c) => c.name === 'chip').source || { text: '' }).text.length`;
+    assert.ok(/^assets\/index\.part\.[0-9a-f]{10}\.js$/.test(await run(`(self.SG_DATA.sgParts || {}).chip`)), 'the chip has a part');
+    assert.equal(await run(chipCode), 0, 'its code is not in the first screen\'s data');
     await run(`location.hash = '#c-chip'`);
     assert.equal(await shownIs('c-chip'), 'c-chip');
+    assert.ok(await run(chipCode) > 40, 'its code, whole, once its page opened');
     await until(`document.querySelectorAll('.pg-preview').length`, (v) => v === 1);
     // Each row of its tables (Parity, Accessibility, Documentation…) opens in full in a side panel, a card per column.
     const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
@@ -592,6 +597,9 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await until(`document.getElementById('sg-comp-panel').classList.contains('is-parked')`, (v) => v === true), true, 'the X closes it, once it has slid out (its page kept, out of sight, for the next one)');
     const cellGo = await run(`(() => { const b = document.querySelector('#status .sg-mx-go--cell'); if (!b) return null; b.click(); const src = document.querySelector('#sg-comp-panel iframe').getAttribute('data-at'); document.querySelector('#sg-comp-panel [data-panel-close]').click(); return src; })()`);
     if (cellGo) assert.match(cellGo, /[?&]embed#c-[^/]+\/(parity|accessibility|documentation)\?st=(todo|check)$/, 'a cell opens its area, filtered');
+    // Only the pill opens its area: the rest of its cell is the row's, and opens the component's own page.
+    const cellRest = await run(`(() => { const b = document.querySelector('#status .sg-mx-go--cell'); if (!b) return null; const td = b.closest('td'); td.dispatchEvent(new MouseEvent('click', { bubbles: true })); const src = document.querySelector('#sg-comp-panel iframe').getAttribute('data-at'); document.querySelector('#sg-comp-panel [data-panel-close]').click(); return [src, getComputedStyle(td).cursor === 'pointer' && !td.closest('.is-link'), getComputedStyle(b).cursor]; })()`);
+    if (cellRest) { assert.match(cellRest[0], /[?&]embed#c-[^/?]+$/, 'the cell around the pill opens the component, as its row does'); assert.deepEqual(cellRest.slice(1), [false, 'pointer'], 'the pointer is the pill\'s'); }
     assert.equal(await run(`!!document.querySelector('#status .sg-mx-side, #status .sg-mx-split')`), false, 'no side panel');
     assert.equal(await run(`[...document.querySelectorAll('#status tr.sg-mx-row')].every((tr) => ['stFigma', 'stCode', 'stPar', 'stAcc', 'stDoc'].every((k) => tr.dataset[k]))`), true, 'every row carries each column\'s state, for the filters to count');
     assert.match(await run(`[...document.querySelectorAll('#status .sg-matrix td .pg-par-status')].map((e) => e.textContent).join('|')`), /^Found\|Found\|(Match|Partial|Differs|N\/A)\|/);
@@ -712,6 +720,39 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`location.hash`), '#status/accessibility', 'an old #todo link');
     assert.equal(await run(`document.querySelector('#status .sg-matrix th[data-sort="Accessibility"]').getAttribute('aria-sort')`), 'descending');
     assert.deepEqual(errors, []);
+    // Served by a host that sends no cache header: the component panel (the page again, in a frame) takes the data the
+    // page around it holds, and downloads it no second time; a component opened in it loads its part and draws.
+    const { createServer } = await import('node:http');
+    const root = join(dir, '.design-system-engine-out/styleguide');
+    const server = createServer((req, res) => {
+      const p = join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+      if (!p.startsWith(root) || !existsSync(p) || !/\.\w+$/.test(p)) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': /\.html$/.test(p) ? 'text/html' : /\.css$/.test(p) ? 'text/css' : /\.js$/.test(p) ? 'text/javascript' : 'application/octet-stream' });
+      res.end(req.method === 'HEAD' ? undefined : readFileSync(p));
+    }).listen(0);
+    try {
+      const web = await openPage(send, 'about:blank');
+      await send('Network.enable', {}, web.sessionId);
+      const asked = [];
+      on('Network.requestWillBeSent', (p, sid) => { if (sid === web.sessionId) asked.push({ url: p.request.url, frame: p.frameId }); });
+      await send('Page.navigate', { url: `http://localhost:${server.address().port}/index.html#status` }, web.sessionId);
+      const wrun = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, web.sessionId)).result.value;
+      assert.ok(await waitForTrue(send, web.sessionId, `document.documentElement.classList.contains('sg-ready')`, { attempts: 1200, tolerateErrors: true }), 'the page drawn over http');
+      const frameReady = `(() => { const f = document.querySelector('.sg-comp-panel-frame'); return !!f && !!f._loaded && f.contentWindow.document.documentElement.classList.contains('sg-ready'); })()`;
+      assert.ok(await waitForTrue(send, web.sessionId, frameReady, { attempts: 600, intervalMs: 100, tolerateErrors: true }), 'the panel\'s page loaded in the background');
+      const top = (await send('Page.getFrameTree', {}, web.sessionId)).frameTree.frame.id;
+      const dataFile = /\.data\.[0-9a-f]{10}\.js/;
+      assert.equal(asked.filter((r) => dataFile.test(r.url) && r.frame === top).length, 1, 'the page downloads its data');
+      assert.equal(asked.filter((r) => dataFile.test(r.url) && r.frame !== top).length, 0, 'the panel downloads it no second time');
+      assert.equal(await wrun(`(() => { const w = document.querySelector('.sg-comp-panel-frame').contentWindow; return w.SG_DATA !== self.SG_DATA && Object.getPrototypeOf(w.SG_DATA) === w.Object.prototype && w.SG_DATA.components.length === self.SG_DATA.components.length; })()`), true, 'its own copy, made in its frame');
+      await wrun(`location.hash = '#c-chip'`);
+      assert.ok(await waitForTrue(send, web.sessionId, `!!document.getElementById('c-chip') && !document.getElementById('c-chip').hidden`, { attempts: 400, tolerateErrors: true }), 'a component opened on the page');
+      const parts = asked.filter((r) => /\.part\./.test(r.url)).length;
+      await wrun(`(() => { const w = document.querySelector('.sg-comp-panel-frame').contentWindow; w.location.replace(w.location.pathname + w.location.search + '#c-chip'); })()`);
+      assert.ok(await waitForTrue(send, web.sessionId, `(() => { const w = document.querySelector('.sg-comp-panel-frame').contentWindow, s = w.document.getElementById('c-chip'); return !!s && !s.hidden && !!s.querySelector('.pg-preview'); })()`, { attempts: 400, tolerateErrors: true }), 'drawn in the panel');
+      assert.equal(asked.filter((r) => /\.part\./.test(r.url)).length, parts, 'the panel takes the part the page already holds');
+      assert.deepEqual(errors, []);
+    } finally { server.close(); }
     close();
   } finally { c.kill(); }
 });
@@ -1735,4 +1776,12 @@ test('a component named with a note in brackets gives no part to draw, and the p
   const uses = tpl.split('\n').filter((l) => /querySelector(All)?\(c\.only\)/.test(l));
   assert.ok(uses.length >= 2, 'the playground and the anatomy read c.only');
   for (const l of uses) assert.match(l, /try \{[^}]*querySelector(All)?\(c\.only\)/, l.trim());
+});
+
+test('the Status matrix: only an area\'s pill opens that area; hovering a row lights its arrow, never while a pill is the one hovered', () => {
+  const tpl = templateText();
+  assert.doesNotMatch(tpl, /sg-mx-cell-go/, 'no cell of its own answers: the rest of it is the row\'s');
+  assert.match(tpl, /\.sg-matrix \.sg-mx-row\.is-link:hover:not\(:has\(\.sg-link-pill:hover, \.sg-tip:hover\)\) \.sg-mx-go \{ background: var\(--sg-hover-fill\); color: var\(--sg-text\); \}/);
+  assert.match(tpl, /\.sg-matrix \.sg-mx-row \.sg-link-pill \{ cursor: pointer; \}/);
+  assert.match(tpl, /\.sg-link-pill:focus-visible \{ outline: 2px solid var\(--sg-accent\)/, 'the pill keeps its focus ring');
 });

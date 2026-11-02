@@ -63,6 +63,9 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Names who decides each thing that waits on a person, from the owners you set, and counts what waits on each.
 - Reads your guidelines against each other: rules that contradict, rules written twice and rules nothing can check.
 - Says what holds each rule on a page: a check that already enforces it, a guard the edit check could hold it with (written once you say yes), or a person's judgment. A rule too vague to check gets a rewrite a reviewer can check, drafted for your review. Read in English and Portuguese.
+- Lets you decide each change to a page on its own: new text for the page, changes to rules and the other proposals, each in its own group. Each group has one action, Approve all, which copies the decision for Claude Code, and each section gets one draft at most.
+- Shows each draft beside where it comes from: the code's prop, the line it says again, or a name only Figma has, flagged so it is not taken for a prop.
+- Offers a rewrite for a draft that names a property only Figma has, saying what carries it in the code.
 - Flags lists copied into the layer that will go stale, and names the generated file to link instead.
 - Rates how ready your guidance is for AI agents, component by component.
 - Never overwrites a sentence a person wrote.
@@ -201,6 +204,12 @@ How it checks the agent's work, in a loop, before you see it:
 - Follows what your team already decided, and never uses a retired component.
 - Holds a new page to how your product's **real pages** are built, not only to the prototypes drawn so far: which components a page holds and in what order, what each action is called, where the actions go. A project on its first day has no prototypes and no designed screens, but it has its pages. Only what the code says for certain is taken; spacing and text styles are never guessed from it.
 
+**What the page's own wrapper may use.** We read the transcripts of twelve measured runs looking for why agents invent. The answer was narrow and the same every time: **every invented value was in the page's own wrapper, and never in a component.** A page width written as `400px`, a line between rows as `#e0e0e0`, an empty state as an `<svg>` drawn by hand — each of them in the same tag as a `var(--padding-m)` the same agent had got right.
+
+It used a token wherever it had been shown one, and invented wherever it had not. The catalog showed spacing and nothing else, while the theme had `--surface-page`, `--text-primary` and `--stroke-default` all along.
+
+So the catalog now names them: what the wrapper may use, and nothing else. What a component owns stays that component's — a `--radii-button` is the button's, and a wrapper reaching for it borrows a look it was not given. A colour, a line, a corner or a width the theme does not name is a need the system lacks, and goes in the page as a gap for the design team, never as a value of the agent's own.
+
 **A state the page owes is not a note.** A page that shows a list owes an empty state; one that takes input owes an error state. The engine worked both out and said so — as advice — and advice gets skipped. We measured it: given the documentation alone, with those very lines in the page's own instructions, agents skipped the empty list and the form-with-a-mistake more often than anything except inventing.
 
 So the page is now **drawn and not ready**. Drawn, because the page somebody still has to finish is exactly the one worth looking at — every size, every state, the pictures, the review. Not ready, because the run comes back unfinished and names the state.
@@ -212,9 +221,17 @@ There is an honest way out, which there has to be, and it costs a reason:
 
 A reason too thin to be one is not taken. *A check a page cannot satisfy honestly is a check people turn off.* A starting point read from a designed screen is excused everything: it is incomplete on purpose, and failing it for not being finished is the same mistake pointing the other way.
 
+**Every finding says which part it is about.** Watched in a measured run: an agent was told `"undefined" is not in the catalog`, could not tell which of the page's parts it meant, ran the check seventeen more times, searched the project for a schema, deleted the page, started over, and ran out of turns with nothing finished.
+
+Both halves of that were the engine's. The finding carried the part's id all along and the report never printed it; and a part you gave no id was keyed `node-7`, a number in walk order that is findable in nothing. Now a finding opens with where it is — `Page › children[1] › children[0]`, or `"actions" (Page › children[0])` for a part you named — which is a route you can follow with the file open.
+
+And a part with no component at all is no longer quoted as a component called `undefined`. It says what it is: a part that was never finished.
+
 **A file in the wrong shape is told so once, not symptom by symptom.** An agent wrote a format of its own invention — `{ name, layout, gap, components: [{ type, label }] }` — and the engine answered with ten findings: the root is not a component, `"undefined"` is not in the catalog, the id `"undefined"` is used in three places. Every one true, and not one of them the thing that was wrong.
 
 Ten symptoms of one mistake read as ten mistakes. The agent fixed them one at a time for thirty turns and was never told the file was the wrong shape. Now it gets one sentence, the shape itself, and the keys its file has instead — so it can map one onto the other.
+
+And where your components are code, it is told something better than the shape of a composition: **which file this project writes.** The catalog of such a project says twice that a page here is a `.jsx` — and the agent wrote a `.json` anyway. Sending it off to write a *better composition* would only send it back to the wrong kind of file. So it now reads: your components are code, a page here is written in that code, write `prototypes/<Name>.jsx`.
 
 **Each prototype carries its own evaluation.** What every check found used to live in one place, in the engine's output folder: good for counting across a project, no use to the prototype itself. A prototype is a part of its own now — read from your team's store into `prototypes/` and sent back from it — and the page travelled, its handoff travelled, what people said about it travelled, and nothing about whether it holds up did.
 

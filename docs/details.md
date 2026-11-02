@@ -445,6 +445,7 @@ The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory ·
 - **A change is tried at once.** A style guide is checked a few components a page, so a change to one component tries only its page again.
 - **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the style guide, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
 - **A change to your CSS's comments or spacing keeps every result.** Only the rules count.
+- **A change to the style guide's own screens keeps every result.** The Status table, the Documentation panel and the other screens around the components never reach what the check measures. When only that CSS changed, each part's page is opened just long enough to read what surrounds its components, and its results are put back. A change around a component (its stage, the page behind it) still tries it again.
 - **The report says why a page was tried again:** the check changed, the CSS every component shares changed, which components changed and the tokens that moved them, or it was never checked before.
 - **Several pages are tried at once.** When many need trying, a few browsers share them out (`a11y.parallel`, by default a quarter of the computer's cores), and the report is the same as one browser's.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
@@ -842,6 +843,23 @@ Rules tell an agent what to do; an example shows it. A page with none gets one, 
 - **Where it came from.** The line above it says how many of the uses take this form, and the file, line and product it was taken from.
 - **A draft.** It goes under Examples, in the page's own format: a code block in a Markdown page, a block of text titled Examples in a DSDS page. Dropped, it goes whole, code and all. A component no product uses keeps the example written from its own code.
 
+### Deciding a page's changes
+
+A page's panel on the Documentation page holds every change it asks for, in groups. Each group has its own heading and count.
+
+| Group | What is in it |
+| --- | --- |
+| New text for the page | Its drafts, each once, under its section |
+| Changes to rules | The guards and rewrites its rules propose |
+| Decisions about the page | Its other proposals: a page to write, a name to keep, a part's page, a page or a decision to review again |
+| Other changes | What is still to write, a part's page to move, notes no agent reads |
+
+- **One action per group.** Each group has one button, Approve all, for everything it shows (never what is folded away). It copies the decision in plain words for you to paste into Claude Code ("Approve all 3 drafts"). What you leave stays as it is.
+- **One draft per section.** The engine drafts one line for each section a page lacks, never a second for the same section, and never a line the page already says.
+- **Each draft beside its source.** The props it names, as the code has them (its file and the values each takes), and the line it says again, on the page or in Figma's notes or the code's comment.
+- **A name only Figma has is flagged.** A Figma property the code does not take, written as a prop, is shown as a warning on its draft. The engine's own drafts never write one: they say what the code does, or call it Figma's.
+- **A rewrite is offered for it.** A draft written before that names one gets a proposed rewrite. It calls the property Figma's and says what carries it in the code: a prop of the same name, or the prop or field the code's own comment says shows it. The review shows it under the draft, and listing the drafts in Claude Code shows it too, ready to take as it is or edit.
+
 ### Pages to write, most used first
 
 A component with no page gives agents nothing to read. The engine ranks those components by how far they reach: how many products use them, in how many files, how many times.
@@ -898,6 +916,8 @@ When the engine proposes an answer to a decision (a page to write, a part to doc
 
 Each piece is strong, some or weak. The answer with the most behind it is proposed. When another answer has as much, the proposal says the evidence is split and a person decides.
 
+- **A change to a rule needs more than the engine.** A guard or a rewrite with nothing behind it but the engine's own reading is never proposed as a yes. It is folded away on the page, with No as its answer until you say otherwise. A rule your page marks as a must, or a yes the team gave to one like it before, is proposed as usual.
+
 ### Who decides
 
 Everything that waits on a person names the person: from `owners` in `ds-config.json`, by component or by area, with `*` for the rest ([Who owns what](#who-owns-what)).
@@ -952,6 +972,14 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - It is on by default ([On by default](#on-by-default)).
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
+- **The first screen loads first.** What only a component's own page reads (its code, its whole changelog, its Code Connect, its Figma images) is a small file of its own in `assets`, loaded when that component opens. The Status page, the menu and the overview show without waiting for it.
+- **Three more load when first used.**
+  - The brands' embedded fonts, when a brand is chosen.
+  - The Showroom screens' drawings, when the Showroom or a screen's card is shown.
+  - What the agents read of each intent layer page, when its row opens on the Documentation page.
+  - An address that shows one at once (a brand already chosen, `#showroom`, `#documentation`) loads it with the page.
+- **A large guide is published in parts.** On GitLab, a guide too large for one commit goes as several: its pictures first, then its data, then the page that links them. The page never names a file that is not there yet. If someone else commits in between, the rest waits for the next round, and the run says how many parts landed.
+- **The component panel downloads nothing twice.** The panel is the page again, in a frame. It takes the data the page around it already holds, so a host that sends no cache header costs no second download.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 - **The template comes in parts.** Its file is the page's frame; its styles and its script are parts of their own under `templates/styleguide/` (`css/` and `js/`, one area of the page each, such as the Overview, the Tokens page or the Status page), joined in order when the page is built. A change is reviewed and tested one area at a time, and the page they make is the same. A project's own template can be one file, or use parts the same way (a line `/*@part …*/` in its styles, `//@part …` in its script).
 
@@ -1107,6 +1135,9 @@ Each rule on a page is said as what holds it. The page's Documentation panel and
 
 - **A checkable rule proposes its guard.** Say yes or no on the Documentation page, or with `--intent-decide <key> yes`. A yes writes the guard into `contract.authored.json` (an import into `ds-config.json`), and the rule is checked from then on, linked to it. A no is kept, and the rule stays one agents read.
 - **A vague rule gets a rewrite.** One that names no component, prop, value, token or count ("use it appropriately") is given one sentence a reviewer can check, from what the page says. A yes drafts it under Rules for your review.
+- **A rewrite keeps what the rule means.** Every word the rule is about is still in it, or no rewrite is proposed. Two rules are never given the same sentence. A label in the rule ("Put Secondary, Cancel, Clear or Back before Primary") is a name, not a vague word.
+- **Each rule is about its own component.** A page that documents two components often writes each name as a heading among its rules. That line is not a rule, and the rules under it are about that component. A count of something inside it ("a maximum of 2 visible buttons" under a footer bar) is not a count of the bar on a screen, so it gets no guard.
+- **A guard never contradicts the component.** A value its code takes is never forbidden outright, nor a setting the page's own lines use. Such a rule means something else, and stays one a person judges.
 - **Agents are held to them.** Each rule in a contract carries its status. Checked and checkable rules are hard constraints.
 - **English and Portuguese.** The same rule, written in either, is read the same way.
 
