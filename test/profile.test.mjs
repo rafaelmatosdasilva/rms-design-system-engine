@@ -105,3 +105,25 @@ test('a store\'s notify survives a profile: the CI to tell and the name of its v
   assert.deepEqual(next.stores.styleguide.notify, [{ url: 'https://ci.acme.test/job/site/build', authEnv: 'ACME_CI_AUTH' }, 'https://hooks.acme.test/site']);
   assert.deepEqual(exportProfile(next).stores.styleguide.notify, next.stores.styleguide.notify);
 });
+
+test('a run with no token where it stands says the folder first, never that the token lacks access; the team\'s command says where to run it', async () => {
+  const away = tempDir('acme-elsewhere-');
+  const http = { get: async () => ({ ok: false, status: 404 }) };
+  const link = `https://${HOST}/design/intent/-/blob/main/setup/profile.json`;
+  const r = await readProfile(link, { from: away, env: { GITLAB_HOST: HOST }, http });
+  assert.match(r.error, /^no GITLAB_TOKEN to read it: none in this run's environment nor in a \.env in .+acme-elsewhere-.+\. That folder is not a project \(no ds-config\.json, no \.env\): run from your project's folder, where its \.env is$/);
+  assert.doesNotMatch(r.error, /must read/, 'never sends anyone to widen a token');
+  assert.equal(r.project, false);
+  // A project without a token: told there is none, and not told to move.
+  const proj = tempDir('acme-project-');
+  writeFileSync(join(proj, 'ds-config.json'), '{}');
+  const p = await readProfile(link, { from: proj, env: { GITLAB_HOST: HOST }, http });
+  assert.match(p.error, /^no GITLAB_TOKEN to read it/);
+  assert.doesNotMatch(p.error, /not a project/);
+  // With a token that cannot read it, the token is still what is said.
+  assert.match((await readProfile(link, { from: away, env: { GITLAB_TOKEN: 'mine', GITLAB_HOST: HOST }, http })).error, /GITLAB_TOKEN in \.env must read design\/intent/);
+  // The command a team installs says to run it from the project's folder.
+  const dir = tempDir('acme-cmd-');
+  const out = writeCommand('acme', link, { dir });
+  assert.match(readFileSync(out, 'utf8'), /Run it from your project's folder, the one with your \.env: the profile is read with the\nGITLAB_TOKEN there\./);
+});
