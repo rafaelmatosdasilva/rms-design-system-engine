@@ -60,7 +60,7 @@ test('Figma: its version in one call, against the one the snapshots were read at
   const fetch = async (url, o) => { asked = [url, o.headers['X-Figma-Token']]; return { ok: true, json: async () => ({ version: '2210' }) }; };
   assert.deepEqual(await figmaVersionNow({ figmaFile: 'https://www.figma.com/design/AbC123/Acme' }, { token: 'tok', fetch }), { version: '2210' });
   assert.deepEqual(asked, ['https://api.figma.com/v1/files/AbC123?depth=1', 'tok']);
-  assert.deepEqual(await figmaVersionNow({ figmaFileKey: 'AbC123' }, { token: 'tok', fetch: async () => ({ ok: false, status: 403 }) }), { error: 'Figma answered 403' });
+  assert.match((await figmaVersionNow({ figmaFileKey: 'AbC123' }, { token: 'tok', fetch: async () => ({ ok: false, status: 403 }) })).skip, /not allowed to read this file \(Figma answered 403\)/);
   const dir = tempDir('watch-figma-');
   mkdirSync(join(dir, 'src'), { recursive: true });
   writeFileSync(join(dir, 'src', 'figma-vars.snapshot.json'), JSON.stringify({ _figmaVersion: '2209' }));
@@ -274,4 +274,21 @@ test('a failed round is kept for the next watch, which tries it again at its fir
   assert.equal(r.built, true);
   assert.deepEqual(builds.at(-1), [['the engine updated'], ['the engine']]);
   assert.equal(kept, null, 'built: nothing left to try again');
+});
+
+test('a Figma token Figma refuses is said once and not asked again; the same error each check is said once, again when it clears', async () => {
+  const { figmaVersionNow, makeWatch } = await import('../lib/watch.mjs');
+  let asked = 0;
+  const fetch = async () => { asked++; return { ok: false, status: 403 }; };
+  const cfg = { figmaFileKey: 'AbC123' };
+  const first = await figmaVersionNow(cfg, { token: 'refused-token', fetch });
+  assert.match(first.skip, /not allowed to read this file \(Figma answered 403\)/);
+  assert.match((await figmaVersionNow(cfg, { token: 'refused-token', fetch })).skip, /not allowed/);
+  assert.equal(asked, 1, 'a refused token is not asked again');
+  // An error that repeats: one line, then one when it clears.
+  const lines = [], answers = [{ error: 'Figma could not be reached (timeout)' }, { error: 'Figma could not be reached (timeout)' }, { version: '1' }];
+  const w = makeWatch({ code: () => 'c', engine: () => 'e', figma: async () => answers.shift() ?? { version: '1' }, layer: async () => ({}), stores: async () => ({}), build: async () => ({ ok: true }), log: (l) => lines.push(l), remoteEveryMs: 1, settleMs: 0 });
+  for (const t of [10, 20, 30]) await w.tick(t);
+  assert.equal(lines.filter((l) => /could not be reached/.test(l)).length, 1);
+  assert.equal(lines.filter((l) => /Figma: reached again/.test(l)).length, 1);
 });
