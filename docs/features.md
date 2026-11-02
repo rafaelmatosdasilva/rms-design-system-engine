@@ -210,6 +210,12 @@ There is an honest way out, which there has to be, and it costs a reason:
 
 A reason too thin to be one is not taken. *A check a page cannot satisfy honestly is a check people turn off.* A starting point read from a designed screen is excused everything: it is incomplete on purpose, and failing it for not being finished is the same mistake pointing the other way.
 
+**Every finding says which part it is about.** Watched in a measured run: an agent was told `"undefined" is not in the catalog`, could not tell which of the page's parts it meant, ran the check seventeen more times, searched the project for a schema, deleted the page, started over, and ran out of turns with nothing finished.
+
+Both halves of that were the engine's. The finding carried the part's id all along and the report never printed it; and a part you gave no id was keyed `node-7`, a number in walk order that is findable in nothing. Now a finding opens with where it is — `Page › children[1] › children[0]`, or `"actions" (Page › children[0])` for a part you named — which is a route you can follow with the file open.
+
+And a part with no component at all is no longer quoted as a component called `undefined`. It says what it is: a part that was never finished.
+
 **Each prototype carries its own evaluation.** What every check found used to live in one place, in the engine's output folder: good for counting across a project, no use to the prototype itself. A prototype is a part of its own now — read from your team's store into `prototypes/` and sent back from it — and the page travelled, its handoff travelled, what people said about it travelled, and nothing about whether it holds up did.
 
 Now `prototypes/<name>.check.json` sits beside the page, as the handoff and the comments do: which components it used and how often, the mistakes with why each happened, what the system lacked for it, the states it owes. The store carries it, and so does every file the engine keeps beside a page — named deliberately rather than left to the extensions, because the check record travelled only because it happens to be JSON and the handoff did not travel at all.
