@@ -850,11 +850,13 @@ A page's panel on the Documentation page holds every change it asks for, in grou
 | --- | --- |
 | New text for the page | Its drafts, each once, under its section |
 | Changes to rules | The guards and rewrites its rules propose |
+| Decisions about the page | Its other proposals: a page to write, a name to keep, a part's page, a page or a decision to review again |
 | Other changes | What is still to write, a part's page to move, notes no agent reads |
 
-- **One decision per item.** Approve, change or drop each one. A second press takes the choice back. An item left undecided stays as it is.
+- **Three actions per item, no more.** Approve, Change or Drop. What a yes or a no does is the button's tip. A second press takes the choice back. An item left undecided stays as it is.
+- **Change edits in place.** It opens the item's own words to edit. The decision copied carries your words as you left them.
 - **Approve all, per group.** It approves what the group shows, never what is folded away.
-- **One copy for all of it.** The decision copied for Claude Code carries every choice, in plain words, and shows above its button as you choose. Every draft approved is said at once ("Approve all 3 drafts").
+- **One Copy for all of it.** No item has a Copy of its own. The one at the end carries every choice, in plain words, and shows above its button as you choose. Every draft approved is said at once ("Approve all 3 drafts").
 - **Each draft beside its source.** The props it names, as the code has them (its file and the values each takes), and the line it says again, on the page or in Figma's notes or the code's comment.
 - **A name only Figma has is flagged.** A Figma property the code does not take, written as a prop, is shown as a warning on its draft. The engine's own drafts never write one: they say what the code does, or call it Figma's.
 

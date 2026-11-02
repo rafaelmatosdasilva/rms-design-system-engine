@@ -15,12 +15,6 @@ const grab = (name, args) => new RegExp(`var ${name} = (function \\(${args}\\) \
 const line = (name) => new RegExp(`var ${name} = (function \\([^)]*\\) \\{[^\\n]*\\});`).exec(tpl)[1];
 const loadProposal = (IL = {}) => new Function('esc', 'capital', 'IL', `var IL_STRENGTH = ${/var IL_STRENGTH = (\{[^\n]*\});/.exec(tpl)[1]};
   var ilOwn = ${line('ilOwn')}; var isRuleChange = ${line('isRuleChange')}; var ilCandidates = ${grab('ilCandidates', 'x')}; var ilAnsweredBy = ${grab('ilAnsweredBy', 'x')}; return (${grab('ilProposal', 'p')});`)(esc, capital, IL);
-// What to do on a row: each answer to its open proposals with the command that gives it.
-const loadIfNot = (IL = {}) => new Function('esc', 'IL', `var ENGINE = 'acme-ds'; var decideMark = function () { return ''; }; var sysButton = function (t, l, a) { return '<button' + a + '>' + l + '</button>'; };
-  ${/function plainText\(.*/.exec(tpl)[0]}
-  var ilOn = ${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]};
-  var ilOwn = ${line('ilOwn')}; var isRuleChange = ${line('isRuleChange')}; var ilOpen = ${line('ilOpen')}; var ilAnswer = ${line('ilAnswer')}; return (${grab('ilIfNot', 'p, html')});`)(esc, IL);
-
 test('a proposal shows each answer it could take, the proposed one first, each with where its evidence comes from and how strong', () => {
   const html = loadProposal()({ proposals: [{ kind: 'add', subject: 'listMain/Row', proposal: 'Document it in List Main\'s page.', recommends: 'yes', split: true, decider: { name: 'Tiles team' },
     candidates: [
@@ -66,10 +60,8 @@ test('an Add answered with no page, its component changed since, has its own row
   const html = loadProposal(IL)(row);
   assert.match(html, /<strong>Does the answer no to &quot;Write its page\.&quot; still hold for newThing as it is now\?<\/strong>/);
   assert.match(html, /Waits on Tiles team\./);
-  const todo = loadIfNot(IL)(row, '<p>Review it.</p>');
-  assert.match(todo, /<strong>It still holds<\/strong><span class="pg-par-val">Recorded as confirmed\.<\/span>/);
-  assert.match(todo, /acme-ds on Component newThing, Yes to &quot;Does the answer no to/);
-  assert.match(todo, /acme-ds on Component newThing, No to &quot;/);
+  // Its answers are the row's three actions, with the page's other changes (intent-drafts-card.test.mjs).
+  assert.match(tpl, /var todo = ilChanges\(p, c\.write, c\.notes, own \? ilTodo\(own, true\) : c\.todo, ilOpen\(p\)\)/);
   // The rows: one a component, reviewed as a decision to review again, with its own address and title.
   assert.match(tpl, /Object\.keys\(IL\.noPageRechecks \|\| \{\}\)\.sort\(\)\.map\(function \(n\) \{ var x = IL\.noPageRechecks\[n\]; return \{ action: 'review', decision: 'Review', recheckFor: n, recheck: 1, decider: x\.decider \|\| null \}; \}\)/);
   assert.match(tpl, /p\.recheckFor \? 'recheck:' \+ p\.recheckFor/);

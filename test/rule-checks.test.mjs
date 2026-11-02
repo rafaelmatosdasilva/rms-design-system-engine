@@ -251,3 +251,10 @@ test('a rewrite keeps the rule\'s meaning or is not proposed', async () => {
   const r = pageRules(page('Tile', ['Keep the text clear.', 'Keep its text clear and short.']), 'Tile', ctx);
   assert.ok(r.rules.every((x) => !x.rewrite));
 });
+
+test('a rule that says when to use a chart is never rewritten as a rule about its label', () => {
+  const ctx = ruleContext({ components: { ringChartKey: { props: { label: { type: 'string' } } } } });
+  const r = classifyRule('Shares of a total that add up to a meaningful whole: use the ring chart with its key.', { component: 'ringChartKey', entity: { whenToUse: [] } }, ctx);
+  assert.equal(rewriteOf('Shares of a total that add up to a meaningful whole: use the ring chart with its key.', { component: 'ringChartKey' }, ctx), 'ringChartKey\'s `label` says what it does in three words at most, starting with a verb.', 'what the template alone would say');
+  assert.equal(r.rewrite, undefined, 'its shares, total and whole are not in it: no rewrite');
+});

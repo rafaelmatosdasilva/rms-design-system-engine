@@ -141,3 +141,12 @@ test('the review takes each draft\'s own decision, page by page', () => {
   assert.match(after, /"statement":"Name the gap\."/, 'the one approved, its marker off');
   assert.doesNotMatch(after, /Ask before building one/, 'the one dropped, gone');
 });
+
+test('a change edited on the page carries the person\'s words: a draft changed in one review, a rule drafted under Rules', () => {
+  const t = 'on Component Draft Saver, Approve the draft "A."; then Change the draft "B." to "B, said better."; then Change "Rewrite the rule “Use it sparingly” as: Use at most one." to "Use at most two."; then Change "Keep it: it names a part." to "Keep it, it is internal."';
+  const r = routed(t);
+  assert.equal(r.run[0], `${cmd} --review-drafts '[{"page":"Draft Saver","line":"A.","do":"approve"},{"page":"Draft Saver","line":"B.","do":"change","to":"B, said better."}]' --said '${t}'`);
+  assert.match(r.run[1], /^rms-design-system-engine --intent-decide 'Rewrite the rule “Use it sparingly” as: Use at most one\.' no --said /);
+  assert.equal(r.run[2], `${cmd} --draft 'Draft Saver' 'Rules' 'Use at most two.' --task 'Rule rewrite'`);
+  assert.ok(r.notes.some((n) => /^The person answered "Keep it: it names a part\." for Component Draft Saver in their own words: "Keep it, it is internal\."/.test(n)));
+});

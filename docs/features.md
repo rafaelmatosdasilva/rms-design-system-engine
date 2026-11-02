@@ -63,7 +63,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Names who decides each thing that waits on a person, from the owners you set, and counts what waits on each.
 - Reads your guidelines against each other: rules that contradict, rules written twice and rules nothing can check.
 - Says what holds each rule on a page: a check that already enforces it, a guard the edit check could hold it with (written once you say yes), or a person's judgment. A rule too vague to check gets a rewrite a reviewer can check, drafted for your review. Read in English and Portuguese.
-- Lets you decide each change to a page on its own: new text for the page and changes to rules, each in its own group, each item approved, changed or dropped, and every decision copied for Claude Code at once.
+- Lets you decide each change to a page on its own: new text for the page, changes to rules and the other proposals, each in its own group. Every item has the same three actions, approve, change (its words edited in place) or drop, and one Copy takes every decision to Claude Code.
 - Shows each draft beside where it comes from: the code's prop, the line it says again, or a name only Figma has, flagged so it is not taken for a prop.
 - Flags lists copied into the layer that will go stale, and names the generated file to link instead.
 - Rates how ready your guidance is for AI agents, component by component.

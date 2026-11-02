@@ -11,14 +11,15 @@ const tpl = templateText();
 
 // The review's functions, from where a source line starts to the end of ilChanges, with what they use from the page.
 const loadReview = () => {
-  const src = /\n    (var ilDraftFrom = function [\s\S]*?\n    var ilChanges = function \(p, write, notes, task, rules\) \{[\s\S]*?\n    \};)\n/.exec(tpl)[1];
+  const src = /\n    (var ilDraftFrom = function [\s\S]*?\n    var ilChanges = function \(p, write, notes, task, open\) \{[\s\S]*?\n    \};)\n/.exec(tpl)[1];
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), decideMark = (k) => `<mark-${k}>`;
   const sysButton = (tag, label, attrs) => `<button${attrs}>${label}</button>`;
   const capital = (x) => String(x).charAt(0).toUpperCase() + String(x).slice(1);
   const ilOn = new Function(`return (${/var ilOn = (function \(p\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
   const ilTaskOf = new Function(`return (${/var ilTaskOf = (function \(drafts\) \{[\s\S]*?\n  \});/.exec(tpl)[1]})`)();
   const ilAnsweredBy = (x) => (x.decider ? `<waits>${x.decider.name}</waits>` : '');
-  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', `${src}\nreturn { ilChanges: ilChanges, ilDecided: ilDecided, ilDraftFrom: ilDraftFrom };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy);
+  const isRuleChange = new Function(`return (${/var isRuleChange = (function \(x\) \{[^\n]*\});/.exec(tpl)[1]})`)();
+  return new Function('esc', 'decideMark', 'sysButton', 'capital', 'ENGINE', 'ilOn', 'ilTaskOf', 'ilAnsweredBy', 'isRuleChange', `${src}\nreturn { ilChanges: ilChanges, ilDecided: ilDecided, ilDraftFrom: ilDraftFrom };`)(esc, decideMark, sysButton, capital, ENGINE, ilOn, ilTaskOf, ilAnsweredBy, isRuleChange);
 };
 const loadChanges = () => loadReview().ilChanges;
 const ENGINE = '/rms-design-system-engine-acme';
@@ -27,15 +28,17 @@ const unq = (s) => String(s).replace(/&quot;/g, '"').replace(/&lt;/g, '<').repla
 // chooses, and the words each answer adds to the decision copied (as ilGroupsOf reads them back).
 const groupsOf = (html) => [...html.matchAll(/<div class="sg-il-group-decide" data-il-group="(\w+)"((?: data-il-all-\w+="[^"]*")*)><div class="sg-il-group-head"><strong>([^<]+)<\/strong>([\s\S]*?)(?=<div class="sg-il-group-decide"|<\/div><div class="sg-il-review-copy")/g)].map((m) => ({
   key: m[1], head: m[3], all: Object.fromEntries([...m[2].matchAll(/data-il-all-(\w+)="([^"]*)"/g)].map((a) => [a[1], unq(a[2])])), approveAll: /data-il-all="/.test(m[4]),
-  items: [...m[4].matchAll(/<div class="sg-il-line sg-il-change sg-il-item" data-il-item((?: data-il-\w+="[^"]*")*)><strong>([^<]+)<\/strong>([\s\S]*?)<span class="sg-il-choices" role="group" aria-label="([^"]+)">([\s\S]*?)<\/span><\/div>/g)].map((i) => ({
+  items: [...m[4].matchAll(/<div class="sg-il-line sg-il-change sg-il-item" data-il-item((?: data-il-[\w-]+="[^"]*")*)><strong>([^<]+)<\/strong>([\s\S]*?)<span class="sg-il-choices" role="group" aria-label="([^"]+)">([\s\S]*?)<\/span>(?:<textarea class="sg-input sg-il-edit" data-il-edit data-il-was="([^"]*)"[^>]*>[\s\S]*?<\/textarea>)?<\/div>/g)].map((i) => ({
     head: unq(i[2]), body: i[3], label: unq(i[4]), quiet: m[4].slice(0, i.index).includes('<details'),
     choice: (/data-il-choose="(\w+)" aria-pressed="true"/.exec(i[5]) ?? [])[1] ?? null,
-    choices: [...i[5].matchAll(/data-il-choose="(\w+)"/g)].map((c) => c[1]),
-    steps: Object.fromEntries([...i[1].matchAll(/data-il-(\w+)="([^"]*)"/g)].map((a) => [a[1], unq(a[2])])),
+    choices: [...i[5].matchAll(/data-il-choose="(\w+)"/g)].map((c) => c[1]), tips: Object.fromEntries([...i[5].matchAll(/data-il-choose="(\w+)" aria-pressed="\w+" title="([^"]*)"/g)].map((c) => [c[1], unq(c[2])])),
+    edit: i[6] == null ? null : unq(i[6]), editOpen: i[0].includes('<textarea') && !/<textarea[^>]* hidden>/.test(i[0]),
+    steps: Object.fromEntries([...i[1].matchAll(/data-il-([\w-]+)="([^"]*)"/g)].map((a) => [a[1] === 'change-to' ? 'changeTo' : a[1], unq(a[2])])),
   })),
 }));
 // The decision copied with the answers chosen: by item, in order ('a', 'c', 'd' or null), group by group.
-const decided = (html, ...picks) => loadReview().ilDecided(unq(/data-il-on="([^"]*)"/.exec(html)[1]), groupsOf(html).map((g, gi) => ({ all: g.all, items: g.items.map((it, i) => ({ choice: picks[gi]?.[i] === undefined ? it.choice : ({ a: 'approve', c: 'change', d: 'drop' })[picks[gi][i]] ?? null, steps: it.steps })) })));
+// 'c:<words>' is a change with the person's words, as edited on the page.
+const decided = (html, ...picks) => loadReview().ilDecided(unq(/data-il-on="([^"]*)"/.exec(html)[1]), groupsOf(html).map((g, gi) => ({ all: g.all, items: g.items.map((it, i) => { const k = picks[gi]?.[i]; return { choice: k === undefined ? it.choice : ({ a: 'approve', c: 'change', d: 'drop' })[String(k ?? '').split(':')[0]] ?? null, to: String(k ?? '').split(':').slice(1).join(':'), steps: it.steps }; }) })));
 
 test('the drafts are in the What to do card under New text for the page, grouped apart, each once, each with its own decision', () => {
   assert.match(tpl, /card\('What to do', todo \|\| task\)/);
@@ -46,14 +49,18 @@ test('the drafts are in the What to do card under New text for the page, grouped
     { where: 'Do and don\'t', text: 'Do: dock it to the bottom.' },
     { where: 'Limitations', text: 'Does not show loading by itself.' },   // the same draft again
   ] });
-  assert.match(html, /^<p class="sg-il-line">Approve, change or drop each one, then copy your decisions into Claude Code\. Agents won't use the drafts until you decide\.<\/p>/);
+  assert.match(html, /^<p class="sg-il-line">Approve, change or drop each one, then copy your decisions into Claude Code\. One left undecided stays as it is\. Agents won't use the drafts until you decide\.<\/p>/);
   const g = groupsOf(html);
   assert.deepEqual(g.map((x) => x.head), ['New text for the page (3)'], 'one group, its count in its heading');
   assert.deepEqual(g[0].items.map((x) => x.head), ['Limitations', 'Limitations', 'Do and don\'t']);
   assert.equal((html.match(/pg-par-val">Does not show loading/g) ?? []).length, 1, 'the same draft once');
   assert.ok(g[0].approveAll, 'an Approve all for the group');
   assert.ok(g[0].items.every((x) => x.choices.join() === 'approve,change,drop' && x.choice === null), 'each draft its own approve, change and drop, none chosen yet');
-  assert.deepEqual(g[0].items[1].steps, { approve: 'Approve the draft "Takes at most two buttons."', change: 'Change the draft "Takes at most two buttons.": ask me for my words', drop: 'Drop the draft "Takes at most two buttons."' });
+  assert.deepEqual(g[0].items[1].steps, { approve: 'Approve the draft "Takes at most two buttons."', change: 'Change the draft "Takes at most two buttons.": ask me for my words', drop: 'Drop the draft "Takes at most two buttons."', changeTo: 'Change the draft "Takes at most two buttons." to "{to}"' });
+  assert.deepEqual([g[0].items[1].edit, g[0].items[1].editOpen], ['Takes at most two buttons.', false], 'its words to edit, shown once Change is pressed');
+  assert.deepEqual(g[0].items[1].tips, { approve: 'Agents use it as written from the next run.', change: 'Edit the words below; the decision copied carries them.', drop: 'It is deleted; no agent ever gets it.' }, 'what each does, as its tip');
+  assert.equal((html.match(/data-il-copy-review/g) ?? []).length, 1, 'one Copy for the whole panel');
+  assert.doesNotMatch(html, /data-il-copy="/, 'no Copy per item or per answer');
   assert.match(html, /<code data-il-preview><\/code><button data-il-copy-review>Copy decisions<\/button>/, 'one Copy for every decision made, nothing decided yet');
   assert.doesNotMatch(html, /sg-decide-grid|Approve all 3, change one|Drop all</, 'no single choice for everything any more');
 });
@@ -68,7 +75,9 @@ test('each draft is decided on its own, and the decision copied carries every on
   const one = loadChanges()({ name: 'error', file: 'e.json', drafts: [{ where: 'Limitations', text: 'Use an inline error.' }] });
   assert.match(one, /Approve, change or drop it, then copy your decision into Claude Code\./);
   assert.equal(decided(one, ['a']), '/rms-design-system-engine-acme on Component error, Approve its draft.');
-  assert.equal(decided(one, ['c']), '/rms-design-system-engine-acme on Component error, Change the draft "Use an inline error.": ask me for my words.');
+  assert.equal(decided(one, ['c']), '/rms-design-system-engine-acme on Component error, Change the draft "Use an inline error.": ask me for my words.', 'words left as they were: asked for');
+  assert.equal(decided(one, ['c:Use an inline error under the field.']), '/rms-design-system-engine-acme on Component error, Change the draft "Use an inline error." to "Use an inline error under the field.".', 'the words as edited on the page');
+  assert.match(tpl, /var to = ed \? String\(ed\.value \|\| ''\)\.replace\(\/\\s\+\/g, ' '\)\.trim\(\) : '';/, 'the panel reads the words as edited');
   assert.ok(!/\.json|\.md|--/.test(decided(html, ['a', 'd', 'c'])), 'no file, no flag');
 });
 
@@ -102,28 +111,35 @@ test('the changes to rules are a group of their own, apart from the drafts; one 
   assert.match(unq(html), /<code data-il-preview>\/rms-design-system-engine-acme on Component Tile, No to "Rewrite the rule “Use it sparingly” as: Use at most one Tile per screen\."\.<\/code>/, 'the folded no is decided already');
   assert.equal(decided(html, ['a'], ['a', undefined]), '/rms-design-system-engine-acme on Component Tile, Approve its draft; then Yes to "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen."; then No to "Rewrite the rule “Use it sparingly” as: Use at most one Tile per screen.".');
   assert.equal(decided(html, [null], ['c', 'a']), '/rms-design-system-engine-acme on Component Tile, Change "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen.": ask me for my words; then Yes to "Rewrite the rule “Use it sparingly” as: Use at most one Tile per screen.".');
-  // A rule change is decided here only: never again under Proposal, nor as a yes or no in the page's task.
-  assert.match(tpl, /var ilOpen = function \(p\) \{ return ilOwn\(p\)\.filter\(function \(x\) \{ return x\.answer !== 'no' && !isRuleChange\(x\); \}\); \};/);
+  assert.equal(decided(html, [null], ['c:At most 2 Tiles on one screen.', undefined]), '/rms-design-system-engine-acme on Component Tile, Change "Hold the rule “Only one Tile per screen” as a check: At most 1 Tile on one screen." to "At most 2 Tiles on one screen."; then No to "Rewrite the rule “Use it sparingly” as: Use at most one Tile per screen.".', 'a rule changed in the person\'s own words');
+  assert.equal(hold.edit, 'At most 1 Tile on one screen.', 'its words to edit are the change proposed');
+  // A rule change is decided here only: never again under Proposal.
   assert.match(tpl, /var list = ilOwn\(p\)\.filter\(function \(x\) \{ return !isRuleChange\(x\); \}\);/);
-  assert.match(tpl, /ilChanges\(p, c\.write, c\.notes, own \? ilTodo\(own, true\) : c\.todo, ilRulesOpen\(p\)\)/);
+  assert.match(tpl, /ilChanges\(p, c\.write, c\.notes, own \? ilTodo\(own, true\) : c\.todo, ilOpen\(p\)\)/);
 });
 
-test('the panel keeps each item\'s decision: a second press takes it back, Approve all leaves what is folded away', () => {
-  assert.match(tpl, /if \(!was\) ch\.setAttribute\('aria-pressed', 'true'\); show\(\); return;/);
-  assert.match(tpl, /if \(it\.closest\('\.sg-il-quiet'\)\) return;/);
+test('the panel keeps each item\'s decision: a second press takes it back, Change opens its words, Approve all leaves what is folded away', () => {
+  assert.match(tpl, /press\(ch\.closest\('\[data-il-item\]'\), ch\.getAttribute\('aria-pressed'\) === 'true' \? null : k\); if \(ed && !ed\.hidden\) ed\.focus\(\);/);
+  assert.match(tpl, /var ed = it\.querySelector\('\[data-il-edit\]'\); if \(ed\) ed\.hidden = k !== 'change';/);
+  assert.match(tpl, /if \(!it\.closest\('\.sg-il-quiet'\)\) press\(it, 'approve'\);/);
+  assert.match(tpl, /detail\.oninput = function \(e\) \{ if \(e\.target\.closest\('\[data-il-edit\]'\)\) showIn/, 'the decision copied follows the words as they are typed');
   assert.match(tpl, /if \(!text\) \{ said\.textContent = 'Choose approve, change or drop for one at least first\.'; return; \} copyText\(text, rc, said, 'Paste it in Claude Code'\);/);
 });
 
-test('a draft\'s words are quoted so a shell runs the command as written, backticks and quotes included', () => {
-  const src = /var shq = (function \(s\) \{[^\n]*\});/.exec(tpl)[1];
-  const shq = new Function(`return (${src})`)();
-  const line = "Takes at most two buttons in `buttons`; it's the footer";
-  const out = execFileSync('/bin/sh', ['-c', `printf %s ${shq(line)}`], { encoding: 'utf8' });
-  assert.equal(out, line, 'nothing in it is run or lost');
-});
-
-test('a "when to use" draft also answers the "which component?" test, so it is not also still to write', () => {
-  assert.match(tpl, /if \(drafted\['When to use'\]\) drafted\['When to use it, not a sibling'\] = 1;/);
+test('every other proposal has the same three actions, with what each answer does as its tip, and no Copy of its own', () => {
+  const recheck = { kind: 'recheck', subject: 'newThing', proposal: 'Does the answer no to "Write its page." still hold for newThing as it is now?', options: [{ answer: 'yes', label: 'It still holds', does: 'Recorded as confirmed.' }, { answer: 'no', label: 'Withdraw it', does: 'The decision is withdrawn and its question asked again.' }], decider: { name: 'Tiles team' } };
+  const fix = { kind: 'fix', subject: 'searchRow', proposal: 'Keep it: it names a part in the code.', yes: 'The sentence stays as it is.', no: 'The sentence is written again.', split: true };
+  const html = loadChanges()({ recheckFor: 'newThing' }, [], [], '', [recheck, fix]);
+  const g = groupsOf(html);
+  assert.deepEqual(g.map((x) => x.head), ['Decisions about the page (2)']);
+  const [a, b] = g[0].items;
+  assert.deepEqual([a.head, a.choices.join()], ['A decision to review again', 'approve,change,drop']);
+  assert.deepEqual([a.tips.approve, a.tips.drop], ['Recorded as confirmed.', 'The decision is withdrawn and its question asked again.']);
+  assert.match(b.body, /searchRow: Keep it: it names a part in the code\.<\/span><span class="sg-il-source">The evidence is split: a person decides\.<\/span>/);
+  assert.equal(decided(html, ['a', 'c:Keep it, and say it is internal.']), '/rms-design-system-engine-acme on Component newThing, Yes to "Does the answer no to "Write its page." still hold for newThing as it is now?"; then Change "Keep it: it names a part in the code." to "Keep it, and say it is internal.".');
+  assert.equal(decided(html, ['d', 'd']), '/rms-design-system-engine-acme on Component newThing, No to "Does the answer no to "Write its page." still hold for newThing as it is now?"; then No to "Keep it: it names a part in the code.".');
+  assert.doesNotMatch(html, /If yes|If no|data-il-copy="/, 'no block and no Copy per answer');
+  assert.doesNotMatch(tpl, /var ilIfNot = |var ilAnswer = /, 'the answers with a Copy each are gone');
 });
 
 test('every other change a page asks for is in What to do too, under Other changes, each with its own decision', () => {
@@ -182,8 +198,7 @@ test('a decision copied names the task that wrote the drafts, and the page by it
   assert.equal(decided(loadChanges()({ action: 'write', absent: {} }, [{ what: 'What to do when no component fits', html: '' }], []), ['a']), '/rms-design-system-engine-acme on the System page, Write "What to do when no component fits" as drafts I review.');
 });
 
-test('the proposals and the part questions are copied in words too', () => {
-  assert.match(tpl, /var cmd = function \(a\) \{ return ENGINE \+ ' on ' \+ ilOn\(p\) \+ ', ' \+ \(a === 'yes' \? 'Yes' : a === 'no' \? 'No'/);
+test('the part questions are copied in words too', () => {
   assert.match(tpl, /var run = function \(to\) \{ return ENGINE \+ ' on Component ' \+ c\.name \+ ', ' \+ \(to === 'none' \? 'It is its own component' : 'It is a part of Component ' \+ to\); \};/);
   assert.doesNotMatch(tpl, /'rms-design-system-engine --(intent-decide|review-drafts|part) /, 'no copied decision names a flag');
 });
