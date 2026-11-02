@@ -80,3 +80,31 @@ test('--prototype <page> --handoff: the page a developer gets, written whatever 
   const md = readFileSync(join(dir, 'prototypes', 'SignIn.handoff.md'), 'utf8');
   assert.match(md, /Field|Button/, 'it opens with what the page is made of');
 });
+
+// A state the page owes is not a note. The page is drawn all the same - the one somebody still has to finish is
+// exactly the one worth looking at - and the run comes back unfinished, with the state named. Measured against the
+// documentation alone, the empty list and the form with a mistake in it were the lines agents skipped most after
+// inventing, with those very lines in the page's own instructions. As advice they were skipped.
+test('a state the page owes: made of the system, and not ready; said why, it is ready', { timeout: budget(300000) }, () => {
+  const dir = project();
+  const r = run(dir, '--prototype', 'prototypes/SignIn.jsx', '--no-browser');
+  const out = `${r.stdout}${r.stderr}`;
+  assert.equal(r.status, 1, out.slice(0, 500));
+  assert.match(out, /❌ Not ready: 1 state the page owes\./);
+  assert.match(out, /^✓ Made of the system:/m, 'never Ready and Not ready at once: the two read as finished and unfinished together');
+  assert.doesNotMatch(out, /^✅ Ready/m);
+  assert.match(out, /data-no-error="<why>"/, 'it says how to say the page needs none');
+
+  // The way out, which has to work or the check gets turned off, and which costs a reason.
+  const page = join(dir, 'prototypes', 'SignIn.jsx');
+  writeFileSync(page, readFileSync(page, 'utf8').replace('<Field label="Email" />', '<Field label="Email" data-no-error="the form only opens a link, it never submits" />'));
+  const said = run(dir, '--prototype', 'prototypes/SignIn.jsx', '--no-browser');
+  assert.equal(said.status, 0, `${said.stdout}`.slice(0, 500));
+  assert.match(`${said.stdout}`, /^✅ Ready:/m);
+
+  // A reason too thin to be one is not a reason.
+  writeFileSync(page, readFileSync(page, 'utf8').replace('data-no-error="the form only opens a link, it never submits"', 'data-no-error="no"'));
+  const thin = run(dir, '--prototype', 'prototypes/SignIn.jsx', '--no-browser');
+  assert.equal(thin.status, 1);
+  assert.match(`${thin.stdout}`, /data-no-error says this page needs no error state: say why in it/);
+});

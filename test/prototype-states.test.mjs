@@ -81,7 +81,12 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
     { component: 'field', props: {} }, { component: 'button', props: { Label: 'Save' } }],
     states: { empty: { chips: { component: 'Text', props: { text: 'No filters yet' } } } } }));
   let r = run('--prototype', 'prototypes/filters.json');
-  assert.equal(r.status, 0, r.stdout);
+  // Drawn, and not ready. A state the page owes is neither an error nor a note: everything below is drawn and
+  // measured, and the run comes back unfinished, because a check that only advises is a check that gets skipped.
+  // Measured against the documentation alone, the empty list and the form with a mistake in it were the lines
+  // agents skipped most after inventing, with those very lines in the page's own instructions.
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /❌ Not ready: 1 state the page owes \(error\)\./);
   assert.match(r.stdout, /⚠️ {2}no error state, and the page owes one \(it takes input \(field\) and sends it \(button\)\)/);
   assert.match(r.stdout, /🎨 DESIGN REVIEW {2}\d+\/10/, 'the page is reviewed as drawn');
   assert.match(r.stdout, /📱 EVERY SIZE AND STATE {2}Phone 375, Tablet 768, Desktop 1280 · 2 states \(default, empty\)/);
@@ -91,6 +96,20 @@ test('--prototype draws each state, owes the states the page lacks, and tries ev
   assert.ok(last.gaps.some((g) => g.kind === 'state' && g.need === 'error state'));
   assert.ok(last.gaps.some((g) => g.kind === 'fit' && /Weekly summary/.test(g.line)));
   assert.match(readFileSync(join(dir, '.design-system-engine-out', 'prototypes', 'filters.html'), 'utf8'), /"states":\[\{"name":"empty"/);
+
+  // The way out: a state written as a sentence is one this page does not need, and the sentence is why. A check a
+  // page cannot satisfy honestly is a check people turn off.
+  const said = JSON.parse(readFileSync(join(dir, 'prototypes', 'filters.json'), 'utf8'));
+  writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ ...said, states: { ...said.states, error: 'the save never fails here: it only closes the panel' } }));
+  r = run('--prototype', 'prototypes/filters.json', '--no-browser');
+  assert.equal(r.status, 0, r.stdout);
+  assert.doesNotMatch(r.stdout, /Not ready/);
+  // A reason too thin to be one is not a reason.
+  writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify({ ...said, states: { ...said.states, error: 'no' } }));
+  r = run('--prototype', 'prototypes/filters.json', '--no-browser');
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /state "error" is written as a sentence, so it is one this page does not need: say why in it/);
+  writeFileSync(join(dir, 'prototypes', 'filters.json'), JSON.stringify(said));
 
   writeFileSync(join(dir, 'prototypes', 'wrong.json'), JSON.stringify({ component: 'Page', children: [{ component: 'button', props: { Label: 'Go' } }], states: { empty: { nowhere: null } } }));
   r = run('--prototype', 'prototypes/wrong.json', '--no-browser');

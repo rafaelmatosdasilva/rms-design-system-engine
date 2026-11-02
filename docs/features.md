@@ -199,6 +199,17 @@ How it checks the agent's work, in a loop, before you see it:
 - Follows what your team already decided, and never uses a retired component.
 - Holds a new page to how your product's **real pages** are built, not only to the prototypes drawn so far: which components a page holds and in what order, what each action is called, where the actions go. A project on its first day has no prototypes and no designed screens, but it has its pages. Only what the code says for certain is taken; spacing and text styles are never guessed from it.
 
+**A state the page owes is not a note.** A page that shows a list owes an empty state; one that takes input owes an error state. The engine worked both out and said so — as advice — and advice gets skipped. We measured it: given the documentation alone, with those very lines in the page's own instructions, agents skipped the empty list and the form-with-a-mistake more often than anything except inventing.
+
+So the page is now **drawn and not ready**. Drawn, because the page somebody still has to finish is exactly the one worth looking at — every size, every state, the pictures, the review. Not ready, because the run comes back unfinished and names the state.
+
+There is an honest way out, which there has to be, and it costs a reason:
+
+- in a composition, `"states": { "empty": "this list always has the three plans" }` — a state written as a sentence is one this page does not need, and the sentence is why;
+- in a page of code, `data-no-empty="this list always has the three plans"`.
+
+A reason too thin to be one is not taken. *A check a page cannot satisfy honestly is a check people turn off.* A starting point read from a designed screen is excused everything: it is incomplete on purpose, and failing it for not being finished is the same mistake pointing the other way.
+
 **Is it actually getting better?** Ask `are our prototypes getting better?` and the whole loop is on one screen:
 
 1. The **patterns** a new page is held to.
