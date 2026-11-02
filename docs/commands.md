@@ -80,4 +80,5 @@ Name a component the way your system does (button primary, Button Primary and pr
 |---|---|
 | `/rms-design-system-engine remember this lesson: the clock button was put inside the tile, because a tile holds one action` | Your correction kept with your reason, and the strongest guard that can hold it (a check, a step agents read, or a rule for your guidelines), written once you say yes |
 | `/rms-design-system-engine show the lessons` | Every lesson and what it became, the rules proposed from findings that repeat, and the lines an AI wrote that a person changed since |
+| `/rms-design-system-engine are our prototypes getting better?` | The whole loop on one screen: the patterns a new page is held to, what agents got wrong and whose fault each was, what was written, what is left for a person, and whether the number is falling |
 | `/rms-design-system-engine judge the Showroom screens with a model` | Each screen judged on its screenshot and its code: the right component, one main action, nothing destructive in front, laid out as its brief says. Advisory, with what it cost (uses your model tokens) |

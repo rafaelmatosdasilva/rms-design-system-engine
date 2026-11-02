@@ -197,6 +197,18 @@ How it checks the agent's work, in a loop, before you see it:
 - Holds pages to each other: the same padding, text styles and action names, never Save on one and Submit on another.
 - Checks your team's rules, such as one main button per screen, and the flows your guidelines describe.
 - Follows what your team already decided, and never uses a retired component.
+- Holds a new page to how your product's **real pages** are built, not only to the prototypes drawn so far: which components a page holds and in what order, what each action is called, where the actions go. A project on its first day has no prototypes and no designed screens, but it has its pages. Only what the code says for certain is taken; spacing and text styles are never guessed from it.
+
+**Is it actually getting better?** Ask `are our prototypes getting better?` and the whole loop is on one screen:
+
+1. The **patterns** a new page is held to.
+2. The **mistakes**, split into the half your documentation owed and the half the agent did not follow.
+3. What was **written** into the intent layer, and what is still owed.
+4. What is **left for a person**, with where to write it.
+5. Whether it is **improving** — mistakes a page, early against late, and whether the documentation's share of them is falling. That last number is the loop working.
+6. Whether agents are **reading** a component's card before using it.
+
+Two things it will not do. It never shows a zero where it means *not yet*: a step with nothing yet says what to run instead, because a zero and *not yet* look the same and mean opposite things. And under twelve checks it refuses to draw a trend and says so — two runs are not a trend, and a tool that draws one from two runs is a tool that says the opposite next week.
 
 ## Publish a living style guide
 

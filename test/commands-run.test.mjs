@@ -48,7 +48,7 @@ const COMMANDS = [
   // itself needs a project whose system is built, and has its own test (page-report-cli.test.mjs) - this sweep
   // reached every flag of --prototype and never the page, which is how it crashed on every project for a week.
   '--check-ui apps/demo/src/App.vue', '--prototype apps/demo/src/App.vue --no-browser',
-  '--prototype --catalog', '--prototype --rules', '--prototype --coverage',
+  '--prototype --catalog', '--prototype --rules', '--prototype --coverage', '--prototype --loop',
   '--prototype --consistency', '--prototype --flow', '--baseline', '--checked', '--ci-changed', '--a11y-no-worse', '--contract-changes', '--code-connect-draft', '--code-connect',
   '--contracts-out', '--docs', '--extract', '--intent', '--profile-export', '--rename-sweep', '--review-drafts',
   '--showroom-compare', '--update', '--check-update', '--from-figma-cli', '--figma-screens', '--figma-effects',
