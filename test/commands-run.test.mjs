@@ -43,7 +43,7 @@ const COMMANDS = [
   '--duplication', '--agent-rules', '--annotation-categories', '--check-intent', '--code-drift',
   '--contract-completeness', '--exemption-debt', '--guidance-rating', '--guide-status', '--readmes', '--route',
   '--stores', '--styleguide-check', '--tailwind', '--unchecked', '--prune', '--figma-edits', '--query chip',
-  '--check-ui apps/demo/src/App.vue', '--prototype --catalog', '--prototype --rules', '--prototype --coverage',
+  '--check-ui apps/demo/src/App.vue', '--prototype --catalog', '--prototype --rules', '--prototype --coverage', '--prototype --loop',
   '--prototype --consistency', '--prototype --flow', '--baseline', '--checked', '--ci-changed', '--a11y-no-worse', '--contract-changes', '--code-connect-draft', '--code-connect',
   '--contracts-out', '--docs', '--extract', '--intent', '--profile-export', '--rename-sweep', '--review-drafts',
   '--showroom-compare', '--update', '--check-update', '--from-figma-cli', '--figma-screens', '--figma-effects',
