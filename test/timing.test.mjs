@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
+import { tempDir } from './helpers.mjs';
 import { join } from 'node:path';
 import * as timing from '../lib/timing.mjs';
 
@@ -14,7 +14,7 @@ test('a run\'s phases and scripts are timed, written beside the last run\'s, and
   const t = timing.timings();
   assert.deepEqual(t.steps.map((s) => s.name), ['first', 'waited']);
   assert.ok(t.steps[1].ms >= 25);
-  const root = mkdtempSync(join(tmpdir(), 'timing-'));
+  const root = tempDir('timing-');
   timing.writeTiming(root, 'out', 'audit');
   timing.writeTiming(root, 'out', 'audit');
   const saved = JSON.parse(readFileSync(join(root, 'out', 'timing.json'), 'utf8'));
