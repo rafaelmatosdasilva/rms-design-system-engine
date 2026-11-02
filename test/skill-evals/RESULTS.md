@@ -1,5 +1,24 @@
 # Skill evaluation results
 
+## 2026-11: The fork the recipe buried: which kind of file this project writes (continuous evaluation)
+
+What changed since the entry below (engine 0191718): Style guide: the corner card's drawing sized to its box, centered and a little smaller, never over its caption (#258); Features page: Fit your team's setup is in early development (#259); A large commit GitLab's gateway turns down is sent again, and looked for longer (#261); Setup ends with a first result; a commit warns, a push refuses; accessibility caught in Figma (#260); Features page: Fit your team's setup is actively improving (#262); Each prototype carries its own evaluation, and each component shows what was built with it (#263); A write GitLab turns down says why, in GitLab's own words (#264); A file that is not a composition is told so once, not symptom by symptom (#266); The style guide's pictures are files of their own, so the page shows in a quarter of the time (#267); A component named with a note in brackets no longer stops the style guide's sweep (#268); Git hooks for a project at the top of its repository get no stray cd on macOS (#270); Releases follow what merged: started when a change is worth it, a backstop every third day (#272); Features page: Fit your team's setup is in early development (#269); A store's write can tell a CI the git host cannot reach (#271); The fork the recipe buried: which kind of file this project writes. The guide changed in `cookbook/prototype.md`.
+
+Guide set measured: `586da3b985b6` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md bb6170bf` `cookbook/figma-edits.md 469513fc` `cookbook/first-setup.md f9e8c07e` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 99e2f8b4` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md 5dcba26d` `cookbook/publish-styleguide.md 8d37d60a` `cookbook/refresh-figma.md 3d4c5584` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md 28f54976` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 7f1584bf` `reference/usage.md 0462e399` `rms-design-system-engine.md 0f804311`
+
+**The agent's command line changed.** The agent's command line bundles other skills than in the runs before (2.1.316 → 2.1.301; removed schedule): a change in the results may come from them, not from the guide.
+
+| Haiku, engine 98c23d4 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.055 | $0.037 |
+| Input a run | 92k | 81k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 81k a run against 92k. no task changed state, and no run moved: the same result. Records: `records/2026-11-02-the-fork-the-recipe-buried`.
+
 ## 2026-11: Guide: first result after setup, git's hooks, accessibility the design owes (continuous evaluation)
 
 What changed since the entry below (engine d0594f9): setup ends with --first-result; the hooks recipe and usage tell git's pre-commit and pre-push (--git-check: commit warns, push refuses, only for what the change uses); the Figma accessibility block and its frame on the design team's to-do page. The guide changed in `rms-design-system-engine.md`.
