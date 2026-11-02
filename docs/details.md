@@ -952,6 +952,7 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. The back
 - **One round at a time.** A lock file stops a second round while one runs.
 - **One line a round** in `.design-system-engine-out/watch.log`: what moved, what ran, how long, and whether it published.
 - **One round now.** `--watch --once` (or `--auto --once`) runs one round and stops, for a scheduler of your own.
+- **Never two at once.** An audit, a build or a publish you start while a round runs waits for it to end first, so the two never write the same files or share the computer.
 - **No token is stored.** Each step reads them from the project's `.env`, as every run does.
 - **`--guide-status`** says whether the watch is on (and why not, when it is off), and what its last round did.
 

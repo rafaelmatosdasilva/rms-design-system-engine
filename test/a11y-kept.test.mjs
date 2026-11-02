@@ -87,6 +87,9 @@ test('a part checked again says why: the check, the page CSS, a component by nam
   assert.deepEqual(w, { checked: 4, run: 1, css: 1, components: ['cardTile'], fresh: 1 });
   assert.equal(whyCheckedLine(w), "4 parts checked again: the check or its settings changed (1); the page's CSS changed (1); 1 component changed (cardTile); not checked before (1)");
   assert.equal(whyCheckedLine(whyChecked([], was)), '');
+  // An older entry for the same components is not the one compared: the newest is.
+  const older = { old: { at: '2026-01-01', parts: { run: 'r', base: 'b', comp: { chip: 'c0' } } }, now: { at: '2026-02-01', parts: { run: 'r', base: 'b', comp: { chip: 'c1' } } } };
+  assert.deepEqual(whyChecked([t({ chip: 'c1' }, { parts: { run: 'r', base: 'B', comp: { chip: 'c1' } } })], older).css, 1);
 });
 
 test('the project is signed by its files, less the packages, what the engine writes and the configuration', () => {
