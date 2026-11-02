@@ -93,3 +93,47 @@ test('published: the page and what it links, never the rest of its folder', () =
   assert.ok(!existsSync(join(pub, 'notes.txt')));
   assert.deepEqual(pageData(join(pub, 'index.html')), DATA);
 });
+
+// A picture's bytes as the data carries them: one large enough to go in a file of its own, one small enough to stay.
+const bigPicture = (seed) => `data:image/png;base64,${Buffer.alloc(3000, seed).toString('base64')}`;
+const smallPicture = `data:image/png;base64,${Buffer.alloc(40, 7).toString('base64')}`;
+const withPictures = (seed = 1) => ({ ...DATA, components: [{ ...DATA.components[0], figmaShots: [{ src: bigPicture(seed), w: 10, h: 10 }, { src: bigPicture(seed), w: 10, h: 10 }], icon: smallPicture }] });
+const pageWith = (data) => page(JSON.stringify(data).replace(/</g, '\\u003c'));
+
+test('a picture in the data goes into a file of its own, named by its bytes; a small one stays; read back, the data is the same', () => {
+  const { files } = splitPage(pageWith(withPictures()), 'index');
+  const pictures = [...files.keys()].filter((f) => f.startsWith('assets/img/'));
+  assert.equal(pictures.length, 1, 'the same picture twice is one file');
+  assert.match(pictures[0], /^assets\/img\/[0-9a-f]{10}\.png$/);
+  assert.deepEqual(files.get(pictures[0]), Buffer.alloc(3000, 1));
+  const data = [...files.entries()].find(([f]) => /\.data\./.test(f))[1];
+  assert.ok(!data.includes('data:image/png;base64,AQEB'), 'the large picture left the data');
+  assert.ok(data.includes(smallPicture), 'the small one stayed');
+  assert.equal(data.split(`"${pictures[0]}"`).length - 1, 2, 'the data names it where it was');
+  const d = tempDir('sg-files-');
+  writeStyleguide(join(d, 'index.html'), pageWith(withPictures()));
+  assert.ok(existsSync(join(d, pictures[0])));
+  assert.deepEqual(pageData(join(d, 'index.html')), withPictures(), 'whatever reads the page back gets the pictures written in');
+});
+
+test('pictures: published and copied with the page that names them; an older build\'s removed, never one a page may still name', () => {
+  const d = tempDir('sg-files-');
+  const first = writeStyleguide(join(d, 'index.html'), pageWith(withPictures(1)));
+  const old = first.files.find((f) => f.startsWith('assets/img/'));
+  writeStyleguide(join(d, 'button.html'), pageWith(withPictures(2)));   // a page of one component, with its own picture
+  const second = writeStyleguide(join(d, 'index.html'), pageWith(withPictures(3)));
+  const now = second.files.find((f) => f.startsWith('assets/img/'));
+  assert.ok(!existsSync(join(d, old)), 'the first build\'s picture is gone');
+  assert.ok(existsSync(join(d, now)));
+  assert.equal(readdirSync(join(d, 'assets/img')).length, 2, 'the other page keeps its own picture');
+  assert.ok([...pageFiles(join(d, 'index.html')).keys()].includes(now), 'the store is sent the picture');
+  const pub = join(d, 'public');
+  assert.ok(copyPage(join(d, 'index.html'), pub).includes(now), 'the Pages job copies it');
+  assert.deepEqual(pageData(join(pub, 'index.html')), withPictures(3));
+  // A page whose data cannot be read may still name a picture: none is removed then.
+  const buttonData = readdirSync(join(d, 'assets')).find((f) => /^button\.data\./.test(f));
+  writeFileSync(join(d, 'assets', buttonData + '.keep'), readFileSync(join(d, 'assets', buttonData)));
+  writeFileSync(join(d, 'button.html'), readFileSync(join(d, 'button.html'), 'utf8').replace(buttonData, 'button.data.0123456789.js'));
+  writeStyleguide(join(d, 'index.html'), pageWith(withPictures(4)));
+  assert.equal(readdirSync(join(d, 'assets/img')).length, 3, 'nothing removed while a page\'s data is missing');
+});

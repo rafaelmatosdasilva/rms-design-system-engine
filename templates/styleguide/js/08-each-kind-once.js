@@ -339,7 +339,7 @@
     hr(); navLink('in-use', 'in use');
     var iu = section('in-use', 'In use', 'The system in use', 'Screens built with the system.');
     var sc = document.createElement('div'); sc.className = 'sg-screens'; iu.appendChild(sc);
-    DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
+    DATA.screens.forEach(function (s) { var f = document.createElement('figure'); f.className = 'sg-screen'; f.innerHTML = '<img loading="lazy" alt="" src="' + esc(s.src) + '"><figcaption>' + esc(s.caption || '') + '</figcaption>'; sc.appendChild(f); });
   }
   // Templates: each page frame Figma composes of the system's components (DATA.templates), what it is made of in Figma's
   // order, whether its code uses each one, and the frame it comes from. A component with a page of its own is linked.
@@ -367,7 +367,7 @@
       if (!t.picture && t.pictureWhy) notes.push('No picture of the frame: ' + esc(t.pictureWhy) + '.');
       a.innerHTML = '<h3>' + esc(t.name) + '</h3>' + (meta.length ? '<p class="sg-template-meta">' + meta.join(' · ') + '</p>' : '') +
         '<div class="sg-template-body' + (t.picture ? '' : ' sg-template-body--parts') + '">' +
-          (t.picture ? '<figure class="sg-screen"><img alt="' + esc(t.name) + ' in Figma" src="' + esc(t.picture.src) + '"' + (t.picture.w ? ' width="' + Math.round(t.picture.w) + '" height="' + Math.round(t.picture.h) + '"' : '') + '><figcaption>The frame in Figma</figcaption></figure>' : '') +
+          (t.picture ? '<figure class="sg-screen"><img loading="lazy" alt="' + esc(t.name) + ' in Figma" src="' + esc(t.picture.src) + '"' + (t.picture.w ? ' width="' + Math.round(t.picture.w) + '" height="' + Math.round(t.picture.h) + '"' : '') + '><figcaption>The frame in Figma</figcaption></figure>' : '') +
           '<div>' + list + notes.map(function (n) { return '<p class="sg-template-note">' + n + '</p>'; }).join('') + '</div>' +
         '</div>';
       tl.appendChild(a);
