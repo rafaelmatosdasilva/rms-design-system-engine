@@ -854,13 +854,11 @@ A page's panel on the Documentation page holds every change it asks for, in grou
 | Decisions about the page | Its other proposals: a page to write, a name to keep, a part's page, a page or a decision to review again |
 | Other changes | What is still to write, a part's page to move, notes no agent reads |
 
-- **Three actions per item, no more.** Approve, Change or Drop. What a yes or a no does is the button's tip. A second press takes the choice back. An item left undecided stays as it is.
-- **Change edits in place.** It opens the item's own words to edit. The decision copied carries your words as you left them.
-- **Approve all, per group.** It approves what the group shows, never what is folded away.
-- **One Copy for all of it.** No item has a Copy of its own. The one at the end carries every choice, in plain words, and shows above its button as you choose. Every draft approved is said at once ("Approve all 3 drafts").
+- **One action per group.** Each group has one button, Approve all, for everything it shows (never what is folded away). It copies the decision in plain words for you to paste into Claude Code ("Approve all 3 drafts"). What you leave stays as it is.
+- **One draft per section.** The engine drafts one line for each section a page lacks, never a second for the same section, and never a line the page already says.
 - **Each draft beside its source.** The props it names, as the code has them (its file and the values each takes), and the line it says again, on the page or in Figma's notes or the code's comment.
 - **A name only Figma has is flagged.** A Figma property the code does not take, written as a prop, is shown as a warning on its draft. The engine's own drafts never write one: they say what the code does, or call it Figma's.
-- **A rewrite is offered for it.** A draft written before that names one gets a proposed rewrite. It calls the property Figma's and says what carries it in the code: a prop of the same name, or the prop or field the code's own comment says shows it. Press Change and the words open with the rewrite, to keep or edit. Listing the drafts in Claude Code shows the same rewrite.
+- **A rewrite is offered for it.** A draft written before that names one gets a proposed rewrite. It calls the property Figma's and says what carries it in the code: a prop of the same name, or the prop or field the code's own comment says shows it. The review shows it under the draft, and listing the drafts in Claude Code shows it too, ready to take as it is or edit.
 
 ### Pages to write, most used first
 

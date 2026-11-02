@@ -233,7 +233,7 @@ test('what else a component page lacks: its role and an example written from the
   const asked = [];
   draftPlan(plan, facts, (prompt) => { asked.push(prompt); return JSON.stringify({ '0.d': { mistakes: ['Using `chipOne` for a list of links; use a link instead.'], limitations: ['It takes one choice only.'], example: 'never asked', doDont: ['Do: keep its label short.', "Don't: put two chips' choices in one."] } }); });
   assert.match(asked[0], /"need": \[\s*"mistakes",\s*"limitations",\s*"doDont"\s*\]/, 'its role and an example are never asked');
-  assert.deepEqual(plan[0].drafted.map((d) => `${d.sure ? 'sure ' : ''}${d.where}: ${d.text}`), ['sure Role: Role: button', 'sure Example: `<ChipOne size="s" />`', 'Common mistakes: Using `chipOne` for a list of links; use a link instead.', 'Limitations: It takes one choice only.', "Do and don't: Do: keep its label short.", "Do and don't: Don't: put two chips' choices in one."]);
+  assert.deepEqual(plan[0].drafted.map((d) => `${d.sure ? 'sure ' : ''}${d.where}: ${d.text}`), ['sure Role: Role: button', 'sure Example: `<ChipOne size="s" />`', 'Common mistakes: Using `chipOne` for a list of links; use a link instead.', 'Limitations: It takes one choice only.', "Do and don't: Do: keep its label short."]);
   const md = applyPlan(plan, new Map([['specs/chip-one.md', '# Chip One\n\n- Source: `src/chips/ChipOne.vue`\n\n## Purpose\n\nA chip for one choice.\n']])).files.get('specs/chip-one.md');
   assert.match(md, /## Role\n\n- Role: button\n/, 'from the code: no Draft marker');
   assert.match(md, /## Example\n\n- `<ChipOne size="s" \/>`/);
