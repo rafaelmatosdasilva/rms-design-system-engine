@@ -3,7 +3,7 @@
 // job that keeps it running from login on (a LaunchAgent on a Mac, a user service on Linux).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdirSync, readFileSync, existsSync, cpSync, realpathSync, symlinkSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync, cpSync, realpathSync, symlinkSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -171,7 +171,7 @@ test('the background job: a LaunchAgent on a Mac, a user service on Linux, each 
 test('install and uninstall: launchctl or systemctl asked only for a job in this computer\'s own folder, through the runner given', () => {
   const home = tempDir('watch-own-'), other = tempDir('watch-other-'), ROOT = tempDir('watch-proj-');
   for (const platform of ['darwin', 'linux']) {
-    const calls = [], run = (argv) => { calls.push(argv[0] + ' ' + argv[2]); return { status: 0 }; };
+    const calls = [], run = (argv) => { calls.push(argv[0] + ' ' + argv[2]); return { status: /^(print|is-active)$/.test(argv[1]) || argv[2] === 'is-active' ? 1 : 0 }; };
     const own = jobFor({ ROOT, engineDir: '/opt/engine', platform, home, uid: 501 });
     assert.equal(dirname(own.file), realJobDir(platform, home));
     let r = installWatch(own, { run, realHome: home, platform });
@@ -193,6 +193,21 @@ test('install and uninstall: launchctl or systemctl asked only for a job in this
     assert.match(r.lines[0], /written \(.+\) and not started/);
     assert.equal(uninstallWatch(borrowed, { run, realHome: home, platform }).removed, true);
     assert.deepEqual(calls, [], 'never asked of launchd or systemd');
+    // Installed again while the old job is still going (launchd lets it go after bootout returns): waited for, and a
+    // start refused meanwhile ("Bootstrap failed: 5") tried again.
+    const seen = [];
+    let stillThere = 2, refusals = 1;
+    const racing = (argv) => {
+      seen.push(argv.join(' '));
+      if (argv.includes('print') || argv.includes('is-active')) return { status: stillThere-- > 0 ? 0 : 1 };
+      if (argv.includes('bootstrap') || argv.includes('enable')) return refusals-- > 0 ? { status: 5, stderr: 'Bootstrap failed: 5: Input/output error' } : { status: 0 };
+      return { status: 0 };
+    };
+    writeFileSync(own.file, own.text);
+    const again = installWatch(own, { run: racing, realHome: home, platform, sleep: () => {} });
+    assert.deepEqual([again.ok, again.started], [true, true], 'started once the old one has gone');
+    assert.equal(seen.filter((c) => c.includes('print') || c.includes('is-active')).length, 3, 'the old job waited for');
+    unlinkSync(own.file);
     const failing = installWatch(own, { run: () => ({ status: 5, stderr: 'Bootstrap failed: 5' }), realHome: home, platform });
     assert.equal(failing.ok, false);
     assert.match(failing.lines[0], /did not start: Bootstrap failed: 5/);
