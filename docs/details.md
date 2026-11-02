@@ -1025,6 +1025,7 @@ The engine turns the watch on by itself, once for each person:
 - **When:** at the end of first setup, or on your next run where it isn't on yet. It says so in one line, and never asks or waits.
 - **Never:** on CI, in tests, inside the watch's own rounds, on an `--offline` run, or from an engine running in a git worktree.
 - **Turn it off for yourself:** `--watch-uninstall`. It stays off for that folder until `--watch-install`.
+- **A round never waits for ever.** A step still running after 90 minutes (`styleguide.stepMinutes`) is stopped with its browsers, and the log says where it stopped; the next round starts again. Inside the accessibility check, a browser that stops answering is stopped two minutes past its limit, the log says what it was on, and its parts are left for the page's own check while the rest of the round builds and publishes.
 - **Turn it off for the project:** `"styleguide": { "watch": false }` in `ds-config.json`, or in your team's profile for everyone. A watch the engine turned on is then taken away on the next run; one you turned on by hand stays.
 - **A failed start** is said once, with its reason, and not tried again on every run. `--watch-install` tries again.
 - **Not a Mac or Linux:** it says once that it can't, and how to rebuild by hand.
