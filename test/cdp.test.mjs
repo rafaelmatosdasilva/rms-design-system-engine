@@ -124,7 +124,9 @@ test('a run killed before it cleaned up has its browser ended and its folders sw
   const socketDir = dirname(readlinkSync(join(dir, 'SingletonSocket')));
   run.kill('SIGKILL');
   await new Promise((r) => run.on('exit', r));
-  assert.ok(sweepDeadProfiles() >= 1);
+  // Swept by this call, or already by another run's start on the same machine (every launch sweeps first): either way
+  // the folders are gone, which is what is asked.
+  assert.ok(sweepDeadProfiles() >= 1 || !existsSync(dir), 'the dead run\'s profile was swept');
   assert.equal(existsSync(dir), false, 'the profile was left behind');
   assert.equal(existsSync(socketDir), false, 'the socket folder was left behind');
   // Ended, not yet gone: a browser takes a moment to exit once it is told to, longer on a busy machine.
@@ -139,10 +141,12 @@ test('a browser start that timed out is tried once more; one that cannot start i
   const { chmodSync } = await import('node:fs');
   const dir = tempDir('cdp-retry-');
   const fake = join(dir, 'chrome.sh'), count = join(dir, 'count');
-  // The first start says nothing (it times out); the second announces its socket.
+  // The first start says nothing (it times out); the second announces its socket. Three seconds to announce it: a busy
+  // machine (a full run, a browser check beside it) can take more than half a second only to start a shell, and the
+  // first start still times out, since it says nothing for five.
   writeFileSync(fake, `#!/bin/sh\nif [ -f "${count}" ]; then echo "DevTools listening on ws://127.0.0.1:1/devtools/browser/x" >&2; sleep 5; else touch "${count}"; sleep 5; fi\n`);
   chmodSync(fake, 0o755);
-  const b = await launchChrome(fake, { timeoutMs: 500, retryAfterMs: 10 });
+  const b = await launchChrome(fake, { timeoutMs: 3000, retryAfterMs: 10 });
   assert.match(b.wsUrl, /^ws:\/\/127\.0\.0\.1:1\//);
   b.kill();
   await assert.rejects(launchChrome(join(dir, 'no-such-browser'), { timeoutMs: 500, retryAfterMs: 10 }), /could not start|exited/);
