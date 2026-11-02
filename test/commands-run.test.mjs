@@ -43,7 +43,12 @@ const COMMANDS = [
   '--duplication', '--agent-rules', '--annotation-categories', '--check-intent', '--code-drift',
   '--contract-completeness', '--exemption-debt', '--guidance-rating', '--guide-status', '--readmes', '--route',
   '--stores', '--styleguide-check', '--tailwind', '--unchecked', '--prune', '--figma-edits', '--query chip',
-  '--check-ui apps/demo/src/App.vue', '--prototype --catalog', '--prototype --rules', '--prototype --coverage',
+  // A command whose argument is a file, not only a flag. This project has no components in code, so --prototype on
+  // a page returns before it checks anything: what it guards here is that saying so is all it does. The page check
+  // itself needs a project whose system is built, and has its own test (page-report-cli.test.mjs) - this sweep
+  // reached every flag of --prototype and never the page, which is how it crashed on every project for a week.
+  '--check-ui apps/demo/src/App.vue', '--prototype apps/demo/src/App.vue --no-browser',
+  '--prototype --catalog', '--prototype --rules', '--prototype --coverage',
   '--prototype --consistency', '--prototype --flow', '--baseline', '--checked', '--ci-changed', '--a11y-no-worse', '--contract-changes', '--code-connect-draft', '--code-connect',
   '--contracts-out', '--docs', '--extract', '--intent', '--profile-export', '--rename-sweep', '--review-drafts',
   '--showroom-compare', '--update', '--check-update', '--from-figma-cli', '--figma-screens', '--figma-effects',
