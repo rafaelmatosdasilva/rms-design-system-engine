@@ -1562,6 +1562,25 @@ and whose examples (`Example:`) are shown as examples.
   wrong**: to write (Missing) where the documentation lacks something, to check (Review) where it is written and was
   still missed. The page system read without Figma: the intent layer's pages name each component and template and
   its code file; with no intent layer, the code's own component files.
+- **The whole loop on one screen: `--prototype --loop`.** Six steps, every number from a file an earlier run wrote,
+  so nothing new is measured: the patterns a new page is held to; the mistakes, with the half the documentation owed
+  told from the half the agent did not follow; what was written into the intent layer and what is still owed; what is
+  left for a person on the Documentation page; whether it is improving (mistakes a page, early against late, and
+  whether the documentation's share of them is falling); and whether agents are reading a component's card before
+  using it. A step with nothing yet says what to run rather than showing a zero - a zero and "not yet" look the same
+  and mean opposite things - and under twelve checks it refuses to draw a trend and says so, because two runs are not
+  a trend. Asking "are our prototypes getting better?" runs it.
+- **A state the page owes is not a note.** A page that shows a list owes an empty state, one that takes input an
+  error state. It is drawn all the same - the page somebody still has to finish is exactly the one worth looking at -
+  and the run comes back as **not ready**, naming the state. Never say a page is ready while it owes one. A page that
+  genuinely needs none says so, with why: in a composition `"states": { "empty": "this list always has the three
+  plans" }`, and on a page of code `data-no-empty="<why>"`. A reason too thin to be one is not taken; write a real
+  one, or add the state. A starting point read from a designed screen is excused everything.
+- **The patterns a new page is held to come from the product's own pages too**, not only the prototypes drawn and the
+  screens designed: the pages in `views/`, `pages/`, `screens/` or the app's own root file. Only what the code says
+  for certain - which components a page holds and in what order, which make its frame, what each action is called,
+  where the actions sit. Spacing and text styles are never guessed from code. A prototype already drawn wins: it is
+  what the team chose for a page of that kind.
 - **The documentation under load.** Three tests find where agents cannot tell what to use or how, and the
   Documentation page lists each finding (`.design-system-engine-out/prototypes/`):
   - `--prototype --coverage` (no agent, instant): what an agent cannot learn about each component, a prop, event or

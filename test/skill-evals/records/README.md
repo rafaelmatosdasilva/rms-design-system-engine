@@ -194,5 +194,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-01-the-guide-names-the-style` | The 24 guide tasks on Haiku (engine 879dd98) | "Guide: the style guide's jobs, parts and watch" |
 | `2026-11-02-the-watch-s-install-asks` | The 24 guide tasks on Haiku (engine 679dd24) | "The watch's install asks launchd or systemd only for a job in this computer's own folder" |
 | `2026-11-02-setup-s-watch-line-ci` | The 24 guide tasks on Haiku (engine b808d92) | "Setup's watch line: CI's reason is a CI run" |
+| `2026-11-02-the-guide-tells-the-agent` | The 24 guide tasks on Haiku (engine 5b6010a) | "The guide tells the agent about the loop, the states a page owes, and where the patterns come from" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
