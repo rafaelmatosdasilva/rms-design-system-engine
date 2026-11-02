@@ -4,12 +4,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
-import { readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, statSync, existsSync, symlinkSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { pushRefs, usedBy, auditFindingsFor, changedFiles, gitCheck, gitCheckText } from '../lib/git-check.mjs';
 import { installHooks, installGitHooks, gitHooksStatus, upgradeHooks } from '../lib/hooks-install.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, tempDir } from './helpers.mjs';
 
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 // A git that reads no person's own settings, and writes as a role.
@@ -200,4 +200,25 @@ test('the command: a commit exits 0 with its warning, a push exits 1, no project
   assert.match(p.stderr, /push refused/);
   assert.equal(run(['--git-check', 'push'], '', makeFixture({})).status, 0);
   assert.equal(run(['--git-check']).status, 2);
+});
+
+// A repository reached through a symbolic link is still its own top.
+//
+// git answers --show-toplevel with the real folder; the person is in the name they typed, which is a link to it.
+// Compared as written, the folder was not itself, and the hook was given a machine path spelled as a climb to the
+// root - `cd ../../../../../../../../var/folders/…` - in a file that every worktree of the repository shares.
+//
+// It was red for a week and nobody saw it, because the machines that run the checks have no such link on the path
+// to a temporary folder and the ones people work on do. So the link here is made on purpose, and the test fails
+// wherever it runs.
+test('a repository reached through a symbolic link gets a hook with no path of its own', () => {
+  const dir = project();
+  const by = join(tempDir('rms-link-'), 'repo');
+  symlinkSync(dir, by);
+  const r = installGitHooks(by, { engineDir: ENGINE });
+  assert.deepEqual(r.written, ['pre-commit', 'pre-push']);
+  const script = readFileSync(join(r.dir, 'pre-commit'), 'utf8');
+  assert.doesNotMatch(script, /\ncd /, script);          // its own top: nowhere to go
+  assert.doesNotMatch(script, /\.\.\/\.\.\//, script);        // and no climb out of it
+  installGitHooks(by, { engineDir: ENGINE, remove: true });
 });
