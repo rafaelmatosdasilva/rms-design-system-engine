@@ -69,6 +69,7 @@ test('never on CI, in a test, in the watch\'s own round, offline, with a borrowe
 test('a failed install is said once with its reason, and not tried again on every run', () => {
   const s = setup({ status: 5 });
   const r = ensureWatch(s.ROOT, {}, s.opts());
+  const tried = starts(s.calls, s.job);   // within one install a refused start is tried a few times (launchd letting an old job go)
   assert.equal(r.on, false);
   assert.equal(r.lines.length, 1);
   assert.match(r.lines[0], /could not start rebuilding itself on this computer: Bootstrap failed: 5: Input\/output error\. It is not tried again on every run; rms-design-system-engine --watch-install tries again\./);
@@ -77,7 +78,8 @@ test('a failed install is said once with its reason, and not tried again on ever
   const later = ensureWatch(s.ROOT, {}, s.opts());
   assert.deepEqual(later.lines, []);
   assert.match(later.why, /could not be turned on \(Bootstrap failed/);
-  assert.equal(starts(s.calls, s.job), 1, 'tried once');
+  assert.equal(starts(s.calls, s.job), tried, 'not tried again on a later run');
+  assert.ok(tried >= 1 && tried <= 4);
   turnedOn(s.ROOT, { home: s.home });   // --watch-install
   assert.ok(!JSON.parse(readFileSync(join(s.ROOT, RECORD), 'utf8')).failed, 'a hand install forgets the failure');
 });
