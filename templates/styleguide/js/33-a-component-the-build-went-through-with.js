@@ -744,7 +744,7 @@
       if (w) { copy.style.width = w + 'px'; copy.style.boxSizing = 'border-box'; }
       copy.setAttribute('inert', ''); copy.setAttribute('aria-hidden', 'true');
       uniqueIds(copy);
-      var img = '<img class="pg-compare-img" alt="' + esc(c.name + ' in Figma') + '" src="' + esc(sh.src) + '" width="' + Math.round(sh.w) + '" height="' + Math.round(sh.h) + '">';
+      var img = '<img loading="lazy" class="pg-compare-img" alt="' + esc(c.name + ' in Figma') + '" src="' + esc(sh.src) + '" width="' + Math.round(sh.w) + '" height="' + Math.round(sh.h) + '">';
       // A small one drawn larger, both by the same amount, so a pixel of difference can be seen.
       var k = Math.max(1, Math.min(4, Math.floor(120 / Math.max(1, sh.h, src.getBoundingClientRect().height))));
       // Figma draws it in the mode its frame uses there; the page's own mode switch brings the code to the same one.

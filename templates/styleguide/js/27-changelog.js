@@ -6,7 +6,7 @@
     var ex = c.examples || [];
     if (!ex.length) return '';
     return '<div class="pg-examples">' + ex.map(function (e) {
-      return '<div class="pg-example"><div class="pg-ctl-label">' + (e.kind === 'do' ? 'Do' : 'Don\'t') + '</div><div class="pg-example-stage"><img alt="' + esc((e.kind === 'do' ? 'Do: ' : 'Don\'t: ') + (e.caption || c.name)) + '" src="' + esc(e.src) + '" width="' + Math.round(e.w) + '" height="' + Math.round(e.h) + '"></div>' + (e.caption ? '<p class="pg-example-caption">' + esc(e.caption) + '</p>' : '') + '</div>';
+      return '<div class="pg-example"><div class="pg-ctl-label">' + (e.kind === 'do' ? 'Do' : 'Don\'t') + '</div><div class="pg-example-stage"><img loading="lazy" alt="' + esc((e.kind === 'do' ? 'Do: ' : 'Don\'t: ') + (e.caption || c.name)) + '" src="' + esc(e.src) + '" width="' + Math.round(e.w) + '" height="' + Math.round(e.h) + '"></div>' + (e.caption ? '<p class="pg-example-caption">' + esc(e.caption) + '</p>' : '') + '</div>';
     }).join('') + '</div>';
   }
   function changelogHTML(c) {

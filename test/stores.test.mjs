@@ -418,6 +418,29 @@ test('publishing the style guide again removes the files an earlier page linked,
   assert.ok(!existsSync(join(dir, old)) && existsSync(join(dir, 'notes.txt')) && existsSync(join(dir, 'index.html')));
 });
 
+test('publishing the style guide again removes a picture its last data named, never one another page\'s data still names', async () => {
+  const { pageFiles } = await import('../lib/stores.mjs');
+  const { writeStyleguide } = await import('../lib/styleguide-files.mjs');
+  const pic = (seed) => `data:image/png;base64,${Buffer.alloc(3000, seed).toString('base64')}`;
+  const page = (seed) => `<!--sg-file:styleguide-->\n<style>.a{}</style>\n<script type="application/json" id="sg-data">{"shot":"${pic(seed)}"}</script>`;
+  const d = project();
+  writeStyleguide(join(d, 'index.html'), page(1));
+  const before = [...pageFiles(join(d, 'index.html')).keys()];
+  const oldData = before.find((f) => /\.data\./.test(f)), oldPic = before.find((f) => f.startsWith('assets/img/'));
+  writeStyleguide(join(d, 'chip.html'), page(2));
+  const chip = [...pageFiles(join(d, 'chip.html')).keys()], chipData = chip.find((f) => /\.data\./.test(f)), chipPic = chip.find((f) => f.startsWith('assets/img/'));
+  const at = (files) => Object.fromEntries(files.map((f) => ['sg/' + f, readFileSync(join(d, f), 'latin1')]));
+  // The store: the last build's page, its data and picture, and a page of one component whose data names a picture of its own.
+  const g = fakeGitlab({ files: { ...at([...before, ...chip]) } });
+  writeStyleguide(join(d, 'index.html'), page(3));
+  const files = pageFiles(join(d, 'index.html'));
+  assert.ok([...files.keys()].some((f) => f.startsWith('assets/img/')), 'the picture is sent with the page');
+  const r = await pushStore(project(), cfgWith({ styleguide: { write: { gitlab: LINK, path: 'sg' } } }), 'styleguide', files, 'Style guide', { env, http: g.http });
+  assert.equal(r.ok, true, r.line);
+  assert.ok(!('sg/' + oldData in g.files) && !('sg/' + oldPic in g.files), 'the last build\'s data and picture are removed');
+  for (const f of ['chip.html', chipData, chipPic]) assert.ok('sg/' + f in g.files, f);
+});
+
 // A write GitLab turns down says why, in GitLab's own words; a gateway's page says nothing more than its status.
 test('a refused commit says GitLab\'s reason; a page with none says the status alone', async () => {
   const { reasonOf } = await import('../lib/stores.mjs');
