@@ -1036,10 +1036,10 @@ Also on each component.
 - **A token's panel.** Click any token to see its value in each mode, the components that use it, and a button to copy it.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
-- **Status and coverage.** Stable, beta or deprecated, and how much of its file your tests cover.
-  - Your team's own stage always wins. Set it as `status` in `contract.authored.json`, or as `Status: beta` in its Figma description, or with `@deprecated` in its code.
-  - Without one, the page suggests a stage from what it measures, in the Status table's words. Stable when Parity is Match, Accessibility Pass and Documentation Ready, with at least 80% of its lines covered when your tests report coverage. Beta otherwise, with what is left.
-  - With one that differs from what the page measures, the page says what it would be beside it.
+- **Coverage.** How much of its file your tests cover, beside its Code Connect.
+- **Its stage is a task, not a label on its page.** Your team sets it as `status` in `contract.authored.json`, as `Status: beta` in its Figma description, or with `@deprecated` in its code. The Tasks page asks for it:
+  - With no stage set, a Stage task says what the page measures, in the Status table's words: Stable when Parity is Match, Accessibility Pass and Documentation Ready (with at least 80% of its lines covered when your tests report coverage), Beta otherwise, with what is left.
+  - With a stage that differs from what the page measures, the task says both, to keep it or change it.
   - A component being retired names what replaces it, from the release that retired it or from a line such as "use button instead" in Figma or its code.
 
 ### Templates
