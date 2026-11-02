@@ -1562,13 +1562,6 @@ and whose examples (`Example:`) are shown as examples.
   wrong**: to write (Missing) where the documentation lacks something, to check (Review) where it is written and was
   still missed. The page system read without Figma: the intent layer's pages name each component and template and
   its code file; with no intent layer, the code's own component files.
-- **Each prototype carries its own evaluation.** Every check writes `prototypes/<name>.check.json` beside the page,
-  as the handoff and the comments are written: the components it used and how often, the mistakes with why each
-  happened, what the system lacked for it, the states it owes. The team's prototypes store carries it, along with
-  everything else kept beside a page, so a prototype that arrives from the store can be judged without running
-  anything. It records what was found, never a verdict; where a check does not work out whose fault each mistake was
-  (a composition's does not), it says nothing rather than zero. Each component's page in the style guide reads these
-  to show the prototypes built with it, and which of them are not ready.
 - **The whole loop on one screen: `--prototype --loop`.** Six steps, every number from a file an earlier run wrote,
   so nothing new is measured: the patterns a new page is held to; the mistakes, with the half the documentation owed
   told from the half the agent did not follow; what was written into the intent layer and what is still owed; what is
