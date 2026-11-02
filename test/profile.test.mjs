@@ -98,3 +98,10 @@ test('a part this engine does not know yet is left unused and named, never a ref
   assert.match(r.lines.join('\n'), /names a part this engine does not know yet \(futurePart\)/);
   assert.ok(JSON.parse(readFileSync(join(d, 'ds-config.json'), 'utf8')).stores.futurePart, 'kept for a newer engine');
 });
+
+test('a store\'s notify survives a profile: the CI to tell and the name of its variable, never a credential', () => {
+  const profile = { profile: 1, name: 'Acme', stores: { styleguide: { write: `https://${HOST}/design/site`, notify: [{ url: 'https://ci.acme.test/job/site/build', authEnv: 'ACME_CI_AUTH', token: 'x' }, 'https://hooks.acme.test/site'] } } };
+  const next = applyProfile({}, profile, { source: 'p.json', sha: 'abc', now: '2026-10-24' });
+  assert.deepEqual(next.stores.styleguide.notify, [{ url: 'https://ci.acme.test/job/site/build', authEnv: 'ACME_CI_AUTH' }, 'https://hooks.acme.test/site']);
+  assert.deepEqual(exportProfile(next).stores.styleguide.notify, next.stores.styleguide.notify);
+});
