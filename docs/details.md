@@ -445,6 +445,7 @@ The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory ·
 - **A change is tried at once.** A style guide is checked a few components a page, so a change to one component tries only its page again.
 - **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the style guide, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
 - **A change to your CSS's comments or spacing keeps every result.** Only the rules count.
+- **A change to the style guide's own screens keeps every result.** The Status table, the Documentation panel and the other screens around the components never reach what the check measures. When only that CSS changed, each part's page is opened just long enough to read what surrounds its components, and its results are put back. A change around a component (its stage, the page behind it) still tries it again.
 - **The report says why a page was tried again:** the check changed, the CSS every component shares changed, which components changed and the tokens that moved them, or it was never checked before.
 - **Several pages are tried at once.** When many need trying, a few browsers share them out (`a11y.parallel`, by default a quarter of the computer's cores), and the report is the same as one browser's.
 - **Live pages are always tried.** A page from a dev server or a link can change without the engine knowing, so it is never reused.
