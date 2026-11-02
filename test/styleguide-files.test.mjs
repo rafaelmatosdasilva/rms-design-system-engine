@@ -226,10 +226,10 @@ test('parts: published and copied with the page that names them; an older build\
 
 // The page's loader (splitPage's two inline scripts), run as a browser runs them: in the page, or in the component
 // panel's frame, whose parent is the page (window.parent).
-function boot(html, { search = '', hash = '#status', parent = null, file = null } = {}) {
+function boot(html, { search = '', hash = '#status', parent = null, file = null, from = null, kept = null } = {}) {
   const tags = [...html.matchAll(/<script (id="sg-data" data-src="([^"]+)"|data-sg-parts)>([\s\S]*?)<\/script>/g)];
   const written = [];
-  const ctx = { location: { search, hash }, document: { write: (t) => written.push(t), currentScript: null } };
+  const ctx = { location: { search, hash }, document: { write: (t) => written.push(t), currentScript: null }, ...(kept ? { localStorage: { getItem: (k) => kept[k] ?? null } } : {}) };
   ctx.self = ctx; ctx.window = ctx;
   ctx.window.parent = parent ?? ctx;
   runInNewContext('0', ctx);
@@ -237,7 +237,7 @@ function boot(html, { search = '', hash = '#status', parent = null, file = null 
     ctx.document.currentScript = { getAttribute: () => file ?? t[2] };
     runInNewContext(t[3], ctx);
     // The data file a top page writes in runs right after the loader, before the next script.
-    for (const w of written.splice(0)) { const src = /src="([^"]+)"/.exec(w)?.[1]; ctx.loaded = [...(ctx.loaded ?? []), ...w.match(/src="[^"]+"/g).map((m) => m.slice(5, -1))]; if (src && /\.data\./.test(src)) runInNewContext(splitPage(pageWith(SYSTEM), 'index').files.get(src), ctx); }
+    for (const w of written.splice(0)) { const src = /src="([^"]+)"/.exec(w)?.[1]; ctx.loaded = [...(ctx.loaded ?? []), ...w.match(/src="[^"]+"/g).map((m) => m.slice(5, -1))]; if (src && /\.data\./.test(src)) runInNewContext((from ?? splitPage(pageWith(SYSTEM), 'index').files).get(src), ctx); }
   }
   return ctx;
 }
@@ -270,4 +270,47 @@ test('the page loads its data and the part its address opens on before its code 
   assert.deepEqual(boot(html, { parent: new Proxy({}, { get() { throw new Error('another origin'); } }) }).loaded, [dataName]);
   // A part the page does not hold, or holds from another file: the panel loads its own.
   assert.deepEqual(boot(html, { hash: '#c-cardTile', parent: { ...top, SG_PART_FILES: { cardTile: 'assets/index.part.0123456789.js' } } }).loaded, [partName]);
+});
+
+// What the first screen never shows (LATERS): the brands' embedded fonts, the Showroom screens' drawings, the intent
+// layer's text as the agents read it. An invented system (Acme).
+const LATE = {
+  title: 'Acme', components: [],
+  brands: { list: [{ key: 'night', name: 'Night', fonts: ['Acme Sans'] }], embedded: ['Acme Sans'], faces: '@font-face { font-family: "Acme Sans"; src: url(data:font/woff2;base64,AAAA); }', css: '[data-brand="night"] { --x: 1; }' },
+  showroom: [{ key: 'home', title: 'Home', markup: '<main class="home">Hi</main>' }, { key: 'broken', markup: null, why: 'not drawn' }],
+  intentLayer: { pages: [{ name: 'Card Tile', reads: { purpose: ['Groups a card.', 'One per row.'], rules: [] }, others: [{ source: 'Code', lines: ['A note.'] }] }, { name: 'Empty' }], noPageOthers: { chip: [{ source: 'Figma description', lines: ['A chip.'] }] } },
+};
+test('what the first screen never shows goes into later files; the data keeps each value\'s place, empty; read back, the same data', () => {
+  const { html, files } = splitPage(pageWith(LATE), 'index');
+  const later = [...files.keys()].filter((f) => /\.later\./.test(f));
+  assert.deepEqual(later.map((f) => /index-(\w+)\.later/.exec(f)[1]), ['fonts', 'showroom', 'intentLayer']);
+  assert.ok(later.every(isOwnFile));
+  const ctx = { self: {} };
+  runInNewContext(files.get([...files.keys()].find((f) => /\.data\./.test(f))), ctx);
+  const slim = JSON.parse(JSON.stringify(ctx.self.SG_DATA));
+  assert.equal(slim.brands.faces, '', 'the fonts: their place kept, empty');
+  assert.deepEqual(slim.showroom.map((x) => x.markup), ['', null], 'a drawing taken out; a screen not drawn stays as it was');
+  assert.deepEqual(slim.intentLayer.pages[0].reads, { purpose: ['', ''], rules: [] }, 'each section\'s lines, empty: the row says what it comes from');
+  assert.deepEqual(slim.intentLayer.pages[0].others, [{ source: 'Code', lines: [] }]);
+  assert.deepEqual(slim.intentLayer.noPageOthers, { chip: [{ source: 'Figma description', lines: [] }] });
+  assert.deepEqual(Object.keys(slim.sgLater), ['fonts', 'showroom', 'intentLayer']);
+  runInNewContext(files.get(slim.sgLater.showroom), ctx);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.self.SG_LATER.showroom())), { home: '<main class="home">Hi</main>' });
+  const d = tempDir('sg-later-');
+  writeStyleguide(join(d, 'index.html'), pageWith(LATE));
+  assert.equal(JSON.stringify(pageData(join(d, 'index.html'))), JSON.stringify(LATE), 'read back: every value where it was');
+  assert.deepEqual(pageFiles(join(d, 'index.html')).size, files.size + 1, 'published with the page: the page and every file, the later ones too');
+});
+
+test('a later file loads with the page when its address shows it at once: a brand chosen, the Showroom, the Documentation page, ?all', () => {
+  const { html, files } = splitPage(pageWith(LATE), 'index');
+  const name = (k) => [...files.keys()].find((f) => f.includes(`-${k}.later`)), data = [...files.keys()].find((f) => /\.data\./.test(f));
+  const at = (o) => boot(html, { from: files, ...o }).loaded;
+  assert.deepEqual(at({}), [data], 'Status: none');
+  assert.deepEqual(at({ hash: '#showroom/home' }), [data, name('fonts'), name('showroom')]);
+  assert.deepEqual(at({ hash: '#documentation' }), [data, name('intentLayer')]);
+  assert.deepEqual(at({ search: '?brand=night' }), [data, name('fonts')]);
+  assert.deepEqual(at({ search: '?brand=default' }), [data]);
+  assert.deepEqual(at({ kept: { 'sg-brand': 'night' } }), [data, name('fonts')], 'a brand kept from the last visit');
+  assert.deepEqual(at({ search: '?all' }), [data, name('fonts'), name('showroom'), name('intentLayer')]);
 });

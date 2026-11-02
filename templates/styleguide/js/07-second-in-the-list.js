@@ -472,7 +472,10 @@
       var code = file(p.code || ((f.props || []).filter(function (x) { return x.file; })[0] || {}).file) || 'the code';
       var tick = function (x) { return '`' + x + '`'; };
       var out = (f.props || []).filter(function (x) { return x.from !== 'Figma'; }).map(function (x) { return 'The code: ' + tick(x.name) + ', a prop of ' + (file(x.file) || code) + (x.options && x.options.length ? ', takes ' + x.options.map(tick).join(', ') : '') + '.'; });
-      var warn = (f.figmaOnly || []).map(function (n) { return 'Figma: ' + tick(n) + ' is a property of the Figma component, not a prop ' + code + ' takes. Change the draft to say what the code does, or name it as Figma\'s.'; });
+      var carries = function (n) { var k = (f.carriers || {})[n]; return k ? ' The code carries it in ' + (k.field ? 'the ' + tick(k.field) + ' field of ' + tick(k.prop) : tick(k.prop)) + '.' : ''; };
+      var warn = (f.figmaOnly || []).map(function (n) { return 'Figma: ' + tick(n) + ' is a property of the Figma component, not a prop ' + code + ' takes.' + carries(n) + ' Change the draft to say what the code does, or name it as Figma\'s.'; });
+      // The rewrite offered (draft-sources.mjs → rewriteOf): Change opens with it, for the person to keep or edit.
+      if (f.rewrite && f.rewrite !== d.text) warn.push('Proposed instead: ' + f.rewrite);
       if (f.line) out.push('Says again: “' + f.line.text + '” (' + f.line.from + ').');
       return warn.map(function (t) { return '<span class="sg-il-source sg-il-source--warn">' + esc(t) + '</span>'; }).join('') + out.map(function (t) { return '<span class="sg-il-source">' + esc(t) + '</span>'; }).join('');
     };
@@ -480,13 +483,14 @@
     // One item and its own three actions, approve, change and drop, never more: what it is, its body, then the three,
     // each with the words it adds to the decision copied (none: nothing is done for it) and what it does as its tip.
     // Change opens the item's own words to edit (opt.edit), and the decision copied carries the words as edited.
-    // def: the answer it has until a person chooses.
+    // def: the answer it has until a person chooses. opt.offer: the words Change opens with, when they are not the item's
+    // own (a rewrite offered); the decision carries them unless the person edits them.
     var ilItem = function (head, body, steps, def, opt) {
       opt = opt || {}; var tips = opt.tips || {};
       var said = function (k) { return steps[k] ? ' data-il-' + k + '="' + esc(steps[k]) + '"' : ''; };
       return '<div class="sg-il-line sg-il-change sg-il-item" data-il-item' + said('approve') + said('change') + said('drop') + (steps.changeTo ? ' data-il-change-to="' + esc(steps.changeTo) + '"' : '') + '><strong>' + esc(head) + '</strong>' + body
         + '<span class="sg-il-choices" role="group" aria-label="' + esc('Your decision: ' + head) + '">' + ilChoice('approve', 'Approve', def === 'approve', tips.approve) + ilChoice('change', 'Change', def === 'change', tips.change || 'Edit the words below; the decision copied carries them.') + ilChoice('drop', 'Drop', def === 'drop', tips.drop) + '</span>'
-        + (opt.edit != null ? '<textarea class="sg-input sg-il-edit" data-il-edit data-il-was="' + esc(opt.edit) + '" rows="2" aria-label="' + esc('Your words: ' + head) + '"' + (def === 'change' ? '' : ' hidden') + '>' + esc(opt.edit) + '</textarea>' : '') + '</div>';
+        + (opt.edit != null ? '<textarea class="sg-input sg-il-edit" data-il-edit data-il-was="' + esc(opt.edit) + '" rows="2" aria-label="' + esc('Your words: ' + head) + '"' + (def === 'change' ? '' : ' hidden') + '>' + esc(opt.offer != null ? opt.offer : opt.edit) + '</textarea>' : '') + '</div>';
     };
     // A group: its heading and count, an Approve all for what it shows, its items, then those folded away (quiet).
     var ilGroup = function (key, head, items, all, quiet) {
@@ -543,7 +547,7 @@
         var t = String(d.text);
         return ilItem(d.where, '<span class="pg-par-val">' + esc(t) + '</span>' + (d.code != null ? '<pre class="sg-il-example"><code>' + esc(String(d.code)) + '</code></pre>' : '') + ilDraftFrom(d, p),
           { approve: 'Approve the draft ' + q(t), change: 'Change the draft ' + q(t) + ': ask me for my words', changeTo: 'Change the draft ' + q(t) + ' to "{to}"', drop: 'Drop the draft ' + q(t) },
-          null, { edit: t, tips: { approve: 'Agents use it as written from the next run.', drop: 'It is deleted; no agent ever gets it.' } });
+          null, { edit: t, offer: d.from && d.from.rewrite && d.from.rewrite !== t ? d.from.rewrite : null, tips: { approve: 'Agents use it as written from the next run.', change: d.from && d.from.rewrite && d.from.rewrite !== t ? 'Opens with the rewrite proposed; edit it or keep it.' : null, drop: 'It is deleted; no agent ever gets it.' } });
       });
       // A proposal's answers: its own (options) when it lists them, else yes and no; approve is the first, drop the other.
       var answers = function (x) { var o = (x.options && x.options.length) ? x.options : [{ answer: 'yes', does: x.yes || '' }, { answer: 'no', does: x.no || '' }]; return [o[0], o[1] || o[0]]; };
@@ -706,8 +710,12 @@
     };
     // A row's own address: its file, the component it is missing for, or the Tokens and system rows by their name.
     var ilKey = function (p, i) { return 'doc:' + (p.tokens ? 'tokens' : p.absent ? 'system' : p.file || p.missingFor || (p.recheckFor ? 'recheck:' + p.recheckFor : null) || p.name || i); };
+    var ilLaterFailed = false;
     var ilPanel = function (i, from) {
       var p = rows[i]; if (!p) return;
+      // What the agents read of each page is in a later file (styleguide-files.mjs): the panel opens once it is here.
+      // One that cannot be read opens it without (asked for again on the next load of the page).
+      if (!ilLaterFailed && needLater('intentLayer', function (ok) { if (!ok) ilLaterFailed = true; ilPanel(i, from); })) return;
       var c = ilCellsOf(p), m = panelShell('sg-il-panel', 'Documentation');
       m._key = ilKey(p, i);
       var card = function (head, html) { return html ? '<div class="pg-inspect sg-token-card"><div class="pg-inspect-head">' + esc(head) + '</div><div class="sg-row-detail-body">' + html + '</div></div>' : ''; };
