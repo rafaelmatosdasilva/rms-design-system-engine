@@ -16,7 +16,7 @@ Each section says why it matters, then what it does not do well today. A line ma
 | [Track system health](#track-system-health) | Warns about risks before they spread as the system grows: a colour named after one product, a token that points to one that was deleted, a combination that only breaks in dark mode on a phone. | Contracts | Ready to use |
 | [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Contracts, Figma library | Ready to use |
 | [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Contracts, intent | Ready to use |
-| [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Actively improving |
+| [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Early development |
 | [Test accessibility](#test-accessibility) | Tests each component the way people use it: contrast, keyboard, focus, touch size and what a screen reader says. Fix it once in the component and every screen benefits. | Contracts, Compare | Early development |
 | [Build with AI, on the system](#build-with-ai-on-the-system) | AI tools build with your real components, rules and past decisions: in your product's code today, and as clickable prototypes for user tests *(Coming soon)*. Each change is checked as it's made, and what the system lacks goes on a list for design. | Contracts, intent, Catch drift | Early development |
 | [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's playground, spec, Figma match, accessibility and history, plus who needs to do what next. | Everything above | Early development |
@@ -130,7 +130,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 ## Fit your team's setup
 
-**Actively improving** · **Why it matters:** It works with the tools you already use.
+**Early development** · **Why it matters:** It works with the tools you already use.
 
 *Today: every browser check runs in Chrome.*
 
