@@ -269,8 +269,13 @@ test('in the browser: no script error, a control changes the real component, the
     assert.deepEqual(await until(`(() => { const p = document.getElementById('demo-panel'); return p && !p.hidden ? [p.querySelector('h1, h2, .sg-panel-title') && p.querySelector('h1, h2, .sg-panel-title').textContent.trim(), p.querySelector('.demo-body').textContent] : null; })()`, Boolean), ['Demo', '<b>Hello</b>'], 'the module\'s panel opens with its title and body, its words escaped');
     await run(`document.getElementById('demo-panel')._shut()`);
     assert.equal(await until(`document.getElementById('demo-panel').hidden`, (v) => v === true), true, 'and closes');
+    // What only its page reads (its code) is in its part, loaded when its page opens: not in the data the Status page read.
+    const chipCode = `(self.SG_DATA.components.find((c) => c.name === 'chip').source || { text: '' }).text.length`;
+    assert.ok(/^assets\/index\.part\.[0-9a-f]{10}\.js$/.test(await run(`(self.SG_DATA.sgParts || {}).chip`)), 'the chip has a part');
+    assert.equal(await run(chipCode), 0, 'its code is not in the first screen\'s data');
     await run(`location.hash = '#c-chip'`);
     assert.equal(await shownIs('c-chip'), 'c-chip');
+    assert.ok(await run(chipCode) > 40, 'its code, whole, once its page opened');
     await until(`document.querySelectorAll('.pg-preview').length`, (v) => v === 1);
     // Each row of its tables (Parity, Accessibility, Documentation…) opens in full in a side panel, a card per column.
     const rowPanel = await until(`(() => { const tr = document.querySelector('#c-chip tr.sg-row-open'); if (!tr) return null; tr.cells[0].click(); const p = document.getElementById('sg-row-panel');
@@ -712,6 +717,39 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`location.hash`), '#status/accessibility', 'an old #todo link');
     assert.equal(await run(`document.querySelector('#status .sg-matrix th[data-sort="Accessibility"]').getAttribute('aria-sort')`), 'descending');
     assert.deepEqual(errors, []);
+    // Served by a host that sends no cache header: the component panel (the page again, in a frame) takes the data the
+    // page around it holds, and downloads it no second time; a component opened in it loads its part and draws.
+    const { createServer } = await import('node:http');
+    const root = join(dir, '.design-system-engine-out/styleguide');
+    const server = createServer((req, res) => {
+      const p = join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+      if (!p.startsWith(root) || !existsSync(p) || !/\.\w+$/.test(p)) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': /\.html$/.test(p) ? 'text/html' : /\.css$/.test(p) ? 'text/css' : /\.js$/.test(p) ? 'text/javascript' : 'application/octet-stream' });
+      res.end(req.method === 'HEAD' ? undefined : readFileSync(p));
+    }).listen(0);
+    try {
+      const web = await openPage(send, 'about:blank');
+      await send('Network.enable', {}, web.sessionId);
+      const asked = [];
+      on('Network.requestWillBeSent', (p, sid) => { if (sid === web.sessionId) asked.push({ url: p.request.url, frame: p.frameId }); });
+      await send('Page.navigate', { url: `http://localhost:${server.address().port}/index.html#status` }, web.sessionId);
+      const wrun = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, web.sessionId)).result.value;
+      assert.ok(await waitForTrue(send, web.sessionId, `document.documentElement.classList.contains('sg-ready')`, { attempts: 1200, tolerateErrors: true }), 'the page drawn over http');
+      const frameReady = `(() => { const f = document.querySelector('.sg-comp-panel-frame'); return !!f && !!f._loaded && f.contentWindow.document.documentElement.classList.contains('sg-ready'); })()`;
+      assert.ok(await waitForTrue(send, web.sessionId, frameReady, { attempts: 600, intervalMs: 100, tolerateErrors: true }), 'the panel\'s page loaded in the background');
+      const top = (await send('Page.getFrameTree', {}, web.sessionId)).frameTree.frame.id;
+      const dataFile = /\.data\.[0-9a-f]{10}\.js/;
+      assert.equal(asked.filter((r) => dataFile.test(r.url) && r.frame === top).length, 1, 'the page downloads its data');
+      assert.equal(asked.filter((r) => dataFile.test(r.url) && r.frame !== top).length, 0, 'the panel downloads it no second time');
+      assert.equal(await wrun(`(() => { const w = document.querySelector('.sg-comp-panel-frame').contentWindow; return w.SG_DATA !== self.SG_DATA && Object.getPrototypeOf(w.SG_DATA) === w.Object.prototype && w.SG_DATA.components.length === self.SG_DATA.components.length; })()`), true, 'its own copy, made in its frame');
+      await wrun(`location.hash = '#c-chip'`);
+      assert.ok(await waitForTrue(send, web.sessionId, `!!document.getElementById('c-chip') && !document.getElementById('c-chip').hidden`, { attempts: 400, tolerateErrors: true }), 'a component opened on the page');
+      const parts = asked.filter((r) => /\.part\./.test(r.url)).length;
+      await wrun(`(() => { const w = document.querySelector('.sg-comp-panel-frame').contentWindow; w.location.replace(w.location.pathname + w.location.search + '#c-chip'); })()`);
+      assert.ok(await waitForTrue(send, web.sessionId, `(() => { const w = document.querySelector('.sg-comp-panel-frame').contentWindow, s = w.document.getElementById('c-chip'); return !!s && !s.hidden && !!s.querySelector('.pg-preview'); })()`, { attempts: 400, tolerateErrors: true }), 'drawn in the panel');
+      assert.equal(asked.filter((r) => /\.part\./.test(r.url)).length, parts, 'the panel takes the part the page already holds');
+      assert.deepEqual(errors, []);
+    } finally { server.close(); }
     close();
   } finally { c.kill(); }
 });

@@ -18,6 +18,8 @@ test('the files a page names: its scripts, styles and pictures, never an anchor,
   const html = '<link rel="stylesheet" href="assets/page.1a.css?v=2"><script src="assets/page.2b.js"></script><script>var a = \'<img src="assets/not-a-file.png">\';</script>' +
     '<a href="#status">Status</a><a href="https://example.com/x">x</a><a href="mailto:qa@example.com">QA</a><img src="data:image/png;base64,AA"><img src="assets/logo%20mark.svg">';
   assert.deepEqual(localFiles(html), ['assets/page.1a.css', 'assets/page.2b.js', 'assets/logo mark.svg']);
+  // The page's data, named by its loader (a component's part is loaded when its page opens: not the page's weight).
+  assert.deepEqual(localFiles('<script id="sg-data" data-src="assets/index.data.0123456789.js">(function(){})();</script><img data-src="assets/lazy.png">'), ['assets/index.data.0123456789.js']);
 });
 
 test('a file the page links to that is not there fails the check; the weight is said, and warned past the budget', () => {

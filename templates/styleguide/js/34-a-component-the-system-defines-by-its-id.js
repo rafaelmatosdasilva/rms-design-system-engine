@@ -25,6 +25,7 @@
       refreshers.push(lazyDraw(cardEl, cardEl._refresh));   // redrawn on a brand or mode change while it shows, else when it is opened
       return cardEl;
     };
+    BUILDERS[cid(c.name)]._c = c;   // drawn once its part is here (needPart)
     if (inMenu(c)) navLink(cid(c.name), c.name);   // a part has its page, opened from its parent's Parts; one only the code has, its page from Status
     else { var fam = menuFamily(c); if (fam && !MENU_FAMS[fam]) { MENU_FAMS[fam] = 1; navLink(cid(FAM_FIRST[fam] || c.name), fam); } }
     if (ALL) { if (!ONLY || ONLY.indexOf(c.name) >= 0) BUILDERS[cid(c.name)](); } else { try { thumbOf(c, baseElement(c)); } catch (e) {} }
@@ -362,6 +363,16 @@
     if (s) html.style.setProperty('--sg-page-top', Math.max(0, Math.round(s.getBoundingClientRect().top + window.scrollY)) + 'px');
   }
   if (!ALL && window.ResizeObserver) new ResizeObserver(pageTop).observe(main);
+  // The page shown while a component's part loads (a moment), never a blank one: its name, then that it is loading, or
+  // that its part could not be read (a file missing beside the page). The component's own page replaces it.
+  function partWaitPage(c, failed) {
+    var s = document.getElementById('sg-part-wait');
+    if (!s) { s = document.createElement('section'); s.id = 'sg-part-wait'; s.className = 'sg-section'; main.appendChild(s); }
+    s.innerHTML = '<div class="sg-section-badge">Components</div><h2>' + esc(c.name) + '</h2><p class="' + (failed ? 'pg-missing' : 'pg-dim') + '" role="status">' +
+      esc(failed ? 'Its details could not be loaded: ' + PARTS[c.name] + ' is not beside the page, or the connection dropped. Open the page again.' : 'Loading its details…') + '</p>';
+    Array.prototype.forEach.call(main.children, function (k) { if (k.matches('section, .sg-hr')) k.hidden = k !== s; });
+    pageTop();
+  }
   function route() {
     if (!location.hash || /^#(index|overview)$/.test(location.hash)) { if (homeId() !== 'index') history.replaceState(null, '', location.search + '#' + homeId()); }
     else if (/^#(documentation|coverage|intent-layer|for-agents)$/.test(location.hash)) history.replaceState(null, '', location.search + (document.getElementById('documentation') ? '#documentation' : '#status/documentation'));   // the address says where it lives now: the Documentation page, else (no intent layer) the Status page's
@@ -369,6 +380,9 @@
     else if (/^#brand-kit([\/?]|$)/.test(location.hash)) history.replaceState(null, '', location.search + '#identity' + location.hash.replace(/^#brand-kit/, ''));   // Identity was once the brand kit
     else if (/^#(todo|tasks|health)([\/?]|$)/.test(location.hash)) history.replaceState(null, '', '#status' + location.hash.replace(/^#(todo|tasks|health)/, ''));   // the page was once To do, then Tasks and Health
     var at = hashParts(), id = at.id || homeId(), built = !!document.getElementById(id);
+    // A component whose part is not here yet: its page says so while it loads, then is drawn as the address asks.
+    var partOf = !built && BUILDERS[id] && BUILDERS[id]._c;
+    if (partOf && needPart(partOf, function (ok) { if ((hashParts().id || homeId()) !== id) return; if (ok) route(); else partWaitPage(partOf, true); })) { partWaitPage(partOf, false); return; }
     if (!built && BUILDERS[id]) BUILDERS[id]();
     if (built && document.getElementById(id)._link) document.getElementById(id)._link(at.q);
     // An area named in the address (#c-chip/accessibility) opens on it; moving to another component opens its Playground.

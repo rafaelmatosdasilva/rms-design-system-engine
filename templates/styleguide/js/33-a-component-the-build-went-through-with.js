@@ -35,7 +35,7 @@
   if (fillDocs) { fillDocs(); fillDocs = null; }
   // Every component not tried yet in this browser, one after another, while the Status page is open: each built out of
   // sight, its Accessibility check run as its own area runs it, kept, then the list drawn again with what it found.
-  var sweepAt = 0, sweeping = false, sweepMissed = [];
+  var sweepAt = 0, sweeping = false, sweepMissed = [], partFailed = {};
   // The components the sweep tried and could not measure in the browser (nothing drawn to try), for the build to name.
   window.__sgSweepMissed = function () { return sweepMissed.slice(); };
   // A component the sweep draws out of sight can take the focus on its own (a modal that opens, a field that focuses
@@ -67,6 +67,10 @@
       if (personBusy() && !(list[sweepAt].__a11y && (list[sweepAt].__a11y.live || list[sweepAt].__a11y.baked))) return setTimeout(next, 500);
       var c = list[sweepAt++], id = cid(c.name);
       if (c.__a11y && (c.__a11y.live || c.__a11y.baked)) return setTimeout(next, 0);
+      // Its part first, as its page needs it: loaded, then this component tried. One whose part cannot be read is not
+      // tried, and named with those the sweep could not measure.
+      if (!partHere(c) && !partFailed[c.name] && needPart(c, function (ok) { if (!ok) partFailed[c.name] = true; setTimeout(next, 0); })) { sweepAt--; return; }
+      if (partFailed[c.name]) { if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null }; if (sweepMissed.indexOf(c.name) < 0) sweepMissed.push(c.name); return setTimeout(next, 0); }
       var sec = null; try { sec = document.getElementById(id) || (BUILDERS[id] && BUILDERS[id]()); } catch (e) { setTimeout(next, 0); throw e; }
       if (!sec || !sec._a11yRun) { if (!c.__a11y) c.__a11y = { items: c.a11y ? a11yStaticItems(c) : [], live: null }; return setTimeout(next, 0); }   // nothing to try in a browser
       sec.hidden = false; sec.classList.add('pg-offstage');
