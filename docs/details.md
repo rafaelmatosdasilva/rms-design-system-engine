@@ -969,6 +969,18 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. The back
   | The engine | Everything, since its output may differ. Each step's own caches keep it short. |
 
 - **It publishes only a page that changed.** With a style guide store set, the published `built-from.json` keeps the page's fingerprint, so a build that made the same page sends only that record.
+- **It tells a CI your git host cannot reach.** A CI on a company network often polls the store, because the git host may not send webhooks into that network, so a published page waits for the next poll. Your computer is inside that network, so the engine can call the CI itself once the write has landed. Name the links under the part's store, in `ds-config.json` or your team's profile:
+
+  ```json
+  "stores": { "styleguide": { "write": "https://gitlab.acme.test/design/site",
+                              "notify": { "url": "https://ci.acme.test/job/style-guide/build", "authEnv": "ACME_CI_AUTH" } } }
+  ```
+
+  - `notify` is a link, `{ "url", "method", "authEnv" }` (`method` is `POST` unless you say `PUT` or `GET`), or a list of them. Any CI with a trigger link works: a remote build with a user's API token, a generic webhook. Every part's store takes one, not only the style guide's.
+  - **The credential stays in `.env`.** `authEnv` names its variable: `user:token` is sent as Basic, anything else as a Bearer token. Not set yet? The run says which variable to add and calls nothing.
+  - **Only a write that landed.** A commit or a push on the branch, or a folder written. Never a merge request (nothing is on the branch until someone merges it), a store that already had the files, a refused write, or an `--offline` run.
+  - **Never another token.** A variable the engine uses for something else (`GITLAB_TOKEN`, `GITLAB_WRITE_TOKEN`, `GITHUB_TOKEN`, `FIGMA_TOKEN`, a store's `tokenEnv`) is refused, so a profile can never send one of your tokens to a host it was not made for. Only `https` links are called (`http` only on `localhost`), and a link with a password in it is refused: put the password in `.env`.
+  - **One line per link:** `🔔 Style guide: told ci.acme.test/job/style-guide/build (201)`. The line never shows the link's query or a credential. A CI that refuses, or does not answer in 10 seconds, gets a line of its own, and the write still counts.
 - **Never from a branch of your own.** A checkout on another branch than its remote's default is built, never published.
 - **A failed step is never published.** The round says where it failed, and it is tried again at the next check.
 - **One round at a time.** A lock file stops a second round while one runs.

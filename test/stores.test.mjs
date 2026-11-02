@@ -622,3 +622,122 @@ test('prototypes are a part: read into the project\'s own folder, and what a per
   const mine = localFiles(dir, cfg, 'prototypes');
   assert.deepEqual([...mine.keys()].sort(), ['Flow.json', 'Reset.vue', 'Signup.vue']);
 });
+
+// ── Telling a CI the git host cannot reach ────────────────────────────────────────────────────────────────────────
+// Acme's CI sits on a network its GitLab cannot send webhooks into; the engine, on a computer inside it, calls the CI.
+const CI = 'https://ci.acme.test/job/style-guide/build';
+function fakeCi(answer = { ok: true, status: 201 }) {
+  const c = { calls: [] };
+  c.send = async (url, o) => { c.calls.push([url, o]); return typeof answer === 'function' ? answer(url, o) : answer; };
+  return c;
+}
+const notifyCfg = (notify, extra = {}) => cfgWith({ styleguide: { read: { gitlab: LINK, path: 'sg' }, notify, ...extra } });
+const page = () => new Map([['index.html', '<p>hi</p>']]);
+
+test('a commit that landed tells the CI once, with the credential from .env as Basic; never the query in the line', async () => {
+  const g = fakeGitlab(), ci = fakeCi(), ROOT = project();
+  writeFileSync(join(ROOT, '.env'), 'ACME_CI_AUTH=builder:api-secret\n');
+  const r = await pushStore(ROOT, notifyCfg({ url: `${CI}?token=build-secret`, authEnv: 'ACME_CI_AUTH' }), 'styleguide', page(), 'Style guide published', { env, http: g.http, notifySend: ci.send, runBy: null });
+  assert.equal(r.ok, true, r.line);
+  assert.equal(r.landed, true);
+  assert.equal(ci.calls.length, 1);
+  assert.equal(ci.calls[0][0], `${CI}?token=build-secret`);
+  assert.equal(ci.calls[0][1].method, 'POST');
+  assert.equal(ci.calls[0][1].headers.Authorization, `Basic ${Buffer.from('builder:api-secret').toString('base64')}`);
+  assert.match(r.line, /committed on[^\n]*\n🔔 Style guide: told ci\.acme\.test\/job\/style-guide\/build \(201\)$/);
+  assert.ok(!/build-secret|api-secret|builder/.test(r.line), 'no query, no credential in the line');
+});
+
+test('a token with no colon is sent as Bearer; a link alone or a list of them works too', async () => {
+  const g = fakeGitlab(), ci = fakeCi({ ok: true, status: 200 });
+  const r = await pushStore(project(), notifyCfg(['https://hooks.acme.test/a', { url: 'https://hooks.acme.test/b', method: 'put', authEnv: 'ACME_HOOK' }]), 'styleguide', page(), 'm', { env: { ...env, ACME_HOOK: 'opaque' }, http: g.http, notifySend: ci.send, runBy: null });
+  assert.deepEqual(ci.calls.map(([u, o]) => [u, o.method, o.headers.Authorization ?? null]), [['https://hooks.acme.test/a', 'POST', null], ['https://hooks.acme.test/b', 'PUT', 'Bearer opaque']]);
+  assert.equal((r.line.match(/🔔/g) ?? []).length, 2, r.line);
+});
+
+test('nothing that did not land on the branch tells the CI: a merge request, the same files, a refusal, an offline run', async () => {
+  const send = (g, cfg, o = {}, ROOT = project()) => { forgetAccess(); return pushStore(ROOT, cfg, 'styleguide', page(), 'm', { env, http: g.http, notifySend: ci.send, runBy: null, ...o }); };
+  const ci = fakeCi();
+  const mr = await send(fakeGitlab(), notifyCfg(CI, { mode: 'merge-request' }));
+  assert.match(mr.line, /merge request/);
+  const protectedBranch = await send(fakeGitlab({ branch: { name: 'main', can_push: false } }), notifyCfg(CI));
+  assert.match(protectedBranch.line, /merge request/);
+  const once = fakeGitlab(), ROOT = project();
+  await send(once, notifyCfg([]), {}, ROOT);
+  const same = await send(once, notifyCfg(CI), {}, ROOT);
+  assert.match(same.line, /already has these files/);
+  const refused = fakeGitlab();
+  refused.http.send = async (url, o) => (o?.body?.branch ? { ok: false, status: 400, json: async () => ({ message: 'no' }) } : fakeGitlab().http.send(url, o));
+  const no = await send(refused, notifyCfg(CI));
+  assert.equal(no.ok, false);
+  const offline = await send(fakeGitlab(), cfgWith({ styleguide: { write: { folder: join(project(), 'site') }, notify: CI } }), { offline: true });
+  assert.equal(offline.ok, true, offline.line);
+  assert.equal(ci.calls.length, 0, 'never called');
+  for (const r of [mr, protectedBranch, same, no, offline]) assert.ok(!/🔔|told/.test(r.line), r.line);
+});
+
+test('a folder written tells the CI; a push with the person\'s own git access does too', async () => {
+  const ci = fakeCi(), dir = join(project(), 'site');
+  const f = await pushStore(project(), cfgWith({ styleguide: { write: { folder: dir }, notify: 'http://localhost:8080/hook' } }), 'styleguide', page(), 'm', { notifySend: ci.send });
+  assert.equal(f.landed, true);
+  assert.match(f.line, /written to[^\n]*\n🔔 Style guide: told localhost:8080\/hook \(201\)/);
+  const p = await pushStore(project(), notifyCfg(CI), 'styleguide', page(), 'm', {
+    env: { GITLAB_HOST: HOST }, gitStore: () => ({ sha: 'a'.repeat(40), files: new Map() }), runBy: null, notifySend: ci.send,
+    gitPushStore: () => ({ ok: true, sha: 'c'.repeat(40) }),
+  });
+  assert.match(p.line, /pushed to[^\n]*\n🔔 Style guide: told/);
+  assert.equal(ci.calls.length, 2);
+});
+
+test('a token the engine uses elsewhere, an http link, a password in the link or a missing variable: no call, one line', async () => {
+  const ci = fakeCi(), g = fakeGitlab();
+  const ROOT = project();
+  const cfg = cfgWith({
+    snapshots: { read: { gitlab: LINK, tokenEnv: 'ACME_SNAPSHOTS_TOKEN' } },
+    styleguide: { read: { gitlab: LINK, path: 'sg' }, notify: [
+      { url: CI, authEnv: 'GITLAB_TOKEN' }, { url: CI, authEnv: 'ACME_SNAPSHOTS_TOKEN' }, { url: CI, authEnv: 'FIGMA_TOKEN' },
+      'http://ci.acme.test/job/x/build', 'https://builder:pw@ci.acme.test/job/x/build', { url: CI, authEnv: 'ACME_CI_AUTH' }] },
+  });
+  const r = await pushStore(ROOT, cfg, 'styleguide', page(), 'm', { env: { ...env, ACME_SNAPSHOTS_TOKEN: 'snap', FIGMA_TOKEN: 'figd' }, http: g.http, notifySend: ci.send, runBy: null });
+  assert.equal(r.ok, true, r.line);
+  assert.equal(ci.calls.length, 0);
+  const lines = r.line.split('\n').slice(1);
+  assert.equal(lines.length, 6, r.line);
+  assert.match(lines[0], /^⚠️ {2}Style guide: ci\.acme\.test\/job\/style-guide\/build not told: GITLAB_TOKEN holds a token the engine uses for something else/);
+  assert.match(lines[1], /ACME_SNAPSHOTS_TOKEN holds a token the engine uses/);
+  assert.match(lines[2], /FIGMA_TOKEN holds a token the engine uses/);
+  assert.match(lines[3], /ci\.acme\.test\/job\/x\/build not told: only an https link is called/);
+  assert.match(lines[4], /carries a user or password/);
+  assert.ok(!lines[4].includes('pw'), 'the password is not repeated');
+  assert.match(lines[5], /^ℹ️ {2}Style guide: ci\.acme\.test\/job\/style-guide\/build not told: set ACME_CI_AUTH in \.env/);
+});
+
+test('a CI that refuses or never answers is said, and the write still counts', async () => {
+  const refuses = fakeCi({ ok: false, status: 403 });
+  const a = await pushStore(project(), notifyCfg(CI), 'styleguide', page(), 'm', { env, http: fakeGitlab().http, notifySend: refuses.send, runBy: null });
+  assert.equal(a.ok, true);
+  assert.match(a.line, /\n⚠️ {2}Style guide: ci\.acme\.test\/job\/style-guide\/build answered 403$/);
+  let aborted = false;
+  const silent = (url, o) => new Promise(() => { o.signal.addEventListener('abort', () => { aborted = true; }); });
+  const b = await pushStore(project(), notifyCfg(CI), 'styleguide', page(), 'm', { env, http: fakeGitlab().http, notifySend: silent, notifyTimeoutMs: 30, runBy: null });
+  assert.equal(b.ok, true);
+  assert.equal(aborted, true, 'the request is ended, not left open');
+  assert.match(b.line, /build did not answer in 0 s$/);
+  const down = async () => { throw Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }); };
+  const c = await pushStore(project(), notifyCfg(CI), 'styleguide', page(), 'm', { env, http: fakeGitlab().http, notifySend: down, runBy: null });
+  assert.equal(c.ok, true);
+  assert.match(c.line, /could not be reached \(ECONNREFUSED\)$/);
+});
+
+test('the real sender: a trigger that takes an empty POST, over Node\'s own http', async () => {
+  const { createServer } = await import('node:http');
+  const got = [];
+  const server = createServer((req, res) => { let n = 0; req.on('data', (d) => { n += d.length; }); req.on('end', () => { got.push([req.method, req.url, req.headers.authorization, req.headers['content-length'], n]); res.statusCode = 201; res.end(); }); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/job/style-guide/build`;
+    const r = await pushStore(project(), cfgWith({ styleguide: { write: { folder: join(project(), 'site') }, notify: { url, authEnv: 'ACME_CI_AUTH' } } }), 'styleguide', page(), 'm', { env: { ACME_CI_AUTH: 'builder:api-secret' } });
+    assert.deepEqual(got, [['POST', '/job/style-guide/build', `Basic ${Buffer.from('builder:api-secret').toString('base64')}`, '0', 0]]);
+    assert.match(r.line, /🔔 Style guide: told 127\.0\.0\.1:\d+\/job\/style-guide\/build \(201\)$/);
+  } finally { server.close(); }
+});
