@@ -441,6 +441,39 @@ test('publishing the style guide again removes a picture its last data named, ne
   for (const f of ['chip.html', chipData, chipPic]) assert.ok('sg/' + f in g.files, f);
 });
 
+test('publishing the style guide again removes the parts its last data named, never one another page\'s data still names', async () => {
+  const { pageFiles } = await import('../lib/stores.mjs');
+  const { writeStyleguide } = await import('../lib/styleguide-files.mjs');
+  const pic = (seed) => `data:image/png;base64,${Buffer.alloc(3000, seed).toString('base64')}`;
+  // A component whose Code Connect and Figma image only its own page reads: both in its part.
+  const page = (seed) => `<!--sg-file:styleguide-->\n<style>.a{}</style>\n<script type="application/json" id="sg-data">${JSON.stringify({ components: [{ name: 'cardTile', codeConnect: { n: seed }, figmaShots: [{ src: pic(seed) }] }] })}</script>`;
+  const d = project();
+  writeStyleguide(join(d, 'index.html'), page(1));
+  const before = [...pageFiles(join(d, 'index.html')).keys()];
+  const oldPart = before.find((f) => /\.part\./.test(f)), oldPic = before.find((f) => f.startsWith('assets/img/'));
+  assert.ok(oldPart && oldPic, 'the page sends its part and the picture the part names');
+  writeStyleguide(join(d, 'chip.html'), page(2));
+  const chip = [...pageFiles(join(d, 'chip.html')).keys()], chipPart = chip.find((f) => /\.part\./.test(f)), chipPic = chip.find((f) => f.startsWith('assets/img/'));
+  const at = (files) => Object.fromEntries(files.map((f) => ['sg/' + f, readFileSync(join(d, f), 'latin1')]));
+  const g = fakeGitlab({ files: { ...at([...before, ...chip]) } });
+  writeStyleguide(join(d, 'index.html'), page(3));
+  const files = pageFiles(join(d, 'index.html'));
+  const r = await pushStore(project(), cfgWith({ styleguide: { write: { gitlab: LINK, path: 'sg' } } }), 'styleguide', files, 'Style guide', { env, http: g.http });
+  assert.equal(r.ok, true, r.line);
+  assert.ok(!('sg/' + oldPart in g.files) && !('sg/' + oldPic in g.files), 'the last build\'s part and its picture are removed');
+  for (const f of ['chip.html', chipPart, chipPic]) assert.ok('sg/' + f in g.files, f);
+  // A folder store whose other page's data cannot be read: its part may still be named there, so none goes.
+  const dir = project(), cfg = cfgWith({ styleguide: { write: { folder: dir } } });
+  mkdirSync(join(dir, 'assets'), { recursive: true });
+  writeFileSync(join(dir, 'chip.html'), '<script id="sg-data" data-src="assets/chip.data.0123456789.js"></script>');
+  writeFileSync(join(dir, oldPart), 'x');
+  assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
+  assert.ok(existsSync(join(dir, oldPart)), 'kept while a page\'s data is missing');
+  writeFileSync(join(dir, 'chip.html'), '<p>no data</p>');
+  assert.equal((await pushStore(project(), cfg, 'styleguide', files, 'Style guide')).ok, true);
+  assert.ok(!existsSync(join(dir, oldPart)), 'removed once no page may name it');
+});
+
 // A write GitLab turns down says why, in GitLab's own words; a gateway's page says nothing more than its status.
 test('a refused commit says GitLab\'s reason; a page with none says the status alone', async () => {
   const { reasonOf } = await import('../lib/stores.mjs');
