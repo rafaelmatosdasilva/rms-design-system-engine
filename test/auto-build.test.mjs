@@ -273,3 +273,28 @@ test('the commands: --watch --once and --auto --once, one round now, with nothin
   assert.equal(logLines(dir).filter((l) => / nothing moved$/.test(l)).length, 2, 'one line a round in watch.log');
   assert.ok(!existsSync(join(dir, LOCK)));
 });
+
+test('a step still running past its limit is stopped with all it started, and the round says where; the next round tries again', async () => {
+  const root = tempDir('acme-auto-');
+  record(root, BASE);
+  const h = harness(root, { sources: { now: { ...BASE, Figma: '101' } } });
+  h.deps.run = (step) => { h.ran.push(step.id); return step.id === 'audit' ? { status: null, signal: 'SIGKILL', timedOut: 90 } : { status: 0 }; };
+  const r = await autoRound(root, h.deps);
+  assert.equal(r.result, 'failed');
+  assert.deepEqual(h.ran, ['page', 'audit'], 'nothing after the step that was stopped');
+  assert.equal(h.pubs.length, 0, 'never published');
+  assert.deepEqual(lastRecord(root).sources, BASE, 'not recorded, so the next round builds again');
+  assert.match(logLines(root).at(-1), /stopped at .+, still running after 90 min \(its browsers with it; the round's log says what it was on\): not published, tried again next round$/);
+  // The watch's own runner: its limit from the setup, its process group stopped with it.
+  const src = readFileSync(join(ENGINE, 'lib', 'audit.mjs'), 'utf8');
+  assert.match(src, /const limitMin = Number\(cfg\.styleguide\?\.stepMinutes\) \|\| 90;/);
+  assert.match(src, /timeout: limitMin \* 60e3, killSignal: 'SIGKILL', detached: true \}\);\n    if \(r\.error\?\.code !== 'ETIMEDOUT'\) return r;\n    try \{ process\.kill\(-r\.pid, 'SIGKILL'\); \}/);
+});
+
+test('the accessibility check stops a browser copy that runs past its limit, says what it was on, and leaves its parts', () => {
+  const src = readFileSync(join(ENGINE, 'lib', 'a11y-check.mjs'), 'utf8');
+  assert.match(src, /const wait = \(Number\(cfg\.a11y\?\.timeoutSec\) \|\| Math\.min\(LIMIT_CAP_SEC, Math\.max\(150, Math\.ceil\(open\.reduce\(\(s, t\) => s \+ share\(t\), 0\) \/ n\)\)\)\) \+ 120;/, 'its limit: its share, two minutes past');
+  assert.match(src, /stdio: \['ignore', fd, fd\], detached: true \}\);/, 'what it prints kept, its browsers in its own group');
+  assert.match(src, /setTimeout\(\(\) => \{ stopped\.push\(\{ i, said \}\); try \{ process\.kill\(-child\.pid, 'SIGKILL'\); \}/);
+  assert.match(src, /was still checking after \$\{wait\}s: stopped, with every browser it started\. It was on: \$\{lastSaid\(x\.said\)\}\. Its parts are left for the page's own check\./);
+});
