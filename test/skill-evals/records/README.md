@@ -192,5 +192,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-01-skill-evaluation-pages-to-write` | The 24 guide tasks on Haiku (engine 5497b03) | "Skill evaluation: pages to write, suggested prop pairs, where a contract's description and rules come from; every run passed" |
 | `2026-11-01-merge-main-into-the-guide` | The 24 guide tasks on Haiku (engine 3f8cfb4) | "Build and change guides, library keys, merged with main" |
 | `2026-11-01-the-guide-names-the-style` | The 24 guide tasks on Haiku (engine 879dd98) | "Guide: the style guide's jobs, parts and watch" |
+| `2026-11-02-the-watch-s-install-asks` | The 24 guide tasks on Haiku (engine 679dd24) | "The watch's install asks launchd or systemd only for a job in this computer's own folder" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
