@@ -317,3 +317,12 @@ test('the style guide kept up to date by itself: the background watch added, or 
   assert.deepEqual(r('build the style guide').run, ['rms-design-system-engine --styleguide']);
   assert.notDeepEqual(r('how does the style guide update automatically?').run, ['rms-design-system-engine --watch-install'], 'a question about it is answered');
 });
+
+test('a routed command an MCP tool runs is said as that tool too, for an agent with no shell; one no tool runs is not', async () => {
+  const { routeText } = await import('../lib/route.mjs');
+  const t = routeText({ recipe: 'ask-the-system', run: ['rms-design-system-engine --query radius', 'rms-design-system-engine --summary', 'rms-design-system-engine --styleguide'], notes: [] }, '');
+  assert.match(t, /^RUN: rms-design-system-engine --query radius$/m, 'the shell first, where there is one');
+  assert.match(t, /^RUN \(no shell\): the query tool \(terms: radius\)$/m);
+  assert.match(t, /^RUN \(no shell\): the summary tool$/m);
+  assert.doesNotMatch(t, /RUN \(no shell\):.*styleguide/, 'a command no tool runs is not offered as one');
+});
