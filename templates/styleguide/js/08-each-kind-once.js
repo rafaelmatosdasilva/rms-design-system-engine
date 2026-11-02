@@ -135,6 +135,19 @@
       if (inPatch.length && pd.patch && pd.apply) prow.decide = '<div class="sg-decide-grid"><div class="sg-decide sg-decide--approve" title="' + esc('Applies the patch: each drafted line goes above its prop in the code.') + '"><strong class="sg-decide-head">' + decideMark('approve') + esc('Apply the ' + inPatch.length + (inPatch.length === 1 ? ' draft' : ' drafts')) + '</strong>' + sysButton('button', 'Copy request', ' data-pair-copy="' + esc(pd.apply) + '"') + '<span class="sg-decide-said" role="status"></span></div></div>';
       rows.push(prow);
     }
+    // The prototypes built with it, from each one's own record kept beside it. The page said what agents got wrong
+    // with this component and never what has been built with it - so a designer could not see, from the component,
+    // where it is actually used. A prototype that passed its last check and one that did not are both worth seeing:
+    // the second is what somebody has to finish.
+    if ((c.prototypes || []).length) {
+      var protos = c.prototypes, open = protos.filter(function (p) { return !p.ok; });
+      rows.push(mk('protos', 'Prototypes built with it', '<p>' + protos.length + (protos.length === 1 ? ' prototype uses it' : ' prototypes use it') + (open.length ? ', ' + open.length + ' of them not ready' : ', all of them ready at their last check') + ':</p><ul>' +
+        protos.slice(0, 8).map(function (p) {
+          return '<li>' + esc(p.name) + ' <span class="pg-dim">' + (p.times > 1 ? '×' + p.times + ' · ' : '') + (p.ok ? 'ready' : p.mistakes + (p.mistakes === 1 ? ' mistake' : ' mistakes')) + (p.at ? ' · ' + esc(String(p.at).slice(0, 10)) : '') + '</span></li>';
+        }).join('') + '</ul>', open.length ? 'check' : 'ok',
+        open.length ? 'Open each prototype that is not ready: what it got wrong with this component is what its documentation does not say plainly enough.' : 'Nothing to do: every prototype that uses it passed its last check.'));
+      rows[rows.length - 1].src = ['Each prototype\'s own record'];
+    }
     // What agents got wrong with it in prototypes, and why: what its documentation lacked (to write), or what is written
     // and was not followed (to review: say it more plainly, or higher on its page).
     var inv = c.inventions;

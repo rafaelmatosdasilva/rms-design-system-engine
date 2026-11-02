@@ -212,6 +212,14 @@ There is an honest way out, which there has to be, and it costs a reason:
 
 A reason too thin to be one is not taken. *A check a page cannot satisfy honestly is a check people turn off.* A starting point read from a designed screen is excused everything: it is incomplete on purpose, and failing it for not being finished is the same mistake pointing the other way.
 
+**Each prototype carries its own evaluation.** What every check found used to live in one place, in the engine's output folder: good for counting across a project, no use to the prototype itself. A prototype is a part of its own now — read from your team's store into `prototypes/` and sent back from it — and the page travelled, its handoff travelled, what people said about it travelled, and nothing about whether it holds up did.
+
+Now `prototypes/<name>.check.json` sits beside the page, as the handoff and the comments do: which components it used and how often, the mistakes with why each happened, what the system lacked for it, the states it owes. The store carries it, and so does every file the engine keeps beside a page — named deliberately rather than left to the extensions, because the check record travelled only because it happens to be JSON and the handoff did not travel at all.
+
+It records what was found, never a verdict of its own. And where a check never worked out whose fault each mistake was, it says nothing rather than zero: *the documentation owed none of them* is a different statement from *nobody worked it out*.
+
+**Each component's page shows the prototypes built with it**, from those records: how often it is used in each, which ones passed their last check and which are still not ready. The page said what agents got wrong with a component and never what has been built with it, so a designer could not see, from the component, where it is actually used.
+
 **Is it actually getting better?** Ask `are our prototypes getting better?` and the whole loop is on one screen:
 
 1. The **patterns** a new page is held to.
