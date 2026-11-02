@@ -92,3 +92,30 @@ test('a job that publishes the page alone (written before the page had files bes
   writeFileSync(join(d, '.gitlab-ci.yml'), `pages:\n  script:\n    - cp public/notes.html public/index.html\n    - cp -r .design-system-engine-out/styleguide public\n`);
   assert.equal(pageOnlyCopies(d, out).length, 1, 'another page copied, or the whole folder: nothing to say');
 });
+
+test('a team on Jenkins gets a Jenkinsfile for its store, on the store\'s own branch, its credentials named and never held', async () => {
+  const { writeStoreJobs, storeJenkinsfile, onJenkins, layerJob } = await import('../lib/publish-job.mjs');
+  const root = tempDir('acme-jenkins-');
+  const place = { gitlab: 'https://gitlab.acme.test/design/guide', branch: 'master', notify: [{ url: 'https://ci.acme.test/jenkins/job/guide/build' }] };
+  const cfg = { profile: { source: 'https://gitlab.acme.test/design/profile/-/blob/master/profile.json' } };
+  assert.equal(onJenkins(root, cfg, place), true, 'the CI its store tells is a Jenkins');
+  assert.equal(onJenkins(root, {}, { gitlab: place.gitlab }), false);
+  assert.equal(onJenkins(root, { ci: 'Jenkins' }, null), true, 'or the team says so');
+  const lines = writeStoreJobs(root, cfg, place);
+  assert.match(lines[0], /builds on Jenkins: .+style-guide-store\.Jenkinsfile to design\/guide as its Jenkinsfile/);
+  const jf = readFileSync(join(root, '.design-system-engine-out', 'style-guide-store.Jenkinsfile'), 'utf8');
+  assert.ok(!existsSync(join(root, '.design-system-engine-out', 'style-guide-store-job.yml')), 'no GitLab job for a Jenkins team');
+  assert.match(jf, /a Pipeline job on this project's master branch/, 'the store\'s own branch, not main');
+  assert.match(jf, /triggers \{ cron\('H\/10 \* \* \* \*'\) \}/);
+  assert.match(jf, /--profile 'https:\/\/gitlab\.acme\.test\/design\/profile\/-\/blob\/master\/profile\.json' --ci-changed/);
+  assert.match(jf, /npx -y @puppeteer\/browsers install chrome@stable --path "\$WORKSPACE\/\.dse-chrome"/, 'Chrome for Testing when the machine has none');
+  for (const c of ['dse-gitlab-token', 'dse-gitlab-write-token', 'dse-figma-token']) assert.match(jf, new RegExp(`credentials\\('${c}'\\)`), `${c} named, held by Jenkins`);
+  assert.doesNotMatch(jf, /glpat-|figd_/, 'no token in it');
+  for (const step of ['--styleguide --no-a11y-bake --no-publish', '--styleguide-check', '--publish-styleguide', '--ci-changed --record']) assert.ok(jf.includes(step), `the same steps as the GitLab job: ${step}`);
+  // A store with no branch named anywhere: the job never assumes main where it can say the default branch instead.
+  const gh = layerJob({ host: 'github', url: 'https://github.com/acme/guidelines' }, { host: 'gitlab', origin: 'https://gitlab.acme.test', path: 'design/guide', branch: 'master' });
+  assert.doesNotMatch(gh.text, /branches: \[main\]/);
+  assert.match(gh.text, /if: github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/);
+  assert.match(gh.text, /-F "ref=master"/, 'the trigger asks for the store\'s branch');
+  assert.match(storeJenkinsfile({ profile: "a'b.json" }), /--profile 'a%27b\.json'/, 'a quote never breaks the shell');
+});
