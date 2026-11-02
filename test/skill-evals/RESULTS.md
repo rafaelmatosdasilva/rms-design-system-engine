@@ -1,5 +1,22 @@
 # Skill evaluation results
 
+## 2026-11: Setup's watch line: CI's reason is a CI run (continuous evaluation)
+
+What changed since the entry below (engine 679dd24): The watch builds only what a change feeds, and publishes the page only when it changed (#237); The privacy check refuses every project name hashed, with no list on the computer (#240); The accessibility check keeps its results through comment changes, says why it checks again; each run times its steps (#239); The background style-guide watch is on by default; Setup's watch line: CI's reason is a CI run. The guide changed in `cookbook/first-setup.md`, `reference/config.md`.
+
+Guide set measured: `72865a962ca7` · Project measured: `13d811a9d668`
+
+Guide files measured: `cookbook/a11y-notes.md 7c4afb26` `cookbook/accept-debt.md cb87b4b7` `cookbook/ask-the-system.md 561e0739` `cookbook/audit-component.md 3d9e924e` `cookbook/build-component-figma.md b923a84b` `cookbook/build-from-figma.md f8f39c65` `cookbook/burndown.md 77e00934` `cookbook/change-component-figma.md 42780d4d` `cookbook/ci-and-hooks.md 597032e7` `cookbook/figma-edits.md 0fe202b3` `cookbook/first-setup.md 61e56d8e` `cookbook/fix-a-difference.md be5fcd7d` `cookbook/full-audit.md 99e2f8b4` `cookbook/guidelines-links.md 91fe2b73` `cookbook/prototype.md eee225e2` `cookbook/publish-styleguide.md 8d37d60a` `cookbook/refresh-figma.md 3d4c5584` `cookbook/states-and-variants.md 549d2a77` `cookbook/visual-diff.md 58946b57` `reference/config.md a180cf9e` `reference/gates.md 8aa5acaf` `reference/maintainers.md d078934e` `reference/personality.md 7f1584bf` `reference/usage.md 2f7f49df` `rms-design-system-engine.md 0f804311`
+
+| Haiku, engine b808d92 | Entry below | This version |
+|---|---|---|
+| The 24 guide tasks (`new-ui-saved` at 10 runs) | 79/79 | 79/79 |
+| Mean cost a run | $0.036 | $0.046 |
+| Input a run | 83k | 87k |
+| Rule violations | 0 | 0 |
+
+**Reading.** Haiku: every task passes and no rule is broken; runs read 87k a run against 83k. no task changed state, and no run moved: the same result. Records: `records/2026-11-02-setup-s-watch-line-ci`.
+
 ## 2026-11: The watch's install asks launchd or systemd only for a job in this computer's own folder (continuous evaluation)
 
 What changed since the entry below (engine 879dd98): The guide names the style guide's new jobs, its template in parts and the watch (#238); The watch builds only what a change feeds, and publishes the page to the team's store only when it changed; Skill evaluation: "sign this off" says a change waits for sign-off as well as "sign-off" does; The watch's install asks launchd or systemd only for a job in this computer's own folder. The guide changed in `cookbook/publish-styleguide.md`, `reference/usage.md`.

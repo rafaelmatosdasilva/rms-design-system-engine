@@ -927,6 +927,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - the engine itself, after it updates.
   - It runs only what the change feeds, and publishes to your team's store only a page that changed. No CI runner? This keeps the team's page up to date ([Rebuilt on your own computer](#rebuilt-on-your-own-computer)).
   - It runs in the background from login on, with no terminal open: a LaunchAgent on a Mac, a user service on Linux. What it does goes to `.design-system-engine-out/watch.log`, and one request turns it off.
+  - It is on by default ([On by default](#on-by-default)).
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
@@ -952,7 +953,19 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. The back
 - **One line a round** in `.design-system-engine-out/watch.log`: what moved, what ran, how long, and whether it published.
 - **One round now.** `--watch --once` (or `--auto --once`) runs one round and stops, for a scheduler of your own.
 - **No token is stored.** Each step reads them from the project's `.env`, as every run does.
-- **`--guide-status`** says whether the watch is on, and what its last round did.
+- **`--guide-status`** says whether the watch is on (and why not, when it is off), and what its last round did.
+
+#### On by default
+
+The engine turns the watch on by itself, once for each person:
+
+- **When:** at the end of first setup, or on your next run where it isn't on yet. It says so in one line, and never asks or waits.
+- **Never:** on CI, in tests, inside the watch's own rounds, on an `--offline` run, or from an engine running in a git worktree.
+- **Turn it off for yourself:** `--watch-uninstall`. It stays off for that folder until `--watch-install`.
+- **Turn it off for the project:** `"styleguide": { "watch": false }` in `ds-config.json`, or in your team's profile for everyone. A watch the engine turned on is then taken away on the next run; one you turned on by hand stays.
+- **A failed start** is said once, with its reason, and not tried again on every run. `--watch-install` tries again.
+- **Not a Mac or Linux:** it says once that it can't, and how to rebuild by hand.
+- **Engine updates:** the watch updates the engine itself (once a day at most, between rounds), builds with the new engine, then restarts on its code. The job names the engine's own folder and a `node` path that upgrades keep, so neither breaks it.
 
 ### What's in it
 
