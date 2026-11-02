@@ -101,9 +101,8 @@ a.pg-usage-name { color: var(--sg-text); }
 .sg-matrix .sg-mx-row.is-link { cursor: pointer; }   /* a row opens the component's page: its own hover and press */
 .sg-matrix .sg-mx-row.is-link:hover > td { background: var(--sg-a2); }
 .sg-matrix .sg-mx-row.is-link:active > td { background: var(--sg-a3); }
-.sg-matrix .sg-mx-row > td.sg-mx-cell-go { cursor: pointer; }   /* a cell opens that area: its own hover and press, over the row's */
-.sg-matrix .sg-mx-row > td.sg-mx-cell-go:hover .sg-link-pill { background: var(--sg-hover-fill); border-color: var(--sg-border-hover); }   /* the cell answers through its pill */
-.sg-matrix .sg-mx-row > td.sg-mx-cell-go:hover .sg-link-go { color: var(--sg-text); }
+.sg-matrix .sg-mx-row.is-link:hover:not(:has(.sg-link-pill:hover, .sg-tip:hover)) .sg-mx-go { background: var(--sg-hover-fill); color: var(--sg-text); }   /* the row and its arrow open the same page: hovering one lights both, never while an area's pill (another place) is the one hovered */
+.sg-matrix .sg-mx-row .sg-link-pill { cursor: pointer; }   /* only an area's pill opens that area: the rest of its cell is the row's */
 .sg-mx-go:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-mx-go > svg { width: calc(var(--sg-space-l) + var(--sg-space-xxs)); height: calc(var(--sg-space-l) + var(--sg-space-xxs)); }
 /* The component's page in a panel over the Status page. */

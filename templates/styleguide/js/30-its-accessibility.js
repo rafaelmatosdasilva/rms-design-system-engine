@@ -218,7 +218,7 @@
       var see = href && x.say !== 'N/A' && (x.fix || x.dec), st = x.st !== undefined ? x.st : x.fix ? 'todo' : x.dec ? 'check' : '', why = x.why || WHY[x.say];
       // An area with something open is a link to it: its state in a link pill, the page's one style for a link in a table.
       var link = see ? '<button type="button" class="sg-link-pill sg-mx-go--cell" data-open="' + esc(href) + '" data-name="' + esc(o.name) + '" data-area="' + slug + '" data-filter="' + st + '" aria-label="Open ' + esc(o.name) + ' on ' + label + ', ' + esc(x.say) + '">' + pill(x.cls, x.say) + LINK_GO + '</button>' : '';
-      return '<td' + (see ? ' class="sg-mx-cell-go"' : '') + ' data-fix="' + (x.fix || 0) + '" data-dec="' + (x.dec || 0) + '" data-rank="' + rankOf(x.cls, x.say) + '" data-ok="' + (x.cls === 'match' ? 1 : 0) + '">' +
+      return '<td data-fix="' + (x.fix || 0) + '" data-dec="' + (x.dec || 0) + '" data-rank="' + rankOf(x.cls, x.say) + '" data-ok="' + (x.cls === 'match' ? 1 : 0) + '">' +
         (see ? (why ? '<span class="sg-mx-why">' + link + tipHTML(why, 'Why ' + x.say) + '</span>' : link) : why ? tipPill(x.cls, x.say, x.why) : pill(x.cls, x.say)) + '</td>';
     };
     var rowHTML = function (o) {
@@ -324,9 +324,8 @@
         var k = MX_COL_OF[g]; if (w && k) { todoKey = k; todoDir = -1; todoArea = MX_AREAS.indexOf(k) >= 0 ? k : null; }
         showTodoArea(box); todoLink(); return;
       }
-      // The whole cell opens what its arrow opens (its tip, if any, stays its own).
-      var cellGo = !e.target.closest('.sg-tip, .sg-mx-go, .sg-mx-go--cell') && e.target.closest('td.sg-mx-cell-go'); if (cellGo) { var cb = cellGo.querySelector('.sg-mx-go--cell'); if (cb) openComponentPanel(cb.dataset.name, cb.dataset.open, cb.dataset.area || '', cb.dataset.filter || '', cb); return; }
-      // The rest of a row opens the component's own page, as its arrow does.
+      // The rest of a row opens the component's own page, as its arrow does: an area cell too, but for its pill, which
+      // alone opens that area.
       var rowGo = !e.target.closest('.sg-tip, .sg-mx-go, a, button') && e.target.closest('tr.sg-mx-row.is-link'); if (rowGo) { var rb = rowGo.querySelector('td.sg-mx-open-cell .sg-mx-go'); if (rb) openComponentPanel(rb.dataset.name, rb.dataset.open, '', '', rb); return; }
       var go = e.target.closest('.sg-mx-go, .sg-mx-go--cell'); if (go) { openComponentPanel(go.dataset.name, go.dataset.open, go.dataset.area || '', go.dataset.filter || '', go); return; }
       // A column head sorts by it; again, the other way round. A name or a date first A to Z and oldest first, the
