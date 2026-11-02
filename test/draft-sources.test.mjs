@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { draftSource, figmaOnlyNamed } from '../lib/draft-sources.mjs';
 import { factsFrom } from '../lib/intent-truth.mjs';
-import { draftPlan, briefOf } from '../lib/intent-changes.mjs';
+import { draftPlan, briefOf, draftPrompt } from '../lib/intent-changes.mjs';
 
 const facts = factsFrom({ components: { draftSaver: { file: 'src/saver/DraftSaver.vue', props: { state: { options: ['idle', 'saving', 'saved'], from: 'the code' }, savedAt: { type: 'object', from: 'the code' }, showClock: { type: 'boolean', from: 'Figma' } } } } });
 
@@ -32,4 +32,26 @@ test('the drafter is told which props are only Figma\'s, and keeps no line that 
   draftPlan(plan, facts, null, { answers: { '0.d': { limitations: ['It shows the time only when `showClock` is set.', 'It shows the time only when `savedAt` is given.'] } } });
   assert.deepEqual(plan[0].drafted.map((d) => d.text), ['It shows the time only when `savedAt` is given.']);
   assert.match(plan[0].dropped[0].why, /`showClock`, a property of the Figma component that the code does not take/);
+});
+
+test('one draft a part: a second line for the same part is not kept, nor one that says again a line the page has', () => {
+  const entity = { kind: 'component', layer: 'components', name: 'Draft Saver', file: 'c/draft-saver.json', purpose: [], whenToUse: ['Use `draftSaver` in a long form so the user can save progress on purpose.'], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [] };
+  const plan = [{ entity, page: { component: 'draftSaver' }, rewrite: [], need: ['whenToUse', 'limitations'] }];
+  draftPlan(plan, facts, null, { answers: { '0.d': {
+    whenToUse: ['Use `draftSaver` in a long form so the user can save their progress on purpose.', 'Use `draftSaver` when the user needs to see `state` move from `idle` to `saved`.', 'Use `draftSaver` with `savedAt` to show when the last save happened.'],
+    limitations: 'It does not submit the form.',
+  } } });
+  assert.deepEqual(plan[0].drafted.map((d) => [d.where, d.text]), [
+    ['When to use', 'Use `draftSaver` when the user needs to see `state` move from `idle` to `saved`.'],
+    ['Limitations', 'It does not submit the form.'],
+  ], 'one line a part, as one line or the first of a list');
+  assert.deepEqual(plan[0].dropped.map((d) => d.why), [
+    'the page already says it: "Use `draftSaver` in a long form so the user can save progress on purpose."',
+    'When to use has a draft already: one a part',
+  ]);
+});
+
+test('the drafter is asked for one line a part', () => {
+  assert.match(draftPrompt([]), /"whenToUse": "<line>", "whenNotToUse": "<line>"/);
+  assert.match(draftPrompt([]), /\(one line each, the most useful one, never a second for the same part; only the parts asked; never a line the page already says\)/);
 });
