@@ -203,6 +203,12 @@ How it checks the agent's work, in a loop, before you see it:
 - Follows what your team already decided, and never uses a retired component.
 - Holds a new page to how your product's **real pages** are built, not only to the prototypes drawn so far: which components a page holds and in what order, what each action is called, where the actions go. A project on its first day has no prototypes and no designed screens, but it has its pages. Only what the code says for certain is taken; spacing and text styles are never guessed from it.
 
+**What the page's own wrapper may use.** We read the transcripts of twelve measured runs looking for why agents invent. The answer was narrow and the same every time: **every invented value was in the page's own wrapper, and never in a component.** A page width written as `400px`, a line between rows as `#e0e0e0`, an empty state as an `<svg>` drawn by hand — each of them in the same tag as a `var(--padding-m)` the same agent had got right.
+
+It used a token wherever it had been shown one, and invented wherever it had not. The catalog showed spacing and nothing else, while the theme had `--surface-page`, `--text-primary` and `--stroke-default` all along.
+
+So the catalog now names them: what the wrapper may use, and nothing else. What a component owns stays that component's — a `--radii-button` is the button's, and a wrapper reaching for it borrows a look it was not given. A colour, a line, a corner or a width the theme does not name is a need the system lacks, and goes in the page as a gap for the design team, never as a value of the agent's own.
+
 **A state the page owes is not a note.** A page that shows a list owes an empty state; one that takes input owes an error state. The engine worked both out and said so — as advice — and advice gets skipped. We measured it: given the documentation alone, with those very lines in the page's own instructions, agents skipped the empty list and the form-with-a-mistake more often than anything except inventing.
 
 So the page is now **drawn and not ready**. Drawn, because the page somebody still has to finish is exactly the one worth looking at — every size, every state, the pictures, the review. Not ready, because the run comes back unfinished and names the state.
