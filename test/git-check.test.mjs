@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
-import { readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, statSync, existsSync, symlinkSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { pushRefs, usedBy, auditFindingsFor, changedFiles, gitCheck, gitCheckText } from '../lib/git-check.mjs';
@@ -170,6 +170,16 @@ test('a hook of the project\'s own, or a hooks folder it commits, is never writt
   assert.deepEqual(o.written, []);
   assert.deepEqual(o.kept.map((k) => k.name), ['pre-commit', 'pre-push']);
   assert.equal(existsSync(join(other, '.githooks')), false);
+});
+
+test('a project reached through a symlinked folder is still the top of its repository: the hook changes no folder', () => {
+  const dir = project();
+  const link = join(makeFixture({}), 'linked');
+  symlinkSync(dir, link);
+  assert.equal(gitHooksStatus(link).sub, '');
+  const r = installGitHooks(link, { engineDir: ENGINE });
+  assert.doesNotMatch(readFileSync(join(r.dir, 'pre-commit'), 'utf8'), /^cd /m);
+  assert.doesNotMatch(readFileSync(join(r.dir, 'pre-push'), 'utf8'), /^cd /m);
 });
 
 test('--install-hooks writes the git hooks beside the Claude Code ones; a project set up before gets them on its next run', () => {
