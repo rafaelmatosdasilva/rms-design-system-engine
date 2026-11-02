@@ -551,8 +551,9 @@ test('in the browser: no script error, a control changes the real component, the
     // the guide stays an underlined link.
     assert.equal(await run(`[...document.querySelectorAll('.sg-section:not([hidden]) table a[href^="#"]')].filter((a) => !a.closest('thead, .sg-tip, .pg-preview, .pg-frame, .pg-variants, .pg-anat-wrap, .sg-showroom, .sg-thumb') && !a.classList.contains('sg-mx-go') && !(a.classList.contains('sg-link-pill') && a.querySelector('svg'))).length`), 0, 'every link in a table is a link pill');
     const kinds = await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody td:nth-child(2)')].map((d) => d.textContent).sort().join('|')`);
-    assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Example', 'Its tokens'].sort().join('|'));
-    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*$/, 'what is to write first, then what is to check, what is written after');
+    // Its stage too, a task when the team has set none (the chip has no status in its contract).
+    assert.equal(kinds, ['What it is', 'When to use', 'When not to use', 'Common mistakes', 'Limitations', 'Do and don\'t', 'Role', 'Example', 'Its tokens', 'Stage'].sort().join('|'));
+    assert.match(await run(`[...document.querySelectorAll('#c-chip .pg-knowledge tbody tr')].map((tr) => tr.dataset.status).join(' ')`), /^(todo )*todo( check)*( done)*( check)?$/, 'what is to write first, then what is to check, what is written after; its stage, not counted, last');
     // The table is its task, kind, status and when it was checked; what is written and what to do are in its panel.
     assert.match(await run(ROW_FULL(`document.querySelector('#c-chip .pg-knowledge tr[data-status="todo"]')`)), /What to do[\s\S]*You in Figma[\s\S]*(How to write it|What to do)[\s\S]*Where[\s\S]*(Not written yet\.|No pictures yet\.)[\s\S]*Missing/);
     assert.match(await run(`document.querySelector('#c-chip .pg-areas [data-v="docs"]').textContent`), /^Documentation, (Partial|Missing)$/, 'its tab says its Status state, as Parity and Accessibility do');
@@ -568,7 +569,8 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), true);
     await run(`location.hash = '#c-button?Disabled=false'`); await new Promise((r) => setTimeout(r, 400));
     // Its page says it is retired, what replaces it, and how much still moves.
-    assert.match(await run(`document.querySelector('#c-button .pg-header').textContent`), /^(?=.*Deprecated).*Use chip instead\. Still used in 3 places \(This system 3\), each on the Status page\./);
+    assert.match(await run(`document.querySelector('#c-button .pg-header').textContent`), /Use chip instead\. Still used in 3 places \(This system 3\), each on the Status page\./);
+    assert.doesNotMatch(await run(`document.querySelector('#c-button .pg-header').textContent`), /Deprecated/, 'no stage in its header: its migration says it');
     assert.equal(await run(`document.querySelector('#c-button .pg-preview button').disabled`), false);
     // How a product brings it in: the import line, copied by the system's button.
     assert.equal(await run(`document.querySelector('#c-chip .pg-import code').textContent`), "import { Chip } from '@/components/Chip';");
