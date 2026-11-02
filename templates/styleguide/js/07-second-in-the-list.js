@@ -331,11 +331,13 @@
   // "Legend, part of Component Pie chart", "the System page". Never its file: the person reads what they decide on.
   var ilOn = function (p) {
     if (!p || p.absent || p.system) return 'the System page';
+    if (p.tokens) return 'the Tokens page';
     if (p.about && p.about.partOf) return p.name + ', part of Component ' + p.about.partOf;
     if (p.missingFor) return 'Component ' + p.missingFor;
     if (p.recheckFor) return 'Component ' + p.recheckFor;
     var kind = ({ templates: 'Template', foundations: 'Foundation', patterns: 'Pattern', flows: 'Flow', pages: 'Page' })[p.layer];
-    return kind ? kind + ' ' + p.name : 'Component ' + ((p.about && p.about.is) || p.component || p.name);
+    var name = (p.about && p.about.is) || p.component || p.name;
+    return kind ? kind + ' ' + p.name : name ? 'Component ' + name : 'the System page';   // a row with no name is the system's
   };
   // The task that wrote a page's drafts, as the decision names it: ' from the task "<title>" (28 Oct)', or '' when the
   // drafts name none or several.
@@ -460,8 +462,8 @@
     // page (its drafts, each once, beside where it comes from), Changes to rules (the guards and rewrites its rules
     // propose, rule-checks.mjs: one with nothing but the engine's own reading behind it folded away, No its answer until
     // a person says otherwise), and Other changes (what is still to write, a part's page to move, the notes no agent
-    // reads). Each item takes its own decision, approve, change or drop; each group an Approve all; one Copy carries every
-    // decision made, in the person's words, for Claude Code. Never where each is written (Claude Code finds it).
+    // reads). One action a group, never one an item: its Approve all copies the decision on everything it shows, in the
+    // person's words, for Claude Code. Never where each is written (Claude Code finds it).
     var REVIEW_LINE = /^Review (its draft|these \d+ drafts)\b/;   // the engine's line for the drafts alone (intent-layer.mjs): the card says it for every change
     // Where a draft comes from (draft-sources.mjs): each prop it names as the code has it, a name only Figma has (never
     // a prop the code takes: said as a warning), and the line it says again, wherever it is written.
@@ -476,48 +478,25 @@
       if (f.line) out.push('Says again: “' + f.line.text + '” (' + f.line.from + ').');
       return warn.map(function (t) { return '<span class="sg-il-source sg-il-source--warn">' + esc(t) + '</span>'; }).join('') + out.map(function (t) { return '<span class="sg-il-source">' + esc(t) + '</span>'; }).join('');
     };
-    var ilChoice = function (k, label, on, tip) { return '<button type="button" class="sg-btn sg-il-choice sg-il-choice--' + k + '" data-il-choose="' + k + '" aria-pressed="' + (on ? 'true' : 'false') + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + decideMark(k) + esc(label) + '</button>'; };
-    // One item and its own three actions, approve, change and drop, never more: what it is, its body, then the three,
-    // each with the words it adds to the decision copied (none: nothing is done for it) and what it does as its tip.
-    // Change opens the item's own words to edit (opt.edit), and the decision copied carries the words as edited.
-    // def: the answer it has until a person chooses.
-    var ilItem = function (head, body, steps, def, opt) {
-      opt = opt || {}; var tips = opt.tips || {};
-      var said = function (k) { return steps[k] ? ' data-il-' + k + '="' + esc(steps[k]) + '"' : ''; };
-      return '<div class="sg-il-line sg-il-change sg-il-item" data-il-item' + said('approve') + said('change') + said('drop') + (steps.changeTo ? ' data-il-change-to="' + esc(steps.changeTo) + '"' : '') + '><strong>' + esc(head) + '</strong>' + body
-        + '<span class="sg-il-choices" role="group" aria-label="' + esc('Your decision: ' + head) + '">' + ilChoice('approve', 'Approve', def === 'approve', tips.approve) + ilChoice('change', 'Change', def === 'change', tips.change || 'Edit the words below; the decision copied carries them.') + ilChoice('drop', 'Drop', def === 'drop', tips.drop) + '</span>'
-        + (opt.edit != null ? '<textarea class="sg-input sg-il-edit" data-il-edit data-il-was="' + esc(opt.edit) + '" rows="2" aria-label="' + esc('Your words: ' + head) + '"' + (def === 'change' ? '' : ' hidden') + '>' + esc(opt.edit) + '</textarea>' : '') + '</div>';
+    // One item: what it is and its body, with the words approving it adds to the group's decision (steps.approve). Its
+    // callers still say its other answers; the panel offers none of them.
+    var ilItem = function (head, body, steps) {
+      return '<div class="sg-il-line sg-il-change sg-il-item" data-il-item' + (steps.approve ? ' data-il-approve="' + esc(steps.approve) + '"' : '') + '><strong>' + esc(head) + '</strong>' + body + '</div>';
     };
-    // A group: its heading and count, an Approve all for what it shows, its items, then those folded away (quiet).
+    // A group: its heading and count, one Approve all for what it shows (it copies the decision), its items, then those
+    // folded away (quiet), which it leaves as they are.
     var ilGroup = function (key, head, items, all, quiet) {
       quiet = quiet || []; var n = items.length + quiet.length; if (!n) return '';
       var said = function (k) { return all && all[k] ? ' data-il-all-' + k + '="' + esc(all[k]) + '"' : ''; };
-      return '<div class="sg-il-group-decide" data-il-group="' + key + '"' + said('approve') + said('drop') + '><div class="sg-il-group-head"><strong>' + esc(head + ' (' + n + ')') + '</strong>' + (items.length ? sysButton('button', 'Approve all', ' data-il-all="' + key + '"') : '') + '</div>' + items.join('')
+      return '<div class="sg-il-group-decide" data-il-group="' + key + '"' + said('approve') + '><div class="sg-il-group-head"><strong>' + esc(head + ' (' + n + ')') + '</strong>' + (items.length ? sysButton('button', items.length === 1 ? 'Approve' : 'Approve all ' + items.length, ' data-il-all="' + key + '" title="' + esc('Copies the decision: paste it in Claude Code') + '"', 'sg-il-all', null, decideMark('approve')) + '<span class="sg-decide-said" role="status"></span>' : '') + '</div>' + items.join('')
         + (quiet.length ? '<details class="sg-il-quiet"><summary>' + esc(quiet.length + (quiet.length === 1 ? ' more the engine has no ground for: No, unless you say otherwise' : ' more the engine has no ground for: No to each, unless you say otherwise')) + '</summary>' + quiet.join('') + '</details>' : '') + '</div>';
     };
-    // The decisions made, in the person's words: each group's in order; a group whose every item took the same answer
-    // said at once when it has words for it ("Approve all 3 drafts"). A change with words of the person's own carries
-    // them; one left as it was asks for them. → the decision to copy, or '' when none is made.
-    var ilDecided = function (on, groups) {
-      var steps = [];
-      var stepOf = function (x) { return x.choice === 'change' && x.to && x.steps.changeTo ? x.steps.changeTo.split('{to}').join(x.to) : x.steps[x.choice]; };
-      groups.forEach(function (g) {
-        var made = g.items.filter(function (x) { return x.choice; }); if (!made.length) return;
-        var one = made[0].choice, all = one !== 'change' && made.length === g.items.length && made.every(function (x) { return x.choice === one; }) && g.all && g.all[one];
-        if (all) steps.push(all); else made.forEach(function (x) { var st = stepOf(x); if (st) steps.push(st); });
-      });
+    // A group's Approve all, in the person's words: the group's own words for it when it has them (all: "Approve all 3
+    // drafts"), else each item's approve in turn (approves: those the group shows, never what is folded away).
+    // → the decision to copy, or '' when there is nothing to approve.
+    var ilApproved = function (on, all, approves) {
+      var steps = all ? [all] : approves.filter(Boolean);
       return steps.length ? on + capital(steps.join('; then ')) + '.' : '';
-    };
-    // The same, read from the panel as the person left it: each item's choice, and its words when they edited them.
-    var ilGroupsOf = function (box) {
-      var at = function (el, k) { return el.getAttribute(k) || ''; };
-      return Array.prototype.map.call(box.querySelectorAll('[data-il-group]'), function (g) {
-        return { all: { approve: at(g, 'data-il-all-approve'), drop: at(g, 'data-il-all-drop') }, items: Array.prototype.map.call(g.querySelectorAll('[data-il-item]'), function (it) {
-          var c = it.querySelector('[data-il-choose][aria-pressed="true"]'), ed = it.querySelector('[data-il-edit]');
-          var to = ed ? String(ed.value || '').replace(/\s+/g, ' ').trim() : '';
-          return { choice: c ? c.getAttribute('data-il-choose') : null, to: to && to !== String(at(ed, 'data-il-was')).replace(/\s+/g, ' ').trim() ? to : '', steps: { approve: at(it, 'data-il-approve'), change: at(it, 'data-il-change'), drop: at(it, 'data-il-drop'), changeTo: at(it, 'data-il-change-to') } };
-        }) };
-      });
     };
     // open: the page's proposals not answered yet. Its rule changes are Changes to rules; the others (a page to write, a
     // name to keep, a part's page, a page to review again) Decisions about the page, each with the same three actions.
@@ -568,11 +547,8 @@
         + ilGroup('rules', 'Changes to rules', rules.filter(function (x) { return !x.quiet; }).map(function (x) { return ruleItem(x); }), null, rules.filter(function (x) { return x.quiet; }).map(function (x) { return ruleItem(x, 'drop'); }))
         + ilGroup('asks', 'Decisions about the page', asks.map(askItem), null)
         + ilGroup('other', 'Other changes', otherItems, { drop: 'write nothing new and leave ' + (notes.length ? 'its notes' : 'the page') + ' as ' + (notes.length ? 'they are' : 'it is') });
-      var lead = (task && !/pg-missing/.test(task) ? task : '') + '<p class="sg-il-line">' + esc((n === 1 ? 'Approve, change or drop it' : 'Approve, change or drop each one') + ', then copy your decision' + (n === 1 ? '' : 's') + ' into Claude Code. One left undecided stays as it is.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you decide.' : '')) + '</p>';
-      // What is decided before anyone chooses: the rule changes folded away, each a no.
-      var first = ilDecided(on, [{ all: {}, items: rules.filter(function (x) { return x.quiet; }).map(function (x) { return { choice: 'drop', steps: { drop: says(answers(x)[1], x) } }; }) }]);
-      return lead + '<div class="sg-il-draft" data-il-review data-il-on="' + esc(on) + '"><div class="sg-il-draft-text">' + html + '</div>'
-        + '<div class="sg-il-review-copy"><span class="sg-tk-code-line sg-il-cmd"><code data-il-preview>' + esc(first) + '</code>' + sysButton('button', 'Copy decisions', ' data-il-copy-review') + '</span><span class="sg-decide-said" role="status"></span></div></div>';
+      var lead = (task && !/pg-missing/.test(task) ? task : '') + '<p class="sg-il-line">' + esc('Approve copies the decision for its group; paste it into Claude Code. What you leave stays as it is.' + (nd ? ' Agents won\'t use ' + (nd === 1 ? 'the draft' : 'the drafts') + ' until you approve.' : '')) + '</p>';
+      return lead + '<div class="sg-il-draft" data-il-review data-il-on="' + esc(on) + '"><div class="sg-il-draft-text">' + html + '</div></div>';
     };
     var ilWhy = function (p) { return ilWrong(p) + (p.component || p.layer !== 'components' ? ((p.notUsed || []).length ? p.notUsed.map(function (n) { return '<p class="sg-il-line"><strong>' + esc(capital(n.what)) + '</strong><span class="pg-par-val">' + esc(n.why) + '</span></p>'; }).join('') : (p.action === 'keep' || (p.wrong || []).length ? '' : '<p class="pg-missing">Everything on it reaches the agents.</p>')) : '<p class="sg-il-line">' + esc((p.notUsed[0] || {}).why || '') + '</p>'); };
     // What is still to write about the component a row is for, from every source: each piece of its documentation not
@@ -717,23 +693,18 @@
       var own = !(p.tokens || p.absent || p.missingFor || p.recheckFor || p.noLayer) && Object.assign({}, p, { todo: (p.todo || []).filter(function (t) { return !REVIEW_LINE.test(t); }) });
       var todo = ilChanges(p, c.write, c.notes, own ? ilTodo(own, true) : c.todo, ilOpen(p)), task = own ? ilTodo(own) : c.todo;
       var body = card('Status', '<p>' + c.decision + '</p>') + card('Proposal', ilProposal(p)) + card('What to do', todo || task) + card('File', c.file) + card('For', c.forWhat) + card('What the agents read', c.reads) + card('Rules', ilRules(p)) + card('Why', c.why) + card('Where it goes', c.gets) + card('Last updated', c.updated ? '<p>' + c.updated + '</p>' : '');
-      // Each item's own decision: a second press takes it back; Change opens its words to edit, and they close again with
-      // any other answer. Approve all approves what its group shows (not what is folded away). The decision copied is read
-      // from the panel as it is, and shown above its one Copy as it grows.
+      // A group's Approve all copies the decision on what it shows (not what is folded away), said beside it once copied.
       var detail = m.querySelector('.sg-row-detail');
-      var showIn = function (box) { var pre = box && box.querySelector('[data-il-preview]'); if (pre) pre.textContent = ilDecided(box.getAttribute('data-il-on'), ilGroupsOf(box)); };
-      var press = function (it, k) { Array.prototype.forEach.call(it.querySelectorAll('[data-il-choose]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-il-choose') === k ? 'true' : 'false'); }); var ed = it.querySelector('[data-il-edit]'); if (ed) ed.hidden = k !== 'change'; return ed; };
       detail.onclick = function (e) {
         var box = e.target.closest('[data-il-review]');
-        var ch = e.target.closest('[data-il-choose]');
-        if (ch && box) { var k = ch.getAttribute('data-il-choose'), ed = press(ch.closest('[data-il-item]'), ch.getAttribute('aria-pressed') === 'true' ? null : k); if (ed && !ed.hidden) ed.focus(); showIn(box); return; }
         var all = e.target.closest('[data-il-all]');
-        if (all && box) { Array.prototype.forEach.call(all.closest('[data-il-group]').querySelectorAll('[data-il-item]'), function (it) { if (!it.closest('.sg-il-quiet')) press(it, 'approve'); }); showIn(box); return; }
-        var rc = e.target.closest('[data-il-copy-review]');
-        if (rc && box) { var said = box.querySelector('.sg-il-review-copy .sg-decide-said'), text = ilDecided(box.getAttribute('data-il-on'), ilGroupsOf(box)); if (!text) { said.textContent = 'Choose approve, change or drop for one at least first.'; return; } copyText(text, rc, said, 'Paste it in Claude Code'); return; }
+        if (all && box) {
+          var g = all.closest('[data-il-group]'), shown = Array.prototype.filter.call(g.querySelectorAll('[data-il-item]'), function (it) { return !it.closest('.sg-il-quiet'); });
+          copyText(ilApproved(box.getAttribute('data-il-on'), g.getAttribute('data-il-all-approve'), shown.map(function (it) { return it.getAttribute('data-il-approve'); })), all, g.querySelector('.sg-il-group-head .sg-decide-said'), 'Paste it in Claude Code');
+          return;
+        }
         var cp = e.target.closest('[data-il-copy]'); if (cp) copyText(cp.getAttribute('data-il-copy'), cp, cp.parentNode.querySelector('.sg-decide-said'), cp.getAttribute('data-il-said'));
       };
-      detail.oninput = function (e) { if (e.target.closest('[data-il-edit]')) showIn(e.target.closest('[data-il-review]')); };
       m.querySelector('.sg-row-detail').innerHTML = sidePanelPage({ crumbs: ['Documentation'].concat(statusOf(p) === 'review' ? ['Review', reviewTopic(p)] : statusOf(p) === 'write' ? ['Missing'] : statusOf(p) === 'remove' ? ['Remove'] : [labelOf('keep')]), title: p.tokens ? 'Tokens' : p.absent ? 'The system' : p.missingFor || p.recheckFor || p.name || p.file || p.component || 'Page', body: body });
       panelShow(m, from);
     };
