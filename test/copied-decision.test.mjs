@@ -121,3 +121,23 @@ test('a snapshot an older engine wrote names only the index: the System page is 
   const plan = draftLinesPlan({ system, entities: [], _source: { entry: file } }, 'the System page', 'Rules', ['Ask first.'], new Map([[file, raw]]), { task: 'T', at: '2026-10-28' });
   assert.equal(plan.file, file);
 });
+
+test('each draft decided on its own is made in one review; a rule change worded by the person is asked for, never written', () => {
+  const t = 'on Component Draft Saver, Approve the draft "Use it to save progress."; then Drop the draft "It shows `x`."; then Change the draft "It saves.": ask me for my words; then No to "Hold the rule as a check"; then Change "Rewrite the rule": ask me for my words.';
+  const r = routed(t);
+  assert.equal(r.run[0], `${cmd} --review-drafts '[{"page":"Draft Saver","line":"Use it to save progress.","do":"approve"},{"page":"Draft Saver","line":"It shows \`x\`.","do":"drop"}]' --said '${t}'`, 'one review for every draft decided on its own');
+  assert.match(r.run[1], /--intent-decide 'Hold the rule as a check' no --said /);
+  assert.equal(r.run.length, 2);
+  assert.ok(r.notes.some((n) => /^Ask the person for their words for the draft "It saves\.", then run rms-design-system-engine --review-drafts --change 'Draft Saver' 'It saves\.' '<their words>'/.test(n)));
+  assert.ok(r.notes.some((n) => /^Ask the person for their words for the rule in "Rewrite the rule", then run rms-design-system-engine --intent-decide 'Rewrite the rule' no .* and rms-design-system-engine --draft 'Draft Saver' 'Rules' '<their words>' --task 'Rule rewrite'\. Never write the words for them\.$/.test(n)));
+});
+
+test('the review takes each draft\'s own decision, page by page', () => {
+  const file = 'specs/system.dsds.json', raw = JSON.stringify(index('- **Draft (T, 2026-10-28):** Ask before building one.'), null, 2);
+  const { system } = readDsds(new Map([[file, JSON.parse(raw)]]), file);
+  const r = reviewPlan({ system, entities: [] }, [{ page: 'the System page', line: 'Name the gap.', do: 'approve' }, { page: 'the System page', line: 'Ask before building one.', do: 'drop' }], new Map([[file, raw]]));
+  assert.deepEqual(r.problems, []);
+  const after = JSON.stringify(JSON.parse(r.files.get(file)));
+  assert.match(after, /"statement":"Name the gap\."/, 'the one approved, its marker off');
+  assert.doesNotMatch(after, /Ask before building one/, 'the one dropped, gone');
+});

@@ -842,6 +842,22 @@ Rules tell an agent what to do; an example shows it. A page with none gets one, 
 - **Where it came from.** The line above it says how many of the uses take this form, and the file, line and product it was taken from.
 - **A draft.** It goes under Examples, in the page's own format: a code block in a Markdown page, a block of text titled Examples in a DSDS page. Dropped, it goes whole, code and all. A component no product uses keeps the example written from its own code.
 
+### Deciding a page's changes
+
+A page's panel on the Documentation page holds every change it asks for, in groups. Each group has its own heading and count.
+
+| Group | What is in it |
+| --- | --- |
+| New text for the page | Its drafts, each once, under its section |
+| Changes to rules | The guards and rewrites its rules propose |
+| Other changes | What is still to write, a part's page to move, notes no agent reads |
+
+- **One decision per item.** Approve, change or drop each one. A second press takes the choice back. An item left undecided stays as it is.
+- **Approve all, per group.** It approves what the group shows, never what is folded away.
+- **One copy for all of it.** The decision copied for Claude Code carries every choice, in plain words, and shows above its button as you choose. Every draft approved is said at once ("Approve all 3 drafts").
+- **Each draft beside its source.** The props it names, as the code has them (its file and the values each takes), and the line it says again, on the page or in Figma's notes or the code's comment.
+- **A name only Figma has is flagged.** A Figma property the code does not take, written as a prop, is shown as a warning on its draft. The engine's own drafts never write one: they say what the code does, or call it Figma's.
+
 ### Pages to write, most used first
 
 A component with no page gives agents nothing to read. The engine ranks those components by how far they reach: how many products use them, in how many files, how many times.
@@ -897,6 +913,8 @@ When the engine proposes an answer to a decision (a page to write, a part to doc
 | Past decisions | The team kept the same name on another page |
 
 Each piece is strong, some or weak. The answer with the most behind it is proposed. When another answer has as much, the proposal says the evidence is split and a person decides.
+
+- **A change to a rule needs more than the engine.** A guard or a rewrite with nothing behind it but the engine's own reading is never proposed as a yes. It is folded away on the page, with No as its answer until you say otherwise. A rule your page marks as a must, or a yes the team gave to one like it before, is proposed as usual.
 
 ### Who decides
 
@@ -1095,6 +1113,9 @@ Each rule on a page is said as what holds it. The page's Documentation panel and
 
 - **A checkable rule proposes its guard.** Say yes or no on the Documentation page, or with `--intent-decide <key> yes`. A yes writes the guard into `contract.authored.json` (an import into `ds-config.json`), and the rule is checked from then on, linked to it. A no is kept, and the rule stays one agents read.
 - **A vague rule gets a rewrite.** One that names no component, prop, value, token or count ("use it appropriately") is given one sentence a reviewer can check, from what the page says. A yes drafts it under Rules for your review.
+- **A rewrite keeps what the rule means.** Every word the rule is about is still in it, or no rewrite is proposed. Two rules are never given the same sentence. A label in the rule ("Put Secondary, Cancel, Clear or Back before Primary") is a name, not a vague word.
+- **Each rule is about its own component.** A page that documents two components often writes each name as a heading among its rules. That line is not a rule, and the rules under it are about that component. A count of something inside it ("a maximum of 2 visible buttons" under a footer bar) is not a count of the bar on a screen, so it gets no guard.
+- **A guard never contradicts the component.** A value its code takes is never forbidden outright, nor a setting the page's own lines use. Such a rule means something else, and stays one a person judges.
 - **Agents are held to them.** Each rule in a contract carries its status. Checked and checkable rules are hard constraints.
 - **English and Portuguese.** The same rule, written in either, is read the same way.
 

@@ -30,7 +30,7 @@ const PAIRS = [
   ['Never put a Button inside a Tile.', 'Nunca coloques um Button dentro de um Tile.', 'checkable', { kind: 'pairing', parent: 'Tile', child: 'Button' }],
   ['A Tile never contains a Button.', 'O Tile nunca contém um Button.', 'checkable', { kind: 'pairing', parent: 'Tile', child: 'Button' }],
   ['Only one primary Button per screen.', 'Apenas um Button primary por ecrã.', 'checkable', { kind: 'max', component: 'Button', props: { variant: 'primary' }, max: 1 }],
-  ['Never use the `loud` tone on Tile.', 'Nunca uses o tom `loud` no Tile.', 'checkable', { kind: 'props', component: 'Tile', props: { tone: 'loud' } }],
+  ['Never use `tone="loud"` with `dense=true`.', 'Nunca uses `tone="loud"` com `dense=true`.', 'checkable', { kind: 'props', component: 'Tile', props: { tone: 'loud', dense: 'true' } }],
   ['Tile must always have a `title`.', 'O Tile deve ter sempre um `title`.', 'checkable', { kind: 'requires', component: 'Tile', prop: 'title' }],
   ['Never use a Tile without its header.', 'Nunca uses um Tile sem o seu header.', 'checkable', { kind: 'requires', component: 'Tile', slot: 'header' }],
   ['Use `--acme-tile-bg`, not `--acme-surface`.', 'Nunca uses `--acme-surface` no Tile; usa `--acme-tile-bg`.', 'checkable', { kind: 'value', value: '--acme-surface', use: '--acme-tile-bg', component: 'Tile' }],
@@ -150,13 +150,13 @@ test('a contract gives each rule with its status: checked and checkable are cons
 test('the guards the rules become are held by the edit check: a prop or slot always there, at most one on a screen', () => {
   const rule = (t) => ({ ...on(t).guard, page: 'Tile' });
   let authored = {};
-  for (const t of ['Tile must always have a `title`.', 'Never use a Tile without its header.', 'Only one primary Button per screen.', 'Never use the `loud` tone on Tile.']) authored = withGuard(rule(t), { authored, id: ruleKey('guard', 'Tile', t), rule: t }).authored;
+  for (const t of ['Tile must always have a `title`.', 'Never use a Tile without its header.', 'Only one primary Button per screen.', 'Never use `tone="loud"` with `dense=true`.']) authored = withGuard(rule(t), { authored, id: ruleKey('guard', 'Tile', t), rule: t }).authored;
   const guards = guardsOf(authored);
   assert.equal(guards.length, 4);
-  const file = ['<Tile tone="calm">', '  <template #header>Hi</template>', '</Tile>', '<Tile title="A" tone="loud"><template #header>x</template></Tile>', '<Tile title="B" />', '<Button variant="primary" />', '<Button variant="primary">Save</Button>', '<Button variant="secondary" />'].join('\n');
+  const file = ['<Tile tone="calm">', '  <template #header>Hi</template>', '</Tile>', '<Tile title="A" tone="loud" dense="true"><template #header>x</template></Tile>', '<Tile title="B" />', '<Button variant="primary" />', '<Button variant="primary">Save</Button>', '<Button variant="secondary" />'].join('\n');
   const found = guardFindings(file, new Set([1, 2, 3, 4, 5, 6, 7, 8]), guards);
   const said = found.map((f) => `${f.line} ${f.text.split(':')[0]}`);
-  assert.deepEqual(said, ['1 Tile without `title`', '5 Tile without its header slot', '6 2 Button with variant="primary" on one screen', '4 Tile with tone="loud" is what a rule of the team rules out (the team\'s rule']);
+  assert.deepEqual(said, ['1 Tile without `title`', '5 Tile without its header slot', '6 2 Button with variant="primary" on one screen', '4 Tile with tone="loud" and dense="true" is what a rule of the team rules out (the team\'s rule']);
   assert.ok(found.every((f) => f.rule && f.rule.startsWith('guard:Tile:')), 'each finding links its rule');
   assert.match(found[0].text, /a rule of the team says it always has it \("Tile must always have a `title`"\); set title/);
   // Props passed on unnamed are not read as missing; a tag the edit did not touch is not this edit's.
@@ -178,7 +178,7 @@ function project(rules) {
   const root = tempDir('rule-cli-');
   writeFileSync(join(root, 'ds-config.json'), JSON.stringify({ name: 'Acme', intentLayer: './docs/' }));
   mkdirSync(join(root, '.design-system-engine-out'), { recursive: true });
-  writeFileSync(join(root, '.design-system-engine-out', 'code.snapshot.json'), JSON.stringify({ api: { Tile: { file: 'src/Tile.vue', props: { tone: { type: 'string', options: ['calm', 'loud'] }, title: { type: 'string' } }, slots: { named: ['header'] } }, Button: { file: 'src/Button.vue', props: { variant: { type: 'string', options: ['primary', 'secondary'] } } } }, tokens: {} }));
+  writeFileSync(join(root, '.design-system-engine-out', 'code.snapshot.json'), JSON.stringify({ api: { Tile: { file: 'src/Tile.vue', props: { tone: { type: 'string', options: ['calm', 'loud'] }, title: { type: 'string' }, dense: { type: 'boolean' } }, slots: { named: ['header'] } }, Button: { file: 'src/Button.vue', props: { variant: { type: 'string', options: ['primary', 'secondary'] } } } }, tokens: {} }));
   mkdirSync(join(root, 'src')); writeFileSync(join(root, 'src', 'Tile.vue'), '<template><div class="tile"><slot name="header" /></div></template>'); writeFileSync(join(root, 'src', 'Button.vue'), '<template><button /></template>');
   mkdirSync(join(root, 'docs'));
   const entity = { kind: 'component', id: 'component-tile', name: 'Tile', sections: [{ kind: 'guidelines', title: 'When to use', items: [{ statement: 'To group related content.' }] }, { kind: 'guidelines', title: 'Rules', items: rules.map((statement) => ({ statement })) }] };
@@ -189,7 +189,7 @@ function project(rules) {
 const run = (root, ...args) => spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, CI: '', DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE: '1' } });
 
 test('--check-intent says each page\'s rules; a yes writes the guard and the rule is checked from then on; a no is kept', () => {
-  const root = project(['Never put a Button inside a Tile.', 'Nunca uses o tom `loud` no Tile.', 'Use it appropriately.', 'Use Tile when content belongs together.']);
+  const root = project(['Never put a Button inside a Tile.', 'Nunca uses `tone="loud"` com `dense=true`.', 'Use it appropriately.', 'Use Tile when content belongs together.']);
   const first = run(root, '--check-intent');
   assert.equal(first.status, 0, first.stdout + first.stderr);
   assert.match(first.stdout, /📏 Rules: 4 on 1 page · 0 checked · 2 checkable · 2 judgment \(1 vague\)/);
@@ -199,7 +199,7 @@ test('--check-intent says each page\'s rules; a yes writes the guard and the rul
   assert.equal(yes.status, 0, yes.stdout + yes.stderr);
   assert.match(yes.stdout, /written into contract\.authored\.json → Tile\.neverCombineWith: the edit check holds "Never put a Button inside a Tile\." from the next edit/);
   assert.deepEqual(JSON.parse(readFileSync(join(root, 'contract.authored.json'), 'utf8')).components.Tile.neverCombineWith, ['Button']);
-  const tone = ruleKey('guard', 'Tile', 'Nunca uses o tom `loud` no Tile.');
+  const tone = ruleKey('guard', 'Tile', 'Nunca uses `tone="loud"` com `dense=true`.');
   const no = run(root, '--intent-decide', tone, 'no');
   assert.equal(no.status, 0, no.stdout + no.stderr);
   assert.equal(JSON.parse(readFileSync(join(root, 'design-system-engine-intent-decisions.json'), 'utf8'))[tone].answer, 'no');
@@ -208,7 +208,7 @@ test('--check-intent says each page\'s rules; a yes writes the guard and the rul
   const after = run(root, '--check-intent');
   assert.match(after.stdout, /📏 Rules: 4 on 1 page · 1 checked · 1 checkable · 2 judgment \(1 vague\)/);
   assert.match(after.stdout, /checked by the edit check's nesting rules/);
-  assert.match(after.stdout, /checkable as Tile never takes tone="loud"\. \(declined\)/);
+  assert.match(after.stdout, /checkable as Tile never takes tone="loud" with dense="true"\. \(declined\)/);
   assert.match(after.stdout, /NEXT: none/, 'nothing left to ask');
 });
 
@@ -216,4 +216,38 @@ test('the Documentation page shows each page\'s rules in a card of their own', (
   const tpl = templateText();
   assert.match(tpl, /card\('Rules', ilRules\(p\)\)/);
   assert.match(tpl, /' checked, ' \+ r\.checkable \+ ' checkable, ' \+ r\.judgment \+ ' judgment'/);
+});
+
+// A page that documents two components, each under its own name as a heading among the rules: an invented system with a
+// footer bar and a save control whose code takes three states.
+test('a page of two components: each rule is about the one whose heading it is under, and no guard or rewrite says what the rule does not', () => {
+  const ctx = ruleContext({ components: { panelFooter: { props: {} }, draftSaver: { props: { state: { options: ['idle', 'saving', 'saved'], from: 'the code' }, showClock: { type: 'boolean', from: 'Figma' } } }, Tile: COMPONENTS.Tile } });
+  const e = page('Draft Saver', ['PanelFooter', 'Use a maximum of 2 visible buttons.', 'Put Secondary, Cancel, Clear, or Back before Primary.', 'Button labels must clearly describe the action.', 'Use only one PanelFooter per screen.', 'DraftSaver', 'Save button must have a clear text label.', 'Saving and saved states must be perceivable as status feedback, not only icon color changes.', 'Use it sparingly.'], { whenToUse: ['Use `draftSaver` with `state` moving from `idle` to `saving` to `saved`.'] });
+  const r = pageRules(e, 'draftSaver', ctx);
+  assert.equal(r.n, 7, 'a component\'s name alone is a heading, not a rule');
+  const of = (t) => r.rules.find((x) => x.text === t);
+  assert.equal(of('Use a maximum of 2 visible buttons.').under, 'panelFooter', 'under the footer bar\'s heading: about the footer bar');
+  assert.equal(of('Use a maximum of 2 visible buttons.').guard, undefined, 'it counts buttons in the bar, not bars on a screen: no guard');
+  assert.deepEqual(of('Use only one PanelFooter per screen.').guard, { kind: 'max', component: 'panelFooter', max: 1 }, 'a count of the bar itself is the bar\'s');
+  assert.equal(of('Saving and saved states must be perceivable as status feedback, not only icon color changes.').status, 'judgment', 'never a guard against a state the code takes');
+  for (const t of ['Put Secondary, Cancel, Clear, or Back before Primary.', 'Button labels must clearly describe the action.', 'Save button must have a clear text label.']) assert.equal(of(t).rewrite, undefined, `no rewrite that changes what it means: ${t}`);
+  assert.equal(of('Put Secondary, Cancel, Clear, or Back before Primary.').vague, undefined, 'a button\'s label is a name, not a vague word');
+  assert.equal(of('Use it sparingly.').rewrite, 'Use at most one draftSaver per screen.', 'a rewrite that keeps the meaning stays');
+  const P = ruleProposals(new Map([[e, r]]));
+  assert.deepEqual([...P.values()].map((x) => [x.kind, x.subject]), [['guard', 'panelFooter'], ['rewrite', 'Draft Saver']]);
+  // A guard against a setting the page's own lines use contradicts the page; one the component does not offer is checked.
+  assert.equal(classifyRule('Never use `state="saving"` with `showClock=true`.', { component: 'draftSaver', entity: { ...e, whenToUse: ['Use `state="saving"` with `showClock=true` while it saves.'] } }, ctx).status, 'judgment');
+  assert.equal(classifyRule('Never use `state="saving"` with `showClock=true`.', { component: 'draftSaver', entity: e }, ctx).status, 'checkable', 'a combination nothing on the page uses can be held');
+  assert.equal(on('Never use the `loud` tone on Tile.').status, 'judgment', 'one value the code takes, forbidden outright, contradicts the component');
+});
+
+test('a rewrite keeps the rule\'s meaning or is not proposed', async () => {
+  const { keepsMeaning } = await import('../lib/rule-checks.mjs');
+  assert.ok(keepsMeaning('Keep the text clear.', 'Tile\'s `title` says what it does in three words at most, starting with a verb.', 'Tile'), 'its text, said as its title');
+  assert.ok(keepsMeaning('Use it appropriately.', 'Use Tile only to group related content.', 'Tile'));
+  assert.ok(!keepsMeaning('Button labels must clearly describe the action.', 'Tile\'s text says what it does in three words at most, starting with a verb.', 'Tile'), 'its button and its action are gone');
+  // Two rules of one page given the same sentence: neither keeps it.
+  const ctx = CTX();
+  const r = pageRules(page('Tile', ['Keep the text clear.', 'Keep its text clear and short.']), 'Tile', ctx);
+  assert.ok(r.rules.every((x) => !x.rewrite));
 });
