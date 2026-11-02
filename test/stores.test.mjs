@@ -418,6 +418,21 @@ test('publishing the style guide again removes the files an earlier page linked,
   assert.ok(!existsSync(join(dir, old)) && existsSync(join(dir, 'notes.txt')) && existsSync(join(dir, 'index.html')));
 });
 
+// A write GitLab turns down says why, in GitLab's own words; a gateway's page says nothing more than its status.
+test('a refused commit says GitLab\'s reason; a page with none says the status alone', async () => {
+  const { reasonOf } = await import('../lib/stores.mjs');
+  assert.equal(await reasonOf({ text: async () => '{"message":"A file with this name doesn\'t exist"}' }), ': "A file with this name doesn\'t exist"');
+  assert.equal(await reasonOf({ json: async () => ({ message: { base: ['branch is protected'], file_path: ['is invalid'] } }) }), ': "base branch is protected; file_path is invalid"');
+  assert.equal(await reasonOf({ text: async () => '<html>502 Bad Gateway</html>' }), '');
+  assert.equal(await reasonOf({ json: async () => { throw new Error('no body'); } }), '');
+  const g = fakeGitlab();
+  g.http.send = async (url, o) => (o?.body?.branch ? { ok: false, status: 400, json: async () => ({ message: 'A file with this name already exists' }) } : fakeGitlab().http.send(url, o));
+  forgetAccess();
+  const r = await pushStore(project(), cfgWith({ styleguide: { write: LINK } }), 'styleguide', new Map([['index.html', '<p>x</p>']]), 'Style guide published', { env, http: g.http, retryMs: 1 });
+  assert.equal(r.ok, false);
+  assert.match(r.line, /GitLab answered 400 to the commit: "A file with this name already exists"/);
+});
+
 test('a commit the gateway timed out on but GitLab made is sent, said once and never sent again', async () => {
   const g = fakeGitlab();
   const send = g.http.send;
