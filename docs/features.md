@@ -117,7 +117,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 **Ready to use** · **Why it matters:** Shortcuts do not pile up until the system falls apart.
 
-*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down.*
+*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
 
 - Spots a product screen or an AI edit that builds its own copy of a system component.
 - Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
@@ -125,6 +125,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
 - Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
 - Checks Tailwind classes against Figma.
+- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
 - Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
 - Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
 
@@ -153,7 +154,8 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
 - Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
-- Lists what the Figma file is missing, such as a focus state or an error message.
+- Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
+- Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
 - Tries again only what changed, so a second run takes seconds.
 - Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
 - Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
