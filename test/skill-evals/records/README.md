@@ -196,5 +196,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-02-setup-s-watch-line-ci` | The 24 guide tasks on Haiku (engine b808d92) | "Setup's watch line: CI's reason is a CI run" |
 | `2026-11-02-the-guide-tells-the-agent` | The 24 guide tasks on Haiku (engine 5b6010a) | "The guide tells the agent about the loop, the states a page owes, and where the patterns come from" |
 | `2026-11-02-the-guide-names-git-s` | The 24 guide tasks on Haiku (engine d0594f9) | "Guide: first result after setup, git's hooks, accessibility the design owes" |
+| `2026-11-02-the-main-guide-keeps-its` | The 24 guide tasks on Haiku (engine 0191718) | "Guide: first result after setup, git's hooks, accessibility the design owes" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.
