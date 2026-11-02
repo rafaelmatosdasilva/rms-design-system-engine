@@ -3,6 +3,13 @@
 //
 //   node test/skill-evals/run.mjs --variant baseline|cookbook|skill|bare|mcp --model <id> --runs 5 --set dev|heldout|all|build|prototype|route
 //        [--route shell|both|mcp|none] [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
+//        [--source <a project of your own>]
+//
+// --source measures the same tasks against a real design system instead of the four-component fixture: name a
+// project set up with that team's profile, and the engine brings in what it reads. The system is never copied
+// into this repository and never written to - each run gets a throwaway copy of the project, and the agent
+// writes its prototype only there. Everything the run produces is that team's, so every row is private and goes
+// under DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT, which such a run requires.
 //
 // --route says how the agent reaches the engine (lib.mjs ROUTES): a shell (the default), the engine's MCP server with
 // no shell (mcp), both, or neither. The route benchmark (--set route) runs the same tasks on each.
@@ -15,11 +22,11 @@
 // transcripts beside them (not committed). Private tasks (DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_TASKS) write only under
 // DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT, never in the repository.
 import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, ENGINE, DEMO, cliOf, cliChange, cliLine, ROUTES } from './lib.mjs';
+import { makeProject, makeHome, runClaude, context, decisionPoints, cleanup, keepFiles, projectHash, againstOwnProject, ENGINE, DEMO, cliOf, cliChange, cliLine, ROUTES } from './lib.mjs';
 import { ROUTE_TASKS } from './route-tasks.mjs';
 import { globalChecks } from './rules.mjs';
 import { DEV } from './tasks.mjs';
@@ -36,6 +43,22 @@ const V = arg('variant', 'baseline'), MODEL = arg('model', 'claude-sonnet-5'), R
 const ROUTE = arg('route', 'shell');
 if (!ROUTES[ROUTE]) { console.log(`✗ no route ${ROUTE}: ${Object.keys(ROUTES).join(', ')}`); process.exit(2); }
 const ONLY = arg('only', null), JOBS = Number(arg('jobs', 2)), BUDGET = Number(arg('budget', 3)), DRY = process.argv.includes('--dry'), RESUME = process.argv.includes('--resume');
+// --source <a project of your own>: the same tasks, measured against a real design system instead of the fixture.
+// The system is never copied here and never written to: the project named is one set up with that team's profile,
+// the engine brings in what it reads, and each run gets a throwaway copy of it so the agent writes only there.
+//
+// Everything such a run produces is a team's own: their component names in the files kept with each row, their
+// words in the transcripts. So it is private by construction, not by how a task happens to be named. The results
+// go where the team says and nowhere else, and every row is named so the recorder drops it (record.mjs, pruneRow).
+const SOURCE = arg('source', null);
+if (SOURCE && !existsSync(SOURCE)) { console.log(`✗ no project at ${SOURCE}`); process.exit(2); }
+// Said before a single run starts, not when the first one goes to write: a measurement against somebody's own
+// system with nowhere private to put the results is one that should not begin.
+const PRIVATE_OUT = envVar(process.env, 'EVAL_PRIVATE_OUT');
+if (SOURCE && !PRIVATE_OUT) { console.log('✗ --source measures a system that is somebody\'s own: set DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT to a folder outside this repository for the results and transcripts.'); process.exit(2); }
+// Outside this repository, and checked rather than trusted: a folder inside it is how a team's code gets committed
+// by somebody who meant well, and the one time it happens is the time that matters.
+if (SOURCE && !relative(ENGINE, resolve(PRIVATE_OUT)).startsWith('..')) { console.log(`✗ ${PRIVATE_OUT} is inside this repository, which is public. Point DESIGN_SYSTEM_ENGINE_EVAL_PRIVATE_OUT somewhere outside it.`); process.exit(2); }
 
 let privateTasks = [];
 const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');
@@ -43,12 +66,12 @@ if (PRIVATE_TASKS && (SET === 'heldout' || SET === 'all' || SET === 'private')) 
   privateTasks = (await import(PRIVATE_TASKS)).PRIVATE.map((t) => ({ ...t, private: true }));
 }
 const sets = { dev: DEV, heldout: [...HELDOUT, ...privateTasks], private: privateTasks, all: [...DEV, ...HELDOUT, ...privateTasks], build: BUILD, prototype: PROTO, route: ROUTE_TASKS };
-const tasks = (sets[SET] ?? []).filter((t) => !ONLY || t.id === ONLY).map((t) => ({ ...t, set: BUILD.includes(t) ? 'build' : PROTO.includes(t) ? 'prototype' : ROUTE_TASKS.includes(t) ? 'route' : DEV.includes(t) ? 'dev' : 'heldout', source: BUILD.includes(t) || PROTO.includes(t) ? TIDEPOOL : t.source }));
+const tasks = againstOwnProject((sets[SET] ?? []).filter((t) => !ONLY || t.id === ONLY).map((t) => ({ ...t, set: BUILD.includes(t) ? 'build' : PROTO.includes(t) ? 'prototype' : ROUTE_TASKS.includes(t) ? 'route' : DEV.includes(t) ? 'dev' : 'heldout', source: BUILD.includes(t) || PROTO.includes(t) ? TIDEPOOL : t.source })), SOURCE);
 const vr = variant(V, { ref: arg('ref', undefined) });
 const sha = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 const engineHash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ENGINE, encoding: 'utf8' }).trim() + (execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ENGINE, encoding: 'utf8' }).trim() ? '+dirty' : '');
 const cliVersion = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
-const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, cliVersion, ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
+const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buffer.byteLength(vr.text), engineHash, project: SOURCE ? projectHash(SOURCE) : SET === 'build' || SET === 'prototype' ? `${projectHash(TIDEPOOL)}+${projectHash(join(HERE, 'build-reference'))}` : projectHash(DEMO), model: MODEL, cliVersion, ...(ROUTE !== 'shell' || SET === 'route' ? { route: ROUTE } : {}) };
 console.log(`${V}${ROUTE !== 'shell' ? ` by ${ROUTE}` : ''} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
