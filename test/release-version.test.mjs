@@ -1,4 +1,4 @@
-// release-version - the next tag the weekly release workflow publishes, and how big the step is.
+// release-version - the next tag the release workflow publishes, and how big the step is.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -35,9 +35,10 @@ test('a malformed tag, bump or version stops the release', () => {
   assert.throws(() => nextVersion('', 'minor', 'one'), /not x\.y\.z/);
 });
 
-test('the workflow runs weekly, reads version tags and pull request labels, and publishes generated notes', () => {
+test('the workflow is started by hand, with a backstop every third day, reads version tags and pull request labels, and publishes generated notes', () => {
   const wf = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
-  assert.match(wf, /schedule:/);
+  assert.match(wf, /workflow_dispatch:/);
+  assert.match(wf, /cron: '0 7 \*\/3 \* \*'/, 'merged work never waits more than three days');
   assert.match(wf, /--match 'v\[0-9\]\*'/);
   assert.match(wf, /gh pr view/);
   assert.match(wf, /release-version\.mjs/);
