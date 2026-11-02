@@ -581,7 +581,7 @@
       var wrap = document.createElement('div'); wrap.className = 'pg-anat-wrap'; wrap.appendChild(copy);
       var marks = document.createElement('div'); marks.className = 'pg-anat-marks'; marks.setAttribute('aria-hidden', 'true');
       stage.appendChild(wrap); stage.appendChild(marks); anatBox.appendChild(stage);
-      var root = c.only ? (copy.querySelector(c.only) || copy) : copy;
+      var root = copy; if (c.only) { try { root = copy.querySelector(c.only) || copy; } catch (err) { /* not a selector: the whole */ } }
       if (/^(fixed|absolute)$/.test(getComputedStyle(root).position)) { anatBox.textContent = 'This component sits over the page, so it is inspected in the browser rather than here.'; return; }
       if (wv) { wrap.classList.add('pg-frame-stage'); wrap.style.width = wv[2] + 'px'; wrap.style.boxSizing = 'border-box'; }
       var whole = (wv ? wrap : copy).getBoundingClientRect(), rr = root.getBoundingClientRect();
@@ -1066,7 +1066,8 @@
       if (ecs.position === 'fixed' && !(c.motion && c.motion.overlay)) { e.style.position = 'relative'; e.style.inset = 'auto'; }
       // A component that lives inside another (one segment of a segmented control): drawn once, inside its parent,
       // and its props act on it, not on the parent.
-      if (c.only) { var ones = Array.prototype.slice.call(e.querySelectorAll(c.only)); if (ones.length) { ones.slice(1).forEach(function (k) { k.remove(); }); e = ones[0]; } }
+      // A part that is not a selector the browser parses draws the whole, so one bad name never stops the page.
+      if (c.only) { var ones = []; try { ones = Array.prototype.slice.call(e.querySelectorAll(c.only)); } catch (err) { /* not a selector */ } if (ones.length) { ones.slice(1).forEach(function (k) { k.remove(); }); e = ones[0]; } }
       cur = e;
       var written = [], hidden = []; leaves = {};
       // Shows, hides and options first, text last, so a part a show prop draws gets its text.

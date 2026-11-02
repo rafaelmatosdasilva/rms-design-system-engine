@@ -1716,3 +1716,23 @@ test('a table filtered by a chip closes on the card\'s own edge: the last row sh
   const tpl = templateText();
   for (const box of ['.pg-inspect', '.pg-par-card .pg-par-table', '.sg-tk-facts']) assert.ok(tpl.includes(`${box} tbody tr:not([hidden]):not(:has(~ tr:not([hidden])))`), box);
 });
+
+test('a component named with a note in brackets gives no part to draw, and the playground never throws on one', async () => {
+  const { innerPart } = await import('../lib/styleguide-data.mjs');
+  // The convention made from such a name: no browser parses it, and its last word ("2030)") is no part.
+  for (const name of ['🟡 .cardTile. (deprecated, to be removed in 2030)', '🟡  .acmeBadge (deprecated, to be removed in 2030)']) {
+    assert.equal(innerPart(name, '.' + name, 'convention'), null, name);
+    assert.equal(innerPart(name, '.' + name, 'code'), null, `${name}, even when a source other than the convention gave it`);
+  }
+  assert.equal(innerPart('.cardTile (deprecated, to be removed in 2030)', '.cardTile (deprecated, to be removed in 2030)', 'selector'), null);
+  // A real one still draws its part; the parent itself stays whole.
+  assert.equal(innerPart('segment', '.segmented-control button', 'contract'), 'button');
+  assert.equal(innerPart('segment', '.segmented-control > button.is-on', 'contract'), 'button.is-on');
+  assert.equal(innerPart('segmentedControl', '.segmented-control button', 'contract'), null);
+  assert.equal(innerPart('chip', '.chip', 'convention'), null);
+  // In the page, a part the browser cannot parse draws the whole rather than stopping the sweep.
+  const tpl = templateText();
+  const uses = tpl.split('\n').filter((l) => /querySelector(All)?\(c\.only\)/.test(l));
+  assert.ok(uses.length >= 2, 'the playground and the anatomy read c.only');
+  for (const l of uses) assert.match(l, /try \{[^}]*querySelector(All)?\(c\.only\)/, l.trim());
+});
