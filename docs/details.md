@@ -551,13 +551,23 @@ GitHub's runners already have Chrome. A pull request can read the caches its bas
 
 ### What the Figma file is missing
 
-Some problems belong to the Figma file. They are listed for whoever keeps it.
+Some problems belong to the Figma file. They are found in Figma alone, before any code exists, and listed for whoever keeps it.
 
-- An interactive component with no focus state, so the code has to invent the focus ring.
-- An error state with no message, so the error is shown by colour alone.
-- A control under 24 pixels.
+- **Contrast.** Each text colour on each surface it is drawn on, in every mode: 4.5:1 for text, 3:1 for an icon or large text.
+- **Pairs the system makes.** A text colour is also measured on the background its name pairs it with, and on every surface when nothing is drawn under it.
+- **Focus.** An interactive component with no focus state, so the code has to invent the focus ring.
+- **Focus ring.** A ring drawn in the focus state is held to 3:1 against every surface, in every mode.
+- **Target size.** A control under 24 pixels tall or wide, in any of its variants.
+- **Role.** A component whose name says it is a control (`iconButton`, `textField`) and has no `Role:` note.
+- **Name.** A control that shows no words and has no note naming it (`aria-label: "Close"`).
+- **Error.** An error state with no message, so the error is shown by colour alone.
 
-Meanwhile Claude writes a visible focus ring and leaves an error message's words to you.
+Each gap reaches the design team:
+
+- **In Figma.** `--figma-edits` puts each one on the page "Design system to do", in a frame "Accessibility the design owes": one card per gap, with its WCAG criterion and its fix. It is written only after you say yes, and afresh each time, so what is fixed clears.
+- **On the style guide.** Each one is on its component's Accessibility list and on the Tasks page, for you in Figma.
+
+Meanwhile Claude writes a visible focus ring and leaves the words of an error message or a name to you. `"designA11y": false` in `ds-config.json` turns this off.
 
 ### What it cannot tell you
 

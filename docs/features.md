@@ -154,7 +154,8 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
 - Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
-- Lists what the Figma file is missing, such as a focus state or an error message.
+- Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
+- Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
 - Tries again only what changed, so a second run takes seconds.
 - Fails a merge request or pull request that adds an accessibility blocker the last build did not have, and says what it fixed.
 - Checks your designed screens in Figma for contrast and target size. *(Coming soon)*
