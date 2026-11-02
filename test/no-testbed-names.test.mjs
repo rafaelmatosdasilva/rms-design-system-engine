@@ -209,3 +209,14 @@ test('a push is refused for any commit it sends: its lines, its files, its autho
     assert.doesNotMatch(r.stderr, /a\.md/, 'a commit the remote already has is not checked again');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a project name hashed here is refused as an identifier, with no list on the computer (the cloud, GitHub), and never in prose', async () => {
+  const { FORBIDDEN_TERMS, termHits, privateFindings, hash } = await import('../.githooks/private-check.mjs');
+  const name = 'quokkatile';   // invented: stands for a project's component name
+  FORBIDDEN_TERMS.add(hash(name));
+  try {
+    for (const written of ['<QuokkaTile />', 'quokka-tile', 'quokka_tile', 'const quokkaTile = 1']) assert.ok(termHits(written) > 0, written);
+    assert.equal(termHits('a quokka and a tile'), 0, 'words apart in a sentence are not a name');
+    assert.ok(privateFindings('import QuokkaTile from "./x"').some((f) => /own name/.test(f.kind) && !/quokka/i.test(f.what)), 'refused, without saying the name');
+  } finally { FORBIDDEN_TERMS.delete(hash(name)); }
+});

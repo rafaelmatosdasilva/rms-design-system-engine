@@ -24,6 +24,7 @@ import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const DIR = () => process.env.RMS_PRIVATE_TERMS_DIR || join(homedir(), '.config', 'rms-engine');
 const PROJECTS = () => join(DIR(), 'private-projects.json');
@@ -336,6 +337,22 @@ if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpath
     const w = norm(at('--name') ?? '');
     if (!/^[a-z]{3,}$/.test(w)) { console.log('Give one word of 3 letters or more: --name <word>'); process.exit(2); }
     const t = buildTerms(); t.namedByHand = [...new Set([...(t.namedByHand ?? []), w])]; t.named = { ...(t.named ?? {}), [w]: 'named by hand' }; writeJson(TERMS(), t); console.log('named', w, '(refused where it is used as a name)');
+  } else if (a.includes('--hashes')) {
+    // Every project name hashed into private-check.mjs, so a run with no list here (the cloud, GitHub) refuses it too.
+    // The plain words that are a name only in context stay here: hashed, they would refuse ordinary prose.
+    const t = buildTerms({ force: a.includes('--rebuild') });
+    const allow = new Set((t.allow ?? []).map(norm));
+    const h = (x) => createHash('sha256').update(x).digest('hex').slice(0, 16);
+    const keep = (x) => x && !allow.has(x) && x.length >= 4;
+    const terms = [...new Set([...Object.keys(t.terms), ...(t.keys ?? []).map(norm)].filter(keep).map(h))].sort();
+    const phrases = [...new Set((t.phrases ?? []).map(norm).filter(keep).map(h))].sort();
+    const file = join(dirname(fileURLToPath(import.meta.url)), 'private-check.mjs');
+    const set = (name, list) => `export const ${name} = new Set([${list.length ? '\n' + list.map((x) => `  '${x}',`).join('\n') + '\n' : ''}]);`;
+    const src = readFileSync(file, 'utf8');
+    const next = src.replace(/(\/\/ BEGIN hashed project names\n)[\s\S]*?(\/\/ END hashed project names)/, `$1${set('FORBIDDEN_TERMS', terms)}\n${set('FORBIDDEN_PHRASES', phrases)}\n$2`);
+    if (next === src && !src.includes('BEGIN hashed project names')) { console.log('private-check.mjs has no hashed project names block'); process.exit(2); }
+    writeFileSync(file, next);
+    console.log(`${terms.length} project names and ${phrases.length} phrases hashed into ${file}.`);
   } else if (a.includes('--review')) {
     const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
     const files = execFileSync('git', ['-C', ROOT, 'ls-files'], { encoding: 'utf8' }).split('\n').filter((f) => f && !/^test\/skill-evals\/records\//.test(f) && /\.(mjs|js|md|json|html|css|yml|sh)$/.test(f));
