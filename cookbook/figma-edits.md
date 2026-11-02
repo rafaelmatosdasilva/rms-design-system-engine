@@ -11,6 +11,8 @@
 
 A component made to follow how the system builds components (its construction grammar, `--query construction`): run `rms-design-system-engine --figma-fix <component>` (or what the copied fix says), show the person the renames it lists, and run the same script once they say yes. A layer Figma left unnamed: read what it holds, propose a name, and once they agree run it again with `--to <name>`. Layout and variable bindings it only says: tell the person what to change, step by step.
 
+The accessibility the design owes (each text colour below its contrast, a focus ring under 3:1, a control under 24px, a role or name note missing) is listed by `--figma-edits` too and, once the person says yes, written by the same script as one card each in an "Accessibility the design owes" frame on the "Design system to do" page, rewritten each run so a fixed gap clears.
+
 What needs a person's words or a design decision is never written in Figma: a description, a component the code lacks, a screen's layout. Those stay in `.design-system-engine-out/handback/figma-changes.md` for the design team.
 
 Always: relay the SUMMARY block as it is, then follow its `NEXT:` line. Change code, config or snapshots only when the person asks for that change.
