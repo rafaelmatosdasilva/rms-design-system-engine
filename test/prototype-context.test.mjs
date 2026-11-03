@@ -408,3 +408,24 @@ test('a difference kept on purpose reaches the agent as the side the team chose'
   const ctx = cf({ components: { tileOne: { props: {} } } }, null, null, { kept: [{ component: 'tileOne', what: 'radius 8 where Figma has 4', truth: 'code', reason: 'the product\'s cards' }] });
   assert.match(pl(ctx, ['tileOne']).join('\n'), /kept on purpose radius 8 where Figma has 4 \(the code is right\): the product's cards/);
 });
+
+test('a long "when not to use" rules a component out only for the use it names, never for a word or two it shares, nor for its own name', () => {
+  const said = (x) => ({ sentence: `Intent layer: ${x}`, clause: x, min: 2 });
+  const filters = { never: [said('Do not use Filters for entity details, previews, management actions, or read-only side content.'), said('Do not use Filters for generic detail panels with custom action sets; use SidePanel. Do not use it for full-page filter destinations.')] };
+  assert.deepEqual(ruledOut(filters, 'a transactions list with filters and a detail panel', 'Filters'), [], 'a request for filters is not ruled out of Filters, and "detail panel" is not the use either sentence names');
+  assert.deepEqual(ruledOut(filters, 'filters for the transactions list', 'Filters'), []);
+  assert.deepEqual(ruledOut(filters, 'a panel with the entity details and previews', 'Filters').map((r) => r.words), [['entity', 'detail']], 'one use of a list, said whole');
+  const r = ruledOut(filters, 'a generic detail panel with custom action sets', 'Filters');
+  assert.equal(r.length, 1, 'the use said in full');
+  assert.match(r[0].sentence, /^Intent layer: Do not use Filters for generic detail panels with custom action sets$/, 'the sentence it rests on, without the alternative after it or the next sentence');
+  const panel = { never: [said('Do not use SidePanel for full-page navigation destinations; use DetailFullPage or Consult.')] };
+  assert.deepEqual(ruledOut(panel, 'a side panel with the transaction detail', 'SidePanel'), [], 'its own name is not a use');
+});
+
+test('reading the parts for a prototype never commits to the intent layer', async () => {
+  const { readFileSync } = await import('node:fs');
+  const gen = readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
+  assert.match(gen, /if \(hasLayer && !opts\.offline && !opts\.partsOnly && !roundRead\) \{ try \{ const fixed = await \(await import\('\.\/intent-changes\.mjs'\)\)\.autoFix/);
+  const proto = readFileSync(new URL('../lib/prototype.mjs', import.meta.url), 'utf8');
+  assert.match(proto, /generateStyleguide\(ROOT, cfg, \{ partsOnly: true, offline: process\.argv\.includes\('--offline'\)/, 'and --offline reads nothing from GitLab');
+});
