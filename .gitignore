@@ -8,6 +8,13 @@ component-prop-result.json
 node_modules
 .DS_Store
 
+# Tokens, never here. The engine reads a GITLAB_TOKEN or a FIGMA_TOKEN from a .env beside the project it runs on,
+# and this repository is a project the engine gets run on. One appeared here during a day's work and `git add -A`
+# staged it; the privacy hook refused the commit, which is the last line and not the first.
+.env
+.env.*
+!.env.example
+
 # private parity plans/roadmap (local-only, never published)
 plans/
 
