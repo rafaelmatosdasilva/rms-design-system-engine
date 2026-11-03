@@ -228,6 +228,11 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
 /* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
 .sg-issues td.sg-todo-whocell { white-space: nowrap; }
+/* The few short things a person does to check a criterion, numbered, and the command that records it. */
+.pg-a11y-steps { margin: var(--sg-space-xs) 0 0; padding-left: var(--sg-space-l); }
+.pg-a11y-steps li { margin: 0 0 var(--sg-space-xxs); }
+.pg-a11y-say { margin: var(--sg-space-s) 0 0; color: var(--sg-muted); }
+.pg-a11y-say code { word-break: break-word; }
 .sg-issues td.sg-todo-whocell .sg-todo-who { margin-bottom: 0; }
 /* A task that follows another person's: which step it is, so a row read on its own still says so. */
 .sg-issues .sg-todo-step { display: inline-block; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted);

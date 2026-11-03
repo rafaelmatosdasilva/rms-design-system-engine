@@ -141,8 +141,11 @@
       // What a person checked by hand: Done, by whom and when, while the component is as it was then; once it has
       // changed, to check again, saying who checked it before. Asked of a person only: a finding still open keeps it open.
       var ok = k.person && st === 'check' && !its.some(function (it) { return it.st === 'todo' || it.st === 'check'; }) && (a.confirmed || {})[k.sc];
-      if (ok && ok.current) { st = 'done'; note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + ': ' + k.person; }
-      else if (ok) note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + ', before ' + c.name + ' changed. ' + person;
+      // What it was checked with, when the person said: a criterion read out loud is only checked for the pair that
+      // read it, so the page says which rather than letting the row stand for every browser and screen reader.
+      var withSaid = ok && ok.using ? ', in ' + ok.using : '';
+      if (ok && ok.current) { st = 'done'; note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + withSaid + ': ' + k.person; }
+      else if (ok) note = 'Checked by ' + ok.by + ' on ' + String(ok.at).slice(0, 10) + withSaid + ', before ' + c.name + ' changed. ' + person;
       if (k.person && st === 'check' && !its.some(function (it) { return it.st === 'todo'; })) note += ' Once someone has checked it, record it as checked and this row reads Done.';
       if (!st) return null;
       return { k: k, st: st, its: its, note: note, how: how, fig: fig };
@@ -180,6 +183,12 @@
       var todos = [];
       r.its.forEach(function (it) { if (it.todo && it.st !== 'done' && todos.indexOf(it.todo) < 0) todos.push(it.todo); });
       if (act) todos.push(esc(act));
+      // The few short things to do to see it (wcag21.mjs), so two people checking the same criterion check the same
+      // way, and the command that records it with who checked and what they checked with.
+      if (r.k.steps && r.k.steps.length && r.st === 'check') {
+        todos.push('<ol class="pg-a11y-steps">' + r.k.steps.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ol>' +
+          '<p class="pg-a11y-say">Then say so: <code>rms-design-system-engine --checked ' + esc(c.name) + ' ' + esc(r.k.sc) + ' --by "&lt;name&gt;" --with "&lt;browser and screen reader&gt;"</code></p>');
+      }
       // A finding with no fix of its own: what the criterion asks, said where it is fixed (the colours in Figma and in the
       // code when the system has both, else the code), as who acts says.
       if (!todos.length && r.st === 'todo' && r.k.says) todos.push(esc((COLOUR_SC.test(r.k.sc) ? (HAS_FIGMA ? 'Change the colours in Figma and in the code so ' : 'Change the colours in the code so ') : 'Change the code so ') + r.k.says.replace(/^\w/, function (k) { return k.toLowerCase(); })));
