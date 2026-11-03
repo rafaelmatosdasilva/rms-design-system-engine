@@ -190,6 +190,20 @@
       // finding's own, else how the criterion is known.
       var failed = open.some(function (it) { return it.st === 'todo' && !it.who; });
       var own = failed ? null : r.its.map(function (it) { return it.who; }).filter(Boolean)[0];
+      // The people this criterion owes work to, each with their own steps: a finding can owe two of them a step each
+      // (a colour pair picked in Figma, then used in the code), so one criterion becomes one row per person. A row
+      // with nothing of its own keeps the single answer a11yWho gives.
+      // A row that is done still says who did it, so a team can see its own work as well as its own backlog.
+      var byWho = [], seen = {}, from = r.st === 'done' ? r.its : open;
+      from.forEach(function (it) {
+        (it.tasks || []).forEach(function (t) {
+          var g = seen[t.who] || (seen[t.who] = { who: t.who, todos: [], step: t.step, steps: t.steps });
+          if (g.todos.indexOf(t.todo) < 0) g.todos.push(t.todo);
+          if (t.step > g.step) { g.step = t.step; g.steps = t.steps; }
+          if (byWho.indexOf(g) < 0) byWho.push(g);
+        });
+      });
+      byWho.sort(function (p, q) { return p.step - q.step || ORDER.indexOf(p.who) - ORDER.indexOf(q.who); });
       // Where it is read from: each finding's own source, else how the criterion is known; Figma's annotations stand in
       // the Figma column.
       var src = [];
@@ -198,12 +212,24 @@
       // Its date, its own check's: tried now on this page, the last audit's day, else when the page was built (what the
       // code and Figma said then).
       var rowAt = src.indexOf(FROM_PAGE) >= 0 ? (live && live.at) || new Date().toISOString() : src.some(function (x) { return /^Tested (on|at the last audit)/.test(x); }) ? (ch && ch.at) || DATA.builtAt || null : DATA.builtAt || null;
-      return { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML('WCAG ' + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
+      var base = { key: c.name + '\u0000a:' + r.k.sc, area: 'Accessibility', kind: name, kindHTML: ALL ? esc(name) : tipHTML('WCAG ' + name, '', { label: name, parts: [['What it means', r.k.says], ['How it is checked', r.how]] }),
         figma: r.fig.map(function (x) { return '<div>' + esc(x) + '</div>'; }).join(''), code: found, todo: todos.map(function (x) { return '<div>' + x + '</div>'; }).join(''),
         who: r.st === 'todo' || r.st === 'check' ? (r.k.extra ? WHO.both : own || a11yWho(r.k.sc, r.k.how, open, r.note)) : '', st: r.st, at: rowAt, src: src, extra: !!r.k.extra, fresh: open.some(function (it) { return it.fresh; }), k: r.k, its: r.its, note: r.note,
         // To check only because its check has not run yet (no audit, not reached, not built, not opened): not a check that ran.
         unrun: r.st === 'check' && (/^(Run the audit|Build .* in the code: the audit|The last audit did not|Tried on .* when its Accessibility area is open|Read once the audit runs)/.test(act || r.note || '') || r.its.some(function (it) { return /Tried once the audit runs/.test(it.html); })) };
-    });
+      // Owed to one person, or to nobody yet: the row as it was. Owed to several: one row each, with that person's
+      // steps alone, and the step said (1 of 2) so a row read on its own still says it follows another's.
+      // Nothing open to split (a row that is done, or one with no task of its own): one row, carrying every person it
+      // touches, so a filter on any of them still finds it.
+      if (!base.who || byWho.length < 2) {
+        base.whoKey = byWho.length ? byWho.map(function (g) { return g.who; }).join(' ') : (WHO_OF[base.who] || '');
+        return [base];
+      }
+      return byWho.map(function (g) {
+        return Object.assign({}, base, { key: base.key + '\u0000' + g.who, whoKey: g.who, who: WHO[g.who] + teamNote(c.name),
+          step: g.step, steps: g.steps, todo: g.todos.map(function (x) { return '<div>' + esc(capital(x)) + '</div>'; }).join('') });
+      });
+    }).reduce(function (a, b) { return a.concat(b); }, []);
   }
 
   // A text that shows only while a boolean is on (Show Text and Text Content, show-label and label-content, or both
@@ -799,7 +825,7 @@
       labelCells(a11yEl.closest('.pg-a11y'));
       var n = {};
       Array.prototype.forEach.call(a11yEl.rows, function (r) { if (!r.hasAttribute('data-extra')) n[r.dataset.status] = (n[r.dataset.status] || 0) + 1; });
-      a11ySumEl.innerHTML = chipsHTML({ todo: n.todo, check: n.check, done: n.done }, 'Accessibility') +
+      a11ySumEl.innerHTML = chipsHTML({ todo: n.todo, check: n.check, done: n.done }, 'Accessibility') + whoChipsHTML(a11yEl.rows) +
         // Nothing to fix or to check, the checks a person makes included: it meets WCAG 2.2 at A and AA.
         (!n.todo && !n.check && n.done ? '<span class="pg-par-status pg-par--' + STATUS.done[2] + ' pg-a11y-meets"><span class="pg-par-sign" aria-hidden="true">' + STATUS.done[0] + '</span>Meets WCAG 2.2 at level A and AA</span>' : '');
       var ch = c.a11y && c.a11y.checked;

@@ -365,8 +365,8 @@ test('in the browser: no script error, a control changes the real component, the
     // number, the criterion, the status with when and where it was read, and the arrow that opens the row; what the
     // Figma notes say, what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
     // it and when the audit last ran. Only what applies. No separate table of sources.
-    assert.match(a11y, /Task nr.*WCAG criterion.*Status/);
-    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found|What to do/, 'what the Figma notes say, what was found and what to do: in the row\'s panel only');
+    assert.match(a11y, /Task nr.*What to do.*Who acts.*WCAG.*Status/, 'the task first, then the person who does it');
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found/, 'what the Figma notes say and what was found: in the row\'s panel only');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr.sg-row-open')].every((tr) => tr.lastElementChild.matches('td.sg-row-go') && !!tr.lastElementChild.querySelector('svg'))`), true, 'every row that opens ends with its arrow');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /What it means|Where it is read from/, 'no column of its own: what a criterion means is in its tip');
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
@@ -413,7 +413,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /1\.4\.3 Contrast/.test(r.cells[1].textContent))`)), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
+    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.querySelector('.sg-todo-area') && /1\.4\.3 Contrast/.test(r.querySelector('.sg-todo-area').textContent))`)), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -961,26 +961,25 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.equal(v.notCompared, null);
 });
 
-test('To do: a role the code fails or has still to be tried on is the code\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
+test('To do: an accessibility row with no task of its own still says the person - the code\'s when the code fails it, a designer\'s when Figma has not stated it yet, a person\'s when only a person can judge', () => {
   const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('var WHO = {'), tpl.indexOf('function doWhat('));
   const a11yWho = new Function(src + 'return a11yWho;')();
   const audit = { st: 'todo', from: 'Tested on 5 Oct' };
   // The rendered role differs from the note: the note is right, the code changes.
-  assert.equal(a11yWho('4.1.2', 'audit', [audit, { st: 'todo', from: 'Figma annotation Role: button' }], ''), 'A developer in the code');
-  assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'A developer in the code');
-  // Nothing failed and what is missing is in Figma: its role is not stated yet.
-  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'From Figma, once it is annotated' }], ''), 'You in Figma');
+  assert.equal(a11yWho('4.1.2', 'audit', [audit, { st: 'todo', from: 'Figma annotation Role: button' }], ''), 'A developer, in the code');
+  assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'A developer, in the code');
+  // Nothing failed and what is missing is in Figma: its role is not stated yet, so it is a designer's.
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'From Figma, once it is annotated' }], ''), 'A designer, in Figma');
   // What a Figma note's role asks, not tried yet: the audit tries it on the code, so nothing is to do in Figma.
-  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'A developer in the code');
-  // A colour pair lives in the system's colours, fixed in Figma and in the code when it has both; what only a person
-  // judges is checked by hand; the code's own finding is the code's.
-  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
-  assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
-  assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Read from the code' }], ''), 'A developer in the code');
-  // A colour's contrast is fixed where the system's colours live: in Figma and in the code when it has both.
-  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
-  assert.equal(a11yWho('1.4.11', 'audit', [audit], ''), 'In Figma and in the code');
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'A developer, in the code');
+  // What only a person judges is checked by hand; the code's own finding is the code's. A colour pair is no longer
+  // answered here: its finding owes a designer a step and a developer another (wcag21.mjs), one row each.
+  assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'A person checks it by hand');
+  assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Read from the code' }], ''), 'A developer, in the code');
+  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'A developer, in the code');
+  // A non-text contrast is the same: two steps, two rows, so the fallback answers for the code alone.
+  assert.equal(a11yWho('1.4.11', 'audit', [audit], ''), 'A developer, in the code');
 });
 
 test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {
