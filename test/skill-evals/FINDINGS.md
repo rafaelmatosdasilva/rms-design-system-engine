@@ -116,9 +116,56 @@ In 27 of the 36 documentation-only runs the agent invented, **with the exact com
 
 ---
 
+## A .env at the root of a public repository, staged by `git add -A`
+
+**Found** 2 November 2026, while committing something else. **Fixed in** this change.
+
+**Evidence.** `git status` after a routine `git add -A`:
+
+```
+A  .env
+M  test/skill-evals/FINDINGS.md
+```
+
+The engine reads a `GITLAB_TOKEN` or a `FIGMA_TOKEN` from a `.env` beside the project it runs on. **This repository is one of the projects the engine gets run on**, and nothing in `.gitignore` covered it. The commit was refused by the privacy hook — which is the last line, not the first, and runs only on a machine that has the hook installed.
+
+**What it settles.** Every guard here was about *names*: a client's, a component's, a token's, caught by a hashed list. None was about the shape of a file that holds a secret by convention. The two are different, and the second is the one that takes a single `git add -A` in a hurry.
+
+**Changed.** `.env` and `.env.*` are ignored (`.env.example` is not, so a project can still show the shape of the file). A test holds the ignore rule in place, because an ignore rule is one line that anyone can tidy away on the day it stops looking necessary.
+
+---
+
+## Three tests called flaky for a day, and it was the machine
+
+**Found** 2 November 2026, by accident, counting processes for an unrelated reason. **Fixed in** #286.
+
+**What I said first, and wrote into the record and the backlog.** Three browser tests fail on a full run and pass alone, every time: the style guide's live page reads empty or half drawn, a test that gives Chrome half a second to start fails on four full runs out of four, and a page accessibility test joined them. The reading was *the suite runs every file at once and this one measures a real browser, so it is being starved*, and the conclusion was that a green run needs a second look — which is how people learn to ignore a red one.
+
+**What was actually there.**
+
+```
+69 processes  audit.mjs --watch 5
+66 of them with a watch for a parent
+the oldest alive for twelve hours
+```
+
+The watch took a new engine by starting the new one with `spawnSync` and waiting for it. A watch never ends, so each old process waited for ever with the new one inside it, and every engine update added a layer. All but the newest were doing nothing but holding memory — on the computer that was measuring the tests.
+
+Killed the nested ones, and they were back to three deep within the half hour.
+
+**Ruled out — by me, wrongly, for a day.** *That the tests were wrong.* "Fails on a full run, passes alone" is not a property of a test. It is a question about the machine, and I read it as a fact about the tests three separate times, wrote each one down, and put them on the backlog as work to do on them.
+
+**What it settles, and it is not about browsers.** A symptom that is only ever seen under load is evidence about the load. The engine measures itself on the same computer it runs on, so the engine's own leaks land in its own numbers — and the measurement is the last place they get looked for.
+
+**Measured after the fix.** Two of the three stopped failing. The third did not: the one that gives Chrome half a second to start, times out, and expects the retry to succeed — under a full suite the retry times out too. So the honest split is that two were starvation and one is a budget too tight to survive any load, which is a different problem and a smaller one.
+
+**Still open.** That third test. And a thing worth keeping in view: the watches were down to four and the machine was otherwise quiet, so what is left is the suite competing with itself.
+
+---
+
 ## A green run that needs a second look
 
-**Open.** Found 2 November 2026, twice.
+**Answered, not by fixing a test.** Found 2 November 2026, twice, then a third time. The cause is the case above: #286. Kept as it was written, because the reasoning in it is the thing worth not repeating.
 
 **Evidence.** Two browser tests fail on a full run and pass alone, every time: the style guide's live page reads empty or half drawn, and a test that gives Chrome half a second to start failed on four full runs out of four. Both measure a real browser against a clock while the rest of the suite is using the machine.
 
