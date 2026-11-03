@@ -93,3 +93,16 @@ test('asked in words, a part goes to --part: the one named before "part of" is t
   assert.deepEqual(vague.run, ['rms-design-system-engine --part <part> tileList']);
   assert.ok(vague.ask, 'the part it does not name is asked');
 });
+
+test('the index names a prop as the code takes it, never the Figma name the code refuses', async () => {
+  const { buildLlms } = await import('../lib/contract-gen.mjs');
+  // Code Connect maps Figma's headlineText onto the code's headline; an agent told to write names exactly as they
+  // are here writes code, so the code's name is the one that belongs on the line.
+  const built = [{ name: 'cardTile', contract: { description: 'A tile.', props: [
+    { name: 'headlineText', bindings: { code: { prop: 'headline', as: 'prop' } } },
+    { name: 'showBadge' }
+  ] } }];
+  const txt = buildLlms(built, {}, 0, null, {});
+  assert.match(txt, /· props: headline, showBadge/);
+  assert.doesNotMatch(txt, /headlineText/);
+});
