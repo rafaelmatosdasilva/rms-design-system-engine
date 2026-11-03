@@ -327,3 +327,29 @@ test('coverage asks the edges a screen meets first: content that does not fit, a
   const said = docCoverage(page, { components: { sheet: il('asks the person to confirm', ['Its body scrolls past 60% of the window; the title and buttons stay.', 'With one button only, the primary one stays, full width.']), dot: il('a status mark') } });
   assert.deepEqual(kinds(said, 'sheet').filter((k) => k === 'overflow' || k === 'oneAction'), []);
 });
+
+test('a page has nothing of its own: no stylesheet, no style attribute, no element that draws', async () => {
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const own = `<template>
+  <div class="app">
+    <list-page :style="{ width: '312px' }">
+      <h1>Orders</h1>
+      <section><div data-missing="the app shell beside the page"/></section>
+    </list-page>
+  </div>
+</template>
+<script setup>
+import ListPage from '@/components/templates/ListPage'
+</script>
+<style scoped>
+.app { display: flex; }
+</style>`;
+  const r = checkPage('prototypes/Own.vue', own, page, {});
+  const msgs = r.findings.filter((f) => f.level === 'error').map((f) => `${f.line} ${f.message}`);
+  const has = (re) => assert.ok(msgs.some((m) => re.test(m)), `${re} in:\n${msgs.join('\n')}`);
+  has(/^3 <list-page> :style: a style of the page's own/);
+  has(/^4 <h1> is the page's own element, not the system's/);
+  has(/^12 a <style> of the page's own/);
+  assert.ok(!msgs.some((m) => /^(2|5) /.test(m)), `grouping elements and gaps stay:\n${msgs.join('\n')}`);
+});

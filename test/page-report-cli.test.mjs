@@ -24,7 +24,6 @@ import { Button } from '@/components/Button';
 export function SignIn() {
   return (
     <main>
-      <h1>Sign in</h1>
       <Field label="Email" />
       <Button label="Sign in" />
     </main>
@@ -124,31 +123,15 @@ test("--prototype <page>: the check is kept beside the page, and carries what it
   assert.match(rec.$description, /carried with it wherever the prototype goes/);
 });
 
-// The catalog of such a project shows what the page's own wrapper may use.
+// The catalog of such a project offers the page nothing of its own: no wrapper, no variable for one.
 //
-// Read from the transcripts of twelve measured runs: every value an agent invented was in the wrapper and never in
-// a component - a width as 400px, a line as #e0e0e0, an empty state as a hand-drawn <svg> - each written in the
-// same tag as a `var(--padding-m)` it had got right. It used a token wherever it had been shown one. The catalog
-// showed spacing and nothing else, while the theme had --surface-page, --text-primary and --stroke-default.
-test('--prototype --catalog: the theme\'s own variables a page wrapper may need, and none a component owns', { timeout: budget(300000) }, () => {
+// Measured runs once found every invented value in the page's own wrapper, so the catalog handed the wrapper the
+// theme's variables. A real run then set the menu beside the page with flex and a width read from the design, and
+// was called made of the system. The page has no wrapper to style: the check refuses one, and the catalog says so.
+test('--prototype --catalog: the page has nothing of its own, and a need the code does not meet is a gap', { timeout: budget(300000) }, () => {
   const dir = project();
   const out = `${run(dir, '--prototype', '--catalog').stdout}`;
-  assert.match(out, /What the page's own wrapper may use, and nothing else:/);
-  for (const v of ['var(--surface-page)', 'var(--text-primary)', 'var(--stroke-default)']) assert.ok(out.includes(v), `${v} is in the theme and not in the catalog:\n${out.slice(0, 1200)}`);
-  // What a component owns stays that component's: a wrapper reaching for it borrows a look it was not given.
-  const line = out.split('\n').find((l) => l.includes("page's own wrapper may use")) ?? '';
-  for (const v of ['--radii-button', '--button-background', '--field-border']) assert.ok(!line.includes(v), `${v} belongs to a component and was offered to the wrapper: ${line}`);
-  // And the way out, so a need the theme does not name is not met with a value of the agent's own.
+  assert.match(out, /Nothing of the page's own: no <style>, no style attribute, no element that draws/);
+  assert.doesNotMatch(out, /wrapper may use|var\(--surface-page\)|var\(--stroke-default\)/);
   assert.match(out, /is a need the system lacks: write the data-missing div for it, never a value of your own/);
-});
-
-// A component the system has and the code has not still owns its variables.
-//
-// The demo system has a field in Figma and only a Button and a Chip in code. Matched against the built components
-// alone, `--radii-field` reads as nobody's and is handed to the wrapper - the field's own corner, lent to a div.
-test('--prototype --catalog: a variable of a component the code has not built is still that component\'s', { timeout: budget(300000) }, () => {
-  const dir = project();
-  const line = `${run(dir, '--prototype', '--catalog').stdout}`.split('\n').find((l) => l.includes("page's own wrapper may use")) ?? '';
-  assert.ok(line, 'the catalog said nothing about the wrapper');
-  assert.ok(!/--radii-field|--field-/.test(line), `a field's own variable was offered to the wrapper: ${line}`);
 });
