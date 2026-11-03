@@ -8,6 +8,20 @@ Newest first.
 
 ---
 
+## On the composition side, the catalog had no spacing to offer
+
+**Found** 2 November 2026, measuring the composition path for the first time. **Fixed in** `lib/prototype-pieces.mjs` (`systemScales`).
+
+**Evidence.** The twelve prototype tasks on Tidepool with only its Figma file, Haiku 5.5. With the skill, 19 of 24 runs passed the first time. Both profile runs failed the same way: the page's padding and gap left at none, and the composition's own note said *"The system has no spacing tokens, so spacing is left at none."* The Settings page beside it, read from Figma, uses `padding/m`. The catalog printed `Spacing tokens: none` and offered `padding=none` only: it read spacing from the code's tokens, and a system not built in code has none there. Figma's variables had `gap/s`, `padding/xs`, `padding/s` and `padding/m` all along.
+
+**Guess ruled out.** Not the agent ignoring the catalog: it followed the catalog exactly, and the catalog was wrong.
+
+**What changed.** With no spacing in the code, the catalog takes the gap, padding, spacing and margin variables from Figma, drawn at their own values. The same 24 runs then passed, 24 of 24. Claude alone on the same tasks: 0 of 12.
+
+**What it settles.** The composition side fails differently from the code side: not by inventing, but by being given less to work with. Findings read from the code-side runs are about code pages; this is the first evidence for compositions.
+
+---
+
 ## The invention is in the page's own wrapper, never in a component
 
 **Found** 2 November 2026, reading the writes of twelve measured prototype runs. **Fixed in** #279.

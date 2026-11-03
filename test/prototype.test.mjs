@@ -355,3 +355,15 @@ test('the products\' screens decide how a component fills its place in a prototy
   assert.equal(comps.panel.grows, true);
   assert.equal(comps.tag.fills, true, 'on no screen: its master decides');
 });
+
+test('a system not built in code yet takes its spacing from Figma: the catalog never says it has none', async () => {
+  const { systemScales, pieceCatalog } = await import('../lib/prototype-pieces.mjs');
+  const figma = { sizing: { 'gap/s': '4px', 'padding/s': '8px', 'padding/m': '12px', 'radii/button': '8px', 'stroke/default': '1px' } };
+  const s = systemScales({ components: [] }, figma, '');
+  assert.deepEqual(s.spacing.map((t) => `${t.name}=${t.value}`), ['gap/s=4px', 'padding/s=8px', 'padding/m=12px'], 'its spacing, never its radii or strokes');
+  assert.equal(s.spacing.find((t) => t.name === 'padding/m').var, '--padding-m', 'drawn at its own value through a variable no code defines');
+  assert.deepEqual(pieceCatalog(s).Page.props.padding.values, ['none', 'gap/s', 'padding/s', 'padding/m']);
+  // Where the code has its own spacing tokens, those are the ones offered.
+  const coded = systemScales({ components: [], tokens: { spacing: [{ figma: 'space/m', var: '--space-m', value: '12px' }] } }, figma, '');
+  assert.deepEqual(coded.spacing.map((t) => t.name), ['space/m']);
+});

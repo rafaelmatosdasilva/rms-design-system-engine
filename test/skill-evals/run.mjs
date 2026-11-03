@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // test/skill-evals/run.mjs - run the skill evaluation. Spends model tokens; not in `node --test`.
 //
-//   node test/skill-evals/run.mjs --variant baseline|cookbook|skill|bare|mcp --model <id> --runs 5 --set dev|heldout|all|build|prototype|route
+//   node test/skill-evals/run.mjs --variant baseline|cookbook|skill|bare|mcp --model <id> --runs 5 --set dev|heldout|all|build|prototype|prototype-figma|route
 //        [--route shell|both|mcp|none] [--only <task-id>] [--jobs 2] [--budget 3] [--ref <git ref for baseline>] [--resume] [--dry]
 //        [--source <a project of your own>]
 //
@@ -33,7 +33,7 @@ import { DEV } from './tasks.mjs';
 import { engineFell, kindOf } from './reading.mjs';
 import { HELDOUT } from './heldout.mjs';
 import { BUILD, TIDEPOOL } from './build-tasks.mjs';
-import { PROTO } from './proto-tasks.mjs';
+import { PROTO, PROTO_FIGMA } from './proto-tasks.mjs';
 import { variant } from './variants.mjs';
 import { envVar } from '../../lib/names.mjs';
 
@@ -65,8 +65,8 @@ const PRIVATE_TASKS = envVar(process.env, 'EVAL_PRIVATE_TASKS');
 if (PRIVATE_TASKS && (SET === 'heldout' || SET === 'all' || SET === 'private')) {
   privateTasks = (await import(PRIVATE_TASKS)).PRIVATE.map((t) => ({ ...t, private: true }));
 }
-const sets = { dev: DEV, heldout: [...HELDOUT, ...privateTasks], private: privateTasks, all: [...DEV, ...HELDOUT, ...privateTasks], build: BUILD, prototype: PROTO, route: ROUTE_TASKS };
-const tasks = againstOwnProject((sets[SET] ?? []).filter((t) => !ONLY || t.id === ONLY).map((t) => ({ ...t, set: BUILD.includes(t) ? 'build' : PROTO.includes(t) ? 'prototype' : ROUTE_TASKS.includes(t) ? 'route' : DEV.includes(t) ? 'dev' : 'heldout', source: BUILD.includes(t) || PROTO.includes(t) ? TIDEPOOL : t.source })), SOURCE);
+const sets = { dev: DEV, heldout: [...HELDOUT, ...privateTasks], private: privateTasks, all: [...DEV, ...HELDOUT, ...privateTasks], build: BUILD, prototype: PROTO, 'prototype-figma': PROTO_FIGMA, route: ROUTE_TASKS };
+const tasks = againstOwnProject((sets[SET] ?? []).filter((t) => !ONLY || t.id === ONLY).map((t) => ({ ...t, set: BUILD.includes(t) ? 'build' : PROTO.includes(t) ? 'prototype' : PROTO_FIGMA.includes(t) ? 'prototype-figma' : ROUTE_TASKS.includes(t) ? 'route' : DEV.includes(t) ? 'dev' : 'heldout', source: BUILD.includes(t) || PROTO.includes(t) || PROTO_FIGMA.includes(t) ? TIDEPOOL : t.source })), SOURCE);
 const vr = variant(V, { ref: arg('ref', undefined) });
 const sha = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 const engineHash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ENGINE, encoding: 'utf8' }).trim() + (execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ENGINE, encoding: 'utf8' }).trim() ? '+dirty' : '');
@@ -75,7 +75,7 @@ const meta = { variant: V, ref: vr.ref, guideHash: sha(vr.text), guideBytes: Buf
 console.log(`${V}${ROUTE !== 'shell' ? ` by ${ROUTE}` : ''} (${vr.ref}, guide ${meta.guideHash}, ${meta.guideBytes} bytes) · ${MODEL} · ${tasks.length} tasks × ${RUNS} runs · engine ${engineHash} · project ${meta.project} · ${cliVersion}`);
 if (DRY) { for (const t of tasks) console.log(`  ${t.set.padEnd(8)} ${t.id}`); process.exit(0); }
 
-const outFor = (t) => (t.private ? envVar(process.env, 'EVAL_PRIVATE_OUT') : t.set === 'build' ? join(HERE, 'results', 'build') : t.set === 'prototype' ? join(HERE, 'results', 'prototype') : t.set === 'route' ? join(HERE, 'results', 'route') : join(HERE, 'results'));
+const outFor = (t) => (t.private ? envVar(process.env, 'EVAL_PRIVATE_OUT') : t.set === 'build' ? join(HERE, 'results', 'build') : t.set === 'prototype' ? join(HERE, 'results', 'prototype') : t.set === 'prototype-figma' ? join(HERE, 'results', 'prototype-figma') : t.set === 'route' ? join(HERE, 'results', 'route') : join(HERE, 'results'));
 // A route other than the shell is a side of its own: its runs never mix with the shell's.
 const SIDE = ROUTE !== 'shell' || SET === 'route' ? `${V}-${ROUTE}` : V;
 const resultsFile = (t) => join(outFor(t), `${SIDE}.${MODEL}.jsonl`);
