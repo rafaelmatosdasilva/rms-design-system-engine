@@ -346,3 +346,30 @@ test('the style guide\'s own CSS changed outside every stage: its parts are put 
   writeFileSync(page, guidePage('.sg-panel .sg-il-choice { border: 1px solid red } .sg-comp { background: #000 }'));
   assert.match(go().out, /1 part checked again: the CSS every component shares changed/, 'a change around a stage is checked');
 });
+
+// What signs a result is what decides it. A finding's wording, who acts on it and a line of comment change nothing a
+// browser measured, so they must not put every component of every system back in the queue; a threshold, a check or
+// the page script must.
+test('the signature follows what decides a result, not every line that lives near it', () => {
+  const dir = join(ENGINE, 'lib');
+  const source = (file) => readFileSync(join(dir, file), 'utf8');
+  const edited = (file, change) => ({ read: (f) => (f.endsWith(`/${file}`) ? change(source(file)) : readFileSync(f, 'utf8')) });
+  const base = { page: checkSignature({ dir, kind: 'page' }), component: checkSignature({ dir, kind: 'component' }) };
+  const after = (file, change) => ({ page: checkSignature({ dir, kind: 'page', ...edited(file, change) }), component: checkSignature({ dir, kind: 'component', ...edited(file, change) }) });
+  const same = (file, change, why) => { const a = after(file, change); assert.deepEqual(a, base, why); };
+  const differs = (file, change, why) => { const a = after(file, change); assert.notDeepEqual(a, base, why); };
+
+  // Words, and who acts on them: they say what was found, never whether it was found.
+  same('a11y-words.mjs', (s) => s.replace('Add a visible outline (a focus ring)', 'Add a visible focus ring'), 'rewording a finding re-checks nothing');
+  same('a11y-words.mjs', (s) => s.replace("who: 'designer'", "who: 'developer'"), 'moving a task to another person re-checks nothing');
+  // A line that is only a comment cannot change what the code does.
+  same('a11y-check.mjs', (s) => s.replace('// Structured record for --json', '// Structured record for the json output'), 'a whole-line comment re-checks nothing');
+  // A comment after code is kept on purpose: finding where it really begins means reading the strings around it, and a
+  // signature that guessed wrong would put back results the engine should have checked again.
+  differs('a11y-check.mjs', (s) => s.replace("const WORDS = ['a11y-words.mjs'];", "const WORDS = ['a11y-words.mjs'];  // a note"), 'a trailing comment is kept: never guess where one starts');
+  // What the check measures, and what it measures with: both decide, so both sign.
+  differs('a11y-check.mjs', (s) => s.replace('AXE_VERSION', 'AXE_VERSION_CHANGED'), 'the rules it runs decide a result');
+  differs('wcag-page.js', (s) => `${s}\n// a line of code\nconst nothing = 1;`, 'the page script decides a result');
+  // The words module is not walked at all, so nothing it imports can sign a result either.
+  assert.equal(engineFiles(join(dir, 'a11y-check.mjs'), { skip: ['a11y-words.mjs'] }).some((f) => f.endsWith('/a11y-words.mjs')), false);
+});
