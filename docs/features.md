@@ -14,8 +14,8 @@ Each section says why it matters, then what it does not do well today. A line ma
 | [Write the intent layer](#write-the-intent-layer) | Why each component exists and when to use it, gathered in one place from your docs and past decisions. What it can't be sure of goes to a person; guidelines that contradict each other are flagged. | Contracts | Ready to use |
 | [Review the Figma library](#review-the-figma-library) | Every check compares against your Figma file, so the file has to be right. This lists what makes it unreliable (values not linked to the system, detached copies, components built against your own rules), each with its fix, on the style guide's Tasks page for whoever keeps the file. | Your Figma file | Ready to use |
 | [Track system health](#track-system-health) | Warns about risks before they spread as the system grows: a colour named after one product, a token that points to one that was deleted, a combination that only breaks in dark mode on a phone. | Contracts | Ready to use |
-| [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Contracts, Figma library | Ready to use |
 | [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Contracts, intent | Ready to use |
+| [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Contracts, Figma library | Actively improving |
 | [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Actively improving |
 | [Test accessibility](#test-accessibility) | Tests each component the way people use it: contrast, keyboard, focus, touch size and what a screen reader says. Fix it once in the component and every screen benefits. | Contracts, Compare | Early development |
 | [Build with AI, on the system](#build-with-ai-on-the-system) | AI tools build with your real components, rules and past decisions: in your product's code today, and as clickable prototypes for user tests *(Coming soon)*. Each change is checked as it's made, and what the system lacks goes on a list for design. | Contracts, intent, Catch drift | Early development |
@@ -97,25 +97,6 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Two components whose own rules are nearly the same.
 - A health number per area on the style guide's Status page.
 
-## Compare Figma and code
-
-**Ready to use** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
-
-*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all. One that cannot be drawn says why.*
-
-- Compares every colour, size, font, shadow and duration with Figma, in every mode (light and dark, phone and desktop).
-- Checks each component's options, defaults and states: hover, focus, pressed, disabled and selected.
-- Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
-- Finds the code file of each Figma component on its own, so nobody writes a map.
-- Checks icons, slots and the parts inside each component.
-- Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
-- Checks that a brand changes only values, never which parts a component draws or how they are laid out.
-- Warns when a Figma frame changed since the version you approved.
-- Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
-- Runs 25 checks, called gates, each listed in the [technical documentation](details.md#the-gates).
-- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
-- Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
-
 ## Catch drift in product code and AI edits
 
 **Ready to use** · **Why it matters:** Shortcuts do not pile up until the system falls apart.
@@ -131,6 +112,25 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
 - Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
 - Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
+
+## Compare Figma and code
+
+**Actively improving** · **Why it matters:** No more visual QA by eye. Drift is caught before release, not by users.
+
+*Today: each component is measured in a real browser. Components with no page to open are drawn straight from their own code, which works for most React and Vue components, not yet for all. One that cannot be drawn says why.*
+
+- Compares every colour, size, font, shadow and duration with Figma, in every mode (light and dark, phone and desktop).
+- Checks each component's options, defaults and states: hover, focus, pressed, disabled and selected.
+- Measures heights, spacing, corners and alignment as a browser draws them, not with a screenshot.
+- Finds the code file of each Figma component on its own, so nobody writes a map.
+- Checks icons, slots and the parts inside each component.
+- Reads Tailwind classes as fully as CSS: each variant, state and mode, type, shadow and motion, from a v4 `@theme` or a v3 `tailwind.config`.
+- Checks that a brand changes only values, never which parts a component draws or how they are laid out.
+- Warns when a Figma frame changed since the version you approved.
+- Puts every difference in one list, with who fixes it: the designer in Figma or a developer in the code.
+- Runs 25 checks, called gates, each listed in the [technical documentation](details.md#the-gates).
+- Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
+- Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
 
 ## Fit your team's setup
 
