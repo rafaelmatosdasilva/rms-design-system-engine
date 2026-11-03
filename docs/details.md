@@ -460,6 +460,24 @@ of them a step each: a colour pair is picked in Figma, then used in the code.
   that takes several people at once, so a team sees only its own work. What is done keeps its person, so a team can
   see what it has finished as well as what is left.
 
+### What a person checks by hand
+
+Nine criteria only a person can decide, and two more the checks try but a person settles. The engine says what to
+look at, **how to look at it**, and keeps the answer only while it is still true.
+
+- **A few short steps, per criterion.** Each one says the two or three things to do before judging: zoom the page to
+  200% and see whether the text blurs, make the field fail and read the message, walk the flow from its first step.
+  They are the same for everyone, so two people checking the same criterion check the same way.
+- **What to do when it fails.** The last step says to leave it unchecked and whose task it becomes, rather than
+  pretending every check ends in a pass.
+- **Say you checked it.** `rms-design-system-engine --checked <component> <criterion> --by "<name>"
+  --with "<browser and screen reader>"`. `--with` is free text, said back as it was written: a closed list would be
+  wrong the day a new version ships.
+- **Why `--with` matters.** A criterion read out loud is only checked for the pair that read it. A check made in
+  VoiceOver says nothing about NVDA, and the page no longer lets one stand for the other.
+- **It expires on its own.** The record keeps the component as it was (its CSS rules, its contract entry, its source
+  file). Change any of them and the row reads *To check again*, saying who checked it before and with what.
+
 ### Only what changed is tried again
 
 - **Each page's results are kept.** They are saved under what the page rests on: its components and your CSS, your settings, and the check itself.
