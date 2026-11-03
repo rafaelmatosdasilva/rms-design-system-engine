@@ -429,3 +429,18 @@ test('reading the parts for a prototype never commits to the intent layer', asyn
   const proto = readFileSync(new URL('../lib/prototype.mjs', import.meta.url), 'utf8');
   assert.match(proto, /generateStyleguide\(ROOT, cfg, \{ partsOnly: true, offline: process\.argv\.includes\('--offline'\)/, 'and --offline reads nothing from GitLab');
 });
+
+test('a component the request names by its own name comes first, a family shows one of its own, and none is ever left out of the index', () => {
+  const comp = (description) => ({ description, props: {} });
+  const ctx = contextFrom({ components: {
+    table: comp(''),
+    tableCellText: comp('A text cell in a table row of the table.'), tableCellTag: comp('A tag cell in a table row of the table.'),
+    menuMain: comp('The main menu at the side of the app.'), menuMainItem: comp('One item of the main menu.'), menuMainHeader: comp('The header of the main menu.'),
+    spinner: comp('Shown at the side of a table row while it loads.'),
+  } }, null, sectionsOf(''));
+  const names = requestFocus(ctx, 'a table of transactions and a side menu', []).components.map((c) => c.name);
+  assert.equal(names[0], 'table', 'the table itself before its cells');
+  assert.equal(names.filter((n) => n.startsWith('menuMain')).length, 1, 'one of the menu family, the rest a --detail away');
+  const index = purposeLines(ctx, Object.keys(ctx.components)).join('\n');
+  assert.match(index, /^  table +\(nothing written about it yet: it exists; its card gives its props, --detail table\)$/m, 'a component with nothing written is listed, never left out');
+});
