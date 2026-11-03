@@ -71,7 +71,9 @@ test('a doc comment\'s fields, a literal as written, and the data a component is
   assert.equal(v[1].id, UNKNOWN, 'a shorthand key is there, its value unknown');
   assert.deepEqual(Object.keys(literalBindings('const tabs = ref([{ id: 1 }])\nlet n = 2\nconst [items, setItems] = useState([])')), ['tabs', 'n', 'items']);
   assert.deepEqual(shapeFindings([{ id: 1, lable: 'x' }], f.tabs, { required: ['id'] }).map((x) => `${x.kind}:${x.key}`), ['unknown:lable']);
-  assert.deepEqual(requiredKeys([[{ id: 1, label: 'a' }, { id: 2, label: 'b', x: 1 }, { id: 3, label: 'c' }]]), ['id', 'label']);
+  assert.deepEqual(requiredKeys([[{ id: 1, label: 'a' }, { id: 2, label: 'b', x: 1 }, { id: 3, label: 'c' }], [{ id: 4, label: 'd' }]]), ['id', 'label']);
+  // Only what an item says: a flag or a picture every use turns on is how those uses look.
+  assert.deepEqual(requiredKeys([[{ id: 1, label: 'a', text: 'x', clickable: true, avatar: null }, { id: 2, label: 'b', text: 'y', clickable: true, avatar: null }, { id: 3, label: 'c', text: 'z', clickable: true, avatar: null }]]), ['id', 'label', 'text']);
 });
 
 test('the markup reader sees multi-line tags, each framework\'s props, events, two-way bindings and slots', () => {
@@ -352,4 +354,23 @@ import ListPage from '@/components/templates/ListPage'
   has(/^4 <h1> is the page's own element, not the system's/);
   has(/^12 a <style> of the page's own/);
   assert.ok(!msgs.some((m) => /^(2|5) /.test(m)), `grouping elements and gaps stay:\n${msgs.join('\n')}`);
+});
+
+test('a list the page builds with .map is read for its item, as a written one is', async () => {
+  const { mappedItems } = await import('../lib/prop-shapes.mjs');
+  assert.deepEqual(Object.keys(mappedItems("computed(() => Object.entries(on).filter(([, v]) => v).map(([id, v]) => ({ id, label: `${id}: ${v}`, icon: 'x' })))")[0]), ['id', 'label', 'icon']);
+  assert.deepEqual(Object.keys(mappedItems('rows.map((r) => { const n = r.n; return { id: n } })')[0]), ['id']);
+  assert.equal(String(mappedItems('rows.map(toRow)')), String(mappedItems('no list here')));
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const r = checkPage('prototypes/Mapped.vue', `<template><list-page title="Orders"><template #header><tab-strip :tabs="tabs" @picked="pick"/></template></list-page></template>
+<script setup>
+import { computed } from 'vue'
+import ListPage from '@/components/templates/ListPage'
+import TabStrip from '@/components/library/tabs/TabStrip'
+const names = ['Open', 'Closed']
+const tabs = computed(() => names.map((n) => ({ label: \`Status: \${n}\` })))
+const pick = () => {}
+</script>`, page, {});
+  assert.ok(r.findings.some((f) => f.level === 'error' && /tabs: item 1 has no "id", which every use in the code gives/.test(f.message)), r.findings.map((f) => f.message).join('\n'));
 });
