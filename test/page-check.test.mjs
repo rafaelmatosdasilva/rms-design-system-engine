@@ -353,3 +353,17 @@ import ListPage from '@/components/templates/ListPage'
   has(/^12 a <style> of the page's own/);
   assert.ok(!msgs.some((m) => /^(2|5) /.test(m)), `grouping elements and gaps stay:\n${msgs.join('\n')}`);
 });
+
+test('a gap marked on a component the page uses is kept, and the component stays', async () => {
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const r = checkPage('prototypes/Marked.vue', `<template><list-page title="Orders"><div data-gap="its button reads another language: it needs a label prop" data-gap-part=".more" data-why="words are content"><tab-strip :tabs="[{ id: 'a', label: 'Open' }]" @picked="pick"/></div><div data-gap=""/></list-page></template>
+<script setup>
+import ListPage from '@/components/templates/ListPage'
+import TabStrip from '@/components/library/tabs/TabStrip'
+const pick = () => {}
+</script>`, page, {});
+  assert.deepEqual(r.gaps.map((g) => [g.kind, g.need, g.part]), [['part', 'its button reads another language: it needs a label prop', '.more']]);
+  assert.ok(r.used.TabStrip, 'the component is still used');
+  assert.ok(r.findings.some((f) => f.level === 'error' && /data-gap names no need/.test(f.message)));
+});
