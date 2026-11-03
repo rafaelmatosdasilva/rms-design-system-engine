@@ -436,6 +436,30 @@ Some WCAG criteria belong to a page, not to a component. They are tried on each 
 
 The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA`. A must-pass check (`"a11yStrict": true`) never stops on an advisory.
 
+### Who acts on each finding
+
+A criterion is not a task. One criterion often owes work to more than one person, and a single finding can owe two
+of them a step each: a colour pair is picked in Figma, then used in the code.
+
+| Person | What falls to them |
+|---|---|
+| A designer, in Figma | Colour pairs, focus states, target sizes, a visible label, a role not stated yet |
+| A developer, in the code | Markup, ARIA, keyboard, focus, ids, reading order |
+| Whoever writes the words | Alternative text, a link's words, a label, a heading, a page title, captions |
+| Whoever owns the flow | Help in the same place, navigation alike across pages, a step that can be undone |
+| A person checks it by hand | What no machine decides: whether a heading describes its section, whether an error says how to put it right |
+
+- **It comes from the finding, not the criterion.** Each kind of finding names the people it owes work to, and what
+  each of them does. A kind that names nobody is the code's, in one step.
+- **Two people, in order.** Where a finding owes two steps, each person gets their own task and the second says which
+  step it is (`2/2`), so a task read on its own still says it follows another's.
+- **It travels with the result.** Every finding in `a11y.json` carries its tasks, so an agent reading the file knows
+  who acts without being told.
+- **Where it shows.** The check prints the tasks under each finding, and ends with a count per person. On a
+  component's Accessibility area each criterion becomes one row per person, with a **Who acts** column and a filter
+  that takes several people at once, so a team sees only its own work. What is done keeps its person, so a team can
+  see what it has finished as well as what is left.
+
 ### Only what changed is tried again
 
 - **Each page's results are kept.** They are saved under what the page rests on: its components and your CSS, your settings, and the check itself.
@@ -1037,8 +1061,7 @@ The engine turns the watch on by itself, once for each person:
 | Page | What you find there |
 |---|---|
 | Overview | A card for each foundation and component, with a thumbnail drawn from your own code, and a search across everything |
-| Health | How far the system has come, in one number and by area |
-| Tasks | Everything still open, with who acts and what to do |
+| Status | How far the system has come, in one number and by area, and everything still open with who acts and what to do (Health and Tasks are one page) |
 | Foundations | Colours, typography, spacing, radii, motion and icons |
 | Components | One page for each component, in areas you switch between |
 | Templates | Each page template, what it is made of and the frame it comes from, when you list templates |

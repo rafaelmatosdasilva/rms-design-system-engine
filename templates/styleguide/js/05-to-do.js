@@ -3,7 +3,15 @@
      own list, so "do 3 and 7" names them. */
   // Who acts on an item: you in the Figma file, the code, you deciding which side is
   // right when Figma and the code each have a case, or you checking by hand what only a person can judge.
-  var WHO = { figma: 'You in Figma', code: 'A developer in the code', figmaCode: 'In Figma and in the code', both: 'You decide', person: 'You check by hand' };
+  // An accessibility task says the person, not the place: one criterion can owe work to several of them, and the
+  // same finding two steps to two (a colour pair picked in Figma, then used in the code). The five are the engine's
+  // own (wcag21.mjs, WHO_PROFILES), the same in every team, so what they count can be compared.
+  var WHO = { figma: 'You in Figma', code: 'A developer in the code', figmaCode: 'In Figma and in the code', both: 'You decide', person: 'You check by hand',
+    designer: 'A designer, in Figma', developer: 'A developer, in the code', content: 'Whoever writes the words', product: 'Whoever owns the flow', a11y: 'A person checks it by hand' };
+  // The five, in the order they are shown and filtered, and each label back to its key (they are all different, so a
+  // row that carries only its words still says which person it is).
+  var WHO_PROFILES = ['designer', 'developer', 'content', 'product', 'a11y'];
+  var WHO_OF = {}; WHO_PROFILES.forEach(function (k) { WHO_OF[WHO[k]] = k; });
   // The team that owns what a task is about (ds-config.json owners: a component, a layer or a token prefix to a team),
   // said after who acts: the longest key that is the component's name, or a token prefix the task names ("primitives/");
   // "*" for everything else. None set: nothing said. A task that already knows its team (a product's own) says that one.
@@ -28,13 +36,19 @@
   // Who acts on an accessibility row: Figma when what is missing is in Figma (a role not stated yet), never when the
   // code fails what a Figma note asks (the note is right, the code changes); a colour pair is a design decision; what
   // only a person can judge is checked by hand; the rest is the code's. its: the row's open items ({ st, from }).
+  // A row with findings says who acts from the findings themselves (each one's tasks, wcag21.mjs). This answers for the
+  // rest: a criterion with no finding of its own (one a person decides, a recording's words, the product's pages -
+  // whoFor), a duty Figma has not stated yet, and a finding from a build made before tasks were written.
   function a11yWho(sc, how, its, note) {
     var from = its.map(function (it) { return it.from || ''; }).join(' ');
     var failed = its.some(function (it) { return it.st === 'todo'; });
     // What waits on its try in a browser is the code's to answer and the audit's to run, a duty a Figma note asked for
     // included: nothing about it is to do in Figma.
     var waits = its.length && its.every(function (it) { return /Tried once the audit runs/.test(it.html || ''); });
-    return waits ? WHO.code : /Figma/.test(from) && !failed ? WHO.figma : COLOUR_SC.test(sc) ? (HAS_FIGMA ? WHO.figmaCode : WHO.code) : how === 'person' || (!its.length && /a person checks/.test(note)) ? WHO.person : WHO.code;
+    var whoFor = (typeof DATA !== 'undefined' && DATA.wcag21 && DATA.wcag21.whoFor) || {};
+    return waits ? WHO.developer : /Figma/.test(from) && !failed ? WHO.designer
+      : how === 'person' || (!its.length && /a person checks/.test(note)) ? WHO.a11y
+      : WHO[whoFor[sc]] || WHO.developer;
   }
   function doWhat(t) { var r = String(t || '').replace(/^In (the code|Figma), /, ''); return r.charAt(0).toUpperCase() + r.slice(1); }   // the label already says where
   var TODO = [], TODO_NO = {};
@@ -103,7 +117,7 @@
     var found = {};
     (DATA.showroom || []).forEach(function (s) { (s.missing || []).forEach(function (m) { if (!m || !m.name || (m.kind === 'component' && rows[m.name]) || SR_ON[m.name]) return; (found[m.kind + '\u0000' + m.name] = found[m.kind + '\u0000' + m.name] || { m: m, screens: [] }).screens.push(s.title || s.key); }); });
   })();
-  var ORDER = ['figma', 'code', 'both'];
+  var ORDER = ['figma', 'designer', 'code', 'developer', 'content', 'product', 'both', 'a11y', 'person'];
   TODO.sort(function (a, b) { return ORDER.indexOf(a.who) - ORDER.indexOf(b.who); });
   TODO.forEach(function (t, i) { t.no = i + 1; });   // numbered again in the order the Status page shows (fillTodo)
 

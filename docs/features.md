@@ -156,6 +156,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Measures touch targets, on the page and again on a small 320 pixel screen.
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
+- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them — a colour pair is picked in Figma, then used in the code — so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
 - Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
 - Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
 - Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.

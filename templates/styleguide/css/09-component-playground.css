@@ -148,7 +148,7 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-chip:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; }
 .sg-chip.sg-chip--only, .sg-chip.sg-chip--only:hover { cursor: default; background: var(--sg-bg); color: var(--sg-text); box-shadow: inset 0 0 0 var(--sg-line-width, 1px) var(--sg-text); }   /* the one status there is: shown chosen, as it is all there is, and never unchosen */
 .sg-chip.sg-chip--only > .sg-count { background: var(--sg-text); color: var(--sg-bg); }
-.sg-issues tr.sg-st-off, .pg-par-card.sg-st-empty { display: none; }
+.sg-issues tr.sg-st-off, .sg-issues tr.sg-who-off, .pg-par-card.sg-st-empty { display: none; }
 .pg-par-sum { display: flex; flex-wrap: wrap; gap: var(--sg-space-l); margin: 0 0 var(--sg-card-gap); font-size: var(--sg-m); color: var(--sg-text-2); }
 /* Wide enough, the table never scrolls on its own (a box that scrolls would hold its head back); on a phone it does. */
 @media (max-width: 720px) {
@@ -226,6 +226,12 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
 .sg-cx-table td { overflow-wrap: normal; word-break: normal; hyphens: none; }
 .sg-cx-table col.sg-cx-rule { width: 34%; } .sg-cx-table col.sg-cx-col { width: 15%; }
 .sg-issues .sg-todo-who { display: block; font-weight: var(--sg-heading-weight); color: var(--sg-text); margin-bottom: var(--sg-space-xxs); }   /* who acts, above what to do */
+/* Who acts, in a column of its own where the table has one (Accessibility): its words stay on one line. */
+.sg-issues td.sg-todo-whocell { white-space: nowrap; }
+.sg-issues td.sg-todo-whocell .sg-todo-who { margin-bottom: 0; }
+/* A task that follows another person's: which step it is, so a row read on its own still says so. */
+.sg-issues .sg-todo-step { display: inline-block; font-size: var(--sg-xs); font-weight: var(--sg-heading-weight); color: var(--sg-muted);
+  border: var(--sg-line); border-radius: var(--sg-radius-pill); padding: 0 var(--sg-space-xs); margin-right: var(--sg-space-xs); vertical-align: 1px; white-space: nowrap; }
 .sg-todo-scope { display: block; color: var(--sg-muted); margin-bottom: var(--sg-space-xxs); }   /* local or shared, and on whom a shared one waits: its reason on hover and in the row's panel */
 .sg-issues .pg-par-status + .pg-par-val { margin-top: var(--sg-space-xxs); }
 .sg-issues th, .sg-issues td { padding-left: var(--sg-space-s); padding-right: var(--sg-space-s); }

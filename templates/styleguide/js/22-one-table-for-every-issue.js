@@ -43,7 +43,10 @@
     written: function (r) { return '<td class="pg-written">' + clip(r.written) + '</td>'; },
     code: function (r) { return '<td>' + clip(firstLine(r.code)) + '</td>'; },
     where: function (r) { return '<td>' + (r.where || r.code || esc(r.kind || '')) + '</td>'; },
-    todo: function (r) { return '<td>' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (isOpen(r) ? scopeHTML(rowScope(r)) : '') + (r.todo || '') + '</td>'; },
+    todo: function (r) { return '<td>' + (r.who && r.area !== 'Accessibility' ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + (isOpen(r) ? scopeHTML(rowScope(r)) : '') + (r.steps > 1 ? '<span class="sg-todo-step" title="' + esc('Step ' + r.step + ' of ' + r.steps + ': it follows another person\u2019s task') + '">' + r.step + '/' + r.steps + '</span>' : '') + (r.todo || '') + '</td>'; },
+    // Who acts, in a column of its own: an accessibility task says the person, so a team can see its own work without
+    // opening every row.
+    whoCell: function (r) { return '<td class="sg-todo-whocell">' + (r.who ? '<span class="sg-todo-who">' + esc(r.who) + '</span>' : '') + '</td>'; },
     // Where it was read, by name only (Figma, Intent layer, Code, Contract, Guidelines); the file and its path are in the
     // row's panel.
     source: function (r) { return '<td class="sg-src-cell">' + esc(srcNames(r.src).join(' · ')) + '</td>'; },
@@ -58,7 +61,7 @@
   };
   var ISSUE_COLS = {
     Parity: [['Task nr', 'no'], ['Type', 'kind'], ['Figma', 'figma'], ['Code', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
-    Accessibility: [['Task nr', 'no'], ['WCAG criterion', 'kind'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
+    Accessibility: [['Task nr', 'no'], ['What to do', 'todo'], ['Who acts', 'whoCell'], ['WCAG', 'kind'], ['What the Figma notes say', 'figma'], ['What the check found', 'code'], ['Status', 'status'], ['Last checked', 'updated']],
     Motion: [['Task nr', 'no'], ['What happens', 'kind'], ['Code', 'code'], ['Figma', 'figma'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Documentation: [['Task nr', 'no'], ['Kind', 'kind'], ['Source', 'source'], ['What is written', 'written'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
     Migration: [['Task nr', 'no'], ['Where', 'where'], ['What to do', 'todo'], ['Status', 'status'], ['Last checked', 'updated']],
@@ -70,7 +73,9 @@
   // What a table leaves to its row's panel: Accessibility's Found and What to do are read in full there, so the table has
   // room for the criterion and Figma's states; Documentation's table is its task, kind, status and when it was checked,
   // what is written and what to do read in its panel.
-  var PANEL_ONLY = { Parity: ['todo'], Accessibility: ['figma', 'code', 'todo'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
+  // Accessibility keeps what it found for the panel, but never its task: two tasks of one criterion differ only by
+  // their words, so a table without them would show the same row twice.
+  var PANEL_ONLY = { Parity: ['todo'], Accessibility: ['figma', 'code'], Documentation: ['written', 'todo'] };   // the rest: the row's panel
   var tableColsOf = function (area) { var off = PANEL_ONLY[area] || []; return colsOf(area).filter(function (col) { return off.indexOf(col[1]) < 0; }); };
   var ROW_GO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   // A long cell (what is written, what was found, what Figma states) shows its first lines in the table; the whole row
@@ -83,7 +88,7 @@
   function openRowKey(key) { for (var i = ROW_DETAIL.length - 1; i >= 0; i--) if (rowKey(ROW_DETAIL[i]) === key) { openRowPanel(i, null); return true; } return false; }
   function issueRowHTML(r, area) {
     var a = area || r.area, id = ROW_DETAIL.push({ r: r, area: a }) - 1;
-    return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
+    return '<tr class="sg-row-open" data-row-detail="' + id + '" tabindex="0" data-status="' + r.st + '"' + (r.area ? ' data-area="' + esc(r.area) + '"' : '') + (r.whoKey ? ' data-who="' + esc(r.whoKey) + '"' : '') + (r.type ? ' data-type="' + esc(r.type) + '"' : '') + (r.extra ? ' data-extra' : '') + '>' +
       tableColsOf(a).map(function (col) { return ISSUE_CELL[col[1]](r); }).join('') + '<td class="sg-row-go">' + ROW_GO_SVG + '</td></tr>';
   }
   // A row in full, in a panel from the right, as a token opens: each column of its table as a card, nothing cut short,
@@ -231,13 +236,67 @@
     if (sts.length === 1) return '<span class="sg-chips"><span class="sg-chip sg-chip--only"><span class="pg-par-status pg-par--' + STATUS[sts[0]][2] + '"><span class="pg-par-sign" aria-hidden="true"></span></span>' + esc(rowWord(sts[0], area)) + countHTML(all) + '</span></span>';
     return '<span class="sg-chips" role="group" aria-label="Show">' + chip('all', 'All', all) + sts.map(function (k) { return chip(k, rowWord(k, area), n[k]); }).join('') + '</span>';
   }
+  // ── Who acts, as a filter beside the status chips ────────────────────────────────────────────────────────────────
+  // An accessibility table says the person on every row, so a team can show its own work and nobody has to read the
+  // rest. Several at once, because one criterion often owes work to more than one of them. The shape is the Status
+  // page's own filter (a chip that opens a listbox, each choice with how many rows it has), and it combines with the
+  // status chips: a row is shown when both let it through.
+  var WHO_DD = 0;
+  function whoChipsHTML(rows) {
+    var n = {}, keys = [];
+    Array.prototype.forEach.call(rows, function (tr) {
+      if (tr.hasAttribute('data-extra')) return;
+      String(tr.dataset.who || '').split(' ').filter(Boolean).forEach(function (k) { if (!n[k]) { n[k] = 0; keys.push(k); } n[k]++; });
+    });
+    if (keys.length < 2) return '';   // one person, or none said: nothing to filter
+    keys.sort(function (a, b) { return ORDER.indexOf(a) - ORDER.indexOf(b); });
+    var id = 'sg-who-dd-' + (++WHO_DD);
+    return '<span class="sg-chip-dd sg-who-dd"><button type="button" class="sg-chip sg-chip-menu" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
+      '<span class="sg-chip-label">Who acts</span><span class="sg-chip-word">All</span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
+      '<span class="sg-select-list" id="' + id + '" role="listbox" aria-multiselectable="true" aria-label="Who acts" tabindex="-1" hidden>' +
+      keys.map(function (k) { return '<span class="sg-dd-option" role="option" data-whopick="' + esc(k) + '" aria-selected="false"><span>' + esc(WHO[k]) + '</span><span class="sg-count">' + n[k] + '</span></span>'; }).join('') +
+      '</span></span>';
+  }
+  // The rows this filter lets through, and the words on its chip: none chosen is All.
+  function applyWho(dd) {
+    var list = document.getElementById(dd.querySelector('.sg-chip-menu').getAttribute('aria-controls'));
+    var picked = Array.prototype.filter.call(list.querySelectorAll('.sg-dd-option'), function (o) { return o.getAttribute('aria-selected') === 'true'; })
+      .map(function (o) { return o.dataset.whopick; });
+    var scope = dd.closest('.pg-par, .sg-todo') || dd.parentElement, shown = 0;
+    Array.prototype.forEach.call(scope.querySelectorAll('table.sg-issues tbody tr'), function (tr) {
+      var has = !picked.length || picked.some(function (k) { return (' ' + (tr.dataset.who || '') + ' ').indexOf(' ' + k + ' ') >= 0; });
+      tr.classList.toggle('sg-who-off', !has);
+      if (has && !tr.classList.contains('sg-st-off')) shown++;
+    });
+    var btn = dd.querySelector('.sg-chip-menu');
+    btn.setAttribute('aria-pressed', picked.length ? 'true' : 'false');
+    btn.querySelector('.sg-chip-word').textContent = !picked.length ? 'All' : picked.length === 1 ? String(WHO[picked[0]]).split(',')[0] : String(WHO[picked[0]]).split(',')[0] + ' +' + (picked.length - 1);
+    btn.querySelector('.sg-chip-n').textContent = shown;
+    Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) {
+      card.classList.toggle('sg-st-empty', !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.classList.contains('sg-who-off') && !tr.hidden; }));
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.sg-who-dd .sg-chip-menu');
+    if (b) {
+      var list = document.getElementById(b.getAttribute('aria-controls')), open = b.getAttribute('aria-expanded') !== 'true';
+      list.hidden = !open; b.setAttribute('aria-expanded', String(open));
+      return;
+    }
+    var o = e.target.closest && e.target.closest('.sg-who-dd .sg-dd-option[data-whopick]');
+    if (o) { o.setAttribute('aria-selected', o.getAttribute('aria-selected') === 'true' ? 'false' : 'true'); applyWho(o.closest('.sg-who-dd')); return; }
+    if (!(e.target.closest && e.target.closest('.sg-who-dd'))) Array.prototype.forEach.call(document.querySelectorAll('.sg-who-dd .sg-chip-menu[aria-expanded="true"]'), function (x) {
+      x.setAttribute('aria-expanded', 'false'); document.getElementById(x.getAttribute('aria-controls')).hidden = true;
+    });
+  });
   function chipsCount(rows) { var n = {}; Array.prototype.forEach.call(rows, function (tr) { if (!tr.hasAttribute('data-extra')) n[tr.dataset.status] = (n[tr.dataset.status] || 0) + 1; }); return n; }
   function applyChip(b) {
     var group = b.closest('.sg-chips'), scope = group.closest('.pg-par, .sg-todo') || group.parentElement, st = b.dataset.st;
     scope._chip = st;
     Array.prototype.forEach.call(group.querySelectorAll('.sg-chip'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
     Array.prototype.forEach.call(scope.querySelectorAll('table.sg-issues tbody tr'), function (tr) { tr.classList.toggle('sg-st-off', st !== 'all' && tr.dataset.status !== st); });
-    Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) { card.classList.toggle('sg-st-empty', st !== 'all' && !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.hidden; })); });
+    Array.prototype.forEach.call(scope.querySelectorAll('.pg-par-card'), function (card) { card.classList.toggle('sg-st-empty', !Array.prototype.some.call(card.querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('sg-st-off') && !tr.classList.contains('sg-who-off') && !tr.hidden; })); });
+    Array.prototype.forEach.call(scope.querySelectorAll('.sg-who-dd'), function (dd) { applyWho(dd); });   // the two filters agree on what is shown
   }
   document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sg-chip[data-st]'); if (b) { applyChip(b); if (e.isTrusted && hashParts().id !== 'status') setHashQuery({ st: b.dataset.st }); } });
   var ST_ORDER = { todo: 0, check: 1, done: 2, kept: 3, skip: 4, none: 5 };
