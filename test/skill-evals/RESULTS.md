@@ -2,6 +2,18 @@
 
 What each run scored is here. What reading them taught is in [FINDINGS.md](FINDINGS.md), written as each case is closed.
 
+## 2026-11: The composition path, measured: the twelve prototype tasks on a system not built in code
+
+The twelve prototype tasks run on Tidepool with only its Figma file (`--set prototype-figma`): each task's own setup, then the code system taken out, so a page there is a composition. Scored by the same scorers, with "invents nothing" now holding a composition to the system's components and the engine's layout pieces, and to no colour or size of its own.
+
+| Haiku 5.5, 2 November 2026 | Passed | Cost |
+|---|---|---|
+| Claude alone (no guide, no engine; `--variant mcp --route none`) | 0 of 12 | $0.10 |
+| With the skill, as first run | 19 of 24 | $0.19 |
+| With the skill, catalog taking spacing from Figma | 24 of 24 | $0.19 |
+
+**Reading.** With the skill every run wrote a composition and the engine checked it. Five failed on the first run: both profile runs left the page's padding at none, writing "the system has no spacing tokens" beside a Settings page that uses `padding/m`. The catalog had read spacing only from the code, so with no code it offered none. With the catalog taking it from Figma's variables, the same 24 runs passed. Claude alone wrote HTML with colours of its own in 11 of 12 runs, and one composition with a part of its own. See FINDINGS.md.
+
 ## 2026-11: The fork the recipe buried: which kind of file this project writes (continuous evaluation)
 
 What changed since the entry below (engine 0191718): Style guide: the corner card's drawing sized to its box, centered and a little smaller, never over its caption (#258); Features page: Fit your team's setup is in early development (#259); A large commit GitLab's gateway turns down is sent again, and looked for longer (#261); Setup ends with a first result; a commit warns, a push refuses; accessibility caught in Figma (#260); Features page: Fit your team's setup is actively improving (#262); Each prototype carries its own evaluation, and each component shows what was built with it (#263); A write GitLab turns down says why, in GitLab's own words (#264); A file that is not a composition is told so once, not symptom by symptom (#266); The style guide's pictures are files of their own, so the page shows in a quarter of the time (#267); A component named with a note in brackets no longer stops the style guide's sweep (#268); Git hooks for a project at the top of its repository get no stray cd on macOS (#270); Releases follow what merged: started when a change is worth it, a backstop every third day (#272); Features page: Fit your team's setup is in early development (#269); A store's write can tell a CI the git host cannot reach (#271); The fork the recipe buried: which kind of file this project writes. The guide changed in `cookbook/prototype.md`.

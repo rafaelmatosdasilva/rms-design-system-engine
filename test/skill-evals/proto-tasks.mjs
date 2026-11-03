@@ -12,7 +12,7 @@
 //   • it is built from the system's components the request needs;
 //   • the reply says what the system lacks, when the request holds something it lacks;
 //   • the page is arranged like the product's other page, and follows the team's guidelines, where the task says so.
-import { cpSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { cpSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { offSystemValues } from './build-score.mjs';
@@ -34,6 +34,11 @@ const withGuidelines = (dir) => {
 };
 
 const DECLARED = new Set(Object.keys(TOKENS.light));
+// The system's components as Figma has them, and the engine's own layout pieces (prototype.mjs): what a composition may
+// be made of.
+const FIGMA_PROPS = JSON.parse(readFileSync(join(TIDEPOOL, 'src/figma/figma-component-props.snapshot.json'), 'utf8'));
+const FIGMA_COMPONENTS = new Set(Object.keys(FIGMA_PROPS.components ?? FIGMA_PROPS).filter((k) => !k.startsWith('_')).map((k) => k.toLowerCase()));
+const PIECES = new Set(['Page', 'Stack', 'Row', 'Columns', 'Text', 'Missing']);
 // The classes the system's own CSS defines: a rule on any other class with a look of its own is a look invented here.
 const SYSTEM_CLASSES = new Set(readdirSync(join(REF, 'src/components')).filter((f) => f.endsWith('.css'))
   .flatMap((f) => [...readFileSync(join(REF, 'src/components', f), 'utf8').matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1])));
@@ -95,6 +100,16 @@ export function inventsNothing(ctx) {
       const exported = [...f.text.matchAll(/export\s+(?:default\s+)?(?:function\s+|const\s+)?([A-Z]\w*)/g)].map((m) => m[1]);
       const extra = defs.filter((d) => !exported.includes(d));
       if (extra.length && defs.length > 1) bad.push(`${f.path}: defines ${extra.join(', ')} for the prototype`);
+    }
+    // A composition: every part one of the system's components or the engine's own layout pieces, and no colour or size
+    // written as a value of its own; any other part is one made for the prototype.
+    if (/\.json$/.test(f.path) && !/conventions|package/.test(f.path)) {
+      let j = null; try { j = JSON.parse(f.text); } catch { /* not a composition */ }
+      const parts = [], values = [];
+      const walk = (n) => { if (Array.isArray(n)) return n.forEach(walk); if (!n || typeof n !== 'object') return; if (typeof n.component === 'string') parts.push(n.component); for (const v of Object.values(n)) { if (typeof v === 'string') values.push(v); else walk(v); } };
+      walk(j);
+      for (const c of new Set(parts)) if (!FIGMA_COMPONENTS.has(c.toLowerCase()) && !PIECES.has(c)) bad.push(`${f.path}: ${c}, a component of its own`);
+      for (const v of values) if (/#[0-9a-f]{3,8}\b|rgba?\(|(?<![\w.-])\d*\.?\d+px\b/i.test(v)) { bad.push(`${f.path}: ${v} (a value the system does not have)`); break; }
     }
     for (const v of offSystemValues(cssOf(f), DECLARED)) bad.push(`${f.path}: ${v}`);
     for (const r of rules(cssOf(f))) {
@@ -398,3 +413,10 @@ export const PROTO = [
       check('says the system has no dialog for the confirmation', namesGap(ctx.final, 'dialogs?|modals?|overlays?|popovers?'))],
   },
 ];
+
+// The same tasks where the system is not built in code: Tidepool with only its Figma file, so a page there is a
+// composition, not a file of code. Each task's own setup runs (its settings page, its guidelines), then the code system
+// it brought is taken out again. Scored the same way: usesSystem and pageOf read a composition as they read code, and
+// inventsNothing holds a composition to the system's components and the engine's layout pieces.
+const figmaOnly = (setup) => (dir) => { setup?.(dir); for (const d of ['src/styles', 'src/components']) rmSync(join(dir, d), { recursive: true, force: true }); };
+export const PROTO_FIGMA = PROTO.map((t) => ({ ...t, id: `${t.id}-figma`, setup: figmaOnly(t.setup) }));
