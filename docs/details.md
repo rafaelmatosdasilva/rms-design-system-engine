@@ -484,6 +484,12 @@ look at, **how to look at it**, and keeps the answer only while it is still true
 - **A token change tries only the components that use it.** Each component is signed with its own CSS rules and the tokens they reach, through `var()` and in every brand. A colour changed in Figma tries again only the components that show it.
 - **A token the whole page shares tries every component.** That is a token the style guide's frame or your global CSS uses (a page background, the body text).
 - **An unchanged page is not opened again.** The next run puts its results back, and the report says how many pages it reused. When nothing changed, no browser opens and the check takes seconds.
+- **An engine update tries again only what it could have changed.** Results are signed by what decides them: the
+  checks, the thresholds, the rules they run and the in-page script. What a finding is called, why it matters,
+  what to do about it and who does it are words, kept apart and left out of the signature, so a reworded finding
+  never makes a whole system check itself again. A comment on a line of its own is left out too; one after code
+  is kept, because finding where it really begins means reading the strings around it, and a signature that
+  guessed wrong would put back results the engine should have checked again.
 - **A change is tried at once.** A style guide is checked a few components a page, so a change to one component tries only its page again.
 - **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the style guide, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
 - **A change to your CSS's comments or spacing keeps every result.** Only the rules count.
