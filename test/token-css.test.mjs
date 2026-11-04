@@ -106,3 +106,11 @@ test('every stylesheet the file is built from is there, with nothing on disk to 
   assert.match(r.line, /1 stylesheet\(s\)/);
   assert.match(readFileSync(join(d, HOSTED_FILE), 'utf8'), /--acme-gap-m/);
 });
+
+test('a system that builds its tokens from Figma is never stopped for the file they go into', async () => {
+  const d = project({});
+  const cfg = { build: true, paths: { themeCSS: ['src/styles/tokens.css'] } };
+  assert.deepEqual(missingThemeCss(d, cfg), ['src/styles/tokens.css'], 'the file is not there yet');
+  const t = await themeCssOnRun(d, cfg, { fetchImpl: fakeHost().fetchImpl });
+  assert.deepEqual(t, { lines: [], stop: false }, 'the gate for that file lists the tokens to write into it');
+});

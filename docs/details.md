@@ -120,8 +120,9 @@ Some systems do not declare their token values in a file in the repository: the 
 Everything the engine measures is compared against those values, so that one file matters more than any other:
 
 - **The address is kept.** `paths.themeCSSFrom` records where the stylesheets came from. One mode's address is enough — the engine asks for the rest by itself.
-- **A run that finds it gone takes it again.** The file is the engine's own, so it rebuilds it rather than measuring against nothing.
+- **A run that measures finds it gone and takes it again.** The file is the engine's own, so it rebuilds it rather than measuring against nothing. A command that reads no token values (writing a CI job, adding a guidelines link) is not held up by it.
 - **A run that cannot take it again stops.** Without the token values, every token reads as undeclared and every component as different from Figma: a page that says your system is broken when nothing is. The run says which file is missing instead.
+- **A system built from Figma is exempt.** When your tokens are written from Figma (`build: true`), the file they go into is not there until they are written, and the gate for it already lists what to write.
 - **Ask for it any time** ([ask in Claude Code](commands.md#set-up)), for instance when the hosted values changed and you want them now.
 
 A file **you** named in `paths.themeCSS` is yours, not the engine's: if it is missing, the run says so and changes nothing.
