@@ -60,10 +60,15 @@ test('the script adds only the listed role, keeps what was there, skips a role a
   const edits = [...figmaEdits(SNAP, VIEW), { kind: 'role', component: 'gone', nodeId: '9:9', label: 'Role: button' }];
   const script = applyScript(edits);
   assert.doesNotMatch(script, /tag/, 'a decision is never in the script');
-  const nodes = { '1:1': { annotations: [{ label: 'Keep the label short', labelMarkdown: '' }] } };
-  assert.deepEqual(await run(script, nodes), { changed: ['button → Role: button'], skipped: [], missing: ['gone'] });
+  const nodes = { '1:1': { id: '1:1', name: 'button', annotations: [{ label: 'Keep the label short', labelMarkdown: '' }] } };
+  const first = await run(script, nodes);
+  assert.deepEqual([first.changed, first.skipped, first.missing], [['button → Role: button'], [], ['gone']]);
   assert.deepEqual(nodes['1:1'].annotations, [{ label: 'Keep the label short' }, { label: 'Role: button' }]);
-  assert.deepEqual(await run(script, nodes), { changed: [], skipped: ['button'], missing: ['gone'] });
+  // What the annotation was before it changed, so the write has a way back (figma-undo.mjs).
+  assert.deepEqual(first.undo, [{ kind: 'annotations', id: '1:1', was: [{ label: 'Keep the label short' }], what: 'button' }]);
+  const again = await run(script, nodes);
+  assert.deepEqual([again.changed, again.skipped, again.missing], [[], ['button'], ['gone']]);
+  assert.deepEqual(again.undo, [], 'a run that changes nothing records nothing to put back');
 });
 
 test('guard: Figma is written only by the engine\'s script, and only after a yes; reading is never stopped', () => {

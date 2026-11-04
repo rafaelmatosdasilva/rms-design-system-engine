@@ -99,7 +99,7 @@
   if (FCH.length) (function () {
     hr(); navLink('changes-in-Figma', 'changes in Figma');
     var sec = section('changes-in-Figma', 'Changes', 'Changes in Figma', '');
-    var ST = { waiting: ['figma', 'Waiting to be made'], made: ['match', 'Made as said'], 'not as said': ['differs', 'Not as said'] };
+    var ST = { waiting: ['figma', 'Waiting to be made'], made: ['match', 'Made as said'], 'not as said': ['differs', 'Not as said'], 'taken back': ['figma', 'Taken back'] };
     var dot = function (k, label) { return '<span class="pg-par-status pg-par--' + k + '"><span class="pg-par-sign" aria-hidden="true"></span>' + esc(label) + '</span>'; };
     var known = {}; COMPONENTS.forEach(function (c) { known[c.name] = 1; });
     var compHTML = function (n) { return known[n] ? '<a class="sg-uses-link" href="#' + esc(cid(n)) + '/history">' + esc(n) + '</a>' : esc(n); };
@@ -142,7 +142,7 @@
     sec.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[data-fc-row]'); if (tr && e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr); } });
     sec._openKey = function (key) { var i = FCH.findIndex(function (x) { return fcKey(x) === key; }); if (i >= 0) panel(i, null); return i >= 0; };
     var nOf = function (st) { return FCH.filter(function (x) { return x.status === st; }).length; };
-    pageBar(sec, { chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }].filter(function (c) { return c.n; }) });
+    pageBar(sec, { chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }, { key: 'taken back', label: 'Taken back', n: nOf('taken back'), dot: 'figma' }].filter(function (c) { return c.n; }) });
   })();
   // History: every change gathered by the release it shipped in, newest first, each a table of what was done and what
   // it affects: the code's commits, each read of Figma that changed what Figma says of a component, and what the team
