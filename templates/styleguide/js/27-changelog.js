@@ -28,7 +28,7 @@
     }).join('');
     // Each change made to it in Figma through the engine, with its status, opening its before and after on the Changes in
     // Figma page.
-    var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said' };
+    var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said', 'taken back': 'Taken back' };
     fig += (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
       return '<tr><td><a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + (x.signedOff ? '<br><span class="pg-dim">' + esc('signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '') + '</td></tr>';
     }).join('');

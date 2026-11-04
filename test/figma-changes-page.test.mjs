@@ -12,7 +12,7 @@ import { libraryUsage } from '../lib/figma-analytics.mjs';
 
 const change = (component, at, extra = {}) => ({ kind: 'change', component, at, asked: `add xl to ${component}'s size`, ops: [{ op: 'addOption', axis: 'size', option: 'xl', like: 'l' }], report: { skeleton: [], architecture: [{ change: 'added', what: 'option size=xl' }], variables: [] }, breaking: [], held: [{ what: 'a new option' }], faults: [], ...extra });
 
-test('every change the engine kept: waiting, made as said, not as said, newest first, one change shown once', () => {
+test('every change the engine kept: waiting, made as said, not as said, taken back, newest first, one change shown once', () => {
   const root = tempDir('fc-');
   const dir = join(root, '.design-system-engine-out', 'changes');
   mkdirSync(join(dir, 'done'), { recursive: true });
@@ -20,9 +20,13 @@ test('every change the engine kept: waiting, made as said, not as said, newest f
   writeFileSync(join(dir, 'done', 'chip-2026-10-28.json'), JSON.stringify(change('chip', '2026-10-28T10:00:00Z', { done: [{ at: 'x', mismatch: [], real: { skeleton: [] } }] })));
   writeFileSync(join(dir, 'done', 'tag-2026-10-27.json'), JSON.stringify(change('tag', '2026-10-27T10:00:00Z', { done: [{ at: 'y', mismatch: [{ change: 'added', what: 'frame Extra' }] }] })));
   writeFileSync(join(dir, 'button.change.json'), JSON.stringify(change('button', '2026-10-29T10:00:00Z')));
+  // A change the way back took back: the read after is the read before, so it is no longer a change that was made.
+  writeFileSync(join(dir, 'done', 'quokka-2026-10-26.json'), JSON.stringify(change('quokka', '2026-10-26T10:00:00Z', { done: [{ at: 'z', mismatch: [], real: { skeleton: [] } }], undo: { at: '2026-10-26T11:00:00Z', complete: true, steps: 2, cannot: [], ranAt: '2026-10-26T12:00:00Z', backToBefore: true } })));
   const v = changesView(root, { readdirSync, readFileSync, join });
-  assert.deepEqual(v.map((x) => [x.component, x.status]), [['button', 'waiting'], ['chip', 'made'], ['tag', 'not as said']]);
+  assert.deepEqual(v.map((x) => [x.component, x.status]), [['button', 'waiting'], ['chip', 'made'], ['tag', 'not as said'], ['quokka', 'taken back']]);
   assert.deepEqual(v[0].steps, ['a new option size=xl, its variants copied from l']);
+  assert.equal(v.find((x) => x.component === 'quokka').undo.steps, 2, 'the way back is on the row, with how many steps it put back');
+  assert.equal(v.find((x) => x.component === 'chip').undo, null, 'a change with no way back run carries none');
   assert.deepEqual(changesView(tempDir('fc-none-'), { readdirSync, readFileSync, join }), []);
 });
 
