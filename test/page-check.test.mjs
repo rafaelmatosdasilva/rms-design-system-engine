@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { docFields, readLiteral, literalBindings, shapeFindings, requiredKeys, UNKNOWN } from '../lib/prop-shapes.mjs';
-import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, boxLine, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../lib/page-check.mjs';
+import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, boxLine, pageConventions, pageCache, pageHookCheck, importedComponents, importsOf, recordInventions } from '../lib/page-check.mjs';
 import { tempDir } from './helpers.mjs';
 
 const put = (root, rel, text) => { const p = join(root, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
@@ -87,6 +87,24 @@ test('the markup reader sees multi-line tags, each framework\'s props, events, t
   assert.equal(jsx.children[0].tag, 'Badge');
   assert.equal(jsx.children[0].children[0].tag, 'Badge', 'a tag inside an expression is a child');
   assert.equal(splitSource('P.vue', '<template><div><template v-if="x"><b/></template></div></template>\n<script>let y</script>').markup, '<div><template v-if="x"><b/></template></div>');
+});
+
+test('the import reader takes the default, every name in the braces, a name given another, and a part loaded late', () => {
+  const m = importsOf(`import TabStrip from '@acme/ui/tab-strip';
+import { Badge, CardTile as Tile } from '@acme/ui';
+import Dialog, { DialogTitle } from '@acme/ui/dialog';
+import type Theme from '@acme/ui/theme';
+const LatePanel = defineAsyncComponent(() => import('@acme/ui/late-panel'));
+const LazyChip = lazy(() => import('@acme/ui/chip'));`);
+  assert.equal(m.get('TabStrip'), '@acme/ui/tab-strip');
+  assert.equal(m.get('Badge'), '@acme/ui');
+  assert.equal(m.get('Tile'), '@acme/ui', 'a name given another is kept under the name the page uses');
+  assert.equal(m.has('CardTile'), false, 'and not under the one it was given');
+  assert.equal(m.get('Dialog'), '@acme/ui/dialog', 'a default beside names in braces is taken too');
+  assert.equal(m.get('DialogTitle'), '@acme/ui/dialog');
+  assert.equal(m.has('Theme'), false, 'a type leads to no component');
+  assert.equal(m.get('LatePanel'), '@acme/ui/late-panel');
+  assert.equal(m.get('LazyChip'), '@acme/ui/chip');
 });
 
 test('a Vue page with invented parts, wrong data and a misplaced part is refused line by line; one written right passes', async () => {
