@@ -45,3 +45,12 @@ test('told where the project is, the engine works there and remembers it for the
   const again = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--version'], { cwd: from, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
   assert.match(again.stderr, new RegExp(`Project: ${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
 });
+
+test('a profile that cannot be read is said, and the run carries on with the setup already there', { timeout: budget(60000) }, () => {
+  const project = tempDir('pd-prof-');
+  mkdirSync(join(project, 'src'), { recursive: true }); writeFileSync(join(project, 'src', 'theme.css'), ':root { --a: #fff; }');
+  const r = spawnSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), '--version', `--profile=${join(project, 'not-here.json')}`], { cwd: project, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stderr, /Profile not read: no file at/);
+  assert.doesNotMatch(r.stdout + r.stderr, /TypeError/, 'a profile with nothing in it is never read for where the project is');
+});
