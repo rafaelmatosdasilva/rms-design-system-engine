@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { docFields, readLiteral, literalBindings, shapeFindings, requiredKeys, UNKNOWN } from '../lib/prop-shapes.mjs';
-import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../lib/page-check.mjs';
+import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, boxLine, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../lib/page-check.mjs';
 import { tempDir } from './helpers.mjs';
 
 const put = (root, rel, text) => { const p = join(root, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
@@ -423,4 +423,38 @@ const props = defineProps({ options: { type: Array, default: () => [] }, params:
   const wrong = msgs("[{ id: 'a', label: 'All' }]");
   assert.equal(wrong.length, 1, wrong.join(' | '));
   assert.match(wrong[0], /options: "label" is not a field it takes \(its fields: id, text\)/);
+});
+
+test('a card carries the width the design gives a component, and says how it takes it', async () => {
+  // What a card could not say before: an agent told only "fixed" laid three buttons beside something that fills the
+  // row, and every label was cut to a letter. The width is what it was missing.
+  assert.equal(boxLine({ width: 90, sizing: { h: 'FIXED', v: 'HUG' }, minWidth: null, maxWidth: null }), 'fixed at 90px');
+  assert.equal(boxLine({ width: 40, sizing: { h: 'FILL', v: 'HUG' }, minWidth: 40, maxWidth: 500 }), 'fills what holds it, never under 40px and never over 500px, 40px in the design');
+  assert.equal(boxLine({ width: 100, sizing: { h: 'HUG', v: 'FIXED' }, minWidth: 280, maxWidth: 500 }), 'hugs its content, never under 280px and never over 500px, 100px in the design');
+  assert.equal(boxLine(null), null, 'no capture yet: the card says nothing of it');
+  assert.equal(boxLine({}), null, 'a box with nothing in it says nothing');
+
+  const root = tempDir('acme-box-');
+  put(root, 'ds-config.json', '{}');
+  put(root, 'src/components/library/chips/FilterChip.vue', `<template><button class="filter-chip">{{ label }}</button></template>
+<script setup>
+const props = defineProps({ label: { type: String, default: '' } })
+</script>`);
+  // The design's box, as the Figma capture writes it per component.
+  put(root, 'src/figma-structure.snapshot.json', JSON.stringify({ components: { FilterChip: { box: { width: 90, sizing: { h: 'FIXED', v: 'HUG' }, minWidth: null, maxWidth: null } } } }));
+  const system = await pageSystem(root, {}, { components: { filterChip: { props: {} } } });
+  assert.deepEqual(system.components.FilterChip.box, { width: 90, sizing: { h: 'FIXED', v: 'HUG' }, minWidth: null, maxWidth: null }, 'read from the capture');
+  const card = [usageCards(system, ['FilterChip'])].flat().join('\n');
+  assert.match(card, /width: fixed at 90px/);
+
+  // A project with no capture: the card is as it was, and nothing is invented.
+  const bare = tempDir('acme-no-box-');
+  put(bare, 'ds-config.json', '{}');
+  put(bare, 'src/components/library/chips/FilterChip.vue', `<template><button class="filter-chip">{{ label }}</button></template>
+<script setup>
+const props = defineProps({ label: { type: String, default: '' } })
+</script>`);
+  const noBox = await pageSystem(bare, {}, { components: { filterChip: { props: {} } } });
+  assert.equal(noBox.components.FilterChip.box, null);
+  assert.ok(!/width:/.test([usageCards(noBox, ['FilterChip'])].flat().join('\n')));
 });
