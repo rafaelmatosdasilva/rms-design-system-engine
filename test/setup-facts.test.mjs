@@ -106,6 +106,20 @@ test('the installer\'s last words set up with where the code is, never --init al
   assert.doesNotMatch(text, /rms-design-system-engine --init +#/);
 });
 
+test('the installer ends inside Claude Code, in the folder it made, or says the line that gets there', () => {
+  const text = readFileSync(join(ENGINE, 'install.sh'), 'utf8');
+  // The token is in that folder's .env and the engine reads it from where it runs, so where Claude Code opens decides
+  // whether the first run works at all. "Open that folder" without saying how is where a first setup stops.
+  assert.doesNotMatch(text, /Open that folder in Claude Code/);
+  assert.match(text, /OPEN_LINE="cd \\"\$FOLDER\\" && claude"/, 'the line to paste is written out');
+  // Done for the person when there is a terminal to ask in and Claude Code to open, as the token is asked for.
+  assert.match(text, /command -v claude >\/dev\/null && \[ -r \/dev\/tty \]/);
+  assert.match(text, /Open Claude Code there now\? \[Y\/n\]/);
+  assert.match(text, /cd "\$FOLDER" && exec claude/, 'exec: Claude Code takes the terminal, not a child of the installer');
+  // With no terminal, or no Claude Code, the line is printed instead of nothing.
+  assert.match(text, /To start, open Claude Code in that folder/);
+});
+
 test('the installer refuses what the engine cannot run without, and names what the optional ones unlock', () => {
   const text = readFileSync(join(ENGINE, 'install.sh'), 'utf8');
   // Node is the one version the engine cannot do without (its built-in WebSocket talks to Chrome).
