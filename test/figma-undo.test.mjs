@@ -57,7 +57,10 @@ function world({ vars = [], styles = [] } = {}) {
     annotations: { getAnnotationCategoriesAsync: async () => [{ id: 'c1', label: 'Accessibility Review' }], addAnnotationCategoryAsync: async ({ label }) => ({ id: 'c-' + label, label }) },
   };
 }
-const go = (script, figma) => new Function('figma', `return (async () => { ${script} })();`)(figma);
+// The script is the body of an async function, not text pasted into one: it already ends in a return and awaits
+// inside, and nothing of it is interpolated into code here (as test/figma-edits.test.mjs runs a rename script).
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const go = (script, figma) => new AsyncFunction('figma', script)(figma);
 // A change made, then put back from the record the run returned.
 async function roundTrip(script, figma) {
   const made = await go(script, figma);
@@ -319,9 +322,11 @@ test('writeUndo keeps the record and the script together; no record, no files', 
 });
 
 test('a name read from Figma can never become code in the script that puts it back', () => {
-  const hostile = '</script><script>figma.root.children[0].remove()</script>';
+  const hostile = '</script><script>figma.root.children[0].remove()</script>\u2028</SCRIPT><SCRIPT>x</SCRIPT>';
   const script = undoScript([{ kind: 'name', id: '1:1', was: hostile, what: hostile }]);
-  assert.doesNotMatch(script, /<\/script>/, 'the characters that could end the script are written as escapes');
-  assert.doesNotMatch(script, /<script>/);
+  assert.doesNotMatch(script, /\u2028/, 'a line separator is escaped too: it ends a line inside a string');
+  // Case-insensitive on purpose: a name could carry </SCRIPT> as well, and the escaping has to cover both.
+  assert.doesNotMatch(script, /<\/script>/i, 'the characters that could end the script are written as escapes');
+  assert.doesNotMatch(script, /<script>/i);
   assert.ok(script.includes('\\u003c'), 'written as an escape instead');
 });
