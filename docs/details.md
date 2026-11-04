@@ -260,6 +260,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 
 ### Components
 
+- **What Figma does not publish is left out.** A component whose name starts with a dot or an underscore (`.tableCell`, `_base`), with or without a status mark in front of it (`🟡 .tableCell`), is private to the library: a building block of other components, not one of your system. Your code is never asked for it, it is not counted as missing, and it gets no page in the style guide.
 - **No hand-built DS components.** A screen uses the real component, not a hand-styled copy.
   - A product's own version of a system component is listed too, as advice. It is found by what it draws (a class that loops the same animation as a component's part, `.spinner` beside the loader's `.loader-spinner`) or by its name (a class of its own that starts with a component's name and says nothing more, `loading-state`).
   - A class beside a system class on the same element dresses the component and is left alone.
