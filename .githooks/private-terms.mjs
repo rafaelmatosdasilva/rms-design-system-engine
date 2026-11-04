@@ -100,11 +100,24 @@ const GENERIC_NAMES = new Set(('buttonprimary buttonsecondary buttontertiary but
   'appbackground pagebackground surfacecolor elevationhigh elevationmedium elevationlow statelayer xsmall xlarge xxlarge').split(/\s+/));
 const camelParts = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').split(/[^A-Za-z0-9]+/).filter(Boolean).map((x) => x.toLowerCase());
 const SIZE_STEP = /^(x*[sml]|\d*x[sl]|xxxs|xxxl|[sml]\d?|\d+x)$/;
+// The engine's own name, and each word of it: whatever a project's files say, these are the engine's. It writes its
+// own name and address into every project it works on (its README there, the jobs it writes), so reading them back
+// would refuse the engine's own documentation, commands and messages - as it did on 4 November 2026. Read from the
+// engine's own package, so it stays true if the engine is ever renamed.
+const OURS = (() => {
+  const out = new Set();
+  const take = (s) => { for (const w of [norm(s), ...camelParts(s)]) if (w && w.length >= 3) out.add(norm(w)); };
+  try { take(readJson(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), {}).name ?? ''); } catch { /* read what we can */ }
+  take(basename(resolve(dirname(fileURLToPath(import.meta.url)), '..')));
+  return out;
+})();
+
 // A name a project chose, as a term to refuse, or null: a number, a colour, a size step, a common word or a name
 // every system writes (buttonPrimary) is no project's. A name of the project itself, a brand's or a font's counts
 // from 3 letters (own); any other from 4.
 function distinctive(raw, { own = false } = {}) {
   const t = norm(raw);
+  if (OURS.has(t)) return null;   // the engine's own name is never a project's, however a project's files carry it
   if (t.length < (own ? 3 : 4) || /^\d+$/.test(t) || /^[0-9a-f]{6,8}$/.test(t) || /^\d+(px|rem|em|ms|s|pt|vh|vw|deg|x)?$/.test(t) || SIZE_STEP.test(t)) return null;
   const bare = t.replace(/\d+$/, '');
   if (isCommon(t) || (bare !== t && (isCommon(bare) || GENERIC_NAMES.has(bare))) || GENERIC_NAMES.has(t)) return null;
@@ -157,7 +170,12 @@ export function projectTerms(root) {
     for (const m of text.matchAll(/(?:https?:\/\/|git@|ssh:\/\/(?:[\w.-]+@)?)([a-z0-9.-]+\.[a-z]{2,})(?::\d+)?[:/]([\w.-]+)\/([\w.-]+?)(?:\.git)?(?=[\s"'/)#?]|$)/gi)) {
       const [, host, owner, repo] = m;
       if (!PUBLIC_HOST.test(host)) hosts.add(host.toLowerCase());
-      add(owner, 'repository owner', own); add(repo, 'repository name', own);
+      // Only a project on a host of their own gives its owner and name. A public host's does not: what lives on
+      // github.com is public, and the engine writes its own address into the projects it works on, so reading it back
+      // would make the engine's own name a client's and refuse every line that says it. A path to a file is no
+      // repository either: a product's hosted stylesheet (files.example.com/Design-System/light.css) would otherwise
+      // name a folder of it as an owner.
+      if (!PUBLIC_HOST.test(host) && !A_FILE.test(repo)) { add(owner, 'repository owner', own); add(repo, 'repository name', own); }
     }
     for (const m of text.matchAll(/https?:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)) if (!PUBLIC_HOST.test(m[1])) hosts.add(m[1].toLowerCase());
   }
@@ -236,8 +254,10 @@ function themeFiles(root, cfg) {
   }
   return out;
 }
+// The last part of a web path that is a file, not a repository: a stylesheet, a script, a picture, a document.
+export const A_FILE = /\.(css|s[ac]ss|less|m?js|c?js|ts|tsx|jsx|json|ya?ml|html?|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|eot|pdf|md|txt|map|zip|gz|tgz)$/i;
 // Hosts everyone uses: never a project's own.
-export const PUBLIC_HOST = /(^|\.)(figma\.com|github\.com|githubusercontent\.com|github\.io|gitlab\.com|bitbucket\.org|notion\.so|notion\.site|google\.com|googleapis\.com|gstatic\.com|npmjs\.(com|org)|jsdelivr\.net|unpkg\.com|w3\.org|mozilla\.org|example\.(com|org|net)|example|test|invalid|localhost|fontsource\.org|cloudflare\.com|claude\.(com|ai)|anthropic\.com|nodejs\.org|json-schema\.org|schema\.org|shields\.io|rsms\.me|git-scm\.com)$/i;
+export const PUBLIC_HOST =/(^|\.)(figma\.com|github\.com|githubusercontent\.com|github\.io|gitlab\.com|bitbucket\.org|notion\.so|notion\.site|google\.com|googleapis\.com|gstatic\.com|npmjs\.(com|org)|jsdelivr\.net|unpkg\.com|w3\.org|mozilla\.org|example\.(com|org|net)|example|test|invalid|localhost|fontsource\.org|cloudflare\.com|claude\.(com|ai)|anthropic\.com|nodejs\.org|json-schema\.org|schema\.org|shields\.io|rsms\.me|git-scm\.com)$/i;
 
 // ── The list ────────────────────────────────────────────────────────────────────────────────────────────────────
 const newest = (root) => {
