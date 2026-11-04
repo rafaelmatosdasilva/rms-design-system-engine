@@ -1,0 +1,67 @@
+name: Something is broken
+description: The engine did something other than what it says it does.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A security problem does not go here. Use the [Security tab](https://github.com/rafaelmatosdasilva/rms-design-system-engine/security/advisories/new) instead, so it stays private until there is a fix.
+
+  - type: textarea
+    id: what-you-ran
+    attributes:
+      label: What you ran
+      description: The command, or what you asked Claude Code.
+      placeholder: rms-design-system-engine --audit
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Paste the run's output, whole rather than trimmed. Replace any client, product, person or host name with an invented one first.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: version
+    attributes:
+      label: Version and setup
+      description: "The output of `rms-design-system-engine --version` and `rms-design-system-engine --doctor`."
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: how-run
+    attributes:
+      label: How you run it
+      multiple: true
+      options:
+        - The command line
+        - Claude Code hooks
+        - The MCP server
+        - CI
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you send it
+      options:
+        - label: I am on the latest version (`rms-design-system-engine --update`), and it still happens.
+          required: true
+        - label: There is no client, product, person, host or token name in what I pasted.
+          required: true

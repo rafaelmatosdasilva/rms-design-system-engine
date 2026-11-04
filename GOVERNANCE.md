@@ -2,7 +2,7 @@
 
 ## How the project is run
 
-The engine has one maintainer, who decides what is built, reviews every change and publishes the releases. Anyone can propose a change through an issue or a pull request ([CONTRIBUTING.md](CONTRIBUTING.md)). The maintainer answers each one, and explains a refusal.
+The engine has one maintainer, who decides what is built, reviews every change and publishes the releases. Anyone can propose a change by opening an issue, and the maintainer answers each one and explains a refusal. Whether a proposal then becomes a pull request is decided in the issue; [CONTRIBUTING.md](CONTRIBUTING.md) says how that works and why.
 
 What decides a change:
 
@@ -16,7 +16,7 @@ What decides a change:
 | Role | Who | Responsible for |
 |---|---|---|
 | Maintainer | Rafael Matos da Silva | Direction and roadmap, reviewing and merging changes, releases, security reports, the code of conduct, the repository and package settings |
-| Contributor | Anyone who opens an issue or a pull request | Following [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md) |
+| Contributor | Anyone who opens an issue, or a pull request the maintainer invited | Following [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md) |
 | Reviewer | None yet | Approving changes before they merge, once the project has a second maintainer |
 
 ## Continuity
