@@ -32,6 +32,12 @@ test('a font service\'s stylesheet is written into the page, its files as data, 
   assert.doesNotMatch(r.html, /fonts\.gstatic\.com/);
   assert.match(r.html, /href="local\.css"/, 'a stylesheet of its own stays linked');
   assert.equal(reads, 3);
+  // The ampersand is undone last: a page that wrote "&amp;quot;" means those six characters, not a quote. Undone
+  // first, the URL read from the page is not the URL the page named, and the font is fetched from the wrong address.
+  let asked = null;
+  await embedRemoteFonts(page('https://fonts.googleapis.com/css2?family=Inter&amp;quot;display=swap'),
+    { ...opts, fetchText: async (u) => { asked = u; return CSS; } });
+  assert.equal(asked, 'https://fonts.googleapis.com/css2?family=Inter&quot;display=swap', 'the escape the page wrote is kept, only the ampersand undone');
   await embedRemoteFonts(page(href), opts);
   assert.equal(reads, 3, 'the second build reads from the cache');
   assert.ok(readdirSync(cacheDir).length >= 3);
