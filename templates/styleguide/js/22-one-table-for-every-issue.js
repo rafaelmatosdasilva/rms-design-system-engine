@@ -120,13 +120,18 @@
     // An open task opens with what to do (and, for something still to write, where); what it is and why come after.
     var taskOpen = r.st && r.st !== 'done', order = colsOf(d.area).filter(function (col) { return ['no', 'kind'].indexOf(col[1]) < 0; });
     if (taskOpen) order = order.filter(function (col) { return col[1] === 'todo'; }).concat(order.filter(function (col) { return col[1] !== 'todo'; }));
+    // Who acts has a column of its own only where the table has one (Accessibility); everywhere else it is said in
+    // what to do, which is then the only place it appears.
+    var whoCol = order.some(function (c) { return c[1] === 'whoCell'; });
     var body = order.map(function (col) {
       var k = col[1];
       // Its source, said once: what it was read from, or, still to write, nothing yet and where it belongs.
       if (k === 'source') return r.writeTo ? '' : card(col[0], srcLines() || '<p class="pg-missing">Nothing.</p>');   // still to write: where is in What to do
       // Written in two places: what each says, apart, under where it was read.
       if (k === 'written' && (r.writtenParts || []).length > 1) return r.writtenParts.map(function (p) { return card(col[0] + ' · ' + p.where.replace(/\s*\([^()]*\)$/, ''), p.html); }).join('');
-      if (k === 'todo') return card(col[0], (r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (isOpen(r) && rowScope(r) ? '<p class="sg-il-line">' + esc(rowScope(r).reason) + (rowScope(r).scope === 'shared' && rowScope(r).decider ? ' It waits on ' + esc(rowScope(r).decider.name) + '.' : '') + '</p>' : '') + (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
+      // Who acts has a column of its own, so it is its own card below, never inside this one.
+      if (k === 'whoCell') return card(col[0], r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '');
+      if (k === 'todo') return card(col[0], (!whoCol && r.who ? '<p><span class="sg-todo-who">' + esc(r.who) + '</span></p>' : '') + (isOpen(r) && rowScope(r) ? '<p class="sg-il-line">' + esc(rowScope(r).reason) + (rowScope(r).scope === 'shared' && rowScope(r).decider ? ' It waits on ' + esc(rowScope(r).decider.name) + '.' : '') + '</p>' : '') + (r.todo ? '<div class="sg-il-line">' + ((r.notes || []).length ? '<span class="sg-il-label">Points to cover</span><ul class="sg-il-points">' + r.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul><span class="sg-il-label">How to write it</span><span class="sg-il-text">' + esc(r.how) + '</span>' : (r.writeTo && srcLines() ? '<span class="sg-il-label">What to do</span>' : '') + '<span class="sg-il-text">' + r.todo + '</span>') + (r.writeTo && srcLines() ? '<span class="sg-il-label">Where</span><span class="sg-il-text">' + srcLines().replace(/<\/?p>/g, ' ').trim() + '</span>' : '') + '</div>' + (r.decide || '') : ''));   // nothing to do: no card; a decision to copy after it (a pair to confirm)
       // Its status, where it was read and when it was last checked: three cards, as the table's columns are apart.
       if (k === 'status') { var line = statusLine(r); return card(col[0], '<p>' + statusHTML(r.st, '', d.area) + '</p>' + (line ? '<p class="pg-par-val">' + esc(line) + '</p>' : '')) + (hasSource ? '' : card('Where it was read', srcLines())); }
       if (k === 'updated') return card(col[0], r.at ? '<p>' + esc(when(r.at)) + '</p>' : '');
@@ -243,9 +248,10 @@
   // status chips: a row is shown when both let it through.
   var WHO_DD = 0;
   function whoChipsHTML(rows) {
-    var n = {}, keys = [];
+    var n = {}, keys = [], total = 0;
     Array.prototype.forEach.call(rows, function (tr) {
       if (tr.hasAttribute('data-extra')) return;
+      if (String(tr.dataset.who || '').trim()) total++;
       String(tr.dataset.who || '').split(' ').filter(Boolean).forEach(function (k) { if (!n[k]) { n[k] = 0; keys.push(k); } n[k]++; });
     });
     if (keys.length < 2) return '';   // one person, or none said: nothing to filter
@@ -253,7 +259,8 @@
     var id = 'sg-who-dd-' + (++WHO_DD);
     return '<span class="sg-chip-dd sg-who-dd"><button type="button" class="sg-chip sg-chip-menu" aria-haspopup="listbox" aria-expanded="false" aria-controls="' + id + '" aria-pressed="false">' +
       '<span class="sg-chip-label">Who acts</span><span class="sg-chip-word">All</span><span class="sg-chip-n"></span>' + FILTER_MARK + '</button>' +
-      '<span class="sg-select-list" id="' + id + '" role="listbox" aria-multiselectable="true" aria-label="Who acts" tabindex="-1" hidden>' +
+      '<span class="sg-select-list" id="' + id + '" role="listbox" aria-multiselectable="false" aria-label="Who acts" tabindex="-1" hidden>' +
+      '<span class="sg-dd-option" role="option" data-whopick="all" aria-selected="true"><span>All</span><span class="sg-count">' + total + '</span></span>' +
       keys.map(function (k) { return '<span class="sg-dd-option" role="option" data-whopick="' + esc(k) + '" aria-selected="false"><span>' + esc(WHO[k]) + '</span><span class="sg-count">' + n[k] + '</span></span>'; }).join('') +
       '</span></span>';
   }
@@ -261,7 +268,7 @@
   function applyWho(dd) {
     var list = document.getElementById(dd.querySelector('.sg-chip-menu').getAttribute('aria-controls'));
     var picked = Array.prototype.filter.call(list.querySelectorAll('.sg-dd-option'), function (o) { return o.getAttribute('aria-selected') === 'true'; })
-      .map(function (o) { return o.dataset.whopick; });
+      .map(function (o) { return o.dataset.whopick; }).filter(function (k) { return k !== 'all'; });   // All is every row: no filter at all
     var scope = dd.closest('.pg-par, .sg-todo') || dd.parentElement, shown = 0;
     Array.prototype.forEach.call(scope.querySelectorAll('table.sg-issues tbody tr'), function (tr) {
       var has = !picked.length || picked.some(function (k) { return (' ' + (tr.dataset.who || '') + ' ').indexOf(' ' + k + ' ') >= 0; });
@@ -284,7 +291,10 @@
       return;
     }
     var o = e.target.closest && e.target.closest('.sg-who-dd .sg-dd-option[data-whopick]');
-    if (o) { o.setAttribute('aria-selected', o.getAttribute('aria-selected') === 'true' ? 'false' : 'true'); applyWho(o.closest('.sg-who-dd')); return; }
+    if (o) {
+      Array.prototype.forEach.call(o.parentElement.querySelectorAll('.sg-dd-option'), function (x) { x.setAttribute('aria-selected', x === o ? 'true' : 'false'); });
+      applyWho(o.closest('.sg-who-dd')); return;
+    }
     if (!(e.target.closest && e.target.closest('.sg-who-dd'))) Array.prototype.forEach.call(document.querySelectorAll('.sg-who-dd .sg-chip-menu[aria-expanded="true"]'), function (x) {
       x.setAttribute('aria-expanded', 'false'); document.getElementById(x.getAttribute('aria-controls')).hidden = true;
     });

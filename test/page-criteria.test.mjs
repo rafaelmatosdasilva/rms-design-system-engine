@@ -14,6 +14,18 @@ import { WCAG22, WCAG_KIND } from '../lib/wcag21.mjs';
 import { A11Y_GUIDE, productA11yTodos } from '../lib/a11y-check.mjs';
 import { findChrome } from '../lib/cdp.mjs';
 
+// A criterion is tried on a set of pages, and a set names each page once. The same address can reach here more than
+// once - one entry per product, per theme - and the tooltip that lists where a criterion was tried then wrote that one
+// address out thirty times, which is what a reader actually saw.
+test('a criterion names each page it was tried on once, however many times it arrives', () => {
+  const same = (label) => ({ label, title: 'A page', lang: 'en', url: 'https://acme.test/' + label });
+  const { criteria } = pageCriteria([same('index.html'), same('index.html'), same('index.html'), same('other.html')]);
+  for (const [sc, c] of Object.entries(criteria)) {
+    assert.deepEqual(c.pages, [...new Set(c.pages)], sc + ': the same page twice');
+    assert.ok(c.pages.length <= 2, sc + ': two pages were given, however many times');
+  }
+});
+
 const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHROME = findChrome({ playwright: true });
 const HAS_CHROME = !!CHROME && typeof WebSocket === 'function';

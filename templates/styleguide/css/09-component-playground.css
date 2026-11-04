@@ -217,6 +217,11 @@ html { scrollbar-gutter: stable; }   /* the scroll bar's room kept while a panel
    its own narrow column at the end, as every table whose rows open something has. */
 /* Accessibility: the criterion takes the room (it is what a row is about); its status and when, a share each. */
 .sg-issues--a11y.sg-cols-4 th:nth-child(3) { width: 26%; } .sg-issues--a11y.sg-cols-4 th:nth-child(4) { width: 14%; }
+/* Accessibility with who acts: every column but what to do is given its width, so what to do keeps the rest - without
+   this the eight share the room evenly and the one sentence a person reads wraps to five lines. */
+.sg-issues--a11y.sg-cols-8 th:nth-child(3) { width: 11%; } .sg-issues--a11y.sg-cols-8 th:nth-child(4) { width: 14%; }
+.sg-issues--a11y.sg-cols-8 th:nth-child(5) { width: 12%; } .sg-issues--a11y.sg-cols-8 th:nth-child(6) { width: 12%; }
+.sg-issues--a11y.sg-cols-8 th:nth-child(7) { width: 11%; } .sg-issues--a11y.sg-cols-8 th:nth-child(8) { width: 9%; }
 .sg-issues .sg-one-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* a status's word and one line under it, never more */
 .sg-issues :is(th, td).sg-row-go { width: calc(var(--sg-space-xl) + var(--sg-space-xs) + var(--sg-cell-x)); padding-left: 0; padding-right: var(--sg-cell-x); text-align: right; color: var(--sg-muted); }
 .sg-issues td.sg-row-go svg { width: var(--sg-mark); height: var(--sg-mark); vertical-align: middle; }
