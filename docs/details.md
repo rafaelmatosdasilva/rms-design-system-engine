@@ -1037,15 +1037,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - it never runs on a push to the store, since the page it sends is one;
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
   - **A token that may write but not read is refused, not guessed at.** Sending the page reads the project's files first: that is how the engine tells what is already there from what is new. A token your host lets commit but not read the repository (a fine-grained token without **Repository: Read**) stops the publish and says so, rather than sending every file as new and leaving the store between two builds.
-- **Your own copy updates on its own too.** On your computer, the style guide can build itself again whenever something changes ([ask for it](commands.md#publish-a-living-style-guide)):
-  - your design system's code, a few seconds after you save, commit or switch branch;
-  - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set (a `FIGMA_ACCESS_TOKEN`, the name Figma's own tools use, counts as one);
-  - the intent layer, checked every 5 minutes;
-  - your team's stores, the profile and a code mirror on GitLab, checked every 5 minutes;
-  - the engine itself, after it updates.
-  - It runs only what the change feeds, and publishes to your team's store only a page that changed. No CI runner? This keeps the team's page up to date ([Rebuilt on your own computer](#rebuilt-on-your-own-computer)).
-  - It runs in the background from login on, with no terminal open: a LaunchAgent on a Mac, a user service on Linux. What it does goes to `.design-system-engine-out/watch.log`, and one request turns it off.
-  - It is on by default ([On by default](#on-by-default)).
+- **Your own copy is rebuilt when you ask.** Nothing rebuilds it by itself: no job is installed on your computer and nothing runs on a schedule. Ask for a round (`--auto`, or [in words](commands.md#publish-a-living-style-guide)) and it reads what moved since the last build - your design system's code, Figma, the intent layer, your team's stores and profile, the engine itself - and runs only the steps those feed, publishing to your team's store only a page that changed ([Rebuilt when you ask](#rebuilt-when-you-ask)).
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **The first screen loads first.** What only a component's own page reads (its code, its whole changelog, its Code Connect, its Figma images) is a small file of its own in `assets`, loaded when that component opens. The Status page, the menu and the overview show without waiting for it.
@@ -1059,9 +1051,9 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 - **The template comes in parts.** Its file is the page's frame; its styles and its script are parts of their own under `templates/styleguide/` (`css/` and `js/`, one area of the page each, such as the Overview, the Tokens page or the Status page), joined in order when the page is built. A change is reviewed and tested one area at a time, and the page they make is the same. A project's own template can be one file, or use parts the same way (a line `/*@part …*/` in its styles, `//@part …` in its script).
 
-### Rebuilt on your own computer
+### Rebuilt when you ask
 
-Some teams have no CI runner, so no pipeline ever rebuilds their guide. The background watch (`--watch`, kept running by `--watch-install`) does it on a person's own computer instead.
+Some teams have no CI runner, so no pipeline ever rebuilds their guide. A round on a person's own computer does it instead: `--auto` builds one now and stops. Nothing is installed and nothing runs on a schedule - a round happens because someone asked for one - and because it runs only what the change reached, asking costs a fraction of a whole build.
 
 - **It runs only what the change feeds.** One table in `lib/auto-build.mjs` says which steps each source feeds:
 
@@ -1086,26 +1078,14 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. The back
   - **Never another token.** A variable the engine uses for something else (`GITLAB_TOKEN`, `GITLAB_WRITE_TOKEN`, `GITHUB_TOKEN`, `FIGMA_TOKEN`, a store's `tokenEnv`) is refused, so a profile can never send one of your tokens to a host it was not made for. Only `https` links are called (`http` only on `localhost`), and a link with a password in it is refused: put the password in `.env`.
   - **One line per link:** `🔔 Style guide: told ci.acme.test/job/style-guide/build (201)`. The line never shows the link's query or a credential. A CI that refuses, or does not answer in 10 seconds, gets a line of its own, and the write still counts.
 - **Never from a branch of your own.** A checkout on another branch than its remote's default is built, never published.
-- **A failed step is never published.** The round says where it failed, and it is tried again at the next check.
+- **A failed step is never published.** The round says where it failed, and the next round tries it again.
 - **One round at a time.** A lock file stops a second round while one runs.
+- **A round never waits for ever.** A step still running after 90 minutes (`styleguide.stepMinutes`) is stopped with its browsers, and the log says so.
 - **One line a round** in `.design-system-engine-out/watch.log`: what moved, what ran, how long, and whether it published.
-- **One round now.** `--watch --once` (or `--auto --once`) runs one round and stops, for a scheduler of your own.
+- **A scheduler of your own.** `--auto` is one round and an exit code, so a cron entry or a CI job of your own can call it on whatever rhythm you choose. The engine never writes one for you.
 - **Never two at once.** An audit, a build or a publish you start while a round runs waits for it to end first, so the two never write the same files or share the computer.
 - **No token is stored.** Each step reads them from the project's `.env`, as every run does.
-- **`--guide-status`** says whether the watch is on (and why not, when it is off), and what its last round did.
-
-#### On by default
-
-The engine turns the watch on by itself, once for each person:
-
-- **When:** at the end of first setup, or on your next run where it isn't on yet. It says so in one line, and never asks or waits.
-- **Never:** on CI, in tests, inside the watch's own rounds, on an `--offline` run, or from an engine running in a git worktree.
-- **Turn it off for yourself:** `--watch-uninstall`. It stays off for that folder until `--watch-install`.
-- **A round never waits for ever.** A step still running after 90 minutes (`styleguide.stepMinutes`) is stopped with its browsers, and the log says where it stopped; the next round starts again. Inside the accessibility check, a browser that stops answering is stopped two minutes past its limit, the log says what it was on, and its parts are left for the page's own check while the rest of the round builds and publishes.
-- **Turn it off for the project:** `"styleguide": { "watch": false }` in `ds-config.json`, or in your team's profile for everyone. A watch the engine turned on is then taken away on the next run; one you turned on by hand stays.
-- **A failed start** is said once, with its reason, and not tried again on every run. `--watch-install` tries again.
-- **Not a Mac or Linux:** it says once that it can't, and how to rebuild by hand.
-- **Engine updates:** the watch updates the engine itself (once a day at most, between rounds), builds with the new engine, then restarts on its code. The job names the engine's own folder and a `node` path that upgrades keep, so neither breaks it.
+- **`--guide-status`** says whether the style guide the team opens is behind what it is built from, and what this folder's last round did.
 
 ### What's in it
 

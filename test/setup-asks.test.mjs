@@ -39,8 +39,10 @@ test('told the code is here, a folder with no design tokens starts from Figma, a
   const r = init(dir, FIGMA, '--project=.');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /Build mode: no stylesheet declares design tokens in .*, so it starts from Figma/);
-  // Setup's closing summary says whether the background watch is on, and why not: never turned on from a test or CI.
-  assert.match(r.stdout, /🔁 The style guide does not rebuild itself on this computer: this is a (test|CI) run\./);
+  // Setup's closing summary answers the question a person has next, and promises nothing automatic: nothing rebuilds
+  // the style guide by itself, and a round is asked for.
+  assert.match(r.stdout, /🔁 Nothing rebuilds the style guide by itself: no job on this computer and nothing on a schedule\./);
+  assert.match(r.stdout, /Ask for one and only what the change reached is built: rms-design-system-engine --auto/);
   assert.equal(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).build, true);
 });
 

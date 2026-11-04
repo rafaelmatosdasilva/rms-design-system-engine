@@ -59,8 +59,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine build the style guide` | The living style guide |
 | `/rms-design-system-engine check the modal and show it in the style guide` | One component's page |
 | `/rms-design-system-engine publish the style guide for the team` | The job that publishes it on every push |
-| `/rms-design-system-engine update the style guide automatically every time there is a change` | Your own copy built again whenever the code, Figma, the intent layer or the engine changes, in the background |
-| `/rms-design-system-engine stop updating the style guide automatically` | The background watch turned off |
+| `/rms-design-system-engine rebuild my style guide` | Your own copy built again, only the parts the change reached |
 
 ## Catch drift in product code and AI edits
 
