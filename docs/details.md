@@ -52,7 +52,7 @@ Each sign the code gives counts. A strong sign pairs on its own. A weak one need
 | Props | Backs another sign | its props hold two thirds of Figma's properties |
 
 - **Paired.** A strong sign, or two that agree.
-- **Proposed.** One weak sign alone. Never applied: the audit prints it (`🔗`), the props and sub-component checks name it in their "no code file" line, and the style guide lists it under Tasks, Parity, to confirm or pin.
+- **Proposed.** One weak sign alone. Never applied: the audit prints it (`🔗`), the props and sub-component checks name it in their "no code file" line, and the style guide lists it on the Status page, under Parity, to confirm or pin.
 - **Only in Figma.** No sign at all. The files nearest its name are named, among those no other component has.
 - **Never taken twice on a weak sign.** A file a name gives to one component is not offered to another on its tokens alone, unless the two differ only by a state word.
 - **One file, two styles.** When Figma has bannerTopPrimary and bannerTopSecondary and the code has `banners/Top.vue` with a prop that chooses the style (`useSecondaryStyle`), both are paired with it.
@@ -643,7 +643,7 @@ Some problems belong to the Figma file. They are found in Figma alone, before an
 Each gap reaches the design team:
 
 - **In Figma.** `--figma-edits` puts each one on the page "Design system to do", in a frame "Accessibility the design owes": one card per gap, with its WCAG criterion and its fix. It is written only after you say yes, and afresh each time, so what is fixed clears.
-- **On the style guide.** Each one is on its component's Accessibility list and on the Tasks page, for you in Figma.
+- **On the style guide.** Each one is on its component's Accessibility list and on the Status page, for you in Figma.
 
 Meanwhile Claude writes a visible focus ring and leaves the words of an error message or a name to you. `"designA11y": false` in `ds-config.json` turns this off.
 
@@ -1112,7 +1112,7 @@ The engine turns the watch on by itself, once for each person:
 | Page | What you find there |
 |---|---|
 | Overview | A card for each foundation and component, with a thumbnail drawn from your own code, and a search across everything |
-| Status | How far the system has come, in one number and by area, and everything still open with who acts and what to do (Health and Tasks are one page) |
+| Status | How far the system has come, in one number and by area, and everything still open with who acts and what to do |
 | Foundations | Colours, typography, spacing, radii, motion and icons |
 | Components | One page for each component, in areas you switch between |
 | Templates | Each page template, what it is made of and the frame it comes from, when you list templates |
@@ -1172,7 +1172,7 @@ Also on each component.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
 - **Coverage.** How much of its file your tests cover, beside its Code Connect.
-- **Its stage is a task, not a label on its page.** Your team sets it as `status` in `contract.authored.json`, as `Status: beta` in its Figma description, or with `@deprecated` in its code. The Tasks page asks for it:
+- **Its stage is a task, not a label on its page.** Your team sets it as `status` in `contract.authored.json`, as `Status: beta` in its Figma description, or with `@deprecated` in its code. The Status page asks for it:
   - With no stage set, a Stage task says what the page measures, in the Status table's words: Stable when Parity is Match, Accessibility Pass and Documentation Ready (with at least 80% of its lines covered when your tests report coverage), Beta otherwise, with what is left.
   - With a stage that differs from what the page measures, the task says both, to keep it or change it.
   - A component being retired names what replaces it, from the release that retired it or from a line such as "use button instead" in Figma or its code.
@@ -1344,7 +1344,7 @@ The last three set its risk (high, medium or low), which the reason says. For ex
 
 Where you see it:
 
-- **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
+- **The style guide's Status page.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
   - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
 - **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
 - **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.
@@ -1476,13 +1476,13 @@ The gates check each mode on its own. When you have two collections that switch 
 - Each token is compared with Figma's value in that combination.
 - Each text and background pair the system uses is measured for contrast.
 
-Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Tasks page, under The system.
+Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Status page, under The system.
 
-The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Tasks page under The system.
+The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Status page under The system.
 
 ### Who owns what
 
-`owners` in `ds-config.json` names the team that owns each component, token layer or token prefix: `{ "primitives/": "Brand team", "semantic/": "Design system team", "tileCard": "Cards team", "*": "Product teams" }`. The Tasks list then says the team after who acts ("You in Figma · Brand team"), the longest key that fits first: a component's own name, else a token prefix the task names, else `*`.
+`owners` in `ds-config.json` names the team that owns each component, token layer or token prefix: `{ "primitives/": "Brand team", "semantic/": "Design system team", "tileCard": "Cards team", "*": "Product teams" }`. The Status page then says the team after who acts ("You in Figma · Brand team"), the longest key that fits first: a component's own name, else a token prefix the task names, else `*`.
 
 - A key can be a pattern: `"tile*"` covers every tile, `"patterns/"` every pattern page.
 - The owner is also who decides what waits on a person about it: a proposal, a page's drafts, a page to review again, a change held for sign-off.
@@ -1736,7 +1736,7 @@ Until now the answer was the same in every project, and it was always the most c
 
 **Your product's code is not on that list, and never will be.** The engine does not change code people wrote. What it finds there comes back as a patch for a person to apply and as the difference on that component's page in the style guide. At most it writes the intent layer; everything else it flags.
 
-Each gets **yes** (write it, and say what changed), **ask** (show the exact change and wait for a yes, every time) or **no** (never: the change goes on the Tasks page, for whoever owns that place). A place with no answer is asked about once, and the answer is recorded, so every session and every run read the same one. `rms-design-system-engine --writes` shows them; `--writes figma ask` sets one.
+Each gets **yes** (write it, and say what changed), **ask** (show the exact change and wait for a yes, every time) or **no** (never: the change goes on the Status page, for whoever owns that place). A place with no answer is asked about once, and the answer is recorded, so every session and every run read the same one. `rms-design-system-engine --writes` shows them; `--writes figma ask` sets one.
 
 Two things the setting cannot override. On CI there is nobody to answer, so **ask** becomes **no**. And CI never writes the design file or the product's code, whatever the setting says: a run nobody is watching changing what people wrote is how a team stops trusting the engine.
 
