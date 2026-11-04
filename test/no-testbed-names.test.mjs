@@ -69,6 +69,30 @@ test('a word of the web a project happens to use is no project\'s: the name it r
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('the engine\'s own name is never a project\'s, and a hosted file is no repository', () => {
+  const dir = tempDir('own-name-');
+  try {
+    // What a project's setup carries: its own name, the stylesheets its product loads at runtime, and the engine's own
+    // public address - which the engine itself writes into the projects it works on. A host of their own is not
+    // written here: this repository refuses a company host even an invented one, which is the guard working.
+    writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({
+      name: 'Quokka DS',
+      paths: { themeCSSFrom: ['https://files.quokka.example/Design-System/light_desktop.css'] },
+      engine: 'https://github.com/someone/rms-design-system-engine.git',
+    }));
+    const { terms } = projectTerms(dir);
+    const has = (w) => terms.has(w);
+    // The engine's own name, and the account a public repository sits under, say nothing about this project.
+    assert.equal(has('rmsdesignsystemengine'), false, 'the engine\'s own name');
+    assert.equal(has('someone'), false, 'nor the account it lives under');
+    // A URL whose last part is a file is no repository, so its folder is not an owner and the file is not a name.
+    assert.equal(has('designsystem'), false, 'a hosted stylesheet\'s folder is no repository owner');
+    assert.equal(has('lightdesktop'), false, 'nor is the file a repository name');
+    // What the project did choose is still refused, which is the point of the guard.
+    assert.equal(has('quokkads'), true, [...terms.keys()].join(' '));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('the commit hooks refuse a private change and let a clean one through', () => {
   const dir = tempDir('private-check-');
   try {
