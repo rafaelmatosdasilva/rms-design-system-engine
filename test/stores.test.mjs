@@ -373,6 +373,21 @@ test('a commit says whose run made it; a checkout with no identity of its own se
   await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"b":2}']]), 'Snapshots', { env, http: g2.http, runBy: null });
   const body2 = g2.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
   assert.equal('author_name' in body2, false, JSON.stringify(body2 && Object.keys(body2)));
+
+  // In a pipeline, who started it is who ran it. A schedule has nobody behind it: GitLab names the schedule's owner,
+  // who did nothing that night, so the commit carries no author and says the schedule made it, for History to read.
+  const inPipeline = async (source) => {
+    forgetAccess();
+    const g3 = fakeGitlab();
+    const ci = { ...env, GITLAB_CI: 'true', CI_PIPELINE_SOURCE: source, GITLAB_USER_NAME: 'Wombat', GITLAB_USER_EMAIL: 'ben@example.com' };
+    await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', `{"${source}":1}`]]), 'Snapshots', { env: ci, http: g3.http });
+    return g3.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
+  };
+  const pushed = await inPipeline('push');
+  assert.deepEqual([pushed.author_name, pushed.author_email, pushed.commit_message], ['Wombat', 'ben@example.com', 'Snapshots'], 'who pushed, with no trailer');
+  const scheduled = await inPipeline('schedule');
+  assert.equal('author_name' in scheduled, false, 'never the schedule\'s owner');
+  assert.equal(scheduled.commit_message, 'Snapshots\n\nRun-by: schedule');
   assert.equal('author_email' in body2, false);
 });
 

@@ -209,6 +209,8 @@
       var m = /^(.+?) (TEXT|BOOLEAN|VARIANT|INSTANCE_SWAP|SLOT)(?: · (.*))? → (?:TEXT|BOOLEAN|VARIANT|INSTANCE_SWAP|SLOT)(?: · (.*))?$/.exec(t);
       return m ? m[1] + ' "' + (m[3] || '') + '" → "' + (m[4] || '') + '"' : t;
     };
+    // Who did a row that is work (who-did-it.mjs), on its own line and in the style of a decision's Answered by.
+    var doneByLine = function (r) { return r && r.by ? '<p class="sg-il-line"><span class="pg-log-date">' + esc(r.by) + '</span></p>' : ''; };
     var isFirst = function (c) { return c.changed.length === 1 && /first time/.test(c.changed[0]); };
     var figmaRows = function (x) {
       var first = x.comps.filter(isFirst), changed = x.comps.filter(function (c) { return !isFirst(c); });
@@ -218,7 +220,7 @@
       // The components it read for the first time are named once, as their pills under Affects.
       if (names.length) rows.push(['<p class="sg-il-line">Read for the first time</p>', pillsHTML(names, 'history')]);
       var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short || '') + '</code>';
-      if (rows.length) rows[rows.length - 1][0] += '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + '</span></p>';
+      if (rows.length) rows[rows.length - 1][0] += '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + '</span></p>' + doneByLine(x.r);
       return rows.map(function (r) { return '<tr data-chip="figma"><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
     };
     // A read of Figma is dated, never released: Figma, and the day it was read.
@@ -230,7 +232,7 @@
       // A page whose component is under Affects is named there only: the others (a pattern, a foundation) are named here.
       var others = x.pages.filter(function (p) { return !x.components.some(function (n) { return n.toLowerCase().replace(/[^a-z0-9]/g, '') === String(p).toLowerCase().replace(/[^a-z0-9]/g, ''); }); });
       return '<tr data-chip="intent"><td><p class="sg-il-line"><strong>' + esc(layerWhat(x)) + '</strong></p>' + (others.length ? '<p class="sg-il-line"><span class="pg-par-val">' + esc(others.join(', ')) + '</span></p>' : '') +
-        (x.to ? '<p class="sg-il-line"><span class="pg-log-date">Committed in ' + layerSha(x) + '</span></p>' : '') + '</td><td>' + (x.components.length ? pillsHTML(x.components, 'documentation') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
+        (x.to ? '<p class="sg-il-line"><span class="pg-log-date">Committed in ' + layerSha(x) + '</span></p>' : '') + doneByLine(x) + '</td><td>' + (x.components.length ? pillsHTML(x.components, 'documentation') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
     };
     var decisionRow = function (d) {
       // A page of the intent layer named like a component of the system opens that component's Documentation.
