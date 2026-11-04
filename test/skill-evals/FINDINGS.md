@@ -184,3 +184,21 @@ Killed the nested ones, and they were back to three deep within the half hour.
 **Evidence.** Two browser tests fail on a full run and pass alone, every time: the style guide's live page reads empty or half drawn, and a test that gives Chrome half a second to start failed on four full runs out of four. Both measure a real browser against a clock while the rest of the suite is using the machine.
 
 **Why it is here.** Until it is fixed, a green run needs a second look — which is how people learn to ignore a red one. It is on the backlog.
+
+---
+
+## A 9/10 that was not a regression, settled by counting instead of arguing
+
+**Answered.** 4 November 2026, on the run that measured the guide for the watch removal.
+
+**Evidence.** The guide tasks came out 72/72. `new-ui-saved`, which runs ten times because it varies, came out 9/10: one run changed nothing and also did not say the system has no green for the confirmation, which are the two acceptable outcomes. A real miss, not a scoring fault - the record shows `changed: []` after six engine runs and thirteen decision points.
+
+The recording tool wrote "noise, not a difference" into the entry, and every earlier entry in `RESULTS.md` reads 79/79, so that line was not evidence of anything. Master was measured next: 10/10. That was still not an answer. Seeing no failure in ten runs when the true rate is 10% happens about 35% of the time, and the mechanism was plausible - this task's agent reads the reference files the change edited, which is the whole reason the guide is measured at all.
+
+Twenty more runs on the branch: 20/20. The branch total is **29/30**, master **10/10**. A rate near 3% explains both (no failure in ten runs at 3% has a 74% chance), and twenty consecutive passes is hard to reconcile with a change that broke something. The failure is a rare intermittent one in that task, not this change's.
+
+**What it teaches.** Three things, in order of how much they cost.
+
+- A single sample of ten decides nothing about a one-in-ten event. The instinct to read 10/10 against 9/10 as "mine broke it, theirs is fine" is wrong in both directions, and the arithmetic to see that takes a second.
+- A tool's own word for its result ("noise") is a hypothesis, not a measurement. It was right here, and it was right for a reason nothing in the entry stated.
+- `--only <task-id>` runs one task; `--set` takes `build`, `prototype`, `dev`, `heldout`, `private` or `all`, and an unknown set runs zero tasks and reports `0/0 passed · $0.00`, which reads like a refusal. The working results file also has to be moved aside (or `--resume` given) before a fresh count, or the run stops on the rows already there.
