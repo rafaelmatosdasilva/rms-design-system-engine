@@ -234,6 +234,13 @@ test('the router as a hook: a request made with the command arrives already rout
   const chip = ctx('/rms-design-system-engine audit the chip');
   assert.match(chip, /^The engine already routed this request/);
   assert.ok(chip.includes(`\nROUTE: audit-component\nRUN: node ${shellPath(join(ENGINE, 'audit.mjs'))} --component chip\n`), chip);
+  // A path the shell reads back as the path it was given. A backslash is never left to it: unquoted it escapes
+  // whatever follows, and inside the quotes it would escape the closing quote, so a folder ending in one breaks the
+  // command the hooks run.
+  assert.equal(shellPath('/Users/me/tools/audit.mjs'), '/Users/me/tools/audit.mjs', 'nothing to quote');
+  assert.equal(shellPath('/Users/me/My Drive/audit.mjs'), '"/Users/me/My Drive/audit.mjs"');
+  assert.equal(shellPath('/tmp/a\\'), '"/tmp/a\\\\"', 'a trailing backslash is quoted and escaped, never left to end the quote');
+  assert.equal(shellPath('/tmp/$HOME'), '"/tmp/\\$HOME"', 'the shell expands nothing');
   const figma = ctx('/rms-design-system-engine change the chip radius in Figma to 12px so it matches the code');
   assert.match(figma, /\nSAY: I can't change this in Figma: the skill writes to Figma only what the code already states/);
   const refresh = ctx('/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday');
