@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sureFixes, withFixes, applyFixes, fixLines, rootElement, DRAFT } from '../lib/engine-fixes.mjs';
-import { makeFixture } from './helpers.mjs';
+import { makeFixture, budget } from './helpers.mjs';
 
 const system = () => ({
   components: {
@@ -110,4 +110,13 @@ test('what a person reads follows what the project lets the engine write', () =>
   assert.match(lines, /1 draft for a person to approve \(marked \*\*Draft:\*\*, never read as the team's own word\)/);
   assert.match(lines, /take out "One value a person types\."/);
   assert.deepEqual(fixLines([]), []);
+});
+
+// A file is read as it is found, so one written to be slow must not be. Before the comment's body was written as
+// "no star, or a star that does not close it", 30 repetitions took 39 seconds, and each one after that doubled it.
+test('rootElement: code of many half-closed comments is refused at once, never by backtracking', () => {
+  const t0 = Date.now();
+  assert.equal(rootElement('return {/*' + '*/}{/*'.repeat(30)), null);
+  assert.ok(Date.now() - t0 < budget(2000), `took ${Date.now() - t0}ms`);
+  assert.equal(rootElement('return ({/* which element */}<span/>)'), 'span', 'a comment before the element is still stepped over');
 });
