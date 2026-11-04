@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, readdirSync
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { unpublished, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
+import { unpublished, publishedByNode, componentsScript, componentsCall, captureScript, readComponents, importComponents, captureWithFigmaCli, cyrb53, importLines, recipeFunctions,
   COMPONENT_FUNCTIONS, AUDIT_FUNCTIONS, STRUCTURE_KEYS, SCRIPT_MAX, ANSWER, varsScript, partsBack, unzip } from '../lib/figma-capture.mjs';
 import * as standin from './figma-standin.mjs';
 import { examplesCaptureScript } from '../lib/figma-examples.mjs';
@@ -539,6 +539,23 @@ test('components: a nested instance Figma fills in lazily reads alike whatever t
 
 test('a component Figma does not publish (a name starting with . or _, a status mark in front or not) is no component of the system', () => {
   assert.deepEqual(['🟡 .rowShade. (deprecated)', '.cell', '_base', '🟡  tableHeader', 'buttonPrimary', 'Layout/Header'].map(unpublished), [true, true, true, false, false, false]);
+});
+
+test('a REST listing by node id drops what Figma does not publish, and names each one once', () => {
+  const r = publishedByNode({
+    '1:1': 'buttonPrimary',
+    '1:2': '\ud83d\udfe1  .cardTileHeaderSort (deprecated, removal planned for the end of the quarter)',
+    '1:3': '.cardTileShade. (deprecated)',
+    '1:4': 'cardTile/Slot/leading',
+    '1:5': '_base',
+    '1:6': '\ud83d\udfe1 .cardTileSlot (deprecated, removal planned for the end of the quarter)',
+  });
+  assert.deepEqual(Object.keys(r.names), ['1:1', '1:4'], 'only what the library publishes');
+  assert.equal(r.hidden.length, 4);
+  assert.ok(r.hidden.every((n) => /^[\s\p{So}]*[._]/u.test(n)), 'each one named, so a person sees what was left out');
+  assert.deepEqual(publishedByNode(), { names: {}, hidden: [] }, 'nothing listed: nothing to leave out');
+  const twice = publishedByNode({ '2:1': '.cell', '2:2': '.cell' });
+  assert.deepEqual(twice.hidden, ['.cell'], 'a name said once, however many nodes carry it');
 });
 
 test('the capture keeps the primitives as Figma has them in each colour mode, their links followed', async () => {
