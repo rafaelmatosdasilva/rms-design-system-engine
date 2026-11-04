@@ -93,6 +93,36 @@ test('the engine\'s own name is never a project\'s, and a hosted file is no repo
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a pull request is opened only when its title and description carry nothing private', () => {
+  const dir = tempDir('pr-gate-');
+  const check = join(ROOT, '.githooks', 'private-check.mjs');
+  const run = (title, body) => {
+    const f = join(dir, 'body.md');
+    writeFileSync(f, body);
+    // PATH without gh: a run that reaches the opening would fail loudly instead of opening anything by accident.
+    return spawnSync(process.execPath, [check, '--pr', '--title', title, '--body', f], { encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent' } });
+  };
+  try {
+    // The form that gets written by hand: an item code in parentheses, in the description.
+    const bad = run('A fix', `## A control that moves nothing (${code('E', 82)})\n`);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /carries something private/);
+    assert.match(bad.stderr, /the description  backlog item code/);
+    assert.match(bad.stderr, /Nothing was opened/);
+    // And in the title, which CI reads too but only once it is public.
+    const titled = `Fixes [${code('E', 82)}] at last`;
+    assert.equal(run(titled, 'Clean.\n').status, 1);
+    assert.match(run(titled, 'Clean.\n').stderr, /the title  backlog item code/);
+    // A clean one is not refused: it goes on to open the pull request, which fails here for want of gh, never for content.
+    const clean = run('A control that moves nothing', 'A component that gives its own value back is bound on both sides.\n');
+    assert.ok(!/carries something private/.test(clean.stderr), clean.stderr);
+    // Told nothing to open, it says so rather than reading the first argument as a file.
+    const bare = spawnSync(process.execPath, [check, '--pr'], { encoding: 'utf8' });
+    assert.equal(bare.status, 2);
+    assert.match(bare.stderr, /--pr needs --title/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('the commit hooks refuse a private change and let a clean one through', () => {
   const dir = tempDir('private-check-');
   try {

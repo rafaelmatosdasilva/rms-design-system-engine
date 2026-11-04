@@ -27,6 +27,9 @@
 //   node .githooks/private-check.mjs --push          every commit a push sends, its refs read from stdin (pre-push)
 //   node .githooks/private-check.mjs --range A..B    every commit in a range (CI; A of zeros: all of B's history)
 //   node .githooks/private-check.mjs --text FILE     any text (a pull request's title and description, in CI)
+//   node .githooks/private-check.mjs --pr --title "…" --body FILE [-- gh arguments]
+//                                                    opens the pull request only when its title and description carry
+//                                                    nothing private: CI checks them too, but by then they are public
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -2675,10 +2678,39 @@ export function messageFindings(text) {
   return privateFindings(text.split('\n').filter((l) => !/^#/.test(l) && !/^Co-Authored-By: .*<noreply@anthropic\.com>$/.test(l)).join('\n'));
 }
 
+// A pull request's title and description, checked before anyone can read them. CI checks them too, but by then they
+// are public: a description is the one text that goes out the moment it is written, with no hook between. → findings
+export function prFindings(title, body) {
+  return [
+    ...privateFindings(String(title ?? '')).map((x) => ({ file: 'the title', line: 0, ...x })),
+    ...privateFindings(String(body ?? '')).map((x) => ({ file: 'the description', line: 0, ...x })),
+  ];
+}
+
 if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])) {
   const args = process.argv.slice(2);
   const at = args.indexOf('--message');
   const arg = (f) => args[args.indexOf(f) + 1];
+  // --pr --title "…" --body FILE [-- more arguments for gh]: the title and the description are read first, and the
+  // pull request is opened only when they carry nothing private. Opening it first and fixing it after leaves the text
+  // in GitHub's edit history, where it stays.
+  if (args.includes('--pr')) {
+    const given = (f) => (args.indexOf(f) >= 0 ? args[args.indexOf(f) + 1] ?? null : null);   // arg() answers the first argument when a flag is absent
+    const title = given('--title') ?? '';
+    const bodyFile = given('--body');
+    if (!bodyFile) { console.error('--pr needs --title "…" and --body FILE.'); process.exit(2); }
+    let body = ''; try { body = readFileSync(bodyFile, 'utf8'); } catch { console.error(`--body: ${bodyFile} cannot be read.`); process.exit(2); }
+    const bad = prFindings(title, body);
+    if (bad.length) {
+      console.error('Refused: this repository is public, and the pull request carries something private.');
+      for (const x of bad) console.error(`  ${x.file}  ${x.kind}${x.what ? ': ' + x.what : ''}`);
+      console.error('Nothing was opened. Say it generically, then run this again.');
+      process.exit(1);
+    }
+    const rest = args.includes('--') ? args.slice(args.indexOf('--') + 1) : [];
+    try { execFileSync('gh', ['pr', 'create', '--title', title, '--body-file', bodyFile, ...rest], { stdio: 'inherit' }); } catch { process.exit(1); }
+    process.exit(0);
+  }
   const found = at >= 0 ? messageFindings(readFileSync(args[at + 1], 'utf8')).map((x) => ({ file: 'the commit message', line: 0, ...x }))
     : args.includes('--staged') ? stagedFindings()
     : args.includes('--push') ? pushFindings(readFileSync(0, 'utf8'))
