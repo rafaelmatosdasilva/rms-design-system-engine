@@ -142,6 +142,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - For each component: a playground with live controls, its specs, every variant, Figma beside the code, parity, accessibility and history.
 - A status page: how far each component is in Figma, code, accessibility and documentation.
 - A task list that says who acts and which team owns each component or token layer.
+- A History where every row names who did it: who answered a decision, and who made a change to the code, a read of Figma or a change to the intent layer, with whoever brought it in when that was somebody else.
 - Foundations: colours, type, spacing, corners, motion and icons, every mode side by side.
 - A Templates page: each page template, the components it is made of in Figma's order, whether its code uses each one, and its frame from Figma.
 - Every colour and space on the page is one of your tokens, so it looks like your system.

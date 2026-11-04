@@ -963,6 +963,12 @@ A decision a person makes on purpose lives in your intent layer, on the page it 
 The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided, each row tagged Code, Figma, Intent layer or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
 
 - **An intent layer change** is a card of its own: the pages it changed, the commit that made it, and the components those pages document. The engine keeps the last 50 changes it read, in the layer's snapshot.
+- **Every row names who did it.** A decision already says who answered it. A row that is work instead (a commit to the code, a read of Figma, a change to the intent layer) says who did it, in the same place:
+  - **One person:** *Done by* and the commit's author.
+  - **Somebody else brought it in:** *Done by* the author, *pushed by* the committer, when the commit's committer is not its author, as when a maintainer merges, rebases or cherry-picks someone else's work. A commit pushed exactly as it was written keeps its author as its committer, so it shows one name: git does not keep who pushed.
+  - **A pipeline:** a run started by a push, by hand or by a merge request names the person who started it. A scheduled run has nobody behind it, and GitLab names whoever owns the schedule, so the engine never takes that name: its commit says `Run-by: schedule`, and its row says *Done by the schedule*.
+  - **An account:** a host's merge button, an app or an access token's bot is said as *a pipeline*, never as if it were a person.
+  - **A name only**, never an address: the guide is shared with the whole team.
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 

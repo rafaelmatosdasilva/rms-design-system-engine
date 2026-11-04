@@ -30,7 +30,7 @@ test('the layer\'s changes on History: a card each, linked to the components the
   const snapFile = join(dir, 'intent-layer.snapshot.json');
   const snap = JSON.parse(readFileSync(snapFile, 'utf8'));
   snap.changes = [
-    { from: 'b0', to: 'c2d4e6f8a0b1', at: '2026-10-31T09:00:00Z', url: 'https://github.com/acme/guidelines/commit/c2d4e6f8a0b1', files: ['docs/components/button.md', 'docs/components/saving.md'], pages: ['button', 'Saving'] },
+    { from: 'b0', to: 'c2d4e6f8a0b1', at: '2026-10-31T09:00:00Z', url: 'https://github.com/acme/guidelines/commit/c2d4e6f8a0b1', files: ['docs/components/button.md', 'docs/components/saving.md'], pages: ['button', 'Saving'], by: 'Done by Quokka · pushed by Wombat' },
     { from: 'a0', to: 'b0b1b2b3b4b5', at: '2026-10-20T09:00:00Z', files: ['docs/README.md'], pages: [] },
   ];
   writeFileSync(snapFile, JSON.stringify(snap, null, 2));
@@ -39,6 +39,8 @@ test('the layer\'s changes on History: a card each, linked to the components the
   const page = join(dir, '.design-system-engine-out', 'styleguide', 'index.html');
   const data = JSON.parse(readPage(page).match(/<script type="application\/json" id="sg-data">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(data.intentChanges.map((x) => [x.to, x.pages, x.components, x.files]), [['c2d4e6f8a0b1', ['button', 'Saving'], ['button'], 2], ['b0b1b2b3b4b5', [], [], 1]]);
+  // Who did each, beside who answers a decision: a change whose commit names nobody says nothing rather than guessing.
+  assert.deepEqual(data.intentChanges.map((x) => x.by ?? null), ['Done by Quokka · pushed by Wombat', null]);
   assert.equal(JSON.parse(readFileSync(snapFile, 'utf8')).changes.length, 2, 'kept as they were while the layer did not move');
 
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');
@@ -53,7 +55,7 @@ test('the layer\'s changes on History: a card each, linked to the components the
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#history tr[data-chip="intent"]')`, { attempts: 200 }), true, 'History has its rows');
     const cards = await run(`[...document.querySelectorAll('#history .pg-inspect')].filter((c) => c.querySelector('tr[data-chip="intent"]')).map((c) => c.querySelector('.pg-inspect-head').textContent + ' | ' + c.querySelector('tbody').innerText.replace(/\\s+/g, ' ').trim())`);
-    assert.deepEqual(cards, ['Intent layer2026-10-31 | 2 pages changed Saving Committed in c2d4e6f8 button', 'Intent layer2026-10-20 | 1 file changed, none of them a page Committed in b0b1b2b3 No component']);
+    assert.deepEqual(cards, ['Intent layer2026-10-31 | 2 pages changed Saving Committed in c2d4e6f8 Done by Quokka · pushed by Wombat button', 'Intent layer2026-10-20 | 1 file changed, none of them a page Committed in b0b1b2b3 No component']);
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href^="https://github.com/acme/guidelines/commit/"]') !== null`), true, 'its commit linked');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href="#c-button/documentation"]') !== null`), true, 'the component its page documents');
     // A chip of its own when History has another kind beside it (one kind alone needs none).

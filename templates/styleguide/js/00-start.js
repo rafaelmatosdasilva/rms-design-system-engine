@@ -409,8 +409,11 @@
     var says = String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '');
     // The merge or pull request it came in by, after it, when its row is an issue's (a row with no issue leads with it).
     var req = r.ticket && r.request ? ' <span class="pg-log-date">' + (r.via ? 'via' : '·') + '</span> ' + requestLink(r.request) : '';
-    return esc(says) + ' ' + sha + req + (extra || '');
+    return esc(says) + ' ' + sha + req + doneByHTML(r) + (extra || '');
   }
+  // Who did it (who-did-it.mjs), beside what a decision says of who answered it: the commit's author, and who brought
+  // it in when that is somebody else, or the schedule for a run nobody started.
+  function doneByHTML(r) { return r && r.by ? ' <span class="pg-log-date">' + esc(r.by) + '</span>' : ''; }
   function requestLink(q) { return q.url ? '<a class="sg-uses-link" href="' + esc(q.url) + '" target="_blank" rel="noopener">' + esc(q.label) + '</a>' : esc(q.label); }
   // Where a commit changed the system besides a component's code (change-where.mjs): Figma's data, the documentation, the
   // tokens, the version, the pipeline, the setup, a folder; each linked to where the change is seen, quieter than a

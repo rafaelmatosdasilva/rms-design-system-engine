@@ -74,7 +74,7 @@ test('blame, the commits of a file with a pattern, their releases and merge requ
   assert.equal(gl.calls.length, before, 'the same commit: nothing is asked again');
   // The commits that changed the card's own rule, with what changed, its earliest release and its merge request.
   assert.deepEqual(commitsOf(dir, ['src/theme.css'], { pattern: '\\.card[^a-zA-Z0-9_-]', ruleChanges }), [
-    { sha: B, short: B.slice(0, 7), date: '2026-02-01T10:00:00Z', subject: 'Card radius from Figma', release: 'v1.2.0', releasedAt: '2026-02-10T09:00:00Z', pr: '12', changed: ['border-radius 4px → --radius-m'] },
+    { sha: B, short: B.slice(0, 7), date: '2026-02-01T10:00:00Z', subject: 'Card radius from Figma', release: 'v1.2.0', releasedAt: '2026-02-10T09:00:00Z', pr: '12', by: 'Done by QA', changed: ['border-radius 4px → --radius-m'] },
   ]);
   assert.deepEqual(commitsOf(dir, ['src/Button.vue']).map((r) => [r.short, r.release, r.pr]), [[C.slice(0, 7), null, null]]);
   const b = blameOf(dir, 'src/theme.css');
