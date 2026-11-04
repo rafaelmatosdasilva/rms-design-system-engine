@@ -2513,7 +2513,7 @@ function figmaKeys(text) {
 }
 // A placeholder host: example, test, invalid and localhost, and the invented companies of the examples.
 const PLACEHOLDER_HOST = /(^|\.)(example|test|invalid|localhost|local\.test)$|(^|\.)(acme|northwind|tidal|tidepool|contoso|fabrikam|your-host|yourcompany|company)(\.[a-z]+)*$/i;
-const INTERNAL_PREFIX = /^(gitlab|git|scm|svn|jira|confluence|wiki|intranet|intra|portal|artifactory|nexus|sonar|sonarqube|jenkins|ci|build|vpn|sso|auth|login|idp|grafana|kibana|vault|registry|docker|harbor|teamcity|bamboo|redmine|youtrack|sharepoint|teams)\./i;
+const INTERNAL_PREFIX = /^(gitlab|git|scm|svn|jira|confluence|wiki|intranet|intra|portal|artifactory|nexus|sonar|sonarqube|ci|build|vpn|sso|auth|login|idp|grafana|kibana|vault|registry|docker|harbor|teamcity|bamboo|redmine|youtrack|sharepoint|teams)\./i;
 const INTERNAL_TLD = /\.(internal|local|lan|corp|intra|intranet|home|priv|private|localdomain)$/i;
 const PRIVATE_IP = /^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|169\.254\.\d+\.\d+)$/;
 function internalHosts(text) {

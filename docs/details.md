@@ -1019,8 +1019,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - On every push to the design system's default branch.
   - At once, when the intent layer's own repository says it changed. Publishing writes that repository's small job to `.design-system-engine-out/intent-layer-job.yml`, with the token to add once.
   - Every hour, when the intent layer, a store, the Figma file or the engine moved since the last build. An hour with nothing new stops in seconds. On GitLab, add the hourly schedule once (Build → Pipeline schedules).
-- **A guide published to your team's store** updates by itself too. Publishing to the store also writes a job for the store's own project (`.design-system-engine-out/style-guide-store-job.yml`), for teams whose code is in a repository they may only read:
-  - **On Jenkins.** A team whose CI is Jenkins (its store tells a Jenkins job, a `Jenkinsfile` in the project, or `"ci": "jenkins"`) gets `.design-system-engine-out/style-guide-store.Jenkinsfile` instead: the same steps, asked every ten minutes, Chrome for Testing downloaded when the machine has none, and three credentials named for Jenkins to hold. Every job is written for the store's own default branch, never one assumed to be `main`.
+- **A guide published to your team's store** updates by itself too. Publishing to the store also writes a job for the store's own project (`.design-system-engine-out/style-guide-store-job.yml`), for teams whose code is in a repository they may only read, written for the store's own default branch, never one assumed to be `main`:
   - it builds from your company's profile, which says where the code, the intent layer, the stores and Figma are;
   - it runs every hour when something moved, and at once when the intent layer's job starts it;
   - it never runs on a push to the store, since the page it sends is one;
