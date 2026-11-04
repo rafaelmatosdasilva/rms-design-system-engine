@@ -6,8 +6,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync, cpSync } from 'node
 import { join, dirname } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { FEEDS, STEPS, WATCHED, stepsFor, storeChanges, whatMoved, recordOf, runRound, autoRound, takeLock, pageFingerprint, publishIfChanged, watchLines, localCode, LOCK, LOG, LAST_BUILD } from '../lib/auto-build.mjs';
-import { makeWatch } from '../lib/watch.mjs';
+import { FEEDS, STEPS, WATCHED, roundLines, stepsFor, storeChanges, whatMoved, recordOf, runRound, autoRound, takeLock, pageFingerprint, publishIfChanged, localCode, LOCK, LOG, LAST_BUILD } from '../lib/auto-build.mjs';
 import { builtFrom } from '../lib/guide-freshness.mjs';
 import { tempDir, budget } from './helpers.mjs';
 
@@ -183,7 +182,7 @@ test('the code as a checkout here: its commit is a source, and a branch of its o
 });
 
 
-test('the watch\'s own sources under their FEEDS names; the stores asked beside them, without the ones it checks itself', () => {
+test('a round\'s own sources under their FEEDS names; the stores asked beside them, without the ones it checks itself', () => {
   assert.deepEqual(Object.values(WATCHED).map((w) => stepsFor([{ what: w }])), [
     ['page', 'audit', 'build', 'publish'], ['page', 'audit', 'build', 'publish'], ['outputs', 'build', 'publish'], ['page', 'audit', 'build', 'publish'],
   ]);
@@ -193,72 +192,54 @@ test('the watch\'s own sources under their FEEDS names; the stores asked beside 
   assert.deepEqual(storeChanges(now, base, { except: ['Figma'] }).map((m) => m.what), ['snapshots:snapshots', 'themes:themes', 'the code'], 'a GitLab code mirror is asked with the stores');
 });
 
-test('a watch tick runs only what the moved sources feed, and publishes only a page that changed', async () => {
-  const root = tempDir('acme-watch-');
+test('a round runs only what the moved sources feed, and publishes only a page that changed', async () => {
+  const root = tempDir('acme-round-');
   record(root, BASE);
-  let codeSig = 'c1', body = 'Button', layerMoved = false, storesMoved = null, published = null;
+  let body = 'Button', published = null;
   const ran = [], sent = [], records = [];
   const page = () => new Map([['index.html', Buffer.from(`<p>${body}</p><i>${new Date().toISOString()}</i>`)]]);
+  // A round for the sources given, as --auto runs one: the steps they feed, the publish, the record, its line in the log.
   const round = (moved) => runRound(root, {
     moved: moved.map((what) => ({ what })),
     readSources: async () => ({ ...BASE }),
     run: (step) => { ran.push(step.id); return { status: 0 }; },
     publish: () => publishIfChanged({ page: pageFingerprint(page()), there: published,
-      send: async () => { sent.push(body); published = pageFingerprint(page()); return { ok: true, line: '📤 Style guide: 1 file pushed' }; },
+      send: async () => { sent.push(body); published = pageFingerprint(page()); return { ok: true, line: '📤 Style guide: published' }; },
       record: async () => { records.push(body); return { ok: true }; } }),
   });
-  const w = makeWatch({
-    code: () => codeSig, engine: () => 'e1',
-    layer: async () => (layerMoved ? { changed: true, line: 'the intent layer has a new commit' } : { changed: false }),
-    stores: async () => (storesMoved ? { changed: true, line: 'moved: themes', moved: storesMoved } : { changed: false }),
-    build: async (reasons, moved) => { const r = await round(moved); return { ok: ['published', 'built'].includes(r.result), line: r.line }; },
-    settleMs: 0, remoteEveryMs: 1000,
-  });
-  await w.tick(0);
-  codeSig = 'c2'; await w.tick(10); const first = await w.tick(20);
-  assert.deepEqual(first.moved, ['the code']);
-  assert.deepEqual(ran, ['page', 'audit', 'build']);
-  assert.deepEqual([sent, records], [['Button'], []], 'a page never published: sent');
-  ran.length = 0; codeSig = 'c3'; await w.tick(30); await w.tick(40);
+
+  const first = await round(['the code']);
+  assert.deepEqual(ran, ['page', 'audit', 'build'], 'the code: the steps it feeds, the publish being the deps\' own');
+  assert.ok(['published', 'built'].includes(first.result), first.result);
+  assert.deepEqual([sent, records], [['Button'], []], 'a page never published before: sent');
+
+  ran.length = 0;
+  await round(['the code']);
   assert.deepEqual([sent, records], [['Button'], ['Button']], 'built again, the same page: only its record');
-  ran.length = 0; layerMoved = true; body = 'cardTile';
-  const layer = await w.tick(2000);
-  assert.deepEqual(layer.moved, ['intentLayer']);
+
+  ran.length = 0; body = 'cardTile';
+  await round(['intentLayer']);
   assert.deepEqual(ran, ['outputs', 'build'], 'the intent layer: no audit');
   assert.deepEqual(sent, ['Button', 'cardTile'], 'a page that changed: sent');
-  ran.length = 0; layerMoved = false; storesMoved = ['themes:themes'];
-  await w.tick(4000);
+
+  ran.length = 0;
+  await round(['themes:themes']);
   assert.deepEqual(ran, ['build'], 'a store: only what it feeds');
-  assert.match(logLines(root).at(-1), /moved: themes:themes · ran build, publish · \d+s · not published \(the page is the same as the one published\)$/);
+  assert.match(logLines(root).at(-1), /moved: themes:themes · ran build, publish · \d+s · not published \(the page is the same as the one published\)/);
 });
 
-test('a watch build that failed is tried again at the next check, for the same sources, never at every tick', async () => {
-  let codeSig = 'a', ok = false;
-  const builds = [];
-  const w = makeWatch({ code: () => codeSig, engine: () => 'e', build: async (r, moved) => { builds.push(moved); return { ok }; }, settleMs: 0, remoteEveryMs: 1000 });
-  await w.tick(0);
-  codeSig = 'b'; await w.tick(1); await w.tick(2);
-  assert.deepEqual(builds, [['the code']]);
-  await w.tick(500);
-  assert.equal(builds.length, 1, 'not at every tick');
-  ok = true;
-  const again = await w.tick(1100);
-  assert.deepEqual([again.moved, builds.length], [['the code'], 2], 'at the next check');
-  await w.tick(2200);
-  assert.equal(builds.length, 2, 'built: nothing more');
-});
-
-test('--guide-status: whether the background watch is on, and what its last round did', async () => {
-  const root = tempDir('acme-auto-');
-  assert.deepEqual(watchLines(root, {}), ['🔁 No background watch for this folder: rms-design-system-engine --watch-install turns it on.']);
+test('--guide-status says what this folder\'s last round did, and nothing about a watch', async () => {
+  // Nothing rebuilds a style guide by itself any more, so there is no watch to report on - only what was last done.
+  const root = tempDir('acme-round-said-');
+  assert.deepEqual(roundLines(root), [], 'a folder with no round behind it says nothing');
   mkdirSync(join(root, '.design-system-engine-out'), { recursive: true });
-  writeFileSync(join(root, LOG), '10:00 👀 Watching\n');
-  assert.equal(watchLines(root, {})[1], '   What it said last: 10:00 👀 Watching');
+  writeFileSync(join(root, LOG), '10:00 \u{1F440} a round\n');
+  assert.equal(roundLines(root)[0], '\u{1F501} What the last round said: 10:00 \u{1F440} a round');
   record(root, BASE);
   await autoRound(root, harness(root, { sources: { now: { ...BASE, 'intentLayer:specs': 'l9' } } }).deps);
-  const said = watchLines(root, { job: { file: '/h/Library/LaunchAgents/acme.plist' }, installed: true });
-  assert.match(said[0], /The background watch is on for this folder \(\/h\/Library\/LaunchAgents\/acme\.plist\)/);
-  assert.match(said[1], /Its last round, .*moved: intentLayer:specs l1 → l9 · ran outputs, build, publish · .* · published\.$/);
+  const said = roundLines(root);
+  assert.match(said[0], /Its last round, .*moved: intentLayer:specs l1 \u2192 l9 \u00b7 ran outputs, build, publish \u00b7 .* \u00b7 published\.$/);
+  assert.ok(!said.some((l) => /watch/i.test(l)), 'no watch is offered, because none exists');
 });
 
 test('the commands: --watch --once and --auto --once, one round now, with nothing moved since the last build', { timeout: budget(60000) }, () => {
@@ -266,7 +247,7 @@ test('the commands: --watch --once and --auto --once, one round now, with nothin
   cpSync(join(ENGINE, 'test', 'fixtures', 'demo-ds'), dir, { recursive: true });
   const engine = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ENGINE, encoding: 'utf8' }).stdout.trim();
   record(dir, engine ? { 'the engine': engine } : {});
-  for (const args of [['--watch', '--once'], ['--auto', '--once']]) {
+  for (const args of [['--auto'], ['--auto', '--once']]) {
     const out = execFileSync(process.execPath, [join(ENGINE, 'lib', 'audit.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, HOME: home, NO_COLOR: '1', FIGMA_TOKEN: '' } });
     assert.match(out, /🔁 \d{4}-\d{2}-\d{2} \d{2}:\d{2} nothing moved/, out);
   }
