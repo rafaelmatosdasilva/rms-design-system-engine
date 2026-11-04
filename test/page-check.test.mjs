@@ -374,3 +374,53 @@ const pick = () => {}
 </script>`, page, {});
   assert.ok(r.findings.some((f) => f.level === 'error' && /tabs: item 1 has no "id", which every use in the code gives/.test(f.message)), r.findings.map((f) => f.message).join('\n'));
 });
+
+test('a component that gives its own value back is bound on both sides, or neither side is an error', async () => {
+  const root = tempDir('acme-controlled-');
+  put(root, 'ds-config.json', '{}');
+  // It holds no state of its own: it takes the value and emits the new one, so the page is what keeps it.
+  put(root, 'src/components/library/menus/MenuPanel.vue', `<template><div class="menu-panel"><button @click="emit('update:collapsed', !collapsed)">x</button><slot/></div></template>
+<script setup>
+const emit = defineEmits(['update:collapsed'])
+const props = defineProps({ collapsed: { type: Boolean, default: false } })
+</script>`);
+  const system = await pageSystem(root, {}, { components: { menuPanel: { props: {} } } });
+  const page = (inner) => `<template><MenuPanel ${inner}/></template>\n<script setup>\nimport { ref } from 'vue'\nimport MenuPanel from '@/components/library/menus/MenuPanel'\nconst shut = ref(false)\nconst fold = () => {}\n</script>`;
+  const msgs = (inner) => checkPage('src/views/Try.vue', page(inner), system).findings.filter((f) => f.level === 'error').map((f) => f.message);
+  // Neither side: whatever its button folds cannot move, and a review sees a control that does nothing.
+  const neither = msgs('');
+  assert.equal(neither.length, 1, neither.join(' | '));
+  assert.match(neither[0], /holds no "collapsed" of its own: it emits update:collapsed/);
+  assert.match(neither[0], /Give :collapsed and listen to update:collapsed, or v-model:collapsed/);
+  // Either side bound is the page keeping that state, which is the point.
+  assert.deepEqual(msgs(':collapsed="shut" @update:collapsed="fold"'), []);
+  assert.deepEqual(msgs('v-model:collapsed="shut"'), []);
+  assert.deepEqual(msgs('@update:collapsed="fold"'), [], 'listening alone is a page that keeps it elsewhere');
+  assert.deepEqual(msgs(':collapsed="shut"'), [], 'giving it alone is a page that sets it once');
+  // The card says it too, since it is what an agent reads before writing the page.
+  const card = [usageCards(system, ['MenuPanel'])].flat().join('\n');
+  assert.match(card, /holds none of collapsed: the page keeps it\. Give the value and listen to its update, or v-model it/);
+});
+
+test('item fields written on the prop\'s own line are read, and a page is held to them', async () => {
+  const root = tempDir('acme-inline-fields-');
+  put(root, 'ds-config.json', '{}');
+  // A team that says the shape in passing, on the prop's own line, rather than under it.
+  put(root, 'src/components/library/dropdowns/Criteria.vue', `<template><ul class="criteria"><li v-for="o in options" :key="o.id">{{ o.text }}</li></ul></template>
+<script setup>
+/** Props
+@options {Array} of objects [{ id, text }]
+@params {Object} with label, iconDown for the dropdown
+*/
+const props = defineProps({ options: { type: Array, default: () => [] }, params: { type: Object, default: () => ({}) } })
+</script>`);
+  const system = await pageSystem(root, {}, { components: { criteria: { props: {} } } });
+  assert.deepEqual(Object.keys(system.components.Criteria.fields.options ?? {}), ['id', 'text'], 'read from "[{ id, text }]"');
+  assert.equal(system.components.Criteria.fields.params, undefined, 'a sentence names no field: nothing is guessed');
+  const page = (items) => `<template><Criteria :options="rows"/></template>\n<script setup>\nimport { ref } from 'vue'\nimport Criteria from '@/components/library/dropdowns/Criteria'\nconst rows = ref(${items})\n</script>`;
+  const msgs = (items) => checkPage('src/views/Try.vue', page(items), system).findings.filter((f) => f.level === 'error').map((f) => f.message);
+  assert.deepEqual(msgs("[{ id: 'a', text: 'All' }]"), []);
+  const wrong = msgs("[{ id: 'a', label: 'All' }]");
+  assert.equal(wrong.length, 1, wrong.join(' | '));
+  assert.match(wrong[0], /options: "label" is not a field it takes \(its fields: id, text\)/);
+});
