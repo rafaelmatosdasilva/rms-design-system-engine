@@ -1010,6 +1010,7 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - it runs every hour when something moved, and at once when the intent layer's job starts it;
   - it never runs on a push to the store, since the page it sends is one;
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
+  - **A token that may write but not read is refused, not guessed at.** Sending the page reads the project's files first: that is how the engine tells what is already there from what is new. A token your host lets commit but not read the repository (a fine-grained token without **Repository: Read**) stops the publish and says so, rather than sending every file as new and leaving the store between two builds.
 - **Your own copy updates on its own too.** On your computer, the style guide can build itself again whenever something changes ([ask for it](commands.md#publish-a-living-style-guide)):
   - your design system's code, a few seconds after you save, commit or switch branch;
   - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set (a `FIGMA_ACCESS_TOKEN`, the name Figma's own tools use, counts as one);
