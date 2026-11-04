@@ -1,0 +1,32 @@
+name: The documentation is wrong
+description: A page says something the engine doesn't do, or doesn't say something it does.
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A typo or a broken link needs no issue. Send the fix straight as a pull request.
+
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The page, and the heading or line.
+      placeholder: docs/details.md, "Compare Figma and code"
+    validations:
+      required: true
+
+  - type: textarea
+    id: says
+    attributes:
+      label: What it says
+    validations:
+      required: true
+
+  - type: textarea
+    id: actually
+    attributes:
+      label: What is actually the case
+      description: What you found when you ran it.
+    validations:
+      required: true

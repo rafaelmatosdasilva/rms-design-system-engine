@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/rafaelmatosdasilva/rms-design-system-engine/security/advisories/new
+    about: Privately, never as an issue. A token sent somewhere it shouldn't go, a write without the yes its setting asks for, a command built from what a file contains. See SECURITY.md.
+  - name: Ask a question about using it
+    url: https://github.com/rafaelmatosdasilva/rms-design-system-engine/discussions
+    about: How to set something up, which setting does what, whether it can do a thing. Not a bug.
+  - name: Read the documentation first
+    url: https://github.com/rafaelmatosdasilva/rms-design-system-engine/blob/main/docs/details.md
+    about: Every option, setting and check, with what the engine reads, sends and may change.

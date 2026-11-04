@@ -1,36 +1,28 @@
 # Contributing
 
+The engine has one maintainer. The way to take part is to **open an issue**: a problem you ran into, something you want it to do, a place the documentation is wrong. Every issue is read and answered.
+
 Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). How decisions are made is in [GOVERNANCE.md](GOVERNANCE.md), and where the engine is going in [ROADMAP.md](ROADMAP.md).
 
 ## Report a problem or ask for something
 
-Open an issue on GitHub. Say what you ran, what you expected and what happened instead, with the run's output. A security problem goes through the Security tab instead, never an issue ([SECURITY.md](SECURITY.md)).
+[Open an issue.](https://github.com/rafaelmatosdasilva/rms-design-system-engine/issues/new/choose) The templates ask for what the answer depends on: what you ran, what you expected, what happened instead, and the run's output.
 
-## Where things are
+A security problem goes through the Security tab instead, never an issue. [SECURITY.md](SECURITY.md) says how, and what is worth reporting.
 
-The engine's modules are in `lib/`. Four files stay at the root because people's setups name them: `audit.mjs` (the `rms-design-system-engine` command), `guard.mjs` (the Claude Code hooks), `mcp.mjs` (the MCP server) and `styleguide-files.mjs` (the style guide publishing job). Each one only loads its module from `lib/`. The guide is `rms-design-system-engine.md`, with `cookbook/` and `reference/` beside it, and the tests are in `test/`.
+## About pull requests
 
-## Send a change
+**Unsolicited pull requests are not merged.** Not because the work isn't welcome, but because a change to the engine carries a test, its documentation and a release label, and deciding whether a change belongs at all is the maintainer's job. A pull request that arrives before that decision is work spent on an answer that may be no.
 
-1. Fork the repository and branch from `main`.
-2. Make the change, with its tests (below).
-3. Run the full suite with Chrome on your PATH (or `CHROME_PATH` set), and the docs check:
+So:
 
-   ```bash
-   for d in .ci-tools .vue-tools .vue-cli-tools .nuxt-tools; do npm ci --prefix test/$d; done
-   node --test test/*.test.mjs
-   node lib/sync-docs.mjs --check
-   ```
+- **A typo, a broken link, a wrong command in the docs.** Just send it. These need no discussion.
+- **Anything else.** Open an issue first. If the answer is yes, that is said in the issue, and a pull request is then welcome.
 
-4. Open a pull request against `main` with one release label: `release: patch` (a fix, docs or internal work), `release: minor` (a new capability) or `release: major` (something that works differently for people already using the engine).
+A pull request opened without that is closed with a pointer to this file. Nothing about it is personal.
 
-## What a change needs
+## Forking
 
-- **A test for new behaviour,** one that fails without the change. A new check is tested with a mistake planted on purpose, so it is known to catch what it claims.
-- **A test for a fixed bug,** one that reproduces it.
-- **Every test passing,** none skipped for want of Chrome or the test tools.
-- **No new npm dependency.** The engine has none, and that is part of what it promises.
-- **Nothing private.** No client, product, person, host or token name, in code, tests, examples or messages. Examples use invented names (Acme, cardTile). The required Privacy check refuses anything else.
-- **Docs that match.** A change people can see updates the README, `docs/` or the guide files in the same pull request. A change to the guide files (`rms-design-system-engine.md`, `cookbook/`, `reference/`) also needs a fresh skill evaluation, recorded in `test/skill-evals/RESULTS.md`. The evaluation (`node test/skill-evals/continuous.mjs`) runs on your Claude plan's login, billed against its usage limits. With `ANTHROPIC_API_KEY` set, it runs through the Agent SDK instead (`npm ci --prefix test/.eval-tools` first), billed to that key's API credits, which include the monthly credits a Max or Team plan comes with. Those credits don't cover Claude Code.
+Forking is encouraged and the [MIT license](LICENSE) covers it. Take the engine, change it, run your own version, build something else from it. That is a different thing from sending the change back here, and only the second one is by invitation.
 
-A pull request merges when the privacy check, the test suite and CodeQL pass.
+If you fork to work on the engine itself, [docs/development.md](docs/development.md) has the repository's layout, how to run the tests, and what a change has to satisfy.
