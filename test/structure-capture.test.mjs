@@ -8,7 +8,7 @@ import { makeFixture } from './helpers.mjs';
 import { resolveComponentFile, textComponentApi, componentSourceFiles, textReader, usedComponents, norm } from '../lib/component-source.mjs';
 import { cemComponents, docgenComponents, storybookFiles, codeConnectPairs, mergeApiReadings, createApiReader, loadTypeScript, typescriptComponentApi, callName } from '../lib/component-api.mjs';
 import { symbolsIn, iconRefs, iconUsage } from '../lib/icon-source.mjs';
-import { fingerprint, markupClassSet } from '../lib/markup-source.mjs';
+import { fingerprint, markupClassSet, stripScripts } from '../lib/markup-source.mjs';
 import { mergeNesting, captureIcons, captureMarkup, captureApis, apiReaderFor, sourceNesting } from '../lib/structure-capture.mjs';
 import { captureCode } from '../lib/code-capture.mjs';
 import { findChrome } from '../lib/cdp.mjs';
@@ -225,6 +225,12 @@ test('markup: fingerprint ids, DS classes, icon context and button content (scri
     const html = `<div id="real"></div><script> var a = "<div id='ghost'></div>"; ${close}<p>x</p>`;
     assert.deepEqual(fingerprint(html, new Set()).ids, ['real'], `nothing inside the script is read as markup (${JSON.stringify(close)})`);
   }
+  // A script that is never closed runs to the end of the file, which is how a browser reads it: what follows is the
+  // script's, not the page's. Asserted on the strip itself, which is what changes; the fingerprint happens not to
+  // read an id out of this particular tail either way, so it is no witness for it.
+  assert.equal(stripScripts('<p>a</p><script>var s = "<div id=\'g\'>";'), '<p>a</p>', 'an unterminated script takes the rest of the file with it');
+  assert.equal(stripScripts('<p>a</p><script>one</script><p>b</p><script>two'), '<p>a</p><p>b</p>', 'a closed one, then one left open');
+  assert.equal(stripScripts('<p>a</p><p>b</p>'), '<p>a</p><p>b</p>', 'nothing to strip');
 });
 
 test('markup: DS classes come from config, else from the saved snapshot, else none', () => {
