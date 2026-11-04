@@ -225,7 +225,7 @@ test('a round runs only what the moved sources feed, and publishes only a page t
   ran.length = 0;
   await round(['themes:themes']);
   assert.deepEqual(ran, ['build'], 'a store: only what it feeds');
-  assert.match(logLines(root).at(-1), /moved: themes:themes · ran build, publish · \d+s · not published \(the page is the one there\)/);
+  assert.match(logLines(root).at(-1), /moved: themes:themes · ran build, publish · \d+s · not published \(the page is the same as the one published\)/);
 });
 
 test('--guide-status says what this folder\'s last round did, and nothing about a watch', async () => {
