@@ -13,6 +13,7 @@ Name a component the way your system does (button primary, Button Primary and pr
 | `/rms-design-system-engine use these guidelines <link>` | Your written guidelines from Notion or GitLab, read on every run |
 | `/rms-design-system-engine use this intent layer <link or folder>` | Your intent layer (DSDS or Markdown pages on GitLab, GitHub or in a folder of your project, or pages in Notion or Confluence) read into each component's documentation, its contract and `llms.txt`, and a page that says what agents use from it |
 | `/rms-design-system-engine refresh the Figma data` | Figma read again, the best way available |
+| `/rms-design-system-engine take the hosted token stylesheets again` | The stylesheets your product loads its token values from, downloaded again into one local file, every mode of them, with the address kept so a later run does it by itself |
 | `/rms-design-system-engine scan from this Figma branch <Figma link>` | The branch read instead of the main file, so edits on main do not restart a scan |
 
 ## Compare Figma and code
