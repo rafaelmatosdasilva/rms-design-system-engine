@@ -5,7 +5,12 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { missingThemeCss, hostedSources, modeNames, retakeHosted, themeCssOnRun, HOSTED_FILE } from '../lib/token-css.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { tempDir } from './helpers.mjs';
+
+const ENGINE = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const HOSTED = 'https://files.acme.test/kit/light_desktop.css';
 const css = (name, value) => `:root { --acme-accent-color: ${value}; --acme-gap-m: 8px; } /* ${name} */`;
@@ -113,4 +118,19 @@ test('a system that builds its tokens from Figma is never stopped for the file t
   assert.deepEqual(missingThemeCss(d, cfg), ['src/styles/tokens.css'], 'the file is not there yet');
   const t = await themeCssOnRun(d, cfg, { fetchImpl: fakeHost().fetchImpl });
   assert.deepEqual(t, { lines: [], stop: false }, 'the gate for that file lists the tokens to write into it');
+});
+
+test('the style guide is never built without the tokens it bakes into the page', async () => {
+  // What happened to a real team: the stylesheet that declares the tokens was gone, and the build read it as an empty
+  // string. The page came out with no font, no spacing and no colour of the system - broken-looking, and silent.
+  const d = project({});
+  const cfg = { paths: { themeCSS: [HOSTED_FILE] } };
+  const sg = await import('../lib/styleguide-gen.mjs');
+  const engine = join(ENGINE, 'lib', 'styleguide-gen.mjs');
+  // Run it in a process of its own, since a build with nothing to measure against stops the run.
+  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(engine)}).then((m) => m.generateStyleguide(${JSON.stringify(d)}, ${JSON.stringify(cfg)}, { partsOnly: true }))`], { encoding: 'utf8' });
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /❌ The design tokens are read from/);
+  assert.match(r.stderr, /NEXT: tell the person which file is missing/);
+  assert.ok(typeof sg.generateStyleguide === 'function');
 });
