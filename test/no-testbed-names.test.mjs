@@ -13,6 +13,33 @@ import { forbiddenHits, privateFindings, messageFindings, repoFindings, PUBLIC_E
 import { projectTerms } from '../.githooks/private-terms.mjs';
 import { tempDir } from './helpers.mjs';
 
+// A project that named a theme, a brand or a mode after a plain word makes that word a name the check carries, and it
+// is refused only where the text uses it as a name. An invented host is not such a place: the engine's own tests write
+// them throughout, so one more of them was refused for a word a project chose elsewhere, and the way past it is the
+// override - the habit that lets a real name through later.
+test('a plain word a project named is no name inside an address', async () => {
+  const dir = tempDir('named-address-');
+  const was = process.env.RMS_PRIVATE_TERMS_DIR;
+  try {
+    writeFileSync(join(dir, 'private-terms.json'), JSON.stringify({ terms: {}, allow: [], phrases: [], named: { quokka: 'brand mode' } }));
+    process.env.RMS_PRIVATE_TERMS_DIR = dir;
+    const { localTerms } = await import('../.githooks/private-terms.mjs?address-is-no-name');
+    const found = (s) => localTerms().find(s).length;
+    // The address, read as the address it is: a label of a dotted host, a file's extension, a URL's scheme.
+    assert.equal(found("brand: 'files.quokka.test'"), 0, 'a label of a dotted host');
+    assert.equal(found("const theme = await fetch('https://files.quokka.test/light.json')"), 0, 'a label inside a URL');
+    assert.equal(found("import theme from './brand.quokka'"), 0, "a file's extension");
+    assert.equal(found("open('quokka://brand/mode')"), 0, "a URL's scheme");
+    // And still a name wherever the text uses it as one.
+    assert.ok(found("setQuery('brand', 'quokka')") > 0, 'quoted, with brand on the line');
+    assert.ok(found('each theme, Quokka and the other') > 0, 'capitalised in the middle of a sentence');
+    assert.ok(found('the quokka theme') > 0, 'beside theme');
+  } finally {
+    if (was === undefined) delete process.env.RMS_PRIVATE_TERMS_DIR; else process.env.RMS_PRIVATE_TERMS_DIR = was;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 export { forbiddenHits };
 
 test('nothing private anywhere in the engine repo', () => {

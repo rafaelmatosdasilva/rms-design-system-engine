@@ -305,8 +305,16 @@ export function localTerms() {
       const hits = new Map();
       // A plain-word name used as a name: in quotes or backticks, as a key or a value (acme: , brand=acme),
       // capitalised in the middle of a sentence (each theme, Acme and…), or beside theme, brand or mode.
+      // A word inside an address names nobody: a label of a dotted host (files.acme.test), a file's extension
+      // (brand.acme) or a URL's scheme (acme://) is the address it is written as. The engine's own tests write
+      // invented hosts throughout, so a commit that only added one was refused for a word a project chose elsewhere,
+      // and the way past it is the override - the habit that lets a real name through later. Blanked to spaces of its
+      // own length, so each line is read as written with its addresses out of it. Only these plain words are read this
+      // way: a project's distinctive names are matched below, where an address is split like any other text.
+      const ADDRESS = /\b[a-z][a-z0-9+.-]*:\/\/[^\s'"`]*|\b[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+\b/g;
+      const addressless = String(text).replace(ADDRESS, (m) => ' '.repeat(m.length));
       for (const [w, from] of named) {
-        const W = w[0].toUpperCase() + w.slice(1), s = String(text);
+        const W = w[0].toUpperCase() + w.slice(1), s = addressless;
         // Capitalised after a lower-case word or an opening bracket (not in a title of capitalised words), or a label
         // between tags (<option>Acme</option>).
         const capitalised = new RegExp(`(?:\\b[a-z][a-z0-9]*[,;]?\\s+|\\(|>\\s*)${W}\\b`);
