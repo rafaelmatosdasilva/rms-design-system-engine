@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture, budget } from './helpers.mjs';
+import { makeFixture, budget, tempDir } from './helpers.mjs';
 import {
   stableJson, engineFiles, checkSignature, runSignature, styleguideSignatures, projectSignature,
   keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE, whyChecked, whyCheckedLine, cssRuleList, sharedOnly,
@@ -47,6 +47,18 @@ test('the check is signed by the engine files its results rest on: never the tem
   fake['/e/vue-harness.mjs'] = 'v2';
   assert.equal(checkSignature({ dir: '/e', read }), page, 'a page read from a file does not rest on the harness');
   assert.notEqual(checkSignature({ dir: '/e', read, kind: 'rendered' }), rendered, 'the components rendered from their code do');
+});
+
+// The engine finds its own folder through import.meta.url, which is a URL: read as a path with .pathname, a folder
+// with a space in its name arrives percent-encoded, every read of an engine file throws, and the signature falls back
+// to the file names alone - so a check whose own code changed would still put back the results it kept, silently.
+// Measured from a copy under a folder with a space, because the engine sits wherever the person keeps it.
+test('the check is signed by its files even when the engine sits under a path with a space', async () => {
+  const lib = join(tempDir('engine folder-'), 'lib');
+  assert.ok(lib.includes(' '), 'the copy sits under a path with a space');
+  cpSync(join(ENGINE, 'lib'), lib, { recursive: true });
+  const { checkSignature: signature } = await import(pathToFileURL(join(lib, 'a11y-check.mjs')).href);
+  assert.equal(signature(), signature({ dir: lib }), 'the folder it reads is the one it sits in');
 });
 
 test('a run is signed by what it was asked, never by where its report goes or when the profile was read', () => {
