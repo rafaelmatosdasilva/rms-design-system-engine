@@ -219,10 +219,12 @@ test('markup: fingerprint ids, DS classes, icon context and button content (scri
   assert.deepEqual(fp.components, [{ id: 'bar', classes: ['toolbar'] }, { id: 'go', classes: ['btn'] }]);
   assert.deepEqual(fp.icons, [{ context: '#go', icon: 'icon-go' }]);
   assert.deepEqual(fp.buttonContent, [{ id: 'go', svg: true, spans: ['lbl'], text: 'Go' }]);
-  // An end tag may carry whitespace before its bracket, which is legal HTML. Left unmatched, the script's own code is
-  // read as markup and whatever it holds is measured as if the page held it.
-  const spaced = '<div id="real"></div><script> var a = "<div id=\'ghost\'></div>"; </script ><p>x</p>';
-  assert.deepEqual(fingerprint(spaced, new Set()).ids, ['real'], 'nothing inside the script is read as markup');
+  // An end tag may carry whitespace, and even junk, before its bracket: a browser closes the script on all of these.
+  // Left unmatched, the script's own code is read as markup and whatever it holds is measured as if the page held it.
+  for (const close of ['</script>', '</script >', '</script\tfoo>', '</script\n bar>']) {
+    const html = `<div id="real"></div><script> var a = "<div id='ghost'></div>"; ${close}<p>x</p>`;
+    assert.deepEqual(fingerprint(html, new Set()).ids, ['real'], `nothing inside the script is read as markup (${JSON.stringify(close)})`);
+  }
 });
 
 test('markup: DS classes come from config, else from the saved snapshot, else none', () => {
