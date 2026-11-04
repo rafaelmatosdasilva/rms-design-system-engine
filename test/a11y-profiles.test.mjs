@@ -7,6 +7,11 @@ import assert from 'node:assert/strict';
 import { WCAG22, WCAG_TASKS, WHO_PROFILES, tasksFor, whoForCriterion } from '../lib/wcag21.mjs';
 import { A11Y_GUIDE, WHO_SAYS, a11yFindingRecord } from '../lib/a11y-check.mjs';
 import { templateText } from '../lib/styleguide-template.mjs';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('the five profiles are the same everywhere, and nothing names a sixth', () => {
   assert.deepEqual(WHO_PROFILES, ['designer', 'developer', 'content', 'product', 'a11y']);
@@ -68,6 +73,26 @@ test('every finding carries its tasks, so a11y.json says who acts', () => {
   assert.deepEqual(a11yFindingRecord('aria', { desc: 'div' }).tasks.map((t) => t.who), ['developer']);
 });
 
+// The column was added to the table and nothing else was moved to meet it: the panel still wrote who inside what to
+// do and left the new column saying "Nothing.", the eight columns shared the room evenly so the one sentence a person
+// reads wrapped to five lines, and the tooltip that lists where a criterion was tried repeated one address thirty
+// times. Each is checked here, against the template as it is written.
+test('who acts has a card of its own in the panel, and stays in what to do where no column shows it', () => {
+  const page = templateText();
+  // Its own card, from the row's own who.
+  assert.match(page, /if \(k === 'whoCell'\) return card\(col\[0\], r\.who \?/);
+  // And what to do writes it only where the table gives it no column (Documentation, Parity).
+  assert.match(page, /var whoCol = order\.some\(function \(c\) \{ return c\[1\] === 'whoCell'; \}\);/);
+  assert.match(page, /if \(k === 'todo'\) return card\(col\[0\], \(!whoCol && r\.who \?/);
+});
+
+test('the accessibility table gives what to do the room the other columns leave', () => {
+  const css = readFileSync(join(ROOT, 'templates', 'styleguide', 'css', '09-component-playground.css'), 'utf8');
+  // Eight columns: every one but what to do is given a width, so what to do keeps the rest.
+  for (const nth of [3, 4, 5, 6, 7, 8]) assert.match(css, new RegExp(`\\.sg-issues--a11y\\.sg-cols-8 th:nth-child\\(${nth}\\) \\{ width: \\d+%; \\}`), `column ${nth}`);
+  assert.ok(!/\.sg-issues--a11y\.sg-cols-8 th:nth-child\(2\)/.test(css), 'what to do is never given one: it takes what is left');
+});
+
 test('the style guide shows the task first, the person in a column, and filters by them', () => {
   const page = templateText();
   // The table: the task, then who does it, then the criterion as a reference beside it.
@@ -79,9 +104,14 @@ test('the style guide shows the task first, the person in a column, and filters 
   assert.match(page, /return byWho\.map\(function \(g\) \{/);
   assert.match(page, /whoKey: g\.who, who: WHO\[g\.who\] \+ teamNote\(c\.name\)/);
   assert.match(page, /r\.steps > 1 \? '<span class="sg-todo-step"/);
-  // The five, with words of their own, and a filter that takes several at once.
+  // The five, with words of their own, and a filter that takes one at a time.
   for (const w of ['A designer, in Figma', 'Whoever writes the words', 'Whoever owns the flow', 'A person checks it by hand']) assert.ok(page.includes(w), w);
-  assert.match(page, /aria-multiselectable="true" aria-label="Who acts"/);
+  assert.match(page, /aria-multiselectable="false" aria-label="Who acts"/, 'one person at a time, never a running total');
+  // All is an option of its own, chosen to begin with, and it is no filter at all.
+  assert.match(page, /data-whopick="all" aria-selected="true"><span>All<\/span>/);
+  assert.match(page, /\.filter\(function \(k\) \{ return k !== 'all'; \}\)/);
+  // Choosing one unchooses the rest, so the list never adds up.
+  assert.match(page, /x\.setAttribute\('aria-selected', x === o \? 'true' : 'false'\)/);
   assert.match(page, /function applyWho\(dd\)/);
   // The two filters agree on what is shown: a row is hidden when either one hides it.
   assert.match(page, /\.sg-issues tr\.sg-st-off, \.sg-issues tr\.sg-who-off/);
