@@ -81,6 +81,18 @@ Two more are optional, and each decides how much a run can see. The installer ch
 
 > **Ask for TypeScript 5 by name.** A plain `npm i -g typescript` installs version 7, the rewrite, which reads no JSX. The engine treats it as no TypeScript at all rather than failing midway through a run, and says so.
 
+### A company's own setup
+
+A team whose setup lives in a profile installs everything with one line: the engine, the team's own command, a work folder and the token to reach their projects.
+
+```bash
+curl -fsSL <the installer> | bash -s -- --client <team> --profile <the profile's link>
+```
+
+- **It asks for your GitLab token** and keeps it only in that folder's `.env`, read without showing on screen. Nothing is passed on the command line.
+- **The folder** is `~/<team>-design-system`, or wherever `--folder` says.
+- **It ends where the work starts.** Your token lives in that folder and the engine reads it from where it runs, so the installer opens Claude Code there for you — or, with no terminal to ask in, writes out the line that gets there. It never leaves you to guess which folder to open.
+
 ### Staying up to date
 
 The skill updates itself. Once a day, before an audit, it pulls the latest version and says so in one line.
