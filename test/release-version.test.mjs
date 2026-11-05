@@ -35,10 +35,10 @@ test('a malformed tag, bump or version stops the release', () => {
   assert.throws(() => nextVersion('', 'minor', 'one'), /not x\.y\.z/);
 });
 
-test('the workflow is started by hand, with a backstop every third day, reads version tags and pull request labels, and publishes generated notes', () => {
+test('the workflow runs once a week and can be started by hand, reads version tags and pull request labels, and publishes generated notes', () => {
   const wf = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
   assert.match(wf, /workflow_dispatch:/);
-  assert.match(wf, /cron: '0 7 \*\/3 \* \*'/, 'merged work never waits more than three days');
+  assert.match(wf, /cron: '0 7 \* \* 1'/, 'a release every Monday: the week\'s record');
   assert.match(wf, /--match 'v\[0-9\]\*'/);
   assert.match(wf, /gh pr view/);
   assert.match(wf, /release-version\.mjs/);
