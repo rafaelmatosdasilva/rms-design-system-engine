@@ -385,7 +385,7 @@ test('in the browser: no script error, a control changes the real component, the
     const a11yRead = await a11yFull();
     assert.match(a11yRead, /a <button type="button"> with aria-pressed/);
     assert.match(a11y, /The audit has not run in a browser yet/);
-    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Pass \(\d+\)/, 'its chips count what passes, in the Status page\'s word');
+    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Met \(\d+\)/, 'its chips count what is met, in the Status page\'s word');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
     // The page tries the keyboard on every variant after it is drawn: wait for that result (its 2.1.1 row says what Tab
     // reached), never for a fixed time, so a busy machine reads it as a quiet one does.
@@ -413,7 +413,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.querySelector('.sg-todo-area') && /1\.4\.3 Contrast/.test(r.querySelector('.sg-todo-area').textContent))`)), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
+    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.querySelector('.sg-todo-area') && /1\.4\.3 Contrast/.test(r.querySelector('.sg-todo-area').textContent))`)), /\d+\.\d:1.*(Met|Issues)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -524,7 +524,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#index .sg-card[href="#c-chip"] > h3').textContent.trim() + '|' + document.querySelector('#index .sg-card[href="#c-chip"]').children.length`), 'chip|2', 'its picture and its name');
     // The name stays beside the areas; each of Parity, Accessibility and Documentation carries its Status row's dot, its
     // word said to a screen reader (componentStates), and the page no line about it.
-    assert.match(await run(`document.querySelector('#c-chip .pg-head > h2').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), /^chip\|Parity, (Match|Partial|Differs)\|Accessibility, (Untested|Pass|Issues|Review)\|false$/, 'its tabs say their Status state');
+    assert.match(await run(`document.querySelector('#c-chip .pg-head > h2').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), /^chip\|Parity, (Match|Partial|Differs)\|Accessibility, (Untested|Met|Issues|Review)\|false$/, 'its tabs say their Status state');
     // Parity's table head stays in view under the areas as its rows scroll by.
     assert.equal(await run(`getComputedStyle(document.querySelector('#c-chip .pg-par-table th')).position`), 'sticky');
     // On a phone the areas scroll sideways in one row, never wrap; the one chosen scrolls into view.
@@ -602,7 +602,7 @@ test('in the browser: no script error, a control changes the real component, the
     if (cellRest) { assert.match(cellRest[0], /[?&]embed#c-[^/?]+$/, 'the cell around the pill opens the component, as its row does'); assert.deepEqual(cellRest.slice(1), [false, 'pointer'], 'the pointer is the pill\'s'); }
     assert.equal(await run(`!!document.querySelector('#status .sg-mx-side, #status .sg-mx-split')`), false, 'no side panel');
     assert.equal(await run(`[...document.querySelectorAll('#status tr.sg-mx-row')].every((tr) => ['stFigma', 'stCode', 'stPar', 'stAcc', 'stDoc'].every((k) => tr.dataset[k]))`), true, 'every row carries each column\'s state, for the filters to count');
-    assert.match(await run(`[...document.querySelectorAll('#status .sg-matrix td .pg-par-status')].map((e) => e.textContent).join('|')`), /^Found\|Found\|(Match|Partial|Differs|N\/A)\|/);
+    assert.match(await run(`[...document.querySelectorAll('#status .sg-matrix td .pg-par-status')].map((e) => e.textContent).join('|')`), /^Found\|Built\|(Match|Partial|Differs|N\/A)\|/);
     // The filters: one chip a column, named only until a state is chosen (no number on it: nothing looks applied); its
     // list has All and the column's states with their counts; no Clear filters while nothing is chosen.
     assert.match(await run(`[...document.querySelectorAll('#status .sg-chip-menu')].map((b) => b.innerText.replace(/\\s+/g, ' ').trim()).join('|')`), /^(Figma|Code|Parity|Accessibility|Documentation) All(\|(Figma|Code|Parity|Accessibility|Documentation) All)*$/, 'each says All until a state is chosen');
@@ -1516,34 +1516,40 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Parity', 'Code', 'Accessibility', 'Documentation'], errors.join('\n'));
-    // The big number is the share of checks done, no line under it; the legend counts the components, the done state
-    // in the big number's word.
-    assert.match(tiles[0][1], /^\d+%matched\|$/, 'parity: the share matched, nothing under it');
-    // Implementation counts over Figma's components; Parity, Accessibility and Documentation only over what the code has
-    // built (one not built yet is the Implementation card's to say), and never say "not in the code yet".
-    const totals = tiles.map((x) => [...x[2].matchAll(/(\d+) /g)].reduce((t, m) => t + +m[1], 0)), found = +/(\d+) built/.exec(tiles[1][2])[1];
-    for (const k of [0, 2, 3]) assert.equal(totals[k], found, `${tiles[k][0]} counts the components the code has`);
-    for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what implementation says');
-    assert.match(tiles[1][1], /^\d+%built\|$/, 'the share of Figma\'s components the code has, no line repeating the legend');
-    assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(found / totals[1] * 100), 'implementation\'s share is its count over its total');
-    assert.match(tiles[1][2], /2 built/, 'Found said as built, as the big number says it');
-    for (const x of tiles) assert.match(x[2], /^Components\d/, 'each legend says first that it counts components');
-    assert.match(tiles[2][1], /^(\d+%passed|–)\|$/);
-    // Each card counts what its column's filter counts: every row whose state there applies, of the components the code
-    // has built.
-    assert.match(tiles[3][1], /^\d+%written\|$/);
-    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = [...tile.querySelector('.sg-health-legend').textContent.matchAll(/(\\d+) /g)].reduce((t, m) => t + +m[1], 0); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent) && tr.dataset.stCode !== 'Missing'); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has that the code has built');
-    assert.match(tiles[3][2], /\d+ (written|partial|missing)/, 'the Documentation column\'s states: Ready (said written), Partial, Missing');
+    // The big number is the share of the work done, in the table's word, nothing under it; the legend says only what is left.
+    assert.match(tiles[0][1], /^\d+%Match\|$/, 'parity: the share matched, nothing under it');
+    for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what Code says');
+    assert.match(tiles[1][1], /^\d+%Built\|$/);
+    assert.match(tiles[2][1], /^(\d+%Met|–)\|$/);
+    assert.match(tiles[3][1], /^\d+%Written\|$/);
+    // Every card counts over the same whole, the table's All, said once above them. Each card's foot counts what is
+    // done in full, the rows its filter shows for the done word, said as complete (the big number counts the work).
+    const table = await run(`(() => { const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')]; const ths = [...document.querySelectorAll('#status .sg-matrix thead th')].map((t) => t.textContent.trim()); const col = (h) => { const i = ths.findIndex((t) => t.startsWith(h)); return rows.map((tr) => (tr.cells[i].innerText || '').trim().split('\\n')[0]); }; return { n: rows.length, total: document.querySelector('#status .sg-health-total').textContent, code: col('Code'), par: col('Parity'), acc: col('Accessibility'), doc: col('Documentation'), done: [...document.querySelectorAll('#status .sg-health-done')].map((p) => p.textContent) }; })()`);
+    assert.equal(table.total, `${table.n} in the system`);
+    const of = (col, w) => col.filter((x) => x === w).length;
+    assert.deepEqual(table.done, [`${of(table.par, 'Match')} of ${table.n} complete`, `${of(table.code, 'Built')} of ${table.n} complete`, `${of(table.acc, 'Met')} of ${table.n} complete`, `${of(table.doc, 'Written')} of ${table.n} complete`], 'each count at the foot is what its filter shows for the done word');
+    assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(of(table.code, 'Built') / table.n * 100), 'Code\'s share is what is built over everything');
+    // The bar draws what the numbers say: its green is the big number, and the big number and the legend's shares add
+    // up to 100. No word says what is counted: the line above the cards does.
+    const bars = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [(/^(\\d+)%/.exec(t.querySelector('.sg-health-num').textContent) || [])[1], (t.querySelector('.sg-health-bar > .is-done') || { style: {} }).style.width, [...(t.querySelector('.sg-health-legend') || { textContent: '' }).textContent.matchAll(/(<?)(\\d+)%/g)].map((m) => m[1] ? 0.5 : +m[2]), !!t.querySelector('.sg-health-lead')])`);
+    for (const [i, [pct, green, shares, lead]] of bars.entries()) {
+      assert.equal(lead, false, `${tiles[i][0]}: no "Components" word`);
+      if (pct == null) continue;
+      if (+pct) assert.equal(green, pct + '%', `${tiles[i][0]}: the green of the bar is the big number`);
+      const sum = +pct + shares.reduce((t, x) => t + x, 0);
+      assert.ok(sum >= 99.5 && sum <= 100.5, `${tiles[i][0]}: ${pct}% and the legend's ${shares.join(', ')} add up to 100`);
+    }
+    if (tiles[3][2]) assert.match(tiles[3][2], /^(<?\d+% (Partial|Missing))+$/, 'the Documentation card\'s words for what is left, the table\'s: Partial, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
-    assert.match(how[0][1], /^How closely the code matches Figma\. The percentage counts every property, token and value compared; the legend counts components\./, 'said simply, in a sentence or two');
+    assert.match(how[0][1], /^How closely the code matches Figma\. The percentage counts every property, token and value compared, in what the code has built\./, 'said simply, in a sentence or two');
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
-    if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Found', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');
-    // Every card's link shows the rows it promises: See 45 missing filters the table to those 45, never to none.
-    const promised = await run(`(() => { const out = []; for (const b of [...document.querySelectorAll('#status .sg-health-go [data-go-area]')]) { const n = +(/\\d+/.exec(b.textContent) || [0])[0]; b.click(); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => tr.offsetParent).length; out.push([b.getAttribute('data-go-area'), n, rows]); } return out; })()`);
-    for (const [area, n, rows] of promised) assert.equal(rows, n, `${area}: its link promises ${n} rows and the table shows ${rows}`);
+    if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Built', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');
+    // Every card's link opens rows, never none, and says no count of its own: the legend above it says how many.
+    const promised = await run(`(() => { const out = []; for (const b of [...document.querySelectorAll('#status .sg-health-go [data-go-area]')]) { b.click(); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => tr.offsetParent).length; out.push([b.getAttribute('data-go-area'), b.textContent, rows]); } return out; })()`);
+    for (const [area, words, rows] of promised) { assert.ok(rows > 0, `${area}: its link opens no rows`); assert.match(words, /^See [A-Z][a-z ]+$/, `${area}: "${words}" says no count`); }
     // Only the cards: no charts or lists of their own; the tasks follow, with their tabs.
     assert.equal(await run(`document.querySelectorAll('#status .sg-health-card, #status .sg-health-comps, #status .sg-health-list').length`), 0);
     assert.equal(await run(`document.querySelector('#status .sg-health-box').compareDocumentPosition(document.querySelector('#status .sg-matrix')) === Node.DOCUMENT_POSITION_FOLLOWING`), true, 'the cards above the table');

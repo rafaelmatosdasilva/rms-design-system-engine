@@ -1159,7 +1159,7 @@ Also on each component.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
 - **Coverage.** How much of its file your tests cover, beside its Code Connect.
 - **Its stage is a task, not a label on its page.** Your team sets it as `status` in `contract.authored.json`, as `Status: beta` in its Figma description, or with `@deprecated` in its code. The Status page asks for it:
-  - With no stage set, a Stage task says what the page measures, in the Status table's words: Stable when Parity is Match, Accessibility Pass and Documentation Ready (with at least 80% of its lines covered when your tests report coverage), Beta otherwise, with what is left.
+  - With no stage set, a Stage task says what the page measures, in the Status table's words: Stable when Parity is Match, Accessibility Met and Documentation Written (with at least 80% of its lines covered when your tests report coverage), Beta otherwise, with what is left.
   - With a stage that differs from what the page measures, the task says both, to keep it or change it.
   - A component being retired names what replaces it, from the release that retired it or from a line such as "use button instead" in Figma or its code.
 
@@ -1280,17 +1280,22 @@ One row for each component, with one word per state. The cards above the table a
 
 | Column | States |
 |---|---|
-| Figma, Code | Found, Unsure, Missing |
+| Figma | Found, Missing |
+| Code | Built, Unsure, Missing |
 | Parity | Match, Partial, Differs, Unsure |
-| Accessibility | Pass, Issues, Review, Untested |
-| Documentation | Ready, Partial, Missing |
+| Accessibility | Met, Issues, Review, Untested |
+| Documentation | Written, Partial, Missing |
 
-- **Cards.** Parity, Code, Accessibility and Documentation, read from the table's rows. The big number is what is done (Match, Found, Pass, Ready) out of the same components; the bar splits the rest in the table's own states and colours (Not checked grey). Each card's button opens the table filtered to what is left (See the 60 missing components).
+- **Cards.** Parity, Code, Accessibility and Documentation, all over the same whole: everything the table lists, said once above them. The big number is the share of the work done, in the table's word (51% Match). The bar draws that share in green and splits the rest into what waits for a person (yellow) and what is to fix (red), and its legend says those shares in the table's words. At its foot, on one line: how many are complete, the same count the filter shows for the done word (1 of 180 complete), and a link that opens the table filtered to what is most urgent (See Missing). It says complete, not the big number's word, because it counts whole components while the big number counts the work.
+  - **Parity** counts every property, token and value compared, in what the code has built.
+  - **Code** counts the rows themselves: built, unsure or missing.
+  - **Accessibility** counts WCAG 2.2 AA criteria over the whole system. A criterion is met when nothing fails it, to review when only a check by hand is left, and failing when anything fails it.
+  - **Documentation** counts what people write. Its page existing and its properties, which the engine writes itself, are not counted.
 - **Parts.** A Figma name with a slash (`chartBars/bar`) is a part, not a row: its parent's row counts what it has left, and the parent's details list it under Parts.
 - **Opening a component.** A row, or its arrow, opens the component's page in a panel from the right, with its tabs. A Parity, Accessibility or Documentation cell with something left opens that area, filtered to what is to fix or decide.
 - **N/A and Untested.** N/A has no dot and no arrow, since there is nothing to open. N/A and Untested carry an i that says why. A component only one side has says what to do in an i on the side that lacks it.
 - **Sorting.** Every column sorts both ways, Parity first.
-- **Filters.** One chip per column, named only until a state is chosen, so nothing looks applied. Each opens a list of All and the column's states, with how many rows each would show. Chips combine (Code: Found and Documentation: Missing is what is built and undocumented), each list counting beside the others' choices. Choosing a state sorts by its column; Clear filters drops them all.
+- **Filters.** One chip per column, named only until a state is chosen, so nothing looks applied. Each opens a list of All and the column's states, with how many rows each would show. Chips combine (Code: Built and Documentation: Missing is what is built and undocumented), each list counting beside the others' choices. Choosing a state sorts by its column; Clear filters drops them all.
 - **The address.** It keeps the view, the filters and the open panel with its tab (`#status/parity?code=Missing&doc=Missing&open=c-chip/accessibility`), so a link opens the page as it was. `#health` and `#tasks` open the Status page too.
 
 ## Catch drift in product code and AI edits

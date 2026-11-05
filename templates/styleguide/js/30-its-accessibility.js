@@ -214,7 +214,7 @@
     var counts = { all: 0, work: 0, nocode: 0, unsure: 0, done: 0, untested: 0 };
     var C = stateC;
     var cellOf = function (x) { return cell(x.cls, x.say, x.fix, x.dec); };
-    var CODE = { found: '<td data-ok="1">' + pill('match', 'Found') + '</td>', css: '<td data-ok="1"><span class="sg-mx-why">' + pill('match', 'CSS only') + tipHTML('Found only as a CSS class in the code: no component file, so it has no props to read or try, and its preview is drawn from Figma.', 'What CSS only means') + '</span></td>', unsure: '<td data-ok="0">' + pill('figma', 'Unsure') + '</td>', missing: '<td data-ok="0">' + pill('differs', 'Missing') + '</td>' };
+    var CODE = { found: '<td data-ok="1">' + pill('match', 'Built') + '</td>', css: '<td data-ok="1"><span class="sg-mx-why">' + pill('match', 'CSS only') + tipHTML('Found only as a CSS class in the code: no component file, so it has no props to read or try, and its preview is drawn from Figma.', 'What CSS only means') + '</span></td>', unsure: '<td data-ok="0">' + pill('figma', 'Unsure') + '</td>', missing: '<td data-ok="0">' + pill('differs', 'Missing') + '</td>' };
     // A row: its name, Figma's and the code's side (found, unsure, missing), its Parity, Accessibility and Documentation,
     // what is left, when it was last checked, and its details.
     var mxRow = function (o) { return o; };
@@ -233,7 +233,7 @@
       return '<tr class="sg-mx-row' + (o.href ? ' is-link' : '') + '" data-name="' + esc(o.name) + '" data-fix="' + (o.fix || 0) + '" data-dec="' + (o.dec || 0) + '" data-done="' + (o.done ? 1 : 0) + '" data-untested="' + (o.untested ? 1 : 0) + '" data-nocode="' + (o.nocode ? 1 : 0) + '" data-unsure="' + (o.unsure ? 1 : 0) + '" data-st-figma="' + (o.figma ? 'Found' : 'Missing') + '" data-st-code="' + esc(MX_WORD.code[o.code]) + '" data-st-par="' + esc(o.par.say) + '" data-st-acc="' + esc(o.acc.say) + '" data-st-doc="' + esc(o.doc.say) + '">' +
         '<td><span class="sg-mx-name" title="' + esc(o.name) + '">' + esc(o.name) + '</span></td>' +
         // What to do about one only Figma or only the code has: a tip on the side that lacks it.
-        (o.codeWhy && !o.figma ? '<td data-ok="0"><span class="sg-mx-why">' + pill('differs', 'Missing') + tipHTML(o.codeWhy, 'What to do about ' + o.name) + '</span></td>' : o.figma ? CODE.found : CODE.missing) +
+        (o.codeWhy && !o.figma ? '<td data-ok="0"><span class="sg-mx-why">' + pill('differs', 'Missing') + tipHTML(o.codeWhy, 'What to do about ' + o.name) + '</span></td>' : o.figma ? FOUND : MISSING) +
         (o.codeWhy && o.figma ? '<td data-ok="0"><span class="sg-mx-why">' + pill(o.code === 'unsure' ? 'figma' : 'differs', MX_WORD.code[o.code]) + tipHTML(o.codeWhy, 'What to do about ' + o.name) + '</span></td>' : CODE[o.code]) +
         areaCell(o, o.par, 'parity', 'Parity') + areaCell(o, o.acc, 'accessibility', 'Accessibility') + areaCell(o, o.doc, 'documentation', 'Documentation') +
         '<td class="sg-mx-at" data-at="' + esc(o.at || '') + '"' + (o.at ? ' title="' + esc(when(o.at)) + '"' : '') + '>' + (o.at ? esc(ago(o.at)) : '–') + '</td>' +
