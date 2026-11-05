@@ -1023,15 +1023,16 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .pg-inspect td:first-child { color: var(--sg-muted); width: 38%; }
 .pg-inspect td:last-child { color: var(--sg-text); word-break: break-all; }
 .pg-inspect tr:last-child td, .pg-inspect tbody tr:not([hidden]):not(:has(~ tr:not([hidden]))) td { border-bottom: none; }   /* the last row shown, when a chip hides the rows after it */
-/* History's table: when, the type, what was done, who did it, what it affects. A card's table as every other (pg-par-card,
+/* History's table: when, the type, what was done, what it affects, who did it. A card's table as every other (pg-par-card,
    pg-par-table): its head sticks with the card's corners, its top line and the gap above it, as the Status page's. */
 .pg-par-table.sg-log td { vertical-align: top; }   /* every cell from its top: a row's date, its type, what it did and who line up */
-.pg-par-table.sg-log tr.sg-log-more > td:first-child { padding-left: var(--sg-space-m); }   /* a row under a shared date starts with What: its own column's padding, not the table's first */
+.pg-par-table.sg-log tr.sg-log-more > td:first-child { padding-left: var(--sg-space-m); }   /* a row under a shared date starts with What and ends with Affects: their own columns' padding, not the table's first and last */
+.pg-par-table.sg-log tr.sg-log-more > td:last-child { padding-right: var(--sg-space-m); }
 .pg-par-table.sg-log td > .sg-log-stick { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--sg-log-head-h, 0px)); }   /* a date, type and person shared by rows of one moment stay in view under the head while those rows scroll */
 .pg-par-table.sg-log :is(th, td):nth-child(1) { width: 7.5em; min-width: 0; white-space: nowrap; }   /* its day, its time under it */
-.pg-par-table.sg-log :is(th, td):nth-child(2) { width: 7em; min-width: 0; }
-.pg-par-table.sg-log :is(th, td):nth-child(4) { width: 14%; }   /* Done by: the names alone, one a line */
-.pg-par-table.sg-log :is(th, td):nth-child(5) { width: 22%; word-break: normal; }
+.pg-par-table.sg-log :is(th, td):nth-child(2) { width: 9em; min-width: 0; white-space: nowrap; }   /* its type on one line: Intent layer, Sign-off */
+.pg-par-table.sg-log :is(th, td):nth-child(4) { width: 22%; word-break: normal; }   /* Affects */
+.pg-par-table.sg-log :is(th, td):nth-child(5) { width: 14%; }   /* Done by: the names alone, one a line */
 .pg-par-table.sg-log tr.sg-log-more > td:nth-child(n) { width: auto; white-space: normal; }   /* a row under a shared date: its columns are What and Affects */
 .sg-log-only { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }   /* a ticket's count: its commits alone */
 /* A section of the documentation as one of these tables: its title the head, each row a name and its text. */

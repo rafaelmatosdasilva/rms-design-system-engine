@@ -195,7 +195,8 @@
     (DATA.intentChanges || []).forEach(function (x) { order.push({ k: '', on: '', at: String(x.at || ''), commits: [], layer: x }); });
     order = order.filter(function (g) { return g.commits.length || g.read || g.layer || (g.decisions || []).length; });
     // One table, a row each, newest first: a commit to the code, what a read of Figma changed in a component, a commit to
-    // the intent layer, a decision. Its date and time, its type, what it did, who did it, what it affects. The chips show
+    // the intent layer, a decision. Its date and time, its type, what it did, what it affects, who did it (last, so the
+    // rows of one moment run unbroken across What and Affects). The chips show
     // one type; a ticket's count of commits shows that ticket's alone.
     // The components a change affects: links the table turns into pills (pillLinks), the first five shown, the rest one
     // click away ("9 more").
@@ -318,14 +319,14 @@
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
     ROWS.sort(function (a, b) { return stamp(b.at) - stamp(a.at); });
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
-    box.innerHTML = '<p class="pg-par-sum sg-log-only-bar" hidden></p><div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-log"><thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">What</th><th scope="col">Done by</th><th scope="col">Affects</th></tr></thead><tbody>' +
+    box.innerHTML = '<p class="pg-par-sum sg-log-only-bar" hidden></p><div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-log"><thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">What</th><th scope="col">Affects</th><th scope="col">Done by</th></tr></thead><tbody>' +
       ROWS.map(function (x, i) {
         // Rows of one moment, side by side: their Date, Type and Done by once, across them all (staying in view as they scroll).
         var n = 1; if (x.group && (i === 0 || ROWS[i - 1].group !== x.group)) while (ROWS[i + n] && ROWS[i + n].group === x.group) n++;
         var lead = !x.group || i === 0 || ROWS[i - 1].group !== x.group, span = n > 1 ? ' rowspan="' + n + '"' : '';
         var shared = function (cell) { return cell.replace(/^<td class="([^"]+)">([\s\S]*)<\/td>$/, '<td class="$1"' + span + '><div class="sg-log-stick">$2</div></td>'); };
         return '<tr data-chip="' + x.chip + '"' + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
-          (lead ? shared(dateCell(x.at)) + shared('<td class="sg-log-type">' + esc(x.type) + '</td>') : '') + '<td class="sg-log-what">' + x.what + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '<td>' + x.affects + '</td></tr>';
+          (lead ? shared(dateCell(x.at)) + shared('<td class="sg-log-type">' + esc(x.type) + '</td>') : '') + '<td class="sg-log-what">' + x.what + '</td><td>' + x.affects + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '</tr>';
       }).join('') + '</tbody></table></div></div>';
     // The shared cells stick under the table's head: how tall the head is, again whenever it changes (shown, resized).
     // Held here: box is a var another page reuses, so it may name another page's by the time the head is measured.

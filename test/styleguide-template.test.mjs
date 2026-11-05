@@ -1259,7 +1259,7 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /navLink\('history', 'history'\)/);
   assert.match(tpl, /The History last in the System group/, 'moved after the other System pages');
   assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
-  assert.match(tpl, /<table class="pg-par-table sg-log"><thead><tr><th scope="col">Date<\/th><th scope="col">Type<\/th><th scope="col">What<\/th><th scope="col">Done by<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'when, its type, what was done or decided, who did it, then what it affects, each column named');
+  assert.match(tpl, /<table class="pg-par-table sg-log"><thead><tr><th scope="col">Date<\/th><th scope="col">Type<\/th><th scope="col">What<\/th><th scope="col">Affects<\/th><th scope="col">Done by<\/th><\/tr><\/thead>/, 'when, its type, what was done or decided, what it affects, then who did it, each column named');
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
   assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
   assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');

@@ -55,12 +55,12 @@ test('the layer\'s changes on History: a row each in its one table, linked to th
     const run = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId)).result.value;
     assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#history tr[data-chip="intent"]')`, { attempts: 200 }), true, 'History has its rows');
     // One table, a row each: its date and time, its type, what it did, who did it, what it affects.
-    assert.deepEqual(await run(`[...document.querySelectorAll('#history table.sg-log thead th')].map((th) => th.textContent)`), ['Date', 'Type', 'What', 'Done by', 'Affects']);
+    assert.deepEqual(await run(`[...document.querySelectorAll('#history table.sg-log thead th')].map((th) => th.textContent)`), ['Date', 'Type', 'What', 'Affects', 'Done by']);
     const rows = await run(`[...document.querySelectorAll('#history tr[data-chip="intent"]')].map((tr) => [...tr.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()))`);
     assert.equal(rows.length, 2);
     assert.match(rows[0][0], /^2026-10-3[01] \d\d:\d\d$/, 'its day and time, as the reader\'s clock says it');
-    assert.deepEqual(rows[0].slice(1), ['Intent layer', '2 pages changed Saving Committed in c2d4e6f8', 'Quokka · pushed by Wombat', 'button']);
-    assert.deepEqual(rows[1].slice(1), ['Intent layer', '1 file changed, none of them a page Committed in b0b1b2b3', '', 'No component']);
+    assert.deepEqual(rows[0].slice(1), ['Intent layer', '2 pages changed Saving Committed in c2d4e6f8', 'button', 'Quokka · pushed by Wombat']);
+    assert.deepEqual(rows[1].slice(1), ['Intent layer', '1 file changed, none of them a page Committed in b0b1b2b3', 'No component', '']);
     assert.equal(await run(`document.querySelectorAll('#history .pg-par-card').length`), 1, 'one table, never a card per change, in the card every table of the guide has');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href^="https://github.com/acme/guidelines/commit/"]') !== null`), true, 'its commit linked');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href="#c-button/documentation"]') !== null`), true, 'the component its page documents');
@@ -108,7 +108,7 @@ test('the code on History: a row each commit, the issues it names, how many comm
     assert.equal(all.length, 3, 'a row each commit');
     assert.match(all[0][1], /^#11 · 3 commits #12 REV-1 Code review [0-9a-f]{7}$/, 'every issue it names, each with how many commits it has when more than one, then what it says');
     assert.match(all[2][1], /Released in v1\.0\.0/);
-    assert.deepEqual(all.map((x) => x[2]), ['Quokka da Wombat', 'wombat', 'Quokka da Wombat'], 'one person by the name they sign with; a Windows sign-in by its name alone');
+    assert.deepEqual(all.map((x) => x[3]), ['Quokka da Wombat', 'wombat', 'Quokka da Wombat'], 'one person by the name they sign with; a Windows sign-in by its name alone');
     // An issue's count shows its commits alone, and a way back to every change.
     await run(`document.querySelector('#history [data-ticket="#12"], #history [data-ticket="#11"]').click()`);
     assert.equal((await rows()).length, 3);
