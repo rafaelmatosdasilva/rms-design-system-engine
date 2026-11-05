@@ -288,3 +288,15 @@ test('page: with no person on the page, focus moved outside by the component\'s 
     assert.equal(r.build, 'finished');
   });
 });
+
+test('what shows is asked of the browser in one call, so a press on a large page is checked in time', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const src = readFileSync(join(dirname(dirname(fileURLToPath(import.meta.url))), 'lib', 'wcag-page.js'), 'utf8');
+  assert.match(src, /el\.checkVisibility\(\{ checkOpacity: true, checkVisibilityCSS: true \}\)/, 'one call for the element and its parents');
+  assert.match(src, /var shown = new Set\(before\);/, 'what showed before, looked up at once');
+  assert.doesNotMatch(src, /before\.indexOf\(n\)/, 'never a list searched for each element');
+  assert.match(src, /createTreeWalker\(document\.body, 1, \{ acceptNode: function \(n\) \{ return n\.checkVisibility\(\) \? 1 : getComputedStyle\(n\)\.display === 'contents' \? 3 : 2; \} \}\)/, 'a part the browser does not draw passed over whole, display: contents looked into');
+  assert.match(src, /if \(watch && !changed && Date\.now\(\) \+ 50 < until\) continue;/, 'looked at again only when the page changed, and at the end');
+});
