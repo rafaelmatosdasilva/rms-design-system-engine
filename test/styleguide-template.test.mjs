@@ -1259,7 +1259,7 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /navLink\('history', 'history'\)/);
   assert.match(tpl, /The History last in the System group/, 'moved after the other System pages');
   assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
-  assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">Date<\/th><th scope="col">Type<\/th><th scope="col">What<\/th><th scope="col">Done by<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'when, its type, what was done or decided, who did it, then what it affects, each column named');
+  assert.match(tpl, /<table class="pg-par-table sg-log"><thead><tr><th scope="col">Date<\/th><th scope="col">Type<\/th><th scope="col">What<\/th><th scope="col">Done by<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'when, its type, what was done or decided, who did it, then what it affects, each column named');
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
   assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
   assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
@@ -1746,7 +1746,7 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   assert.match(text(fns.dateCell('2026-10-20T08:00:00Z')), /^2026-10-2[01] \d\d:\d\d$/, 'a moment: its day and its time, as the reader\'s clock says it');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
   assert.equal((many.match(/ hidden>/g) ?? []).length, 9, 'the first five shown');
-  assert.match(many, /<button data-pills-more>9 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.match(many, /<button type="button" class="sg-link-pill sg-link-pill--table" data-pills-more>9 more<\/button>$/, 'the rest one click away, a pill as the ones beside it');
   assert.match(tpl, /\.sg-link-pill\[hidden\] \{ display: none; \}/, 'a pill kept back stays hidden, its pill style never showing it');
 });
 

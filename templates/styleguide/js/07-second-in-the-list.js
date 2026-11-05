@@ -202,7 +202,8 @@
     var PILLS_SHOWN = 5;
     var pillsHTML = function (names, area) {
       return names.map(function (n, i) { return '<a href="#' + esc(cid(n)) + (area ? '/' + area : '') + '"' + (i >= PILLS_SHOWN ? ' hidden' : '') + '>' + esc(n) + '</a>'; }).join(' ') +
-        (names.length > PILLS_SHOWN ? ' ' + sysButton('button', (names.length - PILLS_SHOWN) + ' more', ' data-pills-more') : '');
+        // The rest one click away, a pill as the ones beside it (their height, their words' size).
+        (names.length > PILLS_SHOWN ? ' <button type="button" class="sg-link-pill sg-link-pill--table" data-pills-more>' + (names.length - PILLS_SHOWN) + ' more</button>' : '');
     };
     // What changed in Figma, said plainly: a property's name without the word, a text's old and new words quoted.
     var figmaChange = function (t) {
@@ -317,15 +318,15 @@
     var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
     ROWS.sort(function (a, b) { return stamp(b.at) - stamp(a.at); });
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
-    box.innerHTML = '<p class="pg-par-sum sg-log-only-bar" hidden></p><div class="pg-inspect"><table class="sg-log"><thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">What</th><th scope="col">Done by</th><th scope="col">Affects</th></tr></thead><tbody>' +
+    box.innerHTML = '<p class="pg-par-sum sg-log-only-bar" hidden></p><div class="pg-par-card"><div class="pg-par-scroll"><table class="pg-par-table sg-log"><thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">What</th><th scope="col">Done by</th><th scope="col">Affects</th></tr></thead><tbody>' +
       ROWS.map(function (x, i) {
         // Rows of one moment, side by side: their Date, Type and Done by once, across them all (staying in view as they scroll).
         var n = 1; if (x.group && (i === 0 || ROWS[i - 1].group !== x.group)) while (ROWS[i + n] && ROWS[i + n].group === x.group) n++;
         var lead = !x.group || i === 0 || ROWS[i - 1].group !== x.group, span = n > 1 ? ' rowspan="' + n + '"' : '';
         var shared = function (cell) { return cell.replace(/^<td class="([^"]+)">([\s\S]*)<\/td>$/, '<td class="$1"' + span + '><div class="sg-log-stick">$2</div></td>'); };
-        return '<tr data-chip="' + x.chip + '"' + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + '>' +
+        return '<tr data-chip="' + x.chip + '"' + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + (x.group ? ' data-group="' + esc(x.group) + '"' : '') + (lead ? '' : ' class="sg-log-more"') + '>' +
           (lead ? shared(dateCell(x.at)) + shared('<td class="sg-log-type">' + esc(x.type) + '</td>') : '') + '<td class="sg-log-what">' + x.what + '</td>' + (lead ? shared(whoCell(x.bys)) : '') + '<td>' + x.affects + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
+      }).join('') + '</tbody></table></div></div>';
     // The shared cells stick under the table's head: how tall the head is, again whenever it changes (shown, resized).
     // Held here: box is a var another page reuses, so it may name another page's by the time the head is measured.
     var logHead = box.querySelector('table.sg-log > thead'), logTable = logHead.parentNode;
