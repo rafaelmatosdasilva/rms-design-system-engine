@@ -1093,6 +1093,18 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. A round 
 - **No token is stored.** Each step reads them from the project's `.env`, as every run does.
 - **`--guide-status`** says whether the style guide the team opens is behind what it is built from, and what this folder's last round did.
 
+### See a change in seconds
+
+A full build tries every component's accessibility in a browser, so it takes minutes on a large system. While you work, a quick build shows your change in seconds and keeps what the last full build found.
+
+- **`--styleguide --quick` builds the page for you to look at.** On a system of 174 components and 5 themes it took about 20 seconds, against 11 minutes for a full build.
+- **What it keeps.** The accessibility saved by the last full build, and the Showroom as it last measured it. A component changed since is tried by the browser that opens the page.
+- **What it leaves out.** No accessibility tried while building, no pictures of the guide's own pages, and nothing read from or sent to your team's stores.
+- **One component, faster still.** Add `--component` with its name for a page of that component and the ones it nests. Its audit is not run first, as it is for a full build.
+- **`--styleguide --watch` builds again on each save.** It follows your project, the style guide's template and the engine, and builds a moment after you save. Several files saved together make one build. Ctrl+C stops it.
+- **Never published.** A quick page carries a mark, and no store takes it. Build the full guide (`--styleguide`) before you publish.
+- **Its times are kept apart.** `--timing` says where the time went, and `timing.json` keeps them under `styleguide --quick`, so they never replace the full build's.
+
 ### What's in it
 
 | Page | What you find there |
