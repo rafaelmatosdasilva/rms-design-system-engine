@@ -281,10 +281,11 @@
     order.forEach(function (g) {
       if (!g.layer) return;
       var x = g.layer, p = partOf(x), last = layers[layers.length - 1];
-      var one = { at: x.at, says: p ? p.base : x.says, by: x.by, pages: x.pages.slice(), components: x.components.slice(), files: x.files || 0, commits: x.to ? [{ to: x.to, url: x.url, k: p ? p.k : 0 }] : [], key: p ? p.base + '|' + (x.by || '') + '|' + p.n : null };
+      var one = { at: x.at, says: p ? p.base : x.says, by: x.by, pages: x.pages.slice(), components: x.components.slice(), alone: x.alone ? x.alone.slice() : null, files: x.files || 0, commits: x.to ? [{ to: x.to, url: x.url, k: p ? p.k : 0 }] : [], key: p ? p.base + '|' + (x.by || '') + '|' + p.n : null };
       if (one.key && last && last.key === one.key) {
         one.pages.forEach(function (n) { if (last.pages.indexOf(n) < 0) last.pages.push(n); });
         one.components.forEach(function (n) { if (last.components.indexOf(n) < 0) last.components.push(n); });
+        if (one.alone && last.alone) one.alone.forEach(function (n) { if (last.alone.indexOf(n) < 0) last.alone.push(n); });
         last.files += one.files; last.commits = last.commits.concat(one.commits); if (String(one.at) > String(last.at)) last.at = one.at;
         return;
       }
@@ -292,7 +293,10 @@
     });
     layers.forEach(function (x) {
       x.components.sort(); x.commits.sort(function (a, b) { return a.k - b.k; });
-      var others = x.pages.filter(function (p) { return !x.components.some(function (n) { return n.toLowerCase().replace(/[^a-z0-9]/g, '') === String(p).toLowerCase().replace(/[^a-z0-9]/g, ''); }); });
+      // The pages that document no component, named here: the others are under Affects, as their components. A page is
+      // known by what documents it (the build's match), never by its name, which is rarely the component's (Table Body
+      // Cell Tooltip documents table/Cell/tooltip). A guide built before the match was kept falls back on the name.
+      var others = x.alone || x.pages.filter(function (p) { return !x.components.some(function (n) { return n.toLowerCase().replace(/[^a-z0-9]/g, '') === String(p).toLowerCase().replace(/[^a-z0-9]/g, ''); }); });
       var count = x.pages.length ? plural(x.pages.length, 'page', 'pages') + ' changed' : plural(x.files || 0, 'file', 'files') + ' changed, none of them a page';
       add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) + line(quiet(esc(count))) : line(esc(count))) + (others.length ? line('<span class="pg-par-val">' + esc(others.join(', ')) + '</span>') : '') +
         (x.commits.length ? line(quiet('Committed in ') + x.commits.map(function (c) { return shaLink(c.url, c.to.slice(0, 8)); }).join(', ')) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'));
