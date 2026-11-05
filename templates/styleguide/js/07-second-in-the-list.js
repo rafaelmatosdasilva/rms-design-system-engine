@@ -298,7 +298,9 @@
       // Cell Tooltip documents table/Cell/tooltip). A guide built before the match was kept falls back on the name.
       var others = x.alone || x.pages.filter(function (p) { return !x.components.some(function (n) { return n.toLowerCase().replace(/[^a-z0-9]/g, '') === String(p).toLowerCase().replace(/[^a-z0-9]/g, ''); }); });
       var count = x.pages.length ? plural(x.pages.length, 'page', 'pages') + ' changed' : plural(x.files || 0, 'file', 'files') + ' changed, none of them a page';
-      add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) + line(quiet(esc(count))) : line(esc(count))) + (others.length ? line('<span class="pg-par-val">' + esc(others.join(', ')) + '</span>') : '') +
+      // The count under the commit's own words, unless they say it already ("… 16 pages changed …").
+      var saysCount = x.says && String(x.says).indexOf(count.split(',')[0]) >= 0;
+      add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) + (saysCount ? '' : line(quiet(esc(count)))) : line(esc(count))) + (others.length ? line(quiet('Not in the guide yet: ') + '<span class="pg-par-val">' + esc(others.join(', ')) + '</span>') : '') +
         (x.commits.length ? line(quiet('Committed in ') + x.commits.map(function (c) { return shaLink(c.url, c.to.slice(0, 8)); }).join(', ')) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'));
     });
     // The decisions: what was decided, ruled out and why, and what it is about.

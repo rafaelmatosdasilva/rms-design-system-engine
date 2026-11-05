@@ -148,7 +148,7 @@ test('the plan: repeated lines out, a wrong sentence written again (checked), a 
   assert.match(md, /## When not to use\n\n- \*\*Draft:\*\* For two subjects use `tileTwo`\./);
   const json = JSON.parse(r.files.get('specs/dsds/tile-one.dsds.json'));
   assert.deepEqual(json.sections.map((s) => s.title), ['When to use', 'When not to use', 'Example']);
-  assert.match(describeChanges(r), /1 sentence the system contradicts written again as drafts/);
+  assert.match(describeChanges(r), /1 sentence the system contradicts written again as a draft/);
   // From a family's spec, the same page takes the line out but no draft of its own.
   const fam = applyPlan(plan, new Map([['specs/tiles.md', '# Tiles\n\n- Source: `src/tiles/`\n\n## When to use\n\n- The task maps to `tileOne` in the manifest.\n']]));
   assert.match(fam.held[0].why, /written from specs\/tiles\.md, which other pages are written from too/);
@@ -387,7 +387,7 @@ test('a change none of the page\'s files holds is never said as made: the summar
   assert.deepEqual(r.pages, []);
   assert.deepEqual(r.missed, [{ name: 'Tile One', line: 'Set `tone="bright"` for alerts.', to: 'Set `tone="loud"` for alerts.' }]);
   const said = describeChanges(r);
-  assert.match(said.split('\n')[0], /^0 pages changed: .*0 sentences the system contradicts written again as drafts, 0 lines drafted\. 1 line could not be found in its page: "Set `tone="bright"` for alerts\." \(Tile One\)\.$/);
+  assert.match(said.split('\n')[0], /^0 pages changed\. 1 line could not be found in its page: "Set `tone="bright"` for alerts\." \(Tile One\)\.$/);
   assert.match(said, /### Not found in the page\n.*\n\n- Tile One: "Set `tone="bright"` for alerts\." \(to be written again as "Set `tone="loud"` for alerts\."\)/);
   // A line to take out that is not there either.
   const out = applyPlan([{ ...plan[0], rewritten: [], remove: ['A line no file has.'] }], files);
@@ -448,7 +448,7 @@ test('a DSDS layer whose code\'s item fields changed: the engine\'s Data line is
   assert.deepEqual(page.sections[1].freeform.map((b) => [b.title, b.body]), [['Data', `- ${now}`], ['Examples', example]], 'in the same block, written as sure');
   assert.deepEqual(p.result.missed, []);
   const first = p.summary.split('\n')[0];
-  assert.match(first, /^1 page changed: 0 lines written on every page alike taken out, 0 sentences the system contradicts written again as drafts, 1 line drafted, 1 line the code no longer says taken out\.$/);
+  assert.match(first, /^1 page changed: 1 line drafted, 1 line the code no longer says taken out\.$/, 'only what happened, never a count of nothing');
   assert.match(p.summary, new RegExp(`- Written from the code, Data: "${now.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\n- Taken out, the code no longer says it: "${old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
 });
 

@@ -61,7 +61,7 @@ test('the layer\'s changes on History: a row each in its one table, linked to th
     const rows = await run(`[...document.querySelectorAll('#history tr[data-chip="intent"]')].map((tr) => [...tr.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()))`);
     assert.equal(rows.length, 2);
     assert.match(rows[0][0], /^2026-10-3[01] \d\d:\d\d$/, 'its day and time, as the reader\'s clock says it');
-    assert.deepEqual(rows[0].slice(1), ['Intent layer', '2 pages changed Saving Committed in c2d4e6f8', 'button', 'Quokka · pushed by Wombat']);
+    assert.deepEqual(rows[0].slice(1), ['Intent layer', '2 pages changed Not in the guide yet: Saving Committed in c2d4e6f8', 'button', 'Quokka · pushed by Wombat']);
     assert.deepEqual(rows[1].slice(1), ['Intent layer', '1 file changed, none of them a page Committed in b0b1b2b3', 'No component', '']);
     assert.equal(await run(`document.querySelectorAll('#history .pg-par-card').length`), 1, 'one table, never a card per change, in the card every table of the guide has');
     assert.equal(await run(`document.querySelector('#history tr[data-chip="intent"] a[href^="https://github.com/acme/guidelines/commit/"]') !== null`), true, 'its commit linked');
