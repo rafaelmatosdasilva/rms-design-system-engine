@@ -197,7 +197,7 @@ test('in the browser: no script error, a control changes the real component, the
   const sysSlug = String(JSON.parse(readFileSync(join(dir, 'ds-config.json'), 'utf8')).name || 'system').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'system';
   mkdirSync(join(dir, 'tools', 'demo-data', sysSlug), { recursive: true });
   writeFileSync(join(dir, 'tools', 'demo-data', sysSlug, 'ocean.json'), JSON.stringify({ name: 'Ocean' }));
-  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'], styleguide: { ...(cfg0.styleguide ?? {}), modules: [{ path: 'tools/demo-module', data: 'tools/demo-data' }] } }));
+  writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({ ...cfg0, systemScripts: ['src/components/system.js'], styleguide: { ...(cfg0.styleguide ?? {}), figmaCompare: true, modules: [{ path: 'tools/demo-module', data: 'tools/demo-data' }] } }));   // Figma beside the code is off unless asked
   // A Figma image of one variant, named as Figma names it, and a file that is not a variant name (left out).
   const shot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   mkdirSync(join(dir, '.design-system-engine-refs', 'components', 'chip'), { recursive: true });
@@ -1541,7 +1541,7 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
-    assert.match(how[0][1], /^How closely the code matches Figma\. The percentage counts every property, token and value compared, in what the code has built\./, 'said simply, in a sentence or two');
+    assert.match(how[0][1], /^How closely the code matches Figma, in every property, token and value\./, 'said simply, in a sentence or two');
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
     if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Built', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');
@@ -1791,4 +1791,30 @@ test('the Status matrix: only an area\'s pill opens that area; hovering a row li
   assert.match(tpl, /\.sg-matrix \.sg-mx-row\.is-link:hover:not\(:has\(\.sg-link-pill:hover, \.sg-tip:hover\)\) \.sg-mx-go \{ background: var\(--sg-hover-fill\); color: var\(--sg-text\); \}/);
   assert.match(tpl, /\.sg-matrix \.sg-mx-row \.sg-link-pill \{ cursor: pointer; \}/);
   assert.match(tpl, /\.sg-link-pill:focus-visible \{ outline: 2px solid var\(--sg-accent\)/, 'the pill keeps its focus ring');
+});
+
+test('the Status cards\' tips stay short and fixed: 25 words at most, nothing made from data; the page criteria a line of their own', () => {
+  const tpl = templateText();
+  const tips = [...tpl.matchAll(/^\s*([pida])T\.how = '((?:[^'\\]|\\.)*)';$/gm)].map((m) => [m[1], m[2].replace(/\\'/g, "'")]);
+  assert.deepEqual(tips.map((t) => t[0]), ['p', 'i', 'a', 'd'], 'each card\'s tip one fixed sentence or two');
+  for (const [k, tip] of tips) {
+    const words = tip.split(/\s+/).filter(Boolean).length;
+    assert.ok(words <= 25, `${k}T's tip is ${words} words: "${tip}"`);
+    assert.doesNotMatch(tip, /[—;]/, 'no dash or semicolon');
+  }
+  assert.doesNotMatch(tpl, /\b[pida]T\.how \+=/, 'nothing added to a tip from data');
+  assert.match(tpl, /aT\.pagesLine = 'Page criteria: ' \+ pgSaid;/, 'the criteria that belong to a page, counted on a line of their own');
+});
+
+test('Figma beside the code is off unless the project asks for it (styleguide.figmaCompare)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const gen = readFileSync(new URL('../lib/styleguide-gen.mjs', import.meta.url), 'utf8');
+  assert.match(gen, /const variantImages = cfg\.styleguide\?\.figmaCompare === true \? await inTurn\(/, 'no variant image is read without it, so the page has no Figma button');
+});
+
+test('a part still in early development says so on its tab: the Playground, Early', () => {
+  const tpl = templateText();
+  assert.match(tpl, /var EARLY_AREAS = \{ play: true \};/);
+  assert.match(tpl, /\.map\(function \(o\) \{ if \(EARLY_AREAS\[o\.v\]\) o\.early = true; return o; \}\)\)/, 'the area tabs carry it');
+  assert.match(tpl, /if \(o\.early\) text \+= '<span class="sg-early"><span class="sg-hidden-text">, <\/span>Early<span class="sg-hidden-text"> development<\/span><\/span>';/, 'said in a word, the whole stage for a screen reader');
 });

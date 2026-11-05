@@ -12,7 +12,8 @@ What the engine does for design and product teams. Every part reads the same kno
 | [Track system health](#track-system-health) | Flags the tokens that will cause trouble as the system grows, such as names tied to a colour or aliases to deleted tokens. They are cheapest to fix early, and nothing here fails a run. | Ready to use |
 | [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Ready to use |
 | [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Ready to use |
-| [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's playground, spec, Figma match, accessibility and history, plus who needs to do what next. | Ready to use |
+| [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's spec, Figma match, accessibility and history, plus who needs to do what next. | Ready to use |
+| [Try components in a playground](#try-components-in-a-playground) | Change a component's props live and see it as the code draws it, in every theme. Its controls are still being tuned to each component. | Early development |
 | [Fit your team's setup](#fit-your-teams-setup) | Works straight from your repositories, with no clone and nothing duplicated. Figma and the code are read from one place the whole team shares, so nobody keeps a copy in sync. | Early development |
 | [Test accessibility](#test-accessibility) | Tests each component the way people use it, from contrast to screen readers, and splits each criterion into tasks for the people who own it, in order. Fix it once and every screen benefits. | Early development |
 | [Build with AI, on the system](#build-with-ai-on-the-system) | AI builds prototypes and product code with your real components, and nothing invented gets past the checks. What passes a user test can ship without being redrawn. | Coming soon |
@@ -131,7 +132,7 @@ What the engine does for design and product teams. Every part reads the same kno
 *Today: it shows only what Figma and the code agree on. Anything still different is a task, not drawn.*
 
 - One site with every token and component of your system.
-- For each component: a playground with live controls, its specs, every variant, Figma beside the code, parity, accessibility and history.
+- For each component: its specs, every variant, parity, accessibility and history. Its playground is a part of its own, [still in early development](#try-components-in-a-playground).
 - A status page: how far each component is in Figma, code, accessibility and documentation.
 - A task list that says who acts and which team owns each component or token layer.
 - A History where every row names who did it: who answered a decision, and who made a change to the code, a read of Figma or a change to the intent layer, with whoever brought it in when that was somebody else.
@@ -142,6 +143,19 @@ What the engine does for design and product teams. Every part reads the same kno
 - Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
 - Your own copy builds itself again whenever the code, Figma, the intent layer, a store or the engine changes, in the background from login on. It is on by default: setup turns it on, and one setting turns it off. It runs only what the change feeds, and publishes to your team's store only a page that changed, so a team with no CI runner stays up to date.
 - The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
+
+## Try components in a playground
+
+**Early development** · **Why it matters:** Anyone can try a component in each of its options and themes before using it, with no code to write.
+
+*Today: each prop is a control read from Figma and the code. The controls are still being tuned, so some props are missing or not shown well.*
+
+- Draws each component from your own markup and CSS, with Figma's props as its controls.
+- Every state, every theme and every breakpoint your Figma file gives.
+- Inspect outlines each part, its padding and gap, with the token behind each value.
+- It behaves as in your products: your system's own scripts run, a selection moves when you click it, and an overlay opens with its own animation.
+- A link keeps what you set, so it opens that exact variant.
+- Marked Early on each component's page while it is tuned.
 
 ## Fit your team's setup
 
