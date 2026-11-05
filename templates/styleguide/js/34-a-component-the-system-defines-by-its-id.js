@@ -517,9 +517,10 @@
     });
     if (edge) {
       edge.classList.add('sg-sticky-edge');
-      // The gap under it only where a table's head sticks below it: elsewhere nothing is cut above the content.
+      // The gap under it only where a table's head sticks below it (any table with a head row, a card's head): elsewhere
+      // nothing is cut above the content, so no row ever shows between the bar and the head that sticks under it.
       var page = edge.closest('.sg-section');
-      if (page && page.querySelector('.pg-inspect-head, .pg-par-table, .sg-token-card thead')) edge.classList.add('sg-sticky-band');
+      if (page && page.querySelector('.pg-inspect-head, .pg-par-table, table > thead')) edge.classList.add('sg-sticky-band');
     }
   }
   window.addEventListener('scroll', function () { if (!stickQueued) { stickQueued = true; requestAnimationFrame(markStuck); } }, { passive: true });
