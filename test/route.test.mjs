@@ -308,14 +308,15 @@ test('Code Connect files drafted from the contracts, for the components that hav
   assert.notDeepEqual(r('how do I write a Code Connect file?').run, ['rms-design-system-engine --code-connect-draft']);
 });
 
-test('the style guide kept up to date by itself: the background watch added, or taken away; publishing for the team stays the publish job', () => {
-  for (const t of ['update the style guide automatically every time there is a change', 'keep the style guide up to date by itself', 'it should update automatically every time the style guide changes', 'atualiza o guia de estilos automaticamente']) {
-    assert.deepEqual([r(t).recipe, r(t).run], ['publish-styleguide', ['rms-design-system-engine --watch-install']], t);
+test('asked to keep the style guide up to date by itself: a round now, since nothing does it by itself', () => {
+  // Nothing rebuilds a style guide on its own - no job on anyone's computer, nothing on a schedule - so the answer to
+  // "turn it on" and to "turn it off" is the same: a round is asked for, and builds only what the change reached.
+  for (const t of ['update the style guide automatically every time there is a change', 'keep the style guide up to date by itself', 'stop updating the style guide automatically']) {
+    assert.deepEqual([r(t).recipe, r(t).run], ['publish-styleguide', ['rms-design-system-engine --auto']], t);
+    assert.match(r(t).notes.join(' '), /Nothing rebuilds the style guide by itself/, t);
   }
-  assert.deepEqual(r('stop updating the style guide automatically').run, ['rms-design-system-engine --watch-uninstall']);
   assert.deepEqual(r('publish the style guide for the team').run, ['rms-design-system-engine --publish-styleguide']);
   assert.deepEqual(r('build the style guide').run, ['rms-design-system-engine --styleguide']);
-  assert.notDeepEqual(r('how does the style guide update automatically?').run, ['rms-design-system-engine --watch-install'], 'a question about it is answered');
 });
 
 test('a routed command an MCP tool runs is said as that tool too, for an agent with no shell; one no tool runs is not', async () => {

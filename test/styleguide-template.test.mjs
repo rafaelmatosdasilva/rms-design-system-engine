@@ -365,8 +365,8 @@ test('in the browser: no script error, a control changes the real component, the
     // number, the criterion, the status with when and where it was read, and the arrow that opens the row; what the
     // Figma notes say, what was found and what to do are read in the row's panel, so the table has room for the rest. A count above
     // it and when the audit last ran. Only what applies. No separate table of sources.
-    assert.match(a11y, /Task nr.*WCAG criterion.*Status/);
-    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found|What to do/, 'what the Figma notes say, what was found and what to do: in the row\'s panel only');
+    assert.match(a11y, /Task nr.*What to do.*Who acts.*WCAG.*Status/, 'the task first, then the person who does it');
+    assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /Figma|found/, 'what the Figma notes say and what was found: in the row\'s panel only');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr.sg-row-open')].every((tr) => tr.lastElementChild.matches('td.sg-row-go') && !!tr.lastElementChild.querySelector('svg'))`), true, 'every row that opens ends with its arrow');
     assert.doesNotMatch(await run(`document.querySelector('#c-chip .pg-a11y thead').textContent`), /What it means|Where it is read from/, 'no column of its own: what a criterion means is in its tip');
     assert.ok(await run(`!!document.querySelector('#c-chip .pg-a11y .pg-par-card .pg-par-table')`), 'in a card table');
@@ -385,7 +385,7 @@ test('in the browser: no script error, a control changes the real component, the
     const a11yRead = await a11yFull();
     assert.match(a11yRead, /a <button type="button"> with aria-pressed/);
     assert.match(a11y, /The audit has not run in a browser yet/);
-    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Pass \(\d+\)/, 'its chips count what passes, in the Status page\'s word');
+    assert.match(await run(`document.querySelector('#c-chip .pg-a11y-sum').textContent`), /Met \(\d+\)/, 'its chips count what is met, in the Status page\'s word');
     assert.equal(await run(`[...document.querySelectorAll('#c-chip .pg-a11y tbody tr')].every((r) => /^(done|todo|check|none)$/.test(r.dataset.status) && r.querySelector('.pg-par-sign'))`), true);
     // The page tries the keyboard on every variant after it is drawn: wait for that result (its 2.1.1 row says what Tab
     // reached), never for a fixed time, so a busy machine reads it as a quiet one does.
@@ -413,7 +413,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.documentElement.getAttribute('data-theme')`), 'dark');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'a11y').click()`);
-    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => /1\.4\.3 Contrast/.test(r.cells[1].textContent))`)), /\d+\.\d:1.*(Pass|Issues)/s, 'measured again in the other mode');
+    assert.match(await run(ROW_FULL(`[...document.querySelectorAll('#c-chip .pg-a11y-rows tr')].find((r) => r.querySelector('.sg-todo-area') && /1\.4\.3 Contrast/.test(r.querySelector('.sg-todo-area').textContent))`)), /\d+\.\d:1.*(Met|Issues)/s, 'measured again in the other mode');
     await run(`[...document.querySelectorAll('#c-chip .pg-areas [data-v]')].find((b) => b.dataset.v === 'play').click()`);
     // The tokens first, the code on their right, as tall as what it holds and never taller than the tokens.
     assert.equal(await run(`!!document.querySelector('#c-chip .pg-code-row > :first-child .pg-tokens') && document.querySelector('#c-chip .pg-code-row > :last-child').classList.contains('pg-code')`), true);
@@ -524,7 +524,7 @@ test('in the browser: no script error, a control changes the real component, the
     assert.equal(await run(`document.querySelector('#index .sg-card[href="#c-chip"] > h3').textContent.trim() + '|' + document.querySelector('#index .sg-card[href="#c-chip"]').children.length`), 'chip|2', 'its picture and its name');
     // The name stays beside the areas; each of Parity, Accessibility and Documentation carries its Status row's dot, its
     // word said to a screen reader (componentStates), and the page no line about it.
-    assert.match(await run(`document.querySelector('#c-chip .pg-head > h2').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), /^chip\|Parity, (Match|Partial|Differs)\|Accessibility, (Untested|Pass|Issues|Review)\|false$/, 'its tabs say their Status state');
+    assert.match(await run(`document.querySelector('#c-chip .pg-head > h2').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="parity"]').textContent + '|' + document.querySelector('#c-chip .pg-areas [data-v="a11y"]').textContent + '|' + !!document.querySelector('#c-chip [data-area-go]')`), /^chip\|Parity, (Match|Partial|Differs)\|Accessibility, (Untested|Met|Issues|Review)\|false$/, 'its tabs say their Status state');
     // Parity's table head stays in view under the areas as its rows scroll by.
     assert.equal(await run(`getComputedStyle(document.querySelector('#c-chip .pg-par-table th')).position`), 'sticky');
     // On a phone the areas scroll sideways in one row, never wrap; the one chosen scrolls into view.
@@ -602,7 +602,7 @@ test('in the browser: no script error, a control changes the real component, the
     if (cellRest) { assert.match(cellRest[0], /[?&]embed#c-[^/?]+$/, 'the cell around the pill opens the component, as its row does'); assert.deepEqual(cellRest.slice(1), [false, 'pointer'], 'the pointer is the pill\'s'); }
     assert.equal(await run(`!!document.querySelector('#status .sg-mx-side, #status .sg-mx-split')`), false, 'no side panel');
     assert.equal(await run(`[...document.querySelectorAll('#status tr.sg-mx-row')].every((tr) => ['stFigma', 'stCode', 'stPar', 'stAcc', 'stDoc'].every((k) => tr.dataset[k]))`), true, 'every row carries each column\'s state, for the filters to count');
-    assert.match(await run(`[...document.querySelectorAll('#status .sg-matrix td .pg-par-status')].map((e) => e.textContent).join('|')`), /^Found\|Found\|(Match|Partial|Differs|N\/A)\|/);
+    assert.match(await run(`[...document.querySelectorAll('#status .sg-matrix td .pg-par-status')].map((e) => e.textContent).join('|')`), /^Found\|Built\|(Match|Partial|Differs|N\/A)\|/);
     // The filters: one chip a column, named only until a state is chosen (no number on it: nothing looks applied); its
     // list has All and the column's states with their counts; no Clear filters while nothing is chosen.
     assert.match(await run(`[...document.querySelectorAll('#status .sg-chip-menu')].map((b) => b.innerText.replace(/\\s+/g, ' ').trim()).join('|')`), /^(Figma|Code|Parity|Accessibility|Documentation) All(\|(Figma|Code|Parity|Accessibility|Documentation) All)*$/, 'each says All until a state is chosen');
@@ -666,7 +666,7 @@ test('in the browser: no script error, a control changes the real component, the
     // with no table (Identity) never has its content cut short under the line.
     // (read from the template: the lowest stuck bar is marked on a scroll frame, which a headless page times freely)
     const sgTpl = templateText();
-    assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, \.sg-token-card thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over tables, the gap under the line');
+    assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, table > thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over any table with a head row, the gap under the line: no row shows between the bar and the head');
     // It stops a line short of the gap: a table's head sticks a pixel under the bars' bottom plus the gap (at.th, -1,
     // above), so its top line is two under; a band a line longer is drawn over that line (the bar is above the table).
     assert.match(sgTpl, /\.sg-sticky-edge\.sg-sticky-band \{ box-shadow: 0 calc\(var\(--sg-stick-gap\) - 2 \* var\(--sg-line-width, 1px\)\) 0 0 var\(--sg-bg\); \}/, 'the band ends where a stuck head\'s top line begins');
@@ -961,26 +961,25 @@ test('parity per component: what agrees (since when), its props and tokens, what
   assert.equal(v.notCompared, null);
 });
 
-test('To do: a role the code fails or has still to be tried on is the code\'s even when a Figma note asked for it; a role not stated yet is done in Figma', () => {
+test('To do: an accessibility row with no task of its own still says the person - the code\'s when the code fails it, a designer\'s when Figma has not stated it yet, a person\'s when only a person can judge', () => {
   const tpl = templateText();
   const src = tpl.slice(tpl.indexOf('var WHO = {'), tpl.indexOf('function doWhat('));
   const a11yWho = new Function(src + 'return a11yWho;')();
   const audit = { st: 'todo', from: 'Tested on 5 Oct' };
   // The rendered role differs from the note: the note is right, the code changes.
-  assert.equal(a11yWho('4.1.2', 'audit', [audit, { st: 'todo', from: 'Figma annotation Role: button' }], ''), 'A developer in the code');
-  assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'A developer in the code');
-  // Nothing failed and what is missing is in Figma: its role is not stated yet.
-  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'From Figma, once it is annotated' }], ''), 'You in Figma');
+  assert.equal(a11yWho('4.1.2', 'audit', [audit, { st: 'todo', from: 'Figma annotation Role: button' }], ''), 'A developer, in the code');
+  assert.equal(a11yWho('1.3.1', 'audit', [{ st: 'todo', from: 'Figma annotation on the "Label" layer' }], ''), 'A developer, in the code');
+  // Nothing failed and what is missing is in Figma: its role is not stated yet, so it is a designer's.
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'From Figma, once it is annotated' }], ''), 'A designer, in Figma');
   // What a Figma note's role asks, not tried yet: the audit tries it on the code, so nothing is to do in Figma.
-  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'A developer in the code');
-  // A colour pair lives in the system's colours, fixed in Figma and in the code when it has both; what only a person
-  // judges is checked by hand; the code's own finding is the code's.
-  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
-  assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'You check by hand');
-  assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Read from the code' }], ''), 'A developer in the code');
-  // A colour's contrast is fixed where the system's colours live: in Figma and in the code when it has both.
-  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'In Figma and in the code');
-  assert.equal(a11yWho('1.4.11', 'audit', [audit], ''), 'In Figma and in the code');
+  assert.equal(a11yWho('4.1.2', 'audit', [{ st: 'check', from: 'Figma annotation Role: toolbar', html: 'On actionBar, it carries role="toolbar". Tried once the audit runs it in a browser.' }], ''), 'A developer, in the code');
+  // What only a person judges is checked by hand; the code's own finding is the code's. A colour pair is no longer
+  // answered here: its finding owes a designer a step and a developer another (wcag21.mjs), one row each.
+  assert.equal(a11yWho('1.3.3', 'person', [], 'On chip, a person checks that the instructions do not rely on shape.'), 'A person checks it by hand');
+  assert.equal(a11yWho('2.1.1', 'static', [{ st: 'todo', from: 'Read from the code' }], ''), 'A developer, in the code');
+  assert.equal(a11yWho('1.4.3', 'audit', [audit], ''), 'A developer, in the code');
+  // A non-text contrast is the same: two steps, two rows, so the fallback answers for the code alone.
+  assert.equal(a11yWho('1.4.11', 'audit', [audit], ''), 'A developer, in the code');
 });
 
 test('To do: AAA advice is to check and to decide, never a must-fix; a component the audit could not try says why', async () => {
@@ -1260,14 +1259,12 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /navLink\('history', 'history'\)/);
   assert.match(tpl, /The History last in the System group/, 'moved after the other System pages');
   assert.doesNotMatch(tpl, /Download for (Excel|Claude)|data-il-export/, 'the Documentation page has no downloads');
-  assert.match(tpl, /One row per issue \(the team's unit of work/);
-  assert.match(tpl, /<table class="sg-log"><thead><tr><th scope="col">What<\/th><th scope="col">Affects<\/th><\/tr><\/thead>/, 'what was done or decided first, then what it affects, each column named');
-  assert.match(tpl, /byTicket\(g\.commits, function \(x\) \{ return x\.r; \}\)/);
+  assert.match(tpl, /<table class="pg-par-table sg-log"><thead><tr><th scope="col">Date<\/th><th scope="col">Type<\/th><th scope="col">What<\/th><th scope="col">Affects<\/th><th scope="col">Done by<\/th><\/tr><\/thead>/, 'when, its type, what was done or decided, what it affects, then who did it, each column named');
   assert.match(tpl, /var RLOG = DATA\.releaseLog \|\| \[\];/, 'everything the developers did, not only what changed a component');
-  assert.match(tpl, /'<span class="pg-log-date">No component<\/span>'/);
+  assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
   assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
-  assert.match(tpl, /order\.sort\(releaseOrder\)/);
-  assert.match(tpl, /'released ' \+ esc\(g\.on\.slice\(0, 10\)\)/);
+  assert.match(tpl, /line\(quiet\('Released in '\) \+ tag/, 'each commit says the release it shipped in');
+  assert.doesNotMatch(tpl, /Not released yet/, 'a commit not released yet says nothing of it');
   // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
   assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);
   assert.match(tpl, /selectionMoves\(st\);/);
@@ -1517,34 +1514,40 @@ test('Status: four cards at the top (Parity, Implementation, Accessibility, Docu
     await waitForTrue(send, sessionId, `(() => { const t = document.querySelectorAll('#status .sg-health-tile')[2]; return !!t && !/tested so far/.test(t.textContent); })()`, { attempts: 400 });
     const tiles = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [t.querySelector('.sg-health-label').textContent, t.querySelector('.sg-health-num').textContent + '|' + ((t.querySelector('.sg-health-desc') || {}).textContent || ''), (t.querySelector('.sg-health-legend') || {}).textContent || ''])`);
     assert.deepEqual(tiles.map((x) => x[0]), ['Parity', 'Code', 'Accessibility', 'Documentation'], errors.join('\n'));
-    // The big number is the share of checks done, no line under it; the legend counts the components, the done state
-    // in the big number's word.
-    assert.match(tiles[0][1], /^\d+%matched\|$/, 'parity: the share matched, nothing under it');
-    // Implementation counts over Figma's components; Parity, Accessibility and Documentation only over what the code has
-    // built (one not built yet is the Implementation card's to say), and never say "not in the code yet".
-    const totals = tiles.map((x) => [...x[2].matchAll(/(\d+) /g)].reduce((t, m) => t + +m[1], 0)), found = +/(\d+) built/.exec(tiles[1][2])[1];
-    for (const k of [0, 2, 3]) assert.equal(totals[k], found, `${tiles[k][0]} counts the components the code has`);
-    for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what implementation says');
-    assert.match(tiles[1][1], /^\d+%built\|$/, 'the share of Figma\'s components the code has, no line repeating the legend');
-    assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(found / totals[1] * 100), 'implementation\'s share is its count over its total');
-    assert.match(tiles[1][2], /2 built/, 'Found said as built, as the big number says it');
-    for (const x of tiles) assert.match(x[2], /^Components\d/, 'each legend says first that it counts components');
-    assert.match(tiles[2][1], /^(\d+%passed|–)\|$/);
-    // Each card counts what its column's filter counts: every row whose state there applies, of the components the code
-    // has built.
-    assert.match(tiles[3][1], /^\d+%written\|$/);
-    assert.equal(await run(`(() => { const tile = document.querySelectorAll('#status .sg-health-tile')[3], total = [...tile.querySelector('.sg-health-legend').textContent.matchAll(/(\\d+) /g)].reduce((t, m) => t + +m[1], 0); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => !/^\\s*Missing/.test(tr.cells[1].textContent) && tr.dataset.stCode !== 'Missing'); return total + '|' + rows.length; })()`).then((v) => { const [a, b] = v.split('|'); return a === b; }), true, 'the card counts every component Figma has that the code has built');
-    assert.match(tiles[3][2], /\d+ (written|partial|missing)/, 'the Documentation column\'s states: Ready (said written), Partial, Missing');
+    // The big number is the share of the work done, in the table's word, nothing under it; the legend says only what is left.
+    assert.match(tiles[0][1], /^\d+%Match\|$/, 'parity: the share matched, nothing under it');
+    for (const k of [0, 2, 3]) assert.doesNotMatch(tiles[k][2], /not in the code yet/, 'it does not repeat what Code says');
+    assert.match(tiles[1][1], /^\d+%Built\|$/);
+    assert.match(tiles[2][1], /^(\d+%Met|–)\|$/);
+    assert.match(tiles[3][1], /^\d+%Written\|$/);
+    // Every card counts over the same whole, the table's All, said once above them. Each card's foot counts what is
+    // done in full, the rows its filter shows for the done word, said as complete (the big number counts the work).
+    const table = await run(`(() => { const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')]; const ths = [...document.querySelectorAll('#status .sg-matrix thead th')].map((t) => t.textContent.trim()); const col = (h) => { const i = ths.findIndex((t) => t.startsWith(h)); return rows.map((tr) => (tr.cells[i].innerText || '').trim().split('\\n')[0]); }; return { n: rows.length, total: document.querySelector('#status .sg-health-total').textContent, code: col('Code'), par: col('Parity'), acc: col('Accessibility'), doc: col('Documentation'), done: [...document.querySelectorAll('#status .sg-health-done')].map((p) => p.textContent) }; })()`);
+    assert.equal(table.total, `${table.n} in the system`);
+    const of = (col, w) => col.filter((x) => x === w).length;
+    assert.deepEqual(table.done, [`${of(table.par, 'Match')} of ${table.n} complete`, `${of(table.code, 'Built')} of ${table.n} complete`, `${of(table.acc, 'Met')} of ${table.n} complete`, `${of(table.doc, 'Written')} of ${table.n} complete`], 'each count at the foot is what its filter shows for the done word');
+    assert.equal(+/^(\d+)%/.exec(tiles[1][1])[1], Math.floor(of(table.code, 'Built') / table.n * 100), 'Code\'s share is what is built over everything');
+    // The bar draws what the numbers say: its green is the big number, and the big number and the legend's shares add
+    // up to 100. No word says what is counted: the line above the cards does.
+    const bars = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => [(/^(\\d+)%/.exec(t.querySelector('.sg-health-num').textContent) || [])[1], (t.querySelector('.sg-health-bar > .is-done') || { style: {} }).style.width, [...(t.querySelector('.sg-health-legend') || { textContent: '' }).textContent.matchAll(/(<?)(\\d+)%/g)].map((m) => m[1] ? 0.5 : +m[2]), !!t.querySelector('.sg-health-lead')])`);
+    for (const [i, [pct, green, shares, lead]] of bars.entries()) {
+      assert.equal(lead, false, `${tiles[i][0]}: no "Components" word`);
+      if (pct == null) continue;
+      if (+pct) assert.equal(green, pct + '%', `${tiles[i][0]}: the green of the bar is the big number`);
+      const sum = +pct + shares.reduce((t, x) => t + x, 0);
+      assert.ok(sum >= 99.5 && sum <= 100.5, `${tiles[i][0]}: ${pct}% and the legend's ${shares.join(', ')} add up to 100`);
+    }
+    if (tiles[3][2]) assert.match(tiles[3][2], /^(<?\d+% (Partial|Missing))+$/, 'the Documentation card\'s words for what is left, the table\'s: Partial, Missing');
     // How each card's number is counted: a tip at its top right, its words in a bubble the trigger describes.
     const how = await run(`[...document.querySelectorAll('#status .sg-health-tile')].map((t) => { const b = t.querySelector('.sg-health-top .sg-tip-btn'); return [!!b && b.getAttribute('aria-describedby') === (t.querySelector('.sg-tip-bubble') || {}).id, (t.querySelector('.sg-tip-bubble') || {}).textContent || '']; })`);
     for (const [hasTip] of how) assert.equal(hasTip, true);
-    assert.match(how[0][1], /^How closely the code matches Figma\. The percentage counts every property, token and value compared; the legend counts components\./, 'said simply, in a sentence or two');
+    assert.match(how[0][1], /^How closely the code matches Figma\. The percentage counts every property, token and value compared, in what the code has built\./, 'said simply, in a sentence or two');
     // A next step opens the table sorted by its area, only the components with something left.
     const next = await run(`(() => { const b = document.querySelector('#status .sg-health-go [data-go-area]'); if (!b) return null; b.click(); const th = document.querySelector('#status .sg-matrix th[aria-sort="descending"]'); const on = [...document.querySelectorAll('#status .sg-dd-option[aria-selected="true"]')].filter((o) => !/:$/.test(o.dataset.mx)).map((o) => o.dataset.mx); return [b.getAttribute('data-go-area'), th && th.dataset.sort, on]; })()`);
-    if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Found', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');
-    // Every card's link shows the rows it promises: See 45 missing filters the table to those 45, never to none.
-    const promised = await run(`(() => { const out = []; for (const b of [...document.querySelectorAll('#status .sg-health-go [data-go-area]')]) { const n = +(/\\d+/.exec(b.textContent) || [0])[0]; b.click(); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => tr.offsetParent).length; out.push([b.getAttribute('data-go-area'), n, rows]); } return out; })()`);
-    for (const [area, n, rows] of promised) assert.equal(rows, n, `${area}: its link promises ${n} rows and the table shows ${rows}`);
+    if (next && next[0] === 'Parity') assert.deepEqual(next, ['Parity', 'Parity', ['figma:Found', 'code:Built', 'par:Differs']], 'it sets the chips its count is made of, sorted by its column');
+    // Every card's link opens rows, never none, and says no count of its own: the legend above it says how many.
+    const promised = await run(`(() => { const out = []; for (const b of [...document.querySelectorAll('#status .sg-health-go [data-go-area]')]) { b.click(); const rows = [...document.querySelectorAll('#status .sg-matrix tr.sg-mx-row')].filter((tr) => tr.offsetParent).length; out.push([b.getAttribute('data-go-area'), b.textContent, rows]); } return out; })()`);
+    for (const [area, words, rows] of promised) { assert.ok(rows > 0, `${area}: its link opens no rows`); assert.match(words, /^See [A-Z][a-z ]+$/, `${area}: "${words}" says no count`); }
     // Only the cards: no charts or lists of their own; the tasks follow, with their tabs.
     assert.equal(await run(`document.querySelectorAll('#status .sg-health-card, #status .sg-health-comps, #status .sg-health-list').length`), 0);
     assert.equal(await run(`document.querySelector('#status .sg-health-box').compareDocumentPosition(document.querySelector('#status .sg-matrix')) === Node.DOCUMENT_POSITION_FOLLOWING`), true, 'the cards above the table');
@@ -1709,48 +1712,52 @@ test('a page opens at its top, reloaded too: the browser never puts back an earl
   assert.ok(tpl.indexOf("history.scrollRestoration = 'manual'") < tpl.indexOf('function route()'), 'set before the page routes');
 });
 
-test('History: each card dated as what it holds is: the code by its release, a read of Figma by its day, the decisions of a day by that day; rows newest first', () => {
+test('History: a row per change, newest first, whatever its type: a commit to the code with its issues and release, what a read of Figma changed in each component, a commit to the intent layer, a decision', () => {
   const tpl = templateText();
-  const src = tpl.slice(tpl.indexOf('    var cardHead = function (g) {'), tpl.indexOf('    box.innerHTML = order.map(function (g) {'));
-  const releaseHead = (g) => (g.k || 'Merged, no release tag yet') + '  ·  ' + (g.k ? 'released ' + g.on : g.at);
-  const byTicket = (cs) => cs.map((c) => ({ items: [c] })), figmaHead = (g) => 'Figma read ' + g.read;
-  const head = new Function('releaseHead', 'esc', 'byTicket', 'figmaHead', src + 'return cardHead;')(releaseHead, (x) => String(x), byTicket, figmaHead);
-  const CODE = '<span class="sg-log-tag">Code</span>';
-  const v2 = { k: 'v2.0.0', on: '2026-10-21', commits: [{}] };
-  assert.equal(head({ k: '', commits: [], day: '2026-10-25', decisions: [{}] }), '2026-10-25', 'the decisions of a day: the day alone');
-  assert.equal(head({ k: '', commits: [{}], at: '2026-10-25' }), CODE + 'Merged, no release tag yet  ·  2026-10-25  ·  1 issue', 'code merged and not released yet keeps its name, tagged Code, with how many issues');
-  assert.equal(head(v2), CODE + 'v2.0.0  ·  released 2026-10-21  ·  1 issue');
-  assert.equal(head({ k: '', commits: [], read: 'x' }), 'Figma read x', 'a read of Figma is a card of its own, as a release is');
-  assert.doesNotMatch(tpl, /'After ' \+ esc/, 'nothing is said to come after a release: what is not code is dated');
-  assert.match(tpl, /if \(!home\) \{ home = byDay\[at\] = \{ k: '', on: '', at: at, commits: \[\], day: at, decisions: \[\] \}; order\.push\(home\); \}/, 'the decisions of each day, a card of their own');
-  assert.doesNotMatch(tpl, /names\.length \+ ' components'/, 'a read of Figma names every component it affects, as a code row does');
-  assert.doesNotMatch(tpl, /Read for the first time: ' \+ first\.length/, 'the components read for the first time are named, not counted');
-  assert.match(tpl, /rows\.sort\(function \(a, b\) \{ return when\(b\.at\) - when\(a\.at\); \}\);/, 'decisions, reads of Figma and issues in one order, newest first');
-});
-
-test('History: a read of Figma is a card of its own, dated: a row a changed component with what changed, then the ones read for the first time, named, the pills only under Affects', () => {
-  const tpl = templateText();
-  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 10;'), tpl.indexOf('    var decisionRow = function (d) {'));
+  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 5;'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const fns = new Function('esc', 'cid', 'sysButton', src + 'return { figmaRows, figmaHead, figmaChange, pillsHTML };')(esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`);
-  assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
-  assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
-  const read = { r: { date: '2026-10-27T10:00:00Z', short: '9878c3f', url: 'https://example.test/c/9878c3f' }, comps: [
+  const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
+    esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1));
+  const text = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const read = { r: { date: '2026-10-27T10:00:00Z', short: '9878c3f', url: 'https://example.test/c/9878c3f', by: 'Done by QA' }, comps: [
     { name: 'navTab', changed: ['property tileSlot added'] }, { name: 'buttonFloat', changed: ['property showLabel added', 'property labelContent added'] },
     { name: 'cardRow', changed: ['read from Figma for the first time'] }, { name: 'chipRow', changed: ['read from Figma for the first time'] }] };
-  const rows = [...fns.figmaRows(read).matchAll(/<tr data-chip="figma"><td>([\s\S]*?)<\/td><td>([\s\S]*?)<\/td><\/tr>/g)].map((m) => [m[1].replace(/<[^>]+>/g, ''), [...m[2].matchAll(/href="#([^"]+)"/g)].map((x) => x[1])]);
-  assert.deepEqual(rows, [
-    ['showLabel added; labelContent added', ['c-buttonFloat/history']],
-    ['tileSlot added', ['c-navTab/history']],
-    ['Read for the first timeSaved in 9878c3f', ['c-cardRow/history', 'c-chipRow/history']],
-  ], 'what changed on the left, the component it changed as its pill; the new ones named once, as their pills under Affects; the commit that saved the read under the last');
-  assert.doesNotMatch(fns.figmaRows(read).split('<td>').filter((_, i) => i % 2).join(''), /href="#/, 'no pill in What: the components are pills only under Affects');
-  assert.equal(fns.figmaHead({ read }).replace(/<[^>]+>/g, ''), 'Figma2026-10-27', 'Figma and its day, nothing else');
+  const fns = run([
+    { k: 'v2.0.0', on: '2026-10-21T09:00:00Z', commits: [{ r: { date: '2026-10-20T08:00:00Z', short: 'aa11bb2', url: 'https://example.test/x/-/commit/aa11bb2', says: 'the tile', ticket: '#11', tickets: [{ ticket: '#11', ticketUrl: 'https://example.test/i/11' }, { ticket: 'REV-1' }], by: 'Done by Quokka' }, comps: ['cardTile'] }] },
+    { k: '', commits: [{ r: { date: '2026-10-28T08:00:00Z', short: 'cc33dd4', says: 'again', ticket: '#11', by: 'Done by quokka' }, comps: [] }] },
+    { k: '', commits: [], read },
+    { k: '', commits: [], layer: { at: '2026-10-26T12:00:00Z', to: 'eea0cd0ed189', says: 'Drafts reviewed', pages: ['Saving'], components: [], files: 1, by: 'Done by Wombat' } },
+    { k: '', commits: [], day: '2026-10-25', decisions: [{ at: '2026-10-25', what: 'No large tile', said: 'answered', by: 'Design', kind: 'decision' }] },
+  ]);
+  assert.deepEqual(fns.ROWS.map((x) => [x.chip, x.type, text(x.what)]), [
+    ['code', 'Code', '#11 · 2 commits again'],
+    ['figma', 'Figma', 'showLabel added; labelContent added Saved in 9878c3f'],
+    ['figma', 'Figma', 'tileSlot added Saved in 9878c3f'],
+    ['figma', 'Figma', 'Read for the first time Saved in 9878c3f'],
+    ['intent', 'Intent layer', 'Drafts reviewed 1 page changed Saving Committed in eea0cd0e'],
+    ['decisions', 'Decision', 'No large tile Answered'],
+    ['code', 'Code', '#11 · 2 commits REV-1 the tile Released in v2.0.0 on 2026-10-21'],
+  ], 'newest first, whatever the type: an issue a count of its commits, each commit its release; a read of Figma a row a component it changed, the new ones named once');
+  assert.match(fns.ROWS.at(-1).what, /href="https:\/\/example\.test\/x\/-\/tags\/v2\.0\.0"/, 'the release linked where the host keeps it');
+  assert.deepEqual(fns.ROWS.filter((x) => x.chip === 'figma').map((x) => [...x.affects.matchAll(/href="#([^"]+)"/g)].map((m) => m[1])), [['c-buttonFloat/history'], ['c-navTab/history'], ['c-cardRow/history', 'c-chipRow/history']], 'the components only under Affects, as pills');
+  assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
+  assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
+  assert.equal(text(fns.dateCell('2026-10-25')), '2026-10-25', 'a day alone has no time');
+  assert.match(text(fns.dateCell('2026-10-20T08:00:00Z')), /^2026-10-2[01] \d\d:\d\d$/, 'a moment: its day and its time, as the reader\'s clock says it');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
-  assert.equal((many.match(/ hidden>/g) ?? []).length, 4, 'the first ten shown');
-  assert.match(many, /<button data-pills-more>4 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.equal((many.match(/ hidden>/g) ?? []).length, 9, 'the first five shown');
+  assert.match(many, /<button type="button" class="sg-link-pill sg-link-pill--table" data-pills-more>9 more<\/button>$/, 'the rest one click away, a pill as the ones beside it');
   assert.match(tpl, /\.sg-link-pill\[hidden\] \{ display: none; \}/, 'a pill kept back stays hidden, its pill style never showing it');
-  assert.match(tpl, /order\.sort\(function \(a, b\) \{ return dayOf\(b\) - dayOf\(a\) \|\| releaseOrder\(a, b\); \}\);/, 'the code\'s releases and the reads of Figma in one order, newest first');
+});
+
+test('History: Done by names each person once, by the name they sign with, wherever on the page they used another', () => {
+  const tpl = templateText();
+  const src = tpl.slice(tpl.indexOf('    var nameKey = function (n)'), tpl.indexOf('    // Its day, and its time where it has one'));
+  const { learn, whoCell } = new Function('esc', 'line', src + 'return { learn, whoCell };')((x) => String(x), (h) => '<p>' + h + '</p>');
+  ['Done by quokka.da.wombat', 'Done by Quokka da Wombat · pushed by wombat', 'Done by QA'].forEach(learn);
+  assert.equal(whoCell(['Done by quokka.da.wombat']), '<td class="sg-log-who"><p>Quokka da Wombat</p></td>');
+  assert.equal(whoCell(['Done by QA, quokka.da.wombat', null]), '<td class="sg-log-who"><p>QA</p><p>Quokka da Wombat</p></td>');
+  assert.equal(whoCell([null]), '<td class="sg-log-who"></td>', 'nobody known: empty, never guessed');
 });
 
 test('a table filtered by a chip closes on the card\'s own edge: the last row shown has no line under it', () => {

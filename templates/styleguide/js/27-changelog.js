@@ -17,7 +17,7 @@
     var day = function (d) { return '<span class="pg-log-date">' + esc(String(d).slice(0, 10)) + '</span>'; };
     // Figma: when it was last read, then every read that changed what Figma says of it, with what changed.
     var fig = (u.figmaRead ? '<tr><td>Last read</td><td>' + esc(when(u.figmaRead)) + '</td></tr>' : '') +
-      figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + what(/first time/.test(r.changed[0]) ? [] : r.changed) + '</td></tr>'; }).join('');
+      figma.map(function (r) { return '<tr><td>' + link(r) + '</td><td>' + esc(r.changed.length === 1 && /first time/.test(r.changed[0]) ? 'Read from Figma for the first time.' : 'Figma read again, and it changed.') + ' ' + day(r.date) + doneByHTML(r) + what(/first time/.test(r.changed[0]) ? [] : r.changed) + '</td></tr>'; }).join('');
     // What the team decided about it, gathered from wherever each decision was made (decisions.mjs). First, because
     // a decision outlives every commit under it: an option somebody looked at and did not want is the one thing a
     // reader needs before proposing it again. Each says what was ruled out, why, who, and when.
@@ -28,7 +28,7 @@
     }).join('');
     // Each change made to it in Figma through the engine, with its status, opening its before and after on the Changes in
     // Figma page.
-    var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said' };
+    var FST = { waiting: 'Waiting to be made', made: 'Made as said', 'not as said': 'Not as said', 'taken back': 'Taken back' };
     fig += (DATA.figmaChanges || []).filter(function (x) { return x.component === c.name; }).map(function (x) {
       return '<tr><td><a class="sg-uses-link" href="#changes-in-Figma?panel=' + esc(encodeURIComponent('doc:fc:' + x.component + ':' + x.at)) + '">' + esc(FST[x.status]) + '</a></td><td>' + esc(x.asked || x.steps[0] || '') + ' ' + day(x.at) + what(x.steps) + (x.signedOff ? '<br><span class="pg-dim">' + esc('signed off by ' + (x.signedOff.reviewerSaid || x.signedOff.by) + (x.authorSaid ? ', made by ' + x.authorSaid : '')) + '</span>' : '') + '</td></tr>';
     }).join('');
@@ -55,7 +55,7 @@
       return card(releaseHead(g, k && rel ? '<a class="sg-uses-link" href="' + esc(rel) + '" target="_blank" rel="noopener">' + esc(k) + '</a>' : null), byTicket(rows, function (r) { return r; }).map(function (t) {
         if (t.ticket) return '<tr><td>' + (t.ticketUrl ? '<a class="sg-uses-link" href="' + esc(t.ticketUrl) + '" target="_blank" rel="noopener">' + esc(t.ticket) + '</a>' : esc(t.ticket)) + '</td><td>' + t.items.map(function (r) { return '<p class="sg-il-line">' + commitLine(r, ' ' + day(r.date) + what(r.changed)) + '</p>'; }).join('') + '</td></tr>';
         var r = t.items[0], pr = r.pr ? (r.prUrl ? ' <a class="sg-uses-link" href="' + esc(r.prUrl) + '" target="_blank" rel="noopener">#' + esc(r.pr) + '</a>' : ' #' + esc(r.pr)) : '';
-        return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + what(r.changed) + '</td></tr>';
+        return '<tr><td>' + link(r) + pr + '</td><td>' + esc(String(r.says || r.subject).replace(/\s*Co-Authored-By:[\s\S]*$/i, '').replace(/\s*\(#\d+\)\s*$/, '')) + ' ' + day(r.date) + doneByHTML(r) + what(r.changed) + '</td></tr>';
       }).join(''));
     }).join('') + '</div>';
   }

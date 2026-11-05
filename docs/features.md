@@ -1,33 +1,25 @@
 # Features and capabilities
 
-What the engine does for design and product teams. How each part works is in the [technical documentation](details.md), and what to ask in Claude Code is on the [Commands](commands.md) page.
-
-Every feature reads the same shared knowledge about your system: what each component is, how it's built and why it exists. What one feature learns, the others use.
-
-Each section says why it matters, then what it does not do well today. A line marked *(Coming soon)* is not ready yet.
+What the engine does for design and product teams. Every part reads the same knowledge about your system, so what one learns, the others use. How each part works is in the [technical documentation](details.md), and what to ask Claude Code is on the [Commands](commands.md) page.
 
 **On this page**
 
-| Feature | What it does for you | Builds on | Stage |
-|---|---|---|---|
-| [Write component contracts](#write-component-contracts) | One up-to-date spec per component, written from your Figma file and your code: its options, states and what goes inside it. People and AI tools read the same spec, and nobody maintains it by hand. | Your Figma file and code | Ready to use |
-| [Write the intent layer](#write-the-intent-layer) | Why each component exists and when to use it, gathered in one place from your docs and past decisions. What it can't be sure of goes to a person; guidelines that contradict each other are flagged. | Contracts | Ready to use |
-| [Review the Figma library](#review-the-figma-library) | Every check compares against your Figma file, so the file has to be right. This lists what makes it unreliable (values not linked to the system, detached copies, components built against your own rules), each with its fix, on the style guide's Tasks page for whoever keeps the file. | Your Figma file | Ready to use |
-| [Track system health](#track-system-health) | Warns about risks before they spread as the system grows: a colour named after one product, a token that points to one that was deleted, a combination that only breaks in dark mode on a phone. | Contracts | Ready to use |
-| [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Contracts, Figma library | Ready to use |
-| [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Contracts, intent | Ready to use |
-| [Fit your team's setup](#fit-your-teams-setup) | Works with what you already use: code on GitLab, Figma branches, very large files. | — | Actively improving |
-| [Test accessibility](#test-accessibility) | Tests each component the way people use it: contrast, keyboard, focus, touch size and what a screen reader says. Fix it once in the component and every screen benefits. | Contracts, Compare | Early development |
-| [Build with AI, on the system](#build-with-ai-on-the-system) | AI tools build with your real components, rules and past decisions: in your product's code today, and as clickable prototypes for user tests *(Coming soon)*. Each change is checked as it's made, and what the system lacks goes on a list for design. | Contracts, intent, Catch drift | Early development |
-| [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's playground, spec, Figma match, accessibility and history, plus who needs to do what next. | Everything above | Early development |
-| [Update Figma from the code](#update-figma-from-the-code) | Sends what developers learn back to designers in Figma: accessibility notes, screen issues and links to the code, only after you approve. | Compare, accessibility | Coming soon |
-| [Keep products on the system](#keep-products-on-the-system) | Helps every product move to the next system version: which version each one runs, a ready-made fix per product, one ticket per difference. | Catch drift, health | Coming soon |
-| [Generate components in Figma and code](#generate-components-in-figma-and-code) | Describe a component in plain words and get it built with your own styles, names and structure, where you choose: in Figma, in code, or both. Ready for sign-off. | Contracts, intent, Figma library | Coming soon |
-| [Build code from Figma](#build-code-from-figma) | For a system that exists only in Figma: the order to build it in, exact names and values, and a check after each piece. | Contracts, Compare | Coming soon |
-
-**Compare or Catch drift?** Compare asks "does the code match the design?"; Catch drift asks "do products use the system?". **Catch drift or Build with AI?** Catch drift finds problems after the fact; Build with AI prevents them as things are built.
-
-Also on this page: [What you can count on](#what-you-can-count-on).
+| Feature | What it does for you | Stage |
+|---|---|---|
+| [Write component contracts](#write-component-contracts) | One up-to-date spec per component, written from your Figma file and your code: its options, states and what goes inside it. People and AI tools read the same spec, and nobody maintains it by hand. | Ready to use |
+| [Write the intent layer](#write-the-intent-layer) | Why each component exists and when to use it, gathered in one place from your docs and past decisions. What it can't be sure of goes to a person, and guidelines that contradict each other are flagged. | Ready to use |
+| [Review the Figma library](#review-the-figma-library) | Checks your Figma file is fit to be the source everything else compares against. Your design team gets a list of what to fix, so no result rests on a broken file. | Ready to use |
+| [Track system health](#track-system-health) | Flags the tokens that will cause trouble as the system grows, such as names tied to a colour or aliases to deleted tokens. They are cheapest to fix early, and nothing here fails a run. | Ready to use |
+| [Catch drift in product code and AI edits](#catch-drift-in-product-code-and-ai-edits) | Shows where products stopped using the system: copied components, hard-coded colours or spacing, invented names, each with what to use instead. What the system is missing goes on a list for design. | Ready to use |
+| [Compare Figma and code](#compare-figma-and-code) | Checks that what was built matches what was designed, in every theme, as a real browser draws it. Each difference says who should fix it, so visual QA stops being done by eye. | Ready to use |
+| [Publish a living style guide](#publish-a-living-style-guide) | One site the whole team shares: each component's playground, spec, Figma match, accessibility and history, plus who needs to do what next. | Ready to use |
+| [Fit your team's setup](#fit-your-teams-setup) | Works straight from your repositories, with no clone and nothing duplicated. Figma and the code are read from one place the whole team shares, so nobody keeps a copy in sync. | Early development |
+| [Test accessibility](#test-accessibility) | Tests each component the way people use it, from contrast to screen readers, and splits each criterion into tasks for the people who own it, in order. Fix it once and every screen benefits. | Early development |
+| [Build with AI, on the system](#build-with-ai-on-the-system) | AI builds prototypes and product code with your real components, and nothing invented gets past the checks. What passes a user test can ship without being redrawn. | Coming soon |
+| [Update Figma from the code](#update-figma-from-the-code) | Sends what developers learn back to designers in Figma: accessibility notes, screen issues and links to the code, only after you approve. | Coming soon |
+| [Keep products on the system](#keep-products-on-the-system) | Helps every product move to the next system version: which version each one runs, a ready-made fix per product, one ticket per difference. | Coming soon |
+| [Generate components in Figma and code](#generate-components-in-figma-and-code) | Describe a component in plain words and get it built with your own styles, names and structure, where you choose: in Figma, in code, or both. Ready for sign-off. | Coming soon |
+| [Build code from Figma](#build-code-from-figma) | For a system that exists only in Figma: the order to build it in, exact names and values, and a check after each piece. | Coming soon |
 
 ## Write component contracts
 
@@ -49,7 +41,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 **Ready to use** · **Why it matters:** What designers know becomes something teammates and agents can read.
 
-*Today: it reads DSDS or Markdown and MDX pages from GitLab, GitHub (Enterprise too) or a folder in your project, and pages kept in Notion or Confluence. Its own fixes go back where the layer lives, in its own format: a commit or a merge request on GitLab, a commit or a pull request on GitHub, or the pages in your folder rewritten for you to commit. Notion and Confluence are only read: each fix is listed for a person to make there. The engine writes only what it is sure of; everything else is a draft for a person to approve.*
+*Today: it reads DSDS or Markdown and MDX pages from GitLab, GitHub (Enterprise too) or a folder in your project, and pages kept in Notion or Confluence. Its own fixes go back where the layer lives, in its own format: a commit or a merge request on GitLab, a commit or a pull request on GitHub, or the pages in your folder rewritten for you to commit. Notion and Confluence are only read: each fix is listed for a person to make there. The engine writes only what it is sure of. Everything else is a draft for a person to approve.*
 
 - Reads your documentation where it already lives: a docs folder, a documentation site's pages, the `.mdx` beside each component, or a Notion or Confluence page and the pages under it. A component's usage, accessibility and style tabs become one page, and Do and Don't examples become when to use it and when not.
 - Shows why each component exists, when to use it and when not, beside Figma and the code.
@@ -73,9 +65,9 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 ## Review the Figma library
 
-**Ready to use** · **Why it matters:** Every check compares against your Figma file, so a clean library is what makes every other result trustworthy.
+**Ready to use** · **Why it matters:** Every other result is only as good as the file it compares against.
 
-*Today: it only reads Figma. Renames are applied after you say yes; every other fix is for your design team to make.*
+*Today: it only reads Figma. Renames are applied after you say yes. Every other fix is for your design team to make.*
 
 - Finds values with no token or style, detached instances, missing auto layout and missing descriptions.
 - Writes down how your system builds components (names, properties, layers, variables) and lists the ones that break it, on a Construction page.
@@ -85,7 +77,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 ## Track system health
 
-**Ready to use** · **Why it matters:** Structural risks show up before they spread.
+**Ready to use** · **Why it matters:** The token layer is where a system ages badly, and it is cheapest to put right early.
 
 *Today: advice only. None of it fails a run.*
 
@@ -96,6 +88,22 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Brands that pin a value they should inherit from the brand they extend.
 - Two components whose own rules are nearly the same.
 - A health number per area on the style guide's Status page.
+
+## Catch drift in product code and AI edits
+
+**Ready to use** · **Why it matters:** Shortcuts do not pile up until the system falls apart.
+
+*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
+
+- Spots a product screen or an AI edit that builds its own copy of a system component.
+- Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
+- Flags CSS variables and text casing the design never asked for.
+- Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
+- Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
+- Checks Tailwind classes against Figma.
+- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
+- Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
+- Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
 
 ## Compare Figma and code
 
@@ -116,25 +124,28 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Compares how components move and what they draw beyond their colours, such as shadows and blurs. *(Coming soon)*
 - Checks each product page against its Figma screen: which components, their order, spacing and alignment. *(Coming soon)*
 
-## Catch drift in product code and AI edits
+## Publish a living style guide
 
-**Ready to use** · **Why it matters:** Shortcuts do not pile up until the system falls apart.
+**Ready to use** · **Why it matters:** Design, engineering and product see the same status, with no doc going stale.
 
-*Today: everything here is advice and fails no run, except values written by hand, whose count may only go down, and a push whose change uses something with a finding.*
+*Today: it shows only what Figma and the code agree on. Anything still different is a task, not drawn.*
 
-- Spots a product screen or an AI edit that builds its own copy of a system component.
-- Counts colours and sizes written by hand, with the token to use instead, and keeps the count going down.
-- Flags CSS variables and text casing the design never asked for.
-- Finds a control laid over a component, a sign it is missing an option. The same one built three times is a gap in the system.
-- Sorts each gap and each proposed change into local (it stays in one product) or shared (it changes what other products get), with the reason in one line. Only the shared ones wait on the person who decides.
-- Checks Tailwind classes against Figma.
-- Warns at a commit and stops a push, only for what the change uses: a value written by hand, a name the system does not have, or a difference in a component it uses. The rest of the system's debt never slows a commit.
-- Names faults in a component's own code that show only when a screen uses it, such as a click that fires twice. *(Coming soon)*
-- Keeps what the system lacks on a list for your design team, and sends it to Figma as to-do cards after you say yes. *(Coming soon)*
+- One site with every token and component of your system.
+- For each component: a playground with live controls, its specs, every variant, Figma beside the code, parity, accessibility and history.
+- A status page: how far each component is in Figma, code, accessibility and documentation.
+- A task list that says who acts and which team owns each component or token layer.
+- A History where every row names who did it: who answered a decision, and who made a change to the code, a read of Figma or a change to the intent layer, with whoever brought it in when that was somebody else.
+- Foundations: colours, type, spacing, corners, motion and icons, every mode side by side.
+- A Templates page: each page template, the components it is made of in Figma's order, whether its code uses each one, and its frame from Figma.
+- Every colour and space on the page is one of your tokens, so it looks like your system.
+- Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
+- Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
+- Your own copy builds itself again whenever the code, Figma, the intent layer, a store or the engine changes, in the background from login on. It is on by default: setup turns it on, and one setting turns it off. It runs only what the change feeds, and publishes to your team's store only a page that changed, so a team with no CI runner stays up to date.
+- The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
 
 ## Fit your team's setup
 
-**Actively improving** · **Why it matters:** It works with the tools you already use.
+**Early development** · **Why it matters:** Your tools stay as they are, and the engine fits around them.
 
 *Today: every browser check runs in Chrome.*
 
@@ -156,6 +167,8 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 - Measures touch targets, on the page and again on a small 320 pixel screen.
 - Checks reading needs: text spacing, zoom, high-contrast mode and colour blindness.
 - Says how sure each finding is: blocker, warning or advisory, in one verdict per component.
+- Turns each finding into a task for a named person: a designer, a developer, whoever writes the words, whoever owns the flow, or a check by hand. One criterion often needs two of them (a colour pair is picked in Figma, then used in the code), so each gets their own task, in order. The style guide filters by person, so a team sees only its own work.
+- Tells a person how to check what no machine can decide: a few short steps per criterion (zoom to 200%, try to select the text), the command that records it, and who checked, when and with which browser and screen reader. The record expires on its own when the component changes, and the page says it is to check again.
 - Tries what belongs to a page across your products' own pages: a title and a language, a skip link, the same navigation and help in the same place, and a flow that never asks twice. What only a person can decide, such as a payment step, is left to a person.
 - Checks the Figma file alone, before any code exists: text contrast in every mode, a focus ring, 24 pixel targets, and a note for each role and name.
 - Puts each gap the Figma file has on the design team's to do list in Figma, once you say yes.
@@ -165,7 +178,7 @@ Also on this page: [What you can count on](#what-you-can-count-on).
 
 ## Build with AI, on the system
 
-**Early development** · **Why it matters:** AI builds fast but invents components. This keeps it on your real system, in your product's code and in prototypes.
+**Coming soon** · **Why it matters:** AI builds fast but invents components. This keeps it on your real system, in your product's code and in prototypes.
 
 *Today: the live checks run in Claude Code. Other tools get the same rules, and a check you run by hand. Prototypes are coming soon.*
 
@@ -202,40 +215,40 @@ How it checks the agent's work, in a loop, before you see it:
 - Holds pages to each other: the same padding, text styles and action names, never Save on one and Submit on another.
 - Checks your team's rules, such as one main button per screen, and the flows your guidelines describe.
 - Follows what your team already decided, and never uses a retired component.
-- Holds a new page to how your product's **real pages** are built, not only to the prototypes drawn so far: which components a page holds and in what order, what each action is called, where the actions go. A project on its first day has no prototypes and no designed screens, but it has its pages. Only what the code says for certain is taken; spacing and text styles are never guessed from it.
+- Holds a new page to how your product's **real pages** are built, not only to the prototypes drawn so far: which components a page holds and in what order, what each action is called, where the actions go. A project on its first day has no prototypes and no designed screens, but it has its pages. Only what the code says for certain is taken. Spacing and text styles are never guessed from it.
 
-**What the page's own wrapper may use.** We read the transcripts of twelve measured runs looking for why agents invent. The answer was narrow and the same every time: **every invented value was in the page's own wrapper, and never in a component.** A page width written as `400px`, a line between rows as `#e0e0e0`, an empty state as an `<svg>` drawn by hand — each of them in the same tag as a `var(--padding-m)` the same agent had got right.
+**What the page's own wrapper may use.** We read the transcripts of twelve measured runs looking for why agents invent. The answer was narrow and the same every time: **every invented value was in the page's own wrapper, and never in a component.** A page width written as `400px`, a line between rows as `#e0e0e0`, an empty state as an `<svg>` drawn by hand, each of them in the same tag as a `var(--padding-m)` the same agent had got right.
 
 It used a token wherever it had been shown one, and invented wherever it had not. The catalog showed spacing and nothing else, while the theme had `--surface-page`, `--text-primary` and `--stroke-default` all along.
 
-So the catalog now names them: what the wrapper may use, and nothing else. What a component owns stays that component's — a `--radii-button` is the button's, and a wrapper reaching for it borrows a look it was not given. A colour, a line, a corner or a width the theme does not name is a need the system lacks, and goes in the page as a gap for the design team, never as a value of the agent's own.
+So the catalog now names them: what the wrapper may use, and nothing else. What a component owns stays that component's: a `--radii-button` is the button's, and a wrapper reaching for it borrows a look it was not given. A colour, a line, a corner or a width the theme does not name is a need the system lacks, and goes in the page as a gap for the design team, never as a value of the agent's own.
 
-**A state the page owes is not a note.** A page that shows a list owes an empty state; one that takes input owes an error state. The engine worked both out and said so — as advice — and advice gets skipped. We measured it: given the documentation alone, with those very lines in the page's own instructions, agents skipped the empty list and the form-with-a-mistake more often than anything except inventing.
+**A state the page owes is not a note.** A page that shows a list owes an empty state, and one that takes input owes an error state. The engine worked both out and said so, as advice, and advice gets skipped. We measured it: given the documentation alone, with those very lines in the page's own instructions, agents skipped the empty list and the form-with-a-mistake more often than anything except inventing.
 
-So the page is now **drawn and not ready**. Drawn, because the page somebody still has to finish is exactly the one worth looking at — every size, every state, the pictures, the review. Not ready, because the run comes back unfinished and names the state.
+So the page is now **drawn and not ready**. Drawn, because the page somebody still has to finish is exactly the one worth looking at: every size, every state, the pictures, the review. Not ready, because the run comes back unfinished and names the state.
 
 There is an honest way out, which there has to be, and it costs a reason:
 
-- in a composition, `"states": { "empty": "this list always has the three plans" }` — a state written as a sentence is one this page does not need, and the sentence is why;
+- in a composition, `"states": { "empty": "this list always has the three plans" }`: a state written as a sentence is one this page does not need, and the sentence is why.
 - in a page of code, `data-no-empty="this list always has the three plans"`.
 
 A reason too thin to be one is not taken. *A check a page cannot satisfy honestly is a check people turn off.* A starting point read from a designed screen is excused everything: it is incomplete on purpose, and failing it for not being finished is the same mistake pointing the other way.
 
 **Every finding says which part it is about.** Watched in a measured run: an agent was told `"undefined" is not in the catalog`, could not tell which of the page's parts it meant, ran the check seventeen more times, searched the project for a schema, deleted the page, started over, and ran out of turns with nothing finished.
 
-Both halves of that were the engine's. The finding carried the part's id all along and the report never printed it; and a part you gave no id was keyed `node-7`, a number in walk order that is findable in nothing. Now a finding opens with where it is — `Page › children[1] › children[0]`, or `"actions" (Page › children[0])` for a part you named — which is a route you can follow with the file open.
+Both halves of that were the engine's. The finding carried the part's id all along and the report never printed it, and a part you gave no id was keyed `node-7`, a number in walk order that is findable in nothing. Now a finding opens with where it is: `Page › children[1] › children[0]`, or `"actions" (Page › children[0])` for a part you named. That is a route you can follow with the file open.
 
 And a part with no component at all is no longer quoted as a component called `undefined`. It says what it is: a part that was never finished.
 
-**A file in the wrong shape is told so once, not symptom by symptom.** An agent wrote a format of its own invention — `{ name, layout, gap, components: [{ type, label }] }` — and the engine answered with ten findings: the root is not a component, `"undefined"` is not in the catalog, the id `"undefined"` is used in three places. Every one true, and not one of them the thing that was wrong.
+**A file in the wrong shape is told so once, not symptom by symptom.** An agent wrote a format of its own invention, `{ name, layout, gap, components: [{ type, label }] }`, and the engine answered with ten findings: the root is not a component, `"undefined"` is not in the catalog, the id `"undefined"` is used in three places. Every one true, and not one of them the thing that was wrong.
 
-Ten symptoms of one mistake read as ten mistakes. The agent fixed them one at a time for thirty turns and was never told the file was the wrong shape. Now it gets one sentence, the shape itself, and the keys its file has instead — so it can map one onto the other.
+Ten symptoms of one mistake read as ten mistakes. The agent fixed them one at a time for thirty turns and was never told the file was the wrong shape. Now it gets one sentence, the shape itself, and the keys its file has instead, so it can map one onto the other.
 
-And where your components are code, it is told something better than the shape of a composition: **which file this project writes.** The catalog of such a project says twice that a page here is a `.jsx` — and the agent wrote a `.json` anyway. Sending it off to write a *better composition* would only send it back to the wrong kind of file. So it now reads: your components are code, a page here is written in that code, write `prototypes/<Name>.jsx`.
+And where your components are code, it is told something better than the shape of a composition: **which file this project writes.** The catalog of such a project says twice that a page here is a `.jsx`, and the agent wrote a `.json` anyway. Sending it off to write a *better composition* would only send it back to the wrong kind of file. So it now reads: your components are code, a page here is written in that code, write `prototypes/<Name>.jsx`.
 
-**Each prototype carries its own evaluation.** What every check found used to live in one place, in the engine's output folder: good for counting across a project, no use to the prototype itself. A prototype is a part of its own now — read from your team's store into `prototypes/` and sent back from it — and the page travelled, its handoff travelled, what people said about it travelled, and nothing about whether it holds up did.
+**Each prototype carries its own evaluation.** What every check found used to live in one place, in the engine's output folder: good for counting across a project, no use to the prototype itself. A prototype is a part of its own now: read from your team's store into `prototypes/` and sent back from it. The page travelled, its handoff travelled, what people said about it travelled, and nothing about whether it holds up did.
 
-Now `prototypes/<name>.check.json` sits beside the page, as the handoff and the comments do: which components it used and how often, the mistakes with why each happened, what the system lacked for it, the states it owes. The store carries it, and so does every file the engine keeps beside a page — named deliberately rather than left to the extensions, because the check record travelled only because it happens to be JSON and the handoff did not travel at all.
+Now `prototypes/<name>.check.json` sits beside the page, as the handoff and the comments do: which components it used and how often, the mistakes with why each happened, what the system lacked for it, the states it owes. The store carries it, and so does every file the engine keeps beside a page, named deliberately rather than left to the extensions, because the check record travelled only because it happens to be JSON and the handoff did not travel at all.
 
 It records what was found, never a verdict of its own. And where a check never worked out whose fault each mistake was, it says nothing rather than zero: *the documentation owed none of them* is a different statement from *nobody worked it out*.
 
@@ -247,28 +260,10 @@ It records what was found, never a verdict of its own. And where a check never w
 2. The **mistakes**, split into the half your documentation owed and the half the agent did not follow.
 3. What was **written** into the intent layer, and what is still owed.
 4. What is **left for a person**, with where to write it.
-5. Whether it is **improving** — mistakes a page, early against late, and whether the documentation's share of them is falling. That last number is the loop working.
+5. Whether it is **improving**: mistakes a page, early against late, and whether the documentation's share of them is falling. That last number is the loop working.
 6. Whether agents are **reading** a component's card before using it.
 
-Two things it will not do. It never shows a zero where it means *not yet*: a step with nothing yet says what to run instead, because a zero and *not yet* look the same and mean opposite things. And under twelve checks it refuses to draw a trend and says so — two runs are not a trend, and a tool that draws one from two runs is a tool that says the opposite next week.
-
-## Publish a living style guide
-
-**Early development** · **Why it matters:** Design, engineering and product see the same status, with no doc going stale.
-
-*Today: it shows only what Figma and the code agree on. Anything still different is a task, not drawn.*
-
-- One site with every token and component of your system.
-- For each component: a playground with live controls, its specs, every variant, Figma beside the code, parity, accessibility and history.
-- A status page: how far each component is in Figma, code, accessibility and documentation.
-- A task list that says who acts and which team owns each component or token layer.
-- Foundations: colours, type, spacing, corners, motion and icons, every mode side by side.
-- A Templates page: each page template, the components it is made of in Figma's order, whether its code uses each one, and its frame from Figma.
-- Every colour and space on the page is one of your tokens, so it looks like your system.
-- Publishes to GitHub Pages or GitLab Pages on every push, and works on a phone.
-- Updates on its own when the intent layer changes: a fix you copy from it into Claude Code is on the published page minutes later, and so is a change made by hand, even in another repository.
-- Your own copy builds itself again whenever the code, Figma, the intent layer, a store or the engine changes, in the background from login on. It is on by default: setup turns it on, and one setting turns it off. It runs only what the change feeds, and publishes to your team's store only a page that changed, so a team with no CI runner stays up to date.
-- The page is checked like a product. Every file it links to must be there, its size is shown, and each build compares pictures of its own pages with the last build's.
+Two things it will not do. It never shows a zero where it means *not yet*: a step with nothing yet says what to run instead, because a zero and *not yet* look the same and mean opposite things. And under twelve checks it refuses to draw a trend and says so: two runs are not a trend, and a tool that draws one from two runs is a tool that says the opposite next week.
 
 ## Update Figma from the code
 
@@ -286,7 +281,7 @@ Two things it will not do. It never shows a zero where it means *not yet*: a ste
 - Renames a token everywhere in one change, with a patch for each product.
 - Lists every place still using a retired component or token, with what to use instead.
 - Tells each product which system version it runs, and what a newer one changes for it, in its code and its docs.
-- Names a product late to move on the Tasks list, for its own team.
+- Names a product late to move on the Status page, for its own team.
 - Opens one issue per difference in your tracker, and closes it once it is fixed.
 - Reviews the screens a product builds with the system as pages, and scores each out of 10.
 - Reads products kept in their own repositories.

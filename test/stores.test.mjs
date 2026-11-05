@@ -16,7 +16,9 @@ const LINK = `https://${HOST}/design/snapshots`;
 
 // One project, its branches and files; each token's role in it.
 // readOnly: tokens whose user has a role but which may only read (their scopes).
-function fakeGitlab({ roles = { 'read-token': 20, 'write-token': 30 }, readOnly = [], branch = { name: 'main', can_push: true }, files = {} } = {}) {
+// noRepoRead: tokens whose scopes do not reach the repository, so listing its files is refused though the role allows it.
+// treeMissing: the path is not in the store yet, as a first write finds it.
+function fakeGitlab({ roles = { 'read-token': 20, 'write-token': 30 }, readOnly = [], noRepoRead = [], treeMissing = false, branch = { name: 'main', can_push: true }, files = {} } = {}) {
   let n = 1;
   const g = { head: 'a'.repeat(40), files: { ...files }, calls: [], mrs: [], branches: { [branch.name]: true } };
   const res = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, arrayBuffer: async () => { const b = Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); } });
@@ -31,6 +33,8 @@ function fakeGitlab({ roles = { 'read-token': 20, 'write-token': 30 }, readOnly 
     if (path.startsWith('/repository/branches/')) return path.endsWith(branch.name) ? res(200, { name: branch.name, can_push: level >= 30 && branch.can_push, protected: !branch.can_push }) : res(404, {});
     if (path.startsWith('/repository/commits/')) return res(200, { id: g.head, title: g.title ?? null });
     if (path === '/repository/tree') {
+      if (noRepoRead.includes(headers['PRIVATE-TOKEN'])) return res(403, { error: 'insufficient_granular_scope', error_description: 'Access denied: This operation requires a fine-grained personal access token with the following project permissions: [Repository: Read].' });
+      if (treeMissing) return res(404, { message: '404 Tree Not Found' });
       const pre = u.searchParams.get('path');
       return res(200, Object.keys(g.files).filter((f) => !pre || f.startsWith(pre + '/')).map((f) => ({ type: 'blob', path: f })));
     }
@@ -127,6 +131,26 @@ test('a protected branch this token cannot push: a merge request, never a commit
   assert.equal(g.mrs[0].target_branch, 'main');
   assert.ok(!g.writes().some((c) => c[0] === 'POST' && c[3]?.branch === 'main'), 'no commit on main');
   assert.equal(await (await mayWrite(ROOT, { stores: { intentLayer: { read: LINK } } }, 'commit', { env, http: g.http })).ok, false, 'the intent layer is not committed there either');
+});
+
+test('a store that will not list its files is not taken for empty: nothing is sent, and the line says which permission is missing', async () => {
+  const g = fakeGitlab({ noRepoRead: ['write-token', 'read-token'], files: { 'snaps/src/figma-vars.snapshot.json': '{"old":1}' } });
+  const cfg = cfgWith({ snapshots: { read: { gitlab: LINK, path: 'snaps' } } });
+  const r = await pushStore(project(), cfg, 'snapshots', new Map([['src/figma-vars.snapshot.json', '{"new":1}']]), 'Snapshots refreshed', { env, http: g.http });
+  assert.equal(r.ok, false, r.line);
+  assert.match(r.line, /would not list the files it holds/);
+  assert.match(r.line, /GITLAB_WRITE_TOKEN must be allowed to read the repository/);
+  assert.ok(!g.writes().some((c) => c[3]?.branch), 'not one file committed');
+  assert.equal(g.files['snaps/src/figma-vars.snapshot.json'], '{"old":1}', 'the store is left as it was');
+});
+
+test('a path the store has not got yet is empty for real: every file is created', async () => {
+  const g = fakeGitlab({ treeMissing: true });
+  const cfg = cfgWith({ snapshots: { read: { gitlab: LINK, path: 'snaps' } } });
+  const r = await pushStore(project(), cfg, 'snapshots', new Map([['src/figma-vars.snapshot.json', '{"a":1}']]), 'Snapshots refreshed', { env, http: g.http });
+  assert.equal(r.ok, true, r.line);
+  const commit = g.writes().find((c) => c[1].endsWith('/repository/commits') && c[3]?.branch);
+  assert.deepEqual(commit[3].actions.map((a) => [a.action, a.file_path]), [['create', 'snaps/src/figma-vars.snapshot.json']]);
 });
 
 test('Developer on a branch it may push: one commit, files created or updated', async () => {
@@ -349,6 +373,21 @@ test('a commit says whose run made it; a checkout with no identity of its own se
   await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', '{"b":2}']]), 'Snapshots', { env, http: g2.http, runBy: null });
   const body2 = g2.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
   assert.equal('author_name' in body2, false, JSON.stringify(body2 && Object.keys(body2)));
+
+  // In a pipeline, who started it is who ran it. A schedule has nobody behind it: GitLab names the schedule's owner,
+  // who did nothing that night, so the commit carries no author and says the schedule made it, for History to read.
+  const inPipeline = async (source) => {
+    forgetAccess();
+    const g3 = fakeGitlab();
+    const ci = { ...env, GITLAB_CI: 'true', CI_PIPELINE_SOURCE: source, GITLAB_USER_NAME: 'Wombat', GITLAB_USER_EMAIL: 'ben@example.com' };
+    await pushStore(project(), cfg, 'snapshots', new Map([['figma-vars.snapshot.json', `{"${source}":1}`]]), 'Snapshots', { env: ci, http: g3.http });
+    return g3.calls.find((c) => c[0] === 'POST' && c[1].endsWith('/repository/commits') && c[3]?.branch)?.[3];
+  };
+  const pushed = await inPipeline('push');
+  assert.deepEqual([pushed.author_name, pushed.author_email, pushed.commit_message], ['Wombat', 'ben@example.com', 'Snapshots'], 'who pushed, with no trailer');
+  const scheduled = await inPipeline('schedule');
+  assert.equal('author_name' in scheduled, false, 'never the schedule\'s owner');
+  assert.equal(scheduled.commit_message, 'Snapshots\n\nRun-by: schedule');
   assert.equal('author_email' in body2, false);
 });
 

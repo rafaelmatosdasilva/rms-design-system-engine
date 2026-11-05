@@ -149,9 +149,27 @@ if [ -n "$CLIENT" ]; then
   printf '%s\n' "$OUT" | grep -v '^NEXT:' || true
   echo ""
   echo "✅  Set up for $CLIENT in $FOLDER"
-  echo "    Open that folder in Claude Code and run /rms-design-system-engine-$SLUG"
   echo "    Your token is in $FOLDER/.env: never share or commit it."
   if [ -n "$NOTES" ]; then printf '%s\n' "$NOTES"; fi
+  # Claude Code must be opened in that folder: the token is in its .env, and the engine reads it from where it runs.
+  # Saying "open that folder" without saying how is where a first setup stops, so it is either done here or written
+  # out as the line to paste. Asked the way the token is asked, from the terminal the person is at.
+  OPEN_LINE="cd \"$FOLDER\" && claude"
+  if command -v claude >/dev/null && [ -r /dev/tty ] && { exec 3</dev/tty; } 2>/dev/null; then
+    echo ""
+    printf "    Open Claude Code there now? [Y/n] "; read -r ANS <&3 || ANS=""; exec 3<&-
+    case "$ANS" in
+      [Nn]*) echo ""; echo "    When you are ready:"; echo ""; echo "      $OPEN_LINE"; echo ""; echo "    Then ask: /rms-design-system-engine-$SLUG monta o projeto" ;;
+      *) echo ""; echo "    Opening Claude Code in $FOLDER — then ask: /rms-design-system-engine-$SLUG"; cd "$FOLDER" && exec claude ;;
+    esac
+  else
+    echo ""
+    echo "    To start, open Claude Code in that folder:"
+    echo ""
+    echo "      $OPEN_LINE"
+    echo ""
+    echo "    Then ask: /rms-design-system-engine-$SLUG"
+  fi
   exit 0
 fi
 

@@ -23,7 +23,7 @@ test('a run started by hand waits for a round of the watch, never for its own ro
   const w = await waitForRound(root, { env: {}, alive: () => true, ancestors: () => [], log: (l) => said.push(l), pollMs: 1, sleep: async () => { if (++ticks === 3) unlinkSync(file); } });
   assert.equal(ticks, 3);
   assert.equal(w.gave, undefined);
-  assert.match(said[0], /^⏳ The background watch is running a round on this project \(process 4242, since 03:00\): waiting for it to end/);
+  assert.match(said[0], /^⏳ A round is running on this project \(process 4242, since 03:00\): waiting for it to end/);
   assert.deepEqual(await waitForRound(root, { env: {} }), { waited: 0 });
 });
 

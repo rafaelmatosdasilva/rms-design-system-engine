@@ -52,7 +52,7 @@ Each sign the code gives counts. A strong sign pairs on its own. A weak one need
 | Props | Backs another sign | its props hold two thirds of Figma's properties |
 
 - **Paired.** A strong sign, or two that agree.
-- **Proposed.** One weak sign alone. Never applied: the audit prints it (`🔗`), the props and sub-component checks name it in their "no code file" line, and the style guide lists it under Tasks, Parity, to confirm or pin.
+- **Proposed.** One weak sign alone. Never applied: the audit prints it (`🔗`), the props and sub-component checks name it in their "no code file" line, and the style guide lists it on the Status page, under Parity, to confirm or pin.
 - **Only in Figma.** No sign at all. The files nearest its name are named, among those no other component has.
 - **Never taken twice on a weak sign.** A file a name gives to one component is not offered to another on its tokens alone, unless the two differ only by a state word.
 - **One file, two styles.** When Figma has bannerTopPrimary and bannerTopSecondary and the code has `banners/Top.vue` with a prop that chooses the style (`useSecondaryStyle`), both are paired with it.
@@ -81,6 +81,18 @@ Two more are optional, and each decides how much a run can see. The installer ch
 
 > **Ask for TypeScript 5 by name.** A plain `npm i -g typescript` installs version 7, the rewrite, which reads no JSX. The engine treats it as no TypeScript at all rather than failing midway through a run, and says so.
 
+### A company's own setup
+
+A team whose setup lives in a profile installs everything with one line: the engine, the team's own command, a work folder and the token to reach their projects.
+
+```bash
+curl -fsSL <the installer> | bash -s -- --client <team> --profile <the profile's link>
+```
+
+- **It asks for your GitLab token** and keeps it only in that folder's `.env`, read without showing on screen. Nothing is passed on the command line.
+- **The folder** is `~/<team>-design-system`, or wherever `--folder` says.
+- **It ends where the work starts.** Your token lives in that folder and the engine reads it from where it runs, so the installer opens Claude Code there for you — or, with no terminal to ask in, writes out the line that gets there. It never leaves you to guess which folder to open.
+
 ### Staying up to date
 
 The skill updates itself. Once a day, before an audit, it pulls the latest version and says so in one line.
@@ -88,7 +100,7 @@ The skill updates itself. Once a day, before an audit, it pulls the latest versi
 - It only does this when the install is on `main` with no local changes, and never on CI.
 - `DESIGN_SYSTEM_ENGINE_NO_AUTO_UPDATE=1` turns it off.
 - `rms-design-system-engine --update` updates it by hand, and `--version` tells you if you are behind.
-- A new version is published on GitHub when something worth having lands: a change in how the engine works, a finished new capability or a fix for a problem people hit, at most once a day, and within three days for anything else. Each release lists what was merged since the last one. Watch the repository (**Watch → Custom → Releases**) to hear about each one.
+- A new version is published on GitHub once a week, on Monday, listing what was merged that week. A security fix, or a fix for a problem that stops people, comes out at once. Your install does not wait for either: it follows the latest code once a day, so a change reaches you the day after it is merged. Watch the repository (**Watch → Custom → Releases**) to hear about each weekly version.
 - `rms-design-system-engine --doctor` checks the install, axe-core included. The install fetches axe-core, so the first accessibility check needs no network.
 
 Keep a single copy. Link anything that needs the skill's files to `~/.claude/skills/rms-design-system-engine`, the folder that updates itself, instead of keeping a clone of your own.
@@ -112,6 +124,20 @@ Setup ends with a first result, so you see what the engine is for before learnin
 - **Its three main findings.** What fails first, one per check, each with what to do and who does it.
 - **What to ask next.** Three requests to try, such as showing that component in the style guide.
 - With no Figma data yet, it says to run the first audit, which reads Figma, then shows the first result.
+
+### Tokens your product loads at runtime
+
+Some systems do not declare their token values in a file in the repository: the product fetches a stylesheet per mode as it starts (`light_desktop.css`, `dark_phone.css`). Setup downloads every one it can reach and merges them into one local file, `src/styles/tokens.hosted.css`, each mode in its own block, and `paths.themeCSS` in `ds-config.json` names it.
+
+Everything the engine measures is compared against those values, so that one file matters more than any other:
+
+- **The address is kept.** `paths.themeCSSFrom` records where the stylesheets came from. One mode's address is enough — the engine asks for the rest by itself.
+- **A run that measures finds it gone and takes it again.** The file is the engine's own, so it rebuilds it rather than measuring against nothing. A command that reads no token values (writing a CI job, adding a guidelines link) is not held up by it.
+- **A run that cannot take it again stops.** Without the token values, every token reads as undeclared and every component as different from Figma: a page that says your system is broken when nothing is. The run says which file is missing instead.
+- **A system built from Figma is exempt.** When your tokens are written from Figma (`build: true`), the file they go into is not there until they are written, and the gate for it already lists what to write.
+- **Ask for it any time** ([ask in Claude Code](commands.md#set-up)), for instance when the hosted values changed and you want them now.
+
+A file **you** named in `paths.themeCSS` is yours, not the engine's: if it is missing, the run says so and changes nothing.
 
 ### A Figma branch
 
@@ -260,6 +286,7 @@ A collection whose values change with a mode (a sizing collection per breakpoint
 
 ### Components
 
+- **What Figma does not publish is left out.** A component whose name starts with a dot or an underscore (`.tableCell`, `_base`), with or without a status mark in front of it (`🟡 .tableCell`), is private to the library: a building block of other components, not one of your system. Your code is never asked for it, it is not counted as missing, and it gets no page in the style guide.
 - **No hand-built DS components.** A screen uses the real component, not a hand-styled copy.
   - A product's own version of a system component is listed too, as advice. It is found by what it draws (a class that loops the same animation as a component's part, `.spinner` beside the loader's `.loader-spinner`) or by its name (a class of its own that starts with a component's name and says nothing more, `loading-state`).
   - A class beside a system class on the same element dresses the component and is left alone.
@@ -436,12 +463,60 @@ Some WCAG criteria belong to a page, not to a component. They are tried on each 
 
 The check ends with one line, `Verdict: 1 blocker · 2 warnings · 1 advisory · WCAG 2.2 AA`. A must-pass check (`"a11yStrict": true`) never stops on an advisory.
 
+### Who acts on each finding
+
+A criterion is not a task. One criterion often owes work to more than one person, and a single finding can owe two
+of them a step each: a colour pair is picked in Figma, then used in the code.
+
+| Person | What falls to them |
+|---|---|
+| A designer, in Figma | Colour pairs, focus states, target sizes, a visible label, a role not stated yet |
+| A developer, in the code | Markup, ARIA, keyboard, focus, ids, reading order |
+| Whoever writes the words | Alternative text, a link's words, a label, a heading, a page title, captions |
+| Whoever owns the flow | Help in the same place, navigation alike across pages, a step that can be undone |
+| A person checks it by hand | What no machine decides: whether a heading describes its section, whether an error says how to put it right |
+
+- **It comes from the finding, not the criterion.** Each kind of finding names the people it owes work to, and what
+  each of them does. A kind that names nobody is the code's, in one step.
+- **Two people, in order.** Where a finding owes two steps, each person gets their own task and the second says which
+  step it is (`2/2`), so a task read on its own still says it follows another's.
+- **It travels with the result.** Every finding in `a11y.json` carries its tasks, so an agent reading the file knows
+  who acts without being told.
+- **Where it shows.** The check prints the tasks under each finding, and ends with a count per person. On a
+  component's Accessibility area each criterion becomes one row per person, with a **Who acts** column and a filter
+  that takes several people at once, so a team sees only its own work. What is done keeps its person, so a team can
+  see what it has finished as well as what is left.
+
+### What a person checks by hand
+
+Nine criteria only a person can decide, and two more the checks try but a person settles. The engine says what to
+look at, **how to look at it**, and keeps the answer only while it is still true.
+
+- **A few short steps, per criterion.** Each one says the two or three things to do before judging: zoom the page to
+  200% and see whether the text blurs, make the field fail and read the message, walk the flow from its first step.
+  They are the same for everyone, so two people checking the same criterion check the same way.
+- **What to do when it fails.** The last step says to leave it unchecked and whose task it becomes, rather than
+  pretending every check ends in a pass.
+- **Say you checked it.** `rms-design-system-engine --checked <component> <criterion> --by "<name>"
+  --with "<browser and screen reader>"`. `--with` is free text, said back as it was written: a closed list would be
+  wrong the day a new version ships.
+- **Why `--with` matters.** A criterion read out loud is only checked for the pair that read it. A check made in
+  VoiceOver says nothing about NVDA, and the page no longer lets one stand for the other.
+- **It expires on its own.** The record keeps the component as it was (its CSS rules, its contract entry, its source
+  file). Change any of them and the row reads *To check again*, saying who checked it before and with what.
+
 ### Only what changed is tried again
 
 - **Each page's results are kept.** They are saved under what the page rests on: its components and your CSS, your settings, and the check itself.
 - **A token change tries only the components that use it.** Each component is signed with its own CSS rules and the tokens they reach, through `var()` and in every brand. A colour changed in Figma tries again only the components that show it.
 - **A token the whole page shares tries every component.** That is a token the style guide's frame or your global CSS uses (a page background, the body text).
 - **An unchanged page is not opened again.** The next run puts its results back, and the report says how many pages it reused. When nothing changed, no browser opens and the check takes seconds.
+- **An engine update tries again only what it could have changed.** Results are signed by what decides them: the
+  checks, the thresholds, the rules they run and the in-page script. What a finding is called, why it matters,
+  what to do about it and who does it are words, kept apart and left out of the signature, so a reworded finding
+  never makes a whole system check itself again. A comment on a line of its own is left out too; one after code
+  is kept, because finding where it really begins means reading the strings around it, and a signature that
+  guessed wrong would put back results the engine should have checked again.
 - **A change is tried at once.** A style guide is checked a few components a page, so a change to one component tries only its page again.
 - **An engine update re-checks only what it changes.** The check is signed by the parts of the engine that measure: a new page in the style guide, or how the browser is driven, keeps every result. A component whose name is not valid CSS is said not checked once, and its page is still kept.
 - **A change to your CSS's comments or spacing keeps every result.** Only the rules count.
@@ -568,7 +643,7 @@ Some problems belong to the Figma file. They are found in Figma alone, before an
 Each gap reaches the design team:
 
 - **In Figma.** `--figma-edits` puts each one on the page "Design system to do", in a frame "Accessibility the design owes": one card per gap, with its WCAG criterion and its fix. It is written only after you say yes, and afresh each time, so what is fixed clears.
-- **On the style guide.** Each one is on its component's Accessibility list and on the Tasks page, for you in Figma.
+- **On the style guide.** Each one is on its component's Accessibility list and on the Status page, for you in Figma.
 
 Meanwhile Claude writes a visible focus ring and leaves the words of an error message or a name to you. `"designA11y": false` in `ds-config.json` turns this off.
 
@@ -885,9 +960,15 @@ Now they come together in one log, written to `DECISIONS.md` in the output folde
 
 A decision a person makes on purpose lives in your intent layer, on the page it is about: a component's, a pattern's, a template's, a flow's, a foundation's or the system's own. It sits under a Decisions heading, one line each: what was decided, what was ruled out, why, who and when. [Tell Claude](commands.md#write-the-intent-layer) and it writes the line for you to read first, and sends it to the layer only when you ask.
 
-The style guide shows them in **History** (it was the Changelog): one table, by release, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided, each row tagged Code, Figma, Intent layer or Decision. A chip for each shows only that kind. Each component's History area does the same for that component.
+The style guide shows them in **History** (it was the Changelog): one table, a row per change, newest first, of what changed in the code, what changed in Figma, what changed in the intent layer and what was decided. Its columns are Date (with the time), Type, What, Done by and Affects. Each commit is a row of its own, with the person who made it and, for the code, the release it shipped in. A chip for each type shows only that type, and an issue with several commits shows them alone in a click. Each component's History area lists the changes to that component.
 
 - **An intent layer change** is a card of its own: the pages it changed, the commit that made it, and the components those pages document. The engine keeps the last 50 changes it read, in the layer's snapshot.
+- **Every row names who did it.** A decision already says who answered it. A row that is work instead (a commit to the code, a read of Figma, a change to the intent layer) says who did it, in the same place:
+  - **One person:** *Done by* and the commit's author.
+  - **Somebody else brought it in:** *Done by* the author, *pushed by* the committer, when the commit's committer is not its author, as when a maintainer merges, rebases or cherry-picks someone else's work. A commit pushed exactly as it was written keeps its author as its committer, so it shows one name: git does not keep who pushed.
+  - **A pipeline:** a run started by a push, by hand or by a merge request names the person who started it. A scheduled run has nobody behind it, and GitLab names whoever owns the schedule, so the engine never takes that name: its commit says `Run-by: schedule`, and its row says *Done by the schedule*.
+  - **An account:** a host's merge button, an app or an access token's bot is said as *a pipeline*, never as if it were a person.
+  - **A name only**, never an address: the guide is shared with the whole team.
 
 The part that pays is what agents get. A card now carries what was already ruled out and why, and `llms.txt` lists it under Decided against: an agent that does not know a thing was considered and rejected will propose it again, confidently, every time it is asked.
 
@@ -956,21 +1037,13 @@ A prop table copied from the code, a whole token family listed by name, or a cat
   - On every push to the design system's default branch.
   - At once, when the intent layer's own repository says it changed. Publishing writes that repository's small job to `.design-system-engine-out/intent-layer-job.yml`, with the token to add once.
   - Every hour, when the intent layer, a store, the Figma file or the engine moved since the last build. An hour with nothing new stops in seconds. On GitLab, add the hourly schedule once (Build → Pipeline schedules).
-- **A guide published to your team's store** updates by itself too. Publishing to the store also writes a job for the store's own project (`.design-system-engine-out/style-guide-store-job.yml`), for teams whose code is in a repository they may only read:
-  - **On Jenkins.** A team whose CI is Jenkins (its store tells a Jenkins job, a `Jenkinsfile` in the project, or `"ci": "jenkins"`) gets `.design-system-engine-out/style-guide-store.Jenkinsfile` instead: the same steps, asked every ten minutes, Chrome for Testing downloaded when the machine has none, and three credentials named for Jenkins to hold. Every job is written for the store's own default branch, never one assumed to be `main`.
+- **A guide published to your team's store** updates by itself too. Publishing to the store also writes a job for the store's own project (`.design-system-engine-out/style-guide-store-job.yml`), for teams whose code is in a repository they may only read, written for the store's own default branch, never one assumed to be `main`:
   - it builds from your company's profile, which says where the code, the intent layer, the stores and Figma are;
   - it runs every hour when something moved, and at once when the intent layer's job starts it;
   - it never runs on a push to the store, since the page it sends is one;
   - it sends the page with the project's own access token, and GitLab decides what that token may do.
-- **Your own copy updates on its own too.** On your computer, the style guide can build itself again whenever something changes ([ask for it](commands.md#publish-a-living-style-guide)):
-  - your design system's code, a few seconds after you save, commit or switch branch;
-  - Figma, checked every 5 minutes when a `FIGMA_TOKEN` is set (a `FIGMA_ACCESS_TOKEN`, the name Figma's own tools use, counts as one);
-  - the intent layer, checked every 5 minutes;
-  - your team's stores, the profile and a code mirror on GitLab, checked every 5 minutes;
-  - the engine itself, after it updates.
-  - It runs only what the change feeds, and publishes to your team's store only a page that changed. No CI runner? This keeps the team's page up to date ([Rebuilt on your own computer](#rebuilt-on-your-own-computer)).
-  - It runs in the background from login on, with no terminal open: a LaunchAgent on a Mac, a user service on Linux. What it does goes to `.design-system-engine-out/watch.log`, and one request turns it off.
-  - It is on by default ([On by default](#on-by-default)).
+  - **A token that may write but not read is refused, not guessed at.** Sending the page reads the project's files first: that is how the engine tells what is already there from what is new. A token your host lets commit but not read the repository (a fine-grained token without **Repository: Read**) stops the publish and says so, rather than sending every file as new and leaving the store between two builds.
+- **Your own copy is rebuilt when you ask.** Nothing rebuilds it by itself: no job is installed on your computer and nothing runs on a schedule. Ask for a round (`--auto`, or [in words](commands.md#publish-a-living-style-guide)) and it reads what moved since the last build - your design system's code, Figma, the intent layer, your team's stores and profile, the engine itself - and runs only the steps those feed, publishing to your team's store only a page that changed ([Rebuilt when you ask](#rebuilt-when-you-ask)).
 - **A job written before** builds only on a push to the system. Publishing says so when your intent layer lives elsewhere, and leaves your job as it is: take the new triggers from `--publish-styleguide --print`.
 - **Easy to host.** The page keeps its styles, code, fonts and data in an `assets` folder beside it, each file named by what it holds. To open it on your computer, download `index.html` and the `assets` folder. A host serves them once and a browser keeps them, so after a rebuild a visitor downloads only the page and its data, and the component panel opens from what is already there. It still opens from disk, double-clicked.
 - **The first screen loads first.** What only a component's own page reads (its code, its whole changelog, its Code Connect, its Figma images) is a small file of its own in `assets`, loaded when that component opens. The Status page, the menu and the overview show without waiting for it.
@@ -984,9 +1057,9 @@ A prop table copied from the code, a whole token family listed by name, or a cat
 - **One template for every project.** Every project fills the same template (`templates/styleguide.template.html`) with its own data, so an improvement there reaches every design system on its next run. A project can still use its own (`styleguide.template` in `ds-config.json`).
 - **The template comes in parts.** Its file is the page's frame; its styles and its script are parts of their own under `templates/styleguide/` (`css/` and `js/`, one area of the page each, such as the Overview, the Tokens page or the Status page), joined in order when the page is built. A change is reviewed and tested one area at a time, and the page they make is the same. A project's own template can be one file, or use parts the same way (a line `/*@part …*/` in its styles, `//@part …` in its script).
 
-### Rebuilt on your own computer
+### Rebuilt when you ask
 
-Some teams have no CI runner, so no pipeline ever rebuilds their guide. The background watch (`--watch`, kept running by `--watch-install`) does it on a person's own computer instead.
+Some teams have no CI runner, so no pipeline ever rebuilds their guide. A round on a person's own computer does it instead: `--auto` builds one now and stops. Nothing is installed and nothing runs on a schedule - a round happens because someone asked for one - and because it runs only what the change reached, asking costs a fraction of a whole build.
 
 - **It runs only what the change feeds.** One table in `lib/auto-build.mjs` says which steps each source feeds:
 
@@ -1011,34 +1084,21 @@ Some teams have no CI runner, so no pipeline ever rebuilds their guide. The back
   - **Never another token.** A variable the engine uses for something else (`GITLAB_TOKEN`, `GITLAB_WRITE_TOKEN`, `GITHUB_TOKEN`, `FIGMA_TOKEN`, a store's `tokenEnv`) is refused, so a profile can never send one of your tokens to a host it was not made for. Only `https` links are called (`http` only on `localhost`), and a link with a password in it is refused: put the password in `.env`.
   - **One line per link:** `🔔 Style guide: told ci.acme.test/job/style-guide/build (201)`. The line never shows the link's query or a credential. A CI that refuses, or does not answer in 10 seconds, gets a line of its own, and the write still counts.
 - **Never from a branch of your own.** A checkout on another branch than its remote's default is built, never published.
-- **A failed step is never published.** The round says where it failed, and it is tried again at the next check.
+- **A failed step is never published.** The round says where it failed, and the next round tries it again.
 - **One round at a time.** A lock file stops a second round while one runs.
+- **A round never waits for ever.** A step still running after 90 minutes (`styleguide.stepMinutes`) is stopped with its browsers, and the log says so.
 - **One line a round** in `.design-system-engine-out/watch.log`: what moved, what ran, how long, and whether it published.
-- **One round now.** `--watch --once` (or `--auto --once`) runs one round and stops, for a scheduler of your own.
+- **A scheduler of your own.** `--auto` is one round and an exit code, so a cron entry or a CI job of your own can call it on whatever rhythm you choose. The engine never writes one for you.
 - **Never two at once.** An audit, a build or a publish you start while a round runs waits for it to end first, so the two never write the same files or share the computer.
 - **No token is stored.** Each step reads them from the project's `.env`, as every run does.
-- **`--guide-status`** says whether the watch is on (and why not, when it is off), and what its last round did.
-
-#### On by default
-
-The engine turns the watch on by itself, once for each person:
-
-- **When:** at the end of first setup, or on your next run where it isn't on yet. It says so in one line, and never asks or waits.
-- **Never:** on CI, in tests, inside the watch's own rounds, on an `--offline` run, or from an engine running in a git worktree.
-- **Turn it off for yourself:** `--watch-uninstall`. It stays off for that folder until `--watch-install`.
-- **A round never waits for ever.** A step still running after 90 minutes (`styleguide.stepMinutes`) is stopped with its browsers, and the log says where it stopped; the next round starts again. Inside the accessibility check, a browser that stops answering is stopped two minutes past its limit, the log says what it was on, and its parts are left for the page's own check while the rest of the round builds and publishes.
-- **Turn it off for the project:** `"styleguide": { "watch": false }` in `ds-config.json`, or in your team's profile for everyone. A watch the engine turned on is then taken away on the next run; one you turned on by hand stays.
-- **A failed start** is said once, with its reason, and not tried again on every run. `--watch-install` tries again.
-- **Not a Mac or Linux:** it says once that it can't, and how to rebuild by hand.
-- **Engine updates:** the watch updates the engine itself (once a day at most, between rounds), builds with the new engine, then restarts on its code. The job names the engine's own folder and a `node` path that upgrades keep, so neither breaks it.
+- **`--guide-status`** says whether the style guide the team opens is behind what it is built from, and what this folder's last round did.
 
 ### What's in it
 
 | Page | What you find there |
 |---|---|
 | Overview | A card for each foundation and component, with a thumbnail drawn from your own code, and a search across everything |
-| Health | How far the system has come, in one number and by area |
-| Tasks | Everything still open, with who acts and what to do |
+| Status | How far the system has come, in one number and by area, and everything still open with who acts and what to do |
 | Foundations | Colours, typography, spacing, radii, motion and icons |
 | Components | One page for each component, in areas you switch between |
 | Templates | Each page template, what it is made of and the frame it comes from, when you list templates |
@@ -1079,7 +1139,7 @@ At the top, the component's name and how a product imports it, with buttons to c
 | Built with | The system's components it is made of |
 | Parts | The components placed only inside it (a dropdown's row, a table's cell), each with its own documentation, written in this component's page |
 | Used in | Each product that uses it, with a picture and how many times. A product that draws its own version (Gate [10]) is there too |
-| History | Each Figma change and each code commit, by release, with links, and what the team decided about it |
+| History | Every change in one table: each code commit (its issues and release), each Figma change, each intent layer commit and each decision, with who did it and when |
 
 Each area has its own link (`#c-chip/accessibility`). The address also keeps what you set in the Playground (`#c-chip?Size=L&width=phone`), so a link opens that exact variant.
 
@@ -1098,8 +1158,8 @@ Also on each component.
 - **Not agreed yet.** A prop only one side has, a different default or a token that differs is left out and counted at the top, so you decide each one first.
 - **Only in the code.** A component only your code has keeps its own page and its place in the menu, marked Only in the code, with its file and its props. Its Status row says Figma is Missing, with what to do in an i: add it to Figma, or remove it from the code. Its Parity is N/A. `styleguide.showCodeOnly: false` leaves these off the pages, a task each.
 - **Coverage.** How much of its file your tests cover, beside its Code Connect.
-- **Its stage is a task, not a label on its page.** Your team sets it as `status` in `contract.authored.json`, as `Status: beta` in its Figma description, or with `@deprecated` in its code. The Tasks page asks for it:
-  - With no stage set, a Stage task says what the page measures, in the Status table's words: Stable when Parity is Match, Accessibility Pass and Documentation Ready (with at least 80% of its lines covered when your tests report coverage), Beta otherwise, with what is left.
+- **Its stage is a task, not a label on its page.** Your team sets it as `status` in `contract.authored.json`, as `Status: beta` in its Figma description, or with `@deprecated` in its code. The Status page asks for it:
+  - With no stage set, a Stage task says what the page measures, in the Status table's words: Stable when Parity is Match, Accessibility Met and Documentation Written (with at least 80% of its lines covered when your tests report coverage), Beta otherwise, with what is left.
   - With a stage that differs from what the page measures, the task says both, to keep it or change it.
   - A component being retired names what replaces it, from the release that retired it or from a line such as "use button instead" in Figma or its code.
 
@@ -1220,17 +1280,22 @@ One row for each component, with one word per state. The cards above the table a
 
 | Column | States |
 |---|---|
-| Figma, Code | Found, Unsure, Missing |
+| Figma | Found, Missing |
+| Code | Built, Unsure, Missing |
 | Parity | Match, Partial, Differs, Unsure |
-| Accessibility | Pass, Issues, Review, Untested |
-| Documentation | Ready, Partial, Missing |
+| Accessibility | Met, Issues, Review, Untested |
+| Documentation | Written, Partial, Missing |
 
-- **Cards.** Parity, Code, Accessibility and Documentation, read from the table's rows. The big number is what is done (Match, Found, Pass, Ready) out of the same components; the bar splits the rest in the table's own states and colours (Not checked grey). Each card's button opens the table filtered to what is left (See the 60 missing components).
+- **Cards.** Parity, Code, Accessibility and Documentation, all over the same whole: everything the table lists, said once above them. The big number is the share of the work done, in the table's word (51% Match). The bar draws that share in green and splits the rest into what waits for a person (yellow) and what is to fix (red), and its legend says those shares in the table's words. At its foot, on one line: how many are complete, the same count the filter shows for the done word (1 of 180 complete), and a link that opens the table filtered to what is most urgent (See Missing). It says complete, not the big number's word, because it counts whole components while the big number counts the work.
+  - **Parity** counts every property, token and value compared, in what the code has built.
+  - **Code** counts the rows themselves: built, unsure or missing.
+  - **Accessibility** counts WCAG 2.2 AA criteria over the whole system. A criterion is met when nothing fails it, to review when only a check by hand is left, and failing when anything fails it.
+  - **Documentation** counts what people write. Its page existing and its properties, which the engine writes itself, are not counted.
 - **Parts.** A Figma name with a slash (`chartBars/bar`) is a part, not a row: its parent's row counts what it has left, and the parent's details list it under Parts.
 - **Opening a component.** A row, or its arrow, opens the component's page in a panel from the right, with its tabs. A Parity, Accessibility or Documentation cell with something left opens that area, filtered to what is to fix or decide.
 - **N/A and Untested.** N/A has no dot and no arrow, since there is nothing to open. N/A and Untested carry an i that says why. A component only one side has says what to do in an i on the side that lacks it.
 - **Sorting.** Every column sorts both ways, Parity first.
-- **Filters.** One chip per column, named only until a state is chosen, so nothing looks applied. Each opens a list of All and the column's states, with how many rows each would show. Chips combine (Code: Found and Documentation: Missing is what is built and undocumented), each list counting beside the others' choices. Choosing a state sorts by its column; Clear filters drops them all.
+- **Filters.** One chip per column, named only until a state is chosen, so nothing looks applied. Each opens a list of All and the column's states, with how many rows each would show. Chips combine (Code: Built and Documentation: Missing is what is built and undocumented), each list counting beside the others' choices. Choosing a state sorts by its column; Clear filters drops them all.
 - **The address.** It keeps the view, the filters and the open panel with its tab (`#status/parity?code=Missing&doc=Missing&open=c-chip/accessibility`), so a link opens the page as it was. `#health` and `#tasks` open the Status page too.
 
 ## Catch drift in product code and AI edits
@@ -1270,7 +1335,7 @@ The last three set its risk (high, medium or low), which the reason says. For ex
 
 Where you see it:
 
-- **The style guide's Tasks.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
+- **The style guide's Status page.** Each task says Local or Shared beside who acts, and the reason when you open it. A task whose files are all one product's is that product's.
   - A component only one side has is counted too. Only in Figma, not built yet: shared, the system's to build. Only in one product's code (the usage map): local, that product's own.
 - **The intent layer's proposals.** Each Fix, Add, Move and review says which, with its reason, on the Documentation page and in `--intent-decide`. One about a component's page (or a template's, a pattern's, a foundation's) is shared. One about a product's flow or page is local.
 - **The issues the engine opens.** Each issue's body has one line: "Shared: waits on Cards lead — the reason" or "Local: the product team's own — the reason". A difference in a product's own files is local: a control its screen builds by hand, or anything else whose files are all that product's (the same reading as the usage map). Any other difference is the system's. The list of open issues by the fix each needs counts them too.
@@ -1402,13 +1467,13 @@ The gates check each mode on its own. When you have two collections that switch 
 - Each token is compared with Figma's value in that combination.
 - Each text and background pair the system uses is measured for contrast.
 
-Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Tasks page, under The system.
+Only what is wrong together and right in each mode alone is listed, with the combination. A phone rule that sets a colour, so Dark on a phone keeps Light's, is a typical case. These show on the style guide's Status page, under The system.
 
-The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Tasks page under The system.
+The collections that switch (a colour mode by media, class or attribute, a sizing mode by breakpoint) are combined, up to 64 combinations (`🎛`). Each is set at once on a page holding only the theme, and every root token is read. A token that differs from Figma's value only in that combination is listed with the combination (`Dark with Phone`), and so is a text and background pair that falls below its WCAG ratio only there. They go to the Status page under The system.
 
 ### Who owns what
 
-`owners` in `ds-config.json` names the team that owns each component, token layer or token prefix: `{ "primitives/": "Brand team", "semantic/": "Design system team", "tileCard": "Cards team", "*": "Product teams" }`. The Tasks list then says the team after who acts ("You in Figma · Brand team"), the longest key that fits first: a component's own name, else a token prefix the task names, else `*`.
+`owners` in `ds-config.json` names the team that owns each component, token layer or token prefix: `{ "primitives/": "Brand team", "semantic/": "Design system team", "tileCard": "Cards team", "*": "Product teams" }`. The Status page then says the team after who acts ("You in Figma · Brand team"), the longest key that fits first: a component's own name, else a token prefix the task names, else `*`.
 
 - A key can be a pattern: `"tile*"` covers every tile, `"patterns/"` every pattern page.
 - The owner is also who decides what waits on a person about it: a proposal, a page's drafts, a page to review again, a change held for sign-off.
@@ -1662,7 +1727,7 @@ Until now the answer was the same in every project, and it was always the most c
 
 **Your product's code is not on that list, and never will be.** The engine does not change code people wrote. What it finds there comes back as a patch for a person to apply and as the difference on that component's page in the style guide. At most it writes the intent layer; everything else it flags.
 
-Each gets **yes** (write it, and say what changed), **ask** (show the exact change and wait for a yes, every time) or **no** (never: the change goes on the Tasks page, for whoever owns that place). A place with no answer is asked about once, and the answer is recorded, so every session and every run read the same one. `rms-design-system-engine --writes` shows them; `--writes figma ask` sets one.
+Each gets **yes** (write it, and say what changed), **ask** (show the exact change and wait for a yes, every time) or **no** (never: the change goes on the Status page, for whoever owns that place). A place with no answer is asked about once, and the answer is recorded, so every session and every run read the same one. `rms-design-system-engine --writes` shows them; `--writes figma ask` sets one.
 
 Two things the setting cannot override. On CI there is nobody to answer, so **ask** becomes **no**. And CI never writes the design file or the product's code, whatever the setting says: a run nobody is watching changing what people wrote is how a team stops trusting the engine.
 

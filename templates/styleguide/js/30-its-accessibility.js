@@ -58,18 +58,25 @@
   function scOfLabel(label) { var m = /WCAG (\d+\.\d+\.\d+)/.exec(label || ''); return m ? m[1] : null; }
   function a11yStaticItems(c) {
     var a = c.a11y || {}, ch = a.checked, ran = ch && !ch.notRead, items = [];
-    // html: what was found (or what is asked); todo: what to do about it, when said apart; who: who acts, when said.
-    var add = function (label, st, html, from, todo, who, fresh) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from, todo: todo || '', who: who || '', fresh: !!fresh }); };
+    // The tasks each finding kind owes, worked out by the engine (wcag21.mjs) and carried here: the page never works
+    // out who acts a second way.
+    var TASKS = (DATA.wcag21 && DATA.wcag21.tasks) || {};
+    // html: what was found (or what is asked); todo: what to do about it, when said apart; who: who acts, when said;
+    // tasks: the steps it owes, each with the person who does it.
+    var add = function (label, st, html, from, todo, who, fresh, tasks) { var sc = scOfLabel(label); if (sc) items.push({ sc: sc, label: label, st: st, html: html, from: from, todo: todo || '', who: who || '', fresh: !!fresh, tasks: (tasks && tasks.length ? tasks : null) }); };
     (c.a11yFindings || []).forEach(function (x) {
       var contrast = /contrast/i.test((x.check || '') + ' ' + (x.what || ''));
-      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), x.from || 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[x.who] || WHO.both) + teamNote(c.name) : '', x.new);
+      // A difference found against Figma says where it is fixed (figma, code, both); in the Accessibility area that is
+      // said as the person who does it, so the whole area speaks of people and not of places.
+      var side = { figma: 'designer', code: 'developer' };
+      add(x.wcag || (contrast ? 'WCAG 1.4.3 Contrast (Minimum) (AA)' : ''), 'todo', onWhat(c, x.plain || x.what), x.from || 'Found in the code by the last audit', x.todo ? esc(doWhat(x.todo)) : '', x.todo ? (WHO[side[x.who]] || WHO.both) + teamNote(c.name) : '', x.new);
     });
-    if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '.') + placesTag(i.items || i.details.map(placeOf)), auditOn(ch.at), esc(capital(i.fix))); });
+    if (ran) ch.issues.forEach(function (i) { add(i.wcag, 'todo', onWhat(c, i.title + '.') + placesTag(i.items || i.details.map(placeOf)), auditOn(ch.at), esc(capital(i.fix)), '', false, i.tasks || TASKS[i.issue]); });
     var stat = {};
     (a.static || []).forEach(function (f) { (stat[f.kind] = stat[f.kind] || []).push(f); });
-    Object.keys(stat).forEach(function (k) { add(wcagLabelOf(wcagScOf(k)), 'todo', esc(wcagTitle(k, stat[k].length) + '.') + placesTag(stat[k].map(function (f) { var p = placeOf(f.desc); p.where = f.file + ':' + f.line; return p; })), 'Its code', esc(wcagFix(k, stat[k][0].fix))); });
+    Object.keys(stat).forEach(function (k) { add(wcagLabelOf(wcagScOf(k)), 'todo', esc(wcagTitle(k, stat[k].length) + '.') + placesTag(stat[k].map(function (f) { var p = placeOf(f.desc); p.where = f.file + ':' + f.line; return p; })), 'Its code', esc(wcagFix(k, stat[k][0].fix)), '', false, TASKS[k]); });
     // Its role: what it is and what that role and Figma's notes ask of it (the first duty says what it is).
-    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet.', 'From Figma, once it is annotated', 'In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a class="sg-uses-link" href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role in the form Role: name (Role: dialog, Role: button, Role: list), and its duties are listed here.', WHO.figma);
+    if (!a.role) add('WCAG 4.1.2 Name, Role, Value (A)', 'check', 'The role of ' + esc(c.name) + ' is not stated yet.', 'From Figma, once it is annotated', 'In Figma, add an annotation to the ' + esc(c.name) + ' component' + (figmaOf(c) ? ' (<a class="sg-uses-link" href="' + esc(figmaOf(c)) + '" target="_blank" rel="noopener">open it in Figma</a>)' : '') + ' that says its role in the form Role: name (Role: dialog, Role: button, Role: list), and its duties are listed here.', WHO.designer);
     // A duty fails when the audit found its own kind of problem (the role's markup, a behaviour, a part, a name, the
     // keys), not when another finding shares its criterion.
     var DUTY = /^(rolecontract|behaviour|partrole|annotation|semantics|name|keyboard|activate|arrows|escape|focusreturn)$/;
@@ -207,7 +214,7 @@
     var counts = { all: 0, work: 0, nocode: 0, unsure: 0, done: 0, untested: 0 };
     var C = stateC;
     var cellOf = function (x) { return cell(x.cls, x.say, x.fix, x.dec); };
-    var CODE = { found: '<td data-ok="1">' + pill('match', 'Found') + '</td>', css: '<td data-ok="1"><span class="sg-mx-why">' + pill('match', 'CSS only') + tipHTML('Found only as a CSS class in the code: no component file, so it has no props to read or try, and its preview is drawn from Figma.', 'What CSS only means') + '</span></td>', unsure: '<td data-ok="0">' + pill('figma', 'Unsure') + '</td>', missing: '<td data-ok="0">' + pill('differs', 'Missing') + '</td>' };
+    var CODE = { found: '<td data-ok="1">' + pill('match', 'Built') + '</td>', css: '<td data-ok="1"><span class="sg-mx-why">' + pill('match', 'CSS only') + tipHTML('Found only as a CSS class in the code: no component file, so it has no props to read or try, and its preview is drawn from Figma.', 'What CSS only means') + '</span></td>', unsure: '<td data-ok="0">' + pill('figma', 'Unsure') + '</td>', missing: '<td data-ok="0">' + pill('differs', 'Missing') + '</td>' };
     // A row: its name, Figma's and the code's side (found, unsure, missing), its Parity, Accessibility and Documentation,
     // what is left, when it was last checked, and its details.
     var mxRow = function (o) { return o; };
@@ -226,7 +233,7 @@
       return '<tr class="sg-mx-row' + (o.href ? ' is-link' : '') + '" data-name="' + esc(o.name) + '" data-fix="' + (o.fix || 0) + '" data-dec="' + (o.dec || 0) + '" data-done="' + (o.done ? 1 : 0) + '" data-untested="' + (o.untested ? 1 : 0) + '" data-nocode="' + (o.nocode ? 1 : 0) + '" data-unsure="' + (o.unsure ? 1 : 0) + '" data-st-figma="' + (o.figma ? 'Found' : 'Missing') + '" data-st-code="' + esc(MX_WORD.code[o.code]) + '" data-st-par="' + esc(o.par.say) + '" data-st-acc="' + esc(o.acc.say) + '" data-st-doc="' + esc(o.doc.say) + '">' +
         '<td><span class="sg-mx-name" title="' + esc(o.name) + '">' + esc(o.name) + '</span></td>' +
         // What to do about one only Figma or only the code has: a tip on the side that lacks it.
-        (o.codeWhy && !o.figma ? '<td data-ok="0"><span class="sg-mx-why">' + pill('differs', 'Missing') + tipHTML(o.codeWhy, 'What to do about ' + o.name) + '</span></td>' : o.figma ? CODE.found : CODE.missing) +
+        (o.codeWhy && !o.figma ? '<td data-ok="0"><span class="sg-mx-why">' + pill('differs', 'Missing') + tipHTML(o.codeWhy, 'What to do about ' + o.name) + '</span></td>' : o.figma ? FOUND : MISSING) +
         (o.codeWhy && o.figma ? '<td data-ok="0"><span class="sg-mx-why">' + pill(o.code === 'unsure' ? 'figma' : 'differs', MX_WORD.code[o.code]) + tipHTML(o.codeWhy, 'What to do about ' + o.name) + '</span></td>' : CODE[o.code]) +
         areaCell(o, o.par, 'parity', 'Parity') + areaCell(o, o.acc, 'accessibility', 'Accessibility') + areaCell(o, o.doc, 'documentation', 'Documentation') +
         '<td class="sg-mx-at" data-at="' + esc(o.at || '') + '"' + (o.at ? ' title="' + esc(when(o.at)) + '"' : '') + '>' + (o.at ? esc(ago(o.at)) : '–') + '</td>' +

@@ -13,6 +13,33 @@ import { forbiddenHits, privateFindings, messageFindings, repoFindings, PUBLIC_E
 import { projectTerms } from '../.githooks/private-terms.mjs';
 import { tempDir } from './helpers.mjs';
 
+// A project that named a theme, a brand or a mode after a plain word makes that word a name the check carries, and it
+// is refused only where the text uses it as a name. An invented host is not such a place: the engine's own tests write
+// them throughout, so one more of them was refused for a word a project chose elsewhere, and the way past it is the
+// override - the habit that lets a real name through later.
+test('a plain word a project named is no name inside an address', async () => {
+  const dir = tempDir('named-address-');
+  const was = process.env.RMS_PRIVATE_TERMS_DIR;
+  try {
+    writeFileSync(join(dir, 'private-terms.json'), JSON.stringify({ terms: {}, allow: [], phrases: [], named: { quokka: 'brand mode' } }));
+    process.env.RMS_PRIVATE_TERMS_DIR = dir;
+    const { localTerms } = await import('../.githooks/private-terms.mjs?address-is-no-name');
+    const found = (s) => localTerms().find(s).length;
+    // The address, read as the address it is: a label of a dotted host, a file's extension, a URL's scheme.
+    assert.equal(found("brand: 'files.quokka.test'"), 0, 'a label of a dotted host');
+    assert.equal(found("const theme = await fetch('https://files.quokka.test/light.json')"), 0, 'a label inside a URL');
+    assert.equal(found("import theme from './brand.quokka'"), 0, "a file's extension");
+    assert.equal(found("open('quokka://brand/mode')"), 0, "a URL's scheme");
+    // And still a name wherever the text uses it as one.
+    assert.ok(found("setQuery('brand', 'quokka')") > 0, 'quoted, with brand on the line');
+    assert.ok(found('each theme, Quokka and the other') > 0, 'capitalised in the middle of a sentence');
+    assert.ok(found('the quokka theme') > 0, 'beside theme');
+  } finally {
+    if (was === undefined) delete process.env.RMS_PRIVATE_TERMS_DIR; else process.env.RMS_PRIVATE_TERMS_DIR = was;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 export { forbiddenHits };
 
 test('nothing private anywhere in the engine repo', () => {
@@ -66,6 +93,60 @@ test('a word of the web a project happens to use is no project\'s: the name it r
     for (const w of ['textcontent', 'required', 'download', 'classlist']) assert.equal(terms.has(w), false, `${w} is the web's word, not a project's`);
     // What the project actually named stays refused, which is the whole point of the guard.
     assert.equal(terms.has('quokkalabel'), true, [...terms.keys()].join(' '));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the engine\'s own name is never a project\'s, and a hosted file is no repository', () => {
+  const dir = tempDir('own-name-');
+  try {
+    // What a project's setup carries: its own name, the stylesheets its product loads at runtime, and the engine's own
+    // public address - which the engine itself writes into the projects it works on. A host of their own is not
+    // written here: this repository refuses a company host even an invented one, which is the guard working.
+    writeFileSync(join(dir, 'ds-config.json'), JSON.stringify({
+      name: 'Quokka DS',
+      paths: { themeCSSFrom: ['https://files.quokka.example/Design-System/light_desktop.css'] },
+      engine: 'https://github.com/someone/rms-design-system-engine.git',
+    }));
+    const { terms } = projectTerms(dir);
+    const has = (w) => terms.has(w);
+    // The engine's own name, and the account a public repository sits under, say nothing about this project.
+    assert.equal(has('rmsdesignsystemengine'), false, 'the engine\'s own name');
+    assert.equal(has('someone'), false, 'nor the account it lives under');
+    // A URL whose last part is a file is no repository, so its folder is not an owner and the file is not a name.
+    assert.equal(has('designsystem'), false, 'a hosted stylesheet\'s folder is no repository owner');
+    assert.equal(has('lightdesktop'), false, 'nor is the file a repository name');
+    // What the project did choose is still refused, which is the point of the guard.
+    assert.equal(has('quokkads'), true, [...terms.keys()].join(' '));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a pull request is opened only when its title and description carry nothing private', () => {
+  const dir = tempDir('pr-gate-');
+  const check = join(ROOT, '.githooks', 'private-check.mjs');
+  const run = (title, body) => {
+    const f = join(dir, 'body.md');
+    writeFileSync(f, body);
+    // PATH without gh: a run that reaches the opening would fail loudly instead of opening anything by accident.
+    return spawnSync(process.execPath, [check, '--pr', '--title', title, '--body', f], { encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent' } });
+  };
+  try {
+    // The form that gets written by hand: an item code in parentheses, in the description.
+    const bad = run('A fix', `## A control that moves nothing (${code('E', 82)})\n`);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /carries something private/);
+    assert.match(bad.stderr, /the description  backlog item code/);
+    assert.match(bad.stderr, /Nothing was opened/);
+    // And in the title, which CI reads too but only once it is public.
+    const titled = `Fixes [${code('E', 82)}] at last`;
+    assert.equal(run(titled, 'Clean.\n').status, 1);
+    assert.match(run(titled, 'Clean.\n').stderr, /the title  backlog item code/);
+    // A clean one is not refused: it goes on to open the pull request, which fails here for want of gh, never for content.
+    const clean = run('A control that moves nothing', 'A component that gives its own value back is bound on both sides.\n');
+    assert.ok(!/carries something private/.test(clean.stderr), clean.stderr);
+    // Told nothing to open, it says so rather than reading the first argument as a file.
+    const bare = spawnSync(process.execPath, [check, '--pr'], { encoding: 'utf8' });
+    assert.equal(bare.status, 2);
+    assert.match(bare.stderr, /--pr needs --title/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { docFields, readLiteral, literalBindings, shapeFindings, requiredKeys, UNKNOWN } from '../lib/prop-shapes.mjs';
-import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, pageConventions, pageCache, pageHookCheck, importedComponents, recordInventions } from '../lib/page-check.mjs';
+import { parseMarkup, splitSource, pageSystem, checkPage, usageCards, boxLine, pageConventions, pageCache, pageHookCheck, importedComponents, importsOf, recordInventions } from '../lib/page-check.mjs';
 import { tempDir } from './helpers.mjs';
 
 const put = (root, rel, text) => { const p = join(root, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
@@ -71,7 +71,9 @@ test('a doc comment\'s fields, a literal as written, and the data a component is
   assert.equal(v[1].id, UNKNOWN, 'a shorthand key is there, its value unknown');
   assert.deepEqual(Object.keys(literalBindings('const tabs = ref([{ id: 1 }])\nlet n = 2\nconst [items, setItems] = useState([])')), ['tabs', 'n', 'items']);
   assert.deepEqual(shapeFindings([{ id: 1, lable: 'x' }], f.tabs, { required: ['id'] }).map((x) => `${x.kind}:${x.key}`), ['unknown:lable']);
-  assert.deepEqual(requiredKeys([[{ id: 1, label: 'a' }, { id: 2, label: 'b', x: 1 }, { id: 3, label: 'c' }]]), ['id', 'label']);
+  assert.deepEqual(requiredKeys([[{ id: 1, label: 'a' }, { id: 2, label: 'b', x: 1 }, { id: 3, label: 'c' }], [{ id: 4, label: 'd' }]]), ['id', 'label']);
+  // Only what an item says: a flag or a picture every use turns on is how those uses look.
+  assert.deepEqual(requiredKeys([[{ id: 1, label: 'a', text: 'x', clickable: true, avatar: null }, { id: 2, label: 'b', text: 'y', clickable: true, avatar: null }, { id: 3, label: 'c', text: 'z', clickable: true, avatar: null }]]), ['id', 'label', 'text']);
 });
 
 test('the markup reader sees multi-line tags, each framework\'s props, events, two-way bindings and slots', () => {
@@ -85,6 +87,24 @@ test('the markup reader sees multi-line tags, each framework\'s props, events, t
   assert.equal(jsx.children[0].tag, 'Badge');
   assert.equal(jsx.children[0].children[0].tag, 'Badge', 'a tag inside an expression is a child');
   assert.equal(splitSource('P.vue', '<template><div><template v-if="x"><b/></template></div></template>\n<script>let y</script>').markup, '<div><template v-if="x"><b/></template></div>');
+});
+
+test('the import reader takes the default, every name in the braces, a name given another, and a part loaded late', () => {
+  const m = importsOf(`import TabStrip from '@acme/ui/tab-strip';
+import { Badge, CardTile as Tile } from '@acme/ui';
+import Dialog, { DialogTitle } from '@acme/ui/dialog';
+import type Theme from '@acme/ui/theme';
+const LatePanel = defineAsyncComponent(() => import('@acme/ui/late-panel'));
+const LazyChip = lazy(() => import('@acme/ui/chip'));`);
+  assert.equal(m.get('TabStrip'), '@acme/ui/tab-strip');
+  assert.equal(m.get('Badge'), '@acme/ui');
+  assert.equal(m.get('Tile'), '@acme/ui', 'a name given another is kept under the name the page uses');
+  assert.equal(m.has('CardTile'), false, 'and not under the one it was given');
+  assert.equal(m.get('Dialog'), '@acme/ui/dialog', 'a default beside names in braces is taken too');
+  assert.equal(m.get('DialogTitle'), '@acme/ui/dialog');
+  assert.equal(m.has('Theme'), false, 'a type leads to no component');
+  assert.equal(m.get('LatePanel'), '@acme/ui/late-panel');
+  assert.equal(m.get('LazyChip'), '@acme/ui/chip');
 });
 
 test('a Vue page with invented parts, wrong data and a misplaced part is refused line by line; one written right passes', async () => {
@@ -366,4 +386,107 @@ const pick = () => {}
   assert.deepEqual(r.gaps.map((g) => [g.kind, g.need, g.part]), [['part', 'its button reads another language: it needs a label prop', '.more']]);
   assert.ok(r.used.TabStrip, 'the component is still used');
   assert.ok(r.findings.some((f) => f.level === 'error' && /data-gap names no need/.test(f.message)));
+});
+
+test('a list the page builds with .map is read for its item, as a written one is', async () => {
+  const { mappedItems } = await import('../lib/prop-shapes.mjs');
+  assert.deepEqual(Object.keys(mappedItems("computed(() => Object.entries(on).filter(([, v]) => v).map(([id, v]) => ({ id, label: `${id}: ${v}`, icon: 'x' })))")[0]), ['id', 'label', 'icon']);
+  assert.deepEqual(Object.keys(mappedItems('rows.map((r) => { const n = r.n; return { id: n } })')[0]), ['id']);
+  assert.equal(String(mappedItems('rows.map(toRow)')), String(mappedItems('no list here')));
+  const { root, catalog } = acme();
+  const page = await pageSystem(root, {}, catalog);
+  const r = checkPage('prototypes/Mapped.vue', `<template><list-page title="Orders"><template #header><tab-strip :tabs="tabs" @picked="pick"/></template></list-page></template>
+<script setup>
+import { computed } from 'vue'
+import ListPage from '@/components/templates/ListPage'
+import TabStrip from '@/components/library/tabs/TabStrip'
+const names = ['Open', 'Closed']
+const tabs = computed(() => names.map((n) => ({ label: \`Status: \${n}\` })))
+const pick = () => {}
+</script>`, page, {});
+  assert.ok(r.findings.some((f) => f.level === 'error' && /tabs: item 1 has no "id", which every use in the code gives/.test(f.message)), r.findings.map((f) => f.message).join('\n'));
+});
+
+test('a component that gives its own value back is bound on both sides, or neither side is an error', async () => {
+  const root = tempDir('acme-controlled-');
+  put(root, 'ds-config.json', '{}');
+  // It holds no state of its own: it takes the value and emits the new one, so the page is what keeps it.
+  put(root, 'src/components/library/menus/MenuPanel.vue', `<template><div class="menu-panel"><button @click="emit('update:collapsed', !collapsed)">x</button><slot/></div></template>
+<script setup>
+const emit = defineEmits(['update:collapsed'])
+const props = defineProps({ collapsed: { type: Boolean, default: false } })
+</script>`);
+  const system = await pageSystem(root, {}, { components: { menuPanel: { props: {} } } });
+  const page = (inner) => `<template><MenuPanel ${inner}/></template>\n<script setup>\nimport { ref } from 'vue'\nimport MenuPanel from '@/components/library/menus/MenuPanel'\nconst shut = ref(false)\nconst fold = () => {}\n</script>`;
+  const msgs = (inner) => checkPage('src/views/Try.vue', page(inner), system).findings.filter((f) => f.level === 'error').map((f) => f.message);
+  // Neither side: whatever its button folds cannot move, and a review sees a control that does nothing.
+  const neither = msgs('');
+  assert.equal(neither.length, 1, neither.join(' | '));
+  assert.match(neither[0], /holds no "collapsed" of its own: it emits update:collapsed/);
+  assert.match(neither[0], /Give :collapsed and listen to update:collapsed, or v-model:collapsed/);
+  // Either side bound is the page keeping that state, which is the point.
+  assert.deepEqual(msgs(':collapsed="shut" @update:collapsed="fold"'), []);
+  assert.deepEqual(msgs('v-model:collapsed="shut"'), []);
+  assert.deepEqual(msgs('@update:collapsed="fold"'), [], 'listening alone is a page that keeps it elsewhere');
+  assert.deepEqual(msgs(':collapsed="shut"'), [], 'giving it alone is a page that sets it once');
+  // The card says it too, since it is what an agent reads before writing the page.
+  const card = [usageCards(system, ['MenuPanel'])].flat().join('\n');
+  assert.match(card, /holds none of collapsed: the page keeps it\. Give the value and listen to its update, or v-model it/);
+});
+
+test('item fields written on the prop\'s own line are read, and a page is held to them', async () => {
+  const root = tempDir('acme-inline-fields-');
+  put(root, 'ds-config.json', '{}');
+  // A team that says the shape in passing, on the prop's own line, rather than under it.
+  put(root, 'src/components/library/dropdowns/Criteria.vue', `<template><ul class="criteria"><li v-for="o in options" :key="o.id">{{ o.text }}</li></ul></template>
+<script setup>
+/** Props
+@options {Array} of objects [{ id, text }]
+@params {Object} with label, iconDown for the dropdown
+*/
+const props = defineProps({ options: { type: Array, default: () => [] }, params: { type: Object, default: () => ({}) } })
+</script>`);
+  const system = await pageSystem(root, {}, { components: { criteria: { props: {} } } });
+  assert.deepEqual(Object.keys(system.components.Criteria.fields.options ?? {}), ['id', 'text'], 'read from "[{ id, text }]"');
+  assert.equal(system.components.Criteria.fields.params, undefined, 'a sentence names no field: nothing is guessed');
+  const page = (items) => `<template><Criteria :options="rows"/></template>\n<script setup>\nimport { ref } from 'vue'\nimport Criteria from '@/components/library/dropdowns/Criteria'\nconst rows = ref(${items})\n</script>`;
+  const msgs = (items) => checkPage('src/views/Try.vue', page(items), system).findings.filter((f) => f.level === 'error').map((f) => f.message);
+  assert.deepEqual(msgs("[{ id: 'a', text: 'All' }]"), []);
+  const wrong = msgs("[{ id: 'a', label: 'All' }]");
+  assert.equal(wrong.length, 1, wrong.join(' | '));
+  assert.match(wrong[0], /options: "label" is not a field it takes \(its fields: id, text\)/);
+});
+
+test('a card carries the width the design gives a component, and says how it takes it', async () => {
+  // What a card could not say before: an agent told only "fixed" laid three buttons beside something that fills the
+  // row, and every label was cut to a letter. The width is what it was missing.
+  assert.equal(boxLine({ width: 90, sizing: { h: 'FIXED', v: 'HUG' }, minWidth: null, maxWidth: null }), 'fixed at 90px');
+  assert.equal(boxLine({ width: 40, sizing: { h: 'FILL', v: 'HUG' }, minWidth: 40, maxWidth: 500 }), 'fills what holds it, never under 40px and never over 500px, 40px in the design');
+  assert.equal(boxLine({ width: 100, sizing: { h: 'HUG', v: 'FIXED' }, minWidth: 280, maxWidth: 500 }), 'hugs its content, never under 280px and never over 500px, 100px in the design');
+  assert.equal(boxLine(null), null, 'no capture yet: the card says nothing of it');
+  assert.equal(boxLine({}), null, 'a box with nothing in it says nothing');
+
+  const root = tempDir('acme-box-');
+  put(root, 'ds-config.json', '{}');
+  put(root, 'src/components/library/chips/FilterChip.vue', `<template><button class="filter-chip">{{ label }}</button></template>
+<script setup>
+const props = defineProps({ label: { type: String, default: '' } })
+</script>`);
+  // The design's box, as the Figma capture writes it per component.
+  put(root, 'src/figma-structure.snapshot.json', JSON.stringify({ components: { FilterChip: { box: { width: 90, sizing: { h: 'FIXED', v: 'HUG' }, minWidth: null, maxWidth: null } } } }));
+  const system = await pageSystem(root, {}, { components: { filterChip: { props: {} } } });
+  assert.deepEqual(system.components.FilterChip.box, { width: 90, sizing: { h: 'FIXED', v: 'HUG' }, minWidth: null, maxWidth: null }, 'read from the capture');
+  const card = [usageCards(system, ['FilterChip'])].flat().join('\n');
+  assert.match(card, /width: fixed at 90px/);
+
+  // A project with no capture: the card is as it was, and nothing is invented.
+  const bare = tempDir('acme-no-box-');
+  put(bare, 'ds-config.json', '{}');
+  put(bare, 'src/components/library/chips/FilterChip.vue', `<template><button class="filter-chip">{{ label }}</button></template>
+<script setup>
+const props = defineProps({ label: { type: String, default: '' } })
+</script>`);
+  const noBox = await pageSystem(bare, {}, { components: { filterChip: { props: {} } } });
+  assert.equal(noBox.components.FilterChip.box, null);
+  assert.ok(!/width:/.test([usageCards(noBox, ['FilterChip'])].flat().join('\n')));
 });

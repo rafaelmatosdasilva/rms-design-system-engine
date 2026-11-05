@@ -131,7 +131,10 @@ test('the style guide shows local or shared beside who acts, never counts them i
   const scopeHTML = new Function('esc', `${fn('scopeWords')}\n${fn('scopeHTML')}\nreturn scopeHTML;`)(esc);
   assert.equal(scopeHTML({ scope: 'shared', reason: 'Shared: why.', decider: { name: 'Cards lead' } }), '<span class="sg-todo-scope" data-scope="shared" title="Shared: why.">Shared, waits on Cards lead</span>');
   assert.equal(scopeHTML({ scope: 'local', reason: 'Local: why.' }), '<span class="sg-todo-scope" data-scope="local" title="Local: why.">Local, waits on no one</span>');
-  assert.match(tpl, /\(r\.who \? '<span class="sg-todo-who">' \+ esc\(r\.who\) \+ '<\/span>' : ''\) \+ \(isOpen\(r\) \? scopeHTML\(rowScope\(r\)\) : ''\)/, 'beside who acts, on every open task');
+  assert.match(tpl, /esc\(r\.who\) \+ '<\/span>' : ''\) \+ \(isOpen\(r\) \? scopeHTML\(rowScope\(r\)\) : ''\)/, 'beside who acts, on every open task');
+  // An accessibility task says who acts in a column of its own, so Local or shared sits beside that column instead.
+  assert.match(tpl, /r\.who && r\.area !== 'Accessibility'/, 'who acts has its own column there, and is not said twice');
+  assert.match(tpl, /whoCell: function \(r\) \{ return '<td class="sg-todo-whocell">'/);
   assert.doesNotMatch(tpl, /sg-todo-scope-line|' shared' \+ \(onList/, 'no line on the Tasks page counting them: each task says it beside who acts');
   assert.match(tpl, /card\('Local or shared', x\.scope \? lines\(\[x\.scope\.reason\]\) : ''\)/, 'a change in Figma says it');
   assert.match(tpl, /scope: \{ scope: 'local', reason: 'Local: ' \+ x\.product/, 'a product\'s near copy is that product\'s');

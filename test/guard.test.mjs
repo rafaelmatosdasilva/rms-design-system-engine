@@ -75,7 +75,7 @@ test('install: per project, keeps other settings and hooks, idempotent, removabl
   assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
   assert.equal(s.hooks.PreToolUse.length, 2);
   assert.deepEqual(s.hooks.UserPromptSubmit, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the router
-  assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit', hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the edit check
+  assert.deepEqual(s.hooks.PostToolUse, [{ matcher: 'Edit|Write|MultiEdit|mcp__.*use_figma', hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the edit check, and the way back from a Figma write
   assert.deepEqual(s.hooks.Stop, [{ hooks: [{ type: 'command', command: `node "${join(ENGINE, 'guard.mjs')}"` }] }]);   // the final check
   assert.equal(installHooks(dir, { engineDir: ENGINE }).changed, false);
   assert.equal(JSON.parse(readFileSync(r.file, 'utf8')).hooks.PreToolUse.length, 2);
@@ -234,6 +234,13 @@ test('the router as a hook: a request made with the command arrives already rout
   const chip = ctx('/rms-design-system-engine audit the chip');
   assert.match(chip, /^The engine already routed this request/);
   assert.ok(chip.includes(`\nROUTE: audit-component\nRUN: node ${shellPath(join(ENGINE, 'audit.mjs'))} --component chip\n`), chip);
+  // A path the shell reads back as the path it was given. A backslash is never left to it: unquoted it escapes
+  // whatever follows, and inside the quotes it would escape the closing quote, so a folder ending in one breaks the
+  // command the hooks run.
+  assert.equal(shellPath('/Users/me/tools/audit.mjs'), '/Users/me/tools/audit.mjs', 'nothing to quote');
+  assert.equal(shellPath('/Users/me/My Drive/audit.mjs'), '"/Users/me/My Drive/audit.mjs"');
+  assert.equal(shellPath('/tmp/a\\'), '"/tmp/a\\\\"', 'a trailing backslash is quoted and escaped, never left to end the quote');
+  assert.equal(shellPath('/tmp/$HOME'), '"/tmp/\\$HOME"', 'the shell expands nothing');
   const figma = ctx('/rms-design-system-engine change the chip radius in Figma to 12px so it matches the code');
   assert.match(figma, /\nSAY: I can't change this in Figma: the skill writes to Figma only what the code already states/);
   const refresh = ctx('/rms-design-system-engine refresh the Figma snapshots, the design changed yesterday');
@@ -271,6 +278,18 @@ test('a project with the older hooks gets the router on its next run; nothing is
   const edits = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: guard }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: guard }] }], PostToolUse: [{ matcher: 'Edit', hooks: [{ type: 'command', command: guard }] }] } } });
   assert.equal(upgradeHooks(edits, {}, { engineDir: ENGINE, env: {} }), true);
   assert.equal(JSON.parse(readFileSync(join(edits, '.claude', 'settings.local.json'), 'utf8')).hooks.Stop.length, 1);
+  // All four events, but the hook that runs after a tool was installed before it had to reach use_figma: the way back
+  // from a Figma write would never be written (figma-undo.mjs), so an older matcher counts as a partial install and
+  // the next run brings the current ones in.
+  const stale = makeFixture({ '.claude/settings.local.json': { hooks: {
+    PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__.*use_figma', hooks: [{ type: 'command', command: guard }] }],
+    UserPromptSubmit: [{ hooks: [{ type: 'command', command: guard }] }],
+    PostToolUse: [{ matcher: 'Edit|Write|MultiEdit', hooks: [{ type: 'command', command: guard }] }],
+    Stop: [{ hooks: [{ type: 'command', command: guard }] }] } } });
+  assert.equal(hooksStatus(stale).partial, true, 'an older matcher does not reach use_figma');
+  assert.equal(upgradeHooks(stale, {}, { engineDir: ENGINE, env: {} }), true);
+  assert.match(JSON.parse(readFileSync(join(stale, '.claude', 'settings.local.json'), 'utf8')).hooks.PostToolUse[0].matcher, /use_figma/);
+  assert.equal(upgradeHooks(stale, {}, { engineDir: ENGINE, env: {} }), false, 'current now, so nothing is written again');
   const none = makeFixture({});
   assert.equal(upgradeHooks(none, {}, { engineDir: ENGINE, env: {} }), false);
   const optedOut = makeFixture({ '.claude/settings.local.json': { hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: guard }] }] } } });

@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { makeFixture, budget } from './helpers.mjs';
+import { makeFixture, budget, tempDir } from './helpers.mjs';
 import {
   stableJson, engineFiles, checkSignature, runSignature, styleguideSignatures, projectSignature,
   keptMark, keptDelta, keptApply, keptWhole, keptToWrite, readKept, KEPT_FILE, whyChecked, whyCheckedLine, cssRuleList, sharedOnly,
@@ -47,6 +47,18 @@ test('the check is signed by the engine files its results rest on: never the tem
   fake['/e/vue-harness.mjs'] = 'v2';
   assert.equal(checkSignature({ dir: '/e', read }), page, 'a page read from a file does not rest on the harness');
   assert.notEqual(checkSignature({ dir: '/e', read, kind: 'rendered' }), rendered, 'the components rendered from their code do');
+});
+
+// The engine finds its own folder through import.meta.url, which is a URL: read as a path with .pathname, a folder
+// with a space in its name arrives percent-encoded, every read of an engine file throws, and the signature falls back
+// to the file names alone - so a check whose own code changed would still put back the results it kept, silently.
+// Measured from a copy under a folder with a space, because the engine sits wherever the person keeps it.
+test('the check is signed by its files even when the engine sits under a path with a space', async () => {
+  const lib = join(tempDir('engine folder-'), 'lib');
+  assert.ok(lib.includes(' '), 'the copy sits under a path with a space');
+  cpSync(join(ENGINE, 'lib'), lib, { recursive: true });
+  const { checkSignature: signature } = await import(pathToFileURL(join(lib, 'a11y-check.mjs')).href);
+  assert.equal(signature(), signature({ dir: lib }), 'the folder it reads is the one it sits in');
 });
 
 test('a run is signed by what it was asked, never by where its report goes or when the profile was read', () => {
@@ -345,4 +357,31 @@ test('the style guide\'s own CSS changed outside every stage: its parts are put 
   assert.match(go({ CHROME_PATH: '/nonexistent/chrome' }).out, /1 of 1 page unchanged since it was last checked/, 'and from then on, no browser');
   writeFileSync(page, guidePage('.sg-panel .sg-il-choice { border: 1px solid red } .sg-comp { background: #000 }'));
   assert.match(go().out, /1 part checked again: the CSS every component shares changed/, 'a change around a stage is checked');
+});
+
+// What signs a result is what decides it. A finding's wording, who acts on it and a line of comment change nothing a
+// browser measured, so they must not put every component of every system back in the queue; a threshold, a check or
+// the page script must.
+test('the signature follows what decides a result, not every line that lives near it', () => {
+  const dir = join(ENGINE, 'lib');
+  const source = (file) => readFileSync(join(dir, file), 'utf8');
+  const edited = (file, change) => ({ read: (f) => (f.endsWith(`/${file}`) ? change(source(file)) : readFileSync(f, 'utf8')) });
+  const base = { page: checkSignature({ dir, kind: 'page' }), component: checkSignature({ dir, kind: 'component' }) };
+  const after = (file, change) => ({ page: checkSignature({ dir, kind: 'page', ...edited(file, change) }), component: checkSignature({ dir, kind: 'component', ...edited(file, change) }) });
+  const same = (file, change, why) => { const a = after(file, change); assert.deepEqual(a, base, why); };
+  const differs = (file, change, why) => { const a = after(file, change); assert.notDeepEqual(a, base, why); };
+
+  // Words, and who acts on them: they say what was found, never whether it was found.
+  same('a11y-words.mjs', (s) => s.replace('Add a visible outline (a focus ring)', 'Add a visible focus ring'), 'rewording a finding re-checks nothing');
+  same('a11y-words.mjs', (s) => s.replace("who: 'designer'", "who: 'developer'"), 'moving a task to another person re-checks nothing');
+  // A line that is only a comment cannot change what the code does.
+  same('a11y-check.mjs', (s) => s.replace('// Structured record for --json', '// Structured record for the json output'), 'a whole-line comment re-checks nothing');
+  // A comment after code is kept on purpose: finding where it really begins means reading the strings around it, and a
+  // signature that guessed wrong would put back results the engine should have checked again.
+  differs('a11y-check.mjs', (s) => s.replace("const WORDS = ['a11y-words.mjs'];", "const WORDS = ['a11y-words.mjs'];  // a note"), 'a trailing comment is kept: never guess where one starts');
+  // What the check measures, and what it measures with: both decide, so both sign.
+  differs('a11y-check.mjs', (s) => s.replace('AXE_VERSION', 'AXE_VERSION_CHANGED'), 'the rules it runs decide a result');
+  differs('wcag-page.js', (s) => `${s}\n// a line of code\nconst nothing = 1;`, 'the page script decides a result');
+  // The words module is not walked at all, so nothing it imports can sign a result either.
+  assert.equal(engineFiles(join(dir, 'a11y-check.mjs'), { skip: ['a11y-words.mjs'] }).some((f) => f.endsWith('/a11y-words.mjs')), false);
 });

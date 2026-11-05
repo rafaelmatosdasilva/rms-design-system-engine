@@ -22,7 +22,7 @@
 //      together covers both modes is not reported as a false "mode-blind" gap.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runGate } from './helpers.mjs';
+import { runGate, budget } from './helpers.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) subcomponent-isolation-check.mjs - combinator with no surrounding spaces
@@ -42,6 +42,19 @@ test('[bugfix subcomponent] .card>svg (child combinator, no spaces) is flagged a
   assert.equal(code, 1, out);
   assert.match(out, /UNDOCUMENTED/, out);
   assert.match(out, /\.card>svg/, out);
+});
+
+// The gate reads whatever CSS the project holds, so a selector written to be slow must not be. Before the colon was
+// taken out of the part itself, 32 repetitions of `(:` took at least 39 seconds inside broadElementTag(), and each
+// repetition after that doubled it; the whole gate now reads them in well under a second.
+test('[bugfix subcomponent] a selector of many `(:` is read at once, never by backtracking', () => {
+  const t0 = Date.now();
+  const { out } = runGate(ISO_GATE, {
+    'ds-config.json': ISO_CFG,
+    'theme.css': `.card a.${'(:'.repeat(32)}! { color: red; }\n.card svg { color: red; }`,
+  });
+  assert.ok(Date.now() - t0 < budget(5000), `took ${Date.now() - t0}ms`);
+  assert.match(out, /\.card svg/, out);   // the real rule beside it is still found
 });
 
 test('[regression subcomponent] .card svg (whitespace descendant) is still flagged', () => {

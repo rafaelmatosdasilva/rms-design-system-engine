@@ -240,7 +240,9 @@ Found 5 things that would make this hard to use for some people (checked in 2 th
 
 • Advisory: 2 controls are smaller than a comfortable touch target
      Why it matters: Between 24 and 44 pixels a control passes WCAG AA, but on a touch screen a finger covers about 44 pixels: people with a tremor, or on the move, miss it or hit the one beside it.
-     What to do:     Where it is used on touch screens, make the control at least 44 by 44 pixels (its padding or an invisible hit area counts).
+     What to do:
+       1. A designer, in Figma: give the control 44 by 44 pixels in Figma where it is used on touch screens.
+       2. A developer, in the code: build it at that size, with padding or an invisible hit area.
 
 Want the exact list? Run the same command again with --a11y — it shows every element and where to find it. (Add --json instead for a machine-readable version an agent can act on.)
 
@@ -249,6 +251,8 @@ axe-core's rules ran on the same page and found nothing.
 Tip for a deeper check: this looked at "apps/gallery/ui.html", which only shows the components that happen to be on screen. For the most thorough check — every component in every state (normal, disabled, error, focused) — add a styleguide (one page that shows all your components). Once it exists, this check finds and uses it automatically, so nothing is missed.
 
 Measured in the browser: 4 texts and 3 controls, each text in 2 themes.
+
+Who acts  A designer, in Figma: 2  ·  A developer, in the code: 5  (one finding can owe two people a step each)
 
 Verdict: 1 blocker · 2 warnings · 2 advisories · WCAG 2.2 AA
 

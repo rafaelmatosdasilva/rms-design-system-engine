@@ -27,7 +27,7 @@ test('an owner\'s key may be a glob, and its value a team with the person who de
 });
 
 test('every who-acts label on the Tasks list carries the owning team', () => {
-  assert.equal((page.match(/\+ teamNote\(/g) ?? []).length, 4);
+  assert.equal((page.match(/\+ teamNote\(/g) ?? []).length, 5, 'the four it had, and an accessibility task\'s own profile');
   assert.doesNotMatch(page, /WHO\[[tx]\.who\] \|\| WHO\.both(?!\) \+ teamNote)/, 'no label left without it');
   assert.equal((page.match(/teamNote\(t\.say, t\.team\)/g) ?? []).length, 2, 'a system task carries the team it knows');
   assert.match(page, /DATA\.systemTodo[^\n]*team: t\.team/);

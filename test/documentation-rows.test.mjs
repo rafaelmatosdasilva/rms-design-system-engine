@@ -109,3 +109,12 @@ test('with no intent layer, a component\'s Do and don\'t and its properties in t
   const tpl = templateText();
   assert.match(tpl, /'Do and don\\'t': 'Write it in any one place the engine reads, each line starting with Do: or Don\\'t:[^']*' \+ \(DATA\.intentLayer \? [^)]*\) \+ 'its description in Figma; the comment above its rule in the code; or contract\.authored\.json under guidance\.doDont\./);
 });
+
+// A component's markup is whatever its file holds, so markup written to be slow must not be. Before a comment's body
+// was written as "no dash, or a dash that does not end it", 30 repetitions took 14 seconds, each one after doubling.
+test('staticRole: markup of many half-closed comments is refused at once, never by backtracking', () => {
+  const t0 = Date.now();
+  assert.equal(staticRole('<!--' + '--><!--'.repeat(30)), null);
+  assert.ok(Date.now() - t0 < budget(2000), `took ${Date.now() - t0}ms`);
+  assert.deepEqual(staticRole('<!-- a note --><span class="badge">High</span>'), { tag: 'span' }, 'a comment before the tag is still stepped over');
+});

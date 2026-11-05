@@ -198,5 +198,6 @@ packages a run installed and anything past 40 KB in one file; transcripts stay o
 | `2026-11-02-the-guide-names-git-s` | The 24 guide tasks on Haiku (engine d0594f9) | "Guide: first result after setup, git's hooks, accessibility the design owes" |
 | `2026-11-02-the-main-guide-keeps-its` | The 24 guide tasks on Haiku (engine 0191718) | "Guide: first result after setup, git's hooks, accessibility the design owes" |
 | `2026-11-02-the-fork-the-recipe-buried` | The 24 guide tasks on Haiku (engine 98c23d4) | "The fork the recipe buried: which kind of file this project writes" |
+| `2026-11-04-a-round-that-did-not` | The 24 guide tasks on Haiku (engine 4fa53d3) | "A round that did not publish says when the guide was last built" |
 
 Summarize a folder: `node test/skill-evals/summarize.mjs test/skill-evals/records/<folder>`.

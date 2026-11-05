@@ -216,7 +216,8 @@ test('each run fixes the layer only where intentLayer.autoFix is "commit", never
   const { spawnSync } = await import('node:child_process');
   const root = tempDir('autofix-');
   writeFileSync(join(root, 'ds-config.json'), '{\n    "name": "Acme",\n    "intentLayer": "https://gitlab.acme.test/ux/layer"\n}\n');
-  const engine = new URL('../lib/audit.mjs', import.meta.url).pathname;
+  const { fileURLToPath } = await import('node:url');
+  const engine = fileURLToPath(new URL('../lib/audit.mjs', import.meta.url));
   assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'on'], { cwd: root, encoding: 'utf8' }).status, 0);
   assert.equal(readFileSync(join(root, 'ds-config.json'), 'utf8'), '{\n    "name": "Acme",\n    "intentLayer": {\n        "gitlab": "https://gitlab.acme.test/ux/layer",\n        "autoFix": "commit"\n    }\n}\n');
   assert.equal(spawnSync(process.execPath, [engine, '--intent-autofix', 'off'], { cwd: root, encoding: 'utf8' }).status, 0);

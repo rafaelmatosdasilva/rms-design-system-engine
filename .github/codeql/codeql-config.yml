@@ -1,0 +1,9 @@
+name: CodeQL
+
+# The style guide's script is written as numbered parts that `lib/styleguide-template.mjs` joins into one file at
+# build time (`//@part styleguide/js/NN-….js`). A part opens a scope the next one continues, so no part is valid
+# JavaScript on its own and CodeQL cannot parse it. Left in, two parts fail extraction, CodeQL reports a warning and
+# the parts are skipped anyway. The built page is what runs, and the engine's own modules in `lib/` are what this
+# scan is for.
+paths-ignore:
+  - templates/styleguide/js

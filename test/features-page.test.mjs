@@ -38,16 +38,21 @@ test('no other stage names are left on the page', () => {
 });
 
 const read = (f) => readFileSync(join(ENGINE, f), 'utf8');
+const parts = [...rows].map(([n]) => n);
 const usable = [...rows].filter(([, s]) => s !== 'Coming soon').map(([n]) => n);
-const soon = [...rows].filter(([, s]) => s === 'Coming soon').map(([n]) => n);
 
-test('the commands page groups its requests under Set up and the usable parts, and has none for a part coming soon', () => {
+// A stage is what the owner promises people, set by hand on the page, not a statement about whether anything is
+// written yet: a part may be held at Coming soon while its requests and its technical section already exist, and a
+// part may be Ready to use before either is written. So the pages are held to the parts, never to the stages: every
+// group and every section names a part of the page, and nothing a reader can use goes undocumented.
+test('every group on the commands page names a part of the features page, or Set up', () => {
   const groups = [...read('docs/commands.md').matchAll(/^## (.+)$/gm)].map((m) => m[1]);
-  assert.deepEqual(groups.filter((g) => g !== 'Set up' && !usable.includes(g)), []);
+  assert.deepEqual(groups.filter((g) => g !== 'Set up' && !parts.includes(g)), []);
 });
 
-test('the technical documentation has a section for every usable part, and none for a part coming soon', () => {
+// The page also carries sections that are not parts at all (Install and update, Run it, Security and data), so only
+// the other direction can be held: nothing a reader can use is left without its technical section.
+test('the technical documentation covers every usable part', () => {
   const sections = [...read('docs/details.md').matchAll(/^## (.+)$/gm)].map((m) => m[1]);
   for (const name of usable.filter((n) => n !== "Fit your team's setup")) assert.ok(sections.includes(name), name);
-  assert.deepEqual(sections.filter((s) => soon.includes(s)), []);
 });
