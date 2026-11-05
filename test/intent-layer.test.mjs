@@ -93,7 +93,7 @@ function tarGz(files, top = 'acme-intent-main-abc1234') {
 }
 
 // A GitLab that answers the three calls the reader makes, counting them and the headers it was sent.
-function fakeGitlab({ sha = 'abc1234def5678', files = LAYER, status = 200 } = {}) {
+function fakeGitlab({ sha = 'abc1234def5678', files = LAYER, status = 200, commits = [] } = {}) {
   const calls = [];
   const fetchImpl = async (url, o = {}) => {
     calls.push({ url, method: o.method ?? 'GET', headers: o.headers ?? {} });
@@ -102,7 +102,9 @@ function fakeGitlab({ sha = 'abc1234def5678', files = LAYER, status = 200 } = {}
     if (/\/repository\/archive\.tar\.gz$/.test(u.pathname)) { const b = tarGz(files); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; }
     // A file's last commit (when its page last changed) and what changed between two commits.
     if (/\/repository\/commits$/.test(u.pathname)) return { ok: true, status: 200, json: async () => [{ id: sha, committed_date: '2026-09-15T08:30:00Z' }] };
-    if (/\/repository\/compare$/.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ diffs: [{ new_path: 'docs/dsds/components/button-main.dsds.json', old_path: 'docs/dsds/components/button-main.dsds.json' }] }) };
+    if (/\/repository\/compare$/.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ commits, diffs: [{ new_path: 'docs/dsds/components/button-main.dsds.json', old_path: 'docs/dsds/components/button-main.dsds.json' }] }) };
+    // One commit's own files (each commit of a read told apart).
+    if (/\/repository\/commits\/[^/]+\/diff$/.test(u.pathname)) return { ok: true, status: 200, json: async () => (u.searchParams.get('page') === '1' ? [{ new_path: 'docs/dsds/components/' + (decodeURIComponent(u.pathname).includes('/c1/') ? 'button-main' : 'chip-filter') + '.dsds.json' }] : []) };
     if (/\/repository\/commits\//.test(u.pathname)) return { ok: true, status: 200, json: async () => ({ id: sha, title: 'Docs', committed_date: '2026-10-01T10:00:00Z' }) };
     return { ok: true, status: 200, json: async () => ({ default_branch: 'main' }) };
   };
@@ -268,6 +270,33 @@ test('each page says when its file last changed; a new commit dates only the fil
   const pages = readIntentLayer(dir, cfg).entities;
   assert.equal(pages.find((e) => e.name === 'Button Main').updatedAt, '2026-10-01T10:00:00Z', 'changed in the new commit: its date');
   assert.equal(pages.find((e) => e.name === 'Filter Chip').updatedAt, '2026-09-15T08:30:00Z', 'unchanged: its date kept');
+});
+
+test('each commit is a change of its own: who made it, when, what it says and its pages; a merge is not one', async () => {
+  const dir = makeFixture({});
+  const cfg = { intentLayer: LINK };
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: fakeGitlab().fetchImpl });
+  const commits = [
+    { id: 'c1', title: 'Button rules', message: 'Button rules\n\nmore', author_name: 'Quokka', committer_name: 'Quokka', committed_date: '2026-10-01T09:00:00Z', parent_ids: ['abc1234def5678'] },
+    { id: 'c2', title: 'Chip rules', author_name: 'ACME\\wombat', committer_name: 'ACME\\wombat', committed_date: '2026-10-01T11:30:00Z', parent_ids: ['c1'] },
+    { id: 'fff9999aaa0000', title: 'Merge branch x', author_name: 'Quokka', committer_name: 'Quokka', committed_date: '2026-10-01T12:00:00Z', parent_ids: ['c2', 'zz'] },
+  ];
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: fakeGitlab({ sha: 'fff9999aaa0000', commits }).fetchImpl });
+  const file = join(dir, 'intent-layer.snapshot.json');
+  const said = (snap) => snap.changes.map((c) => [c.to, c.at, c.says, c.by, c.pages, c.commit]);
+  assert.deepEqual(said(JSON.parse(readFileSync(file, 'utf8'))), [
+    ['c2', '2026-10-01T11:30:00Z', 'Chip rules', 'Done by wombat', ['Filter Chip'], true],
+    ['c1', '2026-10-01T09:00:00Z', 'Button rules', 'Done by Quokka', ['Button Main'], true],
+  ], 'newest first, the merge left out, each with its own pages');
+  // A change kept by an older reader, the read as one: told apart now, though the layer did not move.
+  const snap = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, JSON.stringify({ ...snap, _reader: 18, changes: [{ from: 'abc1234def5678', to: 'fff9999aaa0000', at: '2026-10-01T12:00:00Z', files: [], pages: ['Button Main', 'Filter Chip'] }] }));
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: fakeGitlab({ sha: 'fff9999aaa0000', commits }).fetchImpl });
+  assert.deepEqual(said(JSON.parse(readFileSync(file, 'utf8'))).map((c) => c[0]), ['c2', 'c1']);
+  // One the host cannot tell apart stays as it was, and says who made its commits when it can.
+  writeFileSync(file, JSON.stringify({ ...snap, _reader: 18, changes: [{ from: 'abc1234def5678', to: 'fff9999aaa0000', at: '2026-10-01T12:00:00Z', files: [], pages: [] }] }));
+  await syncIntentLayer(dir, cfg, { env: ENV, fetchImpl: fakeGitlab({ sha: 'fff9999aaa0000' }).fetchImpl });
+  assert.deepEqual(said(JSON.parse(readFileSync(file, 'utf8'))), [['fff9999aaa0000', '2026-10-01T12:00:00Z', undefined, undefined, [], undefined]]);
 });
 
 test('read-only: only GETs, only the project, its latest commit and one archive; nothing written there', async () => {

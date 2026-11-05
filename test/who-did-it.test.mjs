@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runOf, runTrailer, runFromTrailer, doneBy } from '../lib/who-did-it.mjs';
+import { runOf, runTrailer, runFromTrailer, doneBy, doneByAll } from '../lib/who-did-it.mjs';
 import { runBy } from '../lib/decided-by.mjs';
 import { changelogs, figmaChangelogs } from '../lib/component-changelog.mjs';
 import { tempDir } from './helpers.mjs';
@@ -90,4 +90,16 @@ test('History says who did each change: the author, who brought it in, or the sc
   // A read of Figma a schedule saved is the schedule's, never the token's bot nor whoever owns the schedule.
   const fig = figmaChangelogs(dir, { props: 'props.json' }, ['chip'], { cache: false }).chip;
   assert.deepEqual(fig.map((r) => r.by), ['Done by the schedule', 'Done by Quokka']);
+});
+
+test('several commits, one line: every person once, in the order they worked; nobody known is null', () => {
+  assert.equal(doneByAll(['Done by Quokka', 'Done by Wombat', 'Done by quokka', null]), 'Done by Quokka, Wombat');
+  assert.equal(doneByAll(['Done by Quokka · pushed by Wombat']), 'Done by Quokka · pushed by Wombat');
+  assert.equal(doneByAll(['Done by quokka.da.wombat', 'Done by Wombat', 'Done by Quokka da Wombat']), 'Done by Quokka da Wombat, Wombat', 'one person under a username and a name: once, by the name');
+  assert.equal(doneByAll([null, undefined]), null);
+});
+
+test('a Windows sign-in is said by its name alone, without its machine or domain', () => {
+  assert.equal(doneBy({ author: 'WOMBAT-PC\\wombat.jones', committer: 'WOMBAT-PC\\wombat.jones' }), 'Done by wombat.jones');
+  assert.equal(doneBy({ author: 'ACME\\quokka', committer: 'Wombat' }), 'Done by quokka · pushed by Wombat');
 });

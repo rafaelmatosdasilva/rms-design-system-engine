@@ -40,6 +40,10 @@ test('ticketOf: the ticket a commit was made for, its address, and what the comm
   const { ticketOf, ticketLinks } = await import('../lib/component-changelog.mjs');
   assert.deepEqual(ticketOf('#4521 - fixed the chip padding', { changelog: { ticketUrl: 'https://issues.example/t/{id}' } }), { ticket: '#4521', ticketUrl: 'https://issues.example/t/4521', says: 'fixed the chip padding' });
   assert.deepEqual(ticketOf('KIT-88: tile caption wraps', { changelog: { ticket: '[A-Z]+-\\d+' } }), { ticket: 'KIT-88', ticketUrl: null, says: 'tile caption wraps' });
+  // Every ticket it names at its start: one commit for several issues, and the review that groups them.
+  const many = ticketOf('[#4521 #4522 - REV-0811] Code review', { changelog: { ticket: '#\\d+|REV-\\d+', ticketUrl: 'https://issues.example/t/{id}' } });
+  assert.deepEqual([many.ticket, many.says, many.tickets.map((t) => [t.ticket, t.ticketUrl])], ['#4521', 'Code review', [['#4521', 'https://issues.example/t/4521'], ['#4522', 'https://issues.example/t/4522'], ['REV-0811', 'https://issues.example/t/REV-0811']]]);
+  assert.equal(ticketOf('#4521 - one issue').tickets, undefined, 'one ticket: no list');
   assert.equal(ticketOf('Tile caption wraps (#12)'), null, 'a pull request at its end is not a ticket');
   assert.equal(ticketOf('Fixed the menu position'), null);
   // No address set: the project's own changelog says how it links a ticket.

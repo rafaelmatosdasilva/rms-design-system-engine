@@ -144,10 +144,10 @@
     var nOf = function (st) { return FCH.filter(function (x) { return x.status === st; }).length; };
     pageBar(sec, { chips: [{ key: 'not as said', label: 'Not as said', n: nOf('not as said'), dot: 'differs' }, { key: 'waiting', label: 'Waiting', n: nOf('waiting'), dot: 'figma' }, { key: 'made', label: 'Made as said', n: nOf('made'), dot: 'match' }, { key: 'taken back', label: 'Taken back', n: nOf('taken back'), dot: 'figma' }].filter(function (c) { return c.n; }) });
   })();
-  // History: every change gathered by the release it shipped in, newest first, each a table of what was done and what
-  // it affects: the code's commits, each read of Figma that changed what Figma says of a component, and what the team
-  // decided in that time (a component, a pattern, a template, a foundation, the system), what it ruled out and why.
-  // Chips show the code's changes, Figma's, the decisions, or all of them (each row tagged with which).
+  // History: every change in one table, newest first, a row each, with its date and time, who did it and what it
+  // affects: the code's commits (the issues each names, the release it shipped in), what each read of Figma changed in a
+  // component, the intent layer's commits, and what the team decided (a component, a pattern, a template, a foundation,
+  // the system), what it ruled out and why. Chips show one type of change (each row tagged with which).
   var CHANGES = [];
   COMPONENTS.forEach(function (c) { (c.changelog || []).forEach(function (r) { CHANGES.push({ comp: c.name, r: r }); }); });
   // Everything the developers did, release by release (DATA.releaseLog: every commit, whatever it changed); without it,
@@ -194,8 +194,9 @@
     // pages it changed and the components they document.
     (DATA.intentChanges || []).forEach(function (x) { order.push({ k: '', on: '', at: String(x.at || ''), commits: [], layer: x }); });
     order = order.filter(function (g) { return g.commits.length || g.read || g.layer || (g.decisions || []).length; });
-    var dayOf = function (g) { var t = Date.parse(g.k && g.on ? g.on : g.at); return isNaN(t) ? 0 : t; };
-    order.sort(function (a, b) { return dayOf(b) - dayOf(a) || releaseOrder(a, b); });
+    // One table, a row each, newest first: a commit to the code, what a read of Figma changed in a component, a commit to
+    // the intent layer, a decision. Its date and time, its type, what it did, who did it, what it affects. The chips show
+    // one type; a ticket's count of commits shows that ticket's alone.
     // The components a change affects: links the table turns into pills (pillLinks), the first ones shown, the rest one
     // click away.
     var PILLS_SHOWN = 10;
@@ -209,32 +210,77 @@
       var m = /^(.+?) (TEXT|BOOLEAN|VARIANT|INSTANCE_SWAP|SLOT)(?: · (.*))? → (?:TEXT|BOOLEAN|VARIANT|INSTANCE_SWAP|SLOT)(?: · (.*))?$/.exec(t);
       return m ? m[1] + ' "' + (m[3] || '') + '" → "' + (m[4] || '') + '"' : t;
     };
-    // Who did a row that is work (who-did-it.mjs), on its own line and in the style of a decision's Answered by.
-    var doneByLine = function (r) { return r && r.by ? '<p class="sg-il-line"><span class="pg-log-date">' + esc(r.by) + '</span></p>' : ''; };
     var isFirst = function (c) { return c.changed.length === 1 && /first time/.test(c.changed[0]); };
-    var figmaRows = function (x) {
-      var first = x.comps.filter(isFirst), changed = x.comps.filter(function (c) { return !isFirst(c); });
-      // What changed, then the components read for the first time, named; the commit that saved the read under the last.
-      var rows = changed.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; }).map(function (c) { return ['<p class="sg-il-line">' + esc(c.changed.map(figmaChange).join('; ')) + '</p>', pillsHTML([c.name], 'history')]; });
-      var names = first.map(function (c) { return c.name; }).sort();
-      // The components it read for the first time are named once, as their pills under Affects.
-      if (names.length) rows.push(['<p class="sg-il-line">Read for the first time</p>', pillsHTML(names, 'history')]);
-      var sha = x.r.url ? '<a class="sg-uses-link" href="' + esc(x.r.url) + '" target="_blank" rel="noopener"><code>' + esc(x.r.short) + '</code></a>' : '<code>' + esc(x.r.short || '') + '</code>';
-      if (rows.length) rows[rows.length - 1][0] += '<p class="sg-il-line"><span class="pg-log-date">Saved in ' + sha + '</span></p>' + doneByLine(x.r);
-      return rows.map(function (r) { return '<tr data-chip="figma"><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
+    var line = function (html) { return '<p class="sg-il-line">' + html + '</p>'; };
+    var quiet = function (text) { return '<span class="pg-log-date">' + text + '</span>'; };
+    var shaLink = function (url, short) { return url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener"><code>' + esc(short) + '</code></a>' : '<code>' + esc(short) + '</code>'; };
+    // Who did it (who-did-it.mjs): its own column, the names alone (the column says Done by), one a line. One person
+    // under two names on the page (an account's teresa.deus, the Teresa Deus they sign with) is said by the name they sign
+    // with. A row nobody is known for leaves it empty.
+    var nameKey = function (n) { return String(n).toLowerCase().replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim(); };
+    var namesOf = function (b) { return String(b || '').replace(/^Done by /, '').split(', ').map(function (n) { return n.trim(); }).filter(Boolean); };
+    var signed = {};
+    var learn = function (b) { namesOf(b).forEach(function (n) { n.split(' · pushed by ').forEach(function (p) { var k = nameKey(p); if (!signed[k] || (!/\s/.test(signed[k]) && /\s/.test(p))) signed[k] = p; }); }); };
+    var whoCell = function (bys) {
+      var list = [];
+      bys.forEach(function (b) { namesOf(b).forEach(function (n) { n = n.split(' · pushed by ').map(function (p) { return signed[nameKey(p)] || p; }).join(' · pushed by '); if (list.indexOf(n) < 0) list.push(n); }); });
+      return '<td class="sg-log-who">' + list.map(function (n) { return line(esc(n)); }).join('') + '</td>';
     };
-    // A read of Figma is dated, never released: Figma, and the day it was read.
-    var figmaHead = function (g) { return '<span class="sg-log-tag">Figma</span>' + esc(String(g.read.r.date).slice(0, 10)); };
-    // A change to the intent layer: what it changed, the commit that made it, and the components its pages document.
-    var layerSha = function (x) { return !x.to ? '' : x.url ? '<a class="sg-uses-link" href="' + esc(x.url) + '" target="_blank" rel="noopener"><code>' + esc(x.to.slice(0, 8)) + '</code></a>' : '<code>' + esc(x.to.slice(0, 8)) + '</code>'; };
-    var layerWhat = function (x) { return x.pages.length ? plural(x.pages.length, 'page', 'pages') + ' changed' : plural(x.files || 0, 'file', 'files') + ' changed, none of them a page'; };
-    var layerRows = function (x) {
-      // A page whose component is under Affects is named there only: the others (a pattern, a foundation) are named here.
+    // Its day, and its time where it has one, as the reader's clock says it.
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var dateCell = function (at) {
+      var s = String(at || ''), t = Date.parse(s);
+      if (!/T\d/.test(s) || isNaN(t)) return '<td class="sg-log-when">' + line(esc(s.slice(0, 10))) + '</td>';
+      var d = new Date(t);
+      return '<td class="sg-log-when">' + line(d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())) + line(quiet(pad(d.getHours()) + ':' + pad(d.getMinutes()))) + '</td>';
+    };
+    var ROWS = [];
+    var add = function (at, chip, type, what, bys, affects, tickets) { (bys || []).forEach(learn); ROWS.push({ at: String(at || ''), chip: chip, type: type, what: what, bys: bys || [], affects: affects, tickets: tickets || [] }); };
+    // The code: each commit, the issues it names (each linked, with how many commits it has when more than one), what it
+    // says, and the release it shipped in.
+    var ticketsOf = function (r) { return r.tickets || (r.ticket ? [{ ticket: r.ticket, ticketUrl: r.ticketUrl }] : []); };
+    var commitsOf = {};
+    order.forEach(function (g) { g.commits.forEach(function (x) { ticketsOf(x.r).forEach(function (t) { commitsOf[t.ticket] = (commitsOf[t.ticket] || 0) + 1; }); }); });
+    var ticketLine = function (r) {
+      var ts = ticketsOf(r);
+      if (!ts.length) return line(quiet(r.request ? requestLink(r.request) : 'No issue'));
+      return line(ts.map(function (t) {
+        var name = t.ticketUrl ? '<a class="sg-uses-link" href="' + esc(t.ticketUrl) + '" target="_blank" rel="noopener">' + esc(t.ticket) + '</a>' : esc(t.ticket);
+        var n = commitsOf[t.ticket] || 0;
+        return name + (n > 1 ? ' ' + quiet('· <button type="button" class="sg-log-only" data-ticket="' + esc(t.ticket) + '">' + n + ' commits</button>') : '');
+      }).join('  '));
+    };
+    var releaseLine = function (g, r) {
+      if (!g.k) return line(quiet('Not released yet'));
+      var url = r.url ? r.url.replace(/\/-\/commit\/[0-9a-f]+$/, '/-/tags/' + encodeURIComponent(g.k)).replace(/\/commit\/[0-9a-f]+$/, '/releases/tag/' + encodeURIComponent(g.k)) : null;
+      var tag = url && url !== r.url ? '<a class="sg-uses-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(g.k) + '</a>' : esc(g.k);
+      return line(quiet('Released in ') + tag + (g.on ? ' ' + quiet('on ' + esc(String(g.on).slice(0, 10))) : ''));
+    };
+    var noWho = function (r) { var o = {}; for (var k in r) o[k] = r[k]; o.by = null; return o; };
+    order.forEach(function (g) { g.commits.forEach(function (x) {
+      var r = x.r, comps = (x.comps || []).slice().sort();
+      var affects = (comps.length ? pillsHTML(comps) : '') + ((r.where || []).length ? (comps.length ? ' ' : '') + whereHTML(r.where) : '');
+      add(r.date, 'code', 'Code', ticketLine(r) + line(commitLine(noWho(r))) + releaseLine(g, r), [r.by], affects || quiet('No component'), ticketsOf(r).map(function (t) { return t.ticket; }));
+    }); });
+    // Figma: what each read changed in each component, a row each; the components read for the first time, one row.
+    order.forEach(function (g) {
+      if (!g.read) return;
+      var x = g.read, saved = line(quiet('Saved in ') + shaLink(x.r.url, x.r.short || ''));
+      x.comps.filter(function (c) { return !isFirst(c); }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (c) { add(x.r.date, 'figma', 'Figma', line(esc(c.changed.map(figmaChange).join('; '))) + saved, [x.r.by], pillsHTML([c.name], 'history')); });
+      var first = x.comps.filter(isFirst).map(function (c) { return c.name; }).sort();
+      if (first.length) add(x.r.date, 'figma', 'Figma', line('Read for the first time') + saved, [x.r.by], pillsHTML(first, 'history'));
+    });
+    // The intent layer: each commit, what it says, the pages it changed (those of no component named), and the commit.
+    order.forEach(function (g) {
+      if (!g.layer) return;
+      var x = g.layer;
       var others = x.pages.filter(function (p) { return !x.components.some(function (n) { return n.toLowerCase().replace(/[^a-z0-9]/g, '') === String(p).toLowerCase().replace(/[^a-z0-9]/g, ''); }); });
-      return '<tr data-chip="intent"><td><p class="sg-il-line"><strong>' + esc(layerWhat(x)) + '</strong></p>' + (others.length ? '<p class="sg-il-line"><span class="pg-par-val">' + esc(others.join(', ')) + '</span></p>' : '') +
-        (x.to ? '<p class="sg-il-line"><span class="pg-log-date">Committed in ' + layerSha(x) + '</span></p>' : '') + doneByLine(x) + '</td><td>' + (x.components.length ? pillsHTML(x.components, 'documentation') : '<span class="pg-log-date">No component</span>') + '</td></tr>';
-    };
-    var decisionRow = function (d) {
+      var count = x.pages.length ? plural(x.pages.length, 'page', 'pages') + ' changed' : plural(x.files || 0, 'file', 'files') + ' changed, none of them a page';
+      add(x.at, 'intent', 'Intent layer', (x.says ? line(esc(x.says)) + line(quiet(esc(count))) : line(esc(count))) + (others.length ? line('<span class="pg-par-val">' + esc(others.join(', ')) + '</span>') : '') +
+        (x.to ? line(quiet('Committed in ') + shaLink(x.url, x.to.slice(0, 8))) : ''), [x.by], x.components.length ? pillsHTML(x.components, 'documentation') : quiet('No component'));
+    });
+    // The decisions: what was decided, ruled out and why, and what it is about.
+    order.forEach(function (g) { (g.decisions || []).forEach(function (d) {
       // A page of the intent layer named like a component of the system opens that component's Documentation.
       var pageComp = !d.component && d.page && COMPONENTS.some(function (c) { return c.name === d.page; }) ? d.page : null;
       var about = d.component && COMPONENTS.some(function (c) { return c.name === d.component; }) ? '<a class="sg-uses-link" href="#' + esc(cid(d.component)) + '/history">' + esc(d.component) + '</a>'
@@ -242,52 +288,38 @@
         : d.url ? '<a class="sg-uses-link" href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.page || d.about) + '</a>' : esc(d.page || d.component || 'The system');
       // A lesson (a correction a person made) and a rule from repeated findings say what each became, and a lesson that
       // came back says which guard did not hold.
-      var tag = d.kind === 'lesson' ? 'Lesson' : d.kind === 'rule' || d.kind === 'proposed' ? 'Rule' : d.kind === 'signed' ? 'Sign-off' : 'Decision';
-      return '<tr data-chip="decisions"><td><p class="sg-il-line"><span class="sg-log-tag">' + tag + '</span> <strong>' + esc(d.what) + '</strong></p>' +
-        (d.ruledOut && d.ruledOut.length ? '<p class="sg-il-line">Ruled out ' + esc(d.ruledOut.join(', ')) + '.</p>' : '') + (d.why ? '<p class="sg-il-line">' + esc(capital(d.why).replace(/\.?$/, '.')) + '</p>' : '') +
-        (d.became ? '<p class="sg-il-line">' + esc(d.became.replace(/\.?$/, '.')) + '</p>' : '') + (d.back ? '<p class="sg-il-line">' + esc(capital(d.back).replace(/\.?$/, '.')) + '</p>' : '') +
+      var type = d.kind === 'lesson' ? 'Lesson' : d.kind === 'rule' || d.kind === 'proposed' ? 'Rule' : d.kind === 'signed' ? 'Sign-off' : 'Decision';
+      add(d.at, 'decisions', type, line('<strong>' + esc(d.what) + '</strong>') +
+        (d.ruledOut && d.ruledOut.length ? line('Ruled out ' + esc(d.ruledOut.join(', ')) + '.') : '') + (d.why ? line(esc(capital(d.why).replace(/\.?$/, '.'))) : '') +
+        (d.became ? line(esc(d.became.replace(/\.?$/, '.'))) : '') + (d.back ? line(esc(capital(d.back).replace(/\.?$/, '.'))) : '') +
         // Its component changed since it was decided: it still stands, to review again.
-        (d.review ? '<p class="sg-il-line"><span class="pg-par-val">' + esc(d.review) + '</span></p>' : '') +
+        (d.review ? line('<span class="pg-par-val">' + esc(d.review) + '</span>') : '') +
         // A sign-off: who made the change and who reviewed it, never the same one.
-        (d.author ? '<p class="sg-il-line">' + esc('Made by ' + d.author + ', reviewed by ' + (d.reviewer || d.by) + '.') + '</p>' : '') +
-        '<p class="sg-il-line"><span class="pg-log-date">' + esc(capital(d.said) + (d.by ? ' by ' + d.by : '') + (d.at ? ' on ' + String(d.at).slice(0, 10) : '')) + '</span></p></td><td>' + about + '</td></tr>';
-    };
+        (d.author ? line(esc('Made by ' + d.author + ', reviewed by ' + (d.reviewer || d.by) + '.')) : '') +
+        line(quiet(esc(capital(d.said)))), [d.by], about);
+    }); });
+    var stamp = function (s) { var t = Date.parse(s); return isNaN(t) ? 0 : t; };
+    ROWS.sort(function (a, b) { return stamp(b.at) - stamp(a.at); });
     var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);
-    // One row per issue (the team's unit of work: its commits, whatever each changed), then what it affects: the
-    // components its commits changed (none for a change outside them). A commit made for no issue is a row of its own.
-    var codeRow = function (t) {
-      var comps = []; t.items.forEach(function (x) { x.comps.forEach(function (n) { if (comps.indexOf(n) < 0) comps.push(n); }); });
-      // Where else its commits changed things, once each (the same part named by two commits of an issue: once).
-      var where = [], seenW = {}; t.items.forEach(function (x) { (x.r.where || []).forEach(function (w) { var k = w.kind + ':' + w.label + ':' + (w.names || []).join(','); if (!seenW[k]) { seenW[k] = 1; where.push(w); } }); });
-      // A row for no issue leads with the merge or pull request it came by, when there is one: only a commit made
-      // straight on the branch says no issue.
-      var first = t.items[0].r, lead = t.ticket ? '' : '<p class="sg-il-line"><span class="pg-log-date">' + (first.request ? requestLink(first.request) : 'No issue') + '</span></p><p class="sg-il-line">';
-      var affects = (comps.length ? pillsHTML(comps.sort()) : '') + (where.length ? (comps.length ? ' ' : '') + whereHTML(where) : '');
-      var cell = lead + ticketHTML(t, function (x) { return commitLine(x.r); }) + (t.ticket ? '' : '</p>');
-      return '<tr data-chip="code"><td>' + cell + '</td><td>' + (affects || '<span class="pg-log-date">No component</span>') + '</td></tr>';
-    };
-    var when = function (x) { var t = Date.parse(x); return isNaN(t) ? 0 : t; };
-    // A card's head: the code's release (or the code merged since the last one), a read of Figma's day, or the day of
-    // the decisions it holds.
-    var cardHead = function (g) {
-      if (g.read) return figmaHead(g);
-      if (g.layer) return '<span class="sg-log-tag">Intent layer</span>' + esc(String(g.layer.at || '').slice(0, 10));
-      if (g.day) return esc(g.day);
-      var n = byTicket(g.commits, function (x) { return x.r; }).length; return '<span class="sg-log-tag">Code</span>' + releaseHead(g) + '  ·  ' + n + (n === 1 ? ' issue' : ' issues');
-    };
-    box.innerHTML = order.map(function (g) {
-      // Its decisions, reads of Figma and issues together, newest first, each with its own date.
-      var rows = (g.decisions || []).map(function (d) { return { at: String(d.at || ''), html: decisionRow(d) }; })
-        .concat(byTicket(g.commits, function (x) { return x.r; }).map(function (t) { return { at: String(t.items[0].r.date || ''), html: codeRow(t) }; }));
-      rows.sort(function (a, b) { return when(b.at) - when(a.at); });
-      return '<div class="pg-inspect"><div class="pg-inspect-head">' + cardHead(g) + '</div><table class="sg-log"><thead><tr><th scope="col">What</th><th scope="col">Affects</th></tr></thead><tbody>' + (g.read ? figmaRows(g.read) : g.layer ? layerRows(g.layer) : rows.map(function (r) { return r.html; }).join('')) + '</tbody></table></div>';
-    }).join('');
-    // The code, Figma, the decisions or all: a chip for each kind the page has, when it has two, and a release with
-    // nothing of the kind chosen out of the way (read from the page itself: box is a var another page reuses).
+    box.innerHTML = '<p class="pg-par-sum sg-log-only-bar" hidden></p><div class="pg-inspect"><table class="sg-log"><thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">What</th><th scope="col">Done by</th><th scope="col">Affects</th></tr></thead><tbody>' +
+      ROWS.map(function (x) { return '<tr data-chip="' + x.chip + '"' + (x.tickets.length ? ' data-tickets="' + esc(' ' + x.tickets.join(' ') + ' ') + '"' : '') + '>' + dateCell(x.at) + '<td class="sg-log-type">' + esc(x.type) + '</td><td class="sg-log-what">' + x.what + '</td>' + whoCell(x.bys) + '<td>' + x.affects + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    // The code, Figma, the intent layer or the decisions: a chip for each type the page has, when it has two.
     var kinds = [['code', 'Code'], ['figma', 'Figma'], ['intent', 'Intent layer'], ['decisions', 'Decisions']].map(function (x) { return { key: x[0], label: x[1], n: box.querySelectorAll('tr[data-chip="' + x[0] + '"]').length }; }).filter(function (c) { return c.n; });
     if (kinds.length > 1) pageBar(wn, { chips: kinds });
-    box.addEventListener('click', function (e) { var b = e.target.closest('[data-pills-more]'); if (!b) return; Array.prototype.forEach.call(b.parentNode.querySelectorAll('a[hidden]'), function (p) { p.hidden = false; }); b.remove(); });
-    wn.addEventListener('sg-chip', function (e) { Array.prototype.forEach.call(e.currentTarget.querySelectorAll('.pg-inspect'), function (card) { card.hidden = !card.querySelector('tbody tr:not([hidden])'); }); });
+    // A ticket's commits alone, said above the table with a way back to every row.
+    var onlyBar = box.querySelector('.sg-log-only-bar');
+    var showTicket = function (t) {
+      Array.prototype.forEach.call(box.querySelectorAll('tbody tr'), function (tr) { tr.hidden = !!t && (tr.getAttribute('data-tickets') || '').indexOf(' ' + t + ' ') < 0; });
+      onlyBar.hidden = !t;
+      onlyBar.innerHTML = t ? esc('The commits of ' + t) + ' ' + sysButton('button', 'Show every change', ' data-ticket-all') : '';
+      if (t) Array.prototype.forEach.call(wn.querySelectorAll('.sg-chip[data-chip]'), function (c) { c.setAttribute('aria-pressed', c.getAttribute('data-chip') === 'all' ? 'true' : 'false'); });
+    };
+    box.addEventListener('click', function (e) {
+      var only = e.target.closest('[data-ticket]'); if (only) { showTicket(only.getAttribute('data-ticket')); return; }
+      if (e.target.closest('[data-ticket-all]')) { showTicket(null); return; }
+      var b = e.target.closest('[data-pills-more]'); if (!b) return; Array.prototype.forEach.call(b.parentNode.querySelectorAll('a[hidden]'), function (p) { p.hidden = false; }); b.remove();
+    });
+    wn.addEventListener('sg-chip', function () { onlyBar.hidden = true; onlyBar.innerHTML = ''; });
   }
   // Every part of the documentation no agent is given, whatever its source: why, what to do so it is, remove it or not.
   var leftHTML = function (list) { return list.map(function (n) { return '<div class="sg-il-not"><p class="sg-il-line"><strong>' + esc(capital(n.what || n.text)) + '</strong>' + (n.from ? '<span class="pg-par-val">' + esc(capital(n.from)) + '</span>' : '') + '</p><p class="sg-il-line">' + esc(n.why) + '</p>' + (n.fix ? '<p class="sg-il-line"><span class="sg-il-label">To use it</span> ' + esc(n.fix) + '</p>' : '') + (n.remove ? '<p class="sg-il-line"><span class="sg-il-label">Remove it?</span> ' + esc(n.remove) + '</p>' : '') + '</div>'; }).join(''); };
