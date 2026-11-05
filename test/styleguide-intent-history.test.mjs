@@ -41,6 +41,8 @@ test('the layer\'s changes on History: a row each in its one table, linked to th
   assert.deepEqual(data.intentChanges.map((x) => [x.to, x.pages, x.components, x.files]), [['c2d4e6f8a0b1', ['button', 'Saving'], ['button'], 2], ['b0b1b2b3b4b5', [], [], 1]]);
   // Who did each, beside who answers a decision: a change whose commit names nobody says nothing rather than guessing.
   assert.deepEqual(data.intentChanges.map((x) => x.by ?? null), ['Done by Quokka · pushed by Wombat', null]);
+  // The pages that document no component, known by the match and never by the name: only they are named in What.
+  assert.deepEqual(data.intentChanges.map((x) => x.alone), [['Saving'], []]);
   assert.equal(JSON.parse(readFileSync(snapFile, 'utf8')).changes.length, 2, 'kept as they were while the layer did not move');
 
   const { findChrome, launchChrome, connectCDP, openPage, waitForTrue, FILE_PAGE_LOADED } = await import('../lib/cdp.mjs');

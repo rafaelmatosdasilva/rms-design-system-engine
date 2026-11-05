@@ -1739,6 +1739,9 @@ test('History: a row per change, newest first, whatever its type: a commit to th
     ['code', 'Code', '#11 · 2 commits REV-1 the tile Released in v2.0.0 on 2026-10-21'],
   ], 'newest first, whatever the type: an issue a count of its commits, each commit its release; a read of Figma a row a component it changed, the new ones named once');
   assert.match(fns.ROWS.at(-1).what, /href="https:\/\/example\.test\/x\/-\/tags\/v2\.0\.0"/, 'the release linked where the host keeps it');
+  // A page named unlike the component it documents (Table Body Cell Tooltip, table/Cell/tooltip) is under Affects only.
+  const named = run([{ k: '', commits: [], layer: { at: '2026-10-26T12:00:00Z', to: 'eea0cd0ed189', pages: ['Table Body Cell Tooltip', 'Saving'], components: ['table/Cell/tooltip'], alone: ['Saving'], files: 2 } }]);
+  assert.equal(text(named.ROWS[0].what), '2 pages changed Saving Committed in eea0cd0e', 'only the page that documents no component is named in What');
   assert.deepEqual(fns.ROWS.filter((x) => x.chip === 'figma').map((x) => [...x.affects.matchAll(/href="#([^"]+)"/g)].map((m) => m[1])), [['c-buttonFloat/history'], ['c-navTab/history'], ['c-cardRow/history', 'c-chipRow/history']], 'the components only under Affects, as pills');
   assert.equal(fns.figmaChange('property showLabel added'), 'showLabel added');
   assert.equal(fns.figmaChange('property textContent TEXT · March 1, 2025 → TEXT · 1 Mar 2025'), 'textContent "March 1, 2025" → "1 Mar 2025"', 'a text\'s old and new words, quoted');
