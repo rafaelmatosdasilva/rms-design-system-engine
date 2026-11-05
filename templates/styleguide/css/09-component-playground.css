@@ -1027,6 +1027,8 @@ tr.sg-row-open:focus-visible { outline: 2px solid var(--sg-accent); outline-offs
 .sg-log th { text-align: left; font-size: var(--sg-s); font-weight: var(--sg-text-weight); color: var(--sg-muted); padding: var(--sg-space-s) var(--sg-space-m); }
 /* Its head stays in view under the card's head as the rows scroll by, as a token table's does, drawing its own line. */
 .sg-log thead th { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px)); z-index: 5; background: var(--sg-bg-2); box-shadow: inset 0 calc(-1 * var(--sg-line-width, 1px)) 0 var(--sg-line-solid); }
+.pg-inspect .sg-log td { vertical-align: top; }   /* every cell from its top: a row's date, its type, what it did and who line up */
+.sg-log td > .sg-log-stick { position: sticky; top: calc(var(--sg-sticky-top, 0px) + var(--pg-areas-h, 0px) + var(--sg-stick-gap) + var(--pg-card-head-h, 0px) + var(--sg-log-head-h, 0px)); }   /* a date, type and person shared by rows of one moment stay in view under the head while those rows scroll */
 .sg-log td.sg-log-when { color: var(--sg-text); width: 7.5em; white-space: nowrap; }   /* its day, its time under it */
 .sg-log td.sg-log-type { color: var(--sg-text); width: 7em; }
 .sg-log td.sg-log-what { color: var(--sg-text); }

@@ -666,7 +666,7 @@ test('in the browser: no script error, a control changes the real component, the
     // with no table (Identity) never has its content cut short under the line.
     // (read from the template: the lowest stuck bar is marked on a scroll frame, which a headless page times freely)
     const sgTpl = templateText();
-    assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, \.sg-token-card thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over tables, the gap under the line');
+    assert.match(sgTpl, /if \(page && page\.querySelector\('\.pg-inspect-head, \.pg-par-table, table > thead'\)\) edge\.classList\.add\('sg-sticky-band'\)/, 'over any table with a head row, the gap under the line: no row shows between the bar and the head');
     // It stops a line short of the gap: a table's head sticks a pixel under the bars' bottom plus the gap (at.th, -1,
     // above), so its top line is two under; a band a line longer is drawn over that line (the bar is above the table).
     assert.match(sgTpl, /\.sg-sticky-edge\.sg-sticky-band \{ box-shadow: 0 calc\(var\(--sg-stick-gap\) - 2 \* var\(--sg-line-width, 1px\)\) 0 0 var\(--sg-bg\); \}/, 'the band ends where a stuck head\'s top line begins');
@@ -1264,7 +1264,7 @@ test('links and changelog: Figma, the code and the team\'s pages; each commit th
   assert.match(tpl, /quiet\('No component'\)/, 'a change to no component says so');
   assert.match(tpl, /byTicket\(rows, function \(r\) \{ return r; \}\)/, 'a component\'s own changelog groups the same way');
   assert.match(tpl, /line\(quiet\('Released in '\) \+ tag/, 'each commit says the release it shipped in');
-  assert.match(tpl, /line\(quiet\('Not released yet'\)\)/);
+  assert.doesNotMatch(tpl, /Not released yet/, 'a commit not released yet says nothing of it');
   // A Width frame runs the system's own scripts and lets a selection move, as the live preview does.
   assert.match(tpl, /querySelectorAll\('script\[data-system-script\]'\)/);
   assert.match(tpl, /selectionMoves\(st\);/);
@@ -1714,7 +1714,7 @@ test('a page opens at its top, reloaded too: the browser never puts back an earl
 
 test('History: a row per change, newest first, whatever its type: a commit to the code with its issues and release, what a read of Figma changed in each component, a commit to the intent layer, a decision', () => {
   const tpl = templateText();
-  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 10;'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
+  const src = tpl.slice(tpl.indexOf('    var PILLS_SHOWN = 5;'), tpl.indexOf("    var box = document.createElement('div'); box.className = 'pg-cards'; wn.appendChild(box);"));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const run = (order, components = []) => new Function('esc', 'cid', 'sysButton', 'order', 'COMPONENTS', 'requestLink', 'commitLine', 'whereHTML', 'plural', 'capital', src + 'return { ROWS, figmaChange, pillsHTML, dateCell };')(
     esc, (n) => 'c-' + n, (tag, label, attrs) => `<button${attrs}>${label}</button>`, order, components, (q) => q.label, (r) => esc(r.says || r.subject), () => '', (n, a, b) => n + ' ' + (n === 1 ? a : b), (x) => x[0].toUpperCase() + x.slice(1));
@@ -1730,7 +1730,7 @@ test('History: a row per change, newest first, whatever its type: a commit to th
     { k: '', commits: [], day: '2026-10-25', decisions: [{ at: '2026-10-25', what: 'No large tile', said: 'answered', by: 'Design', kind: 'decision' }] },
   ]);
   assert.deepEqual(fns.ROWS.map((x) => [x.chip, x.type, text(x.what)]), [
-    ['code', 'Code', '#11 · 2 commits again Not released yet'],
+    ['code', 'Code', '#11 · 2 commits again'],
     ['figma', 'Figma', 'showLabel added; labelContent added Saved in 9878c3f'],
     ['figma', 'Figma', 'tileSlot added Saved in 9878c3f'],
     ['figma', 'Figma', 'Read for the first time Saved in 9878c3f'],
@@ -1745,8 +1745,8 @@ test('History: a row per change, newest first, whatever its type: a commit to th
   assert.equal(text(fns.dateCell('2026-10-25')), '2026-10-25', 'a day alone has no time');
   assert.match(text(fns.dateCell('2026-10-20T08:00:00Z')), /^2026-10-2[01] \d\d:\d\d$/, 'a moment: its day and its time, as the reader\'s clock says it');
   const many = fns.pillsHTML(Array.from({ length: 14 }, (_, i) => 'c' + i));
-  assert.equal((many.match(/ hidden>/g) ?? []).length, 4, 'the first ten shown');
-  assert.match(many, /<button data-pills-more>4 more<\/button>$/, 'the rest one click away, with the system\'s button');
+  assert.equal((many.match(/ hidden>/g) ?? []).length, 9, 'the first five shown');
+  assert.match(many, /<button data-pills-more>9 more<\/button>$/, 'the rest one click away, with the system\'s button');
   assert.match(tpl, /\.sg-link-pill\[hidden\] \{ display: none; \}/, 'a pill kept back stays hidden, its pill style never showing it');
 });
 

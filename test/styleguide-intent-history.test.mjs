@@ -106,7 +106,7 @@ test('the code on History: a row each commit, the issues it names, how many comm
     const rows = async () => run(`[...document.querySelectorAll('#history tr[data-chip="code"]:not([hidden])')].map((tr) => [...tr.cells].slice(1).map((c) => c.innerText.replace(/\\s+/g, ' ').trim()))`);
     const all = await rows();
     assert.equal(all.length, 3, 'a row each commit');
-    assert.match(all[0][1], /^#11 · 3 commits #12 REV-1 Code review [0-9a-f]{7} Not released yet$/, 'every issue it names, each with how many commits it has when more than one, then what it says');
+    assert.match(all[0][1], /^#11 · 3 commits #12 REV-1 Code review [0-9a-f]{7}$/, 'every issue it names, each with how many commits it has when more than one, then what it says');
     assert.match(all[2][1], /Released in v1\.0\.0/);
     assert.deepEqual(all.map((x) => x[2]), ['Quokka da Wombat', 'wombat', 'Quokka da Wombat'], 'one person by the name they sign with; a Windows sign-in by its name alone');
     // An issue's count shows its commits alone, and a way back to every change.
@@ -114,6 +114,9 @@ test('the code on History: a row each commit, the issues it names, how many comm
     assert.equal((await rows()).length, 3);
     assert.match(await run(`document.querySelector('#history .sg-log-only-bar').innerText`), /The commits of #11/);
     await run(`document.querySelector('#history [data-ticket-all]').click()`);
+    // Scrolled, the lowest bar paints the gap the table's head sticks under, as over every table: no row shows above the head.
+    await run(`window.scrollTo(0, 400); window.dispatchEvent(new Event('scroll'))`);
+    assert.equal(await waitForTrue(send, sessionId, `!!document.querySelector('#history .sg-sticky-band')`, { attempts: 50 }), true, 'the History table has the band over it');
     assert.equal(await run(`document.querySelector('#history .sg-log-only-bar').hidden`), true);
     assert.deepEqual(errors, []);
     close();
