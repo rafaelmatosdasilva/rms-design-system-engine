@@ -131,7 +131,7 @@ test('in the browser: with Figma\'s data a component only the code has has its p
     assert.equal(await run(`!!document.querySelector('.sg-nav a[href="#c-button"]')`), true, 'Figma\'s components are');
     // A row of the table: in the code, not in Figma; a tip on its Figma cell says what to do.
     const row = await run(`(() => { const tr = document.querySelector('#status tr.sg-mx-row[data-name="HbChip"]'); if (!tr) return ''; return [...tr.cells].slice(1, 4).map((td) => (td.querySelector('.pg-par-status') || td).textContent).join('|') + '|' + tr.cells[1].textContent; })()`);
-    assert.match(row, /^Missing\|Found\|N\/A/);
+    assert.match(row, /^Missing\|Built\|N\/A/);
     assert.match(row, /components\/HbChip\.vue/);
     assert.match(row, /Add HbChip to Figma, remove it from the code, or keep it as a known exception\./);
     assert.deepEqual(errors, []);

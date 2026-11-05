@@ -270,15 +270,15 @@
     return '<header class="sg-panel-head">' + (crumbs.length ? '<nav class="sg-panel-crumbs" aria-label="Where you are">' + crumbs.map(function (c) { return '<span>' + esc(c) + '</span>'; }).join('') + '</nav>' : o.badge ? '<p class="sg-section-badge">' + esc(o.badge) + '</p>' : '') + '<h2>' + esc(o.title) + (o.titleTip ? ' ' + o.titleTip : '') + '</h2>' + (o.sub ? '<p class="sg-panel-sub">' + esc(o.sub) + '</p>' : '') + '</header>' +
       '<div class="sg-panel-body">' + o.body + '</div>';
   }
-  // The components a token is used by, as the Status table shows them: whether Figma and the code have each, and an
+  // The components a token is used by, as the Status table shows them: whether Figma has each (Found) and the code (Built), and an
   // arrow to its page (one only in Figma has none to open).
-  var STATUS_PILL = function (ok) { return '<span class="pg-par-status pg-par--' + (ok ? 'match' : 'differs') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + (ok ? 'Found' : 'Missing') + '</span>'; };
+  var STATUS_PILL = function (ok, yes) { return '<span class="pg-par-status pg-par--' + (ok ? 'match' : 'differs') + '"><span class="pg-par-sign" aria-hidden="true"></span>' + (ok ? yes || 'Found' : 'Missing') + '</span>'; };
   var USERS_ARROW = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
   function usersTable(names) {
     if (!names.length) return '<p class="sg-tk-none">No component uses it.</p>';
     return '<div class="pg-par-scroll"><table class="pg-par-table sg-tk-users"><thead><tr><th scope="col">Component</th><th scope="col">Figma</th><th scope="col">Code</th><th scope="col" class="sg-mx-open-cell"><span class="sg-hidden-text">Open</span></th></tr></thead><tbody>' +
       names.map(function (n) { var c = HAS_PAGE[n], inFigma = c ? !c.codeOnly : true, inCode = !!c;
-        return '<tr class="sg-mx-row' + (c ? ' is-link' : '') + '"><td><span class="sg-mx-name" title="' + esc(n) + '">' + esc(n) + '</span></td><td>' + STATUS_PILL(inFigma) + '</td><td>' + STATUS_PILL(inCode) + '</td>' +
+        return '<tr class="sg-mx-row' + (c ? ' is-link' : '') + '"><td><span class="sg-mx-name" title="' + esc(n) + '">' + esc(n) + '</span></td><td>' + STATUS_PILL(inFigma) + '</td><td>' + STATUS_PILL(inCode, 'Built') + '</td>' +
           '<td class="sg-mx-open-cell">' + (c ? '<a class="sg-mx-go" href="#' + esc(cid(n)) + '" aria-label="Open ' + esc(n) + '">' + USERS_ARROW + '</a>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
   }
   function usesOf(v, figma) {

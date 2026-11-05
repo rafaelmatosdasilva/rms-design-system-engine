@@ -27,6 +27,11 @@
 .sg-health-count { display: flex; flex-direction: column; gap: 0; }
 .sg-health-count > .sg-health-desc { margin-top: calc(-1 * var(--sg-space-xs)); }   /* the label close under the count, into its line's own space */
 .sg-health-num { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--sg-space-s); }
+.sg-health-top + .sg-health-count { margin-top: calc(-1 * var(--sg-space-s)); }   /* the big number 8px closer to its card's title */
+.sg-health-count > .sg-health-num:has(.sg-health-dot) { flex-wrap: nowrap; column-gap: 0; }   /* the dot, the number, and its word on the number's baseline, all on one line */
+.sg-health-num > .sg-health-dot { align-self: center; margin-right: calc(var(--sg-space-xs) + var(--sg-space-xxs)); }
+.sg-health-num > .sg-health-dot ~ .sg-health-out { margin-left: var(--sg-space-s); }
+.sg-health-dot { flex: none; width: calc(var(--sg-space-xs) * 2.25); height: calc(var(--sg-space-xs) * 2.25); border-radius: var(--sg-radius-pill); background: var(--sg-positive); }   /* green, as the done part of the bar: the big number is that part */
 .sg-health-out { font-size: calc(var(--sg-s) + var(--sg-space-s)); font-weight: var(--sg-heading-weight); color: var(--sg-muted); }   /* of 133, 8px over the text size */
 .sg-health-desc { font-size: calc(var(--sg-s) + var(--sg-space-xxs) / 2); color: var(--sg-text-2); }   /* what the count counts, under it, 1px over the text size */
 .sg-health-num, .sg-health-num.sg-health-num { line-height: normal; }
@@ -71,16 +76,21 @@
 .sg-mx-sys-head { font-size: var(--sg-l); font-weight: var(--sg-heading-weight); color: var(--sg-text); margin: var(--sg-card-gap) 0 var(--sg-space-l); }
 .sg-mx-sys { display: flex; flex-direction: column; gap: var(--sg-card-gap); }
 .sg-todo > .pg-par-card { margin-bottom: 0; }
+.sg-health-total { margin: 0 0 var(--sg-space-s); font-size: var(--sg-s); color: var(--sg-text-2); }   /* the whole every card counts over, said once above them */
+.sg-health-go { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-space-s); }   /* how many are complete at the left, the link at the right, one line */
+.sg-health-done { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; font-size: var(--sg-m); color: var(--sg-text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sg-health-done > svg { flex: none; width: var(--sg-mark); height: var(--sg-mark); }
+.sg-health-total > b, .sg-health-done > b { font-weight: var(--sg-heading-weight); color: var(--sg-text); }
 .sg-health-go { margin-top: auto; padding-top: calc(var(--sg-space-l) + var(--sg-space-xs)); border-top: var(--sg-line); }   /* the same space above its words as the card leaves below them */   /* the card's next step at its foot, under a line */
 .sg-health-anchor { display: inline-flex; align-items: center; gap: var(--sg-space-xs); margin: 0; padding: 0; border: 0; background: none; color: var(--sg-text); font: inherit; font-size: var(--sg-m); cursor: pointer; }   /* a link down to the table: its words and an arrow pointing down */
 .sg-health-anchor > svg { width: var(--sg-mark); height: var(--sg-mark); transition: transform var(--sg-fast); }
 .sg-health-anchor:hover { text-decoration: underline; text-underline-offset: 3px; }
 .sg-health-anchor:hover > svg { transform: translateY(var(--sg-space-xxs)); }
 .sg-health-anchor:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; }
-.sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) calc(var(--sg-card-gap) - var(--sg-space-s) - var(--sg-space-xs)); font-size: var(--sg-s); color: var(--sg-text-2); }   /* 20px between items on an 8px system */
+.sg-health-legend { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-space-xs) var(--sg-space-m); font-size: var(--sg-s); color: var(--sg-text-2); }   /* what is left, side by side on one line */
+.sg-health-legend .pg-par-status { gap: calc(var(--sg-space-xxs) * 2.5); white-space: nowrap; }   /* the dot, its words and the count of components 5px apart */
 .sg-health-bar + .sg-health-legend { margin-top: calc(-1 * var(--sg-space-s)); }   /* the legend 8px closer to its bar */
 .sg-health-legend .pg-par-status { font-weight: var(--sg-text-weight); color: var(--sg-text-2); }
-.sg-health-lead { color: var(--sg-muted); }   /* what the legend counts (Components), quieter than its counts */
 .sg-health-bar > span + span { background: var(--sg-a5); }
 .sg-health-bar > span + span + span { background: repeating-linear-gradient(135deg, var(--sg-a5) 0 2px, transparent 2px 4px); }
 .sg-health-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--sg-space-m); }
