@@ -902,6 +902,8 @@ Two lines are never crossed. What is certain is written as final and what is jud
 
 A component's role in the intent layer follows the same line: written as final when its code renders an element that has one (`<button>` is a button), drafted from what the component does when it renders a plain `div` or `span`, and only ever one of the ARIA roles.
 
+A part your team does not want drafted for now is named in `intentLayer.noDrafts` in `ds-config.json` (`["role"]`, by the name your pages head it with). A page that has the part keeps it. Only the drafting stops, until you take it off the list. A draft already waiting is known by what it says too, so a "Role: button" kept under Rules is never offered a second time.
+
 What each list holds (a page's Data lines) is the engine's own, written from the code:
 
 - **It follows the code.** When the code changes what a list's items hold, the old line comes out and the code's new one goes in, as final, in the Markdown spec and the DSDS page alike. It is never drafted for a person.

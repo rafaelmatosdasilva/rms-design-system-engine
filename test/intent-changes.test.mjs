@@ -270,6 +270,16 @@ test('a page with drafts waiting for review still gets drafted the parts it lack
   assert.deepEqual(it.need, ['whenNotToUse', 'mistakes', 'example', 'role', 'doDont'], 'what waits is not asked again; the rest is');
 });
 
+test('a draft is known by what it says too: a "Role: button" waiting under Rules is a role waiting, never drafted twice', () => {
+  const e = { kind: 'component', layer: 'components', name: 'Tile One', id: 'component-tile-one', file: 'specs/dsds/tile-one.dsds.json', code: 'src/tiles/TileOne.vue', purpose: ['A tile.'], whenToUse: [], whenNotToUse: [], mistakes: [], limitations: [], rules: [], sections: [], drafts: [{ where: 'Rules', text: 'Role: button' }, { where: 'Rules', text: 'Limitations: none known' }, { where: 'Rules', text: 'Keep it short' }] };
+  const snap = { _source: {}, entities: [e] };
+  const report = useReport(snap, new Map([['tileOne', e]]), { names: ['tileOne'], wrongOf: () => [] });
+  const [it] = planOf(snap, report);
+  assert.ok(!it.need.includes('role'), 'the role waits under Rules');
+  assert.ok(!it.need.includes('limitations'), 'so do its limitations, led by their part\'s name');
+  assert.ok(it.need.includes('whenToUse'), 'a draft that names no part covers none');
+});
+
 test('a large change goes as several commits, each made on the one before, and stops when someone else committed between', async () => {
   const { commitToBranch } = await import('../lib/intent-changes.mjs');
   const files = new Map(Array.from({ length: 90 }, (_, i) => [`specs/page-${i}.md`, 'x'.repeat(100)]));
@@ -440,4 +450,11 @@ test('a DSDS layer whose code\'s item fields changed: the engine\'s Data line is
   const first = p.summary.split('\n')[0];
   assert.match(first, /^1 page changed: 0 lines written on every page alike taken out, 0 sentences the system contradicts written again as drafts, 1 line drafted, 1 line the code no longer says taken out\.$/);
   assert.match(p.summary, new RegExp(`- Written from the code, Data: "${now.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\n- Taken out, the code no longer says it: "${old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+});
+
+test('the parts a project asks not to be drafted are never drafted, by the name its pages give them or the engine\'s key', async () => {
+  const { noDraftsOf } = await import('../lib/intent-changes.mjs');
+  assert.deepEqual([...noDraftsOf({ intentLayer: { noDrafts: ['Role', "Do and don't", 'limitations', 'banana'] } })].sort(), ['doDont', 'limitations', 'role']);
+  assert.deepEqual([...noDraftsOf({ intentLayer: 'https://git.example.test/x' })], [], 'a layer given as a link alone asks nothing');
+  assert.deepEqual([...noDraftsOf({})], []);
 });
