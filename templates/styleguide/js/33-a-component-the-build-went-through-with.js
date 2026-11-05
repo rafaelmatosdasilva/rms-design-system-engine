@@ -350,7 +350,7 @@
         var f = a[0] === 'motion' ? motionOpen(c) : null;
         if (f && f.todo) return { v: a[0], label: a[1], state: { cls: 'differs', say: f.say } };
         return { v: a[0], label: a[1], state: f && motionIssueRows(c).length ? { cls: 'match', say: 'Match' } : null };
-      })) + '</div></div>' +
+      }).map(function (o) { if (EARLY_AREAS[o.v]) o.early = true; return o; })) + '</div></div>' +
       // Playground: the component drawn, its controls, the tokens behind what is drawn and its code.
       '<div class="pg-area" data-area="play">' +
       '<div class="pg-stage"><div class="pg-preview-card' + (isBig(c) ? ' pg-preview-card--tall' : '') + '"><div class="pg-preview-col"><div class="pg-stage-bar pg-stage-bar--top"><div class="pg-stage-mode"></div><div class="pg-stage-tools"></div></div><div class="pg-preview"></div><div class="pg-frame" hidden></div><div class="pg-anatomy" hidden></div><div class="pg-stage-bar pg-stage-bar--bottom"><div class="pg-actions"></div><p class="pg-anat-line" hidden></p><div class="pg-stage-mode"></div></div><div class="pg-panel-grip" role="separator" aria-orientation="vertical" aria-label="Controls width" tabindex="0" title="Drag to resize the controls. Double-click to reset."></div></div><div class="pg-panel">' +
